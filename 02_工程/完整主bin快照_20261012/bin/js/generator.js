@@ -11249,14 +11249,142 @@ AntSolver.Generator = (function() {
     // 守恒校验
     var sum = 0;
     for (var bi = 0; bi < boxes.length; bi++) sum += boxes[bi].count;
-    if (sum !== total) return null;
+    var _totalPx = total;
+    if (sum !== total) { blocks._lbStat = { n: boxes.length, sum: sum, total: total, fail: 'sum' }; return null; }
     // 按到期排序 → elimSeq
     boxes.sort(function (a, b) { return a._due - b._due; });
     for (var bj = 0; bj < boxes.length; bj++) { boxes[bj].elimSeq = bj; boxes[bj].due = boxes[bj]._due; delete boxes[bj]._due; }
     return boxes;
   }
 
+  /* ==================== 【v347·用户裁决】按「依赖层 × 色块」切车 ====================
+   * 与 layerCut2 的区别：
+   *   layerCut2 = 每层每「颜色」切（同色跨块的像素被当成一个整体）
+   *   layerBlock = 每层每「同色连通块」切（块是自然单元），再按到期把相邻单元合并到目标车数
+   * 容量不是切出来的，是「合并出来的」：先有自然块，再把到期的块并成一辆车。
+   * 目标车数 = 盘格范围中值 × 0.86（不读用户容量输入）。
+   * 守恒校验：Σ车容量 = 彩色像素，不通过返回 null 落回默认切法。 */
+  function onionLayerMap(blocks) {
+    var rows = blocks.length, cols = blocks[0].length;
+    var layerOf = [], removed = [];
+    for (var r = 0; r < rows; r++) {
+      var a = [], b = [];
+      for (var c = 0; c < cols; c++) { a.push(-1); b.push(false); }
+      layerOf.push(a); removed.push(b);
+    }
+    var total = 0;
+    for (var r1 = 0; r1 < rows; r1++) for (var c1 = 0; c1 < cols; c1++) if (blocks[r1][c1] > 0) total++;
+    var done = 0, li = 0, DIRS = [[1,0],[-1,0],[0,1],[0,-1]], pxByLayer = [];
+    while (done < total && li < 200) {
+      var exp = [];
+      for (var r2 = 0; r2 < rows; r2++) for (var c2 = 0; c2 < cols; c2++) {
+        if (blocks[r2][c2] <= 0 || removed[r2][c2]) continue;
+        if (r2 === 0 || r2 === rows-1 || c2 === 0 || c2 === cols-1) { exp.push([r2, c2]); continue; }
+        for (var d0 = 0; d0 < 4; d0++) {
+          var nr = r2 + DIRS[d0][0], nc = c2 + DIRS[d0][1];
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && removed[nr][nc]) { exp.push([r2, c2]); break; }
+        }
+      }
+      if (!exp.length) break;
+      var n = 0;
+      for (var e0 = 0; e0 < exp.length; e0++) {
+        var er = exp[e0][0], ec = exp[e0][1];
+        if (removed[er][ec]) continue;
+        var col = blocks[er][ec], stack = [[er, ec]];
+        removed[er][ec] = true; layerOf[er][ec] = li;
+        while (stack.length) {
+          var cur = stack.pop(), x = cur[0], y = cur[1]; n++;
+          for (var d1 = 0; d1 < 4; d1++) {
+            var nx = x + DIRS[d1][0], ny = y + DIRS[d1][1];
+            if (nx >= 0 && nx < rows && ny >= 0 && ny < cols && !removed[nx][ny] && blocks[nx][ny] === col) {
+              removed[nx][ny] = true; layerOf[nx][ny] = li; stack.push([nx, ny]);
+            }
+          }
+        }
+      }
+      pxByLayer.push(n); done += n; li++;
+    }
+    return { layerOf: layerOf, pxByLayer: pxByLayer, total: total, rows: rows, cols: cols };
+  }
+
+  function layerBlockCut(blocks, config) {
+    var map = onionLayerMap(blocks);
+    var rows = map.rows, cols = map.cols, total = map.total;
+    if (!total) return null;
+    var layerOf = map.layerOf, pxByLayer = map.pxByLayer;
+    var DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+    // 目标车数：盘格范围中值 × 0.86（不读用户容量输入）
+    var rMin = parseInt(config.boardRowsMin, 10) || 4, rMax = parseInt(config.boardRowsMax, 10) || 7;
+    var cMin = parseInt(config.boardColsMin, 10) || 6, cMax = parseInt(config.boardColsMax, 10) || 9;
+    var targetCars = Math.max(8, Math.round(((rMin + rMax) / 2) * ((cMin + cMax) / 2) * 0.86));
+    // 每层内找「同色连通块」= 自然单元
+    var units = [], cumBefore = [0];
+    for (var pb = 0; pb < pxByLayer.length; pb++) cumBefore.push(cumBefore[cumBefore.length-1] + pxByLayer[pb]);
+    var seen = [];
+    for (var sr = 0; sr < rows; sr++) { var rowSeen = []; for (var sc = 0; sc < cols; sc++) rowSeen.push(false); seen.push(rowSeen); }
+    for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) {
+      if (blocks[r3][c3] <= 0 || seen[r3][c3]) continue;
+      var L = layerOf[r3][c3], colr = blocks[r3][c3];
+      var stack2 = [[r3, c3]], px = 0, cellsList = [];
+      seen[r3][c3] = true;
+      while (stack2.length) {
+        var cc2 = stack2.pop(), x2 = cc2[0], y2 = cc2[1]; px++; cellsList.push([x2, y2]);
+        for (var d2 = 0; d2 < 4; d2++) {
+          var nx2 = x2 + DIRS[d2][0], ny2 = y2 + DIRS[d2][1];
+          if (nx2 >= 0 && nx2 < rows && ny2 >= 0 && ny2 < cols && !seen[nx2][ny2] &&
+              blocks[nx2][ny2] === colr && layerOf[nx2][ny2] === L) {
+            seen[nx2][ny2] = true; stack2.push([nx2, ny2]);
+          }
+        }
+      }
+      units.push({ color: colr, layer: L, px: px, due: (cumBefore[L] + px) / total, cells: cellsList });
+    }
+    // 【v347·修正】按色分配车数：每色车数 = 目标总车数 × 该色像素占比；
+    //   色内把所有层的单元按到期升序、按像素累积切成 n 辆（容量由累积结果决定，不是切出来的）。
+    var byColor = {};
+    for (var ui2 = 0; ui2 < units.length; ui2++) {
+      var u2 = units[ui2];
+      (byColor[u2.color] = byColor[u2.color] || []).push(u2);
+    }
+    var boxes = [];
+    for (var colKey in byColor) {
+      var list = byColor[colKey].slice().sort(function (a, b) { return a.due - b.due; });
+      var pxSum = 0;
+      for (var ls = 0; ls < list.length; ls++) pxSum += list[ls].px;
+      var nCar = Math.max(1, Math.round(targetCars * pxSum / total));
+      if (nCar > list.length) nCar = list.length;
+      var perCar = pxSum / nCar;
+      var acc = 0, accDue = 0, made = 0;
+      for (var lm = 0; lm < list.length; lm++) {
+        acc += list[lm].px; accDue = list[lm].due;
+        var remainingUnits = list.length - lm - 1;
+        var needCars = nCar - made - 1;
+        // 达到均值，或剩余单元数刚好等于剩余车数 → 封箱
+        if ((acc >= perCar - 1e-6 && made < nCar - 1) || (remainingUnits === needCars && made < nCar - 1)) {
+          boxes.push({ color: +colKey, count: acc, due: accDue });
+          acc = 0; made++;
+        }
+      }
+      if (acc > 0) boxes.push({ color: +colKey, count: acc, due: accDue });
+    }
+    var sum = 0;
+    for (var bi2 = 0; bi2 < boxes.length; bi2++) sum += boxes[bi2].count;
+    if (sum !== total) { blocks._lbStat = { n: boxes.length, sum: sum, total: total, fail: 'sum' }; return null; }
+    boxes.sort(function (a, b) { return a.due - b.due; });
+    for (var bj2 = 0; bj2 < boxes.length; bj2++) { boxes[bj2].elimSeq = bj2; }
+    return boxes;
+  }
+
   function pickBoxSplit(blocks, config) {
+    // 【v347·用户裁决】按「依赖层 × 色块」切车：先有自然块，再合并到目标车数
+    if (config && config.cutMode === 'layerBlock') {
+      try {
+        var _lb = layerBlockCut(blocks, config);
+        var _sum = 0; if (_lb) for (var _li = 0; _li < _lb.length; _li++) _sum += _lb[_li].count;
+        blocks._lbStat = { n: _lb ? _lb.length : 0, sum: _sum };
+        if (_lb && _lb.length) return _lb;
+      } catch (e) { blocks._lbErr = String(e && e.message); }
+    }
     // 【v342·实验】层切：按依赖层切车 + 按到期排序（失败自动落回默认切法）
     if (config && config.cutMode === 'layerCut2') {
       try {
