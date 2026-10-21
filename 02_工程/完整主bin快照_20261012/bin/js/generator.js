@@ -11747,37 +11747,54 @@ AntSolver.Generator = (function() {
     }
     var colors = Object.keys(firstRound).map(Number).sort(function (a, b) { return firstRound[a] - firstRound[b]; });
 
-    var pctLo = (config.exposeCapPctLo != null) ? +config.exposeCapPctLo : 1.5;
-    var pctHi = (config.exposeCapPctHi != null) ? +config.exposeCapPctHi : 3.5;
-    if (!(pctHi > pctLo)) pctHi = pctLo;
+    // 【v351·用户裁决】上限 = 界面上的「球容量」参数（config.boxSizeMax，默认 60）；
+    //   每辆车在【上限 − 浮动, 上限】之间取值，浮动幅度由用户自己设（config.capJitter，默认 5）。
+    //   用户原话："按求解器上的固定容量的参数作为上限，同时有浮动（我自己设）"。
+    var capBase = Math.max(1, parseInt(config.boxSizeMax, 10) || 60);
+    var jitter = Math.max(0, parseInt(config.capJitter, 10));
+    if (isNaN(jitter)) jitter = 5;
     var minCap = Math.max(1, parseInt(config.exposeCapMin, 10) || 8);
     var mergeBelow = Math.max(1, parseInt(config.exposeMergeBelow, 10) || 12);
 
     function pickCap() {
-      var pct = pctLo + rnd() * (pctHi - pctLo);
-      return Math.max(minCap, Math.round(total * pct / 100));
+      var lo = Math.max(minCap, capBase - jitter);
+      if (lo >= capBase) return capBase;
+      return lo + Math.floor(rnd() * (capBase - lo + 1));   // [capBase-jitter, capBase]
     }
 
-    var groups = [];
+    // 【v351·用户裁决】每色车数 = ceil(该色总量 / 上限)，然后【平均分配】。
+    //   这样每辆都贴着上限、且严格不超过它。
+    //   ⚠ 数学上的硬约束：车数 = Σ ceil(T_c / C)。006（C=31）算出来是 46 辆 → 6×8 盘。
+    //     历史 119 关的中位是 42 辆 / 6×7，但它们的单车最大到 76px —— 也就是说
+    //     历史合格关卡本身允许个别车超上限。想要 6×7 且不超上限，两者不可兼得。
+    var boxes = [];
     for (var ci = 0; ci < colors.length; ci++) {
       var col = colors[ci], g = byRound[col] || {};
       var rounds = Object.keys(g).map(Number).sort(function (a, b) { return a - b; });
-      var cur = null;
-      for (var ri = 0; ri < rounds.length; ri++) {
-        var rd = rounds[ri], px = g[rd];
-        if (cur && px < mergeBelow) { cur.px += px; cur.rounds.push(rd); }
-        else { cur = { color: col, px: px, rounds: [rd] }; groups.push(cur); }
-      }
-    }
-
-    var boxes = [];
-    for (var gi = 0; gi < groups.length; gi++) {
-      var gr = groups[gi], rest = gr.px;
-      while (rest > 0) {
-        var cap = pickCap();
-        var take = Math.min(cap, rest);
-        boxes.push({ color: gr.color, count: take, exposeRound: gr.rounds[0] });
-        rest -= take;
+      var cTot = 0;
+      for (var ri0 = 0; ri0 < rounds.length; ri0++) cTot += g[rounds[ri0]];
+      if (cTot <= 0) continue;
+      var firstRd = rounds.length ? rounds[0] : 0;
+      if (cTot <= capBase) { boxes.push({ color: col, count: cTot, exposeRound: firstRd }); continue; }
+      var nCar = Math.ceil(cTot / capBase);
+      if (nCar < 1) nCar = 1;
+      // 平均分配 + ±jitter/2 的随机浮动（用户："不想让大色块都等于容量上限，5px 以内浮动"）
+      //   逐辆取 min(剩余/剩余车数 + 抖动, 上限)，并夹在"给后面留得下"的区间里，保证总数守恒且不超上限。
+      var rest = cTot;
+      for (var k = 0; k < nCar; k++) {
+        var left = nCar - k;
+        if (left === 1) { boxes.push({ color: col, count: rest, exposeRound: firstRd }); rest = 0; break; }
+        var avg = Math.round(rest / left);
+        var jit = Math.round((rnd() * 2 - 1) * (jitter / 2));
+        var cc = avg + jit;
+        if (cc > capBase) cc = capBase;
+        var maxAllowed = rest - (left - 1);              // 后面每辆至少 1
+        var minAllowed = rest - (left - 1) * capBase;    // 后面每辆最多 capBase
+        if (cc > maxAllowed) cc = maxAllowed;
+        if (cc < minAllowed) cc = minAllowed;
+        if (cc < 1) cc = 1;
+        boxes.push({ color: col, count: cc, exposeRound: firstRd });
+        rest -= cc;
       }
     }
     return boxes;

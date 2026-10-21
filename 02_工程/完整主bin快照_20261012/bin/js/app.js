@@ -1995,8 +1995,13 @@ AntSolver.App = (function() {
       // 【v342·实验】层切：按依赖层 × 颜色切车，并按「到期」排序
       cutMode: (document.getElementById('gen-cutmode') || {}).value || undefined,
       // 【v350·用户裁决】暴露顺序模式：车单按目标图暴露顺序排 + 行优先摆盘（越早暴露的越靠上）。
-      //   实测 006：路径序+固定容量 0/8 通关 → 暴露序+2.5%±1%浮动容量 8/8 通关、顺序匹配 100%。
-      boardLayout: ((document.getElementById('gen-cutmode') || {}).value === 'exposeCut') ? 'rowMajor' : undefined
+      boardLayout: ((document.getElementById('gen-cutmode') || {}).value === 'exposeCut') ? 'rowMajor' : undefined,
+      // 【v351·用户裁决】容量浮动：每辆车在【boxSizeMax − capJitter, boxSizeMax】之间取值。
+      //   "按求解器上的固定容量的参数作为上限，同时有浮动（我自己设）"
+      capJitter: (function () {
+        var v = parseInt((document.getElementById('gen-capjitter') || {}).value, 10);
+        return isNaN(v) ? 5 : Math.max(0, Math.min(30, v));
+      })()
       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
     };
   }
@@ -4699,7 +4704,12 @@ AntSolver.App = (function() {
       debtCarCap: _debtCap,                 // 【v221】债车目标容量（由自适应均值推出）
       cutMode: _cutMode,                    // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
       // 【v350·用户裁决】选 exposeCut 时同步打开行优先摆盘（车单顺序 = 棋盘自上而下）。
-      boardLayout: (_cutMode === 'exposeCut') ? 'rowMajor' : undefined
+      boardLayout: (_cutMode === 'exposeCut') ? 'rowMajor' : undefined,
+      // 【v351·用户裁决】容量浮动幅度（界面自己设）
+      capJitter: (function () {
+        var v = parseInt((document.getElementById('gen-capjitter') || {}).value, 10);
+        return isNaN(v) ? 5 : Math.max(0, Math.min(30, v));
+      })()
     });
     try {
       genLog('棋盘：行 ' + _norm.rowsMin + '~' + _norm.rowsMax + ' · 列 ' + _norm.colsMin + '~' + _norm.colsMax +
