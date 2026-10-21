@@ -607,6 +607,10 @@ AntSolver.Generator = (function() {
 
   function generateFromBlocks(blocks, config) {
     config = Object.assign({}, DEFAULT_CONFIG, config || {});
+    // 【v344·修】generateFromBlocks 原来不设 seed（只有 produce/produceFixed 设），
+    //   导致任何直接调用它的验证脚本 seed 全是废的、结果不可复现。
+    //   加 _seedOnce 开关：验证脚本显式传 true 才重置，避免影响 produce 内部重试的多样性。
+    if (config.seed != null && config._seedOnce) seedRng(config.seed);
     GENPERF.generateCalls++;                       // 埋点：generateFromBlocks 调用次数(基础候选 + 压力调整重生成)
     var rows = blocks.length, cols = blocks[0].length;
     var deadlineAt = config._deadlineAt || 0;
@@ -1098,16 +1102,6 @@ AntSolver.Generator = (function() {
         }
       }
       list = list.slice(fi);   // 空位+管道各首遍1个后仍剩的盒 → 第二遍均匀填管道(下方)
-      // 【v343·G1】按「到期」加冰：越晚到期的车冰越久，让它到该点的时候才化开
-      var _ibd = (typeof config.iceByDue === 'number') ? config.iceByDue : 0;
-      if (_ibd > 0) {
-        for (var _ir = 0; _ir < rows; _ir++) for (var _ic = 0; _ic < cols; _ic++) {
-          var _icell = cells[_ir][_ic];
-          if (!_icell || _icell.t !== 'box' || _icell._due == null) continue;
-          var _in = Math.round(Math.max(0, _icell._due - 0.25) * 12 * _ibd);
-          if (_in > 0) _icell.numice = Math.max(1, Math.min(12, _in));
-        }
-      }
       // 注：基础阶段不做任何换球/换位扰动(v86 起)——保持纯粹的消除顺序铺盒；换球只在【卡点B支】(chokeSwap)定向执行。
     } else {
       // ===== 旧：交错随机铺盒（对齐 bin 毛线 generateBaseElements）=====
@@ -13336,6 +13330,9 @@ AntSolver.Generator = (function() {
       var _best = null, _bestT = null, _tried = 0, _passes = 0;
       for (var _pi = 0; _pi < _pk; _pi++) {
         var _cfg = Object.assign({}, config, { portfolioK: 1 });
+        // 【v344】轮换切法：奇数轮尝试按依赖层切车（layerCut2），由 portfolioBetter 按覆盖率择优。
+        //   用户手动指定 cutMode 时不轮换（尊重用户）；_pk=1 时也不轮换（没有可比对象）。
+        if (!config.cutMode && _pk > 1 && (_pi % 2 === 1)) _cfg.cutMode = 'layerCut2';
         // 【v234】棋盘自动选择：每次尝试换一个棋盘尺寸（由 config.boardTryDims 给出）
         if (config && config.boardTryDims && config.boardTryDims.length) {
           var _bd = config.boardTryDims[_pi % config.boardTryDims.length];

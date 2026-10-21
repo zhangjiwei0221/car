@@ -25,7 +25,7 @@ function band3(res){
   return {band3: tot?Math.round(ge/tot*100):null, peak:pk};
 }
 function run(cfg, i){
-  const c = Object.assign({}, cfg0, cfg, { seed: 1000 + i });
+  const c = Object.assign({}, cfg0, cfg, { seed: 1000 + i, _seedOnce: true });
   let out=null;
   try { out = G.generateFromBlocks(blocks, c); } catch(e){ return {err:String(e&&e.message)}; }
   if(!out || !out.solveResult) return {err:'no solve'};
