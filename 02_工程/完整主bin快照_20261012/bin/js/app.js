@@ -1983,7 +1983,11 @@ AntSolver.App = (function() {
       easyRatioPercent: (function () { var v = parseInt((document.getElementById('gen-easy-ratio') || {}).value); return isNaN(v) ? 30 : Math.max(0, Math.min(100, v)); })(),
       // 多轮难度标定轮次(任务 ANT-DIFF-MULTIROUND-PROD-20260901)：最终选中关卡按 N 轮玩家路线取最稳标定难度。
       //   缺控件时不写(=undefined)，由 generator DEFAULT_CONFIG 填默认 7；填 1 = 回到旧单轮。
-      difficultyRounds: (function () { var v = parseInt((document.getElementById('gen-difficulty-rounds') || {}).value, 10); return isNaN(v) ? undefined : Math.max(1, Math.min(25, v)); })()
+      difficultyRounds: (function () { var v = parseInt((document.getElementById('gen-difficulty-rounds') || {}).value, 10); return isNaN(v) ? undefined : Math.max(1, Math.min(25, v)); })(),
+      // 【v341·实验】通道模式：第 0 行只留一个入口，第 1 行从入口右侧封 k 格
+      channelMode: !!(document.getElementById('gen-channel') || {}).checked,
+      channelEntryCol: parseInt((document.getElementById('gen-channel-col') || {}).value, 10) || 0,
+      channelK: parseInt((document.getElementById('gen-channel-k') || {}).value, 10) || 0
       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
     };
   }
