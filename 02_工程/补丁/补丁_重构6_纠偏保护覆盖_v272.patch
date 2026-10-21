@@ -1,0 +1,67 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -11010,8 +11010,14 @@
+         return (v < slo) ? (slo - v) / 20 : (v > shi ? (v - shi) / 20 : 0);
+       }
+       var c0 = d0 + dSteady(gv.steadyWonPct), c2 = d2 + dSteady(alt.goodV3.steadyWonPct);
++      // 【v272】纠偏重产的关**不走 portfolio 的结构组合**，所以覆盖率天然偏低；
++      //   原来只要"离带更近"就替换，实测会把 cov=48% 的关换成 cov=18% 的。
++      //   现在同违规条数时先比覆盖率，覆盖不掉才比带距。
++      var b0 = (gv.persist && gv.persist.band3Pct != null) ? gv.persist.band3Pct : -1;
++      var b2 = (alt.goodV3.persist && alt.goodV3.persist.band3Pct != null) ? alt.goodV3.persist.band3Pct : -1;
+       var better = false;
+       if (f2 !== f0) better = (f2 < f0);
++      else if (b2 !== b0) better = (b2 > b0);
+       else if (Math.abs(c2 - c0) > 0.05) better = (c2 < c0);
+       else better = ((alt.goodV3.steadyWonPct || 0) > (gv.steadyWonPct || 0));
+       if (better) { alt.bandFix = { from: p, to: p2, ice: ni, failsFrom: f0, failsTo: f2 }; return alt; }
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=271">
++  <link rel="stylesheet" href="css/style.css?v=272">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=271"></script>
+-  <script src="js/utils.js?v=271"></script>
++  <script src="js/zip.js?v=272"></script>
++  <script src="js/utils.js?v=272"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=271"></script>
+-  <script src="js/simulator.js?v=271"></script>
++  <script src="js/color-libs.js?v=272"></script>
++  <script src="js/simulator.js?v=272"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=271"></script>
+-  <script src="js/solver-strategy.js?v=271"></script>
+-  <script src="js/solver.js?v=271"></script>
+-  <script src="js/playersim.js?v=271"></script>
+-  <script src="js/generator.js?v=271"></script>
+-  <script src="js/analysis.js?v=271"></script>
++  <script src="js/anchor-cut.js?v=272"></script>
++  <script src="js/solver-strategy.js?v=272"></script>
++  <script src="js/solver.js?v=272"></script>
++  <script src="js/playersim.js?v=272"></script>
++  <script src="js/generator.js?v=272"></script>
++  <script src="js/analysis.js?v=272"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=271"></script>
+-  <script src="js/app.js?v=271"></script>
++  <script src="js/level-editor.js?v=272"></script>
++  <script src="js/app.js?v=272"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

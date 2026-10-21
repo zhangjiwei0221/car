@@ -1,0 +1,1724 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3205,6 +3205,74 @@
+    * 单次候选尝试：结构候选 → 结构检查 → 填球 → 障碍绑定 → 守恒 → 1+3 求解筛选。
+    * @returns {object} { ok, reason, timing, ... }
+    */
++  /**
++   * 【v153】债务节拍 → 道具落位（config.beatProps 驱动）
++   *
++   * 背景（用户 2026-10-15/16 定下的模型）：压力来自"取了一辆颜色还没露脸的车 → 全额进暂存"。
++   *   节拍 = 「在进度 p 附近，让玩家面对这样一辆债车」。落位职责是把这辆债车的**可见性与时机**固定下来：
++   *     · ice(k)：给债车挂数字冰 = k → 它要等玩家再取 k 个球才进菜单（延迟到指定时点）
++   *     · chain  ：把债车与**相邻**的另一色车绑成一组（与实机一致：锁链是相邻两辆）→ 取债车必须同时背两笔债
++   *     · 管道   ：由结构层的配额决定（本函数不碰管道，避免与守恒/配额打架）
++   *   只改 cells 上的 numice / chain 两个字段，**不改盒数与容量** → 守恒不受影响；
++   *   改完由调用方继续跑结构性卡死检验与求解，破坏可解性的候选照旧淘汰。
++   */
++  function applyBeatProps(board, config) {
++    var props = (config && config.beatProps) || null;
++    if (!props || !props.length) return null;
++    var rows = board.rows, cols = board.cols, marks = [], applied = 0;
++    var late = {};
++    for (var q = 0; q < props.length; q++) if (props[q].debtColor) late[props[q].debtColor] = 1;
++    function boxesOf(color) {
++      var out = [];
++      for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++        var x = board.cells[r][c];
++        if (x && x.t === 'box' && x.color === color) out.push({ r: r, c: c, cell: x });
++      }
++      out.sort(function (a, b) { return a.r - b.r || a.c - b.c; });   // 行号小 = 早进菜单
++      return out;
++    }
++    function maxChainId() {
++      var mx = 0;
++      for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++        var x = board.cells[r][c];
++        if (x && x.chain > mx) mx = x.chain;
++      }
++      return mx;
++    }
++    var nextGid = maxChainId() + 1;
++    for (var i = 0; i < props.length; i++) {
++      var p = props[i], mine = boxesOf(p.debtColor);
++      if (!mine.length) { marks.push({ kind: p.kind, ok: false, why: '棋盘上没有 ' + p.debtColor + ' 号色的盒子' }); continue; }
++      var debt = mine[i % Math.min(mine.length, 2)];       // 节拍分散到不同辆车
++      if (p.kind === 'ice') {
++        if (debt.cell.numice > 0) { marks.push({ kind: 'ice', ok: false, why: '该格已有冰' }); continue; }
++        debt.cell.numice = Math.max(2, parseInt(p.steps, 10) || 6);
++        marks.push({ kind: 'ice', ok: true, at: [debt.r, debt.c], color: p.debtColor, steps: debt.cell.numice });
++        applied++;
++        continue;
++      }
++      if (p.kind === 'chain') {
++        if (debt.cell.chain) { marks.push({ kind: 'chain', ok: false, why: '债车已在链里' }); continue; }
++        var D4 = [[-1, 0], [1, 0], [0, -1], [0, 1]], partner = null;
++        for (var d = 0; d < 4 && !partner; d++) {
++          var nr = debt.r + D4[d][0], nc = debt.c + D4[d][1];
++          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
++          var nb = board.cells[nr][nc];
++          if (!nb || nb.t !== 'box' || nb.chain || late[nb.color]) continue;   // 优先"早露脸色"的邻居；不绑另一个债色
++          partner = { r: nr, c: nc, cell: nb };
++        }
++        if (!partner) { marks.push({ kind: 'chain', ok: false, why: '债车四邻没有可绑的早色车' }); continue; }
++        debt.cell.chain = nextGid; partner.cell.chain = nextGid; nextGid++;
++        marks.push({ kind: 'chain', ok: true, cells: [[debt.r, debt.c], [partner.r, partner.c]],
++                     colors: [p.debtColor, partner.cell.color] });
++        applied++;
++        continue;
++      }
++      marks.push({ kind: p.kind, ok: false, why: '未实现的节拍道具种类' });
++    }
++    return { applied: applied, marks: marks, want: props.length };
++  }
++
+   function buildOneCandidateAttempt(blocks, config, opts) {
+     opts = opts || {};
+     var timing = newCandidateTiming();
+@@ -3257,6 +3325,13 @@
+     // 以及 fallback* 标记。兜底是行为变更，必须可观测——否则"管道为什么只有 2 条"无从追溯。
+     board.pipeStat = struct.pipeStat || null;
+ 
++    // ③b 【v153】债务节拍落位：把"债车"的可见性/时机用冰或链固定下来（只挂 numice/chain，不动盒与容量）
++    try {
++      // 只在真的落了位时才挂诊断字段 —— 不落位时保持关卡本体与改动前【逐字节一致】（v149 口径不变测试就吃这个）
++      var beatStat = applyBeatProps(board, config);
++      if (beatStat) board.beatStat = beatStat;
++    } catch (e) { board.beatStat = { applied: 0, error: String(e && e.message || e) }; }
++
+     // ④ 结构性卡死检验（带球后的完整检查）
+     var tSdc = Date.now();
+     var sdc = structuralDeadlockCheck(board);
+@@ -3558,6 +3633,19 @@
+    * 纠偏版生产总入口（对应旧 produce）。K 候选 × B 分支 × N 轮，合格即停，超时兜底。
+    * 与旧版差异仅在候选生成与筛选路径；合格门、审核、难度、兜底口径完全复用同一套函数。
+    */
++  // ==================== 【v153】单关进度钩子（供界面显示"这一关跑到哪了"）====================
++  //   为什么用【模块级钩子】而不是 config 字段：config 要经 postMessage 结构化克隆，函数传不过去。
++  //   worker 与主线程各自注册一次；produceFixed 里在每个候选/变体结束后上报（节流 400ms）。
++  var PROGRESS_HOOK = null, PROGRESS_T0 = 0, PROGRESS_LAST = 0;
++  function setProgressHook(fn) { PROGRESS_HOOK = (typeof fn === 'function') ? fn : null; }
++  function reportProgress(o) {
++    if (!PROGRESS_HOOK) return;
++    var now = Date.now();
++    if (now - PROGRESS_LAST < 400) return;
++    PROGRESS_LAST = now;
++    try { PROGRESS_HOOK(Object.assign({ elapsedMs: PROGRESS_T0 ? (now - PROGRESS_T0) : 0 }, o)); } catch (e) {}
++  }
++
+   function produceFixed(blocks, config, opts) {
+     config = Object.assign({}, DEFAULT_CONFIG, config || {});
+     opts = opts || {};
+@@ -3568,6 +3656,7 @@
+     var requireHard = !!config.requireHardPass;
+     setCurveScore(!!config.curveScore);   // 【v151】曲线评分开关（默认关；见 CURVE_SCORE_ON 注释）
+     var t0 = Date.now(), timedOut = false;
++    PROGRESS_T0 = t0; PROGRESS_LAST = 0;      // 【v153】进度计时基准（每个 produce 重置）
+     // 【仅底部入口】生产前门：源图在底部规则下若有永久不可达像素，直接判"结构不适配"，
+     //   不进入候选生成，也不消耗时间预算——避免把源图问题误报成生成器超时(原需求 §四)。
+     // 瞬时连锁模式固定四方向，不存在「只与顶/左/右背景连通的空腔永远打不通」这个底部专有风险，
+@@ -3591,7 +3680,11 @@
+     //   被卡的图直接返回、【不消耗时间预算】、不产出任何关卡结构（绝不造假关）。
+     //   fragmentMaxRate<=0 时整段跳过，行为与本参数引入前完全一致。
+     var fragGate = checkFragmentGate(blocks, config);
+-    if (!fragGate.ok) {
++    // 【v153】碎色闸门**默认降级为提醒**（用户 2026-10-16：「怎么还有这个，我该怎么处理」）。
++    //   依据：碎色是"背债车"的压力素材，不是缺陷 —— 我们实测过小鹿图碎色 26%（超过旧上限 22%）而你认可它是好关；
++    //   旧行为会把这整张图跳过（合格 0 / 不合格 0 / 跳过 1），用户拿到的是"什么都没产出"。
++    //   现在：超上限只记一条警告 + 照常生产；要恢复硬拦请显式设 config.fragmentGateHard = true。
++    if (!fragGate.ok && config.fragmentGateHard === true) {
+       return {
+         level: null, valid: false, flow: 'new_fixed',
+         entryMode: (config.instantChain ? 'fourSideInstantChain' : (config.bottomOnly ? 'bottomOnly' : 'fourSide')),
+@@ -3663,6 +3756,7 @@
+         GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (candPass(c, requireHard) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
+       }
+       var out = finalizeProduce(c, K, evaluated);
++      if (out && fragGate && fragGate.ok === false) out.fragmentWarn = fragGate.detail;   // 【v153】如实带出"碎色超上限但已放行"
+       if (!out) {
+         // 【v137】失败也要带出「为什么全灭」：候选淘汰计数 + 棋盘预检结论（原先只剩「候选全灭：」四个字）。
+         var diag = diagnoseNoCandidate(flowStats, boardFit);
+@@ -3699,6 +3793,8 @@
+       var base = tagAudit(generateFromBlocksFixed(blocks, kCfg, {
+         inputId: opts.inputId || null, candidateId: 'K' + (k + 1), onScreenFail: opts.onScreenFail
+       }));
++      reportProgress({ phase: 'candidate', k: k + 1, K: K, round: 0, N: N, evaluated: evaluated,
++                       tier: (base && base.valid) ? candTier(base) : null });
+       if (base) base.sampledConfig = kCfg._sampled || null;   // 采样值随候选带出，供落库追溯
+       mergeFlowStats(flowStats, base.flowStats);
+       if (!base.valid) continue;
+@@ -3716,6 +3812,7 @@
+             var child = makeChokeVariantFixed(layer[li], blocks, config, round, flowStats);
+             if (!child) continue;
+             consider(child);
++            reportProgress({ phase: 'variant', k: k + 1, K: K, round: round, N: N, evaluated: evaluated, tier: candTier(child) });
+             if (candPass(child, requireHard)) return done(child);
+             next.push(child);
+           }
+@@ -4271,8 +4368,60 @@
+       out[col] = (out[col] || 0) + n;
+     }
+     return out;
++  }
++
++  /**
++   * 【v153】源图体检：开局「暴露」了几种颜色、各多少像素。
++   *
++   * 为什么这个数是第一判据：玩家每一步的可选项 = 【棋盘顶行的车】(第0行恒可取) ∩ 【目标图上当前暴露的颜色】
++   *   —— 一辆车只有在它自己颜色的暴露像素 ≥ 该车容量时才能被吃满（模拟器 canConsumeReach 的同一口径）。
++   * v153 实测（2026-10-15，全部逐条记在 01_交接文档/工作日志_20261012.md 第十七节）：
++   *   · 蚂蚁关卡_1791949636679.txt（596 像素 / 5 色）：开局只暴露 **1 色**（24 号色，140 像素）
++   *     → 开局"能吃满"的选项恒为 1~2，且【改障碍、改棋盘、改容差、改车容量全都改不动】。
++   *   · 004_55像素_004_12种（1786 像素 / 12 色）：开局暴露 **8 色** → 开局选项 6，用户评价"有灵气"。
++   * 也就是说：**这一项是源图属性，不是参数问题** —— 剪影被单一颜色包住的图，开局只能沿唯一路线剥。
++   *
++   * @returns {object|null} { exposedColors, totalColors, exposedPixels, top:{color,px}, detail:[{color,px}] }
++   */
++  function openingExposure(blocks, rows, cols, bottomOnly) {
++    if (!blocks || !blocks.length || !blocks[0]) return null;
++    var R = rows || blocks.length, C = cols || blocks[0].length;
++    if (!(R > 0 && C > 0)) return null;
++    var elim, blob;
++    try { elim = AntSolver.outsideReachSeed(blocks, R, C, !!bottomOnly); } catch (e) { return null; }
++    if (!elim) return null;
++    try { blob = exposedBlobByColor(elim, blocks, R, C); } catch (e) { return null; }
++    var list = [], total = 0, k;
++    for (k in blob) { if (!blob[k]) continue; list.push({ color: +k, px: blob[k] }); total += blob[k]; }
++    list.sort(function (a, b) { return b.px - a.px; });
++    var seen = {}, nColor = 0;
++    for (var r0 = 0; r0 < R; r0++) for (var c0 = 0; c0 < C; c0++) {
++      var v = blocks[r0][c0];
++      if (v > 0 && !seen[v]) { seen[v] = 1; nColor++; }
++    }
++    return {
++      exposedColors: list.length, totalColors: nColor,
++      exposedPixels: total, top: list[0] || null, detail: list
++    };
+   }
+ 
++  /**
++   * 【v153】开局没得选时的如实说明（只在暴露颜色 ≤ 2 时产出文案，否则返回 null）。
++   * 口径故意写"这是源图造成的、调参改不了"，免得用户又去调障碍参数（v151/v152 已经试过一整轮）。
++   */
++  function exposureWarnText(exp) {
++    if (!exp || exp.exposedColors > 2) return null;
++    var top = exp.top;
++    return '这张图【开局只有 ' + exp.exposedColors + ' 种颜色可吃】'
++      + (top ? ('（最多的是 ' + top.color + ' 号色，' + top.px + ' 像素）') : '')
++      + '，整图共 ' + exp.totalColors + ' 色。'
++      + '开局那几辆顶行车里往往只有一两辆的颜色已经露出来 → 前段几乎只能按唯一路线走。'
++      + '这是【目标图剪影】造成的（整张剪影被单一颜色勾边包住，其余颜色在剥掉外圈前一个像素都不暴露），'
++      + '调障碍比例/棋盘大小/可用空间容差都改不了（v153 逐条实测过）。'
++      + '想让开局就出现分支：让轮廓上出现多种颜色（例如把外框拆成几段不同色），'
++      + '或改用轮廓本来就杂的源图（实测那种图开局能暴露 8~9 色）。';
++  }
++
+   /** 曲线火花线（0~8 档）。 */
+   var CURVE_SPARK = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+   // 【v151】曲线评分默认【关】：它只改"同档候选谁胜出"，而实测在用户那张图 + 极难档下
+@@ -4385,10 +4534,26 @@
+     return safe ? 1 : 0;
+   }
+   // 候选 b 是否比当前 best a 更优：先比档次(tierOf)，同档再比 candScore(审核+封锁+玩家表现细分)。
++  /**
++   * 【v153】取「30~80% 区间里的卡点数」（用户 2026-10-16：「只要有卡就行了，
++   *   你要保证在 30%-80% 的区域有卡点」）——同档候选的**首选比较键**。
++   *   口径与日志里的「被迫点(中段 n)」一致：那一步"能吃满的选项 ≤1 且暂存空位 ≤2"。
++   */
++  function midChokeOf(c) {
++    if (!c) return 0;
++    if (c._choiceCurve === undefined) {
++      try { c._choiceCurve = (c.level && c.solveResult) ? choiceCurve(AntSolver.parseLevel(c.level), c.solveResult) : null; }
++      catch (e) { c._choiceCurve = null; }
++    }
++    return (c._choiceCurve && c._choiceCurve.forcedMid) ? c._choiceCurve.forcedMid : 0;
++  }
+   function candBetter(b, a) {
+     if (a == null) return true;
+     var tb = candTier(b), ta = candTier(a);
+     if (tb !== ta) return tb > ta;
++    // 同档：先看"30~80% 里有没有真卡点"（有 > 无），再看曲线分/审核分
++    var mb = (midChokeOf(b) > 0) ? 1 : 0, ma = (midChokeOf(a) > 0) ? 1 : 0;
++    if (mb !== ma) return mb > ma;
+     return candScore(b) > candScore(a);
+   }
+   // requireHard=true 时只认【困难合格】(真实卡点，omniAudit.pass)；简单合格(趋势符合)不算早停条件，继续搜索。
+@@ -5973,6 +6138,14 @@
+   }
+ 
+   function pickBoxSplitRaw(blocks, config) {
++    // ===== 【v153 切球规划器】外部车单直通 =====
++    //   config.forcedBoxes = [{color,count}, ...]（顺序 = 供给顺序）。
++    //   切球方案由规划器按「供给时间线」给出（矿脉表 → 每条矿脉切 1~4 辆），
++    //   生成器只负责把它造成关卡（选盘/铺障碍/填车/验证），不再自行决定切法。
++    //   车单顺序即填车顺序：早矿脉的车摆在早可达位 → 「切球的顺序」由此进入关卡。
++    if (config.forcedBoxes && config.forcedBoxes.length) {
++      return config.forcedBoxes.map(function (b) { return { color: b.color, count: b.count }; });
++    }
+     // ===== v137 锚点切盒（可选；boxCutMode 默认 'trend'，不进这段）=====
+     //   失败（拿不到盒/抛错）就落回默认切法 —— 新模式不许把关卡生产整死。
+     if (config.boxCutMode === 'anchor' && AntSolver.AnchorCut && AntSolver.AnchorCut.cutBoxes) {
+@@ -6200,6 +6373,10 @@
+     var n = nMed;
+     res.cars = nMax; res.carsMed = nMed; res.carsMin = nMin;
+     res.carsSamples = nAll.slice();
++    // 【v153】源图体检：开局暴露了几种颜色（纯读，不改任何生成口径）。
++    //   放在预检里而不是另做一遍的原因：这里的入口【每次生产都会走】（boardFitGuard!=='off'），
++    //   而且失败/成功两条返回路径都能带上它 → 页面日志与逐关记录都能如实看到这张图的"开局可选性"。
++    res.openingExposure = openingExposure(blocks, blocks.length, (blocks[0] || []).length, !!config.bottomOnly);
+     var rng = ext.rowsMin + '~' + ext.rowsMax + ' × ' + ext.colsMin + '~' + ext.colsMax;
+     if (n < 0.55 * ext.cellsMin) {
+       var sug = suggestBoardRange(n, config);
+@@ -6211,6 +6388,7 @@
+         + (sug ? '建议把行数范围改成 ' + sug.rowsMin + '~' + sug.rowsMax + '、列数范围改成 ' + sug.colsMin + '~' + sug.colsMax + ' 再试；'
+                : '建议把行列范围整体调小，或把盒容量调小让车变多（车数 ≈ 目标图像素数 ÷ 每车容量）。')
+         + '也可以直接把「切盒方式」换成锚点切盒后重试（它按平均容量切，车数与趋势切不同）。';
++      res.exposureWarn = exposureWarnText(res.openingExposure);   // 【v153】源图体检（可能为 null）
+       return res;
+     }
+     if (nMax < 0.75 * ext.cellsMin) {
+@@ -6224,6 +6402,9 @@
+       res.warn = '棋盘范围偏小：车数至少 ' + res.carsMin + ' > 范围内最大盘 ' + ext.maxDim.rows + '×' + ext.maxDim.cols
+         + '=' + ext.cellsMax + ' 格，大量盒要走管道，可能撞管道容量/深度上限。';
+     }
++    // 【v153】开局仅 1~2 色可吃 → 追加一句"这是源图造成的、调参改不了"的说明（与上面那条提醒并存，不覆盖）。
++    var expWarn = exposureWarnText(res.openingExposure);
++    if (expWarn) res.warn = res.warn ? (res.warn + ' ｜ 另外：' + expWarn) : expWarn;
+     return res;
+   }
+ 
+@@ -6492,12 +6673,34 @@
+     if (!(limit > 0)) return { ok: true, rate: null, limit: 0, frag: null, detail: '闸门未启用' };
+     var f = computeFragmentation(blocks, config || {});
+     var ok = f.rate <= limit;
++    // 【v153】超标时补上"先修哪一色 + 要并入多少"（用户 2026-10-15 只看到「碎色超限」四个字，不知从何下手）。
++    //   口径零改动：只是再向 computeFragmentation 多要一份块级明细（fragmentDetail:true，函数内部注释写明
++    //   "明细完全来自已有结果、零计算改动"），再按色汇总。文案与修图工具那句"至少要把 N 个碎色像素
++    //   并入邻近同色块"同一件事。仅在**已经判定超标**时才多算一遍，正常出关的路径不受影响。
++    var hotTxt = '';
++    if (!ok) {
++      try {
++        var fd = computeFragmentation(blocks, Object.assign({}, config || {}, { fragmentDetail: true }));
++        var hot = (fd.perColorDetail || []).filter(function (d) { return d.frag > 0; })
++          .sort(function (a, b) { return (b.frag - a.frag) || (b.rate - a.rate); }).slice(0, 3);
++        if (hot.length) {
++          var CN = (AntSolver.COLORS && AntSolver.COLORS.length) ? AntSolver.COLORS : null;
++          hotTxt = '；最碎的是 ' + hot.map(function (d) {
++            var nm = (CN && CN[d.color] && CN[d.color].name) ? ('(' + CN[d.color].name + ')') : '';
++            return d.color + ' 号色' + nm + ' ' + d.frag + ' 像素/' + d.total;
++          }).join('、')
++            + '；要把碎色像素并入邻近同色块，降到上限以下（修图工具 → 碎色率检查里有逐色明细与红点高亮，' +
++            '勾上就能直接看到该修哪些格）';
++        }
++      } catch (e) { hotTxt = ''; }
++    }
+     return {
+       ok: ok, rate: +f.rate.toFixed(4), limit: limit, frag: f,
+       detail: ok
+         ? ('碎色率 ' + (f.rate * 100).toFixed(2) + '% ≤ 上限 ' + (limit * 100).toFixed(2) + '%')
+         : ('碎色率 ' + (f.rate * 100).toFixed(2) + '% 超过上限 ' + (limit * 100).toFixed(2) + '%'
+-           + '（碎色 ' + f.fragPixels + '/' + f.totalPixels + ' 像素，碎块 ' + f.fragBlocks + '/' + f.blocks + '，最碎单色 ' + (f.maxColorRate * 100).toFixed(1) + '%）')
++           + '（碎色 ' + f.fragPixels + '/' + f.totalPixels + ' 像素，碎块 ' + f.fragBlocks + '/' + f.blocks + '，最碎单色 ' + (f.maxColorRate * 100).toFixed(1) + '%）'
++           + hotTxt)
+     };
+   }
+ 
+@@ -7176,12 +7379,19 @@
+ 
+   // ==================== TXT解析 ====================
+ 
++  /**
++   * 目标图 TXT → 数字矩阵。
++   * 【v154 修】起始行判定从 /^\d/ 放宽到 /^-?\d/：
++   *   官方 JSON 原始颜色矩阵（bin/参考/色库/official_json_original_color_matrices/）
++   *   用 -1 表示空位，一行**以 -1 开头**很正常；旧写法会把这种行当成标题整行丢掉，
++   *   结果矩阵缺行、行列全错位。现在负号开头的行按数据行读入。
++   */
+   function blocksFromTXT(txtContent) {
+     var lines = txtContent.trim().split('\n');
+     var startIdx = 0;
+     for (var i = 0; i < lines.length; i++) {
+       var trimmed = lines[i].trim();
+-      if (trimmed === '' || !/^\d/.test(trimmed)) { startIdx = i + 1; } else { break; }
++      if (trimmed === '' || !/^-?\d/.test(trimmed)) { startIdx = i + 1; } else { break; }
+     }
+     var blocks = [];
+     for (var i = startIdx; i < lines.length; i++) {
+@@ -7251,6 +7461,9 @@
+     preflightBoardFit: preflightBoardFit,                   // 棋盘范围 × 车数 预检
+     // 【v151】「选择余地」曲线：每步有几个"能吃满"的选项（供闸门/报告/界面共用）
+     choiceCurve: choiceCurve,
++    // 【v153】源图体检：开局暴露了几种颜色（"这张图能不能出有选择的关"的第一判据）
++    openingExposure: openingExposure,
++    exposureWarnText: exposureWarnText,
+     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
+     isCurveScore: isCurveScore,
+     choiceCurveScore: choiceCurveScore,
+@@ -7274,6 +7487,9 @@
+     // ===== 管道深度参数化 + 兜底（ANT-GEN-PIPE-DEPTH-FALLBACK-20260825）=====
+     pipeDepthOf: pipeDepthOf,                                 // 生效的管道队列深度上限
+     pipeMinFillOf: pipeMinFillOf,                             // 生效的单管最少装盒数
++    applyBeatProps: applyBeatProps,       // 【v153】债务节拍→道具落位（冰/链）
++    midChokeOf: midChokeOf,               // 【v153】30~80% 区间内的卡点数（同档候选首选键）
++    setProgressHook: setProgressHook,     // 【v153】单关进度钩子（worker/界面显示跑到哪了）
+     solveSpaceQuota: solveSpaceQuota,                         // 可用空间配额联立解（含管道兜底），可独立调用体检参数是否自相矛盾
+     pipeCountByConservation: pipeCountByConservation,          // 守恒反推管道数（usableSpaceTarget 关闭时生效）
+     // ===== 卡点体系类型化（ANT-GEN-CHOKE-TYPES-20260824）=====
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -92,7 +92,10 @@
+   // 生成器独立页面状态
+   var genFileFilter = { color: null };  // 文件列表当前筛选(点分组标题筛该组；null=不筛选)
+   var genBatchRunning = false, genBatchAborted = false;
+-  var genBatchResults = [];             // 本批已产出记录(实时展示 + 收尾打包共用同一引用)
++  var genBatchResults = [];             // 本批已产出记录(收尾打包用；语义不变)
++  // 【v153】展示用的"跨批次历史"：用户 2026-10-16「生成过的关卡能不能先保留，每次生成都覆盖掉之前的，很难对比」。
++  //   只影响展示：每次开批往里 push 一条批次头 + 逐关记录；ZIP/落库仍走 genBatchResults（本批语义不变）。
++  var genResultHistory = [];            // [{__batch:true, label}, {__batch:false, ...rec}]
+   // 【v140】结果表「带入棋盘」按钮的回查表：按【渲染顺序】存放记录。
+   //   必须单独存一份：表格支持按难度/名称排序与按档位分组，渲染下标与 results 下标不再对应。
+   var genResultRows = [];
+@@ -282,8 +285,88 @@
+   function init() {
+     document.getElementById('btn-import-txt').addEventListener('click', importTXT);
+     document.getElementById('btn-generate').addEventListener('click', runGenerate);
++    var _cpBtn = document.getElementById('btn-cutplan');
++    if (_cpBtn) _cpBtn.addEventListener('click', cutplanRun);
++    // 【v153】自动档：切到手动档时把「关卡时长」那行收起来（避免误以为它还有效）
++    // 【v153】生产档位：一次设定候选数 / 难度轮数 / 单关时间预算（三个数决定一批多久）
++    var _stEl = document.getElementById('gen-speed-tier');
++    if (_stEl) _stEl.addEventListener('change', function () {
++      var M = { fast: [3, 2, 2], std: [4, 4, 3], pro: [6, 7, 5] }[this.value] || [6, 7, 5];
++      var setv = function (id, v) { var e = document.getElementById(id); if (e) e.value = v; };
++      setv('gen-candidates', M[0]); setv('gen-difficulty-rounds', M[1]); setv('gen-timebudget', M[2]);
++      genLog('生产档位：候选 ' + M[0] + ' × 难度轮数 ' + M[1] + ' × 单关 ' + M[2] + ' 分钟（每关完成即可用，可随时停止）', 'gen-log-ok');
++    });
++    var _pmEl = document.getElementById('gen-param-mode');
++    if (_pmEl) {
++      var syncAutoRow = function () {
++        var auto = _pmEl.value !== 'manual';
++        var row = document.getElementById('gen-auto-row');
++        if (row) row.style.display = auto ? '' : 'none';
++        var info = document.getElementById('gen-auto-info');
++        if (info) info.textContent = auto
++          ? '自动档：盒容量 / 冰 / 锁链 / 问号 / 管道 数量都由规则推，日志里会写出每一个数是怎么来的。'
++          : '手动档：盒容量与障碍数量完全按下面「障碍设置 / 棋盘尺寸」里的数值走（原有行为）。';
++      };
++      _pmEl.addEventListener('change', syncAutoRow);
++      syncAutoRow();
++    }
+     document.getElementById('btn-simulate').addEventListener('click', enterSimulation);
+     document.getElementById('btn-exit-sim').addEventListener('click', exitSimulation);
++    // ===== 【v154】色库：读图色库下拉 + 新老色库转换面板 =====
++    if (!COLORS) {
++      console.error(CL_ERR + '：导入 TXT 将无法识别/转换官方色库，请检查 index.html 里的脚本引入。');
++    }
++    var clSel = document.getElementById('colorlib-select');
++    if (clSel) {
++      clSel.value = readLibChoice;
++      clSel.addEventListener('change', function () {
++        readLibChoice = this.value || 'auto';
++        // 已经导入的图要按新选择重判（否则改了下拉却看不出任何变化，等于摆设）
++        if (levelList.length) reimportWithCurrentLib();
++        else renderColorlibPanel();
++      });
++    }
++    bindClick('btn-colorlib', function () {
++      if (!COLORS) { alert(CL_ERR); return; }
++      toggleColorlibPanel();
++    });
++    bindClick('colorlib-close', function () { toggleColorlibPanel(false); });
++    var clDir = document.getElementById('colorlib-direction');
++    if (clDir && clDir.addEventListener) {
++      // 换方向只刷新对照表（不动数据），要真正转换得点「🔁 转换」
++      clDir.addEventListener('change', function () { renderColorlibPanel(); });
++    }
++    bindClick('colorlib-swap', function () {
++      var p = document.getElementById('colorlib-direction');
++      if (p) { p.value = (p.value === 'older') ? 'official' : 'older'; renderColorlibPanel(); }
++    });
++    bindClick('colorlib-apply', function () {
++      var scopeSel = document.getElementById('colorlib-scope');
++      var mode = scopeSel ? scopeSel.value : 'all';
++      var note = document.getElementById('colorlib-note');
++      // 【重要】目标色库必须在任何渲染之前读定：renderColorlibPanel() 会把下拉重设成
++      //   「跟当前图相反」的方向，转换完再读就会读到被翻过的值，导致"转过去又被转回来"。
++      var toLib = (document.getElementById('colorlib-direction') || {}).value || 'older';
++      if (mode === 'current') {
++        // 单张：只转当前图，并把它设成该色库（同时把预览换成转换结果）
++        if (currentLevelIdx < 0 || currentLevelIdx >= levelList.length) { alert('还没有导入任何目标图'); return; }
++        var en = levelList[currentLevelIdx];
++        try {
++          var cv = convertEntryBlocks(en, toLib);
++          en.blocks = cv.outBlocks;
++          en.usedLib = toLib;
++          en._colorCount = null;
++          reloadCurrentEntry();
++          renderGenFileList(); renderColorlibHint(); renderColorlibPanel();
++          if (note) { note.className = 'colorlib-note good'; note.textContent = '已转换当前图《' + en.name + '》→ ' + libTag(toLib); }
++        } catch (e) {
++          if (note) { note.className = 'colorlib-note warn'; note.textContent = '转换失败：' + e.message; }
++        }
++        return;
++      }
++      var msg = applyColorlibBatch(mode === 'download' ? 'download' : 'preview', toLib);
++      if (note) { note.className = 'colorlib-note good'; note.textContent = msg; }
++    });
+     // 【v132】手动摆盒：进入/退出编辑态，并把宿主能力交给 js/level-editor.js。
+     //   currentLevel / levelList 都在本闭包里，外部文件取不到，所以用回调注入而不是挂全局。
+     bindClick('btn-manual-edit', enterEditMode);
+@@ -468,6 +551,14 @@
+       });
+       var adv = document.getElementById('gen-show-advanced');
+       if (adv) adv.addEventListener('change', applyAdvancedVisibility);
++      // 【v153】高级参数临时开关：Ctrl+Shift+A（界面默认不显示，这条是留给调试/精调的后门）
++      document.addEventListener('keydown', function (e) {
++        if (e && e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
++          genAdvancedForce = !genAdvancedForce;
++          applyAdvancedVisibility();
++          genLog(genAdvancedForce ? '高级参数已临时显示（Ctrl+Shift+A 再按一次收起）' : '高级参数已收起', 'gen-log-warn');
++        }
++      });
+       applyAdvancedVisibility();      // 默认收起高级段
+       updatePresetInfo();
+     })();
+@@ -477,14 +568,21 @@
+     bindClick('btn-gen-download', genDownloadPending);
+     bindClick('btn-gen-persist-retry', genRetryPersist);   // 落库失败后重试同一关(服务端幂等)
+     bindClick('btn-gen-log-clear', function () { var el = document.getElementById('gen-log'); if (el) el.innerHTML = ''; });
++    // 【v153】清空结果表（只清展示历史；已落库的关卡在 输出文件/ 里不受影响）
++    bindClick('btn-gen-result-clear', function () {
++      genResultHistory.length = 0;
++      if (!genBatchRunning) { genBatchResults = []; }
++      genRenderResultsLive();
++      genLog('结果表已清空（已落库的关卡仍在「输出文件/」里）', 'gen-log-warn');
++    });
+     var fileSortSel = document.getElementById('gen-file-sort');
+     if (fileSortSel) fileSortSel.addEventListener('change', renderGenFileList);
+     var fileGroupChk = document.getElementById('gen-file-group');
+     if (fileGroupChk) fileGroupChk.addEventListener('change', renderGenFileList);
+     var resultSortSel = document.getElementById('gen-result-sort');
+-    if (resultSortSel) resultSortSel.addEventListener('change', function () { renderGenResultTable(genBatchResults); });
++    if (resultSortSel) resultSortSel.addEventListener('change', function () { renderGenResultTable(genResultHistory, true); });
+     var resultGroupSel = document.getElementById('gen-result-group');
+-    if (resultGroupSel) resultGroupSel.addEventListener('change', function () { renderGenResultTable(genBatchResults); });
++    if (resultGroupSel) resultGroupSel.addEventListener('change', function () { renderGenResultTable(genResultHistory, true); });
+     // 【v140】结果表「🎮 带入棋盘」：用事件委托绑一次即可 —— 表格每次排序/分组都整体重绘，
+     //   逐行绑会随重绘反复叠加监听。按 data-rec 从 genResultRows 回查记录（渲染顺序 ≠ results 顺序）。
+     (function () {
+@@ -731,10 +829,17 @@
+     }
+   }
+ 
+-  /** 高级参数开关：棋盘尺寸 / 批量与卡点细项平时收起。 */
++  /**
++   * 【v153】高级参数：界面上**永不出现**（用户 2026-10-16：「那些高级参数就不要了吧」）。
++   *   默认只留 5 张卡：导入目标图 / 生成设置 / 开始生产 / 进度 / 结果。
++   *   自动档会自己填盒容量、可用空间、冰/链/问号/管道的数量，所以那六段平时不用看。
++   *   需要精调时按 **Ctrl+Shift+A** 临时打开（只是不显示，DOM 与 getGenConfig 的读取一律保留，
++   *   所以"看不见" ≠ "配置变了"）。
++   */
++  var genAdvancedForce = false;
+   function applyAdvancedVisibility() {
+-    var on = genChkVal('gen-show-advanced');
+-    ['gen-sec-board', 'gen-sec-batch'].forEach(function (id) {
++    var on = genAdvancedForce;
++    ['gen-sec-scheme', 'gen-sec-basic', 'gen-sec-obstacle', 'gen-sec-board', 'gen-sec-batch', 'cutplanner-card'].forEach(function (id) {
+       var el = document.getElementById(id);
+       if (el) el.classList.toggle('hidden', !on);
+     });
+@@ -920,55 +1025,318 @@
+   function importTXT() { document.getElementById('txt-input').click(); }
+ 
+   // 关卡列表存储
+-  var levelList = []; // [{name, blocks}]
++  // 【v154】每条多了色库相关字段：
++  //   rawBlocks   原始编号矩阵（**永不改变**，反复互转都以它为准，避免转了又转叠加误差）
++  //   detectedLib 自动识别的色库；confident=false 表示判据不足（实心图）
++  //   usedLib     实际按哪套色库解释（= 「读图色库」下拉的选择或自动结果）
++  //   convStats   官方→老 的转换统计（老色库读入时为 null）
++  var levelList = []; // [{name, blocks, txt, rawBlocks, detectedLib, confident, usedLib, convStats}]
+   var currentLevelIdx = -1;
+ 
++  // ==================== 【v154】色库：读图色库 + 新老互转 ====================
++  // 两套色库：老色库 34 色（0 = 空位，1-34 = 颜色，求解器内部一直用的编号空间）
++  //           官方色库 0-21（-1 = 空位，0 = 黄色，官方 JSON 原始颜色矩阵那套）
++  // 两套色库**没有一个同 Hex 的色**（已逐一比对），所以「按哪套读」会实打实改变颜色，
++  // 必须显式可选。求解器内部一律只跑老色库编号，转换只发生在导入/导出 TXT 的边界上。
++  var COLORS = AntSolver.ColorLibs;
++  var readLibChoice = 'auto';    // 顶栏下拉当前值：'auto' | 'older' | 'official'
++  var CL_ERR = '色库模块 js/color-libs.js 未加载';
++
++  /** 按「读图色库」下拉决定一张图该按哪套色库解释。 */
++  function pickReadLib(rawBlocks) {
++    if (!COLORS) return { lib: 'older', confident: false, detected: 'older', reason: CL_ERR };
++    var d = COLORS.detect(rawBlocks);
++    if (readLibChoice === 'older' || readLibChoice === 'official') {
++      return { lib: readLibChoice, confident: d.confident, detected: d.lib,
++               reason: '按「读图色库」手动指定（自动判定为' + (d.lib === 'official' ? '官方色库' : '老色库') +
++                       (d.confident ? '' : '，但判据不足') + '）' };
++    }
++    return { lib: d.lib, confident: d.confident, detected: d.lib, reason: d.reason };
++  }
++
++  /** 源编号矩阵 → 求解器内部编号空间（老色库 0 空 / 1-34 色）。 */
++  function toSolverBlocks(rawBlocks, lib) {
++    if (!COLORS || lib === 'older') return { blocks: rawBlocks, stats: null };
++    var r = COLORS.toSolver(rawBlocks);
++    return { blocks: r.matrix, stats: r.stats };
++  }
++
++  /** 刷新「导入目标图」里的色库提示行。 */
++  function renderColorlibHint() {
++    var el = document.getElementById('gen-colorlib-hint');
++    if (!el) return;
++    var nOff = 0, nUnclear = 0;
++    for (var i = 0; i < levelList.length; i++) {
++      if (levelList[i].usedLib === 'official') nOff++;
++      if (levelList[i].confident === false) nUnclear++;
++    }
++    var parts = [];
++    if (nOff) parts.push('已按官方色库 0-21 读入并转成老色库 34 色：' + nOff + ' 张');
++    if (nUnclear) parts.push('⚠ ' + nUnclear + ' 张判据不足（实心图，两套色库都能解释），可开「🎨 色库转换」核对');
++    el.className = 'gen-hint' + (nUnclear ? ' colorlib-warn' : '');
++    el.textContent = parts.join(' · ');
++  }
++
+   function handleTXTSelect(e) {
+     var files = e.target.files;
+     if (!files || files.length === 0) return;
+ 
+-    levelList = [];
+-    currentLevelIdx = -1;
+-    var loaded = 0;
+-    var total = files.length;
+-
++    // 【v154】两遍处理：第一遍只读文本（异步），第二遍才解析+判色库。
++    //   原实现边读边解析，导致「读图色库」下拉在解析完之前改不了、也没法回头重判；
++    //   现在先收集文本，全部到齐后统一处理，色库判定一次成型。
++    var read = [], loaded = 0, total = files.length;
+     for (var i = 0; i < files.length; i++) {
+-      (function(file, idx) {
++      (function (file, idx) {
+         var reader = new FileReader();
+-        reader.onload = function(ev) {
+-          try {
+-            var blocks = AntSolver.Generator.blocksFromTXT(ev.target.result);
+-            if (blocks && blocks.length > 0) {
+-              levelList.push({ name: file.name, blocks: blocks, txt: ev.target.result });
+-            }
+-          } catch(err) { /* skip bad files */ }
++        reader.onload = function (ev) {
++          read[idx] = { name: file.name, txt: String(ev.target.result) };
+           loaded++;
+-          if (loaded >= total) {
+-            // 全部加载完毕
+-            levelList.sort(function(a, b) {
+-              var na = parseInt(a.name) || 0, nb = parseInt(b.name) || 0;
+-              return na - nb;
+-            });
+-            onAllTXTLoaded();
+-          }
++          if (loaded >= total) applyImportedTXT(read);
+         };
++        reader.onerror = function () {
++          read[idx] = null; loaded++;
++          if (loaded >= total) applyImportedTXT(read);
++        };
+         reader.readAsText(file);
+       })(files[i], i);
+     }
+     e.target.value = '';
+   }
+ 
+-  function onAllTXTLoaded() {
++  /** 第二遍：解析文本 → 判色库 → 转成求解器编号 → 填 levelList。 */
++  function applyImportedTXT(read) {
++    levelList = [];
++    currentLevelIdx = -1;
++    var badFiles = [];
++
++    for (var i = 0; i < read.length; i++) {
++      var item = read[i];
++      if (!item) continue;
++      var rawBlocks = null;
++      try { rawBlocks = COLORS ? COLORS.parseTXT(item.txt) : AntSolver.Generator.blocksFromTXT(item.txt); }
++      catch (err) { rawBlocks = null; }
++      if (!rawBlocks || !rawBlocks.length || !rawBlocks[0].length) { badFiles.push(item.name); continue; }
++
++      var pick = pickReadLib(rawBlocks);
++      var conv = { blocks: rawBlocks, stats: null };
++      try { conv = toSolverBlocks(rawBlocks, pick.lib); }
++      catch (err2) { badFiles.push(item.name + '（色库转换失败）'); continue; }
++
++      levelList.push({
++        name: item.name,
++        blocks: conv.blocks,
++        txt: item.txt,
++        rawBlocks: rawBlocks,          // 原始编号（不随转换改变，供反复互转）
++        convStats: conv.stats,         // 官方→老的转换统计（老色库读入时为 null）
++        detectedLib: pick.detected,
++        confident: pick.confident,
++        libReason: pick.reason,
++        usedLib: pick.lib
++      });
++    }
++
+     if (levelList.length === 0) { alert('未解析到有效TXT文件'); return; }
+     // 显示关卡列表
+     document.getElementById('level-list-panel').classList.remove('hidden');
+     document.getElementById('level-list-count').textContent = '(' + levelList.length + ')';
+     renderLevelList();
+     renderGenFileList();
+-    // 自动加载第一关
++    renderColorlibHint();
++    if (badFiles.length) console.warn('[色库] 以下文件解析失败，已跳过：', badFiles);
++    // 自动加载第一关（这一步会把 currentLevelIdx 从 -1 设成 0）
+     selectLevel(0);
++    // 【顺序要紧】色库面板必须在 selectLevel 之后渲染：它读的是 currentLevelIdx，
++    //   在 -1 时渲染会显示成"当前没有导入的图"，用户打开面板会看到空白。
++    renderColorlibPanel();
+   }
+ 
++  /** 按各自的原始编号 + 色库判定，重放一遍导入结果（改下拉后调用）。 */
++  function reinterpretAll() {
++    for (var i = 0; i < levelList.length; i++) {
++      var en = levelList[i];
++      if (!en.rawBlocks) continue;
++      var pick = pickReadLib(en.rawBlocks);
++      var conv = { blocks: en.rawBlocks, stats: null };
++      try { conv = toSolverBlocks(en.rawBlocks, pick.lib); } catch (err) { continue; }
++      en.blocks = conv.blocks;
++      en.convStats = conv.stats;
++      en.detectedLib = pick.detected;
++      en.confident = pick.confident;
++      en.libReason = pick.reason;
++      en.usedLib = pick.lib;
++      en._colorCount = null;          // 颜色数缓存失效
++    }
++  }
++
++  /** 把当前关按最新 blocks 重新装进界面（board 传 null = 清掉棋盘缓存，需要重新生成）。 */
++  function reloadCurrentEntry() {
++    if (currentLevelIdx < 0 || currentLevelIdx >= levelList.length) return;
++    var en = levelList[currentLevelIdx];
++    var tbuf = parseInt((document.getElementById('gen-buffer') || {}).value) || 5;
++    loadLevel({ blocks: en.blocks, bufferLimit: tbuf, board: null });
++    // loadLevel 会先把「求解结果」隐藏掉，这里再填上色库说明并显示，口径与原导入提示一致。
++    var trr = en.blocks.length, tcc = en.blocks[0] ? en.blocks[0].length : 0;
++    var html = '<p>' + en.name + '</p>';
++    html += '<p style="font-size:11px;color:#888">已导入目标图 ' + trr + '×' + tcc + '（未生产棋盘）。点「生成」按当前参数生产棋盘。</p>';
++    html += colorlibDetailHtml(en);
++    document.getElementById('solve-result').classList.remove('hidden');
++    document.getElementById('solve-details').innerHTML = html;
++  }
++
++  /** 色库说明行（导入提示 / 重判提示共用）。 */
++  function colorlibDetailHtml(en) {
++    var html = '';
++    if (en.usedLib === 'official') {
++      html += '<p style="font-size:11px;color:#666">🎨 色库：按官方色库 0-21 读入 → 已转成老色库 34 色' +
++        (en.convStats && en.convStats.colors ? '（' + en.convStats.colors + ' 色）' : '') + '</p>';
++    } else {
++      html += '<p style="font-size:11px;color:#666">🎨 色库：老色库 34 色（0 = 空位）</p>';
++    }
++    if (en.confident === false) {
++      html += '<p style="font-size:11px;color:#e6a23c">⚠ ' + (en.libReason || '色库判据不足') + '</p>';
++    }
++    return html;
++  }
++
++  /**
++   * 改了「读图色库」后：按新的选择重判本批全部图，并刷新当前关。
++   * 不调 loadLevel（那样会清掉左栏的求解结果、也不重置入口模式），只就地换 blocks，
++   * 同时把棋盘缓存打空 —— 色号变了，旧棋盘上的盒颜色已经对不上了，必须重新生成。
++   */
++  function reimportWithCurrentLib() {
++    if (!COLORS || !levelList.length) return;
++    reinterpretAll();
++    renderColorlibHint();
++    renderColorlibPanel();
++    if (currentLevelIdx < 0 || currentLevelIdx >= levelList.length) return;
++    var en = levelList[currentLevelIdx];
++    currentLevel = AntSolver.parseLevel({ blocks: en.blocks, bufferLimit: currentLevel.bufferLimit, board: null });
++    currentGenerationEval = null;
++    currentChokeInfo = null;
++    renderLevelInfo();
++    renderTarget(null);
++    renderQueues(null);
++    document.getElementById('solve-result').classList.remove('hidden');
++    document.getElementById('solve-details').innerHTML =
++      '<p>' + en.name + '</p><p style="font-size:11px;color:#888">已按新的「读图色库」重判本批全部图。' +
++      '棋盘缓存已清空，点「生成」重新生产。</p>' + colorlibDetailHtml(en);
++  }
++
++  /** 「🎨 色库转换」开关面板。 */
++  function toggleColorlibPanel(force) {
++    var p = document.getElementById('colorlib-panel');
++    if (!p) return;
++    var show = (force === undefined) ? p.classList.contains('hidden') : !!force;
++    p.classList.toggle('hidden', !show);
++    if (show) renderColorlibPanel();
++  }
++
++  /** 面板内容：当前图色库、方向默认值、色值对照表（标出本图真正用到的色）。 */
++  function renderColorlibPanel() {
++    var cur = document.getElementById('colorlib-current-lib');
++    var mapEl = document.getElementById('colorlib-map');
++    var note = document.getElementById('colorlib-note');
++    var dirSel = document.getElementById('colorlib-direction');
++    if (!mapEl) return;
++    if (!COLORS) { mapEl.innerHTML = '<p style="font-size:11px;color:#a33">' + CL_ERR + '</p>'; return; }
++
++    var en = (currentLevelIdx >= 0 && currentLevelIdx < levelList.length) ? levelList[currentLevelIdx] : null;
++    var curLib = en ? en.usedLib : 'older';
++    if (cur) {
++      cur.textContent = (curLib === 'official' ? '官方色库 0-21' : '老色库 34 色') +
++        (en ? '（' + en.name + (en.confident === false ? ' · 判据不足' : '') + '）' : '（当前没有导入的图）');
++    }
++    if (dirSel) {
++      // 只在**确实有当前图**时才自动翻方向：没有图时翻了也没用，还会让"看起来没反应"变成困惑。
++      if (en) dirSel.value = (curLib === 'official') ? 'older' : 'official';
++    }
++    if (note) {
++      note.className = 'colorlib-note' + (en && en.confident === false ? ' warn' : '');
++      note.textContent = en ? (en.libReason || '') : '先导入目标图 TXT，这里会显示判定依据';
++    }
++
++    var toLib = dirSel ? dirSel.value : 'older';
++    var fromLib = (curLib === 'official') ? 'official' : 'older';
++    var M = null;
++    try { M = COLORS.map(fromLib, toLib); } catch (e) { M = null; }
++    if (!M) { mapEl.innerHTML = '<p style="font-size:11px;color:#a33">映射表构建失败</p>'; return; }
++
++    var used = {};
++    if (en && en.rawBlocks) {
++      for (var r = 0; r < en.rawBlocks.length; r++) for (var c = 0; c < en.rawBlocks[r].length; c++) {
++        var v = en.rawBlocks[r][c];
++        used[v] = (used[v] || 0) + 1;
++      }
++    }
++    var html = '<table><thead><tr><th>源色号</th><th>源色值</th><th>→</th><th>目标色号</th><th>目标色值</th><th>色差</th><th>本图用量</th></tr></thead><tbody>';
++    for (var i = 0; i < M.rows.length; i++) {
++      var r2 = M.rows[i];
++      var cnt = used[r2.from];
++      html += '<tr class="' + (cnt ? 'colorlib-used' : '') + '">' +
++        '<td>' + r2.from + ' ' + r2.fromName + '</td>' +
++        '<td><span class="colorlib-sw" style="background:' + r2.fromHex + '"></span>' + r2.fromHex + '</td>' +
++        '<td>→</td>' +
++        '<td>' + r2.to + ' ' + r2.toName + '</td>' +
++        '<td><span class="colorlib-sw" style="background:' + r2.toHex + '"></span>' + r2.toHex + '</td>' +
++        '<td>' + r2.dist.toFixed(0) + '</td>' +
++        '<td>' + (cnt ? cnt + (r2.exact ? ' 精确' : '') : '-') + '</td>' +
++        '</tr>';
++    }
++    html += '</tbody></table>';
++    mapEl.innerHTML = html;
++  }
++
++  /** 单张图转换（永远从 rawBlocks 出发，避免转了又转叠加误差）。 */
++  function convertEntryBlocks(en, toLib) {
++    var fromLib = (en.usedLib === 'official') ? 'official' : 'older';
++    var res = COLORS.convertMatrix(en.rawBlocks, fromLib, toLib);
++    return { outBlocks: res.matrix, fromLib: fromLib, toLib: toLib, stats: res.stats };
++  }
++
++  function libTag(lib) { return lib === 'official' ? '官方色库0-21' : '老色库34色'; }
++
++  /** 本批全部转换：'preview' 只改页面预览；'download' 改预览并下载转换后的 TXT。
++   *  toLib 由调用方在渲染前读定并传入（见 colorlib-apply 里那段注释：面板渲染会翻方向下拉）。 */
++  function applyColorlibBatch(mode, toLib) {
++    if (!toLib) toLib = (document.getElementById('colorlib-direction') || {}).value || 'older';
++    if (!levelList.length) { alert('还没有导入任何目标图'); return '还没有导入任何目标图'; }
++    if (!COLORS) { alert(CL_ERR); return CL_ERR; }
++
++    var nSame = 0, outs = [];
++    for (var i = 0; i < levelList.length; i++) {
++      var en = levelList[i];
++      if (!en.rawBlocks) continue;
++      try {
++        var cv = convertEntryBlocks(en, toLib);
++        outs.push({ name: en.name, txt: COLORS.renderTXT(cv.outBlocks, '像素矩阵') });
++        if (cv.fromLib === toLib) nSame++;
++        en.blocks = cv.outBlocks;         // 预览与后续生产都用转换后的编号
++        en.usedLib = toLib;
++        en._colorCount = null;
++      } catch (err) {
++        console.warn('[色库] 转换失败：' + en.name, err);
++      }
++    }
++
++    if (mode === 'download') {
++      for (var j = 0; j < outs.length; j++) {
++        var base = String(outs[j].name).replace(/\.txt$/i, '');
++        downloadText(base + '_' + libTag(toLib) + '.txt', outs[j].txt);
++      }
++      reloadCurrentEntry();
++      renderGenFileList(); renderColorlibHint(); renderColorlibPanel();
++      return '已下载 ' + outs.length + ' 个 TXT（目标色库：' + libTag(toLib) + '）。';
++    }
++
++    reloadCurrentEntry();
++    renderGenFileList();
++    renderColorlibHint();
++    renderColorlibPanel();
++    return '已把本批 ' + levelList.length + ' 张的预览改成「' + libTag(toLib) + '」' +
++      (nSame ? '（其中 ' + nSame + ' 张本来就是这个色库）' : '') +
++      '，棋盘缓存已清空，按需重新点「生成」。';
++  }
++
+   // ==================== 生成器页面：文件列表(排序/分组/筛选/删除) ====================
+   // 统计某目标图条目的颜色数(用于排序/分组)：blocks 中出现的正整数色值去重计数。
+   function genFileColorCount(entry) {
+@@ -1164,8 +1532,10 @@
+     var trr = entry.blocks.length, tcc = entry.blocks[0] ? entry.blocks[0].length : 0;
+     var html = '<p>' + entry.name + '</p>';
+     html += '<p style="font-size:11px;color:#888">已导入目标图 ' + trr + '×' + tcc + '（未生产棋盘）。点「生成」按当前参数生产棋盘。</p>';
++    html += colorlibDetailHtml(entry);   // 【v154】这张图按哪套色库读的 + 判据不足提醒
+     document.getElementById('solve-result').classList.remove('hidden');
+     document.getElementById('solve-details').innerHTML = html;
++    renderColorlibPanel();               // 【v154】换关后面板里的"当前图色库/用量"要跟着换
+   }
+ 
+   function getGenConfig() {
+@@ -3789,12 +4159,257 @@
+   }
+ 
+   // ==================== 生成器 ====================
++  // ==================== 【v153】自动档：盒容量 + 功能块数量全部由规则推 ====================
++  // 依据（全部是本工程实测，见 01_交接文档/工作日志_20261012.md 第二十二节）：
++  //   · 车数 = 彩色像素数 ÷ 平均车容量；棋盘格数 ≈ 车数 ÷ 0.74，且列数 = 行数+1~2。
++  //     实测：1155 像素的图，容量 25~52（≈30 辆）→ 30 次尝试全灭；容量 10~30（≈50 辆）→ 7×8 通关、开局选项 4。
++  //     小鹿 1105 像素 / 40 辆 / 6×7 也是好关 ⇒ **目标车数 40~55 最舒服**。
++  //   · 功能块数量由「债务节拍」推（债车=颜色还没露脸的车；冰=延迟选项、锁链=绑一辆同背、管道=藏供给）。
++  //     小鹿实际用量：冰 5、链 3 组、问号 2、管道 2 —— 正好是这个量级；问号与管道必须少（玩家要靠可见线索思考）。
++  var GEN_AUTO = null;   // 最近一次自动档推出来的参数（供日志/界面显示）
++
++  function genParamMode() { var e = document.getElementById('gen-param-mode'); return e && e.value === 'manual' ? 'manual' : 'auto'; }
++  function genTargetSteps() { var e = document.getElementById('gen-target-steps'); var v = parseInt(e && e.value, 10); return (v > 0) ? v : 0; }
++
++  /** 目标图 → 自动参数（纯函数，逐图现算） */
++  function genAutoParams(blocks, stepsN) {
++    var R = blocks.length, C = blocks[0].length, P = 0;
++    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) if (blocks[r][c] > 0) P++;
++    var N = stepsN > 0 ? stepsN : Math.max(40, Math.min(55, Math.round(P / 22)));   // 目标车数
++    var cap = P / Math.max(1, N);
++    var capMin = Math.max(4, Math.round(cap * 0.65)), capMax = Math.max(capMin + 2, Math.round(cap * 1.35));
++    var beats = N >= 45 ? 3 : 2;                       // 债务节拍数（= 卡点数）
++    var ice = Math.max(6, Math.min(14, beats * 3));    // 冰（%盒）
++    var chain = Math.max(2, Math.min(4, beats));       // 锁链（组）
++    var q = Math.max(2, Math.min(8, Math.round(beats * 1.5)));   // 问号（%盒，硬上限 8 ≈ 2~4 个）
++    var pipes = Math.max(1, Math.min(3, Math.round(N / 25)));    // 管道下限（条）
++    // 【v153】卡点机制**固定开启**、不再让用户选（用户 2026-10-16：「只要有卡就行了，
++    //   你要保证在 30%-80% 的区域有卡点」）——页面上的「按债务节拍落位道具」勾选框已下线。
++    var wantBeatProps = true;
++    // 债务节拍 → 道具落位：在 35%/60%/80% 附近各安排一辆"颜色还没露脸"的债车，
++    //   第一笔用锁链（与相邻的早色车绑一组 → 一笔取两债），后面两笔用冰（延迟到指定时点进菜单）。
++    var beatProps = [];
++    try {
++      var eo = AntSolver.eliminationOrder(blocks, R, C, false), rd = eo.round, rounds = eo.rounds;
++      var vein = [], layerTot = {};
++      for (var r2 = 0; r2 < R; r2++) for (var c2 = 0; c2 < C; c2++) {
++        var v2 = blocks[r2][c2]; if (v2 <= 0) continue;
++        var d2 = rd[r2][c2] || 0, hit = null;
++        for (var q2 = 0; q2 < vein.length; q2++) if (vein[q2].round === d2 && vein[q2].color === v2) { hit = vein[q2]; break; }
++        if (!hit) { hit = { round: d2, color: v2, size: 0 }; vein.push(hit); }
++        hit.size++; layerTot[d2] = (layerTot[d2] || 0) + 1;
++      }
++      var firstRound = {};
++      vein.forEach(function (v) { if (firstRound[v.color] == null || v.round < firstRound[v.color]) firstRound[v.color] = v.round; });
++      var cumAll = [], acc = 0;
++      for (var d3 = 1; d3 <= rounds; d3++) { acc += (layerTot[d3] || 0); cumAll[d3] = acc; }
++      var poss = beats >= 3 ? [35, 60, 80] : [40, 70];
++      for (var b2 = 0; b2 < poss.length; b2++) {
++        var targetPx = poss[b2] / 100 * P, rStar = 1;
++        for (var d4 = 1; d4 <= rounds; d4++) if (cumAll[d4] >= targetPx) { rStar = d4; break; }
++        var cand = Object.keys(firstRound).map(Number).filter(function (c) { return firstRound[c] > rStar; })
++          .sort(function (a, b) { return firstRound[a] - firstRound[b]; });
++        if (!cand.length) continue;
++        beatProps.push({ kind: b2 === 0 ? 'chain' : 'ice', debtColor: cand[0],
++          steps: b2 === 1 ? 6 : (b2 === 2 ? 10 : 0), pos: poss[b2], round: firstRound[cand[0]] });
++      }
++    } catch (e) { beatProps = []; }
++    if (!wantBeatProps) beatProps = [];
++    return {
++      beatProps: beatProps,
++      // 【v153】可用空间目标：0.74 → 0.82。实测（两张图 × 2 种子）：
++      //   0.74 → 管道盒占总车 33~37%、曲线 ≤1占 37~42%；0.82~0.84 → 管道 10~15%、≤1占 19~29%、出关率还更高。
++      //   机理：可用空间 = 非黑块非管道格占比；黑块有比例上限，配额凑不满的部分**只能给管道**，
++      //   所以"管道总是很多"不是选出来的，是 0.74 这条配额代数推出来的。管道下限设 0 也一样（实测）。
++      usableSpaceTarget: 0.82,
++      boxSizeMin: capMin, boxSizeMax: capMax,
++      icePercent: ice, icePercentMin: ice, icePercentMax: ice,
++      chainCount: chain, chainCountMin: chain, chainCountMax: chain,
++      questionPercent: q, questionPercentMin: q, questionPercentMax: q,
++      minPipes: pipes, minPipesMin: pipes, minPipesMax: pipes,
++      fragmentMaxRate: 0,
++      _why: { P: P, N: N, cap: +cap.toFixed(1), capMin: capMin, capMax: capMax, beats: beats, ice: ice, chain: chain, q: q, pipes: pipes }
++    };
++  }
++
++  /** 把自动参数并进 config（手动档原样返回）；tag 用于日志前缀 */
++  function genApplyAuto(cfg, blocks, tag) {
++    if (genParamMode() !== 'auto') return cfg;
++    var a = genAutoParams(blocks, genTargetSteps());
++    GEN_AUTO = a._why;
++    var deltas = {};
++    for (var k in a) if (k !== '_why') deltas[k] = a[k];
++    // 黑块不能设 0（实测：黑块 0 → 管道容量 20/20 全灭），兜一个下限
++    if (!(deltas.blackPercent > 0)) deltas.blackPercent = 3;
++    // 只报"安排了几处卡点、落在哪个区间"，不再报"第几 % 卡哪个颜色"（那是内部实现，用户不需要知道）
++    var beatTxt = '';
++    if (a.beatProps && a.beatProps.length) {
++      beatTxt = '；卡点：自动安排 ' + a.beatProps.length + ' 处（落在 30~80% 区间：' +
++        a.beatProps.map(function (b) { return b.pos + '%'; }).join('/') + '）';
++    }
++    genLog('自动档' + (tag ? '·' + tag : '') + '：像素 ' + a._why.P + ' ÷ 目标车数 ' + a._why.N + ' → 平均容量 ' + a._why.cap +
++      '，盒容量 ' + a._why.capMin + '~' + a._why.capMax + '；可用空间 0.82（管道约占 10~15%，原 0.74 会到 33~37%）；冰 ' + a._why.ice + '%、锁链 ' + a._why.chain +
++      ' 组、问号 ' + a._why.q + '%、管道下限 ' + a._why.pipes + ' 条' + beatTxt + '（碎色闸门一并关闭：碎色是规划内的压力素材）', 'gen-log-ok');
++    return Object.assign({}, cfg, deltas);
++  }
++
++  // ==================== 【v153】切球规划器 ====================
++  // 按导师 2026-10-15 的模型：关卡制作 = 把目标图像素切到若干车里（切球），再决定这些车在
++  // 棋盘上的出现顺序（顺序）。供给时间线（矿脉表）由图的几何决定，切球只是在消耗它。
++  // 验收三数：菜单宽 ≥4；同存 1~2 笔可解债（解药 ≤5 轮）；未偿总额 ≤ 暂存-2。
++  var cutPlanParams = null;   // {steps, beatsText} —— 勾选后批量/单关生成时逐图现算车单
++
++  function cutplanParseBeats(txt) {
++    return String(txt || '').split(/[\s,]+/).filter(Boolean).map(function (s2) {
++      var pp = s2.split(':');
++      return { pos: parseFloat(pp[0]) || 0, size: parseFloat(pp[1]) || 0 };
++    }).filter(function (b) { return b.pos > 0 && b.size > 0; });
++  }
++
++  /** 核心：目标图 + 目标步数 + 债务节拍 → 车单（纯函数，逐图现算） */
++  function cutplanBuild(blocks, stepsN, beatsArr) {
++    var R = blocks.length, C = blocks[0].length, P = 0;
++    var colTot = {};
++    for (var r0 = 0; r0 < R; r0++) for (var c0 = 0; c0 < C; c0++) { var v0 = blocks[r0][c0]; if (v0 > 0) { P++; colTot[v0] = (colTot[v0] || 0) + 1; } }
++    var eo = AntSolver.eliminationOrder(blocks, R, C, false), rd = eo.round, rounds = eo.rounds;
++    var veins = [], layerTot = {};
++    for (var r1 = 0; r1 < R; r1++) for (var c1 = 0; c1 < C; c1++) {
++      var v1 = blocks[r1][c1]; if (v1 <= 0) continue;
++      var d1 = rd[r1][c1] || 0;
++      var vn = null;
++      for (var q1 = 0; q1 < veins.length; q1++) if (veins[q1].round === d1 && veins[q1].color === v1) { vn = veins[q1]; break; }
++      if (!vn) { vn = { round: d1, color: v1, size: 0 }; veins.push(vn); }
++      vn.size++; layerTot[d1] = (layerTot[d1] || 0) + 1;
++    }
++    veins.sort(function (a, b) { return a.round - b.round; });
++    // 【v153 口径统一】默认目标车数与自动档【同一个口径】（像素÷22，夹在 40~55）。
++    //   原先这里写死 ÷28（1155 像素 → 41 辆、平均容量 28），比自动档的目标车数少 12 辆，
++    //   于是"自动档说 53 辆 / 规划器说 41 辆"两套数字打架；而实测这张图容量 ~28 那一档是【会全灭】的
++    //   （容量 25~52 → 30 次尝试全灭；10~30 才出关）。统一后两处一致。
++    var N = stepsN > 0 ? stepsN : Math.max(40, Math.min(55, Math.round(P / 22)));
++    var avgCap = P / N;
++    var k = veins.map(function (v) { return Math.max(1, Math.round(v.size / avgCap)); });
++    var K = k.reduce(function (a, b) { return a + b; }, 0), guard = 0;
++    while (K !== N && guard++ < 500) {
++      if (K < N) { var bi = -1, bv = -1; for (var i1 = 0; i1 < veins.length; i1++) { var vv = veins[i1].size / k[i1]; if (vv > bv) { bv = vv; bi = i1; } } k[bi]++; K++; }
++      else { var bj = -1, bvj = -1; for (var i2 = 0; i2 < veins.length; i2++) if (k[i2] > 1 && k[i2] > bvj) { bvj = k[i2]; bj = i2; } if (bj < 0) break; k[bj]--; K--; }
++    }
++    var cars = [];
++    veins.forEach(function (v, i3) {
++      var base = Math.floor(v.size / k[i3]), extra = v.size - base * k[i3];
++      for (var j3 = 0; j3 < k[i3]; j3++) cars.push({ color: v.color, count: base + (j3 < extra ? 1 : 0), round: v.round, veinIdx: i3 });
++    });
++    // 债务节拍：债车 = 一辆「颜色还没露脸」的车（取它 → 纯债；该色第一层矿脉开出 → 自动结清）
++    //   【v153 更正】先把"每笔债用哪个颜色"定下来（beatPlan），供上一步的排序把债车提前到位。
++    var cumAll = [], acc = 0, beatOut = [], beatOK = 0, beatPlan = [];
++    for (var d2 = 1; d2 <= rounds; d2++) { acc += (layerTot[d2] || 0); cumAll[d2] = acc; }
++    var firstRound = {};
++    for (var q3 = 0; q3 < veins.length; q3++) { var vv3 = veins[q3]; if (firstRound[vv3.color] == null || vv3.round < firstRound[vv3.color]) firstRound[vv3.color] = vv3.round; }
++    for (var b5 = 0; b5 < beatsArr.length; b5++) {
++      var bt0 = beatsArr[b5], tp0 = bt0.pos / 100 * P, rs0 = 1;
++      for (var d5 = 1; d5 <= rounds; d5++) if (cumAll[d5] >= tp0) { rs0 = d5; break; }
++      var cd0 = Object.keys(firstRound).map(Number).filter(function (c) { return firstRound[c] > rs0; })
++        .sort(function (a, b) { return firstRound[a] - firstRound[b]; });
++      if (cd0.length && !(bt0.size > colTot[cd0[0]])) beatPlan.push({ pos: bt0.pos, size: bt0.size, debtColor: cd0[0], firstRound: firstRound[cd0[0]], rStar: rs0 });
++    }
++    // ---------- 排列：按【供给时刻】排位，再按债务节拍把债车提前（用户 2026-10-16 更正） ----------
++    //   用户原话：「顶行可以没有过多颜色，我们的目的就是控制各个球的出现时机，来造成卡点和解决」。
++    //   所以排序的目标不是"顶行颜色多"，而是**时机**：
++    //     ① 默认：每辆车排在"它的供给到来"的那一步附近（车到时货刚到 → 平顺、无债）；
++    //     ② 债务节拍：把指定的债车【提前】到节拍进度处（车比货早到 → 全额进暂存 = 这笔债）；
++    //     ③ 解药：债色的后续矿脉（更深的像素）由别的颜色的车剥开 —— 那些车按供给序天然排在债车之后，
++    //        于是"取债车 → 再去吃几辆解药车 → 债自动结清"这条链就成立了。
++    var cum = [], acc2 = 0;
++    for (var vi = 0; vi < veins.length; vi++) { acc2 += veins[vi].size; cum[vi] = acc2; }
++    cars.forEach(function (c) { c.supplyPct = P ? (cum[c.veinIdx] / P * 100) : 0; });
++    var ordered = cars.slice().sort(function (a, b) {
++      return (a.supplyPct - b.supplyPct) || (a.color - b.color) || (b.count - a.count);
++    });
++    // 债务节拍（进 beatProps 的那几笔）：把该色的车从供给时刻提前到节拍位置
++    var beatsForOrder = beatPlan;
++    var moved = [];
++    for (var bi = 0; bi < beatsForOrder.length; bi++) {
++      var bt2 = beatsForOrder[bi];
++      var hostIdx = Math.max(0, Math.min(ordered.length - 1, Math.round(bt2.pos / 100 * ordered.length)));
++      // 挑一辆该色的车（优先容量最接近节拍量、且还没被挪过的）
++      var pickI = -1, bestD = Infinity;
++      for (var ci = 0; ci < ordered.length; ci++) {
++        var cc = ordered[ci];
++        if (cc.color !== bt2.debtColor || cc._moved) continue;
++        var dd = Math.abs(cc.count - (bt2.size || cc.count));
++        if (dd < bestD) { bestD = dd; pickI = ci; }
++      }
++      if (pickI < 0) continue;
++      var car = ordered.splice(pickI, 1)[0];
++      car._moved = 1;
++      var to = Math.max(0, Math.min(ordered.length, hostIdx));
++      ordered.splice(to, 0, car);
++      moved.push({ color: car.color, cap: car.count, pos: bt2.pos, from: Math.round(car.supplyPct) });
++    }
++    cars.length = 0; cars.push.apply(cars, ordered);
++    if (moved.length) {
++      console.log('[切球规划器] 债务节拍提前：' + moved.map(function (m) { return m.color + '号(容量' + m.cap + ') 供给' + m.from + '%→ 排在' + m.pos + '%'; }).join('；'));
++    }
++
++    for (var b4 = 0; b4 < beatsArr.length; b4++) {
++      var bt = beatsArr[b4], targetPx = bt.pos / 100 * P, rStar = 1;
++      for (var d3 = 1; d3 <= rounds; d3++) if (cumAll[d3] >= targetPx) { rStar = d3; break; }
++      var cand = Object.keys(firstRound).map(Number).filter(function (c) { return firstRound[c] > rStar; })
++        .sort(function (a, b) { return firstRound[a] - firstRound[b]; });
++      if (!cand.length) { beatOut.push('✗ 进度' + bt.pos + '%：这个进度之后没有还没露脸的颜色了'); continue; }
++      var color = cand[0];
++      if (bt.size > colTot[color]) { beatOut.push('✗ 进度' + bt.pos + '%：债太大（' + color + ' 号色总共 ' + colTot[color] + ' 像素）'); continue; }
++      var mine = cars.filter(function (c) { return c.color === color; })
++        .sort(function (a, b) { return Math.abs(a.count - bt.size) - Math.abs(b.count - bt.size); });
++      if (!mine.length) { beatOut.push('✗ 进度' + bt.pos + '%：该色没有车辆'); continue; }
++      mine[0].count = bt.size;
++      var rest = colTot[color] - bt.size, others = cars.filter(function (c) { return c.color === color && c !== mine[0]; });
++      var ob = others.length ? Math.max(1, Math.floor(rest / others.length)) : 0;
++      others.forEach(function (c, i) { c.count = (i === others.length - 1) ? Math.max(1, rest - ob * (others.length - 1)) : ob; });
++      beatOut.push('✓ 进度' + bt.pos + '%：' + color + ' 号色（还没露脸）1 辆容量 ' + bt.size + '，解药 = 第' + firstRound[color] + ' 轮露脸（距离 ' + (firstRound[color] - rStar) + ' 轮）');
++      beatOK++;
++    }
++    return { cars: cars, veins: veins, rounds: rounds, beatOut: beatOut, beatOK: beatOK, pixelTotal: P, colorTotal: Object.keys(colTot).length };
++  }
++
++  /** 规划按钮：对当前选中（或第一张）目标图规划，并把结果写到面板 */
++  function cutplanRun() {
++    var el = function (id) { return document.getElementById(id); };
++    var idx = currentLevelIdx >= 0 ? currentLevelIdx : 0;
++    if (!levelList[idx] || !levelList[idx].blocks) { genLog('切球规划器：请先导入目标图', 'gen-log-warn'); return; }
++    var stepsN = parseInt((el('cutplan-steps') || {}).value, 10) || 0;
++    var beats = cutplanParseBeats((el('cutplan-beats') || {}).value);
++    var plan = cutplanBuild(levelList[idx].blocks, stepsN, beats);
++    cutPlanParams = { steps: stepsN, beatsText: (el('cutplan-beats') || {}).value || '' };
++    var useEl = el('cutplan-use'); if (useEl) useEl.disabled = false, useEl.checked = true;
++    var lines = ['第 ' + (idx + 1) + ' 张图：矿脉 ' + plan.veins.length + ' 条（' + plan.rounds + ' 轮）→ 车单 ' + plan.cars.length + ' 辆（平均容量 ' + (plan.pixelTotal / plan.cars.length).toFixed(1) + '）'];
++    plan.veins.forEach(function (v) { lines.push('  第' + v.round + '轮 ' + v.color + ' 号色 ×' + v.size + ' → ' + (plan.cars.filter(function (c) { return c.round === v.round && c.color === v.color; }).length) + ' 辆'); });
++    if (plan.beatOut.length) { lines.push('债务节拍：'); plan.beatOut.forEach(function (t) { lines.push('  ' + t); }); }
++    lines.push('已勾选「生成时使用这份车单」——点「▶ 批量生产」即按这份切法生成。');
++    el('cutplan-body').textContent = lines.join('\n');
++    genLog('切球规划器：第 ' + (idx + 1) + ' 张图 车单 ' + plan.cars.length + ' 辆（平均容量 ' + (plan.pixelTotal / plan.cars.length).toFixed(1) + '）' +
++      (plan.beatOK ? '｜债务节拍 ' + plan.beatOK + ' 笔' : ''), 'gen-log-ok');
++  }
++
+   function runGenerate() {
+     var config = getGenConfig();
+ 
++    // 【v153】切球规划器：勾了「使用这份车单」→ 把规划车单作为切法（forcedBoxes 直通）。
++    //   同时临时关闭碎色闸门：规划内的碎色是「背债车」的压力素材，不是缺陷（用户 2026-10-15 模型）。
++    if (cutPlanParams && (document.getElementById('cutplan-use') || {}).checked && currentLevelIdx >= 0 && levelList[currentLevelIdx]) {
++      var plan = cutplanBuild(levelList[currentLevelIdx].blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText));
++      config.forcedBoxes = plan.cars;
++      if (config.fragmentMaxRate) {
++        config.fragmentMaxRate = 0;
++        genLog('切球规划器：碎色闸门已临时关闭（规划内的碎色 = 背债车素材，不再按缺陷拦截）', 'gen-log-warn');
++      }
++      genLog('切球规划器：使用车单 ' + plan.cars.length + ' 辆（目标步数 ' + cutPlanParams.steps + '，债务节拍 ' + plan.beatOK + ' 笔）', 'gen-log-ok');
++    }
++
+     // 如果当前有导入的TXT图，使用它
+     if (currentLevelIdx >= 0 && levelList[currentLevelIdx]) {
+       var entry = levelList[currentLevelIdx];
++      config = genApplyAuto(config, entry.blocks, entry.name);   // 【v153】自动档：容量/障碍数量由规则推
+       config.mapSize = entry.blocks.length;
+ 
+       document.getElementById('solve-result').classList.remove('hidden');
+@@ -4160,11 +4775,19 @@
+   //   这里对【网络层失败】自动重试一次（服务端按 batchId+inputIndex 幂等，重发不会重复写）；仍失败才交给上层暂停+人工重试。
+   function genApi(pathname, body) {
+     var payload = JSON.stringify(body || {});
++    // 【v153 修复「批量一直转、已处理 0」】原实现没有超时：服务没响应时 fetch 永远不 settle，
++    //   落库回调既不成功也不失败 → 该槽位永远停在这一关，界面只有"处理中"，看不出任何错误。
++    //   现在：15 秒超时 → 判定失败（上层降级为内存模式继续生产）。
++    var TIMEOUT_MS = 15000;
+     function once() {
+-      return fetch(pathname, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload })
+-        .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'HTTP ' + r.status }; }); });
++      var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
++      var timer = ctl ? setTimeout(function () { try { ctl.abort(); } catch (e) {} }, TIMEOUT_MS) : null;
++      return fetch(pathname, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload,
++                               signal: ctl ? ctl.signal : undefined })
++        .then(function (r) { if (timer) clearTimeout(timer); return r.json().catch(function () { return { ok: false, error: 'HTTP ' + r.status }; }); },
++              function (err) { if (timer) clearTimeout(timer); return { ok: false, error: String((err && err.message) || err) }; });
+     }
+-    return once().catch(function () { return once(); });
++    return once().then(function (r) { return (r && r.ok) ? r : once(); });   // 失败重试一次（服务端按 batchId+inputIndex 幂等）
+   }
+ 
+   // 探测本地生产服务是否可用（file:// 或未起服务时会失败 → 回退旧模式）
+@@ -4274,7 +4897,11 @@
+         genPersistStatusEl('落库失败 ' + Object.keys(genPersist.pendingPayloads).length + ' 关：' + e.message, 'err');
+         var retryBtn = document.getElementById('btn-gen-persist-retry');
+         if (retryBtn) retryBtn.classList.remove('hidden');
+-        // 注意：不调 next()。该槽位就此停住不再领新关，避免在服务已经写不进去的情况下继续空转产出。
++        // 【v153】落库服务不可用（超时/断线）时**不把整批停死**：降级为内存模式继续生产，
++        //   结果照常出在结果表里、可「带入棋盘」，收尾给 ZIP 下载；待服务恢复后点「重试落库」补写。
++        genPersist.enabled = false;
++        genLog('⚠ 落库服务不可用 → 已切换为「内存模式」继续生产（结果仍在结果表里、可带入棋盘；服务恢复后点「重试落库」补写，或最后下载 ZIP）。', 'gen-log-warn');
++        if (typeof next === 'function') next();
+       });
+   }
+ 
+@@ -4298,7 +4925,7 @@
+     if (rec.gateBlocked) {
+       var ms = Date.now() - (genInFlightT0[inputIndex] || Date.now());
+       rec._idx = inputIndex; rec._elapsedMs = ms;
+-      genBatchResults.push(rec);
++      genBatchResults.push(rec); genResultHistory.push(rec);   // 【v153】同一条记录也进跨批次历史（展示用）
+       genRenderResultsLive();
+       genLog(entry.name + '  ' + (ms / 1000).toFixed(1) + 's  已跳过·' + rec.gateReasonCN +
+         (rec.gateDetail ? ('（' + rec.gateDetail + '）') : ''), 'gen-log-warn');
+@@ -4318,7 +4945,7 @@
+     rec._idx = inputIndex;             // 并发下必须带下标：落库回调要靠它精确定位本关记录（原先按「最后一个 _full」找会错行）
+     // 耗时按【本关自己的派发时刻】算。原先用全局 genBatch.itemT0，并发下会被后派发的关覆写 → 所有关耗时全错。
+     rec._elapsedMs = Date.now() - (genInFlightT0[inputIndex] || Date.now());
+-    genBatchResults.push(rec);
++    genBatchResults.push(rec); genResultHistory.push(rec);   // 【v153】同记录进跨批次历史
+     genRenderResultsLive();
+     genMaybeAutoMap(rec);
+     var dt = (rec._elapsedMs / 1000).toFixed(1);
+@@ -4329,7 +4956,10 @@
+     if (rec.choiceCurve) {
+       var c2 = rec.choiceCurve;
+       curveTxt = '　选择余地 开局' + c2.opening + ' 中位' + c2.medFull +
+-        ' ≤1占' + c2.lowPct + '% 被迫点' + c2.forcedN + (c2.forcedMid ? ('(中段' + c2.forcedMid + ')') : '') +
++        (rec.fragmentWarn ? (' ⚠ 碎色 ' + (rec.fragmentWarn.match(/碎色率[^，]*/) || [''])[0] + '（已放行：碎色=压力素材）') : '') +
++        ' ≤1占' + c2.lowPct + '% ' + (c2.forcedMid > 0
++          ? ('卡点 ' + c2.forcedMid + ' 处@30~80%')
++          : ('⚠ 30~80% 无卡点（全长 ' + c2.forcedN + ' 处被迫点）')) +
+         (typeof AntSolver.Generator.choiceCurveScore === 'function' ? (' 分' + Math.round(AntSolver.Generator.choiceCurveScore(c2))) : '');
+     }
+     // 【v147】空转比（取盒后暂存没降的步数占比）—— 批量时横向比较"压力是从哪来的"
+@@ -4358,6 +4988,15 @@
+         ab.rowsMin + '~' + ab.rowsMax + ' × ' + ab.colsMin + '~' + ab.colsMax +
+         '（' + ab.cells + ' 格，含管道可带走 ' + ab.pipeCap + ' 辆）', 'gen-log-ok');
+     }
++    // 【v153】源图体检：开局暴露颜色数 —— "这张图能不能出有选择的关"的第一判据（源图属性，不是参数问题）。
++    //   只在小到"开局几乎没得选"时才报成警告色，其余按正常信息显示，避免天天报警没人看。
++    if (result && result.boardFit && result.boardFit.openingExposure) {
++      var oe = result.boardFit.openingExposure;
++      var oeTxt = '开局可选性：这张图开局只暴露 ' + oe.exposedColors + '/' + oe.totalColors +
++        ' 种颜色' + (oe.top ? ('（最多 ' + oe.top.color + ' 号色 ' + oe.top.px + ' 像素）') : '') +
++        (oe.exposedColors <= 2 ? ' → 前段几乎没得选，属源图剪影问题，调参改不了' : ' → 开局有分支');
++      genLog(oeTxt, oe.exposedColors <= 2 ? 'gen-log-warn' : 'gen-log-ok');
++    }
+     // 【v149】管道下限被自动降级时如实说出来（否则用户会以为"我明明设了 4 条"）
+     if (rec._autoPipeClamp) {
+       var pc = rec._autoPipeClamp;
+@@ -4395,7 +5034,7 @@
+ 
+   function genOnError(entry, msg, inputIndex, next) {
+     var rec = { name: entry ? entry.name : '(未知)', valid: false, audit: null, difficulty: 0, grade: '-', fallback: false, error: msg, _idx: inputIndex };
+-    genBatchResults.push(rec);
++    genBatchResults.push(rec); genResultHistory.push(rec);   // 【v153】同记录进跨批次历史
+     genRenderResultsLive();
+     genLog(rec.name + '  异常: ' + msg, 'gen-log-err');
+     if (genPersist.enabled) {
+@@ -4437,6 +5076,11 @@
+     if (genBatchRunning) return;
+ 
+     var config = getGenConfig();
++    // 【v153】切球规划器：哪几张图勾了「使用这份车单」，就把规划车单作为该关的切法（forcedBoxes 直通），
++    //   并临时关闭碎色闸门——规划内的碎色是「背债车」的压力素材，不是缺陷（用户 2026-10-15 模型）。
++    var cutUseChecked = !!(document.getElementById('cutplan-use') || {}).checked;
++    var planIdx = {};
++    if (cutPlanParams && cutUseChecked) for (var pi = 0; pi < levelList.length; pi++) planIdx[pi] = true;
+     var progressCard = document.getElementById('gen-progress-card');
+     var resultCard = document.getElementById('gen-result-card');
+     if (progressCard) progressCard.classList.remove('hidden');
+@@ -4449,6 +5093,8 @@
+     if (hint0) hint0.textContent = '';
+     var logEl = document.getElementById('gen-log');
+     if (logEl) logEl.innerHTML = '';
++    // 【v153】切球规划器提示（放在日志清空之后，保证可见）
++    if (cutPlanParams && cutUseChecked) genLog('切球规划器：本批 ' + levelList.length + ' 张图按规划车单切球（碎色闸门临时关闭）', 'gen-log-ok');
+     genUpdateStatChips([]);
+     genUpdateProgressBar(0, levelList.length);
+ 
+@@ -4459,6 +5105,8 @@
+ 
+     genBatchRunning = true; genBatchAborted = false; genBatchStartAt = Date.now();
+     genBatchResults = [];
++    genResultHistory.push({ __batch: true, label: '批次 ' + (genBatch && genBatch.dirName ? genBatch.dirName : '') + ' · ' +
++      new Date().toLocaleTimeString('zh-CN', { hour12: false }) + ' · ' + levelList.length + ' 张图' });
+ 
+     // 按【简单关比例】把本批次里的部分关卡预先标记为"简单关名额"(requireHardPass=false)/其余"困难关名额"，
+     // 用等间距分布(Bresenham 式)让名额均匀撒在整批里。比例由 UI「简单关比例(%)」控制，默认30%。
+@@ -4539,6 +5187,32 @@
+     });
+   }
+ 
++  /**
++   * 【v153】单关进度心跳 + 每一跳日志。
++   *   用户 2026-10-16：「这也太慢了吧，也没进度条，为什么这么久」——单关最坏烧满预算（默认 5 分钟），
++   *   期间界面只有一句"处理中"，看不出是在跑还是卡死。这里做三件事：
++   *     ① 派发/返回/落库各打一条带用时的日志（卡在哪一跳一眼可见）；
++   *     ② produce 内部的进度钩子（候选 k/K、轮 r/N、已试变体数、当前最好档）刷新"处理中"那行；
++   *     ③ 心跳更新时间行，证明还在跑。
++   */
++  var genLastProgressPaint = 0;
++  function genSlotProgress(slot, p) {
++    if (!p || !genBatchRunning) return;
++    var now = Date.now();
++    if (now - genLastProgressPaint < 250) return;
++    genLastProgressPaint = now;
++    var idx = (slot && slot.idx != null && slot.idx >= 0) ? slot.idx : 0;
++    var total = (genBatch && genBatch.total) || levelList.length;
++    var nm = (levelList[idx] && levelList[idx].name) || '';
++    var el = document.getElementById('gen-progress-current');
++    if (el) el.textContent = '处理中 (' + (idx + 1) + '/' + total + '): ' + nm +
++      '　· 候选 ' + (p.k || 1) + '/' + (p.K || 1) + ' · 轮 ' + (p.round || 0) + '/' + (p.N || 0) +
++      ' · 已试 ' + (p.evaluated || 0) + ' 个变体 · 本关 ' + ((p.elapsedMs || 0) / 1000).toFixed(0) + 's' +
++      ((p.tier != null) ? (' · 当前最好档 ' + p.tier + '/3') : '');
++    var te = document.getElementById('gen-progress-time');
++    if (te) te.textContent = '已用时 ' + Math.round((Date.now() - (genBatchStartAt || Date.now())) / 1000) + 's · 本关已跑 ' + ((p.elapsedMs || 0) / 1000).toFixed(0) + 's（每关完成即可用，可随时停止）';
++  }
++
+   // ==================== 后台线程池 ====================
+   // 池内每个槽位是一个独立 Worker，同一时刻各自处理【一关】。槽位空闲就领走下一个待处理下标，
+   // 因此快关不会被慢关堵住（改动前的串行结构里，一关跑满 5 分钟预算会把后面全部关卡一起拖住）。
+@@ -4576,8 +5250,19 @@
+         return;
+       }
+       if (d.type === 'loadfail') { clearTimeout(readyTimer); genSlotDead(slot, '后台线程脚本加载失败'); return; }
+-      if (d.type === 'result') { clearTimeout(slot.watchdog); genSlotSettle(slot, d.index, function (next) { genOnResult(levelList[d.index], d.result, d.index, next); }); return; }
+-      if (d.type === 'error') { clearTimeout(slot.watchdog); genSlotSettle(slot, d.index, function (next) { genOnError(levelList[d.index], d.message, d.index, next); }); return; }
++      if (d.type === 'progress') { genSlotProgress(slot, d.p); return; }   // 【v153】单关进度心跳
++      if (d.type === 'result') {
++        clearTimeout(slot.watchdog);
++        var _dt = ((Date.now() - (genInFlightT0[d.index] || Date.now())) / 1000).toFixed(1);
++        genLog('✔ 线程' + (slot.no + 1) + ' 返回：' + ((levelList[d.index] && levelList[d.index].name) || '') + '　' +
++          (d.result && d.result.level ? '有关卡' : ('无关卡 ' + ((d.result && d.result.lastFailReason) || '?'))) + '　用时 ' + _dt + 's', 'gen-log-ok');
++        genSlotSettle(slot, d.index, function (next) { genOnResult(levelList[d.index], d.result, d.index, next); }); return;
++      }
++      if (d.type === 'error') {
++        clearTimeout(slot.watchdog);
++        genLog('✗ 线程' + (slot.no + 1) + ' 报错：' + d.message, 'gen-log-warn');
++        genSlotSettle(slot, d.index, function (next) { genOnError(levelList[d.index], d.message, d.index, next); }); return;
++      }
+     };
+     slot.w.onerror = function (err) {
+       if (epoch !== slot.epoch) return;
+@@ -4641,16 +5326,26 @@
+     if (idx < 0) { slot.busy = false; slot.idx = -1; genMaybeFinalize(); return; }
+ 
+     var entry = levelList[idx], isEasy = !!b.easySlot[idx];
++    // 【v153 修复】切球规划器的"本批要不要用车单"必须在**本函数作用域内**重新取一次。
++    //   planIdx/cutPlanParams/cutUseChecked 都是 batchProduce 的局部变量，这里根本看不见 ——
++    //   原写法 `planIdx[idx] ? ... : null` 会在【第一关派发时】抛 ReferenceError: planIdx is not defined，
++    //   异常沿 ready 回调冒出去 → 整条派发链死掉 → 界面永远"处理中"、不写盘、连错误都不报
++    //   （用户 2026-10-16 全部批次"已处理 0"的真因；用假 Worker 的派发链路测试复现）。
++    var wantPlan = !!(cutPlanParams && (document.getElementById('cutplan-use') || {}).checked);
+     slot.busy = true; slot.idx = idx;
+     genInFlightT0[idx] = Date.now();
+     genPoolProgressText();
+     slot.w.postMessage({
+       cmd: 'produce', index: idx, blocks: entry.blocks,
+-      config: Object.assign({}, b.config, {
++      config: Object.assign({}, genApplyAuto(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
+         mapSize: entry.blocks.length, requireHardPass: !isEasy,
+-        isBossSlot: !!(b.bossSlot && b.bossSlot[idx])      // BOSS 规格逐关透传（卡点类型配额用）
++        isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
++        forcedBoxes: wantPlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,  // 【v153】逐图现算车单直通
++        fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
+       })
+     });
++    genLog('▶ 线程' + (slot.no + 1) + ' 接单：' + entry.name + '（车单' + (wantPlan ? '=' + cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars.length + '辆' : '自动') +
++      ' · 候选' + (b.config.candidateCount || 1) + ' × 轮' + (b.config.difficultyRounds || 1) + '）', '');
+     // 单关看门狗：超过【单关预算 + 2 分钟余量】仍无返回 → 判定该关卡死，跳过并只重启这一个槽（预算=0/不限时则不设）
+     clearTimeout(slot.watchdog);
+     var budget = (b.config && b.config.timeBudgetMs != null) ? b.config.timeBudgetMs : 300000;
+@@ -4721,6 +5416,7 @@
+   // ---- 主线程模式(后台线程不可用时的回退)：只能串行，每关 produce 前先检查停止标记，避免多跑一关 ----
+   //   本模式【不并发】——主线程跑 produce 本身就阻塞页面，多开无意义。仅在 Worker 完全不可用时兜底。
+   function genRunSync() {
++    var cutUseChecked = !!(document.getElementById('cutplan-use') || {}).checked;   // 【v153】切球规划器开关
+     function step() {
+       if (!genBatchRunning) return;
+       var b = genBatch;
+@@ -4746,11 +5442,20 @@
+           step();
+         }
+         try {
+-          var cfg = Object.assign({}, b.config, {
++          // 【v153】主线程路径也接进度钩子（同一套显示；跑完清掉，避免影响后面的求解/模拟）
++          if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: curIdx, no: 0 }, p); });
++          var usePlan = cutPlanParams && cutUseChecked;   // 【v153】主线程串行路径同样逐图现算车单直通
++          var cfgAuto = genApplyAuto(b.config, entry.blocks, entry.name);   // 【v153】自动档
++          var cfg = Object.assign({}, cfgAuto, {
+             mapSize: entry.blocks.length, requireHardPass: !isEasy,
+-            isBossSlot: !!(b.bossSlot && b.bossSlot[curIdx])
++            isBossSlot: !!(b.bossSlot && b.bossSlot[curIdx]),
++            forcedBoxes: usePlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,
++            fragmentMaxRate: usePlan ? 0 : (b.config.fragmentMaxRate || 0)
+           });
+           var result = AntSolver.Generator.produce(entry.blocks, cfg);
++          if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(null);
++          genLog('✔ 主线程完成：' + entry.name + '　' + (result && result.level ? '有关卡' : ('无关卡 ' + ((result && result.lastFailReason) || '?'))) +
++            '　用时 ' + ((Date.now() - (genInFlightT0[curIdx] || Date.now())) / 1000).toFixed(1) + 's', 'gen-log-ok');
+           genOnResult(entry, result, curIdx, afterOne);
+         } catch (err) { genOnError(entry, err.message, curIdx, afterOne); }
+       }, 10);
+@@ -4799,7 +5504,7 @@
+           if (curEl2) curEl2.textContent = (genBatchAborted ? '已停止' : '已完成') + '，输出目录：' + relDir;
+         })
+         .catch(function (e) { genLog('收尾通知服务失败：' + e.message + '（已落库的关卡不受影响）', 'gen-log-warn'); });
+-      renderGenResultTable(results);
++      renderGenResultTable(genResultHistory, true);   // 【v153】收尾也用历史渲染（跨批次保留）
+       var resultCardP = document.getElementById('gen-result-card');
+       if (resultCardP) resultCardP.classList.remove('hidden');
+       var cntElP = document.getElementById('gen-result-count');
+@@ -4838,7 +5543,7 @@
+     if (resultCard) resultCard.classList.remove('hidden');
+     var countEl = document.getElementById('gen-result-count');
+     if (countEl) countEl.textContent = '(' + results.length + ')';
+-    renderGenResultTable(results);
++    renderGenResultTable(genResultHistory, true);   // 【v153】收尾也用历史渲染（跨批次保留）
+ 
+     if (!AntSolver.Zip) { alert('ZIP模块未加载'); return; }
+ 
+@@ -4862,6 +5567,11 @@
+ 
+     for (var i = 0; i < results.length; i++) {
+       var r = results[i];
++      // 【v153 修复】前置闸门拦下/候选全灭的结果没有关卡体（level=undefined）——
++      //   旧代码直接 parseLevel(undefined) 抛错 → 收尾中断 → 界面永远停在「生产中」，
++      //   用户以为挂了只能手动停止（实测 2026-10-15 19:18 批次：规划车单 + 重度障碍 → 候选全灭 → 卡 12 分钟）。
++      //   失败结果本来就在结果表里如实列出原因，ZIP 里没有可打包的关卡体，跳过即可。
++      if (!r.level) continue;
+       var base = safeName(r.name);
+       if (used[base]) base = base + '_' + i;   // 去重
+       used[base] = true;
+@@ -5096,17 +5806,44 @@
+     var card = document.getElementById('gen-result-card');
+     if (card) card.classList.remove('hidden');
+     var cntEl = document.getElementById('gen-result-count');
+-    if (cntEl) cntEl.textContent = '（进行中 ' + genBatchResults.length + ' 关）';
++    if (cntEl) cntEl.textContent = '（进行中：本批 ' + genBatchResults.length + ' 关 · 表内累计 ' + genResultHistory.filter(function (x) { return !x.__batch; }).length + ' 关）';
+     var body = document.getElementById('gen-result-body');
+     var keepTop = body ? body.scrollTop : 0;
+-    renderGenResultTable(genBatchResults);
++    renderGenResultTable(genResultHistory, true);   // 【v153】渲染跨批次历史（含批次头）
+     if (body) body.scrollTop = keepTop;
+   }
+ 
+-  function renderGenResultTable(results) {
++  function renderGenResultTable(results, withBatchHeads) {
+     var body = document.getElementById('gen-result-body');
+     if (!body) return;
+     if (!results || !results.length) { body.innerHTML = ''; return; }
++    // 【v153】带批次头模式：批次头原样插在它的关卡行之前（历史累积展示用）
++    if (withBatchHeads) {
++      // 跨批次历史：按批次分段，段内仍按「排序」下拉排（批次之间不打乱顺序，方便上下对比）
++      var sortBy0 = (document.getElementById('gen-result-sort') || {}).value || 'order';
++      var segs = [], cur = { head: null, rows: [] };
++      for (var hi = 0; hi < results.length; hi++) {
++        var it = results[hi];
++        if (it.__batch) { if (cur.head || cur.rows.length) segs.push(cur); cur = { head: it.label, rows: [] }; continue; }
++        cur.rows.push(it);
++      }
++      segs.push(cur);
++      var html = '', orderN = 0;
++      genResultRows = [];                       // 【v153】重建：按钮以 data-rec 指向本表下标
++      segs.forEach(function (sg) {
++        if (sg.head) html += '<div class="gen-result-batch" style="margin:6px 0 2px;font-size:11px;color:#8a7358;border-top:1px dashed #d8c8b0;padding-top:4px">' + sg.head + '</div>';
++        var rs = sg.rows.slice();
++        rs.sort(function (a, b) {
++          if (sortBy0 === 'name') return String(a.name).localeCompare(String(b.name), 'zh');
++          if (sortBy0 === 'difficulty-desc') return (b.difficulty || 0) - (a.difficulty || 0);
++          if (sortBy0 === 'difficulty-asc') return (a.difficulty || 0) - (b.difficulty || 0);
++          return 0;
++        });
++        rs.forEach(function (r2) { genResultRows.push(r2); html += rowHtml({ r: r2, order: orderN++ }); });
++      });
++      body.innerHTML = html;
++      return;
++    }
+     var sortBy = (document.getElementById('gen-result-sort') || {}).value || 'order';
+     var groupBy = (document.getElementById('gen-result-group') || {}).value || 'none';
+     var items = results.map(function (r, i) { return { r: r, order: i }; });
+--- a/bin/js/gen-worker.js
++++ b/bin/js/gen-worker.js
+@@ -20,6 +20,12 @@
+   _loaded = false;   // 加载失败(如本地 file:// 方式打开时被浏览器拦截) → 主线程会回退到主线程模式
+ }
+ 
++// 【v153】注册进度钩子：produce 内部每跑完一个候选/变体就上报一次，主线程据此刷新"跑到哪了"。
++//   为什么要它：单关最坏要烧满时间预算（默认 5 分钟），期间界面只有一句"处理中"，看起来像卡死。
++if (_loaded && AntSolver.Generator.setProgressHook) {
++  AntSolver.Generator.setProgressHook(function (p) { self.postMessage({ type: 'progress', p: p }); });
++}
++
+ self.onmessage = function (e) {
+   var d = e.data || {};
+   if (d.cmd === 'ping') {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=151">
++  <link rel="stylesheet" href="css/style.css?v=153">
+ </head>
+ <body>
+   <header>
+@@ -14,6 +14,15 @@
+          退出模拟就自动回到生成器的参数面板。 -->
+     <div class="header-actions" id="header-actions">
+       <button id="btn-import-txt">导入TXT图</button>
++      <!-- 【v154·色库】读图色库：决定 TXT 里的数字按哪套色库解释。
++           老色库=34色（0 空位，1-34 颜色）；新色库=官方 0-21（-1 空位，0 = 黄色）。
++           两套色库无一色相同，读错会实打实改颜色，所以这里必须显式可选。 -->
++      <select id="colorlib-select" title="读图色库：导入 TXT 时数字按哪套色库解释。&#10;&#10;· 自动识别（推荐）：有 -1 判为官方色库；有 >21 的编号判为老色库；实心图（无 0 无 -1）判据不足时会提示，需手动指定。&#10;· 老色库 34 色：0 = 空位，1-34 = 颜色（本工程一直用的那套）。&#10;· 官方色库 0-21：-1 = 空位，0 = 黄色（官方 JSON 原始颜色矩阵那套，300 关在 参考/色库/ 里）。">
++        <option value="auto">读图色库：自动识别</option>
++        <option value="older">读图色库：老色库 34 色</option>
++        <option value="official">读图色库：官方色库 0-21</option>
++      </select>
++      <button id="btn-colorlib" title="新老色库转换：查看两套色库的对照表，并把当前图/本批全部图在 老色库(34色) ↔ 官方色库(0-21) 之间互转、下载转换后的 TXT。">🎨 色库转换</button>
+       <button id="btn-import-pack" title="导入整个关卡包文件夹（关卡/ + 审核数据/），自动配对求解数据">导入关卡包📁</button>
+       <button id="btn-generate">生成关卡</button>
+       <button id="btn-manual-edit" title="手动摆盒：车场里每格的车（颜色/载客量/空位/黑块）自己点着放。目标图仍用「导入TXT图」，也可以先「导入关卡包」把现成车场带进来再改。摆完可带入模拟器或导出关卡JSON/TXT">✏️ 手动摆盒</button>
+@@ -303,6 +312,8 @@
+       </div>
+       <div id="gen-file-list" class="gen-file-list"></div>
+       <div id="gen-file-empty" class="gen-file-empty">尚未导入任何目标图</div>
++      <!-- 【v154】色库提示行：用了官方色库读入多少张 / 多少张判据不足，由 app.js 的 renderColorlibHint 填 -->
++      <div id="gen-colorlib-hint" class="gen-hint"></div>
+     </div>
+ 
+     <!-- ==================== 【v147】难度档 + 压力来源 ====================
+@@ -311,8 +322,30 @@
+                   它会把具体数值写进下面那些控件里，所以"自动"与"手动微调"是同一套数字，不会打架。
+          压力来源 = 在难度档之上做减法：取消勾选就等于把那一类障碍清零。 -->
+     <div class="gen-section">
+-      <h2>2. 难度</h2>
++      <h2>2. 生成设置</h2>
++      <!-- 【v153】自动档：只填「关卡时长」，盒容量与功能块数量全部由规则推（实测口径见工作日志第二十二节） -->
+       <div class="gen-row">
++        <label title="自动档：按「像素数 ÷ 目标车数」推盒容量，再按「债务节拍」推冰/锁链/问号/管道的数量。&#10;手动档：下面所有旋钮由你自己调（原有行为，逐值不变）。">参数档位</label>
++        <select id="gen-param-mode" style="flex:1">
++          <option value="auto" selected>自动（推荐：只填关卡时长）</option>
++          <option value="manual">手动（下面全部自己调）</option>
++        </select>
++      </div>
++      <div class="gen-row">
++        <label title="一次设定三项决定「一批要跑多久」的旋钮：候选数 / 难度轮数 / 单关时间预算。&#10;&#10;实测：单关最长可以烧满时间预算（默认 5 分钟），一批 6 张图并发 6 线程 → 全批约等于【单关最慢那一关】。&#10;快速档适合调参数/试图；精产档适合正式出库。">生产档位</label>
++        <select id="gen-speed-tier" style="flex:1">
++          <option value="fast">快速（候选3 · 轮数2 · 2分钟/关）</option>
++          <option value="std">标准（候选4 · 轮数4 · 3分钟/关）</option>
++          <option value="pro" selected>精产（候选6 · 轮数7 · 5分钟/关）</option>
++        </select>
++      </div>
++      <div class="gen-row" id="gen-auto-row">
++        <label title="关卡时长 = 这关要几辆车。平均车容量 = 彩色像素数 ÷ 步数。&#10;0 = 自动（按像素数推，约 40~55 步）。">关卡时长</label>
++        <input type="number" id="gen-target-steps" value="0" min="0" max="999" step="1" style="width:80px">
++        <span class="gen-hint">步数（车数）；0=自动</span>
++      </div>
++            <div class="gen-hint" id="gen-auto-info">自动档：盒容量 / 冰 / 锁链 / 问号 / 管道 数量都由规则推，日志里会写出每一个数是怎么来的。</div>
++      <div class="gen-row">
+         <label title="一整套难度旋钮的预设。选它之后下面「障碍设置 / 批量生产参数」里的具体数值会被写进去；&#10;你自己再动过任何一项，这里会自动变成「自定义」。&#10;&#10;极难档会顺带把「切盒方式」换成锚点切盒 —— 实测那是目前唯一能自动做出真卡点的切法。">难度档</label>
+         <select id="gen-preset" style="flex:1">
+           <option value="简单">简单（障碍少、六成是简单关）</option>
+@@ -334,13 +367,10 @@
+       <div class="gen-row">
+         <label class="gen-hint" title="【v151·实验，默认关】打开后，生成器在同档候选里优先挑「选择余地曲线」形状好的：&#10;  曲线 = 每步有几个「能吃满」的选项（≥3 有得选、≤1 只能按既定路线走）。&#10;  曲线被压平（≤1 占比 ≥35% 或 中位 ≤2）时还会强制降压（障碍 ×0.7、锁链 −2）。&#10;&#10;⚠ 为什么默认关：它只改「同档候选谁胜出」。实测在你那张 32×27 图上，极难档的候选池整体都是扁的，&#10;  挑不出好曲线 —— 没证明能改善之前不动生产口径（保持逐字节可复现）。&#10;  曲线统计与火花线无论开关都会算、都会写进日志与逐关记录。"> <input type="checkbox" id="gen-curve-score"> 按「选择余地」曲线挑关卡（实验）</label>
+       </div>
+-      <div class="gen-row">
+-        <label class="gen-hint" title="引擎内部兜底项（棋盘尺寸、管道三级兜底、填盘交错、候选数、时间预算、卡点逐类参数…）。&#10;平时不用看；要精细控制时再打开。"> <input type="checkbox" id="gen-show-advanced"> 显示高级参数</label>
+-      </div>
+     </div>
+ 
+     <!-- 参数方案 -->
+-    <div class="gen-section">
++    <div class="gen-section hidden" id="gen-sec-scheme">
+       <div class="gen-accordion-head" data-target="gen-acc-scheme">
+         <span class="gen-acc-arrow">▾</span><h2>参数方案</h2>
+       </div>
+@@ -360,7 +390,7 @@
+     </div>
+ 
+     <!-- 基础参数 -->
+-    <div class="gen-section">
++    <div class="gen-section hidden" id="gen-sec-basic">
+       <div class="gen-accordion-head" data-target="gen-acc-basic">
+         <span class="gen-acc-arrow">▾</span><h2>基础参数</h2>
+       </div>
+@@ -416,7 +446,7 @@
+     </div>
+ 
+     <!-- 障碍设置 -->
+-    <div class="gen-section">
++    <div class="gen-section hidden" id="gen-sec-obstacle">
+       <div class="gen-accordion-head" data-target="gen-acc-obstacle">
+         <span class="gen-acc-arrow">▾</span><h2>障碍设置</h2>
+       </div>
+@@ -469,7 +499,7 @@
+     </div>
+ 
+     <!-- 棋盘尺寸 -->
+-    <div class="gen-section" id="gen-sec-board">
++    <div class="gen-section hidden" id="gen-sec-board">
+       <div class="gen-accordion-head" data-target="gen-acc-board">
+         <span class="gen-acc-arrow">▾</span><h2>棋盘尺寸（管道自动装溢出盒）</h2>
+       </div>
+@@ -569,7 +599,7 @@
+     </div>
+ 
+     <!-- 批量生产参数 -->
+-    <div class="gen-section" id="gen-sec-batch">
++    <div class="gen-section hidden" id="gen-sec-batch">
+       <div class="gen-accordion-head" data-target="gen-acc-batch">
+         <span class="gen-acc-arrow">▾</span><h2>批量生产参数</h2>
+       </div>
+@@ -605,8 +635,8 @@
+         </div>
+         <div class="gen-row">
+           <label title="目标图碎色率上限（百分比）。碎色 = 目标图上自己不够大、附近同色也凑不够的色块。&#10;超过该上限的源图在【生成候选之前】就被跳过，不消耗生产预算，生产日志与逐关记录会标明「碎色超限」。&#10;留空或 0 = 关闭闸门（与旧版行为一致）。&#10;【当前默认 22%】用户 2026-08-26 裁决（原 18%，2026-08-25 裁决）。⚠ 修图工具的碎色达标提示仍用 18%，两端已不同源——工具那边判达标的图这里一定不会被卡，但工具判不达标的图这里可能仍能过（22% 更宽）。&#10;&#10;⚠ 2026-08-25 小色块判定已放宽为「小于8像素」(原≤10)，同一张图的碎色率比之前低约4.3个百分点，阈值语义随之变化。&#10;新口径标定（同一批344关、同一份线上好差关标签）：&#10;  四等分 Q1≤11.47% 好关率32.6%(各档最高)/严重差关3.5%；Q2≤14.50% 29.1%/9.3%；Q3≤17.19% 24.4%/11.6%；Q4 22.1%/12.8%&#10;  全样本基础率：好关27.0% / 差关31.7%&#10;各阈值在新口径下的过闸率：15.16%→55.5%、18%→79.1%、20.47%→91.3%（旧口径同阈值分别是25.3%/43.0%/60.8%）&#10;⚠ 18% 过闸集的好关率28.7%已接近基础率27.0%，新口径下筛选力较弱（放过约八成图）。要恢复原设计强度请填 11.47。&#10;三批源图过闸率（新口径/旧口径）：200新图 18%→58.5%/13.0%；347修复批 18%→59.9%/28.8%">碎色上限%</label>
+-          <input type="number" id="gen-frag-max" value="22" min="0" max="99" step="0.01" style="width:80px">
+-          <span class="gen-hint">0=关闭；15.16=好关率最高档上界</span>
++          <input type="number" id="gen-frag-max" value="0" min="0" max="99" step="0.01" style="width:80px">
++          <span class="gen-hint">0=关闭（现在默认 0）；填了也只作提醒、不再跳过源图</span>
+         </div>
+         <div class="gen-row">
+           <label title="【仅对「仅底部入口」模式生效】底部盒切分的并行吐球路数。&#10;&#10;含义：同时保持几个颜色在累积「单盒进度」，每 tick 轮询各路各吃 1 像素，谁先装满谁先挤出成盒。&#10;语义对齐暂存区上限——手上同时能攒几种颜色。&#10;&#10;为什么需要：旧路径按轮次批量消除（每轮挑一个颜色一次消完它全部可达像素），&#10;导致盒队列是一段段单色长串，铺进棋盘就是一整排同色。&#10;实测已产出的底部消除批次：前3行最大同色簇中位4盒、极端12盒、最长横排同色9个、前3行只有6种颜色。&#10;&#10;v110 实测（347张图全量对照）：队列同色run最长 5→2；前3行最大同色簇 5→2（极端16→4）；&#10;前3行色数 7→10；最大单色占比 25.9%→22.2%；水平同色对占比 88.0%→6.5%；&#10;「最大同色簇≤2」达标率 1.4%→82.1%；盒总数 61→60；像素守恒 100%。&#10;&#10;已实测代价：交错把压力从后期挪到前期（前期峰 0.33→1.83，trendOK 7/10→4/10）；可解率不变（10/10）。&#10;&#10;0 = 关闭，回退到旧的单色批量路径（可逐值复现 v110 之前的底部批次）。&#10;留空 = 取暂存上限（当前 5）。">底部并行路数</label>
+@@ -729,9 +759,23 @@
+ 
+   <!-- 右栏：开始生成 + 进度可视化 + 结果表 -->
+   <main id="gen-panel-main">
++    <!-- 【v153】切球规划器：按供给时间线切球（矿脉表 → 车单 → 债务节拍） -->
++    <section id="cutplanner-card" class="gen-card hidden">
++      <h2>切球规划器 <span class="gen-hint">按「供给时间线」切球：先算矿脉表，再决定每条矿脉切几辆车、谁背债</span></h2>
++      <div class="gen-row">
++        <label title="这关多少辆车 = 多少步 = 关卡时长。平均车容量 = 彩色像素 ÷ 步数。&#10;0 = 自动（按平均容量 28 估）。">目标步数</label>
++        <input type="number" id="cutplan-steps" value="0" min="0" max="999" step="1" style="width:80px">
++        <span class="gen-hint">0=自动(≈像素÷28)</span>
++      </div>
++            <div class="gen-row">
++        <button id="btn-cutplan" class="gen-btn-primary">规划切球</button>
++        <label style="margin-left:12px"><input type="checkbox" id="cutplan-use" disabled> 生成时使用这份车单</label>
++      </div>
++      <div id="cutplan-body" style="white-space:pre-wrap;font-size:11px;color:#5a4632;line-height:1.5"></div>
++    </section>
+     <!-- 2. 开始生成 -->
+     <section class="gen-card">
+-      <h2>2. 开始生成</h2>
++      <h2>3. 开始生产</h2>
+       <div class="gen-row">
+         <button id="btn-gen-start" class="gen-btn-primary">▶ 批量生产（每关自动落库）</button>
+         <button id="btn-gen-stop" class="gen-btn-danger hidden">■ 停止</button>
+@@ -759,7 +803,7 @@
+ 
+     <!-- 3. 生产进度可视化 -->
+     <section id="gen-progress-card" class="gen-card hidden">
+-      <h2>3. 生产进度</h2>
++      <h2>4. 生产进度</h2>
+       <div id="gen-progress-bar-wrap">
+         <div id="gen-progress-bar"><div id="gen-progress-fill"></div></div>
+         <span id="gen-progress-pct">0%</span>
+@@ -781,7 +825,8 @@
+ 
+     <!-- 4. 结果 -->
+     <section id="gen-result-card" class="gen-card hidden">
+-      <h2>4. 生产结果 <span id="gen-result-count"></span></h2>
++      <h2>5. 生产结果 <span id="gen-result-count"></span>
++        <button id="btn-gen-result-clear" class="gen-btn-sm" title="清空结果表里的历史（只清展示，不动已落库的输出文件）">🗑 清空表</button></h2>
+       <div class="gen-hint" style="margin:-4px 0 6px">每一行末尾的「🎮 带入棋盘」可把这关直接装进模拟器（连同入口模式、生成时的压力样本与卡点信息），不用先导出再导入。</div>
+       <div class="gen-row">
+         <button id="btn-gen-download" class="gen-btn-primary hidden">⬇ 下载关卡包 ZIP</button>
+@@ -868,18 +913,68 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=151"></script>
+-  <script src="js/utils.js?v=151"></script>
+-  <script src="js/simulator.js?v=151"></script>
++  <!-- ===== 【v154】新老色库转换面板 =====
++       两套色库：老色库 34 色（0 空位 / 1-34 颜色）、官方色库 0-21（-1 空位 / 0 黄）。
++       转换表来自 js/color-libs.js 的最小代价单射分配：官方 22 色 ↔ 老色库 22 个互不相同的色号，
++       所以「新→老→新」逐像素无损；老色库多出来的 12 色按最近色落到官方 22 色上。 -->
++  <div id="colorlib-panel" class="colorlib-panel hidden">
++    <div class="colorlib-head">
++      <b>🎨 新老色库转换</b>
++      <span class="colorlib-sub">老色库 34 色（0 = 空位） ↔ 官方色库 0-21（-1 = 空位，0 = 黄色）</span>
++      <button id="colorlib-close" title="关闭">✕</button>
++    </div>
++
++    <div class="colorlib-row">
++      <label>当前图色库</label>
++      <span id="colorlib-current-lib">—</span>
++      <label style="margin-left:14px">目标色库</label>
++      <select id="colorlib-direction">
++        <option value="older">转到 老色库 34 色（0 空位，给生成器/模拟器用）</option>
++        <option value="official">转到 官方色库 0-21（-1 空位，给实机/存档用）</option>
++      </select>
++    </div>
++
++    <div class="colorlib-row">
++      <label>范围</label>
++      <select id="colorlib-scope">
++        <option value="current">只转当前这一张</option>
++        <option value="all" selected>转本批全部（仅改预览，不写盘）</option>
++        <option value="download">转本批全部并下载 TXT</option>
++      </select>
++      <button id="colorlib-swap" title="只把「目标色库」和当前图色库对调，便于来回转">⇄ 换个方向</button>
++    </div>
++
++    <div class="colorlib-row">
++      <button id="colorlib-apply" class="colorlib-primary">🔁 转换</button>
++      <span id="colorlib-note" class="colorlib-note"></span>
++    </div>
++
++    <details class="colorlib-details">
++      <summary>色值对照表（官方 22 色 → 老色库 22 个色号，互不相同）</summary>
++      <div id="colorlib-map" class="colorlib-map"></div>
++    </details>
++
++    <div class="colorlib-hint">
++      转换只改颜色编号，不改尺寸；空位在两套格式里自动换成对应标记（老 <code>0</code> ↔ 官方 <code>-1</code>）。
++      「转本批全部」只改页面里的预览与后续生产用的数据，<b>不写盘</b>；要落盘请用「转本批全部并下载 TXT」，
++      把下载的 TXT 放进 <code>输出文件/</code> 或直接再导入。整批转换会清掉已生成的棋盘缓存，需要重新点「生成」。
++    </div>
++  </div>
++
++  <script src="js/zip.js?v=153"></script>
++  <script src="js/utils.js?v=153"></script>
++  <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
++  <script src="js/color-libs.js?v=154"></script>
++  <script src="js/simulator.js?v=153"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=151"></script>
+-  <script src="js/solver-strategy.js?v=151"></script>
+-  <script src="js/solver.js?v=151"></script>
+-  <script src="js/playersim.js?v=151"></script>
+-  <script src="js/generator.js?v=151"></script>
+-  <script src="js/analysis.js?v=151"></script>
++  <script src="js/anchor-cut.js?v=153"></script>
++  <script src="js/solver-strategy.js?v=153"></script>
++  <script src="js/solver.js?v=153"></script>
++  <script src="js/playersim.js?v=153"></script>
++  <script src="js/generator.js?v=153"></script>
++  <script src="js/analysis.js?v=153"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=151"></script>
+-  <script src="js/app.js?v=151"></script>
++  <script src="js/level-editor.js?v=153"></script>
++  <script src="js/app.js?v=153"></script>
+ </body>
+ </html>

@@ -1,0 +1,70 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4573,6 +4573,10 @@
+       debtCarCap: _debtCap,                 // 【v221】债车目标容量（由自适应均值推出）
+       cutMode: _cutMode                     // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
+     });
++    try {
++      genLog('棋盘：行 ' + _norm.rowsMin + '~' + _norm.rowsMax + ' · 列 ' + _norm.colsMin + '~' + _norm.colsMax +
++        (_boardAuto ? '（棋盘自适应：开，将自动换尺寸）' : '（棋盘自适应：关，严格用此范围）'), 'gen-log-ok');
++    } catch (e) {}
+     // 【v234】棋盘自动选：只有勾了「自适应」才用自动尺寸列表；不勾则严格用你填的行列范围
+     if (_boardAuto) {
+       out.boardTryDims = [[6, 7], [7, 7], [6, 8], [7, 8]];
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=233">
++  <link rel="stylesheet" href="css/style.css?v=235">
+ </head>
+ <body>
+   <header>
+@@ -334,10 +334,10 @@
+         <span class="gen-hint">~</span>
+         <input type="number" id="gen-cols-max" value="10" min="4" max="30" style="width:52px">
+         <label style="margin-left:16px" title="勾上 = 棋盘尺寸按车数自适应（上面四个数字被忽略）；不勾 = 严格用上面的范围。">
+-          <input type="checkbox" id="gen-board-auto"> 自适应
++          <input type="checkbox" id="gen-board-auto"> 棋盘自适应（勾上=自动选尺寸，勾掉=用左边行列）
+         </label>
+         <label style="margin-left:16px" title="按棋盘大小反推每辆车的容量：让车数 ≈ 可放盒格数，避免装不下或多出太多空格。">
+-          <input type="checkbox" id="gen-autobox"> 容量随棋盘自适应（小棋盘自动开）
++          <input type="checkbox" id="gen-autobox"> 容量自适应
+         </label>
+         <label style="margin-left:16px" title="切法：默认=按消除趋势平均切；合球=同色同层单独成车。">
+           切法
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=233"></script>
+-  <script src="js/utils.js?v=233"></script>
++  <script src="js/zip.js?v=235"></script>
++  <script src="js/utils.js?v=235"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=233"></script>
+-  <script src="js/simulator.js?v=233"></script>
++  <script src="js/color-libs.js?v=235"></script>
++  <script src="js/simulator.js?v=235"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=233"></script>
+-  <script src="js/solver-strategy.js?v=233"></script>
+-  <script src="js/solver.js?v=233"></script>
+-  <script src="js/playersim.js?v=233"></script>
+-  <script src="js/generator.js?v=233"></script>
+-  <script src="js/analysis.js?v=233"></script>
++  <script src="js/anchor-cut.js?v=235"></script>
++  <script src="js/solver-strategy.js?v=235"></script>
++  <script src="js/solver.js?v=235"></script>
++  <script src="js/playersim.js?v=235"></script>
++  <script src="js/generator.js?v=235"></script>
++  <script src="js/analysis.js?v=235"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=233"></script>
+-  <script src="js/app.js?v=233"></script>
++  <script src="js/level-editor.js?v=235"></script>
++  <script src="js/app.js?v=235"></script>
+ </body>
+ </html>

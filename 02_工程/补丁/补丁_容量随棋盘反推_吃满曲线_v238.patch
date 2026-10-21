@@ -1,0 +1,188 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4545,16 +4545,20 @@
+     var _usable0 = 0.86;
+     var _targetCars0 = Math.max(6, Math.round(_cellsAll * _usable0));
+     var _capAvg = Math.max(14, Math.min(72, Math.round(_pxAll / _targetCars0)));
+-    var _capMin = Math.max(10, Math.round(_capAvg * 0.85));
+-    var _capMax = Math.min(96, Math.max(_capMin + 4, Math.round(_capAvg * 1.15)));
++    // 【v238】容量下限抬到 33：小图（35×35=1225 px）实测 容量 30~38 全灭在 pipeCapacity、
++    //   33~41 反而出关 —— 容量压得太低会把小图切碎成装不下的盒数。大图不受影响（均值本来就高）。
++    var _capMin = Math.max(33, Math.round(_capAvg * 0.85));
++    var _capMax = Math.min(96, Math.max(_capMin + 6, Math.round(_capAvg * 1.15)));
+     var _debtCap = Math.max(26, Math.min(40, Math.round(_capAvg * 1.05)));
+     preset = Object.assign({}, preset, { boxSizeMin: _capMin, boxSizeMax: _capMax });
+     try {
+       genLog('容量自适应：' + _norm.rowsMax + '×' + _norm.colsMax + ' ≈ ' + _targetCars0 + ' 辆 → 每辆 ' + _capMin + '~' + _capMax +
+         ' px（均值 ' + _capAvg + '，债车目标 ' + _debtCap + '）', 'gen-log-ok');
+     } catch (e) {}
+-    // 【v223】单一模式：大容量 + 小盘 + 拆车补空（实测稳健 33~83%、峰窗 4）
+-    preset = Object.assign({}, preset, { boxSizeMin: 34, boxSizeMax: 50 });
++    // 【v238】删掉 v223 的"容量写死 34~50"：它把上面这段「容量随棋盘反推」整段覆盖了，
++    //   于是 6×6（36 格）也按 7×7 的容量切 → 出 ~42 辆装不下 36 格 → 结构层 pipeCapacity 10/10 全灭。
++    //   实测对照：批次 unnamed-10-19-109 是 6×6 合格关，31 辆、容量 28~60（均值 46.3）——
++    //   正是「容量跟着棋盘走」才成立的形态（工作日志 96）。棋盘不同，容量必须不同。
+     var out = Object.assign({}, cfg, preset, {
+       candidateCount: 2, portfolioK: 8, timeBudgetMs: 25000, difficultyRounds: 2,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
+       goodV3: true, requireHardPass: false, seed: null,
+@@ -4589,15 +4593,19 @@
+       boardColsMin: _boardAuto ? 7 : _norm.colsMin,
+       boardColsMax: _boardAuto ? 8 : _norm.colsMax,
+       boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: true,
+-      targetCarCount: 36,
++      // 【v238】目标车数也随棋盘走：36 是 7×7 的数字，放到 6×6（36 格）就是 100% 填满、一格空位都不剩。
++      targetCarCount: _boardAuto ? 36 : _targetCars0,
+       valvePlan: true, valveMode: 'largest', valveIceSteps: 10,
+       maxPipes: 1, pipeFloorCount: 1, pipeFallbackCount: 1,   // 【v228】管道只留 1 条
+       acceptMode: 'target', targetPeakMin: 3, targetPeakMax: 4, targetSteadyMin: 30, targetSteadyMax: 80,  // 【v230】合格 = 落在困难区间
+ 
+       blackPercent: 3, blackPercentMin: 2, blackPercentMax: 4  // 【v228】黑块减半（底部不再被堵）
+     });
+-    try { genLog('模式：容量 34~50 · 6×7 · 拆到 36 辆 · 冰锁最大色(10步) · 管道≤2', 'gen-log-warn'); } catch (e) {}
+     try {
++      genLog('模式：容量 ' + _capMin + '~' + _capMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
++        ' 辆 · 冰锁最大色(10步) · 管道≤2', 'gen-log-warn');
++    } catch (e) {}
++    try {
+       genLog('固定参数：' + (big ? '大图' : '小图') + '预设（' + R + '×' + C + '）· 每图多产 3 次 · 候选 6 · 单关 5 分钟',
+         'gen-log-ok');
+     } catch (e) {}
+@@ -5104,6 +5112,9 @@
+       // 【v157】卡点判据 v2（用户 R1~R9）指标：{omni, player, worst, gates}。
+       //   生产侧记录 + 每关日志 + 批次 CSV 都用它，方便"边生产边看这批关在 v2 口径下长什么样"。
+       chokeV2: (result.generationEval && result.generationEval.auditV2) || null,
++      // 【v238】每步"能吃满"的曲线（压力的直接来源）：中位/≤1 占比/被迫点。
++      //   实测 31 关：合格关 吃满≤1 占 44~81%、中位 1；太松的不合格关 2~21%、中位 3~7。
++      fillCurve: (result.goodV3 && result.goodV3.fillCurve) || null,
+       // 【v115】卡点类型改「检查次数 × 概率」后，数量本身是随机量，只记 chokeCount 无法判断
+       //   「这关只出 1 种」是参数设小了还是抽样波动。这里把设定值(rolls/prob)、实测命中(hits)、
+       //   理论期望(expected，含池截断的精确式)与池大小一并记下，供批量实测均值与期望对照。
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6645,7 +6645,12 @@
+     var S = AntSolver.Simulator;
+     if (!S || !S.enter || !S.listMoves) return null;
+     var st;
+-    try { st = S.enter(parsed, { useSlotStart: true }); } catch (e) { return null; }
++    // 【v238】改用 createState 建独立状态：S.enter 会把全局模拟器的 state 换成这次回放，
++    //   生产里每关算一次曲线就会打断用户正在界面上玩的局面。createState 口径相同（含激活/管道初始化），
++    //   但不碰全局态。拿不到 createState 时退回旧路径。
++    try {
++      st = (S.createState ? S.createState(parsed, { useSlotStart: true }) : S.enter(parsed, { useSlotStart: true }));
++    } catch (e) { return null; }
+     var rows = st.rows, cols = st.cols, limit = parsed.bufferLimit || 5;
+     var order = solveResult.pickOrder.slice().sort(function (a, b) { return (a.step || 0) - (b.step || 0); });
+     var steps = [];
+@@ -6737,6 +6742,15 @@
+     var buried = (b.buried != null) ? b.buried : null;
+     var steady = play ? play.steadyWonPct : null;
+     var spread = play ? play.spreadPct : null;
++    // 【v238】选择余地曲线：沿求解路线逐步统计"每步能吃满几辆"（= 压力的直接来源）。
++    //   实测 31 关：合格关「吃满≤1 的步」占 44~81%、每步能吃满 0.9~1.7 辆；
++    //   简单关 46%/1.9；太松的不合格关 2~21%/2.7~7.1。这里只记录，不改合格门。
++    var _fill = null;
++    try {
++      var _cv = choiceCurve(lv, sr);
++      if (_cv) _fill = { medFull: _cv.medFull, lowPct: _cv.lowPct, low2Pct: _cv.low2Pct,
++                         opening: _cv.opening, forcedMid: _cv.forcedMid, n: _cv.n, spark: _cv.spark };
++    } catch (e) { _fill = null; }
+     // 【v190】口径修正：spread 大不一定不公平——"稳健 100% / 乱点 33%" 很正常。
+     //   真正要抓的是"稳打不如别的打法"：steadyGap = 最好打法 − 稳健。
+     var bestWon = play ? play.bestWonPct : null;
+@@ -6761,7 +6775,7 @@
+       if (steady == null || steady < _sMin || steady > _sMax) _tf.push('稳健不在' + _sMin + '~' + _sMax);
+       return { pass: _tf.length === 0, fails: _tf, solved: !!sr.completed,
+                steadyWonPct: steady, midLateMax: midLate, midLateAudit: midLateAudit,
+-               buried: buried, targetScore: (function () {
++               buried: buried, fillCurve: _fill, targetScore: (function () {
+                  var pv = (midLate == null || midLate < _pMin || midLate > _pMax) ? 1 : 0;
+                  var sv = (steady == null || steady < _sMin || steady > _sMax) ? 1 : 0;
+                  var pd = (midLate == null) ? 9 : Math.abs(midLate - (_pMin + _pMax) / 2);
+@@ -6791,7 +6805,7 @@
+     return {
+       pass: fails.length === 0, fails: fails,
+       steadyWonPct: steady, spreadPct: spread, bestWonPct: bestWon, steadyGap: steadyGap, buried: buried,
+-      noGood: _noGood,
++      noGood: _noGood, fillCurve: _fill,
+       earlyMax: early, midLateMax: midLate, midLateAudit: midLateAudit,
+       peakMin: play ? play.lateMax.min : null,
+       peakMax: play ? play.lateMax.max : null,
+@@ -10243,14 +10257,20 @@
+     if (!g || !g.fails) return { f: 99, d: 1e9, s: -1 };
+     var p = g.midLateMax;
+     var d = (p == null) ? 1e9 : (p < 3.2 ? (3.2 - p) : (p > 4.8 ? (p - 4.8) : 0));
+-    return { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore) };
++    return { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
++             fc: (g.fillCurve ? g.fillCurve.medFull : null), lp: (g.fillCurve ? g.fillCurve.lowPct : null) };
+   }
+   function portfolioBetter(x, y) {
+     if (!y) return true;
+     if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
+     if (x.ts != null || y.ts != null) {
+       if (!!x.ok !== !!y.ok) return !!x.ok;
+-      return (x.ts || 9) < (y.ts || 9);
++      if ((x.ts || 9) !== (y.ts || 9)) return (x.ts || 9) < (y.ts || 9);
++      // 【v238】目标分打平时的加赛：优先「吃满≤1 的步占比」落在 45~90%（实测合格关集中带）。
++      //   只影响完全同分的情况，不改合格门、不改目标分公式。
++      var _band = function (v) { return (v == null) ? 99 : (Math.max(0, 45 - v) + Math.max(0, v - 90)); };
++      if (_band(x.lp) !== _band(y.lp)) return _band(x.lp) < _band(y.lp);
++      return false;
+     }
+     if (_AUDIT_FIRST) {
+       if (x.ap !== y.ap) return x.ap > y.ap;              // 全知线峰窗大的胜
+@@ -10424,6 +10444,17 @@
+           _cfg.boardColsMin = _bd[1]; _cfg.boardColsMax = _bd[1];
+           _cfg.boardHardRange = true; _cfg.boardAuto = false; _cfg.boardAllowSquare = true;
+           _cfg.targetCarCount = Math.round(_bd[0] * _bd[1] * 0.86);
++          // 【v238】容量也随这次选的棋盘反推（原先只有 app 侧算一次，换尺寸后容量不跟着变）：
++          //   每辆容量 ≈ 彩色像素 ÷ 目标车数，区间 ±12%。这样 6×7/7×7/6×8/7×8 各自有各自的容量，
++          //   不会出现"小棋盘配大车装不下 / 大棋盘配小车太空"。
++          var _px238 = 0;
++          for (var _r238 = 0; _r238 < blocks.length; _r238++)
++            for (var _c238 = 0; _c238 < blocks[_r238].length; _c238++) if (blocks[_r238][_c238] > 0) _px238++;
++          if (_px238 > 0 && _cfg.targetCarCount > 0) {
++            var _cap238 = Math.max(12, Math.min(96, Math.round(_px238 / _cfg.targetCarCount)));
++            _cfg.boxSizeMin = Math.max(33, Math.round(_cap238 * 0.88));   // 【v238】下限 33：小图压低容量会切碎（35×35 实测 30~38 全灭）
++            _cfg.boxSizeMax = Math.max(_cfg.boxSizeMin + 6, Math.round(_cap238 * 1.12));
++          }
+         }
+         if (config && config.seed != null && !isNaN(+config.seed)) _cfg.seed = (+config.seed) + _pi;
+         var _o = flow === 'old' ? produce(blocks, _cfg) : produceFixed(blocks, _cfg, opts);
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=237">
++  <link rel="stylesheet" href="css/style.css?v=238">
+ </head>
+ <body>
+   <header>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js
+@@ -154,7 +154,10 @@
+   // v120（任务 ANT-GEN-CHOKE-TYPE-PARAMS-20260827）：卡点类型逐类参数化 + 位置记录。
+   // CSV 只放**摘要**（类型×数量、首个坐标、进度带），全量坐标在 逐关记录.jsonl 的「卡点位置」里 ——
+   // 一格塞不下十几个坐标，硬塞会让表在 Excel 里没法筛。
+-  '卡点落地摘要', '卡点首位', '卡点进度带'];
++  '卡点落地摘要', '卡点首位', '卡点进度带',
++  // v238：每步"能吃满"的曲线 —— 压力最直接的来源（不是事后指标，是设计时就能算的量）。
++  //   实测 31 关：合格关「吃满≤1 的步」占 44~81%、中位 1 辆；太松的不合格关只占 2~21%、中位 3~7。
++  '吃满中位', '吃满<=1占比', '被迫点30-80%'];
+ 
+ /**
+  * 目标图入口模式的中文名（v110）。取值由 bin/js/generator.js 的 produceDispatch 在唯一出口打上，
+@@ -446,7 +449,11 @@
+     (rec.chokeMarks && rec.chokeMarks.length) ? ('(' + rec.chokeMarks[0].r + ',' + rec.chokeMarks[0].c + ')' + rec.chokeMarks[0].cn) : '',
+     (rec.chokeStat && rec.chokeStat.chokePos)
+       ? (Math.round(rec.chokeStat.chokePos.min * 100) + '~' + Math.round(rec.chokeStat.chokePos.max * 100) + '%')
+-      : ''
++      : '',
++    // v238 追加：吃满曲线（顺序须与 CSV_HEADER 尾部一致）
++    num(rec.fillCurve && rec.fillCurve.medFull),
++    num(rec.fillCurve && rec.fillCurve.lowPct),
++    num(rec.fillCurve && rec.fillCurve.forcedMid)
+   ].map(csvCell).join(','));
+ 
+   b.currentIndex = idx; b.currentName = rec.name || '';

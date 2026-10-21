@@ -1,0 +1,21 @@
+--- a/bin/js/simulator.js
++++ b/bin/js/simulator.js
+@@ -398,10 +398,14 @@
+       return rows - 1 - r;                               // 右：下→上（横向进入时由右向左）
+     }
+     function keyOf(r, c, source, depth) {
+-      var base = source * SOURCE_SPAN + depth * AREA + tieOf(r, c, source);
+-      // 手动模式仍以"离盒起点"优先；同起点距离内再遵循动态依赖波，保持原玩家口径。
+-      if (start) return (Math.abs(r - start.r) + Math.abs(c - start.c)) * (4 * SOURCE_SPAN) + base;
+-      return base;
++      // 【2026-10-13 口径·动态层】小人（目标像素）选取顺序（用户指定）：
++      //   ① 先取“当前未被遮挡”的 —— 即此刻就能从外部识别到的像素（可达性由下面的动态
++      //      候选机制保证：初始贴外边/贴空洞的像素入堆，每吃掉一格就把它的同色邻居揭示进来）。
++      //      所以“层”是动态的：每吃完一层，外围自动变成新露出来的那一圈，不需要预先分层。
++      //   ② 由下到上 —— 行号大的先
++      //   ③ 由左到右 —— 同行内列号小的先
++      // 旧的起点距离/入口源/依赖波深度不再参与排序（source/depth/start 保留仅作兼容）。
++      return (rows - 1 - r) * cols + c;   // 由下到上、由左到右
+     }
+     function pushCandidate(r, c, source, depth) {
+       var id = r * cols + c, k = keyOf(r, c, source, depth);

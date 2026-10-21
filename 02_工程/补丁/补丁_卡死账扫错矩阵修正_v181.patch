@@ -1,0 +1,80 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -6404,7 +6404,10 @@
+   function stuckLineOf(stuck) {
+     if (!stuck || !stuck.length) return '';
+     var s = stuck[0];
+-    return '色' + s.color + ' 还差 ' + s.needLeft + ' / 盘上剩 ' + s.boardLeft + ' / 可达 ' + s.reachable;
++    var verdict = (s.reachable > 0)
++      ? '还有救'
++      : (s.boardLeft >= s.needLeft ? '被埋（够得着 0 个）' : '不够（盘上比它要的还少）');
++    return '色' + s.color + ' 还差 ' + s.needLeft + ' / 盘上剩 ' + s.boardLeft + ' / 可达 ' + s.reachable + ' → ' + verdict;
+   }
+   function auditV2OfLevel(lv, em) {
+     var omni = null, pl = null;
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4759,13 +4759,16 @@
+     var stuck = null;
+     if (!cleared && st.buffer && st.buffer.length) {
+       var leftByColor = {}, reachByColor = {};
+-      for (var rr = 0; rr < st.boardRows; rr++) {
+-        for (var cc3 = 0; cc3 < st.boardCols; cc3++) {
++      // ⚠ 这里必须用 `st.rows / st.cols`（**目标图**的尺寸，40×40），
++      //   不是 `st.boardRows / st.boardCols`（**棋盘**尺寸，6×8）。v180 首版扫错了矩阵，
++      //   只看了左上角 48 格 → 才会出现"盘上剩 0 但车还差 24"这种假异常（日志第 34.4 节）。
++      for (var rr = 0; rr < st.rows; rr++) {
++        for (var cc3 = 0; cc3 < st.cols; cc3++) {
+           if (st.eliminated[rr][cc3]) continue;
+           var col3 = st.blocks[rr][cc3];
+           if (col3 <= 0) continue;
+           leftByColor[col3] = (leftByColor[col3] || 0) + 1;
+-          if (rr === 0 || cc3 === 0 || rr === st.boardRows - 1 || cc3 === st.boardCols - 1 ||
++          if (rr === 0 || cc3 === 0 || rr === st.rows - 1 || cc3 === st.cols - 1 ||
+               st.eliminated[rr - 1][cc3] || st.eliminated[rr + 1][cc3] || st.eliminated[rr][cc3 - 1] || st.eliminated[rr][cc3 + 1]) {
+             reachByColor[col3] = (reachByColor[col3] || 0) + 1;
+           }
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=180">
++  <link rel="stylesheet" href="css/style.css?v=181">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=180"></script>
+-  <script src="js/utils.js?v=180"></script>
++  <script src="js/zip.js?v=181"></script>
++  <script src="js/utils.js?v=181"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=180"></script>
+-  <script src="js/simulator.js?v=180"></script>
++  <script src="js/color-libs.js?v=181"></script>
++  <script src="js/simulator.js?v=181"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=180"></script>
+-  <script src="js/solver-strategy.js?v=180"></script>
+-  <script src="js/solver.js?v=180"></script>
+-  <script src="js/playersim.js?v=180"></script>
+-  <script src="js/generator.js?v=180"></script>
+-  <script src="js/analysis.js?v=180"></script>
++  <script src="js/anchor-cut.js?v=181"></script>
++  <script src="js/solver-strategy.js?v=181"></script>
++  <script src="js/solver.js?v=181"></script>
++  <script src="js/playersim.js?v=181"></script>
++  <script src="js/generator.js?v=181"></script>
++  <script src="js/analysis.js?v=181"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=180"></script>
+-  <script src="js/app.js?v=180"></script>
++  <script src="js/level-editor.js?v=181"></script>
++  <script src="js/app.js?v=181"></script>
+ </body>
+ </html>

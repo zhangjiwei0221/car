@@ -1,0 +1,74 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3890,6 +3890,58 @@
+       marks.push({ kind: p.kind, ok: false, why: '未实现的节拍道具种类' });
+     }
+     return { applied: applied, marks: marks, want: props.length };
++  }
++
++  /**
++   * 【v189·实验】"别掐死"修复：如果稳健模拟里出现**被埋色**，就把它"开壳色"的车上的障碍拆掉，
++   *   让那些车更早到位（= 把选择还给玩家）。改动前先做快照，修完更差就整体回滚。
++   *   config.strangleRepair === true 才生效；默认关。
++   *   成本：触发时 2 次稳健模拟（~0.1~0.2s）。
++   */
++  function repairStrangle(board, blocks, config) {
++    if (!config || !config.strangleRepair) return null;
++    function parsedOf() { return AntSolver.parseLevel({ blocks: blocks, bufferLimit: config.bufferLimit, board: board }); }
++    var b0;
++    try { b0 = buriedCountOf(parsedOf()); } catch (e) { return null; }
++    if (!b0 || !b0.details || !b0.details.length) return { buried0: 0, removed: 0 };
++    var snap = AntSolver.deepClone(board.cells);
++    var removed = 0, marks = [], cache = {};
++    var MAXR = (config.strangleRepairMax != null) ? Math.max(1, parseInt(config.strangleRepairMax, 10)) : 3;
++    for (var di = 0; di < b0.details.length && removed < MAXR; di++) {
++      var c = b0.details[di].color;
++      var shells = shellColorsOf(blocks, c, cache);
++      for (var si = 0; si < shells.length && removed < MAXR; si++) {
++        var d = shells[si], did = false;
++        // 先拆冰（最便宜、可逆）
++        for (var r = 0; r < board.rows && !did; r++) for (var cc = 0; cc < board.cols && !did; cc++) {
++          var x = board.cells[r][cc];
++          if (!x || x.t !== 'box' || x.color !== d) continue;
++          if (x.numice > 0) { marks.push({ kind: 'numice', at: [r, cc], color: d, of: c, was: x.numice }); x.numice = 0; removed++; did = true; }
++        }
++        if (did) continue;
++        // 再拆链（整组一起拆，否则留下半组）
++        for (var r2 = 0; r2 < board.rows && !did; r2++) for (var c2 = 0; c2 < board.cols && !did; c2++) {
++          var y = board.cells[r2][c2];
++          if (!y || y.t !== 'box' || y.color !== d || !y.chain) continue;
++          var gid = y.chain, cnt = 0;
++          for (var rr = 0; rr < board.rows; rr++) for (var ccc = 0; ccc < board.cols; ccc++) {
++            var z = board.cells[rr][ccc];
++            if (z && z.t === 'box' && z.chain === gid) { z.chain = 0; cnt++; }
++          }
++          marks.push({ kind: 'chain', color: d, of: c, size: cnt });
++          removed++; did = true;
++        }
++      }
++    }
++    if (!removed) return { buried0: b0.details.length, removed: 0 };
++    var b1 = null;
++    try { b1 = buriedCountOf(parsedOf()); } catch (e) { b1 = null; }
++    var after = b1 ? b1.buried : null;
++    if (after != null && after > b0.buried) {          // 修完更差 → 回滚
++      board.cells = snap;
++      return { buried0: b0.buried, removed: 0, reverted: true, worseTo: after };
++    }
++    return { buried0: b0.buried, removed: removed, after: after, marks: marks };
+   }
+ 
+   /**
+@@ -4050,6 +4102,12 @@
+     }
+ 
+     // ⑤ 解析
++    // ③b3 【v189·实验】"别掐死"修复：被埋色 → 拆掉开壳车上的障碍，让选择回来（默认关）
++    try {
++      var strStat = repairStrangle(board, blocks, config);
++      if (strStat) board.strangleStat = strStat;
++    } catch (e) { board.strangleStat = { error: String(e && e.message || e) }; }
++
+     var level = { blocks: blocks, bufferLimit: config.bufferLimit, board: board };
+     var tParse = Date.now();
+     var parsed = AntSolver.parseLevel(level);

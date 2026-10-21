@@ -1,0 +1,389 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -31,6 +31,27 @@
+ 
+ AntSolver.Generator = (function() {
+ 
++  // 【v193】可复现随机源：config.seed 一旦给出，生成器内部所有随机都走本地 LCG；
++  //   不给 seed 时逐值等于 Math.random（生产行为不变）。
++  //   为什么需要：① 重建/重试要能和原局对比（v192 的调压就在这一步失准）；
++  //   ② 风险清单 R5「随机种子未固定」一直挂着；③ 所有 A/B 才可复现。
++  var _RNG = { on: false, s: 1 };
++  function rnd() {
++    if (!_RNG.on) return rnd();
++    _RNG.s = (_RNG.s * 1664525 + 1013904223) >>> 0;
++    return _RNG.s / 4294967296;
++  }
++  function seedRng(seed) {
++    if (seed == null || seed === '' || isNaN(+seed)) { _RNG.on = false; return; }
++    _RNG.on = true;
++    // ⚠ LCG 的经典弱点：**相邻 seed 会产生高度相关的序列**（101/102/103… 前几十个数几乎一样）。
++    //   所以先做一次散列 + 8 步预热，再当起点，保证相邻 seed 互不相关（实测：修前 10 个相邻 seed 峰窗全是 3）。
++    var s = ((+seed) >>> 0) || 1;
++    s = (s ^ 0x9e3779b9) >>> 0;
++    for (var i = 0; i < 8; i++) s = (s * 1664525 + 1013904223) >>> 0;
++    _RNG.s = s;
++  }
++
+   var DEFAULT_CONFIG = {
+     // 【默认参数基线：v95四方向消除统一默认参数】2026-07-31 起，以下标注「统一默认」的字段
+     // 取自 方案文件夹/方案_v95四方向消除统一默认参数.json 的 config，作为四方向消除的统一默认口径。
+@@ -676,8 +697,8 @@
+     var rMax = clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20);
+     var cMin = clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30);
+     var cMax = clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30);
+-    var rows = rMin + Math.floor(Math.random() * (rMax - rMin + 1));
+-    var cols = cMin + Math.floor(Math.random() * (cMax - cMin + 1));
++    var rows = rMin + Math.floor(rnd() * (rMax - rMin + 1));
++    var cols = cMin + Math.floor(rnd() * (cMax - cMin + 1));
+     // ===== 管道数量下限保证（用户 2026-08-04：管道太少，要确保不低于 4 个）=====
+     // 管道数由守恒反推：溢出盒 D = 盒数 n − (格数 − 黑块)，管道数下界 = ⌈D/5⌉（每管容量 4~6）。
+     // 因此「管道数 ≥ minPipes」等价于「D ≥ minPipes×5」，即棋盘格数有一个上限：
+@@ -696,7 +717,7 @@
+       }
+       if (feasible.length) {
+         // 可行组合里随机取，保留原有的尺寸随机性，只是把过大的尺寸剔除
+-        var pickIdx = Math.floor(Math.random() * feasible.length);
++        var pickIdx = Math.floor(rnd() * feasible.length);
+         rows = feasible[pickIdx].rows; cols = feasible[pickIdx].cols;
+       } else {
+         // 参数范围内没有任何尺寸能满足下限（盒数太少或范围下限太大）→ 取范围内最小面积，尽力而为。
+@@ -925,7 +946,7 @@
+         var idxs = [];
+         for (var li = 0; li < list.length; li++) if (list[li].color === parseInt(colorId, 10)) idxs.push(li);
+         for (var t = 0; t < take && idxs.length > 0; t++) {
+-          var pickI = Math.floor(Math.random() * idxs.length);
++          var pickI = Math.floor(rnd() * idxs.length);
+           var listIndex = idxs[pickI];
+           extract.push(list[listIndex]);
+           list.splice(listIndex, 1);
+@@ -1035,7 +1056,7 @@
+         var gc0 = cells[g.r][g.c];
+         if (!gc0 || gc0.t !== 'box' || chained[g.r + ',' + g.c]) continue;
+         var members = [{ r: g.r, c: g.c }];
+-        var size = (Math.random() < 0.5) ? 3 : 2;
++        var size = (rnd() < 0.5) ? 3 : 2;
+         var guard = 0;
+         while (members.length < size && guard++ < 20) {
+           var grew = false;
+@@ -1448,7 +1469,7 @@
+           }
+         };
+       }
+-      function pickRandom(list) { return list[Math.floor(Math.random() * list.length)]; }
++      function pickRandom(list) { return list[Math.floor(rnd() * list.length)]; }
+ 
+       // 收集所有可行尺寸：方案范围内（缩小距离 0）+ 逐行向下缩小（缩小距离 = rMin−sr）。
+       // 每个尺寸带 shrinkDist，供「最小缩小量」择优——不同盒数的图会缩到不同大小，天然保留多样性。
+@@ -1563,7 +1584,7 @@
+ 
+     // ⑤ 没有任何合法形态可用 → 退回原行为并如实标记
+     if (!chosen) {
+-      var fallback = anyInRange[Math.floor(Math.random() * anyInRange.length)];
++      var fallback = anyInRange[Math.floor(rnd() * anyInRange.length)];
+       chosen = { e: fallback, tier: 'shapeRelaxed' };
+       shapeRelaxed = true;
+     }
+@@ -1654,7 +1675,7 @@
+         var d = Math.max(Math.abs(p.r - seedPts[j].r), Math.abs(p.c - seedPts[j].c));
+         if (d < best) best = d;
+       }
+-      rest.push({ p: p, d: best, jitter: Math.random() });
++      rest.push({ p: p, d: best, jitter: rnd() });
+     }
+     rest.sort(function (a, b) { return (a.d - b.d) || (a.jitter - b.jitter); });
+     for (var m = 0; m < rest.length && picked.length < count; m++) {
+@@ -1772,7 +1793,7 @@
+     for (i = 0; i < order.length && out.length < count; i++) {
+       var seed = order[i], sk = seed.r + ',' + seed.c;
+       if (taken[sk]) continue;
+-      var want = sizeMin + ((Math.random() * (sizeMax - sizeMin + 1)) | 0);
++      var want = sizeMin + ((rnd() * (sizeMax - sizeMin + 1)) | 0);
+       if (want > count - out.length) want = count - out.length;
+       // 从 seed 做四方向 BFS，只走仍在候选池且未被占用的格
+       var q = [seed], mem = [], seen = {};
+@@ -1889,12 +1910,12 @@
+     var hits = 0;
+     for (var roll = 0; roll < rolls; roll++) {
+       if (!pool.length) break;                       // 池耗尽：剩余检查次数不再产生新类型
+-      if (Math.random() >= prob) continue;           // 本次未出现
++      if (rnd() >= prob) continue;           // 本次未出现
+       hits++;
+       var sum = 0, j;
+       for (j = 0; j < pool.length; j++) sum += pool[j].w;
+       if (sum <= 0) break;
+-      var x = Math.random() * sum, hit = pool.length - 1;
++      var x = rnd() * sum, hit = pool.length - 1;
+       for (j = 0; j < pool.length; j++) { x -= pool[j].w; if (x <= 0) { hit = j; break; } }
+       chosen.push(pool[hit]);
+       pool.splice(hit, 1);
+@@ -2114,7 +2135,7 @@
+      */
+     function growGroup(seed, minRow, maxRow, group, wantSize) {
+       var members = [{ r: seed.r, c: seed.c }];
+-      var size = (wantSize != null) ? wantSize : ((Math.random() < 0.5) ? 3 : 2), guard = 0;
++      var size = (wantSize != null) ? wantSize : ((rnd() < 0.5) ? 3 : 2), guard = 0;
+       while (members.length < size && guard++ < 30) {
+         var grew = false;
+         for (var mi = 0; mi < members.length && !grew; mi++) {
+@@ -2146,7 +2167,7 @@
+     var chainWant = (function () {
+       var pool = config.chainTierPool;
+       if (pool && pool.length) {
+-        var pk = pool[Math.floor(Math.random() * pool.length)];
++        var pk = pool[Math.floor(rnd() * pool.length)];
+         var a = (pk && pk.g2 != null) ? pk.g2 : (pk ? pk[0] : 0);
+         var b = (pk && pk.g3 != null) ? pk.g3 : (pk ? pk[1] : 0);
+         return { g2: Math.max(0, a | 0), g3: Math.max(0, b | 0), src: 'tierPool' };
+@@ -2239,7 +2260,7 @@
+       var d4c = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+       for (var ai = 0; ai < anchors.length && placed < total; ai++) {
+         if (!freeForChain(anchors[ai].r, anchors[ai].c)) continue;
+-        var want = gMin + ((Math.random() * (gMax - gMin + 1)) | 0);
++        var want = gMin + ((rnd() * (gMax - gMin + 1)) | 0);
+         if (want > total - placed) want = total - placed;
+         var clusterMembers = [], groupsInCluster = 0, frontier = [anchors[ai]], guard = 0;
+         while (groupsInCluster < want && frontier.length && guard++ < 40) {
+@@ -2314,7 +2335,7 @@
+       for (var gi2 = 0; gi2 < narrowGaps.length; gi2++) {
+         var gp = narrowGaps[gi2];
+         if (!freeForChain(gp.r, gp.c)) continue;
+-        var mem = null, size2 = (Math.random() < 0.5) ? 3 : 2, tries = 0;
++        var mem = null, size2 = (rnd() < 0.5) ? 3 : 2, tries = 0;
+         var acc = [{ r: gp.r, c: gp.c }];
+         while (acc.length < size2 && tries++ < 20) {
+           var grew2 = false;
+@@ -2352,7 +2373,7 @@
+       for (var pe = 0; pe < pipeExits.length && pg < 90; pe++) {
+         var ex = pipeExits[pe];
+         if (!freeForChain(ex.r, ex.c)) continue;
+-        var pacc = [{ r: ex.r, c: ex.c }], psize = (Math.random() < 0.5) ? 3 : 2, ptry = 0;
++        var pacc = [{ r: ex.r, c: ex.c }], psize = (rnd() < 0.5) ? 3 : 2, ptry = 0;
+         while (pacc.length < psize && ptry++ < 20) {
+           var pgrew = false;
+           for (var pi2 = 0; pi2 < pacc.length && !pgrew; pi2++) {
+@@ -3988,7 +4009,12 @@
+     function dist(x) { return x == null ? 1e9 : (x < 3.2 ? (3.2 - x) : (x > 4.8 ? (x - 4.8) : 0)); }
+     if (dist(p0) === 0) return { meta: { skipped: true, why: 'in-band', p1: p0 } };
+     var cfg0 = cand.config || {};
+-    var ice0 = (cfg0.icePercent != null) ? cfg0.icePercent : 10;
++    // 方案里可能只给了区间（icePercent 为 null）→ 用区间中值当基准
++    var ice0;
++    if (cfg0.icePercent != null && !isNaN(+cfg0.icePercent)) ice0 = +cfg0.icePercent;
++    else if (cfg0.icePercentMin != null && cfg0.icePercentMax != null) ice0 = (+cfg0.icePercentMin + +cfg0.icePercentMax) / 2;
++    else ice0 = 10;
++    ice0 = Math.round(ice0);
+     var steps = Math.max(1, Math.min(3, parseInt(cfg0.pressureLoopSteps, 10) || 2));
+     var best = cand, bestP = p0, bestD = dist(p0), bestF = (gv.fails || []).length;
+     var iceCur = ice0, log = [], pLast = p0;      // 方向看"上一次试出来的峰窗"，而不是最优的那个
+@@ -4001,6 +4027,7 @@
+       var retry = {};
+       for (var k in cfg0) { if (k.charAt(0) !== '_') retry[k] = cfg0[k]; }
+       retry.icePercent = ni; retry.icePercentMin = ni; retry.icePercentMax = ni;
++      retry.icePercentMin2 = undefined;
+       retry.pressureLoop = false;
+       try { retry.mapSize = cand.level.blocks.length; } catch (e) {}
+       var res = null;
+@@ -4351,7 +4378,7 @@
+     return c._choiceCurve;
+   }
+   function makeChokeVariantFixed(parent, blocks, config, round, flowStats) {
+-    if (round >= 2 && parent.audit && Math.random() < 0.3) {
++    if (round >= 2 && parent.audit && rnd() < 0.3) {
+       var pa = applyPressureAdjust(config, parent.audit, parent.level.bufferLimit, ensureCurve(parent));
+       GENPERF.regenVariants++;
+       // 【v116 修正】这一支不是"改盒"，是**从头重建棋盘**的新候选，因此必须和 produceFixed 的候选循环
+@@ -4499,6 +4526,7 @@
+   }
+ 
+   function produceFixed(blocks, config, opts) {
++    seedRng(config && config.seed);
+     config = Object.assign({}, DEFAULT_CONFIG, config || {});
+     opts = opts || {};
+     var K = Math.max(1, config.candidateCount || 1);
+@@ -5881,6 +5909,7 @@
+    *   继续搜索直到拿到【困难合格(真实卡点)】或超时兜底——供批量生产按比例分配"简单/困难"关卡用。
+    */
+   function produce(blocks, config) {
++    seedRng(config && config.seed);
+     config = Object.assign({}, DEFAULT_CONFIG, config || {});
+     var K = Math.max(1, config.candidateCount || 1);
+     var B = Math.max(1, config.chokeBranches || 3);
+@@ -6610,12 +6639,12 @@
+     if (config.bigBoxCapMin != null && config.bigBoxCapMax != null) {
+       var cLo = parseInt(config.bigBoxCapMin, 10), cHi = parseInt(config.bigBoxCapMax, 10);
+       if (cHi < cLo) cHi = cLo;
+-      target = cLo + ((Math.random() * (cHi - cLo + 1)) | 0);
++      target = cLo + ((rnd() * (cHi - cLo + 1)) | 0);
+     } else {
+       var lo = config.bigBoxMulMin != null ? config.bigBoxMulMin : 1.5;
+       var hi = config.bigBoxMulMax != null ? config.bigBoxMulMax : 2.0;
+       if (hi < lo) hi = lo;
+-      target = Math.round(max * (lo + Math.random() * (hi - lo)));
++      target = Math.round(max * (lo + rnd() * (hi - lo)));
+     }
+     var sinks = [];
+     // 【落位⑤ 与大容量球位置组合】共位开启时允许（并优先）选锁链格；缺省仍避开锁链。
+@@ -6641,7 +6670,7 @@
+         if (o < best) { best = o; sink = sinks[si]; }
+       }
+     }
+-    if (!sink) sink = sinks[(Math.random() * sinks.length) | 0];
++    if (!sink) sink = sinks[(rnd() * sinks.length) | 0];
+     var donors = [];
+     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) { var e = cells[r][c]; if (e && e.t === 'box' && e !== sink && e.color === sink.color && e.chain === 0) donors.push(e); }
+     if (!donors.length) return false;
+@@ -6715,7 +6744,7 @@
+       if (CK.bigBox) opts.push('bigBox');
+       if (CK.inflate) opts.push('inflate');
+       if (opts.length) {
+-        var pick = opts[(Math.random() * opts.length) | 0];
++        var pick = opts[(rnd() * opts.length) | 0];
+         if (pick === 'swap') return chokeSwap(board, pickOrder, config, targets, blocks);
+         if (pick === 'bigBox') return chokeInflate(board, targets, config, blocks);
+         return chokeInflateSpread(board, targets, config);
+@@ -6723,13 +6752,13 @@
+       // 抽中的全是结构类（narrowPath/簇/叠加等）→ post 阶段不额外制造，避免"没抽中却照做"
+       return false;
+     }
+-    if (Math.random() < 0.6) return chokeSwap(board, pickOrder, config, targets, blocks);
++    if (rnd() < 0.6) return chokeSwap(board, pickOrder, config, targets, blocks);
+     return chokeInflate(board, targets, config, blocks);
+   }
+   // 从父变体派生一个卡点变体：round≥2 少数分支用【增减压重生成】(据父审核诊断调障碍参数)；
+   //   其余为【卡点制造】(clone 父 board + 后期段扰动)；重解+结构校验通过才返回，破坏可解则丢弃(null)。
+   function makeChokeVariant(parent, blocks, config, round) {
+-    if (round >= 2 && parent.audit && Math.random() < 0.3) {
++    if (round >= 2 && parent.audit && rnd() < 0.3) {
+       var pa = applyPressureAdjust(config, parent.audit, parent.level.bufferLimit, ensureCurve(parent));
+       GENPERF.regenVariants++;                     // 埋点：走"压力调整重新建盘"的变体数
+       var regen = generateFromBlocks(blocks, Object.assign({}, pa.cfg, { maxRetries: 2, candidateCount: 1 }));
+@@ -7053,16 +7082,16 @@
+     } else {
+       var gmin = clampInt(config.narrowPathGapsMin, 1, 1, 6);
+       var gmax = clampInt(config.narrowPathGapsMax, 2, gmin, 6);
+-      gapWant = gmin + Math.floor(Math.random() * (gmax - gmin + 1));
++      gapWant = gmin + Math.floor(rnd() * (gmax - gmin + 1));
+     }
+ 
+     // 尝试多次构造"不规律锯齿(斜向)+边缘锚定+连通楼梯"墙，直到形成合法窄路。
+     for (var attempt = 0; attempt < 8; attempt++) {
+       // 1) 基准行(中后部) + 逐列随机游走(步长≤1，约40%概率移动) → 平缓斜向/锯齿折线（不规律但墙体不厚）
+-      var baseR = Math.max(2, Math.min(rows - 3, Math.round(rows * (0.48 + Math.random() * 0.2))));
++      var baseR = Math.max(2, Math.min(rows - 3, Math.round(rows * (0.48 + rnd() * 0.2))));
+       var f = [baseR];
+       for (var c = 1; c < cols; c++) {
+-        var step = [-1, 0, 0, 0, 1][Math.floor(Math.random() * 5)];
++        var step = [-1, 0, 0, 0, 1][Math.floor(rnd() * 5)];
+         var rr = f[c - 1] + step;
+         if (rr < 1) rr = 1; if (rr > rows - 2) rr = rows - 2;
+         f.push(rr);
+@@ -7126,7 +7155,7 @@
+     var actualCount = Math.min(count, actualRange);
+     var picked = [];
+     for (var i = 0; i < actualCount; i++) {
+-      var idx = Math.floor(Math.random() * actualRange);
++      var idx = Math.floor(rnd() * actualRange);
+       picked.push(list[idx]);
+       list.splice(idx, 1);
+       actualRange--;
+@@ -7344,7 +7373,7 @@
+     if (!(p >= 0)) p = 1;                 // 非法值按默认必定出现处理
+     if (p >= 1) return true;
+     if (p <= 0) return false;
+-    return Math.random() < p;
++    return rnd() < p;
+   }
+ 
+   /**
+@@ -7366,7 +7395,7 @@
+     function rnd(lo, hi, isInt) {
+       if (lo > hi) { var t = lo; lo = hi; hi = t; }
+       if (lo === hi) return lo;
+-      var v = lo + Math.random() * (hi - lo);
++      var v = lo + rnd() * (hi - lo);
+       return isInt ? Math.round(v) : v;
+     }
+     // single: 单值参数名；lo/hi: 区间参数名；isInt: 是否取整
+@@ -7399,13 +7428,13 @@
+     var bias = (config.boxSizePolarBias != null) ? config.boxSizePolarBias : 0.7;
+     var bandRatio = (config.boxSizePolarBandRatio != null) ? config.boxSizePolarBandRatio : 0.25;
+     var band = Math.max(0, Math.round(span * bandRatio));
+-    function uniform(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)); }
++    function uniform(lo, hi) { return lo + Math.floor(rnd() * (hi - lo + 1)); }
+     return function pickCap() {
+       if (mode === 'max') return boxMax;
+       if (mode === 'min') return boxMin;
+       if (mode === 'polar' && span > 0) {
+-        if (Math.random() < bias) {
+-          return (Math.random() < 0.5) ? uniform(boxMin, boxMin + band)   // 低端窄带
++        if (rnd() < bias) {
++          return (rnd() < 0.5) ? uniform(boxMin, boxMin + band)   // 低端窄带
+             : uniform(boxMax - band, boxMax);                              // 高端窄带
+         }
+         return uniform(boxMin, boxMax);                                    // 其余仍全区间均匀
+@@ -8763,7 +8792,7 @@
+     //            生成器根据实际关卡参数来随机选择这些组合。」
+     //
+     // 【为什么必须加参数】原实现里每组是 2 连还是 3 连由**写死的抛硬币**决定
+-    //   （`var size = (Math.random() < 0.5) ? 3 : 2;`），`chainCount` 只控制组数。
++    //   （`var size = (rnd() < 0.5) ? 3 : 2;`），`chainCount` 只控制组数。
+     //   于是「2连/3连 的拆分」不可控 —— 评分体系 2.0 的锁链 18 档表恰好依赖这个拆分，
+     //   实测组数钉死后档位仍漂 1.7 档，导致档位无法作为受控实验的自变量。
+     //
+@@ -8776,7 +8805,7 @@
+     var chainWant = (function () {
+       var pool = config.chainTierPool;
+       if (pool && pool.length) {
+-        var pick = pool[Math.floor(Math.random() * pool.length)];
++        var pick = pool[Math.floor(rnd() * pool.length)];
+         var a = (pick && pick.g2 != null) ? pick.g2 : (pick ? pick[0] : 0);
+         var b = (pick && pick.g3 != null) ? pick.g3 : (pick ? pick[1] : 0);
+         return { g2: Math.max(0, a | 0), g3: Math.max(0, b | 0), src: 'tierPool' };
+@@ -8806,7 +8835,7 @@
+         var sr = cand[ci].r, sc = cand[ci].c;
+         if (chained[sr + ',' + sc] || cells[sr][sc].chain > 0) continue;
+         // 队列模式：peek 不 shift；成功落位后才消耗（见下方 placed++ 处）
+-        var size = chainSizeQueue ? chainSizeQueue[0] : ((Math.random() < 0.5) ? 3 : 2);
++        var size = chainSizeQueue ? chainSizeQueue[0] : ((rnd() < 0.5) ? 3 : 2);
+         if (chainSizeQueue && size == null) break;   // 队列空 → 本批不再放
+         var members = [{ r: sr, c: sc }];
+         var guard = 0;
+@@ -9030,7 +9059,7 @@
+ 
+   function shuffle(a) {
+     for (var i = a.length - 1; i > 0; i--) {
+-      var j = Math.floor(Math.random() * (i + 1));
++      var j = Math.floor(rnd() * (i + 1));
+       var t = a[i]; a[i] = a[j]; a[j] = t;
+     }
+     return a;
+@@ -9133,10 +9162,10 @@
+     var dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+     for (var ci = 0; ci < colors.length; ci++) {
+       var sr, sc, att = 0;
+-      do { sr = Math.floor(Math.random()*size); sc = Math.floor(Math.random()*size); att++; } while (assigned[sr][sc] && att < 100);
++      do { sr = Math.floor(rnd()*size); sc = Math.floor(rnd()*size); att++; } while (assigned[sr][sc] && att < 100);
+       var queue = [{r:sr,c:sc}], grown = 0;
+       while (queue.length > 0 && grown < perColor) {
+-        var idx = Math.floor(Math.random()*queue.length);
++        var idx = Math.floor(rnd()*queue.length);
+         var cell = queue.splice(idx, 1)[0];
+         if (assigned[cell.r][cell.c]) continue;
+         assigned[cell.r][cell.c] = true; blocks[cell.r][cell.c] = colors[ci]; grown++;
+@@ -9146,13 +9175,13 @@
+         }
+       }
+     }
+-    for (var r = 0; r < size; r++) for (var c = 0; c < size; c++) if (!assigned[r][c]) blocks[r][c] = colors[Math.floor(Math.random()*colors.length)];
++    for (var r = 0; r < size; r++) for (var c = 0; c < size; c++) if (!assigned[r][c]) blocks[r][c] = colors[Math.floor(rnd()*colors.length)];
+     return blocks;
+   }
+ 
+   function generateRandom(size, colors) {
+     var blocks = AntSolver.create2D(size, size, 0);
+-    for (var r = 0; r < size; r++) for (var c = 0; c < size; c++) blocks[r][c] = colors[Math.floor(Math.random()*colors.length)];
++    for (var r = 0; r < size; r++) for (var c = 0; c < size; c++) blocks[r][c] = colors[Math.floor(rnd()*colors.length)];
+     return blocks;
+   }
+ 

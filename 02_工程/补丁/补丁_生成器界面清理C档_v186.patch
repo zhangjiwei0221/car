@@ -1,0 +1,239 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -1077,7 +1077,8 @@
+     var name, inputs;
+     if (sel && sel.value) { var s = loadSchemes().filter(function (x) { return x.id === sel.value; })[0]; name = s ? s.name : '方案'; inputs = s ? s.inputs : captureScheme(); }
+     else { name = (nameEl && nameEl.value || '当前参数').trim(); inputs = captureScheme(); }
+-    var obj = { type: 'antGenScheme', version: 1, name: name, savedAt: new Date().toISOString(), inputs: inputs, config: getGenConfig() };
++    // 【v186】version 2：界面删掉了 C 档控件；旧方案里多出来的字段载入时会被忽略（applyScheme 按现存控件取）
++    var obj = { type: 'antGenScheme', version: 2, name: name, savedAt: new Date().toISOString(), inputs: inputs, config: getGenConfig() };
+     downloadJSON(obj, '方案_' + safeName(name) + '.json');
+   }
+   function handleSchemeSelect(e) {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=185">
++  <link rel="stylesheet" href="css/style.css?v=186">
+ </head>
+ <body>
+   <header>
+@@ -403,14 +403,7 @@
+           <label>暂存上限</label>
+           <input type="number" id="gen-buffer" min="3" max="7" value="5">
+         </div>
+-        <div class="gen-row">
+-          <label title="卡点换球(仅在候选未合格、进入卡点分支时才执行)按此进度%划分早/后期区域；基础阶段不换球">换球区域</label>
+-          <input type="number" id="gen-swap-min" min="0" max="100" value="50" style="width:44px" title="进度下限%">
+-          <span style="width:8px">~</span>
+-          <input type="number" id="gen-swap-max" min="0" max="100" value="100" style="width:44px" title="进度上限%">
+-          <span style="font-size:11px;color:#888">%</span>
+-        </div>
+-      </div>
++              </div>
+     </div>
+ 
+     <!-- 障碍设置 -->
+@@ -495,18 +488,9 @@
+         <div class="gen-row">
+           <label title="不规律锯齿墙(斜向/边缘锚定)+缺口+缺口冰/锁链，制造唯一可达通道，需推理才可通过">窄路卡点</label>
+           <input type="checkbox" id="gen-narrow" checked>
+-          <span style="font-size:11px;color:#888">缺口</span>
+-          <input type="number" id="gen-narrow-gap-min" min="1" max="4" value="1" style="width:38px" title="活口数下限">
+-          <span style="width:8px">~</span>
+-          <input type="number" id="gen-narrow-gap-max" min="1" max="4" value="3" style="width:38px" title="活口数上限">
+         </div>
+         <!-- ===== v99 新增：窄路出现概率 ===== -->
+-        <div class="gen-row">
+-          <label title="窄路卡点按概率出现。1=必定出现(与本参数引入前一致)；0.6=约六成关卡出现。只控制本关是否建窄路墙，缺口数仍由上面的活口数决定。
+-注意：四方向瞬时连锁模式下窄路实际落地率会明显低于设定值（已知限制，见文档 v99 §五）">窄路概率</label>
+-          <input type="number" id="gen-narrow-prob" min="0" max="1" step="0.1" value="1" style="width:56px">
+-        </div>
+-        <!-- ===== 管道与可用空间（v115 起明确标注：三种入口模式通用）=====
++                <!-- ===== 管道与可用空间（v115 起明确标注：三种入口模式通用）=====
+              修正：v99~v114 期间此处标为「瞬时连锁专用」，那是失准的 ——
+              引擎里这些参数从来没有 instantChain 门控，app.js 也无条件透传；
+              输出文件/底部消除 那批就是靠 minPipes=4 / usableSpaceTarget=0.74 跑出来的。
+@@ -534,20 +518,7 @@
+           <span style="font-size:11px;color:#888">单管最少</span>
+           <input type="number" id="gen-pipe-minfill" min="1" max="20" value="4" style="width:38px" title="单管最少要排几个盒。它决定溢出盒最多摊给几条管道：P ≤ ⌊溢出/本值⌋。默认 4 = 参数化前的行为。调大会让管道更深但条数更少">
+         </div>
+-        <div class="gen-row">
+-          <label title="管道不足时的第一级兜底：按「管道数下限」求不出解、或落位放不满时，退到保底条数 + 每管最少深度，而不是淘汰整个候选。条数设 0 = 关闭这一级">管道兜底</label>
+-          <input type="number" id="gen-pipe-fb-count" min="0" max="12" value="2" style="width:38px" title="保底管道条数。0=关闭这一级兜底">
+-          <span style="font-size:11px;color:#888">条 · 每管≥</span>
+-          <input type="number" id="gen-pipe-fb-depth" min="1" max="20" value="3" style="width:38px" title="兜底档每管最少装几个盒（硬下限）">
+-        </div>
+-        <div class="gen-row">
+-          <label title="管道的绝对下限。连这一级都达不到（条数不够，或溢出盒摊不到每管这么多层）就【直接去除管道】，管道格全部退回普通盒格；若撤除后仍有盒无处安放才淘汰该候选。条数设 0 = 关闭这一级">管道绝对下限</label>
+-          <input type="number" id="gen-pipe-floor-count" min="0" max="12" value="2" style="width:38px" title="绝对下限条数。0=关闭这一级">
+-          <span style="font-size:11px;color:#888">条 · 每管≥</span>
+-          <input type="number" id="gen-pipe-floor-depth" min="1" max="20" value="2" style="width:38px" title="绝对下限深度：每管最少装几个盒。低于此值即认为管道不构成卡点，整体撤除">
+-          <span style="font-size:11px;color:#888">层，否则去除管道</span>
+-        </div>
+-        <div class="gen-row">
++                        <div class="gen-row">
+           <label title="可用棋盘空间 =(总棋盘格 − 墙 − 管道占位)/总棋盘格。设为 0=关闭。开启后各候选尺寸按该目标联立求解(管道数,黑块数)，只保留有解的尺寸并随机选，从而让同一批像素图产出不同大小的棋盘而密度一致。实测推荐 0.74">可用空间目标</label>
+           <div class="gen-dual" title="可用空间目标区间。左钮=下限，右钮=上限；两钮重合=不启用区间。0=关闭该能力">
+             <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+@@ -580,11 +551,7 @@
+           <label title="单关生产最长搜索时间；到点仍不合格则立即停止，输出树内已评估过的最接近合格的候选(不再是完全无效关卡)。0=不限时">单关限时(分)</label>
+           <input type="number" id="gen-timebudget" min="0" max="30" value="5" style="width:48px">
+         </div>
+-        <div class="gen-row">
+-          <label title="批量生产时，按此比例把部分关卡定为「简单关」：这些关卡只要趋势符合(前中期无压、中后期压力提升)即可通过，不强求真实卡点；其余关卡必须命中真实卡点(困难合格)才算通过。均匀分布到整批中">简单关比例(%)</label>
+-          <input type="number" id="gen-easy-ratio" min="0" max="100" value="30" style="width:48px">
+-        </div>
+-        <div class="gen-row">
++                <div class="gen-row">
+           <label title="最终选中关卡的难度分用多少轮玩家路线标定：跑 N 轮(不同 pickThreshold)取最稳的一条，去掉单轮抽样抖动(实测单轮极差均~18)。7=实测收敛拐点(耗时约单轮×1.4)；1=旧单轮口径。只影响难度分，不影响合格判定。">难度标定轮次</label>
+           <input type="number" id="gen-difficulty-rounds" min="1" max="25" value="7" style="width:48px">
+         </div>
+@@ -606,17 +573,7 @@
+           <input type="number" id="gen-frag-max" value="0" min="0" max="99" step="0.01" style="width:80px">
+           <span class="gen-hint">0=关闭（现在默认 0）；填了也只作提醒、不再跳过源图</span>
+         </div>
+-        <div class="gen-row">
+-          <label title="【仅对「仅底部入口」模式生效】底部盒切分的并行吐球路数。&#10;&#10;含义：同时保持几个颜色在累积「单盒进度」，每 tick 轮询各路各吃 1 像素，谁先装满谁先挤出成盒。&#10;语义对齐暂存区上限——手上同时能攒几种颜色。&#10;&#10;为什么需要：旧路径按轮次批量消除（每轮挑一个颜色一次消完它全部可达像素），&#10;导致盒队列是一段段单色长串，铺进棋盘就是一整排同色。&#10;实测已产出的底部消除批次：前3行最大同色簇中位4盒、极端12盒、最长横排同色9个、前3行只有6种颜色。&#10;&#10;v110 实测（347张图全量对照）：队列同色run最长 5→2；前3行最大同色簇 5→2（极端16→4）；&#10;前3行色数 7→10；最大单色占比 25.9%→22.2%；水平同色对占比 88.0%→6.5%；&#10;「最大同色簇≤2」达标率 1.4%→82.1%；盒总数 61→60；像素守恒 100%。&#10;&#10;已实测代价：交错把压力从后期挪到前期（前期峰 0.33→1.83，trendOK 7/10→4/10）；可解率不变（10/10）。&#10;&#10;0 = 关闭，回退到旧的单色批量路径（可逐值复现 v110 之前的底部批次）。&#10;留空 = 取暂存上限（当前 5）。">底部并行路数</label>
+-          <input type="number" id="gen-box-parallel" value="5" min="0" max="12" step="1" style="width:80px">
+-          <span class="gen-hint">0=关闭(回旧路径)；仅底部入口模式生效</span>
+-        </div>
+-        <div class="gen-row">
+-          <label title="填盘时的局部交错窗口宽度。四方向与底部两种入口模式都生效。&#10;&#10;作用：解决「前几行一整排同色盒」。每个可放格从盒队列头部宽 W 的前瞻窗口里，&#10;挑出颜色既不同于左邻、也不同于上邻的那个盒来放；窗口内全冲突就退回队首（不卡住、不丢盒）。&#10;&#10;为什么改在填盘层而不是出盒层：盒是单色整批消耗，像素级交错无法打包进盒级投放&#10;（实测底部并行路数 P 从 1 到 ∞ 各项全持平，调 P 无效），而交错出盒会把严格按序回放的溢出率从 12.5% 推到 35%。&#10;聚集是棋盘相邻性的属性、与队列顺序无关，所以放到填盘层解决，两个目标就不抢同一个自由度。&#10;&#10;W 就是位移上限：盒最多偏离原队列位置 W 格，取盒顺序基本保序（裸盘实测平均位移 1.13）。&#10;&#10;裸盘实验（40张）：旧路径+W=6 → 前3行最大同色簇 1.00、同色对 0、通关率 82.5%、溢出 17.5%；&#10;W=3 不够（簇 3.00），W=6/9/12 等效 → 取 6。&#10;真实棋盘（12关）：并行P=5 + W=6 → 前3行最大同色簇 1.0、同色对 0.0，是各组合里聚集最低的。&#10;&#10;0 = 关闭，逐行左→右原行为（可逐值复现 v113 及以前的批次）。">填盘交错窗口</label>
+-          <input type="number" id="gen-fill-interleave" value="6" min="0" max="24" step="1" style="width:80px">
+-          <span class="gen-hint">0=关闭(逐行左→右)；打散前几行同色</span>
+-        </div>
+-        <div class="gen-row" style="border-top:1px solid #4d3627;margin-top:6px;padding-top:6px">
++                        <div class="gen-row" style="border-top:1px solid #4d3627;margin-top:6px;padding-top:6px">
+           <label title="【v115 新机制】卡点类型数量由「出现检查次数 × 出现概率」决定，替代原来的固定数量。&#10;&#10;怎么算：掷「检查次数」次骰子，每次以「出现概率」判定是否出现一个卡点类型；&#10;出现则从已勾选且未被抽中的类型里随机取一个（同一关内类型不重合）。&#10;类型池耗尽后，剩余检查次数不再产生新类型。&#10;&#10;例：勾了 4 种类型、检查次数 4、概率 0.5 → 数学期望 2 种。&#10;实测分布：0种 6.1% / 1种 25.0% / 2种 38.2% / 3种 24.8% / 4种 5.9%（2 万次抽样）。&#10;&#10;为什么换机制（用户原话）：「旧的机制无法用稳定的期望算出会出多少这样卡点类型，同时也无法制造波动」。&#10;&#10;检查次数填 0 = 退回旧的固定数量口径（读下面那行「固定数量·兼容」），此时概率视为 1。&#10;精确期望 E = E[min(B(次数,概率), 池大小)]，随每关的 chokePlan.expected 一起输出，可与批量实测均值对照。">卡点类型·检查次数</label>
+           <span class="gen-hint">普通</span>
+           <input type="number" id="gen-choke-rolls" value="0" min="0" max="20" step="1" style="width:56px">
+@@ -628,17 +585,7 @@
+           <input type="number" id="gen-choke-prob" value="0.5" min="0" max="1" step="0.05" style="width:56px">
+           <span class="gen-hint">0次=用下行兼容值</span>
+         </div>
+-        <div class="gen-row">
+-          <label style="color:#8a7358" title="【v115 起已停用】原来的「每关固定抽 N 种」。保留仅为兼容旧方案文件：&#10;当上面的「检查次数」为 0 时，这里的值仍会被读取，并按概率 1 复现旧的固定数量行为。&#10;新方案请改用上面的「检查次数 × 概率」。">固定数量·兼容（已停用）</label>
+-          <span class="gen-hint">普通</span>
+-          <input type="number" id="gen-choke-count" value="0" min="0" max="8" step="1" style="width:56px">
+-          <span class="gen-hint">难关</span>
+-          <input type="number" id="gen-choke-count-boss" value="0" min="0" max="8" step="1" style="width:56px">
+-          <span class="gen-hint" title="每隔多少关指定一个难关名额。&#10;⚠ 生产顺序 ≠ 上线顺序：这里只是按间隔预先指定「哪些关按难关规格生产」，&#10;真正出现在第几关由排序分组阶段决定。">难关间隔</span>
+-          <input type="number" id="gen-boss-interval" value="0" min="0" max="50" step="1" style="width:56px">
+-          <span class="gen-hint">0=不分难关</span>
+-        </div>
+-        <div class="gen-row" style="flex-wrap:wrap;gap:8px">
++                <div class="gen-row" style="flex-wrap:wrap;gap:8px">
+           <label title="勾选参与抽取的卡点类型（等权）。不勾则该类型永不出现。&#10;&#10;【v120】窄路已进池：窄路墙缺口本身也是一个卡点类型，出现概率与其他类型一样由「检查次数×概率」抽取，&#10;不再是「默认开启的独立参数」。&#10;⚠ 抽中「窄路口叠冰」或「窄路口叠链」时会自动补建窄路（否则那两个名额会空转）。&#10;⚠ 一个类型都不勾（或检查次数与固定数量都为 0）= 不启用类型化，此时窄路回落到旧的「窄路卡点」开关 + 出现概率。">可用卡点类型</label>
+           <label class="gen-hint" title="窄路墙 + 缺口本身。缺口数由上面「窄路卡点」那行的活口数范围决定。"><input type="checkbox" id="gen-choke-narrowPath"> 窄路墙缺口</label>
+           <label class="gen-hint"><input type="checkbox" id="gen-choke-iceCluster"> 数字冰簇</label>
+@@ -657,71 +604,14 @@
+         <div class="gen-row" style="border-top:1px dashed #d8cbb4;padding-top:6px;margin-top:4px">
+           <label style="font-size:11px;color:#8a7358" title="每个卡点类型的具体形态参数。只有抽中该类型时对应参数才起作用。&#10;默认值由 _kiro临时/08.28-卡点类型参数化/_实验-默认值标定.js 定向标定，见文档 §8g。">卡点类型·逐类参数（抽中才生效） ↓</label>
+         </div>
+-        <div class="gen-row">
+-          <label title="数字冰簇的「四方向聚集数量」：一个簇里有几格数字冰，按四方向 BFS 连通块算（相邻=BFS 距离 1，含链式传递）。&#10;簇越大，局部锁死的时间越长、范围越广。&#10;总格数仍由「数字冰比例」决定，本参数只决定这些冰**怎么分团**。">数字冰簇大小</label>
+-          <input type="number" id="gen-ice-cluster-min" value="4" min="1" max="20" step="1" style="width:56px">
+-          <span class="gen-hint">~</span>
+-          <input type="number" id="gen-ice-cluster-max" value="6" min="1" max="20" step="1" style="width:56px">
+-          <span class="gen-hint">个/簇（四方向连通）</span>
+-        </div>
+-        <div class="gen-row">
+-          <label title="问号簇：以某格为中心，把四方向 BFS 距离 ≤ 该阈值的候选格收进同一簇。&#10;阈值越小簇越紧（1 = 只收正邻格）。问号只影响玩家可见颜色，不改可解性。">问号簇半径</label>
+-          <input type="number" id="gen-question-cluster-radius" value="2" min="1" max="6" step="1" style="width:56px">
+-          <span class="gen-hint">BFS 中心距离阈值</span>
+-          <label title="锁链簇：几个锁链组聚成一簇（组与组四方向相邻）。&#10;⚠ v120 修复：此前绑定阶段无条件否决「组间相邻」，导致该类型自 v103 引入起从未真正生效。&#10;报告里同时记录簇内成员的 BFS 平均距离作为度量。">锁链簇组数</label>
+-          <input type="number" id="gen-chain-cluster-min" value="2" min="2" max="8" step="1" style="width:48px">
+-          <span class="gen-hint">~</span>
+-          <input type="number" id="gen-chain-cluster-max" value="3" min="2" max="8" step="1" style="width:48px">
+-        </div>
+-        <div class="gen-row">
+-          <label title="冰叠锁链：给锁链组的「端点」叠冰。端点 = 组内四方向度 ≤1 的成员（二连两端都是端，三连是两个末端）。&#10;叠 1 端 = 只锁一头；叠 2 端 = 两头都锁，整组解锁被推迟更久（更狠，可能压低通关率）。">冰叠锁链·端数</label>
+-          <select id="gen-chain-ice-ends" style="width:70px">
+-            <option value="1" selected>1 端</option>
+-            <option value="2">2 端</option>
+-          </select>
+-          <label title="窄路口叠冰：从缺口格起沿可用盒格四方向 BFS，叠 N 个冰。N 越大，窄路被锁的时间越长。">窄路口叠冰数</label>
+-          <input type="number" id="gen-narrow-gap-ice-count" value="2" min="1" max="8" step="1" style="width:56px">
+-          <span class="gen-hint">个/缺口</span>
+-        </div>
+-        <div class="gen-row">
+-          <label title="超大盒的容量【绝对区间】（v120 起取代原来的倍率口径）。&#10;选盒逻辑：优先选**总像素最少的颜色**——稀有色本来就难凑，做成超大盒才真正卡人；&#10;原实现在候选里随机挑，常挑到大宗色，做成超大盒也不难。&#10;留空两者之一 = 回退到下面的倍率口径（供复现旧批次）。">超大盒容量</label>
+-          <input type="number" id="gen-bigbox-cap-min" value="80" min="10" max="400" step="5" style="width:64px">
+-          <span class="gen-hint">~</span>
+-          <input type="number" id="gen-bigbox-cap-max" value="110" min="10" max="400" step="5" style="width:64px">
+-          <span class="gen-hint">（绝对容量，优先最少像素色）</span>
+-        </div>
+-        <div class="gen-row">
+-          <label title="增容：随机给 N 个盒各加 M 容量（同色守恒，从同色盒抽）。&#10;与「超大盒」的区别：超大盒是把一个盒堆到很大，本项是多处小幅加压。">增容 N盒×M容量</label>
+-          <input type="number" id="gen-inflate-count" value="1" min="1" max="10" step="1" style="width:48px">
+-          <span class="gen-hint">盒 ×</span>
+-          <input type="number" id="gen-inflate-amount" value="30" min="1" max="100" step="1" style="width:56px">
+-          <span class="gen-hint">容量</span>
+-        </div>
+-        <div class="gen-row">
+-          <label title="稀有色占关键位：把稀有色换到哪类关键位上。可多选（逗号分隔的键：narrowGap / pipeExit / chainEnd）。&#10;三者全开 = 与 v104~v119 行为一致。只留一项即可把稀有色专门顶到那类位置。">稀有色目标位</label>
+-          <select id="gen-rare-targets" style="flex:1">
+-            <option value="narrowGap,pipeExit,chainEnd" selected>窄路口 + 管道口 + 锁链端（全部）</option>
+-            <option value="narrowGap">仅窄路口</option>
+-            <option value="pipeExit">仅管道口</option>
+-            <option value="chainEnd">仅锁链端</option>
+-            <option value="narrowGap,pipeExit">窄路口 + 管道口</option>
+-          </select>
+-        </div>
+-        <div class="gen-row">
++                                                        <div class="gen-row">
+           <label title="【卡点组合出现的进度位置】卡点手段只落在目标图消除进度的这个区间内。&#10;口径：棋盘盒格按填盘序（= 消除序）排成一条进度轴，取该区间内的格作为卡点候选位。&#10;&#10;⚠ 与合格门的卡点判定区（30%~100%）是两件事：这里是「卡点造在哪」，那里是「压力峰出现在哪」。&#10;障碍造在 15% 处，其压力后果可能到 40% 才显现。&#10;&#10;基础障碍（按比例铺的冰/问号/锁链）仍铺满全盘，本区间只约束**卡点类型手段**。">卡点进度位置</label>
+           <input type="number" id="gen-choke-pos-min" value="0.15" min="0" max="1" step="0.05" style="width:64px">
+           <span class="gen-hint">~</span>
+           <input type="number" id="gen-choke-pos-max" value="0.80" min="0" max="1" step="0.05" style="width:64px">
+           <span class="gen-hint">进度比例（默认 15%~80%）</span>
+         </div>
+-        <div class="gen-row">
+-          <label style="color:#8a7358" title="【v120 起已停用】原超大盒倍率口径（× 盒容量上限）。上面填了「超大盒容量」绝对区间时本行不生效，&#10;仅当那两个框清空时才回退到这里，用于复现旧批次。">超大盒倍率（旧口径）</label>
+-          <input type="number" id="gen-bigbox-min" value="1.5" min="1" max="5" step="0.1" style="width:64px">
+-          <span class="gen-hint">~</span>
+-          <input type="number" id="gen-bigbox-max" value="2.0" min="1" max="5" step="0.1" style="width:64px">
+-          <label class="gen-hint" title="【v120 起已停用】窄路口两项现在一律按「是否抽中类型」生效，本开关不再影响行为，仅保留读取以兼容旧方案。"><input type="checkbox" id="gen-choke-gate-narrow"> 窄路口按类型门控（已停用）</label>
+-        </div>
+-      </div>
++              </div>
+     </div>
+   </aside>
+ 
+@@ -939,20 +829,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=185"></script>
+-  <script src="js/utils.js?v=185"></script>
++  <script src="js/zip.js?v=186"></script>
++  <script src="js/utils.js?v=186"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=185"></script>
+-  <script src="js/simulator.js?v=185"></script>
++  <script src="js/color-libs.js?v=186"></script>
++  <script src="js/simulator.js?v=186"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=185"></script>
+-  <script src="js/solver-strategy.js?v=185"></script>
+-  <script src="js/solver.js?v=185"></script>
+-  <script src="js/playersim.js?v=185"></script>
+-  <script src="js/generator.js?v=185"></script>
+-  <script src="js/analysis.js?v=185"></script>
++  <script src="js/anchor-cut.js?v=186"></script>
++  <script src="js/solver-strategy.js?v=186"></script>
++  <script src="js/solver.js?v=186"></script>
++  <script src="js/playersim.js?v=186"></script>
++  <script src="js/generator.js?v=186"></script>
++  <script src="js/analysis.js?v=186"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=185"></script>
+-  <script src="js/app.js?v=185"></script>
++  <script src="js/level-editor.js?v=186"></script>
++  <script src="js/app.js?v=186"></script>
+ </body>
+ </html>

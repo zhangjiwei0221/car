@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>思维导图 · 求解器 → 反解 → 关卡生产全流程</title>
+<style>
+  :root{
+    --bg:#f7f5f1; --fg:#221f1b; --muted:#6d665d; --line:#cdc6ba; --chip:#fffdf9; --hdr:#ffffff;
+    --a1:#b45309; --a2:#0f766e; --a3:#4338ca; --a4:#be123c; --a5:#15803d; --a6:#7c3aed;
+    --ok:#15803d; --half:#b45309; --miss:#8d8d8d;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#171513; --fg:#f1eee8; --muted:#a9a29a; --line:#4b453d; --chip:#221f1c; --hdr:#1d1a18;
+      --a1:#f0a55f; --a2:#4fd1c5; --a3:#9aa4ff; --a4:#fb7185; --a5:#6ee7a0; --a6:#c4a1ff;
+      --ok:#6ee7a0; --half:#f0a55f; --miss:#9ca3af;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:26px 22px 60px; background:var(--bg); color:var(--fg);
+    font:15px/1.62 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  header{max-width:1180px;margin:0 auto 18px}
+  h1{font-size:21px;font-weight:600;margin:0 0 6px}
+  .sub{margin:0 0 14px;color:var(--muted);font-size:13.5px;max-width:900px}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button.ctl{
+    font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);
+    background:var(--hdr);color:var(--fg);cursor:pointer
+  }
+  button.ctl:hover{border-color:var(--fg)}
+  .legend{display:flex;gap:10px;margin-left:6px;color:var(--muted);font-size:12.5px;flex-wrap:wrap}
+  .tag{font-style:normal;white-space:nowrap}
+  .tag.ok{color:var(--ok)} .tag.half{color:var(--half)} .tag.miss{color:var(--miss)}
+  main{max-width:1180px;margin:0 auto}
+  ul.tree, ul.tree ul{list-style:none;margin:0;padding:0}
+  ul.tree ul{margin-left:13px;padding-left:17px;border-left:1px solid var(--line)}
+  li{position:relative;margin:7px 0}
+  li > ul > li::before{
+    content:"";position:absolute;left:-17px;top:16px;width:13px;height:1px;background:var(--line)
+  }
+  button.node, span.node{
+    display:inline-block;text-align:left;vertical-align:top;max-width:100%;
+    background:var(--chip);border:1px solid var(--line);border-left:3px solid var(--accent,var(--line));
+    border-radius:7px;padding:6px 11px;font:inherit;font-size:14px;line-height:1.55;color:var(--fg)
+  }
+  button.node{cursor:pointer}
+  button.node:hover{border-color:var(--fg);border-left-color:var(--accent,var(--fg))}
+  .node .t{display:block}
+  .node .n{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+  .node b{font-weight:600}
+  .node code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    background:rgba(128,128,128,.13);padding:0 4px;border-radius:4px
+  }
+  button.node.branch::before{content:"▾";color:var(--muted);margin-right:6px;font-size:11px}
+  li.collapsed > button.node.branch::before{content:"▸"}
+  li.collapsed > ul{display:none}
+  ul.tree > li > button.node.root{
+    font-size:17px;font-weight:600;border-left-width:5px;--accent:var(--a3);padding:9px 14px
+  }
+  .callout{
+    max-width:1180px;margin:16px auto 0;padding:11px 14px;border-radius:9px;
+    border:1px solid var(--line);background:var(--chip);color:var(--muted);font-size:13px
+  }
+  .callout b{color:var(--fg)}
+  footer{max-width:1180px;margin:22px auto 0;color:var(--muted);font-size:13px}
+  footer b{color:var(--fg)}
+</style>
+</head>
+<body>
+<header>
+  <h1>求解器 → 反解 → 关卡生产：整条链条对照图</h1>
+  <p class="sub">
+    按前辈那段口述整理：信息只在"玩"的过程中出现；人不能批量玩，所以要招一批<b>幽灵员工</b>（求解器）替你玩；
+    玩出来的数据要能<b>评分</b>、能看出<b>波动</b>、能<b>归因</b>；反过来反解这款游戏，最后才轮到<b>拆图 → 合球 → 铺球 → 铺障碍 → 复检 → 出炉</b>。
+    每一层后面都标了<b>我们现在有什么、缺什么</b>。
+  </p>
+  <div class="bar">
+    <button class="ctl" id="expand" type="button">展开全部</button>
+    <button class="ctl" id="collapse" type="button">只看主干</button>
+    <span class="legend">
+      <i class="tag ok">✅ 已有</i><i class="tag half">🟡 半成品</i><i class="tag miss">⬜ 缺</i>
+      　（点任意方框可折叠 / 展开）
+    </span>
+  </div>
+  <div class="callout" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0 4px">
+    <div>
+      <div style="color:var(--fg);font-weight:600;margin-bottom:4px">你（人）只需要做三件事</div>
+      ① 玩一关，回来一句话：<b>卡不卡、有没有得选、还想不想再来一次</b><br>
+      ② 方向拍板（一句话）：<b>继续把测量做深 / 先回去调生成 / 先停</b><br>
+      ③ 需要时给一张目标图。参数、阈值、版本号、补丁，都<b>不用你管</b>。
+    </div>
+    <div>
+      <div style="color:var(--fg);font-weight:600;margin-bottom:4px">我负责的</div>
+      把"玩"变成数据（能不能过 / 稳不稳 / 为什么难）· 查账 · 改生成器 · 跑回归 · 留补丁与日志。<br>
+      每次改动都保证：<b>能回退、改前改后可对比、不影响你正在试的关卡</b>。
+    </div>
+  </div>
+</header>
+
+<main>
+<ul class="tree" id="tree">
+  <li>
+    <button class="node root branch" type="button">
+      <span class="t">幽灵员工（求解器）驱动的关卡生产闭环</span>
+      <span class="n">先让机器替你玩 → 变成数据 → 反解游戏 → 才能生成；顺序不能颠倒</span>
+    </button>
+    <ul>
+
+      <li style="--accent:var(--a1)">
+        <button class="node branch" type="button">
+          <span class="t">0 · 为什么要"玩"（第一性原理）</span>
+          <span class="n">关卡的信息不在文件里，在"玩的过程"里</span>
+        </button>
+        <ul>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">关卡的信息只有在玩的过程中才出现</span><span class="n">压力怎么涨、卡在哪、选择变窄还是变宽 —— 这些都不是 TXT 里写着的</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">人工玩：可以，但<b>不能批量</b></span><span class="n">成本过高，在 AI 时代已经被淘汰；这是"幽灵员工"存在的全部理由</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">于是需要代理玩家 = 求解器</span><span class="n">它能玩 100 遍、1000 遍，告诉你"这一关大概是什么样"</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">三个前提必须同时牛</span><span class="n">① 求解器够强 ② 评分体系 ③ 量化数据 —— 缺一个，玩出来的结论就不精准</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">前辈自评：评分大概只有 80 分</span><span class="n">远远不到完美 → 所以"数据说了算"也要留出手动校准的余地</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">警告：不理解整条链就上手做，太着急</span><span class="n">我们这两天撞的墙（第 26 节"用最优玩家量压力本身有问题"）就是这条警告的实证</span></span></li>
+        </ul>
+      </li>
+
+      <li style="--accent:var(--a2)">
+        <button class="node branch" type="button">
+          <span class="t">1 · 幽灵员工本身（求解器）——我们的现状</span>
+          <span class="n">已经有 3 条线，但都只"玩一遍"</span>
+        </button>
+        <ul>
+          <li><span class="node" style="--accent:var(--a2)"><span class="t">全知线（Solver）✅</span><span class="n">透视管道、永远走最优 → 量的是这一关的<b>下界</b>（最省暂存的走法长什么样）</span></span></li>
+          <li><span class="node" style="--accent:var(--a2)"><span class="t">玩家线（PlayerSim）✅</span><span class="n">按既定策略走 → 量"正常打法"，但它也会绕开要垫的选项</span></span></li>
+          <li><span class="node" style="--accent:var(--a2)"><span class="t">贪心线（v176 新增）🟡</span><span class="n">能消就消、消不掉先垫、没得挑就赌管道 → <b>唯一像真人的那条</b>；现在只报数、不进判定</span></span></li>
+          <li><span class="node" style="--accent:var(--a2)"><span class="t">缺口①：只玩 1 遍 → <b>✅ 已补（v177/v178）</b></span><span class="n">每关跑 18 局（稳健/冒险/乱点 各 6）。两个首测结论：① 同一关峰窗 <b>2~5</b>（小鹿），单轮数字全在噪声里；② 换打法通关率差很多（批次61：稳健 0/6、乱点 4/6）= 这关"稳健被坑"</span></span></li>
+          <li><span class="node" style="--accent:var(--a2)"><span class="t">⬜ 缺口②：没有真人的玩的数据</span><span class="n">上线后的失败点、复活点、在哪一步放弃 —— 这些能把"像不像真人"校准到真</span></span></li>
+        </ul>
+      </li>
+
+      <li style="--accent:var(--a3)">
+        <button class="node branch" type="button">
+          <span class="t">2 · 评分体系与量化数据</span>
+          <span class="n">有维度了，但没有波动、没有归因</span>
+        </button>
+        <ul>
+          <li><span class="node" style="--accent:var(--a3)"><span class="t">已有维度 ✅</span><span class="n">中后期峰窗 · 独木桥 · 预算判断点 · 无满解步数 · 前期限压 · 选择余地曲线（窄选择占比）· 垫槽/赌管道次数</span></span></li>
+          <li><span class="node" style="--accent:var(--a3)"><span class="t">阈值状态：<b>暂定</b>🟡</span><span class="n">独木桥 ≤1 · 预算点 ≥12 · 无满解 ≤3 · 峰窗 ≥3.5 —— 全部是从"小鹿"<b>一关</b>反推的，样本量=1</span></span></li>
+          <li><span class="node" style="--accent:var(--a3)"><span class="t">⬜ 缺口③：没有"波动"</span><span class="n">同一关玩 N 遍的 均值 / 最坏 / 方差 —— 这是"关卡稳不稳"的唯一证据</span></span></li>
+          <li><span class="node" style="--accent:var(--a3)"><span class="t">⬜ 缺口④：没有"归因"</span><span class="n">压力是墙挤出来的？冰锁出来的？管道赌出来的？还是切球切出来的？——分不出来，就只能靠改参数试错</span></span></li>
+          <li><span class="node" style="--accent:var(--a3)"><span class="t">目标形态</span><span class="n">从"一个分数"升级成"<b>构成 + 归因 + 波动区间</b>"：这一关为什么这样、哪里会变、变多少</span></span></li>
+        </ul>
+      </li>
+
+      <li style="--accent:var(--a4)">
+        <button class="node branch" type="button">
+          <span class="t">3 · 反解：从数据回到设计</span>
+          <span class="n">矿脉依赖 → 债务 Δ —— "切球与顺序"的数学化</span>
+        </button>
+        <ul>
+          <li><span class="node" style="--accent:var(--a4)"><span class="t">只有几何是固定的</span><span class="n">谁包着谁（依赖关系）—— 由目标图像素决定，与怎么切球、怎么摆车无关</span></span></li>
+          <li><span class="node" style="--accent:var(--a4)"><span class="t"><code>L(v)</code> = 最短解锁轮次</span><span class="n">矿脉 v 最早能在第几轮被碰到（自由格 BFS 层数）。这是<b>下界</b>，任何玩法都不可能更早</span></span></li>
+          <li><span class="node" style="--accent:var(--a4)"><span class="t"><code>R(v)</code> = 实际到达轮次</span><span class="n">由"切球 × 摆车顺序 × 道具"共同决定 —— <b>换顺序，暴露出来的颜色就变</b></span></span></li>
+          <li><span class="node" style="--accent:var(--a4)"><span class="t"><b><code>Δ(v) = R − L</code> = 债务</b></span><span class="n">这就是"卡点 / 暂存压力"的量化定义：欠得越多的矿脉，就是这一关的卡点来源</span></span></li>
+          <li><span class="node" style="--accent:var(--a4)"><span class="t">债务从哪来</span><span class="n">车接不满白占一个槽位 · 拿错颜色浪费一次机会 · 把"包着关键色的那辆车"提前吃掉（等于提前用掉钥匙）</span></span></li>
+          <li><span class="node" style="--accent:var(--a4)"><span class="t">于是"切球与顺序"可以被目标推导</span><span class="n">切球 = 定每辆车能动哪些颜色（容量+色组成）；顺序 = 定哪一轮手上有钥匙；<b>卡点 = 故意让某条关键矿脉的 Δ 变大</b></span></span></li>
+        </ul>
+      </li>
+
+      <li style="--accent:var(--a5)">
+        <button class="node branch" type="button">
+          <span class="t">4 · 生产流水线：前辈的每一步 → 我们的对应物</span>
+          <span class="n">拆图 → 合球 → 铺球 → 选棋盘 → 铺障碍 →（二次验证）→ 复检 → 合成 → 检查/求解/审核/评分 → 出炉</span>
+        </button>
+        <ul>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">① 拆图 🟡</span><span class="n">= 切球规划器（车单 41 辆、平均容量 28.2）。现在按"像素 ÷ 车数"分，<b>没有按依赖结构分</b> —— 这是"少了点灵气"的根</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">② 合球 🟡</span><span class="n">= 每辆车的容量与颜色组成（盒容量 14~29、颜色配比）。有规则，但不是从 Δ 推出来的</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">③ 铺球 🟡</span><span class="n">= 车的出场顺序（候选生成 + 摆盒顺序）。顺序是"搜出来的"而不是"设计出来的" → 所以没有明确的设计意图</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">④ 选棋盘 ✅</span><span class="n">= 行列自适应（8~9 × 9~10）+ 入口模式（四边 / 仅底部）</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">⑤ 铺障碍 🟡</span><span class="n">= 冰 / 数字冰 / 锁链 / 问号 / 管道 / 墙（冰=节拍×4；锁链必须相邻；管道下限 2；墙上限 4%）。现在仍是<b>比例 + 抽样</b>，不是"目标驱动"</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">⑥ 二次验证 ✅</span><span class="n">= 铺完障碍后<b>重新求解 + 重新审核</b>（变体必须重解重审，否则"挂上去的指标"是假的）</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">⑦ 复检 ✅ 🟡</span><span class="n">= 关卡体检（只读，全知/玩家/贪心三条线并排）。还有"批量模拟分析""批量难度重标定"两个按钮，含义待重新定</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">⑧ 合成关卡 ✅</span><span class="n">= 落库 / 导出 / 带入棋盘 / 导入实机（第 3 关那种）</span></span></li>
+          <li><span class="node" style="--accent:var(--a5)"><span class="t">⑨ 检查→求解→审核→评分→出炉 ✅</span><span class="n">= 合格门 + 逐关落库 + 批次报告</span></span></li>
+        </ul>
+      </li>
+
+      <li style="--accent:var(--a6)">
+        <button class="node branch" type="button">
+          <span class="t">5 · 我们真正缺的三块（都在最上游）</span>
+          <span class="n">不是"生成参数调得不够好"，是上游没建起来</span>
+        </button>
+        <ul>
+          <li><span class="node" style="--accent:var(--a6)"><span class="t">⬜ 批量玩（幽灵员工还没开工）</span><span class="n">同关玩 N 遍 → 波动区间。最便宜、最该先补；补完之后很多"玄学"会自己消失</span></span></li>
+          <li><span class="node" style="--accent:var(--a6)"><span class="t">归因（为什么波动）→ <b>🟡 已开工（v179）</b></span><span class="n">功能块层已经能归因（消融：拿掉墙/冰/链/问号各跑一遍）。下一步是<b>切球/容量层</b>——61 证明病根在那里</span></span></li>
+          <li><span class="node" style="--accent:var(--a6)"><span class="t">⬜ 反解（矿脉债务 Δ）</span><span class="n">目前唯一有可能<b>不靠墙</b>就把中后期压力顶到 3~4 的方向</span></span></li>
+        </ul>
+      </li>
+
+      <li style="--accent:var(--a1)">
+        <button class="node branch" type="button">
+          <span class="t">6 · 该怎么做（顺序）</span>
+          <span class="n">先补上游度量，再动生成；每一步都要能拿数据验收</span>
+        </button>
+        <ul>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">第 0 步（你先做）</span><span class="n">对着这张图指出哪一步你不同意 / 哪一步词不对 —— 这是唯一需要你先拍板的</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">第 1 步：把"玩 100 遍"做出来 ✅ v177→v178</span><span class="n">已上线：每关 18 局 → <b>稳健通关率（主指标）+ 策略差 + 峰窗区间 + 卡死位置</b>。（v177 曾误报"通关 0/64"：求解器路径不结算胜负，v178 已修——小鹿 6/6、批次61 稳健 0/6）</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">第 2 步：归因 ✅ v179（消融实验）</span><span class="n">拿掉一种功能块重玩 6 局，看通关率回升多少。实测：批次61 <b>全拿掉仍 0/6</b> → 病根在切球/容量/摆位，不在墙冰链；批次62 是叠加型（全拿掉 +67）。管道不可这样消融（会带走车 → 不可解）</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">第 3 步：矿脉债务 Δ → <b>🟡 已开工（v180~v181）</b></span><span class="n">层表已出（61 与 62 同一张图 → 层表<b>逐值相同</b>=只由图决定）。<b>61 的死因已查清</b>：卡住的 4 辆车，每种颜色恰好还剩它要的量（24/17/8/2）但<b>可达全是 0</b> → 被埋 + 无盒可点。→ 下一步：用层表反推"开壳车必须排在被包色之前"</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">第 4 步：拆图 / 合球改由 Δ 驱动</span><span class="n">不再按比例随机切球；按"想制造哪条矿脉的债务"来切、来配车</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">第 5 步：评分体系校准</span><span class="n">用真人试玩数据回填阈值，替掉"从一关反推"的暂定门</span></span></li>
+          <li><span class="node" style="--accent:var(--a1)"><span class="t">一直在做的治理</span><span class="n">每次改动 → 体检 + 回归 + 落补丁 + 记工作日志（这条已经是习惯了，保持）</span></span></li>
+        </ul>
+      </li>
+
+    </ul>
+  </li>
+</ul>
+</main>
+
+<div class="callout">
+  <b>理解顺序（前辈那句"太着急"的落点）</b>：先搞懂求解器怎么玩 → 再学会读数据 → 再反解出结构 → 最后才谈生成。
+  反过来做（拿生成参数直接试），就是这两天反复出现"改了没用 / 越改越乱"的原因。
+</div>
+
+<footer>
+  一句话：前辈那条链，我们<b>每一步都已经有东西了</b>；真正空着的只有三处 —— <b>批量玩、归因、反解</b>，
+  而且全都在最上游。先补这三块，比继续调生成的参数便宜得多。
+</footer>
+
+<script>
+(function(){
+  var tree = document.getElementById('tree');
+  if (!tree) return;
+  var buttons = tree.querySelectorAll('button.node');
+  for (var i = 0; i < buttons.length; i++) {
+    var btn = buttons[i];
+    if (btn.parentElement.querySelector('ul')) btn.classList.add('branch');
+    btn.addEventListener('click', function () {
+      var li = this.parentElement;
+      if (!li.querySelector('ul')) return;
+      li.classList.toggle('collapsed');
+    });
+  }
+  document.getElementById('expand').addEventListener('click', function () {
+    var lis = tree.querySelectorAll('li');
+    for (var k = 0; k < lis.length; k++) lis[k].classList.remove('collapsed');
+  });
+  document.getElementById('collapse').addEventListener('click', function () {
+    // 只留主干：根节点与它的第一层分支保持展开，其余全部折叠
+    var lis = tree.querySelectorAll('li');
+    for (var k = 0; k < lis.length; k++) {
+      var depth = 0, p = lis[k];
+      while (p && p !== tree) { if (p.tagName === 'LI') depth++; p = p.parentElement; }
+      if (depth >= 2) lis[k].classList.add('collapsed');
+      else lis[k].classList.remove('collapsed');
+    }
+  });
+})();
+</script>
+</body>
+</html>

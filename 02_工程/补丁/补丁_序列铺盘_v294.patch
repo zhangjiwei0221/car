@@ -1,0 +1,162 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3029,6 +3029,100 @@
+         order.push([or2, oc2, dist[or2][oc2] < 0 ? 999 : dist[or2][oc2]]);
+       }
+       order.sort(function (a, b) { return a[2] - b[2] || a[0] - b[0] || a[1] - b[1]; });
++
++      // ===== 【seqFill·序列铺盘】把"格子铺放顺序"从 BFS 距离换成**沿前沿推进的单链遍历** =====
++      // 为什么需要它：
++      //   BFS 距离只在前期近似等于"玩家第几步能点到"。中段前沿会同时展开一大片，
++      //   玩家能点到的有六七辆，而车单是按"第 i 辆在第 i 步上场"排的 → 序列失效。
++      //   实测（工作日志第 217 节）：现行切法下 r 中位 0.20、上限 0.60，
++      //   20~80% 的后半段在数学上不可能有债 —— 就是被这个脱钩锁死的。
++      //
++      // 做法：从第 0 行出发做一次"蛇形 + 邻接优先"的确定性遍历：
++      //   保证 seq 上相邻的两个格子在棋盘上也相邻 → 取走第 k 格就激活第 k+1 格，
++      //   于是"车单顺序 = 实际取用顺序"在几何上成立（近似，允许玩家在前沿小范围换序）。
++      //   玩家仍可自由选择（不改变规则），只是**可选集合**被收窄到计划的那几辆。
++      if (config.seqFill) {
++        var _seqVis = [], _seqOut = [];
++        for (var _vi = 0; _vi < rows; _vi++) { _seqVis.push([]); for (var _vj = 0; _vj < cols; _vj++) _seqVis[_vi].push(false); }
++        function _seqFree(rr, cc) {
++          if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) return false;
++          if (_seqVis[rr][cc]) return false;
++          var x = cells[rr][cc];
++          return x == null;                       // 只排空格（管道/墙不参与填盒）
++        }
++        // 起点：第 0 行最左的空格；之后每一步在"当前格的 4 邻"里挑，
++        //   优先同行（蛇形推进），其次向下一行；都没有就退回"离已铺序列最近的格子"。
++        var _startC = -1, _startR = 0;
++        for (var _sc0 = 0; _sc0 < cols; _sc0++) if (_seqFree(0, _sc0)) { _startC = _sc0; break; }
++        // 【兜底】第 0 行可能被管道/障碍占满（实测 6×7 上会这样）→ 改从全盘第一个空格起步。
++        //   起点不是第 0 行时，序列的前几格要等玩家挖下去才激活，顺序性会差一些，
++        //   但比"整个 seqFill 静默失效、退回 BFS"好：至少顺序仍然是单链的。
++        if (_startC < 0) {
++          var _fb = null;
++          for (var _fr1 = 0; _fr1 < rows && !_fb; _fr1++) for (var _fc1 = 0; _fc1 < cols; _fc1++) {
++            if (_seqFree(_fr1, _fc1)) { _fb = [_fr1, _fc1]; break; }
++          }
++          if (_fb) { _startR = _fb[0]; _startC = _fb[1]; }
++        }
++        timing.seqFillStart = { r: _startR, c: _startC };
++        if (_startC >= 0) {
++          _seqVis[_startR][_startC] = true; _seqOut.push([_startR, _startC]);
++          var _curR = _startR, _curC = _startC, _dir = 1;   // 蛇形方向
++          var _guardSeq = rows * cols * 4;
++          while (_seqOut.length < rows * cols && _guardSeq-- > 0) {
++            var _next = null;
++            // ① 同行下一格（蛇形）
++            var _nc0 = _curC + _dir;
++            if (_seqFree(_curR, _nc0)) _next = [_curR, _nc0];
++            // ② 同行走到头 → 下一行，方向反转
++            if (!_next) {
++              var _nr0 = _curR + 1;
++              if (_nr0 < rows) {
++                _dir = -_dir;
++                var _cand0 = (_dir > 0) ? 0 : cols - 1;
++                // 从该行往中间找第一个空格，优先靠近当前列
++                var _best0 = -1, _bd0 = 1e9;
++                for (var _cc0 = 0; _cc0 < cols; _cc0++) {
++                  if (!_seqFree(_nr0, _cc0)) continue;
++                  var _d0 = Math.abs(_cc0 - _curC);
++                  if (_d0 < _bd0) { _bd0 = _d0; _best0 = _cc0; }
++                }
++                if (_best0 >= 0) _next = [_nr0, _best0];
++              }
++            }
++            // ③ 兜底：全场找"与已铺序列曼哈顿距离最近"的空格（保持连通扫描，不跳飞）
++            if (!_next) {
++              var _b1 = null, _bd1 = 1e9;
++              for (var _fr0 = 0; _fr0 < rows; _fr0++) for (var _fc0 = 0; _fc0 < cols; _fc0++) {
++                if (!_seqFree(_fr0, _fc0)) continue;
++                var _d1 = Math.abs(_fr0 - _curR) + Math.abs(_fc0 - _curC);
++                if (_d1 < _bd1) { _bd1 = _d1; _b1 = [_fr0, _fc0]; }
++              }
++              if (!_b1) break;
++              _next = _b1;
++            }
++            _seqVis[_next[0]][_next[1]] = true;
++            _seqOut.push(_next);
++            _curR = _next[0]; _curC = _next[1];
++          }
++          // 用序列序替换 BFS 距离序（保留 dist 在 [2] 位，仅为兼容下游排序字段）
++          if (_seqOut.length === order.length) {
++            order = _seqOut.map(function (x, i) { return [x[0], x[1], i]; });
++            timing.seqFill = { n: order.length };
++          } else {
++            // 空格数与序列长度不一致（有不可达空位）→ 保守：把序列铺到的放前面，其余按原 BFS 补后
++            var _used = {};
++            for (var _ui = 0; _ui < _seqOut.length; _ui++) _used[_seqOut[_ui][0] + ',' + _seqOut[_ui][1]] = 1;
++            var _merged = _seqOut.map(function (x, i) { return [x[0], x[1], i]; });
++            for (var _oi0 = 0; _oi0 < order.length; _oi0++) {
++              var _k0 = order[_oi0][0] + ',' + order[_oi0][1];
++              if (!_used[_k0]) _merged.push([order[_oi0][0], order[_oi0][1], _merged.length]);
++            }
++            order = _merged;
++            timing.seqFill = { n: _seqOut.length, merged: _merged.length };
++          }
++        }
++      }
+       // 【v260·用户裁决】闸门借车：把"需求最晚"的几辆车换到"扇出最大"的浅层格子上。
+       //   理由：全知求解器不会主动拿吃不饱的车，只有它挡在通往一大片车的唯一通路上时才会被迫拿。
+       //   所以"晚熟色 + 高扇出 + 浅层"三者同时成立，才会出现又高又持久的全知压力。
+@@ -3175,13 +3269,34 @@
+           timing.coupledFill = { n: _nc, lag: _LAG, window: _W };
+         } catch (e3) { coupledAssign = null; }
+       }
++      // 【seqFill】序列铺盘时，车单必须**严格按当用时刻 r 升序**落到序列格上：
++      //   免费车（r=0）先上场，之后 r 递增 → 玩家越往后走，手上的车越晚才能装满 = 债。
++      //   同时关掉颜色交错与第 0 行同色限量：它们会打乱序列，而 seqFill 的卖点正是"顺序可控"。
++      if (config.seqFill && _dc) {
++        for (var _sqi = 0; _sqi < list.length; _sqi++) {
++          var _sqv = -1;
++          try { _sqv = demandAt(_dc, list[_sqi].color, list[_sqi].count); } catch (e) { _sqv = -1; }
++          list[_sqi]._sqr = (_sqv >= 0) ? _sqv : 1.0;
++        }
++        // 同 r 时把**容量大的免费车**排前面（先消耗供给），再按原切序稳定排序
++        list.sort(function (a, b) {
++          var d = a._sqr - b._sqr;
++          if (Math.abs(d) > 1e-9) return d;
++          if (a._sqr <= 1e-9) return (b.count - a.count) || (a._seq - b._seq);
++          return a._seq - b._seq;
++        });
++        timing.seqFillList = { n: list.length, rMin: list[0] ? +list[0]._sqr.toFixed(2) : null, rMax: list[list.length - 1] ? +list[list.length - 1]._sqr.toFixed(2) : null };
++      }
+       var exW = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
++      if (config.seqFill) exW = 0;      // 序列铺盘不做颜色交错（会破坏顺序）
+       for (var oi = 0; oi < order.length && fi < list.length; oi++) {
+         var tr2 = order[oi][0], tc2 = order[oi][1];
+         // 【v280·用户反馈】不要 160 这种超大车。改法：容量上限压到正常区间（capCeil 84），
+         //   同时**限制第 0 行同色车的辆数**——开局可点的只有最前面这几格，
+         //   同色车少摆几辆，开局能装满的数量自然就下来了，不靠"把车做大"。
+-        if (config.row0ColorMax && oi < cols) {
++        // 【seqFill】序列铺盘不做第 0 行同色限量：它靠"免费车先上场、r 递增"控制开局，
++        //   再按颜色换位会把 r 顺序打乱（v290 那种"第一行全同色"的副作用也由 r 排序本身避免）。
++        if (config.row0ColorMax && oi < cols && !config.seqFill) {
+           var _c0m = Math.max(1, parseInt(config.row0ColorMax, 10) || 2);
+           var _seen0 = {};
+           for (var _c4 = 0; _c4 < cols; _c4++) {
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4632,6 +4632,9 @@
+       // 【v293·A/B 实测】小图配小盘：像素少 → 单车容量小 → 免费车多 → 没有压力。
+       //   把棋盘缩到 5×6/5×7，同样像素能切出更大的车（35×35：5%→13%，30×30：10%→23%）。
++      //   ⚠ 【v294 更正】这个结论是在 targetBand3Min=0（不卡覆盖率）下测的，且没走生产验收。
++      //     实测 35×35 配 5×6 时切出 41 盒 > 30 格，溢出全部挤管道，
++      //     而 usableSpaceTarget=0.86 的容差又卡死 → pipeCapacity 20/20 全灭。
+       out.boardTryDims = (_pxAll < 1300)
+         ? [[5, 6], [5, 7], [6, 7], [6, 8]]
+         : [[6, 7], [7, 7], [6, 8], [7, 8]];
+@@ -4694,6 +4697,14 @@
+       capTie: true, capPerColor: 2, capCeil: 84, row0ColorMax: 2,
++      // 【v294·序号铺盘】默认关，留作 A/B 实验开关。
++      //   压力 = 序差，实测模型命中 93%。但现行 BFS 铺法只用"暴露距离"近似"第几步能点到"，
++      //   中段前沿同时展开一大片 → 车单顺序与实际取用顺序脱钩。
++      //   seqFill 把格子铺放顺序换成沿前沿推进的单链遍历，使序列顺序 ≈ 实际取用顺序。
++      seqFill: false,
++      // 小盘上 usableSpaceTarget 必须放大：0.86 是按 6×7 调的，小盘溢出装不下时
++      //   "可用空间偏离"与"管道容量"会互相锁死（35×35 + 5×6 实测 20/20 全灭）。
++      usableSpaceTarget: (_norm.rowsMax * _norm.colsMax <= 35) ? 0.94 : 0.86,
+       // 【v284】容量归一化：同色内拆分/合并，保证每辆都在 [0.6×均值, 1.6×均值]
+       capNormalize: true,

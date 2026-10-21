@@ -1,0 +1,665 @@
+diff -u a/03_工具/像素画工具/图片转像素画.js b/03_工具/像素画工具/图片转像素画.js
+--- a/03_工具/像素画工具/图片转像素画.js	2026-10-15 17:34:20
++++ b/03_工具/像素画工具/图片转像素画.js	2026-10-15 17:34:20
+@@ -13,25 +13,44 @@
+  *   --outdir 目录   输出目录（默认当前目录）
+  *   --name 名字     输出文件名前缀（默认用输入文件名）
+  *   --bin 目录      工程 bin/js 目录（默认取交接包里的快照，用于色表 + 碎色闸门判定）
++ *   --lib auto|older|official   【v154】色库（默认 auto）
++ *                     older    = 真实毛线 34 色（1-34，0=空位），本工程一直在用
++ *                     official = 官方 22 色（游戏真实色号 0-21，-1=空位）→ **取色表换成 22 个真色**，
++ *                                产出的色号都是游戏里真有的颜色，可直接上实机
++ *                     auto     = 输入是 TXT 就自动认（-1 → 官方；>21 → 老）；图片输入按 older
++ *                     ⚠ 选 official 时，官方里没有的颜色（如 34 色的深灰 #010101）会落到最近的官方色，
++ *                       画面观感会变 —— 这是"只许用真机色"的必然取舍
+  *
+  * 产出：
+- *   <名字>_<列>x<行>.txt          目标图 TXT（首行"像素矩阵"，空格分隔，0=空）
++ *   <名字>_<列>x<行>.txt          目标图 TXT（首行"像素矩阵"，空格分隔）
++ *                                老色库：0 = 空位；官方色库：-1 = 空位、色号 0-21
+  *   <名字>_<列>x<行>_预览.png      像素画预览（放大的方格图）
+- *   屏幕报告：尺寸 / 色数 / 每色格数 / 碎色率（与生成器同一口径）/ 是否过闸
++ *   屏幕报告：输出色库 / 尺寸 / 色数 / 每色格数 / 碎色率（与生成器同一口径）/ 是否过闸
+  */
+ const fs = require('fs'), os = require('os'), path = require('path'), zlib = require('zlib'), vm = require('vm');
+ const { execFileSync } = require('child_process');
+ 
+ // ---------- 参数 ----------
+ const argv = process.argv.slice(2);
+-if (argv.length < 3) { console.log('用法: node 图片转像素画.js <图片或TXT> <列数> <行数> [--colors N] [--despeckle N] [--outdir 目录] [--name 名字] [--bin bin/js目录]'); process.exit(1); }
++if (argv.length < 3) { console.log('用法: node 图片转像素画.js <图片或TXT> <列数> <行数> [--colors N] [--despeckle N] [--lib auto|older|official] [--outdir 目录] [--name 名字] [--bin bin/js目录]'); process.exit(1); }
+ const SRC = argv[0], COLS = +argv[1], ROWS = +argv[2];
+ function opt(name, dflt) { const i = argv.indexOf('--' + name); return i >= 0 ? argv[i + 1] : dflt; }
+ const MAX_COLORS = +opt('colors', 12);
+ const DESPECKLE = +opt('despeckle', 8);
+ const SAMPLE = (opt('sample', 'mode') === 'avg') ? 'avg' : 'mode';   // 【2026-10-14】默认改成主色聚类投票
+ const PROTECT = +opt('protect', 0);                                  // 细线保护（0=关）
++// 【v153】取色窗口：格内取中间多大一片投票。默认 0.75 —— AI 放大图/带阴影描边的图，
++//   格子四边有一圈抗锯齿与立体倒角，整格投进去会让深色倒角多投票（实测黑块比真值多约 10%、描边变粗一格）。
++const INNER = (() => { const v = +opt('inner', 0.75); return v > 0 && v <= 1 ? v : 0.75; })();
+ const OUTDIR = opt('outdir', '.');
++// 【v154】色库：--lib auto|older|official
++//   older  = 真实毛线 34 色（1-34，0=空位），本工程一直用的那套
++//   official = 官方 22 色（游戏真实色号 0-21，-1=空位），产出直接能上实机
++//   auto   = 输入 TXT 自动认；图片输入按 older
++//   选了 official：**取色表就换成官方 22 个真色**，所以输出的每个色号都是游戏里真有的颜色，
++//   不需要事后再让求解器做一次近似转换。代价：官方里没有的颜色（如 34 色的深灰 #010101）
++//   落到最近的官方色，画面观感会变 —— 这是"用真机色"必然的取舍。
++const LIBOPT = (function () { const v = String(opt('lib', 'auto')).toLowerCase(); return ['auto', 'older', 'official'].includes(v) ? v : 'auto'; })();
+ // 找工程里的 bin/js（色表 + 碎色闸门用）：--bin 优先；否则从本文件往上找，
+ // 这样整个包随便挪目录都不用改脚本。
+ function findBin() {
+@@ -108,25 +127,107 @@
+ const sb = { console, Math, Date, JSON, Int32Array, Uint8Array, Float64Array, Object, Array, String, Number, Boolean, parseInt, parseFloat, isNaN };
+ sb.window = sb; sb.globalThis = sb;
+ const ctx = vm.createContext(sb);
+-['utils.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'generator.js'].forEach(f => {
++['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'generator.js'].forEach(f => {
+   const p = path.join(BIN, f); if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, 'utf8'), ctx, { filename: f });
+ });
+ const A = ctx.AntSolver;
+-const PAL = A.COLORS.map((c, i) => c && ({ id: i, hex: c.hex, name: c.name })).filter(Boolean);
+ const rgbOf = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+ const cssOf = id => A.getColorCSS(id);
+ 
++// ---------- 色库模块（可选）----------
++// 【v154】这个工具能指向**任意一份工程副本**（--bin 或自动往上找）——实测会命中
++//   03_工具/关卡图修改工具/bin/js 那份 v110 的旧副本，它没有 color-libs.js。
++//   所以这里必须优雅降级：没有色库模块就退回 A.COLORS（老色库仍然可用），
++//   只有用户明确要 official 时才报错并说清怎么解决。
++let CL = A.ColorLibs || null;
++if (!CL) {
++  const clPath = path.join(BIN, 'color-libs.js');
++  if (fs.existsSync(clPath)) {
++    try { vm.runInContext(fs.readFileSync(clPath, 'utf8'), ctx, { filename: 'color-libs.js' }); CL = ctx.AntSolver.ColorLibs || null; }
++    catch (e) { CL = null; }
++  }
++}
++if (!CL) {
++  console.log('⚠ 这份工程副本里没有色库模块 color-libs.js（' + BIN + '）——「老色库 34 色」照常可用；');
++  console.log('  要用「官方 22 色」请加 --bin 指向带 color-libs.js 的工程（如 完整主bin快照_20261012/bin/js）。');
++}
++
++// ---------- 0. 【v154】定"取色表"与"输出色库" ----------
++// 工作态约定：**grid 里 0 恒为空位、颜色恒为 1..N 的正整数**（既有算法全部依赖这一点）。
++//   older   ：色号就是工程色号 1..34，原样可用。
++//   official：色号 = 官方色号 + 1（官方 0..21 → 工作态 1..22）。因为官方 0 是有含义的黄色，
++//             而工作态要用 0 表示空位，所以整体 +1；出文件时再减回去（空位写 -1）。
++function paletteOf(lib) {
++  if (lib === 'official') {
++    if (!CL) throw new Error('这份工程副本没有 color-libs.js，取不到官方 22 色。请加 --bin 指向 完整主bin快照_20261012/bin/js');
++    return CL.OFFICIAL.colors.map((c, i) => ({ id: i + 1, hex: c.hex, name: c.name }));
++  }
++  // 老色库：有色库模块就用它（与求解器内置副本同源）；没有就直接用工程的 AntSolver.COLORS
++  const src = CL ? CL.OLDER.colors : A.COLORS;
++  return src.map((c, i) => (c ? { id: i, hex: c.hex, name: c.name } : null)).filter(Boolean);
++}
++const PAL_OLDER = paletteOf('older');
++let _palOfficial = null;
++const PAL_OFFICIAL = () => (_palOfficial || (_palOfficial = paletteOf('official')));   // 懒建：没色库模块时不报错，只有真要用官方才报
++// 输入 TXT 是不是官方格式：交给色库模块判（-1 → 官方；>21 → 老；实心图判据不足时回落老）
++let inLib = 'older';
++const lower0 = SRC.toLowerCase();
++if (LIBOPT === 'official') inLib = 'official';
++else if (LIBOPT === 'older') inLib = 'older';
++else if (lower0.endsWith('.txt')) {
++  let raw = null;
++  try { raw = CL ? CL.parseTXT(fs.readFileSync(SRC, 'utf8')) : null; } catch (e) { raw = null; }
++  if (raw && raw.length && CL) {
++    const d = CL.detect(raw);
++    inLib = d.lib;
++    console.log('输入色库：' + (inLib === 'official' ? '官方 0-21（-1 空位）' : '老色库 34 色（0 空位）') +
++      (d.confident ? '' : '【判据不足，实心图】') + ' —— ' + d.reason);
++  }
++}
++const OUTLIB = (LIBOPT === 'auto' || LIBOPT === 'older') ? 'older' : 'official';
++let PAL;
++try { PAL = (OUTLIB === 'official') ? PAL_OFFICIAL() : PAL_OLDER; }
++catch (e) {
++  console.error('✗ ' + e.message);
++  console.error('  当前色表目录：' + BIN);
++  process.exit(1);
++}
++const ALL_IDS = PAL.map(p => p.id);
++const FIRST_ID = ALL_IDS[0];               // 兜底色号（原来是写死的 31，现在跟色库走）
++const ID2HEX = new Map(PAL.map(p => [p.id, p.hex]));
++const ID2NAME = new Map(PAL.map(p => [p.id, p.name]));
++console.log('取色表：' + (OUTLIB === 'official' ? '官方 22 色（色号 0-21，输出 -1 空位）' : '老色库 34 色（色号 1-34，输出 0 空位）') +
++  (LIBOPT === 'auto' ? '（auto）' : ''));
++// 官方色号 → 工作态色号的换算（懒建，理由同上：没色库模块时不能在这里就炸）
++function officialToWork(v) {
++  if (!CL) return 0;
++  if (v < 0 || v > CL.OFFICIAL_MAX) return 0;
++  return v + 1;
++}
++// 出文件时用：把 grid 写成目标色库的 TXT 文本（官方空位写 -1，老色库写 0）
++function gridToTXT(grid) {
++  if (OUTLIB !== 'official') return '像素矩阵\n' + grid.map(r => r.join(' ')).join('\n') + '\n';
++  return '像素矩阵\n' + grid.map(r => r.map(v => v === 0 ? -1 : v - 1).join(' ')).join('\n') + '\n';
++}
++
+ // ---------- 1. 取源像素（图片或 TXT）----------
+ let sw, sh, srcPx;
+ const lower = SRC.toLowerCase();
+ if (lower.endsWith('.txt')) {
+-  const lines = fs.readFileSync(SRC, 'utf8').trim().split('\n').filter(l => /^\s*\d/.test(l));
++  // 【v154 修】原来用 /^\s*\d/ 过滤数据行 → **以 -1 开头的行会被整行丢掉**（官方 300 关里 180 关有这种行，
++  //   共丢 5276 行），矩阵缺行错位。改成 /^\s*-?\d/，并把编号按输入色库换算进工作态。
++  const lines = fs.readFileSync(SRC, 'utf8').trim().split('\n').filter(l => /^\s*-?\d/.test(l));
+   const g = lines.map(l => l.trim().split(/\s+/).map(Number));
+   sw = g[0].length; sh = g.length;
+   srcPx = (x, y) => {
+     const v = g[Math.min(y, sh - 1)][Math.min(x, sw - 1)];
+-    if (!v) return [255, 255, 255];
+-    return PAL.find(p => p.id === v) ? rgbOf(PAL.find(p => p.id === v).hex) : [255, 255, 255];
++    if (v === undefined || v === null) return [255, 255, 255];
++    // 输入色库 → 工作态色号（老：原样，0=空；官方：0..21 → 1..22，-1=空）
++    let work;
++    if (inLib === 'official') work = officialToWork(v);
++    else work = v > 0 ? v : 0;
++    if (!work) return [255, 255, 255];
++    return ID2HEX.has(work) ? rgbOf(ID2HEX.get(work)) : [255, 255, 255];
+   };
+   console.log('源：TXT 像素画 ' + sw + '×' + sh);
+ } else {
+@@ -142,19 +243,20 @@
+ // ---------- 2. 分格取色：主色聚类投票（默认）/ 整格平均（旧口径）----------
+ //   为什么默认改了：一条单色直线的抗锯齿像素会散落吸附到好几个相近的暗色上，整格平均后每格混到的比例又不同，
+ //   同一条线会被识别成一节一节的不同色（用户实测）。聚类投票把相近色并成一簇再取最大簇，线就合成一个颜色。
++const hexOf = id => ID2HEX.get(id) || null;
++const nameOf = id => ID2NAME.get(id) || ('色' + id);
+ function nearest(colorArr, ids) {
+   let best = null, bd = Infinity;
+-  for (const id of ids) { const q = rgbOf(PAL.find(p => p.id === id).hex);
++  for (const id of ids) { const q = rgbOf(hexOf(id));
+     const d = (q[0] - colorArr[0]) ** 2 + (q[1] - colorArr[1]) ** 2 + (q[2] - colorArr[2]) ** 2;
+     if (d < bd) { bd = d; best = id; } }
+   return best;
+ }
+-const ALL_IDS = PAL.map(p => p.id);
+ const MERGE2 = 9000;            // 聚簇阈值（本文件用的是平方欧氏距离；≈ HTML 版 redmean 阈值 150²的等价量级）
+ const PROTECT_CONTRAST = 0.25;
+-const lumOf = (id) => { const c = rgbOf(PAL.find(p => p.id === id).hex); return (0.299*c[0]+0.587*c[1]+0.114*c[2])/255; };
++const lumOf = (id) => { const c = rgbOf(hexOf(id)); return (0.299*c[0]+0.587*c[1]+0.114*c[2])/255; };
+ function cellToId(pix) {
+-  if (!pix.length) return 31;
++  if (!pix.length) return FIRST_ID;
+   if (SAMPLE === 'avg') {
+     let R = 0, G = 0, B = 0;
+     for (const p of pix) { R += p[0]; G += p[1]; B += p[2]; }
+@@ -164,7 +266,7 @@
+   for (const p of pix) { const id = nearest(p, ALL_IDS); byId.set(id, (byId.get(id) || 0) + 1); }
+   const cl = [];
+   [...byId.entries()].sort((a, b) => b[1] - a[1]).forEach(([id, n2]) => {
+-    const pc = rgbOf(PAL.find(p => p.id === id).hex);      // ★簇心用"色表色"，不是像素均值（否则相近色并不到一起）
++    const pc = rgbOf(hexOf(id));      // ★簇心用"色表色"，不是像素均值（否则相近色并不到一起）
+     let hit = cl.find(x => ((x.rgb[0]-pc[0])**2 + (x.rgb[1]-pc[1])**2 + (x.rgb[2]-pc[2])**2) <= MERGE2);
+     if (hit) { const t = hit.n + n2;
+       hit.rgb = [(hit.rgb[0]*hit.n + pc[0]*n2)/t, (hit.rgb[1]*hit.n + pc[1]*n2)/t, (hit.rgb[2]*hit.n + pc[2]*n2)/t];
+@@ -189,8 +291,12 @@
+   for (let c = 0; c < COLS; c++) {
+     const x0 = Math.floor(c * sw / COLS), x1 = Math.max(x0 + 1, Math.floor((c + 1) * sw / COLS));
+     const y0 = Math.floor(r * sh / ROWS), y1 = Math.max(y0 + 1, Math.floor((r + 1) * sh / ROWS));
++    // 【v153】只看格心那一片（默认 75%），避开四边抗锯齿与立体倒角
++    const kit = (1 - INNER) / 2;
++    const kx0 = Math.floor(x0 + (x1 - x0) * kit), kx1 = Math.max(kx0 + 1, Math.ceil(x1 - (x1 - x0) * kit));
++    const ky0 = Math.floor(y0 + (y1 - y0) * kit), ky1 = Math.max(ky0 + 1, Math.ceil(y1 - (y1 - y0) * kit));
+     const pix = [];
+-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) pix.push(srcPx(x, y));
++    for (let y = ky0; y < ky1; y++) for (let x = kx0; x < kx1; x++) pix.push(srcPx(x, y));
+     row.push(cellToId(pix));
+   }
+   info.push(row);
+@@ -204,15 +310,18 @@
+   for (const [nr, nc] of nb) {
+     const nrow = info[nr]; if (!nrow) continue;
+     const nCell = nrow[nc]; if (!nCell || typeof nCell === 'number' || !nCell.cand) continue;
+-    const a = rgbOf(PAL.find(p => p.id === nCell.cand).hex), b = rgbOf(PAL.find(p => p.id === cellv.cand).hex);
++    const a = rgbOf(hexOf(nCell.cand)), b = rgbOf(hexOf(cellv.cand));
+     if (nCell.cand === cellv.cand || ((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2) <= MERGE2) return cellv.cand;
+   }
+   return cellv.main;
+ }));
+ const used = new Map();
+ for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const id = cell[r][c]; used.set(id, (used.get(id) || 0) + 1); }   // 上面取色已直接给出 id
+-let keep = [...used.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_COLORS).map(e => e[0]);
+-let grid = cell.map(row => row.map(id => keep.includes(id) ? id : nearest(rgbOf(PAL.find(p => p.id === id).hex), keep)));
++// --colors 超过色表容量时（例如官方色库只有 22 色却写了 30）如实说明，别让用户以为 30 色生效了
++const COLOR_CAP = ALL_IDS.length;
++if (MAX_COLORS > COLOR_CAP) console.log('提示：--colors ' + MAX_COLORS + ' 超过本色库容量 ' + COLOR_CAP + ' 色，最多只能用 ' + COLOR_CAP + ' 色');
++let keep = [...used.entries()].sort((a, b) => b[1] - a[1]).slice(0, Math.min(MAX_COLORS, COLOR_CAP)).map(e => e[0]);
++let grid = cell.map(row => row.map(id => keep.includes(id) ? id : nearest(rgbOf(hexOf(id)), keep)));
+ if (used.size > keep.length) console.log('色数限制：把 ' + used.size + ' 色压到 ' + keep.length + ' 色（用最多的那些）');
+ 
+ // ---------- 4. 去碎色（4-连通小块并到边界最长的邻色）----------
+@@ -247,6 +356,7 @@
+ if (DESPECKLE > 0) grid = despeckle(grid, DESPECKLE);
+ 
+ // ---------- 4.5 背景 → 空位(0)：贴边那一色整片挖空 ----------
++let bgDug = 0, bgDugId = 0;     // 【v153】如实记下"挖掉了多少格"，供结果提醒
+ if (BG !== 'none') {
+   // 取四边出现最多的颜色当背景色（含四角）
+   const tally = {};
+@@ -267,18 +377,45 @@
+     seen[y][x] = true; grid[y][x] = 0; cleared++;
+     stack.push([y + 1, x], [y - 1, x], [y, x + 1], [y, x - 1]);
+   }
+-  if (cleared) console.log('背景识别：贴边那色（' + bgId + ' ' + PAL.find(p => p.id === bgId).name + '）连通片挖成空位，共 ' + cleared + ' 格');
++  if (cleared) { bgDug = cleared; bgDugId = bgId;
++    console.log('背景识别：贴边那色（' + bgId + ' ' + nameOf(bgId) + '）连通片挖成空位，共 ' + cleared + ' 格'); }
+ }
+ 
++// ---------- 4.6 【v153】保真度：与"每格格心 3×3 像素的中位色"逐格比 ----------
++//   格心那一点正是"这格看上去是什么色"，避开了上高光/下阴影/四边抗锯齿 → 拿它当参考。
++//   这个数就是"识别得好不好"的度量：低了先看背景挖掉多少格，再看源图是不是带渐变/阴影。
++let fidelity = null, diffCells = 0;
++{
++  let same = 0, n = 0;
++  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
++    const cx = Math.round((c + 0.5) * sw / COLS), cy = Math.round((r + 0.5) * sh / ROWS);
++    const R = [], G = [], B = [];
++    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
++      const yy = cy + dy, xx = cx + dx;
++      if (yy < 0 || yy >= sh || xx < 0 || xx >= sw) continue;
++      const p = srcPx(xx, yy);
++      if (p[0] === 255 && p[1] === 255 && p[2] === 255 && lower.endsWith('.txt')) continue;
++      R.push(p[0]); G.push(p[1]); B.push(p[2]);
++    }
++    let refId = 0;
++    if (R.length) { R.sort((a, b) => a - b); G.sort((a, b) => a - b); B.sort((a, b) => a - b);
++      const m = R.length >> 1; refId = nearest([R[m], G[m], B[m]], ALL_IDS) || FIRST_ID; }
++    n++;
++    if ((refId === 0) === (grid[r][c] === 0) && (refId === 0 || refId === grid[r][c])) same++; else diffCells++;
++  }
++  fidelity = n ? same / n : 0;
++}
++
+ // ---------- 5. 出文件 + 报告 ----------
+ fs.mkdirSync(OUTDIR, { recursive: true });
+ const base = NAME + '_' + COLS + 'x' + ROWS;
+-writeTXT(path.join(OUTDIR, base + '.txt'), grid);
++// 【v154】按目标色库出 TXT：官方把空位写成 -1、色号 = 工作态 - 1；老色库仍 0=空位
++fs.writeFileSync(path.join(OUTDIR, base + '.txt'), gridToTXT(grid));
+ const S = Math.max(6, Math.min(40, Math.floor(900 / Math.max(COLS, ROWS))));
+ const W = COLS * S, H = ROWS * S, buf = Buffer.alloc(W * H * 3, 245);
+ for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+   const id = grid[r][c];
+-  const col = id ? rgbOf(PAL.find(p => p.id === id).hex) : [235, 235, 235];
++  const col = id ? rgbOf(hexOf(id)) : [235, 235, 235];
+   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+     const px = (r * S + y) * W + (c * S + x);
+     const edge = (x === 0 || y === 0);
+@@ -289,14 +426,24 @@
+ writePNG(path.join(OUTDIR, base + '_预览.png'), W, H, buf);
+ 
+ const cnt = {}; grid.forEach(row => row.forEach(v => cnt[v] = (cnt[v] || 0) + 1));
++// 报告里显示的颜色编号：官方色库按游戏真实色号（0-21）显示，老色库按 1-34
++const showNo = id => (OUTLIB === 'official') ? (id - 1) : id;
+ console.log('\n产出：' + path.join(OUTDIR, base + '.txt') + '（' + COLS + ' 列 × ' + ROWS + ' 行）');
+ console.log('       ' + path.join(OUTDIR, base + '_预览.png'));
++console.log('输出色库：' + (OUTLIB === 'official'
++  ? '官方 22 色（色号 0-21，空位 -1）—— 每个色号都是游戏里真有的颜色，可直接上实机'
++  : '老色库 34 色（色号 1-34，空位 0）'));
++console.log('保真度：' + (fidelity * 100).toFixed(1) + '%（与「每格格心 3×3 中位色」逐格比，不一致 ' + diffCells + ' 格；取色窗口 格内 ' + Math.round(INNER * 100) + '%）');
++if (bgDug) console.log('⚠ 背景挖空吃掉了 ' + bgDug + ' 格（' + (100 * bgDug / (COLS * ROWS)).toFixed(1) + '%，颜色 ' +
++  bgDugId + ' ' + nameOf(bgDugId) + '）—— 如果这是美术自带的边框/底色，请加 --bg none 再转一次。');
+ console.log('每色格数：');
+ Object.keys(cnt).map(Number).sort((a, b) => b - a).forEach(id => {
+-  const p = PAL.find(x => x.id === id);
+-  console.log('   ' + (id === 0 ? '  0 空位' : String(id).padStart(3) + ' ' + p.name.padEnd(4) + ' ' + p.hex) + '  ×' + cnt[id]);
++  console.log('   ' + (id === 0
++    ? String(OUTLIB === 'official' ? '-1' : ' 0').padStart(3) + ' 空位'
++    : String(showNo(id)).padStart(3) + ' ' + nameOf(id).padEnd(4) + ' ' + hexOf(id)) + '  ×' + cnt[id]);
+ });
+ if (A.Generator && A.Generator.checkFragmentGate) {
++  // 闸门只按"色号是否相等"算几何碎色（不看色值），所以工作态编号直接喂进去就是准确口径。
+   const g = A.Generator.checkFragmentGate(grid, { fragmentMaxRate: 0.22 });
+   console.log('\n碎色闸门（与生成器同一口径，上限 22%）：' + (g.ok ? '✅ 过闸' : '❌ 不过闸') + ' —— ' + g.detail);
+   if (!g.ok) console.log('   建议：把 --colors 调小、或 --despeckle 调大（例如 12~20），再跑一次');
+diff -u a/03_工具/像素画工具/图片转像素画.html b/03_工具/像素画工具/图片转像素画.html
+--- a/03_工具/像素画工具/图片转像素画.html	2026-10-15 17:34:20
++++ b/03_工具/像素画工具/图片转像素画.html	2026-10-15 17:34:20
+@@ -59,6 +59,21 @@
+ 
+     <h2 style="margin-top:12px">3. 颜色</h2>
+     <div class="row">
++      <label title="适合已经按规则网格排好的像素图/拼豆图：先只看每格中心，再把全图相近的格心归并成同一个颜色簇。&#10;这样同一视觉颜色即使带有高光、阴影、压缩噪点，也会尽量输出同一个色号。&#10;注意：左右拼接图、截图带边框、格子和行列数对不上时，仍要先裁图。">
++        <input type="checkbox" id="preciseMode" checked> 像素图精准模式
++      </label>
++    </div>
++    <div class="row">
++      <label title="把全图里颜色相近的格子归并到同一色号。&#10;低：只合并非常接近的颜色，最保守。&#10;中/高：适合带光影、高光的拼豆图。&#10;超强：容易把浅粉/浅灰这类本就接近的颜色也合并。">同色归并</label>
++      <select id="mergeMode">
++        <option value="0">关(逐格判断)</option>
++        <option value="45" selected>低(推荐)</option>
++        <option value="65">中</option>
++        <option value="85">高</option>
++        <option value="110">超强</option>
++      </select>
++    </div>
++    <div class="row">
+       <label>最多用</label><input type="number" id="maxColors" value="0" min="0" max="34">
+       <label>色（0=不限）</label>
+     </div>
+@@ -94,11 +109,21 @@
+     <div class="row">
+       <label title="每个格子里取中间多大一片来投票。&#10;&#10;整格：格子四边的抗锯齿/立体倒角也会投票 → 深色倒角会多投票，描边变粗、黑块变多。&#10;格内 75%（推荐）：只看格心那一片，最接近"这格看上去是什么色"。&#10;格内 60%：更保守，细碎花纹多时用。">取色窗口</label>
+       <select id="innerWin">
+-        <option value="0.75" selected>格内 75%(推荐)</option>
++        <option value="0.50" selected>格心 50%(精准推荐)</option>
++        <option value="0.75">格内 75%(推荐)</option>
+         <option value="1">整格(旧口径)</option>
+         <option value="0.6">格内 60%</option>
+       </select>
+     </div>
++    <!-- 【v154】色库：决定"取色表"和"输出色号"。老色库=工程惯用的 34 色；官方=游戏真实 22 色 -->
++    <div class="row">
++      <label title="选“官方 22 色”时，下面的取色板会换成游戏里真实存在的 22 个色号（0-21），产出的 TXT 空位写 -1、色号 0-21，游戏里直接就有这些颜色，不需要事后再近似转换。&#10;&#10;代价：官方色库只有 22 色，工程 34 色里多出来的那些（例如深灰 #010101、中灰 #BBB6B7）会落到最近的官方色，画面观感会变。">色库</label>
++      <select id="libMode">
++        <option value="older" selected>老色库 34 色（1-34，空位 0）</option>
++        <option value="official">官方 22 色（0-21，空位 -1，可上实机）</option>
++      </select>
++    </div>
++    <div class="sub" style="margin:-2px 0 6px">官方 22 色 = 游戏真机色号；选它时取色板同步换成这 22 个真色。</div>
+     <div class="sub" style="margin:2px 0 4px">参与匹配的颜色（点一下可关掉，关掉的不会被用）：</div>
+     <div class="row" style="margin-bottom:2px">
+       <button id="palAll" style="font-size:11px;padding:2px 8px">全选</button>
+@@ -129,7 +154,7 @@
+ 
+ <script>
+ /* ================= 色表（与 bin/js/utils.js 的 AntSolver.COLORS 同源，34 色） ================= */
+-var PAL = [
++var PAL_OLDER = [
+  {id:1,name:'红色',hex:'#FF3240'},{id:2,name:'浅红',hex:'#FF269F'},{id:3,name:'粉红',hex:'#FF5294'},
+  {id:4,name:'暗粉',hex:'#DF2455'},{id:5,name:'浅粉',hex:'#FF98A3'},{id:6,name:'深红',hex:'#F63C3F'},
+  {id:7,name:'紫色',hex:'#A073E7'},{id:8,name:'浅紫粉',hex:'#E749B6'},{id:9,name:'玫红',hex:'#AD00AC'},
+@@ -143,21 +168,52 @@
+  {id:31,name:'浅灰',hex:'#FDE8D6'},{id:32,name:'灰色',hex:'#FFEAB2'},{id:33,name:'深灰',hex:'#010101'},
+  {id:34,name:'中灰',hex:'#BBB6B7'}
+ ];
+-PAL.forEach(function(p){ p.rgb = hexToRgb(p.hex); });
++/* 【v154】官方色库（游戏真实色号 0-21）—— 与 bin/参考/色库/标准色库_colors_0-21.txt 逐项一致。
++   选了它，**取色表就换成这 22 个真色**，产出的色号游戏里都有，不需要事后再近似转换。
++   内部仍把空位记作 0、颜色记作 1..22（= 官方色号 + 1），只在导出 TXT 时换算回 0-21 / -1，
++   这样既有的取色/去碎色/挖背景逻辑一行都不用改。 */
++var PAL_OFFICIAL = [
++ {id:1,name:'黄色',hex:'#FFEB33'},{id:2,name:'橙黄',hex:'#FFBF24'},{id:3,name:'橙色',hex:'#FF8025'},
++ {id:4,name:'暗红',hex:'#E75862'},{id:5,name:'深红',hex:'#D52C21'},{id:6,name:'浅绿',hex:'#AEDB6F'},
++ {id:7,name:'深绿',hex:'#1F9D12'},{id:8,name:'墨绿',hex:'#178459'},{id:9,name:'浅蓝',hex:'#61D6F0'},
++ {id:10,name:'天蓝',hex:'#3B90F9'},{id:11,name:'浅粉',hex:'#FFB1BE'},{id:12,name:'粉紫',hex:'#F97AFF'},
++ {id:13,name:'紫色',hex:'#9746EC'},{id:14,name:'深蓝',hex:'#2513BA'},{id:15,name:'深棕',hex:'#793A1D'},
++ {id:16,name:'白色',hex:'#D7DFE0'},{id:17,name:'黑色',hex:'#48494D'},{id:18,name:'米色',hex:'#F3C4A7'},
++ {id:19,name:'蓝色',hex:'#3150FF'},{id:20,name:'棕色',hex:'#985B2E'},{id:21,name:'玫红',hex:'#DE1B5F'},
++ {id:22,name:'米黄',hex:'#F2E58A'}
++];
++PAL_OLDER.forEach(function(p){ p.rgb = hexToRgb(p.hex); });
++PAL_OFFICIAL.forEach(function(p){ p.rgb = hexToRgb(p.hex); });
+ function hexToRgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+ 
++/* 当前色表（默认老色库 34 色，与改动前完全一致）；切到官方 22 色就是换一张 PAL */
++var LIB = 'older';
++var PAL = PAL_OLDER;
++var ALL_IDS = PAL.map(function(p){ return p.id; });
++function setLib(lib){
++  LIB = (lib === 'official') ? 'official' : 'older';
++  PAL = (LIB === 'official') ? PAL_OFFICIAL : PAL_OLDER;
++  ALL_IDS = PAL.map(function(p){ return p.id; });
++  if (typeof FIRST_ID !== 'undefined') FIRST_ID = PAL[0].id;   // 兜底色号跟着换，否则切到 22 色后 31 会越界
++}
++/* 导出时才换算：官方 → 空位写 -1、色号 = 内部号 - 1；老色库 → 原样（空位 0） */
++function libTagText(){ return LIB === 'official' ? '官方色库0-21' : '老色库34色'; }
++
+ /* ================= 核心：取"最相似的颜色" =================
+    用 redmean 加权距离（比裸 RGB 欧氏更接近人眼），对渐变/抗锯齿的图更稳。 */
+ function dist2(c, p){
+   var rmean = (c[0]+p[0])/2, dr = c[0]-p[0], dg = c[1]-p[1], db = c[2]-p[2];
+   return (2 + rmean/256)*dr*dr + 4*dg*dg + (2 + (255-rmean)/256)*db*db;
+ }
+-function nearestId(rgb, ids){
++// 注意：idx（旧名 ids）是 **0-based 的 PAL 下标数组**（调用方用 id-1 换来）；返回的是 **1-based 色号**。
++// 【v154】色号语义跟色表走：老色库 1..34、官方 1..22（= 官方色号 + 1）。
++function nearestId(rgb, idx){
+   var best = -1, bd = Infinity;
+-  for (var i=0;i<ids.length;i++){ var p = PAL[ids[i]]; var d = dist2(rgb, p.rgb); if (d<bd){ bd=d; best=p.id; } }
++  for (var i=0;i<idx.length;i++){ var p = PAL[idx[i]]; var d = dist2(rgb, p.rgb); if (d<bd){ bd=d; best=p.id; } }
+   return best;
+ }
+ function idToRgb(id){ return (PAL[id-1]||{rgb:[0,0,0]}).rgb; }
++var FIRST_ID = PAL[0].id;   // 兜底色号（原来是写死的 31，跟色表走才安全）
+ 
+ /* 主转换：imgData{data,width,height} + opts → {grid, cols, rows, counts, fragRate} */
+ function convert(imgData, opts){
+@@ -179,12 +235,16 @@
+     //   而且这些点不是背景色、连"背景挖空"都清不掉（用户反馈"转换结果不行"的一类）。
+     //   规则：不透明像素占比 < 25% 时，按"近白"处理（旧口径就是这么干的），留给背景挖空去清。
+     var opaque = pix.length, total = area || 1;
+-    if (opaque === 0 || opaque / total < 0.25) return { main: 31, cand: null };
++    if (opaque === 0 || opaque / total < 0.25) return { main: FIRST_ID, cand: null, empty: true, med: null, votes: {} };
++    var mr=[], mg=[], mb=[];
++    for (var m=0;m<pix.length;m++){ mr.push(pix[m][0]); mg.push(pix[m][1]); mb.push(pix[m][2]); }
++    mr.sort(function(a,b){return a-b;}); mg.sort(function(a,b){return a-b;}); mb.sort(function(a,b){return a-b;});
++    var med=[mr[mr.length>>1], mg[mg.length>>1], mb[mb.length>>1]];
+     if (opts.sampleMode === 'avg'){
+       var R=0,G=0,B=0;
+       for (var a=0;a<pix.length;a++){ R+=pix[a][0];G+=pix[a][1];B+=pix[a][2]; }
+       var avg=[Math.round(R/pix.length), Math.round(G/pix.length), Math.round(B/pix.length)];
+-      return { main: (nearestId(avg, ids)||31), cand: null };
++      return { main: (nearestId(avg, ids)||FIRST_ID), cand: null, empty: false, med: med, votes: {} };
+     }
+     var byId = {};
+     for (var k=0;k<pix.length;k++){ var id = nearestId(pix[k], ids); (byId[id]=byId[id]||[]).push(pix[k]); }
+@@ -212,7 +272,9 @@
+       }
+       if (bestDiff < PROTECT_CONTRAST) cand = null;
+     }
+-    return { main: main, cand: cand };
++    var votes={};
++    Object.keys(byId).forEach(function(id){ votes[id]=byId[id].length; });
++    return { main: main, cand: cand, empty: false, med: med, votes: votes };
+   }
+   var info = [];
+   for (var r=0;r<rows;r++){ var row=[];
+@@ -243,6 +305,14 @@
+     }
+     return cell.main;
+   }); });
++  // ②.5 【精准模式】全图同色归并：相近格心先归成同一簇，再统一吸附到同一个色号。
++  //     解决“同一片颜色因为高光/阴影/压缩噪点，被逐格判断成几个不同色号”的问题。
++  var mergeDist = opts.precise ? (+opts.mergeDist || 0) : 0;
++  var mergedGroups = 0;
++  if (mergeDist > 0){
++    var merged = mergeSameColors(info, grid, rows, cols, mergeDist, ids);
++    grid = merged.grid; mergedGroups = merged.groups;
++  }
+   // ③ 色数上限：保留用量前 N，其余吸附到其中最近的
+   if (opts.maxColors > 0){
+     var cnt = {}; grid.forEach(function(row){ row.forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
+@@ -287,7 +357,7 @@
+         }
+         var refId = 0;
+         if (op > 0){ pr.sort(function(a,b){return a-b;}); pg.sort(function(a,b){return a-b;}); pb.sort(function(a,b){return a-b;});
+-          var m5 = pr.length >> 1; refId = nearestId([pr[m5], pg[m5], pb[m5]], ids) || 31; }
++          var m5 = pr.length >> 1; refId = nearestId([pr[m5], pg[m5], pb[m5]], ids) || FIRST_ID; }
+         rw.push(refId); n++;
+         if ((refId === 0) === (grid[r5][c5] === 0) && (refId === 0 || refId === grid[r5][c5])) same++; else diffCells++;
+       }
+@@ -295,7 +365,8 @@
+     fidelity = n ? same / n : 0;
+   })();
+   return { grid:grid, cols:cols, rows:rows, counts:counts, frag: fragStat(grid, rows, cols),
+-           bgDug:bgDug, bgDugId:bgDugId, fidelity:fidelity, diffCells:diffCells, refGrid:refGrid, innerWin:WIN };
++           bgDug:bgDug, bgDugId:bgDugId, fidelity:fidelity, diffCells:diffCells, refGrid:refGrid, innerWin:WIN,
++           mergedGroups:mergedGroups, mergeDist:mergeDist };
+ }
+ function despeckle(grid, rows, cols, minPx){
+   for (var round=0; round<12; round++){
+@@ -337,18 +408,38 @@
+ }
+ 
+ /* ================= 界面 ================= */
+-var imgData=null, srcW=0, srcH=0, lastResult=null, useIds=PAL.map(function(p){ return p.id; });
++var imgData=null, srcW=0, srcH=0, lastResult=null;
++var useIds=PAL.map(function(p){ return p.id; });   // 1-based 色号（与 PAL[id-1] 配套）
+ var $=function(id){ return document.getElementById(id); };
+-PAL.forEach(function(p){
+-  var b=document.createElement('div'); b.className='sw'; b.style.background=p.hex; b.textContent=p.id;
+-  b.title=p.name+' '+p.hex; b.dataset.id=p.id;
+-  b.onclick=function(){ var id=p.id; if (useIds.indexOf(id)>=0){ if (useIds.length<=1) return; useIds.splice(useIds.indexOf(id),1); b.classList.add('off'); }
+-    else { useIds.push(id); b.classList.remove('off'); } };
+-  $('pal').appendChild(b);
+-});
+-$('palAll').onclick=function(){ useIds=PAL.map(function(p){return p.id;}); document.querySelectorAll('.sw').forEach(function(e){e.classList.remove('off');}); };
+-$('palNone').onclick=function(){ useIds=[19]; document.querySelectorAll('.sw').forEach(function(e){ e.classList.toggle('off', +e.dataset.id!==19); }); };
+-$('palReset').onclick=function(){ useIds=PAL.map(function(p){return p.id;}); document.querySelectorAll('.sw').forEach(function(e){e.classList.remove('off');}); };
++/* 【v154】按当前色表重建取色板。切色库时必须重建，否则残留的旧色号会越界（官方只有 22 色，34 号就没了）。 */
++function buildPal(){
++  var box=$('pal'); box.innerHTML='';
++  PAL.forEach(function(p){
++    var b=document.createElement('div'); b.className='sw'; b.style.background=p.hex; b.textContent=p.id;
++    b.title=p.name+' '+p.hex; b.dataset.id=p.id;
++    b.onclick=function(){ var id=p.id;
++      if (useIds.indexOf(id)>=0){ if (useIds.length<=1) return; useIds.splice(useIds.indexOf(id),1); b.classList.add('off'); }
++      else { useIds.push(id); b.classList.remove('off'); } };
++    box.appendChild(b);
++  });
++}
++function palSelectAll(off){ document.querySelectorAll('#pal .sw').forEach(function(e){ e.classList.remove('off'); }); useIds=PAL.map(function(p){return p.id;}); }
++function palNone(){ useIds=[PAL[0].id]; document.querySelectorAll('#pal .sw').forEach(function(e){ e.classList.toggle('off', +e.dataset.id!==PAL[0].id); }); }
++$('palAll').onclick=function(){ palSelectAll(); };
++$('palNone').onclick=palNone;
++$('palReset').onclick=function(){ palSelectAll(); };
++buildPal();
++/* 切色库：换取色表 + 重建色板 + 把上次结果按新色表重算（图还在的话） */
++if ($('libMode')) $('libMode').onchange=function(){
++  setLib(this.value);
++  useIds=PAL.map(function(p){ return p.id; });
++  buildPal();
++  if (imgData && $('go') && !$('go').disabled) $('go').onclick();
++};
++$('preciseMode').onchange=function(){
++  // 精准模式更适合只看格心；关掉时回到旧的 75% 口径。
++  $('innerWin').value = this.checked ? '0.50' : '0.75';
++};
+ 
+ $('drop').onclick=function(){ $('file').click(); };
+ $('drop').ondragover=function(e){ e.preventDefault(); this.classList.add('on'); };
+@@ -376,25 +467,44 @@
+              maxColors:Math.max(0,+$('maxColors').value||0), desp:Math.max(0,+$('desp').value||0),
+              bgcut:$('bgcut').checked, ids:useIds.slice().sort(function(a,b){return a-b;}).map(function(id){return id-1;}),
+              innerWin:parseFloat(($('innerWin')||{}).value)||0.75,               // 【v153】取色窗口（格内 75% 默认）
++             precise:!!($('preciseMode')||{}).checked,                           // 像素图精准模式
++             mergeDist:+(($('mergeMode')||{}).value||0),                         // 全图同色归并阈值（redmean 距离）
+              sampleMode:($('sampleMode')||{}).value==='avg'?'avg':'mode',        // 取色方式：默认主色聚类投票
+              protect:parseFloat(($('protectMode')||{}).value)||0 };              // 细线保护阈值（0=关）
+   var t0=Date.now(); var res=convert(imgData, opts); var ms=Date.now()-t0;
+   lastResult=res;
+   draw(res);
+-  var txtLines=res.grid.map(function(row){ return row.join(' '); });
++  // 【v154】按所选色库出 TXT：官方 → 空位写 -1、色号 = 内部号 - 1；老色库 → 原样（空位 0）
++  var outGrid = (LIB === 'official')
++    ? res.grid.map(function(row){ return row.map(function(v){ return v===0 ? -1 : v-1; }); })
++    : res.grid;
++  var txtLines=outGrid.map(function(row){ return row.join(' '); });
+   var txt='像素矩阵\n'+txtLines.join('\n')+'\n';
+   $('txt').value=txt;
+   var used=Object.keys(res.counts).map(Number).sort(function(a,b){ return res.counts[b]-res.counts[a]; });
+   var html='<b>'+res.cols+' 列 × '+res.rows+' 行</b>　非空格 <b>'+(res.cols*res.rows-(res.counts[0]||0))+'</b>　空位 '+(res.counts[0]||0)+'　色数 '+used.filter(function(v){return v>0;}).length+'　用时 '+ms+'ms<br>';
++  html+='<div style="margin-top:4px">输出色库：<b>'+(LIB==='official'
++      ? '官方 22 色（色号 0-21，空位 -1）—— 每个色号都是游戏里真有的颜色'
++      : '老色库 34 色（色号 1-34，空位 0）')+'</b></div>';
+   used.forEach(function(id){
+     if (!id) return;
+     var p=PAL[id-1];
+-    html+='<div class="swrow"><span class="dot" style="background:'+p.hex+'"></span>'+String(id).padStart(3)+' '+p.name+' <span style="color:#8a7358">'+p.hex+'</span> — <b>'+res.counts[id]+'</b> 格</div>';
++    var showNo = (LIB==='official') ? (id-1) : id;   // 官方按游戏真实色号显示（0-21）
++    html+='<div class="swrow"><span class="dot" style="background:'+p.hex+'"></span>'+String(showNo).padStart(3)+' '+p.name+' <span style="color:#8a7358">'+p.hex+'</span> — <b>'+res.counts[id]+'</b> 格</div>';
+   });
+   var f=res.frag;
+   html+='<div style="margin-top:6px">碎色率 <b>'+(f.rate*100).toFixed(2)+'%</b>（小色块 '+f.smallBlocks+' 个 / '+f.fragPixels+' 格，共 '+f.blocks+' 块）'
+      + (f.rate<=0.22 ? ' <span class="ok">≈ 过闸（上限 22%）</span>' : ' <span class="warn">≈ 超限，把「最多用色」调小或「去碎色」调大</span>')
+      + '<br><span style="font-size:11px">这是近似口径，正式判定以生成器的碎色闸门为准（命令行工具 图片转像素画.js 报的就是正式口径）</span></div>';
++  if (res.mergeDist > 0){
++    html+='<div style="margin-top:6px">精准同色归并 <b>'+(res.mergeDist||0)+'</b>：归并成 <b>'+res.mergedGroups+'</b> 组'
++       + '<br><span style="font-size:11px">同一组会强制使用同一个色号；如果浅粉/浅灰这类接近色被误合并，请把归并强度调低。</span></div>';
++  }
++  var cw=imgData.width/res.cols, chh=imgData.height/res.rows, cr=Math.max(cw,chh)/Math.max(1,Math.min(cw,chh));
++  if (cr > 1.12){
++    html+='<div class="warn" style="margin-top:6px">⚠ 源图宽高比例和 '+res.cols+'×'+res.rows+' 格差异很大（每格约 '+cw.toFixed(1)+'×'+chh.toFixed(1)+' 像素）。'
++       + '这通常是左右拼接图、未裁边或行列数填错；请先裁出单独一张图再转。</div>';
++  }
+   // 【v153】保真度 + 背景挖空代价：把"识别得好不好"变成一个数字
+   if (res.fidelity != null){
+     var fp = (res.fidelity*100).toFixed(1);
+@@ -430,6 +540,63 @@
+     g.strokeStyle='rgba(0,0,0,.10)'; g.strokeRect(W+16+c*S+.5, r*S+.5, S-1, S-1);
+   }
+ }
++/* 精准模式辅助：把全图相近的“格心颜色”先归并，再让整簇共用一个色号。
++   这解决的是用户最常遇到的问题：同一颗颜色/同一片色块，因为高光或压缩噪点逐格判断时结果不一致。 */
++function mergeSameColors(info, grid, rows, cols, threshold, ids){
++  if (!threshold || threshold <= 0) return { grid: grid, groups: 0 };
++  var cells = [];
++  for (var r=0;r<rows;r++) for (var c=0;c<cols;c++){
++    var cell = info[r][c];
++    if (!cell.empty && cell.med) cells.push({ r:r, c:c, rgb:cell.med });
++  }
++  // 先贪心成簇；再做两轮重分配，避免完全依赖第一颗种子。
++  var groups = [];
++  for (var i=0;i<cells.length;i++){
++    var p = cells[i].rgb, hit = null, hd = Infinity;
++    for (var g=0;g<groups.length;g++){
++      var d = dist2(p, groups[g].center);
++      if (d < hd){ hd=d; hit=groups[g]; }
++    }
++    if (hit && hd <= threshold*threshold){
++      hit.cells.push(cells[i]);
++      var n = hit.cells.length;
++      for (var k=0;k<3;k++) hit.center[k] += (p[k]-hit.center[k])/n;
++    } else groups.push({ center:[p[0],p[1],p[2]], cells:[cells[i]] });
++  }
++  for (var round=0;round<2;round++){
++    groups.forEach(function(g){
++      for (var q=0;q<3;q++){
++        var s=0; for (var z=0;z<g.cells.length;z++) s+=g.cells[z].rgb[q];
++        g.center[q]=s/Math.max(1,g.cells.length);
++      }
++    });
++    groups.forEach(function(g){ g.members=[]; });
++    cells.forEach(function(cell){
++      var best=null, bd=Infinity;
++      groups.forEach(function(g){
++        var d=dist2(cell.rgb,g.center);
++        if (d<bd){ bd=d; best=g; }
++      });
++      best.members.push(cell);
++    });
++    var next=[];
++    groups.forEach(function(g){ if (g.members && g.members.length) next.push({ center:g.center.slice(), cells:g.members }); });
++    groups=next;
++  }
++  // 每个簇用簇内所有格心像素投票，避免单个噪声格决定色号。
++  groups.forEach(function(g){
++    var votes={};
++    g.cells.forEach(function(cell){
++      var src = cell.votes || {};
++      Object.keys(src).forEach(function(id){ votes[id]=(votes[id]||0)+src[id]; });
++    });
++    var keys=Object.keys(votes).sort(function(a,b){ return votes[b]-votes[a]; });
++    var winner = keys.length ? +keys[0] : nearestId(g.center, ids);
++    g.id = winner;
++    g.cells.forEach(function(cell){ grid[cell.r][cell.c]=winner; });
++  });
++  return { grid: grid, groups: groups.length };
++}
+ function canvasOf(imgData){
+   if (canvasOf._c) { }
+   var cv=document.createElement('canvas'); cv.width=imgData.width; cv.height=imgData.height;
+@@ -440,7 +607,7 @@
+   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+ }
+-$('dl').onclick=function(){ if(lastResult) dl('目标图_'+lastResult.cols+'x'+lastResult.rows+'.txt', $('txt').value); };
++$('dl').onclick=function(){ if(lastResult) dl('目标图_'+lastResult.cols+'x'+lastResult.rows+'_'+libTagText()+'.txt', $('txt').value); };
+ $('cp').onclick=function(){ $('txt').select(); document.execCommand('copy'); $('tip').textContent='已复制'; setTimeout(function(){$('tip').textContent='';},1500); };
+ $('dlpng').onclick=function(){
+   if (!lastResult) return;

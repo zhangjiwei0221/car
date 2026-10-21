@@ -1,0 +1,215 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4589,7 +4589,10 @@
+     var out = Object.assign({}, cfg, preset, {
+       // 【v257】候选 2→3；早停要求"峰窗≥3.5 且 稳健≤70"，不再拿第一个勉强及格的收工
+       candidateCount: 4, portfolioK: 8, timeBudgetMs: 25000, difficultyRounds: 2,
+-      earlyStopPeak: 3.5, earlyStopSteady: 70,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
++      earlyStopPeak: 3.5, earlyStopSteady: 70,
++      // 【v260·实验】把最晚熟的几辆车借到"扇出最大"的格子上 → 想让全知线被逼出长债。
++      //   ⚠ 实测尚未生效（两个版本的闸门都返回 0 组），先默认关，别影响生产。
++      gateBorrow: 0,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
+       goodV3: true, requireHardPass: false, seed: null,
+       designSweep: false, designDebt: false, // 【v224】单套参数，取消扫描（之前每张图跑 11 变体 × 6 候选 × 7 轮，太慢）
+       boardHardRange: !_boardAuto,          // 【v207】不勾自适应 = 硬范围（不许缩小、不许自动换范围）
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3012,6 +3012,53 @@
+         order.push([or2, oc2, dist[or2][oc2] < 0 ? 999 : dist[or2][oc2]]);
+       }
+       order.sort(function (a, b) { return a[2] - b[2] || a[0] - b[0] || a[1] - b[1]; });
++      // 【v260·用户裁决】闸门借车：把"需求最晚"的几辆车换到"扇出最大"的浅层格子上。
++      //   理由：全知求解器不会主动拿吃不饱的车，只有它挡在通往一大片车的唯一通路上时才会被迫拿。
++      //   所以"晚熟色 + 高扇出 + 浅层"三者同时成立，才会出现又高又持久的全知压力。
++      //   扇出 = 拿掉这格后，有多少辆车从不可点变成可点。
++      try {
++        var _gb = Math.max(0, Math.min(6, parseInt(config.gateBorrow, 10) || 0));
++        timing.gateDbg = { gb: _gb, dc: !!_dc, n: list.length };
++        if (_gb > 0 && _dc && list.length > _gb + 2) {
++          function fanoutAt(r0, c0) {
++            var R2 = [], vis = [];
++            for (var rr = 0; rr < rows; rr++) { R2.push([]); vis.push([]); for (var cc2 = 0; cc2 < cols; cc2++) { R2[rr].push(false); vis[rr].push(false); } }
++            var q2 = [];
++            for (var c2 = 0; c2 < cols; c2++) {
++              var x2 = cells[0][c2];
++              if (x2 == null || (r0 === 0 && c2 === c0)) { R2[0][c2] = true; q2.push([0, c2]); }
++            }
++            for (var h2 = 0; h2 < q2.length; h2++) {
++              var pr2 = q2[h2][0], pc2 = q2[h2][1];
++              var d4 = [[-1,0],[1,0],[0,-1],[0,1]];
++              for (var d2 = 0; d2 < 4; d2++) {
++                var nr3 = pr2 + d4[d2][0], nc3 = pc2 + d4[d2][1];
++                if (nr3 < 0 || nr3 >= rows || nc3 < 0 || nc3 >= cols || R2[nr3][nc3]) continue;
++                if (cells[nr3][nc3] == null || (nr3 === r0 && nc3 === c0)) { R2[nr3][nc3] = true; q2.push([nr3, nc3]); }
++              }
++            }
++            // 铺盘阶段车还没放进去，所以"扇出"要按【可达空位数】数，不能数盒
++            var reachN = 0;
++            for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) if (R2[r3][c3]) reachN++;
++            return reachN;
++          }
++          var base0 = fanoutAt(-1, -1);
++          var gates = [];
++          for (var gi = 0; gi < order.length && gi < list.length; gi++) {
++            if (order[gi][2] < 1 || order[gi][2] > 3) continue;      // 只看深度 1~3，不碰第 0 行
++            var fo = fanoutAt(order[gi][0], order[gi][1]) - base0 - 1;   // 减掉被拿掉那一格自己
++            if (fo > 0) gates.push({ idx: gi, fan: fo });
++          }
++          gates.sort(function (a, b) { return b.fan - a.fan; });
++          timing.gateDbg.base = base0; timing.gateDbg.gates = gates.length; timing.gateDbg.top = gates.slice(0,3).map(function(g){return g.fan;});
++          var borrow = Math.min(_gb, gates.length);
++          for (var bi = 0; bi < borrow && (list.length - 1 - bi) > gates[bi].idx; bi++) {
++            var gi2 = gates[bi].idx, tail = list.length - 1 - bi;
++            var tmp = list[gi2]; list[gi2] = list[tail]; list[tail] = tmp;
++          }
++          if (borrow > 0) timing.gateBorrow = { k: borrow, fans: gates.slice(0, borrow).map(function (g) { return g.fan; }) };
++        }
++      } catch (e) { /* 借车失败不影响铺盘 */ }
+       var exW = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
+       for (var oi = 0; oi < order.length && fi < list.length; oi++) {
+         var tr2 = order[oi][0], tc2 = order[oi][1];
+@@ -3051,6 +3098,10 @@
+       }
+     }
+     }
++    // 【v260】铺完之后做闸门借车（此时盒子才是障碍，扇出才有意义）
++    var _gbStat = null;
++    try { _gbStat = gateBorrowAfterFill(cells, rows, cols, config); } catch (e) { _gbStat = null; }
++    if (_gbStat) bindStat.gateBorrow = _gbStat;
+     var rest = list.slice(fi);
+     timing.fillMs = Date.now() - tFill;
+     // 检查点1：填球完成（rest 为独立待放计数）
+@@ -7616,6 +7667,85 @@
+       frozen.push({ r: t.r, c: t.c, color: t.color, count: t.count, seq: t.seq, numice: v });
+     }
+     return { frozen: frozen, count: frozen.length };
++  }
++
++  /**
++   * 【v260·修正版】闸门借车必须在**铺完盘之后**做。
++   *   铺盘前棋盘是空的，任何格子都不"挡路"，扇出恒为 0（上一版就卡在这）。
++   *   铺完之后，盒子本身是障碍：拿掉某一格能让多少辆车从"不可点"变"可点"，才是真的扇出。
++   *   做法：算出每格的扇出 → 取扇出最大的前 K 个（深度≥1，不碰第 0 行）
++   *        → 把"需求最晚"的 K 辆车的数据换到这些格子上（颜色/容量交换，位置不变）。
++   *   这样全知线要往深处走，就必须先拿这几辆晚熟车 → 长债。
++   */
++  function gateBorrowAfterFill(cells, rows, cols, config) {
++    var K = Math.max(0, Math.min(6, parseInt(config && config.gateBorrow, 10) || 0));
++    if (K <= 0) return null;
++    var dc = config._demandCurve;
++    if (!dc || !dc.curve) return null;
++    function exposedCount(r0, c0) {
++      var R2 = [], seen = [];
++      for (var r = 0; r < rows; r++) { R2.push([]); seen.push([]); for (var c = 0; c < cols; c++) { R2[r].push(false); seen[r].push(false); } }
++      var q = [];
++      for (var c0s = 0; c0s < cols; c0s++) {
++        var x0 = cells[0][c0s];
++        if (x0 == null || (r0 === 0 && c0s === c0)) { R2[0][c0s] = true; q.push([0, c0s]); }
++      }
++      var d4 = [[-1,0],[1,0],[0,-1],[0,1]];
++      for (var h = 0; h < q.length; h++) {
++        var pr = q[h][0], pc = q[h][1];
++        for (var d = 0; d < 4; d++) {
++          var nr = pr + d4[d][0], nc = pc + d4[d][1];
++          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || R2[nr][nc]) continue;
++          var cel = cells[nr][nc];
++          if (cel == null || (nr === r0 && nc === c0)) { R2[nr][nc] = true; q.push([nr, nc]); }
++        }
++      }
++      var n = 0;
++      for (var rr = 0; rr < rows; rr++) for (var cc = 0; cc < cols; cc++) {
++        var b = cells[rr][cc];
++        if (!b || b.t !== 'box') continue;
++        if (rr === 0) { n++; continue; }
++        if (R2[rr-1][cc] || R2[rr+1] && R2[rr+1][cc] || R2[rr][cc-1] || R2[rr][cc+1]) n++;
++      }
++      return n;
++    }
++    var base = exposedCount(-1, -1);
++    var cands = [];
++    for (var r = 1; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var b2 = cells[r][c];
++      if (!b2 || b2.t !== 'box') continue;
++      var fo = exposedCount(r, c) - base;
++      if (fo > 0) cands.push({ r: r, c: c, fan: fo, cell: b2 });
++    }
++    if (!cands.length) return null;
++    cands.sort(function (a, b) { return b.fan - a.fan; });
++    // 需求最晚的车（按 demandAt 排序，取尾部）
++    var all = [];
++    for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) {
++      var b3 = cells[r3][c3];
++      if (!b3 || b3.t !== 'box') continue;
++      all.push({ r: r3, c: c3, cell: b3, dm: demandAt(dc, b3.color, b3.count) });
++    }
++    all.sort(function (a, b) { return b.dm - a.dm; });
++    var picked = {}, swaps = [];
++    for (var i = 0; i < cands.length && swaps.length < K; i++) {
++      var gate = cands[i], key = gate.r + ',' + gate.c;
++      if (picked[key]) continue;
++      var donor = null;
++      for (var j = 0; j < all.length; j++) {
++        var dk = all[j].r + ',' + all[j].c;
++        if (picked[dk] || dk === key) continue;
++        if (all[j].dm <= 0.6) break;          // 只借"确实晚熟"的车
++        donor = all[j]; break;
++      }
++      if (!donor) break;
++      picked[key] = 1; picked[donor.r + ',' + donor.c] = 1;
++      var t = { color: gate.cell.color, count: gate.cell.count };
++      gate.cell.color = donor.cell.color; gate.cell.count = donor.cell.count;
++      donor.cell.color = t.color; donor.cell.count = t.count;
++      swaps.push({ gate: [gate.r, gate.c], fan: gate.fan, donated: [donor.r, donor.c] });
++    }
++    return swaps.length ? { k: swaps.length, swaps: swaps } : null;
+   }
+ 
+   function ensureRow0Opening(level) {
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=259">
++  <link rel="stylesheet" href="css/style.css?v=260">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=259"></script>
+-  <script src="js/utils.js?v=259"></script>
++  <script src="js/zip.js?v=260"></script>
++  <script src="js/utils.js?v=260"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=259"></script>
+-  <script src="js/simulator.js?v=259"></script>
++  <script src="js/color-libs.js?v=260"></script>
++  <script src="js/simulator.js?v=260"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=259"></script>
+-  <script src="js/solver-strategy.js?v=259"></script>
+-  <script src="js/solver.js?v=259"></script>
+-  <script src="js/playersim.js?v=259"></script>
+-  <script src="js/generator.js?v=259"></script>
+-  <script src="js/analysis.js?v=259"></script>
++  <script src="js/anchor-cut.js?v=260"></script>
++  <script src="js/solver-strategy.js?v=260"></script>
++  <script src="js/solver.js?v=260"></script>
++  <script src="js/playersim.js?v=260"></script>
++  <script src="js/generator.js?v=260"></script>
++  <script src="js/analysis.js?v=260"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=259"></script>
+-  <script src="js/app.js?v=259"></script>
++  <script src="js/level-editor.js?v=260"></script>
++  <script src="js/app.js?v=260"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

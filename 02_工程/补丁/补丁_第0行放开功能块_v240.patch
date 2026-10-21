@@ -1,0 +1,167 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -1096,12 +1096,6 @@
+     placeBoardObstacles(cells, rows, cols, config);
+ 
+     // 顶部 1-3 行(索引0/1/2)障碍密度封顶（默认≤20%）：优先清 问号→冰→锁链整组→黑块转空，管道不动
+-    // 【v239·用户裁决】第 0 行硬禁冰/锁链/问号：不管哪条路径放的，这里统一摘掉。
+-    //   理由（用户 2026-10-19）："第0行禁冰/链/问号，只要有解就行" —— 开局行只留普通盒。
+-    for (var tc0 = 0; tc0 < cols; tc0++) {
+-      var c0 = cells[0][tc0];
+-      if (c0 && c0.t === 'box') { c0.numice = 0; c0.chain = 0; c0.q = false; }
+-    }
+     enforceTopObstacleCap(cells, rows, cols, config);
+ 
+     // 清除孤立锁链：chain 值仅 1 个成员的盒无互锁语义（求解器 chainGroups 只收≥2组，孤立会致 listMoves 崩）
+@@ -1994,15 +1988,14 @@
+       if (CK.iceCluster) {
+         var icMin = config.iceClusterSizeMin != null ? config.iceClusterSizeMin : 4;
+         var icMax = config.iceClusterSizeMax != null ? config.iceClusterSizeMax : 6;
+-        iceSel = pickClusteredBFS(bandCells.filter(function (p) { return p.r !== 0; }), iceCount, icMin, icMax);
++        iceSel = pickClusteredBFS(bandCells, iceCount, icMin, icMax);
+         iceClusterStat = { clusters: (iceSel._clusters || []).length, sizeMin: icMin, sizeMax: icMax,
+           sizes: (iceSel._clusters || []).map(function (x) { return x.size; }) };
+         (iceSel._clusters || []).forEach(function (cl) {
+           mark('iceCluster', '数字冰簇聚集', cl.seed.r, cl.seed.c, { size: cl.size });
+         });
+       } else {
+-        // 【v239·用户裁决】第 0 行禁冰：第 0 行是唯一开局可点行，冰落上去等于开局直接废几辆车。
+-        iceSel = pickDispersed(nullCells.filter(function (p) { return p.r !== 0; }), iceCount, 2);
++        iceSel = pickDispersed(nullCells, iceCount, 2);
+       }
+       for (var i = 0; i < iceSel.length; i++) {
+         var k = iceSel[i].r + ',' + iceSel[i].c;
+@@ -2083,7 +2076,6 @@
+     var dirs8 = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]];
+     function freeForChain(r, c) {
+       if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
+-      if (r === 0) return false;                             // 【v239·用户裁决】第 0 行禁锁链
+       if (cells[r][c] != null) return false;                 // 必须是未来盒格
+       var k = r + ',' + c;
+       return !chainKey[k] && !qKey[k];                        // 不与问号/其他锁链叠加
+@@ -3117,13 +3109,6 @@
+       if (!tcell) continue;
+       if (tcell.t === 'black') beforeTop.black++;
+       else if (tcell.t === 'box') { if (tcell.numice > 0) beforeTop.ice++; if (tcell.q) beforeTop.q++; if (tcell.chain > 0) beforeTop.chain++; }
+-    }
+-    // 【v239·用户裁决】第 0 行硬禁冰/锁链/问号（绑定之后、顶部封顶之前统一摘掉）。
+-    //   注意：这里必须是 fillStructureFixed 的这一处 —— 旧 buildBoard 路径也有一处同名调用，
+-    //   v239 第一版误加到了那一处，实测产物第 0 行仍有 2 冰 2 链，才定位到这里。
+-    for (var tc0b = 0; tc0b < cols; tc0b++) {
+-      var c0b = cells[0][tc0b];
+-      if (c0b && c0b.t === 'box') { c0b.numice = 0; c0b.chain = 0; c0b.q = false; }
+     }
+     enforceTopObstacleCap(cells, rows, cols, config);
+     var afterTop = { ice: 0, q: 0, chain: 0, black: 0 };
+@@ -7453,20 +7438,29 @@
+   }
+ 
+   /**
+-   * 【v239·用户裁决】第 0 行硬禁冰 / 锁链 / 问号。
+-   *   为什么不在结构层一处解决：实测第 0 行的冰有两个来源 —— 结构层预定 + 阀门(valvePlan 'largest')
+-   *   在【铺盘之后】再冻结"最大供给色"的浅层车；锁链也会被后续修复步骤挪动。
+-   *   所以必须在最终出口统一摘一遍。只改标记、不动盒子，守恒不受影响。
+-   *   摘掉链成员后组内可能只剩 1 个 → 整组清标（否则模拟器 chainGroups 会收到单成员组）。
++   * 【v240·用户裁决】第 0 行【不】禁功能块 —— "有功能块反而能提高难度"。
++   *   这里只保留一条底线：整行都被冰/链锁死时（第 0 步没有任何合法操作 = 必死候选），
++   *   解冻冰最少的那一辆，让开局有得点。其余情况一律不动：
++   *   第 0 行的冰/链现在是被允许的难度来源，不再被摘掉。
+    */
+-  function stripRow0Obstacles(level) {
++  function ensureRow0Opening(level) {
+     var board = level && level.board;
+-    if (!board || !board.cells || !board.cells.length) return 0;
+-    var rows = board.rows, cols = board.cols, cells = board.cells, n = 0;
++    if (!board || !board.cells || !board.cells.length) return null;
++    var rows = board.rows, cols = board.cols, cells = board.cells;
++    var plain = 0, locked = [];
+     for (var c0 = 0; c0 < cols; c0++) {
+       var x = cells[0][c0];
+-      if (x && x.t === 'box' && (x.numice > 0 || x.chain > 0 || x.q)) { x.numice = 0; x.chain = 0; x.q = false; n++; }
++      if (!x || x.t !== 'box') continue;
++      if (x.numice > 0 || x.chain > 0) locked.push({ c: c0, cell: x });
++      else plain++;
+     }
++    if (plain > 0 || !locked.length) return null;          // 还有能动的 → 不动它
++    // 整行锁死（冰 + 链）：挑冰最少的一辆解冻，否则第 0 步就没有任何合法操作 → 必死候选。
++    locked.sort(function (a, b) { return (a.cell.numice || 0) - (b.cell.numice || 0); });
++    var pick = locked[0].cell, at = locked[0].c;
++    var was = { numice: pick.numice || 0, chain: pick.chain || 0 };
++    pick.numice = 0; pick.chain = 0;
++    // 清孤立锁链（摘掉一端后，另一端的组就只剩 1 个成员了）
+     var cnt = {};
+     for (var r = 0; r < rows; r++) for (var cc = 0; cc < cols; cc++) {
+       var b = cells[r][cc];
+@@ -7476,7 +7470,7 @@
+       var b2 = cells[r2][c2];
+       if (b2 && b2.t === 'box' && b2.chain > 0 && cnt[b2.chain] < 2) b2.chain = 0;
+     }
+-    return n;
++    return { at: [0, at], was: was };
+   }
+ 
+   function finalizeProduce(cand, K, evaluated) {
+@@ -7586,11 +7580,11 @@
+       } catch (e) { cand.pressureLoop = { error: String((e && e.message) || e) }; }
+     }
+ 
+-    // 【v239】最终出口：第 0 行禁冰/链/问号（最后一道兜底，见 stripRow0Obstacles 注释）
++    // 【v240】第 0 行不硬禁功能块，只在"整行锁死"时解冻一辆保开局（见 ensureRow0Opening 注释）
+     try {
+-      var _strip = stripRow0Obstacles(cand && cand.level);
+-      if (_strip > 0) cand.row0Strip = _strip;
+-    } catch (e) { cand.row0StripError = String((e && e.message) || e); }
++      var _open = ensureRow0Opening(cand && cand.level);
++      if (_open) cand.row0OpeningFix = _open;
++    } catch (e) { cand.row0OpeningError = String((e && e.message) || e); }
+ 
+     return cand;
+   }
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=239">
++  <link rel="stylesheet" href="css/style.css?v=240">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=239"></script>
+-  <script src="js/utils.js?v=239"></script>
++  <script src="js/zip.js?v=240"></script>
++  <script src="js/utils.js?v=240"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=239"></script>
+-  <script src="js/simulator.js?v=239"></script>
++  <script src="js/color-libs.js?v=240"></script>
++  <script src="js/simulator.js?v=240"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=239"></script>
+-  <script src="js/solver-strategy.js?v=239"></script>
+-  <script src="js/solver.js?v=239"></script>
+-  <script src="js/playersim.js?v=239"></script>
+-  <script src="js/generator.js?v=239"></script>
+-  <script src="js/analysis.js?v=239"></script>
++  <script src="js/anchor-cut.js?v=240"></script>
++  <script src="js/solver-strategy.js?v=240"></script>
++  <script src="js/solver.js?v=240"></script>
++  <script src="js/playersim.js?v=240"></script>
++  <script src="js/generator.js?v=240"></script>
++  <script src="js/analysis.js?v=240"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=239"></script>
+-  <script src="js/app.js?v=239"></script>
++  <script src="js/level-editor.js?v=240"></script>
++  <script src="js/app.js?v=240"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

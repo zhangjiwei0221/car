@@ -1,0 +1,115 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4597,7 +4597,9 @@
+       targetCarCount: _boardAuto ? 36 : _targetCars0,
+       valvePlan: true, valveMode: 'largest', valveIceSteps: 10,
+       maxPipes: 1, pipeFloorCount: 1, pipeFallbackCount: 1,   // 【v228】管道只留 1 条
+-      acceptMode: 'target', targetPeakMin: 3, targetPeakMax: 4, targetSteadyMin: 30, targetSteadyMax: 80,  // 【v230】合格 = 落在困难区间
++      // 【v242】目标带下界 3 → 3.2：审核的卡点线是 5−1.8=3.2，原来写 3 会让"峰窗正好 3.0"的关
++      //   被搜索当成"进带收工"，却被审核判成"无卡点 → 简单关·趋势过平"。这正是"简单合格"的主要来源。
++      acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4, targetSteadyMin: 30, targetSteadyMax: 80,
+ 
+       // 【v239·用户裁决】「尽量用数字冰代替黑块」：黑块全撤（v228 的 2~4% 也不留），
+       //   障碍改用数字冰承担（冰是可消的锁，黑块是永久死格，且配额会把墙堆到 14%）。
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -10380,6 +10380,44 @@
+   /** 【v194】一图多产的比较元组：先比六条过几条，再比离带距离，再比稳健通关率。 */
+   var _PRESSURE_FIRST = false;   // 【v215】压力优先：可解的前提上，峰窗越高越好
+   var _AUDIT_FIRST = false;      // 【v216】全知线优先：看"最优解自己扛多少"，不是玩家容错低
++  /**
++   * 【v242】带外纠偏一次：portfolio 选出的关如果峰窗不在目标带里，用"冰量"做一次比例修正再产一遍。
++   *   为什么用冰：实测冰是最直接的压力旋钮（冰锁住浅层车 = 砍供给），而且不需要重算切法。
++   *   只在带外时触发一次，带内不动；成本 = 一次额外 produceFixed（5~15s）。
++   *   方向：峰窗低于下界 → 加冰（×1.2）；高于上界 → 减冰（×0.85）。
++   */
++  function bandFixOnce(out, blocks, config) {
++    try {
++      var gv = out && out.goodV3;
++      if (!gv || gv.midLateMax == null) return out;
++      var lo = (config && config.targetPeakMin != null) ? +config.targetPeakMin : 3.2;
++      var hi = (config && config.targetPeakMax != null) ? +config.targetPeakMax : 4.0;
++      var p = gv.midLateMax;
++      var d0 = (p < lo) ? (lo - p) : (p > hi ? (p - hi) : 0);
++      if (d0 <= 0.05) return out;
++      var cfg = config || {};
++      var ice0;
++      if (cfg.icePercent != null && !isNaN(+cfg.icePercent)) ice0 = +cfg.icePercent;
++      else if (cfg.icePercentMin != null && cfg.icePercentMax != null) ice0 = (+cfg.icePercentMin + +cfg.icePercentMax) / 2;
++      else ice0 = 12;
++      ice0 = Math.round(ice0);
++      var down = (p > hi);
++      var ni = Math.max(0, Math.min(45, Math.round(ice0 * (down ? 0.85 : 1.2))));
++      if (ni === ice0) return out;
++      var cfg2 = {};
++      for (var k in cfg) if (k.charAt(0) !== '_') cfg2[k] = cfg[k];
++      cfg2.icePercent = ni; cfg2.icePercentMin = ni; cfg2.icePercentMax = ni;
++      cfg2._deadlineAt = 0;
++      var alt = null;
++      try { alt = produceFixed(blocks, cfg2, {}); } catch (e) { alt = null; }
++      if (!alt || !alt.level || !alt.goodV3) return out;
++      var p2 = alt.goodV3.midLateMax;
++      var d2 = (p2 < lo) ? (lo - p2) : (p2 > hi ? (p2 - hi) : 0);
++      if (d2 < d0) { alt.bandFix = { from: p, to: p2, ice: ni }; return alt; }
++      return out;
++    } catch (e) { return out; }
++  }
++
+   function portfolioTuple(out) {
+     var g = out && out.goodV3;
+     if (!g || !g.fails) return { f: 99, d: 1e9, s: -1 };
+@@ -10594,6 +10632,8 @@
+       }
+       out = _best;
+       if (out) out.portfolio = { K: _pk, tried: _tried, passes: _passes, tuple: _bestT };
++      // 【v242】带外纠偏一次（只在这里触发，不在每个候选里跑，避免 ×8 的成本）
++      if (out) { try { out = bandFixOnce(out, blocks, config); } catch (e) {} }
+     }
+     // 唯一出口处统一标记本关的【目标图入口模式】，供批次记录 / CSV / 生产报告识别。
+     // 只写在生产侧结果对象上，【不写入关卡本体】——关卡 JSON 协议保持不变(用户决定 D1)。
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=241">
++  <link rel="stylesheet" href="css/style.css?v=242">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=241"></script>
+-  <script src="js/utils.js?v=241"></script>
++  <script src="js/zip.js?v=242"></script>
++  <script src="js/utils.js?v=242"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=241"></script>
+-  <script src="js/simulator.js?v=241"></script>
++  <script src="js/color-libs.js?v=242"></script>
++  <script src="js/simulator.js?v=242"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=241"></script>
+-  <script src="js/solver-strategy.js?v=241"></script>
+-  <script src="js/solver.js?v=241"></script>
+-  <script src="js/playersim.js?v=241"></script>
+-  <script src="js/generator.js?v=241"></script>
+-  <script src="js/analysis.js?v=241"></script>
++  <script src="js/anchor-cut.js?v=242"></script>
++  <script src="js/solver-strategy.js?v=242"></script>
++  <script src="js/solver.js?v=242"></script>
++  <script src="js/playersim.js?v=242"></script>
++  <script src="js/generator.js?v=242"></script>
++  <script src="js/analysis.js?v=242"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=241"></script>
+-  <script src="js/app.js?v=241"></script>
++  <script src="js/level-editor.js?v=242"></script>
++  <script src="js/app.js?v=242"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

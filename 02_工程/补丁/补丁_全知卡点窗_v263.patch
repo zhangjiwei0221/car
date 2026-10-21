@@ -1,0 +1,129 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4591,7 +4591,7 @@
+       candidateCount: 4, portfolioK: 8, timeBudgetMs: 25000, difficultyRounds: 2,
+       earlyStopPeak: 3.5, earlyStopSteady: 70,
+       // 【v262·用户裁决】"压力要持久"：不够持久就继续搜，而不是拿第一个高而不久的收工
+-      earlyStopGe3: 20, earlyStopLongest: 5,
++      earlyStopGe3: 20, earlyStopLongest: 5, earlyStopChokeWin: 2,
+       // 【v260·实验】把最晚熟的几辆车借到"扇出最大"的格子上 → 想让全知线被逼出长债。
+       //   ⚠ 实测尚未生效（两个版本的闸门都返回 0 组），先默认关，别影响生产。
+       gateBorrow: 0,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6896,6 +6896,26 @@
+     //   用户 2026-10-19：「想让全知求解器的压力高一点、且持久一点」——先把这个量记下来才谈得上调。
+     var _persist = null;
+     try {
++      // 【v263】全知线的"卡点覆盖"：把压力样本按 5% 进度分桶，统计均值 ≥ 卡点线(3.2) 的桶数/
++      //   最长连续桶数。峰窗只说明"最高那一桶"，说明不了"有多少段真的到了卡点线"。
++      //   用户 2026-10-19 看图后："全知求解器的卡点不够" —— 说的就是 plateau 只有 3.0（差 0.2）。
++      var _pw = (function () {
++        var ps = sr.pressureSamples || [], tb = sr.totalBoxes || 0;
++        if (!ps.length || !tb) return null;
++        var NB = 20, sums = [], cnts = [];
++        for (var bi = 0; bi < NB; bi++) { sums.push(0); cnts.push(0); }
++        for (var pi = 0; pi < ps.length; pi++) {
++          var pr = ps[pi].done / tb; if (pr > 1) pr = 1;
++          var b = Math.min(NB - 1, Math.floor(pr * NB));
++          sums[b] += ps[pi].buf; cnts[b]++;
++        }
++        var line = 3.2, win = 0, span = 0, cur = 0;
++        for (var bj = 0; bj < NB; bj++) {
++          var mean = cnts[bj] ? (sums[bj] / cnts[bj]) : 0;
++          if (mean >= line) { win++; cur++; if (cur > span) span = cur; } else cur = 0;
++        }
++        return { win: win, span: span, buckets: NB };
++      })();
+       var _h = sr.stepBufferHistory || [];
+       if (_h.length) {
+         var _pk = 0, _ge = 0, _run = 0, _best = 0;
+@@ -6903,7 +6923,8 @@
+           if (_h[_hi] > _pk) _pk = _h[_hi];
+           if (_h[_hi] >= 3) { _ge++; _run++; if (_run > _best) _best = _run; } else { _run = 0; }
+         }
+-        _persist = { peak: _pk, ge3Pct: Math.round(_ge / _h.length * 100), longest: _best, steps: _h.length };
++        _persist = { peak: _pk, ge3Pct: Math.round(_ge / _h.length * 100), longest: _best, steps: _h.length,
++                     chokeWin: (_pw ? _pw.win : null), chokeSpan: (_pw ? _pw.span : null) };
+       }
+     } catch (e) { _persist = null; }
+     var _fill = null;
+@@ -7074,6 +7095,11 @@
+       if (!ps) return false;
+       if (geMin > 0 && (ps.ge3Pct || 0) < geMin) return false;
+       if (lgMin > 0 && (ps.longest || 0) < lgMin) return false;
++    }
++    // 【v263】全知线至少要有 N 个 5% 窗到达卡点线（默认 2），否则继续搜
++    var cwMin = (config && config.earlyStopChokeWin != null) ? +config.earlyStopChokeWin : 0;
++    if (cwMin > 0) {
++      if (!g.persist || (g.persist.chokeWin || 0) < cwMin) return false;
+     }
+     return true;
+   }
+@@ -10906,7 +10932,8 @@
+     var d = (p == null) ? 1e9 : (p < 3.2 ? (3.2 - p) : (p > 4.8 ? (p - 4.8) : 0));
+     return { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
+              fc: (g.fillCurve ? g.fillCurve.medFull : null), lp: (g.fillCurve ? g.fillCurve.lowPct : null),
+-             ge: (g.persist ? g.persist.ge3Pct : null), lg: (g.persist ? g.persist.longest : null) };
++             ge: (g.persist ? g.persist.ge3Pct : null), lg: (g.persist ? g.persist.longest : null),
++             cw: (g.persist ? g.persist.chokeWin : null) };
+   }
+   function portfolioBetter(x, y) {
+     if (!y) return true;
+@@ -10919,7 +10946,7 @@
+       var _band = function (v) { return (v == null) ? 99 : (Math.max(0, 45 - v) + Math.max(0, v - 90)); };
+       if (_band(x.lp) !== _band(y.lp)) return _band(x.lp) < _band(y.lp);
+       // 【v262】仍然同分：优先"全知压力更持久"的（≥3 步占比 + 最长连续）
+-      var _pers = function (t) { return ((t.ge || 0) * 1.0 + (t.lg || 0) * 3.0); };
++      var _pers = function (t) { return ((t.cw || 0) * 8.0 + (t.ge || 0) * 1.0 + (t.lg || 0) * 3.0); };
+       if (_pers(x) !== _pers(y)) return _pers(x) > _pers(y);
+       return false;
+     }
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=262">
++  <link rel="stylesheet" href="css/style.css?v=263">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=262"></script>
+-  <script src="js/utils.js?v=262"></script>
++  <script src="js/zip.js?v=263"></script>
++  <script src="js/utils.js?v=263"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=262"></script>
+-  <script src="js/simulator.js?v=262"></script>
++  <script src="js/color-libs.js?v=263"></script>
++  <script src="js/simulator.js?v=263"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=262"></script>
+-  <script src="js/solver-strategy.js?v=262"></script>
+-  <script src="js/solver.js?v=262"></script>
+-  <script src="js/playersim.js?v=262"></script>
+-  <script src="js/generator.js?v=262"></script>
+-  <script src="js/analysis.js?v=262"></script>
++  <script src="js/anchor-cut.js?v=263"></script>
++  <script src="js/solver-strategy.js?v=263"></script>
++  <script src="js/solver.js?v=263"></script>
++  <script src="js/playersim.js?v=263"></script>
++  <script src="js/generator.js?v=263"></script>
++  <script src="js/analysis.js?v=263"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=262"></script>
+-  <script src="js/app.js?v=262"></script>
++  <script src="js/level-editor.js?v=263"></script>
++  <script src="js/app.js?v=263"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

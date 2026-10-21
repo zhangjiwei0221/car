@@ -1,0 +1,261 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4599,7 +4599,10 @@
+       maxPipes: 1, pipeFloorCount: 1, pipeFallbackCount: 1,   // 【v228】管道只留 1 条
+       acceptMode: 'target', targetPeakMin: 3, targetPeakMax: 4, targetSteadyMin: 30, targetSteadyMax: 80,  // 【v230】合格 = 落在困难区间
+ 
+-      blackPercent: 3, blackPercentMin: 2, blackPercentMax: 4  // 【v228】黑块减半（底部不再被堵）
++      // 【v239·用户裁决】「尽量用数字冰代替黑块」：黑块全撤（v228 的 2~4% 也不留），
++      //   障碍改用数字冰承担（冰是可消的锁，黑块是永久死格，且配额会把墙堆到 14%）。
++      blackPercent: 0, blackPercentMin: 0, blackPercentMax: 0,
++      icePercent: 18, icePercentMin: 14, icePercentMax: 22
+     });
+     try {
+       genLog('模式：容量 ' + _capMin + '~' + _capMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -1096,6 +1096,12 @@
+     placeBoardObstacles(cells, rows, cols, config);
+ 
+     // 顶部 1-3 行(索引0/1/2)障碍密度封顶（默认≤20%）：优先清 问号→冰→锁链整组→黑块转空，管道不动
++    // 【v239·用户裁决】第 0 行硬禁冰/锁链/问号：不管哪条路径放的，这里统一摘掉。
++    //   理由（用户 2026-10-19）："第0行禁冰/链/问号，只要有解就行" —— 开局行只留普通盒。
++    for (var tc0 = 0; tc0 < cols; tc0++) {
++      var c0 = cells[0][tc0];
++      if (c0 && c0.t === 'box') { c0.numice = 0; c0.chain = 0; c0.q = false; }
++    }
+     enforceTopObstacleCap(cells, rows, cols, config);
+ 
+     // 清除孤立锁链：chain 值仅 1 个成员的盒无互锁语义（求解器 chainGroups 只收≥2组，孤立会致 listMoves 崩）
+@@ -1988,14 +1994,15 @@
+       if (CK.iceCluster) {
+         var icMin = config.iceClusterSizeMin != null ? config.iceClusterSizeMin : 4;
+         var icMax = config.iceClusterSizeMax != null ? config.iceClusterSizeMax : 6;
+-        iceSel = pickClusteredBFS(bandCells, iceCount, icMin, icMax);
++        iceSel = pickClusteredBFS(bandCells.filter(function (p) { return p.r !== 0; }), iceCount, icMin, icMax);
+         iceClusterStat = { clusters: (iceSel._clusters || []).length, sizeMin: icMin, sizeMax: icMax,
+           sizes: (iceSel._clusters || []).map(function (x) { return x.size; }) };
+         (iceSel._clusters || []).forEach(function (cl) {
+           mark('iceCluster', '数字冰簇聚集', cl.seed.r, cl.seed.c, { size: cl.size });
+         });
+       } else {
+-        iceSel = pickDispersed(nullCells, iceCount, 2);
++        // 【v239·用户裁决】第 0 行禁冰：第 0 行是唯一开局可点行，冰落上去等于开局直接废几辆车。
++        iceSel = pickDispersed(nullCells.filter(function (p) { return p.r !== 0; }), iceCount, 2);
+       }
+       for (var i = 0; i < iceSel.length; i++) {
+         var k = iceSel[i].r + ',' + iceSel[i].c;
+@@ -2076,6 +2083,7 @@
+     var dirs8 = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]];
+     function freeForChain(r, c) {
+       if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
++      if (r === 0) return false;                             // 【v239·用户裁决】第 0 行禁锁链
+       if (cells[r][c] != null) return false;                 // 必须是未来盒格
+       var k = r + ',' + c;
+       return !chainKey[k] && !qKey[k];                        // 不与问号/其他锁链叠加
+@@ -2886,6 +2894,13 @@
+     for (var bi = 0; bi < boxes.length; bi++)
+       list.push({ color: boxes[bi].color, count: boxes[bi].count, _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi) });
+     list.sort(function (a, b) { return a._seq - b._seq; });
++    // 【v239】再按【需求进度】重排：早熟的放浅位、晚熟的放深位。
++    //   同需求进度时保留切序（消除序列），保证打法还是"由外向内"。
++    var _dc = config && config._demandCurve;
++    if (_dc) {
++      for (var dmi = 0; dmi < list.length; dmi++) list[dmi]._dm = demandAt(_dc, list[dmi].color, list[dmi].count);
++      list.sort(function (a, b) { return (a._dm - b._dm) || (a._seq - b._seq); });
++    }
+ 
+     // 单扫填球：空格→普通盒；管道本体→入队 1 个
+     //
+@@ -2965,7 +2980,9 @@
+           }
+         }
+         if (pickIdx !== fi) { var mvx = list.splice(pickIdx, 1)[0]; list.splice(fi, 0, mvx); }
+-        cells[tr2][tc2] = { t: 'box', color: list[fi].color, count: list[fi].count, chain: 0, q: false, numice: 0, _seq: list[fi]._seq };
++        // 【v239】_seq 记【摆位序】而不是原切序：冰的数值 = _seq + 延迟 就是在算"大概第几步走到它"，
++        //   摆位改了以后必须跟着改，否则冰值又对不上位置（这正是实测"冰锁 23 步的车摆在深度1"的来源）。
++        cells[tr2][tc2] = { t: 'box', color: list[fi].color, count: list[fi].count, chain: 0, q: false, numice: 0, _seq: fi };
+         fi++;
+       }
+     } else {
+@@ -3101,6 +3118,13 @@
+       if (tcell.t === 'black') beforeTop.black++;
+       else if (tcell.t === 'box') { if (tcell.numice > 0) beforeTop.ice++; if (tcell.q) beforeTop.q++; if (tcell.chain > 0) beforeTop.chain++; }
+     }
++    // 【v239·用户裁决】第 0 行硬禁冰/锁链/问号（绑定之后、顶部封顶之前统一摘掉）。
++    //   注意：这里必须是 fillStructureFixed 的这一处 —— 旧 buildBoard 路径也有一处同名调用，
++    //   v239 第一版误加到了那一处，实测产物第 0 行仍有 2 冰 2 链，才定位到这里。
++    for (var tc0b = 0; tc0b < cols; tc0b++) {
++      var c0b = cells[0][tc0b];
++      if (c0b && c0b.t === 'box') { c0b.numice = 0; c0b.chain = 0; c0b.q = false; }
++    }
+     enforceTopObstacleCap(cells, rows, cols, config);
+     var afterTop = { ice: 0, q: 0, chain: 0, black: 0 };
+     for (var tr2 = 0; tr2 < Math.min(2, rows); tr2++) for (var tc2 = 0; tc2 < cols; tc2++) {
+@@ -5030,6 +5054,8 @@
+   function produceFixed(blocks, config, opts) {
+     seedRng(config && config.seed);
+     config = Object.assign({}, DEFAULT_CONFIG, config || {});
++    // 【v239】需求日程按图算一次（与候选无关），供 fillStructureFixed 按需求序铺盘。
++    if (!config._demandCurve) { try { config._demandCurve = demandCurveOf(blocks); } catch (e) { config._demandCurve = null; } }
+     opts = opts || {};
+     var K = Math.max(1, config.candidateCount || 1);
+     var B = Math.max(1, config.chokeBranches || 3);
+@@ -7424,6 +7450,33 @@
+     }
+     cand.rescue = { applied: false, log: log };
+     return cand.rescue;
++  }
++
++  /**
++   * 【v239·用户裁决】第 0 行硬禁冰 / 锁链 / 问号。
++   *   为什么不在结构层一处解决：实测第 0 行的冰有两个来源 —— 结构层预定 + 阀门(valvePlan 'largest')
++   *   在【铺盘之后】再冻结"最大供给色"的浅层车；锁链也会被后续修复步骤挪动。
++   *   所以必须在最终出口统一摘一遍。只改标记、不动盒子，守恒不受影响。
++   *   摘掉链成员后组内可能只剩 1 个 → 整组清标（否则模拟器 chainGroups 会收到单成员组）。
++   */
++  function stripRow0Obstacles(level) {
++    var board = level && level.board;
++    if (!board || !board.cells || !board.cells.length) return 0;
++    var rows = board.rows, cols = board.cols, cells = board.cells, n = 0;
++    for (var c0 = 0; c0 < cols; c0++) {
++      var x = cells[0][c0];
++      if (x && x.t === 'box' && (x.numice > 0 || x.chain > 0 || x.q)) { x.numice = 0; x.chain = 0; x.q = false; n++; }
++    }
++    var cnt = {};
++    for (var r = 0; r < rows; r++) for (var cc = 0; cc < cols; cc++) {
++      var b = cells[r][cc];
++      if (b && b.t === 'box' && b.chain > 0) cnt[b.chain] = (cnt[b.chain] || 0) + 1;
++    }
++    for (var r2 = 0; r2 < rows; r2++) for (var c2 = 0; c2 < cols; c2++) {
++      var b2 = cells[r2][c2];
++      if (b2 && b2.t === 'box' && b2.chain > 0 && cnt[b2.chain] < 2) b2.chain = 0;
++    }
++    return n;
+   }
+ 
+   function finalizeProduce(cand, K, evaluated) {
+@@ -7533,6 +7586,12 @@
+       } catch (e) { cand.pressureLoop = { error: String((e && e.message) || e) }; }
+     }
+ 
++    // 【v239】最终出口：第 0 行禁冰/链/问号（最后一道兜底，见 stripRow0Obstacles 注释）
++    try {
++      var _strip = stripRow0Obstacles(cand && cand.level);
++      if (_strip > 0) cand.row0Strip = _strip;
++    } catch (e) { cand.row0StripError = String((e && e.message) || e); }
++
+     return cand;
+   }
+ 
+@@ -9615,6 +9674,64 @@
+    * 4. 确保每盒都在 [boxMin, boxMax] 范围内
+    * 5. 总和严格 = pixelCount
+    */
++  // ==================== 【v239】需求日程：每辆车"什么时候才攒够" ====================
++  //   根因（用户 2026-10-19 指出「左上角永远是那几个颜色」）：
++  //     铺盘按【切序】排车，而切序来自 peel —— 只保证"这个颜色有 1 个像素在最外层"，
++  //     不保证"够一辆车吃"。30 号色共 31 px、其中只有 1 px 在第 1 层，于是被切到第 4 位、
++  //     又被摆到第 0 行；实测 109 / 156 / 107 三关都是 (0,3) 色30 要等到 91% 才吃得动。
++  //   修法：先算一条【颜色 → 已暴露累计量】的曲线（纯目标图，与棋盘无关），
++  //     把每辆车换算成"需求进度 = 该色攒够这辆容量时的全局进度"，再按它升序铺盘：
++  //     早熟的放浅位、晚熟的放深位。曲线按图缓存，同图多次候选只算一次。
++  var _demandCurveCache = {};
++  function demandCurveOf(blocks) {
++    var Sim = AntSolver.Simulator;
++    if (!Sim || !Sim.createState || !Sim.previewNextEliminationOrder) return null;
++    if (!blocks || !blocks.length || !blocks[0]) return null;
++    var rows = blocks.length, cols = blocks[0].length;
++    var total = 0, hash = rows * 131 + cols;
++    for (var hr = 0; hr < rows; hr++) for (var hc = 0; hc < cols; hc++) {
++      if (blocks[hr][hc] > 0) { total++; hash = (hash * 31 + blocks[hr][hc]) % 2147483647; }
++    }
++    if (!total) return null;
++    var key = rows + 'x' + cols + ':' + total + ':' + hash;
++    if (_demandCurveCache[key]) return _demandCurveCache[key];
++    var s;
++    try {
++      s = Sim.createState({ blocks: blocks, rows: rows, cols: cols, totalPixels: total, totalBoxes: 0,
++        bufferLimit: 5, board: { rows: 0, cols: 0, cells: [] } }, {});
++    } catch (e) { return null; }
++    var consumed = {}, curve = {}, done = 0, guard = 0;
++    while (done < total && guard++ < 400) {
++      var pv;
++      try { pv = Sim.previewNextEliminationOrder(s); } catch (e) { break; }
++      var prog = done / total, best = -1, bestN = 0;
++      for (var k in pv.byColor) {
++        var col = +k, av = (pv.byColor[col] && pv.byColor[col].reachable) || 0;
++        var exp = (consumed[col] || 0) + av;
++        var arr = curve[col] || (curve[col] = []);
++        if (!arr.length || arr[arr.length - 1][0] < exp) arr.push([exp, prog]);
++        if (av > bestN) { bestN = av; best = col; }
++      }
++      if (best < 0) break;
++      var got = 0;
++      try { got = Sim.elimDispatch(s, best, Infinity); } catch (e) { break; }
++      if (!(got > 0)) break;
++      consumed[best] = (consumed[best] || 0) + got; done += got;
++    }
++    var out = { curve: curve, total: total };
++    _demandCurveCache[key] = out;
++    return out;
++  }
++  /** 这辆车（颜色 color、容量 count）要等到全局进度百分之几，才攒得够。 */
++  function demandAt(dc, color, count) {
++    if (!dc || !dc.curve) return 0.5;
++    var arr = dc.curve[color];
++    if (!arr || !arr.length) return 1;
++    var q = count > 0 ? count : 1;
++    for (var i = 0; i < arr.length; i++) if (arr[i][0] >= q) return arr[i][1];
++    return 1;
++  }
++
+   function splitIntoBoxes(pixelCount, boxMin, boxMax) {
+     if (pixelCount <= 0) return [];
+     if (pixelCount <= boxMax) return [pixelCount]; // 一盒搞定
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=238">
++  <link rel="stylesheet" href="css/style.css?v=239">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=238"></script>
+-  <script src="js/utils.js?v=238"></script>
++  <script src="js/zip.js?v=239"></script>
++  <script src="js/utils.js?v=239"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=238"></script>
+-  <script src="js/simulator.js?v=238"></script>
++  <script src="js/color-libs.js?v=239"></script>
++  <script src="js/simulator.js?v=239"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=238"></script>
+-  <script src="js/solver-strategy.js?v=238"></script>
+-  <script src="js/solver.js?v=238"></script>
+-  <script src="js/playersim.js?v=238"></script>
+-  <script src="js/generator.js?v=238"></script>
+-  <script src="js/analysis.js?v=238"></script>
++  <script src="js/anchor-cut.js?v=239"></script>
++  <script src="js/solver-strategy.js?v=239"></script>
++  <script src="js/solver.js?v=239"></script>
++  <script src="js/playersim.js?v=239"></script>
++  <script src="js/generator.js?v=239"></script>
++  <script src="js/analysis.js?v=239"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=238"></script>
+-  <script src="js/app.js?v=238"></script>
++  <script src="js/level-editor.js?v=239"></script>
++  <script src="js/app.js?v=239"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

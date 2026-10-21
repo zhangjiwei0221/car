@@ -1,0 +1,100 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4328,7 +4328,9 @@
+     var cap = P / Math.max(1, N);
+     var capMin = Math.max(4, Math.round(cap * 0.65)), capMax = Math.max(capMin + 2, Math.round(cap * 1.35));
+     var beats = N >= 45 ? 3 : 2;                       // 债务节拍数（= 卡点数）
+-    var ice = Math.max(6, Math.min(14, beats * 3));    // 冰（%盒）
++    // 【v164】用户 2026-10-16：「黑块太多，很 low 的手法增加阻碍，可以多使用数字冰」
++    //   → 冰的配额从 beats×3（夹 6~14%）提到 beats×4（夹 10~20%）：44 盒的关从 ~4 格提到 ~7~9 格。
++    var ice = Math.max(10, Math.min(20, beats * 4));   // 冰（%盒）
+     var chain = Math.max(2, Math.min(4, beats));       // 锁链（组）
+     var q = Math.max(2, Math.min(8, Math.round(beats * 1.5)));   // 问号（%盒，硬上限 8 ≈ 2~4 个）
+     var pipes = Math.max(1, Math.min(3, Math.round(N / 25)));    // 管道下限（条）
+@@ -4373,12 +4375,31 @@
+       //   0.74 → 管道盒占总车 33~37%、曲线 ≤1占 37~42%；0.82~0.84 → 管道 10~15%、≤1占 19~29%、出关率还更高。
+       //   机理：可用空间 = 非黑块非管道格占比；黑块有比例上限，配额凑不满的部分**只能给管道**，
+       //   所以"管道总是很多"不是选出来的，是 0.74 这条配额代数推出来的。管道下限设 0 也一样（实测）。
+-      usableSpaceTarget: 0.82,
++      // 【v164】0.82 → 0.86：非盒格（墙+管道）从 18% 降到 14%，**黑块直接少一大截**。
++      //   用户 2026-10-16：「黑块太多，很 low 的手法增加阻碍，可以多使用数字冰」——
++      //   省下的格子优先变成"盒"（= 多一个选择），阻碍改由数字冰/锁链承担。
++      //   代价：阻挡变弱、每步可点更多（压力会降），由 v163 的抉择投放 + 更高的冰配额补偿。
++      // 【v168】**关闭**可用空间目标（用户 2026-10-16：「怎么可能关卡一定要有黑块和管道来占用棋盘呢？
++      //   就算整个棋盘没有色块也没有管道，它也能组成一个关卡，根据这些色块之间的阻挡关系产生暂存压力」）。
++      //   关闭后不再有"非盒格额度"，也就不再逼着放墙/塞管道；压力来自颜色与容量关系。
++      //   实测：出关率 1/4 → 4/4，黑块 5 → 0，管道 2 → 0.75 格，窄选择 25% → 11%，开局可点 5 → 5.5。
++      usableSpaceTarget: 0,
+       boxSizeMin: capMin, boxSizeMax: capMax,
++      // 【v166 实测否决】用户要求"黑块最多 4%"→ 直接把这里改成 4% **会崩出关率**（实测 4 关里 3 关候选全灭）。
++      //   原因：`blackPercent` 只是**目标带**，真正决定墙数的是 `solveSpaceQuota` 的额度
++      //   K = 格数 ×(1 − 可用空间目标) = 14%，其中 **B(墙) + P(管道) = K**；调小 blackPercent 只会把
++      //   可行带压窄（bMax≈9%），而 K 没变 → 常常无解 → 候选全灭。
++      //   → 要真正做到"墙 ≤4%"，必须改成"**墙当上限、允许不足**，余量给**空位**"（而不是让管道或黑块把额度吃满）。
++      //   在那之前保持 8%（该值只作目标带用）。
++      // 【v168】黑块 0：自动档不再放任何墙（用户：「黑块依旧，整把有 5 个…我不信这个黑块不能去掉」）。
++      blackPercent: 0, blackPercentMin: 0, blackPercentMax: 0,
++      blackAsCapOnly: true, blackPercentCapPct: 0,
+       icePercent: ice, icePercentMin: ice, icePercentMax: ice,
+       chainCount: chain, chainCountMin: chain, chainCountMax: chain,
+       questionPercent: q, questionPercentMin: q, questionPercentMax: q,
+-      minPipes: pipes, minPipesMin: pipes, minPipesMax: pipes,
++      minPipes: 0, minPipesMin: 0, minPipesMax: 0,   // 【v168】管道下限 0：管道只在真有溢出盒时出现
++      narrowPath: false, narrowPathProb: 0,          // 【v168】窄路墙关掉（墙的唯一结构性来源）
++
+       fragmentMaxRate: 0,
+       _why: { P: P, N: N, cap: +cap.toFixed(1), capMin: capMin, capMax: capMax, beats: beats, ice: ice, chain: chain, q: q, pipes: pipes }
+     };
+@@ -4400,7 +4421,7 @@
+         a.beatProps.map(function (b) { return b.pos + '%'; }).join('/') + '）';
+     }
+     genLog('自动档' + (tag ? '·' + tag : '') + '：像素 ' + a._why.P + ' ÷ 目标车数 ' + a._why.N + ' → 平均容量 ' + a._why.cap +
+-      '，盒容量 ' + a._why.capMin + '~' + a._why.capMax + '；可用空间 0.82（管道约占 10~15%，原 0.74 会到 33~37%）；冰 ' + a._why.ice + '%、锁链 ' + a._why.chain +
++      '，盒容量 ' + a._why.capMin + '~' + a._why.capMax + '；可用空间 0.86（黑块 8%、管道约占 10~15%；原 0.82/0.74 墙会更多）；冰 ' + a._why.ice + '%、锁链 ' + a._why.chain +
+       ' 组、问号 ' + a._why.q + '%、管道下限 ' + a._why.pipes + ' 条' + beatTxt + '（碎色闸门一并关闭：碎色是规划内的压力素材）', 'gen-log-ok');
+     return Object.assign({}, cfg, deltas);
+   }
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=163">
++  <link rel="stylesheet" href="css/style.css?v=168">
+ </head>
+ <body>
+   <header>
+@@ -974,20 +974,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=163"></script>
+-  <script src="js/utils.js?v=163"></script>
++  <script src="js/zip.js?v=168"></script>
++  <script src="js/utils.js?v=168"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=163"></script>
+-  <script src="js/simulator.js?v=163"></script>
++  <script src="js/color-libs.js?v=168"></script>
++  <script src="js/simulator.js?v=168"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=163"></script>
+-  <script src="js/solver-strategy.js?v=163"></script>
+-  <script src="js/solver.js?v=163"></script>
+-  <script src="js/playersim.js?v=163"></script>
+-  <script src="js/generator.js?v=163"></script>
+-  <script src="js/analysis.js?v=163"></script>
++  <script src="js/anchor-cut.js?v=168"></script>
++  <script src="js/solver-strategy.js?v=168"></script>
++  <script src="js/solver.js?v=168"></script>
++  <script src="js/playersim.js?v=168"></script>
++  <script src="js/generator.js?v=168"></script>
++  <script src="js/analysis.js?v=168"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=163"></script>
+-  <script src="js/app.js?v=163"></script>
++  <script src="js/level-editor.js?v=168"></script>
++  <script src="js/app.js?v=168"></script>
+ </body>
+ </html>

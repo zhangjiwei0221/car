@@ -1,0 +1,116 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -1190,8 +1190,9 @@
+    * 形态硬约束（2026-07-31）：棋盘必须【列数 > 行数】且【列-行 ∈ {1,2}】。
+    * 不允许行列相等、行多于列、或列比行多 3 格及以上。
+    */
+-  function boardShapeOk(rows, cols) {
++  function boardShapeOk(rows, cols, allowSquare) {
+     var d = cols - rows;
++    if (allowSquare) return d >= 0 && d <= 2;   // 【v216】允许正方形（列=行），其余规则不变
+     return d >= 1 && d <= 2;
+   }
+ 
+@@ -1438,7 +1439,7 @@
+       var UST = parseFloat(config.usableSpaceTarget);
+       var shrinkFloor = Math.max(6, rMin - 3);   // 向下缩到的行数下限，避免缩成过小的怪盘
+       function feasAt(fr, fc) {
+-        if (!boardShapeOk(fr, fc)) return null;
++        if (!boardShapeOk(fr, fc, !!config.boardAllowSquare)) return null;
+         var q = solveSpaceQuota(n, fr, fc, config);
+         return (q && q.ok) ? { rows: fr, cols: fc, q: q } : null;
+       }
+@@ -1537,7 +1538,7 @@
+       for (cc = cMin; cc <= cMax; cc++) {
+         e = evalPair(rr, cc);
+         anyInRange.push(e);
+-        if (boardShapeOk(rr, cc)) inRange.push(e);
++        if (boardShapeOk(rr, cc, !!config.boardAllowSquare)) inRange.push(e);
+       }
+     }
+     // 向下缩小候选：行从 rMin-1 一直缩到 3，列只取 行+1 / 行+2（天然满足形态约束）
+@@ -8545,7 +8546,7 @@
+     var cMax = clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30);
+     var minA = Infinity, maxA = 0, minDim = null, maxDim = null, legal = 0;
+     function consider(r, c) {
+-      if (!boardShapeOk(r, c)) return;
++      if (!boardShapeOk(r, c, !!config.boardAllowSquare)) return;
+       var a = r * c; legal++;
+       if (a < minA) { minA = a; minDim = { rows: r, cols: c }; }
+       if (a > maxA) { maxA = a; maxDim = { rows: r, cols: c }; }
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4492,10 +4492,10 @@
+       var cMax = parseInt((document.getElementById('gen-cols-max') || {}).value, 10) || 10;
+       if (cMax < cMin) { var t2 = cMin; cMin = cMax; cMax = t2; }
+       var ok = false;
+-      for (var r = rMin; r <= rMax && !ok; r++) for (var c = cMin; c <= cMax; c++) { if (c - r === 1 || c - r === 2) { ok = true; break; } }
++      for (var r = rMin; r <= rMax && !ok; r++) for (var c = cMin; c <= cMax; c++) { if (c - r === 0 || c - r === 1 || c - r === 2) { ok = true; break; } }
+       if (!ok) {
+         var fixedMin = rMax + 1, fixedMax = rMax + 2;
+-        try { genLog('棋盘范围里没有合法形态（列必须 = 行+1 或 行+2），已自动把列改成 ' + fixedMin + '~' + fixedMax, 'gen-log-warn'); } catch (e) {}
++        try { genLog('棋盘范围里没有合法形态（列必须 ≥ 行，且比行多不超过 2 格），已自动把列改成 ' + fixedMin + '~' + fixedMax, 'gen-log-warn'); } catch (e) {}
+         return { rowsMin: rMin, rowsMax: rMax, colsMin: fixedMin, colsMax: fixedMax };
+       }
+       return { rowsMin: rMin, rowsMax: rMax, colsMin: cMin, colsMax: cMax };
+@@ -4507,6 +4507,7 @@
+       goodV3: true, requireHardPass: false, seed: null,
+       designSweep: true, designDebt: true,  // 【v201】饥荒强度扫描，按最终 goodV3 择优
+       boardHardRange: !_boardAuto,          // 【v207】不勾自适应 = 硬范围（不许缩小、不许自动换范围）
++      boardAllowSquare: true,               // 【v211】允许正方形（列=行）
+       boardAuto: _boardAuto,                // 【v207】勾了自适应 = 按车数反推范围，忽略手填数字
+       // 【v215】形态约束：列 − 行 只能是 1 或 2；手填的范围里一个合法组合都没有时，
+       //   自动把列改成"最大行+1 ~ 最大行+2"，并在日志里说明（否则用户会看到"候选全灭"却不知为什么）。
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=210">
++  <link rel="stylesheet" href="css/style.css?v=211">
+ </head>
+ <body>
+   <header>
+@@ -329,7 +329,7 @@
+         <input type="number" id="gen-rows-min" value="7" min="4" max="20" style="width:52px">
+         <span class="gen-hint">~</span>
+         <input type="number" id="gen-rows-max" value="9" min="4" max="20" style="width:52px">
+-        <label style="margin-left:14px" title="棋盘列数范围（含端点）。列必须 = 行+1 或 行+2；范围里没有合法组合时会自动纠正并提示。">列</label>
++        <label style="margin-left:14px" title="棋盘列数范围（含端点）。列 ≥ 行，且最多比行多 2 格（允许正方形）。范围里没有合法组合时会自动纠正并提示。">列</label>
+         <input type="number" id="gen-cols-min" value="8" min="4" max="30" style="width:52px">
+         <span class="gen-hint">~</span>
+         <input type="number" id="gen-cols-max" value="10" min="4" max="30" style="width:52px">
+@@ -844,20 +844,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=210"></script>
+-  <script src="js/utils.js?v=210"></script>
++  <script src="js/zip.js?v=211"></script>
++  <script src="js/utils.js?v=211"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=210"></script>
+-  <script src="js/simulator.js?v=210"></script>
++  <script src="js/color-libs.js?v=211"></script>
++  <script src="js/simulator.js?v=211"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=210"></script>
+-  <script src="js/solver-strategy.js?v=210"></script>
+-  <script src="js/solver.js?v=210"></script>
+-  <script src="js/playersim.js?v=210"></script>
+-  <script src="js/generator.js?v=210"></script>
+-  <script src="js/analysis.js?v=210"></script>
++  <script src="js/anchor-cut.js?v=211"></script>
++  <script src="js/solver-strategy.js?v=211"></script>
++  <script src="js/solver.js?v=211"></script>
++  <script src="js/playersim.js?v=211"></script>
++  <script src="js/generator.js?v=211"></script>
++  <script src="js/analysis.js?v=211"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=210"></script>
+-  <script src="js/app.js?v=210"></script>
++  <script src="js/level-editor.js?v=211"></script>
++  <script src="js/app.js?v=211"></script>
+ </body>
+ </html>

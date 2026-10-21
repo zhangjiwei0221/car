@@ -1,0 +1,114 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4648,6 +4648,8 @@
+       //   降到 10%（8~12）：约 4 块，第 0 行最多 1 块。
+       // 【v253】随机冰降到 0：冰只由「顺序闸门」（下面三项）和阀门补冰产生，不再随机撒。
+       // row0IceMax 必须 >= 排程数量：排程冻的就是「需求最早」的车，而它们在 v239 之后正好排在第 0 行。
++      // 【v256·用户裁决】墙全部压到最底层：中间不再被切出窄走廊
++      wallBottomFirst: true,
+       icePercent: 0, icePercentMin: 0, icePercentMax: 0, row0IceMax: 2,
+       // 【v253·用户裁决】冰当"顺序闸门"：只冻开局就能装满的车，冻 3 辆、各滞后 2 步。
+       //   随机撒冰停用（icePercent 仍留一点做背景障碍）。
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -1132,9 +1132,40 @@
+   /**
+    * @returns {{planned:number, placed:number, shapeRejected:number, reachRejected:number, coords:Array}}
+    */
++  /**
++   * 【v256·用户裁决】"墙全都放在最底层"。
++   *   底盘的最底行本来就离入口最远、对路径影响最小；把墙压到那里，中间就不会被切出窄走廊。
++   *   从最后一行往上、行内从左到右取空格；第 0 行永不落墙（那是入口行）。
++   *   每放一块都做可达性检查，放不下就交给调用方的原有分散逻辑兜底。
++   * @returns {{placed:number, coords:Array}}
++   */
++  function placeBottomWalls(cells, rows, cols, need, gapProtect) {
++    var out = { placed: 0, coords: [] };
++    if (!(need > 0)) return out;
++    for (var r = rows - 1; r >= 1 && out.placed < need; r--) {
++      for (var c = 0; c < cols && out.placed < need; c++) {
++        if (cells[r][c] != null) continue;
++        if (gapProtect && gapProtect[r + ',' + c]) continue;
++        cells[r][c] = { t: 'black' };
++        if (typeof nullCellsReachable === 'function' && !nullCellsReachable(cells, rows, cols)) {
++          cells[r][c] = null; continue;
++        }
++        out.placed++; out.coords.push({ r: r, c: c });
++      }
++    }
++    return out;
++  }
++
+   function placeDispersedBlackReal(cells, rows, cols, extraBlack, gapProtect, config) {
+     var stat = { planned: extraBlack, placed: 0, shapeRejected: 0, reachRejected: 0, coords: [] };
+     if (extraBlack <= 0) return stat;
++    // 【v256】先按用户要求压到最底层
++    if (config && config.wallBottomFirst !== false) {
++      var bw = placeBottomWalls(cells, rows, cols, extraBlack, gapProtect);
++      stat.placed = bw.placed; stat.coords = bw.coords; stat.bottomFirst = bw.placed;
++      if (stat.placed >= extraBlack) return stat;
++      extraBlack -= bw.placed;
++    }
+     function wallNbrCount(r, c) {
+       var k = 0, dd = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+       for (var i = 0; i < 4; i++) if (isWallAt(cells, rows, cols, r + dd[i][0], c + dd[i][1])) k++;
+@@ -1167,6 +1198,11 @@
+     var stat = { need: surplus, filled: 0, coords: [] };
+     if (surplus <= 0) return stat;
+     var cap = Math.floor(rows * cols * 0.45);
++    // 【v256】补位墙也先压最底层（用户要求），放不下再走分散逻辑
++    var _bw2 = placeBottomWalls(cells, rows, cols, surplus, gapProtect);
++    stat.filled = _bw2.placed; stat.coords = _bw2.coords;
++    surplus -= _bw2.placed;
++    if (surplus <= 0) return stat;
+     // 【v255·用户反馈"路径很窄"】补位的墙先挑**四邻没有墙**的格子：
+     //   原来所有空格一锅端随机撒，墙容易连成一条，把棋盘切出窄走廊。
+     var cand = [], candLoose = [];
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=255">
++  <link rel="stylesheet" href="css/style.css?v=256">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=255"></script>
+-  <script src="js/utils.js?v=255"></script>
++  <script src="js/zip.js?v=256"></script>
++  <script src="js/utils.js?v=256"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=255"></script>
+-  <script src="js/simulator.js?v=255"></script>
++  <script src="js/color-libs.js?v=256"></script>
++  <script src="js/simulator.js?v=256"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=255"></script>
+-  <script src="js/solver-strategy.js?v=255"></script>
+-  <script src="js/solver.js?v=255"></script>
+-  <script src="js/playersim.js?v=255"></script>
+-  <script src="js/generator.js?v=255"></script>
+-  <script src="js/analysis.js?v=255"></script>
++  <script src="js/anchor-cut.js?v=256"></script>
++  <script src="js/solver-strategy.js?v=256"></script>
++  <script src="js/solver.js?v=256"></script>
++  <script src="js/playersim.js?v=256"></script>
++  <script src="js/generator.js?v=256"></script>
++  <script src="js/analysis.js?v=256"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=255"></script>
+-  <script src="js/app.js?v=255"></script>
++  <script src="js/level-editor.js?v=256"></script>
++  <script src="js/app.js?v=256"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

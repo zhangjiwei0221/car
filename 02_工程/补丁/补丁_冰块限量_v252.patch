@@ -1,0 +1,125 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4642,7 +4642,9 @@
+       // 【v239·用户裁决】「尽量用数字冰代替黑块」：黑块全撤（v228 的 2~4% 也不留），
+       //   障碍改用数字冰承担（冰是可消的锁，黑块是永久死格，且配额会把墙堆到 14%）。
+       blackPercent: 0, blackPercentMin: 0, blackPercentMax: 0,
+-      icePercent: 18, icePercentMin: 14, icePercentMax: 22
++      // 【v252】冰 18% 实测"一堆"（39 辆车里 9 块=23%，第 0 行还站 2 块）。
++      //   降到 10%（8~12）：约 4 块，第 0 行最多 1 块。
++      icePercent: 10, icePercentMin: 8, icePercentMax: 12, row0IceMax: 1
+     });
+     try {
+       genLog('模式：容量 ' + _capMin + '~' + _capMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -1996,6 +1996,21 @@
+         });
+       } else {
+         iceSel = pickDispersed(nullCells, iceCount, 2);
++      }
++      // 【v252·用户裁决】第 0 行允许有冰，但不要"一堆"：最多 row0IceMax 块（默认 1）。
++      //   超出部分换成非第 0 行的格子（保持总数不变，只是把位置挪走）。
++      var _r0max = (config.row0IceMax != null) ? Math.max(0, parseInt(config.row0IceMax, 10) || 0) : 1;
++      var _r0cnt = 0, _used = {};
++      for (var _ii = 0; _ii < iceSel.length; _ii++) _used[iceSel[_ii].r + ',' + iceSel[_ii].c] = 1;
++      for (var _ij = 0; _ij < iceSel.length; _ij++) {
++        if (iceSel[_ij].r !== 0) continue;
++        if (_r0cnt < _r0max) { _r0cnt++; continue; }
++        var _pool2 = nullCells.filter(function (pp) { return pp.r !== 0 && !_used[pp.r + ',' + pp.c]; });
++        if (!_pool2.length) continue;
++        var _rep = _pool2[Math.floor(rnd() * _pool2.length)];
++        delete _used[iceSel[_ij].r + ',' + iceSel[_ij].c];
++        _used[_rep.r + ',' + _rep.c] = 1;
++        iceSel[_ij] = _rep;
+       }
+       for (var i = 0; i < iceSel.length; i++) {
+         var k = iceSel[i].r + ',' + iceSel[i].c;
+@@ -7459,7 +7474,28 @@
+    *   这里只保留一条底线：整行都被冰/链锁死时（第 0 步没有任何合法操作 = 必死候选），
+    *   解冻冰最少的那一辆，让开局有得点。其余情况一律不动：
+    *   第 0 行的冰/链现在是被允许的难度来源，不再被摘掉。
++   */
++  /**
++   * 【v252】第 0 行的冰最多留 N 块（默认 1）。
++   *   结构层的冰候选已经按 row0IceMax 限过一次，但**阀门（valvePlan 'largest'）是在铺盘之后**
++   *   又给浅层车补冰的 —— 它不受那个限制，实测会再多 1 块。这里在最终出口统一封顶。
+    */
++  function capRow0Ice(level, maxN) {
++    var board = level && level.board;
++    if (!board || !board.cells || !board.cells.length) return 0;
++    var max = (maxN != null) ? Math.max(0, parseInt(maxN, 10) || 0) : 1;
++    var cells = board.cells, cols = board.cols, got = [], removed = 0;
++    for (var c = 0; c < cols; c++) {
++      var x = cells[0][c];
++      if (x && x.t === 'box' && x.numice > 0) got.push({ c: c, cell: x });
++    }
++    if (got.length <= max) return 0;
++    // 保留冰值最小的（最容易被解开的那几块），把其余摘掉
++    got.sort(function (a, b) { return (a.cell.numice || 0) - (b.cell.numice || 0); });
++    for (var i = max; i < got.length; i++) { got[i].cell.numice = 0; removed++; }
++    return removed;
++  }
++
+   function ensureRow0Opening(level) {
+     var board = level && level.board;
+     if (!board || !board.cells || !board.cells.length) return null;
+@@ -7599,6 +7635,10 @@
+ 
+     // 【v240】第 0 行不硬禁功能块，只在"整行锁死"时解冻一辆保开局（见 ensureRow0Opening 注释）
+     try {
++      var _iceCut = capRow0Ice(cand && cand.level, cand && cand.config ? cand.config.row0IceMax : 1);
++      if (_iceCut > 0) cand.row0IceCapped = _iceCut;
++    } catch (e) { cand.row0IceCapError = String((e && e.message) || e); }
++    try {
+       var _open = ensureRow0Opening(cand && cand.level);
+       if (_open) cand.row0OpeningFix = _open;
+     } catch (e) { cand.row0OpeningError = String((e && e.message) || e); }
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=251">
++  <link rel="stylesheet" href="css/style.css?v=252">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=251"></script>
+-  <script src="js/utils.js?v=251"></script>
++  <script src="js/zip.js?v=252"></script>
++  <script src="js/utils.js?v=252"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=251"></script>
+-  <script src="js/simulator.js?v=251"></script>
++  <script src="js/color-libs.js?v=252"></script>
++  <script src="js/simulator.js?v=252"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=251"></script>
+-  <script src="js/solver-strategy.js?v=251"></script>
+-  <script src="js/solver.js?v=251"></script>
+-  <script src="js/playersim.js?v=251"></script>
+-  <script src="js/generator.js?v=251"></script>
+-  <script src="js/analysis.js?v=251"></script>
++  <script src="js/anchor-cut.js?v=252"></script>
++  <script src="js/solver-strategy.js?v=252"></script>
++  <script src="js/solver.js?v=252"></script>
++  <script src="js/playersim.js?v=252"></script>
++  <script src="js/generator.js?v=252"></script>
++  <script src="js/analysis.js?v=252"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=251"></script>
+-  <script src="js/app.js?v=251"></script>
++  <script src="js/level-editor.js?v=252"></script>
++  <script src="js/app.js?v=252"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

@@ -1,0 +1,78 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4502,6 +4502,21 @@
+     })();
+     var big = Math.max(R, C) > 45;
+     var preset = big ? FIXED_PRESETS.large : FIXED_PRESETS.small;
++    // 【v212】容量随棋盘自适应：车数 ≈ 可放盒格数（棋盘面积 × 可用率），容量 = 总像素 ÷ 目标车数。
++    //   这样 7×7 用 ~38px 的车、8×9 用 ~26px 的车，都不会出现"装不下/空太多"。
++    var _autoBoxEl = document.getElementById('gen-autobox');
++    var _cells0 = _norm.rowsMax * _norm.colsMax;
++    // 小棋盘（≤56 格，比如 7×7/7×8）自动开；大棋盘只有手动勾选才改容量
++    if ((_autoBoxEl && _autoBoxEl.checked) || _cells0 <= 56) {
++      var _cells = _cells0;
++      var _usable = 0.86;
++      var _targetCars = Math.max(6, Math.round(_cells * _usable));
++      var _px = 0;
++      for (var _r = 0; _r < R; _r++) for (var _c = 0; _c < C; _c++) if (blocks[_r][_c] > 0) _px++;
++      var _cap = Math.max(18, Math.min(90, Math.round(_px / _targetCars)));
++      preset = Object.assign({}, preset, { boxSizeMin: _cap - 3, boxSizeMax: _cap + 5 });
++      try { genLog('容量随棋盘自适应：' + _norm.rowsMax + '×' + _norm.colsMax + ' → 约 ' + _targetCars + ' 辆 → 每辆 ' + (_cap - 3) + '~' + (_cap + 5) + ' px', 'gen-log-ok'); } catch (e) {}
++    }
+     var out = Object.assign({}, cfg, preset, {
+       candidateCount: 6, portfolioK: 1, timeBudgetMs: 300000, difficultyRounds: 7,
+       goodV3: true, requireHardPass: false, seed: null,
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=211">
++  <link rel="stylesheet" href="css/style.css?v=212">
+ </head>
+ <body>
+   <header>
+@@ -336,6 +336,9 @@
+         <label style="margin-left:16px" title="勾上 = 棋盘尺寸按车数自适应（上面四个数字被忽略）；不勾 = 严格用上面的范围。">
+           <input type="checkbox" id="gen-board-auto"> 自适应
+         </label>
++        <label style="margin-left:16px" title="按棋盘大小反推每辆车的容量：让车数 ≈ 可放盒格数，避免装不下或多出太多空格。">
++          <input type="checkbox" id="gen-autobox"> 容量随棋盘自适应（小棋盘自动开）
++        </label>
+         <label style="margin-left:16px" title="切法：默认=按消除趋势平均切；按层=同色同层单独成车（浅层壳车/深层包车）。">
+           切法
+           <select id="gen-cutmode">
+@@ -844,20 +847,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=211"></script>
+-  <script src="js/utils.js?v=211"></script>
++  <script src="js/zip.js?v=212"></script>
++  <script src="js/utils.js?v=212"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=211"></script>
+-  <script src="js/simulator.js?v=211"></script>
++  <script src="js/color-libs.js?v=212"></script>
++  <script src="js/simulator.js?v=212"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=211"></script>
+-  <script src="js/solver-strategy.js?v=211"></script>
+-  <script src="js/solver.js?v=211"></script>
+-  <script src="js/playersim.js?v=211"></script>
+-  <script src="js/generator.js?v=211"></script>
+-  <script src="js/analysis.js?v=211"></script>
++  <script src="js/anchor-cut.js?v=212"></script>
++  <script src="js/solver-strategy.js?v=212"></script>
++  <script src="js/solver.js?v=212"></script>
++  <script src="js/playersim.js?v=212"></script>
++  <script src="js/generator.js?v=212"></script>
++  <script src="js/analysis.js?v=212"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=211"></script>
+-  <script src="js/app.js?v=211"></script>
++  <script src="js/level-editor.js?v=212"></script>
++  <script src="js/app.js?v=212"></script>
+ </body>
+ </html>

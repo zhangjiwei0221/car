@@ -1,0 +1,101 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -5171,6 +5171,8 @@
+       // 【v238】每步"能吃满"的曲线（压力的直接来源）：中位/≤1 占比/被迫点。
+       //   实测 31 关：合格关 吃满≤1 占 44~81%、中位 1；太松的不合格关 2~21%、中位 3~7。
+       fillCurve: (result.goodV3 && result.goodV3.fillCurve) || null,
++      // 【v259】全知线压力持久度：{peak, ge3Pct, longest, steps}
++      persist: (result.goodV3 && result.goodV3.persist) || null,
+       // 【v115】卡点类型改「检查次数 × 概率」后，数量本身是随机量，只记 chokeCount 无法判断
+       //   「这关只出 1 种」是参数设小了还是抽样波动。这里把设定值(rolls/prob)、实测命中(hits)、
+       //   理论期望(expected，含池截断的精确式)与池大小一并记下，供批量实测均值与期望对照。
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6835,6 +6835,21 @@
+     // 【v238】选择余地曲线：沿求解路线逐步统计"每步能吃满几辆"（= 压力的直接来源）。
+     //   实测 31 关：合格关「吃满≤1 的步」占 44~81%、每步能吃满 0.9~1.7 辆；
+     //   简单关 46%/1.9；太松的不合格关 2~21%/2.7~7.1。这里只记录，不改合格门。
++    // 【v259】全知线的"压力持久度"：峰窗只说明最高点，说明不了"扛了多久"。
++    //   ge3Pct = 暂存≥3 的步数占比；longest = 最长连续≥3 的步数。
++    //   用户 2026-10-19：「想让全知求解器的压力高一点、且持久一点」——先把这个量记下来才谈得上调。
++    var _persist = null;
++    try {
++      var _h = sr.stepBufferHistory || [];
++      if (_h.length) {
++        var _pk = 0, _ge = 0, _run = 0, _best = 0;
++        for (var _hi = 0; _hi < _h.length; _hi++) {
++          if (_h[_hi] > _pk) _pk = _h[_hi];
++          if (_h[_hi] >= 3) { _ge++; _run++; if (_run > _best) _best = _run; } else { _run = 0; }
++        }
++        _persist = { peak: _pk, ge3Pct: Math.round(_ge / _h.length * 100), longest: _best, steps: _h.length };
++      }
++    } catch (e) { _persist = null; }
+     var _fill = null;
+     try {
+       var _cv = choiceCurve(lv, sr);
+@@ -6865,7 +6880,7 @@
+       if (steady == null || steady < _sMin || steady > _sMax) _tf.push('稳健不在' + _sMin + '~' + _sMax);
+       return { pass: _tf.length === 0, fails: _tf, solved: !!sr.completed,
+                steadyWonPct: steady, midLateMax: midLate, midLateAudit: midLateAudit,
+-               buried: buried, fillCurve: _fill, targetScore: (function () {
++               buried: buried, fillCurve: _fill, persist: _persist, targetScore: (function () {
+                  var pv = (midLate == null || midLate < _pMin || midLate > _pMax) ? 1 : 0;
+                  var sv = (steady == null || steady < _sMin || steady > _sMax) ? 1 : 0;
+                  var pd = (midLate == null) ? 9 : Math.abs(midLate - (_pMin + _pMax) / 2);
+@@ -6895,7 +6910,7 @@
+     return {
+       pass: fails.length === 0, fails: fails,
+       steadyWonPct: steady, spreadPct: spread, bestWonPct: bestWon, steadyGap: steadyGap, buried: buried,
+-      noGood: _noGood, fillCurve: _fill,
++      noGood: _noGood, fillCurve: _fill, persist: _persist,
+       earlyMax: early, midLateMax: midLate, midLateAudit: midLateAudit,
+       peakMin: play ? play.lateMax.min : null,
+       peakMax: play ? play.lateMax.max : null,
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=258">
++  <link rel="stylesheet" href="css/style.css?v=259">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=258"></script>
+-  <script src="js/utils.js?v=258"></script>
++  <script src="js/zip.js?v=259"></script>
++  <script src="js/utils.js?v=259"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=258"></script>
+-  <script src="js/simulator.js?v=258"></script>
++  <script src="js/color-libs.js?v=259"></script>
++  <script src="js/simulator.js?v=259"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=258"></script>
+-  <script src="js/solver-strategy.js?v=258"></script>
+-  <script src="js/solver.js?v=258"></script>
+-  <script src="js/playersim.js?v=258"></script>
+-  <script src="js/generator.js?v=258"></script>
+-  <script src="js/analysis.js?v=258"></script>
++  <script src="js/anchor-cut.js?v=259"></script>
++  <script src="js/solver-strategy.js?v=259"></script>
++  <script src="js/solver.js?v=259"></script>
++  <script src="js/playersim.js?v=259"></script>
++  <script src="js/generator.js?v=259"></script>
++  <script src="js/analysis.js?v=259"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=258"></script>
+-  <script src="js/app.js?v=258"></script>
++  <script src="js/level-editor.js?v=259"></script>
++  <script src="js/app.js?v=259"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

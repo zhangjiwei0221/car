@@ -1,0 +1,909 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -442,7 +442,11 @@
+     // 因此默认 10% 偏保守；要更狠就往上调，生成器的求解器闸门会淘汰被锁死的候选。
+     numIceDelayPct: 10,
+     // 数值硬上限比例：数值一律不超过 floor(总盒数 × 本值)，保证"总能减到 0"（永不变成死墙）。
+-    numIceCapPct: 100
++    // 【v296】默认改为 null（= 走自动上限 ceil(总盒数×iceCapRatio) 夹 [3,12]）。
++    //   原来默认 100 → 上限 = 总盒数−1（36 盒 → 35），于是 _seq(0~35) + delay(≈4) 直接产出
++    //   25~30 的冰值，实测 bindStat.ice.values = [29,25,30,27]，关卡里几乎每块冰都是 20 多。
++    //   想回到"按总盒数百分比"的旧口径，把它设成数字（如 100）即可。
++    numIceCapPct: null
+   };
+ 
+   /**
+@@ -473,11 +477,63 @@
+     var pct = (config && config.numIceDelayPct != null) ? config.numIceDelayPct : 10;
+     var delay = Math.round(total * Math.max(0, Math.min(60, pct)) / 100);
+     var seq = (box._seq != null) ? box._seq : 0;
+-    var capPct = (config && config.numIceCapPct != null) ? config.numIceCapPct : 100;
+-    var hi = Math.floor(total * Math.max(1, Math.min(100, capPct)) / 100);
+-    hi = Math.max(1, Math.min(hi, total - 1));
+-    var v = Math.round(seq + delay);
+-    return Math.max(AntSolver.NUMICE_MIN || 1, Math.min(v, hi));
++    // 【v296】上限口径统一：原来默认 capPct=100% → hi = 总车数−1（36 车 → 上限 35），
++    //   于是 seq(0~35) + delay(≈4) 直接产出 25~30 的冰值 —— 这就是"冰全是 20 多"的真正来源。
++    //   实测（工作日志 220 节）bindStat.ice.values = [29,25,30,27]，全部来自这里（窄路缺口冰）。
++    //   改为与 iceValueFor 同一把尺子：上限 = ceil(总车数 × iceCapRatio)，缺省 25%，夹 [3,12]。
++    //   仍保留 numIceCapPct 显式覆盖的能力（设了就按它算，但不超过 total−1）。
++    var capRatio = (config && config.iceCapRatio != null) ? +config.iceCapRatio : 0.25;
++    if (!(capRatio > 0)) capRatio = 0.25;
++    var _capAuto = Math.max(3, Math.min(12, Math.ceil(total * capRatio)));
++    var hi;
++    if (config && config.numIceCapPct != null) {
++      hi = Math.floor(total * Math.max(1, Math.min(100, +config.numIceCapPct)) / 100);
++      hi = Math.max(1, Math.min(hi, total - 1));
++    } else {
++      hi = _capAuto;
++    }
++    // 【v296·关键】冰值 = 把「自然位次 seq」**按比例映射到 [2, hi] 区间**，而不是直接 seq + delay。
++    //
++    //   为什么必须映射：seq 的范围是 0~总盒数−1（36 盒 → 0~35），而 hi 现在只有 11。
++    //   直接 seq + delay 会让几乎所有格子都 ≥ hi → 全部顶到上限 11，冰值又回到"一模一样"。
++    //   实测（工作日志 220 节）：改完上限后 bindStat.ice.values = [11,11,11,11] —— 正是这个原因。
++    //
++    //   映射后：靠前取的盒子冰值小（2~4），靠后取的冰值大（接近 hi），冰值随位置连续变化，
++    //   同时保留原语义"这辆车被锁到它大致该被取走的时刻"（位次越后 → 锁得越久）。
++    // 【v297·修】改按**时差**算，不再按位次比例。
++    //
++    //   为什么位次比例不行：实测（工作日志 222 节）同一关里 4 块窄路缺口冰的 _seq 是 5/6/7/8 这种连续值，
++    //   映射到 [2,hi] 后全部落在同一档 → 冰值仍然是 [6,6,6,5] / [8,8,8,8]。
++    //   **位次相近的格子 → 冰值必然相近**，这是映射本身的性质，改系数救不了。
++    //
++    //   正确口径（与 `applyIceSchedule` 的同步模式同源）：冰值 = 这辆车"要等多久"
++    //     gap = r(色,容量) − 该车被点到的进度
++    //   其中 r 来自 demandCurve（目标图剥离序），s 用 _seq/总车数的位次近似。
++    //   于是同一关里不同颜色、不同容量的车会得到**不同的 gap** → 不同的冰值。
++    var _dcv = config && config._demandCurve;
++    var _gapV = -1;
++    if (_dcv && _dcv.curve) {
++      try {
++        var _rNeed = demandAt(_dcv, box.color, box.count);
++        var _sProg = total > 1 ? (seq / (total - 1)) : 0;
++        _gapV = _rNeed - _sProg;
++      } catch (e) { _gapV = -1; }
++    }
++    var _loBound = AntSolver.NUMICE_MIN || 2;
++    var _hiBound = Math.max(_loBound, hi);
++    var v;
++    if (_gapV >= 0) {
++      // 有时差：走与同步模式同一个 iceValueFor（含 iceScaleCoef / iceCapRatio 两个旋钮）
++      v = iceValueFor(_gapV, total, config);
++      // 原 delay 语义（"按自然位次再往后推一点"）保留一点点，但不再主导
++      if (delay > 0) v = Math.min(_hiBound, v + Math.max(0, Math.round(delay / 4)));
++    } else {
++      // 没有需求曲线时退回位次比例（旧行为）
++      var _posSpan = Math.max(1, total - 1);
++      var _posRatio = Math.max(0, Math.min(1, seq / _posSpan));
++      v = Math.round(_loBound + _posRatio * (_hiBound - _loBound));
++    }
++    return Math.max(AntSolver.NUMICE_MIN || 1, Math.min(v, _hiBound));
+   }
+ 
+   /**
+@@ -2936,14 +2992,19 @@
+   /**
+    * @returns {object} { ok, reason, board, bindStat, conservation:[...] }
+    */
+-  function fillStructureFixed(struct, boxes, baseline, config, timing) {
++  function fillStructureFixed(struct, boxes, baseline, config, timing, blocksForDep) {
+     var tFill = Date.now();
+     var cells = struct.cells, rows = struct.rows, cols = struct.cols, pipeList = struct.pipeList;
+     var conservation = [];
+ 
+     var list = [];
+     for (var bi = 0; bi < boxes.length; bi++)
+-      list.push({ color: boxes[bi].color, count: boxes[bi].count, _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi) });
++      list.push({
++        color: boxes[bi].color, count: boxes[bi].count,
++        // 【v298】把切法给出的依赖层带进车单，供 depFill 使用（layerCut 才有这个字段）
++        layer: (boxes[bi].layer != null) ? boxes[bi].layer : null,
++        _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi)
++      });
+     list.sort(function (a, b) { return a._seq - b._seq; });
+     // 【v239】再按【需求进度】重排：早熟的放浅位、晚熟的放深位。
+     //   同需求进度时保留切序（消除序列），保证打法还是"由外向内"。
+@@ -3029,6 +3090,100 @@
+         order.push([or2, oc2, dist[or2][oc2] < 0 ? 999 : dist[or2][oc2]]);
+       }
+       order.sort(function (a, b) { return a[2] - b[2] || a[0] - b[0] || a[1] - b[1]; });
++
++      // ===== 【seqFill·序列铺盘】把"格子铺放顺序"从 BFS 距离换成**沿前沿推进的单链遍历** =====
++      // 为什么需要它：
++      //   BFS 距离只在前期近似等于"玩家第几步能点到"。中段前沿会同时展开一大片，
++      //   玩家能点到的有六七辆，而车单是按"第 i 辆在第 i 步上场"排的 → 序列失效。
++      //   实测（工作日志第 217 节）：现行切法下 r 中位 0.20、上限 0.60，
++      //   20~80% 的后半段在数学上不可能有债 —— 就是被这个脱钩锁死的。
++      //
++      // 做法：从第 0 行出发做一次"蛇形 + 邻接优先"的确定性遍历：
++      //   保证 seq 上相邻的两个格子在棋盘上也相邻 → 取走第 k 格就激活第 k+1 格，
++      //   于是"车单顺序 = 实际取用顺序"在几何上成立（近似，允许玩家在前沿小范围换序）。
++      //   玩家仍可自由选择（不改变规则），只是**可选集合**被收窄到计划的那几辆。
++      if (config.seqFill) {
++        var _seqVis = [], _seqOut = [];
++        for (var _vi = 0; _vi < rows; _vi++) { _seqVis.push([]); for (var _vj = 0; _vj < cols; _vj++) _seqVis[_vi].push(false); }
++        function _seqFree(rr, cc) {
++          if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) return false;
++          if (_seqVis[rr][cc]) return false;
++          var x = cells[rr][cc];
++          return x == null;                       // 只排空格（管道/墙不参与填盒）
++        }
++        // 起点：第 0 行最左的空格；之后每一步在"当前格的 4 邻"里挑，
++        //   优先同行（蛇形推进），其次向下一行；都没有就退回"离已铺序列最近的格子"。
++        var _startC = -1, _startR = 0;
++        for (var _sc0 = 0; _sc0 < cols; _sc0++) if (_seqFree(0, _sc0)) { _startC = _sc0; break; }
++        // 【兜底】第 0 行可能被管道/障碍占满（实测 6×7 上会这样）→ 改从全盘第一个空格起步。
++        //   起点不是第 0 行时，序列的前几格要等玩家挖下去才激活，顺序性会差一些，
++        //   但比"整个 seqFill 静默失效、退回 BFS"好：至少顺序仍然是单链的。
++        if (_startC < 0) {
++          var _fb = null;
++          for (var _fr1 = 0; _fr1 < rows && !_fb; _fr1++) for (var _fc1 = 0; _fc1 < cols; _fc1++) {
++            if (_seqFree(_fr1, _fc1)) { _fb = [_fr1, _fc1]; break; }
++          }
++          if (_fb) { _startR = _fb[0]; _startC = _fb[1]; }
++        }
++        timing.seqFillStart = { r: _startR, c: _startC };
++        if (_startC >= 0) {
++          _seqVis[_startR][_startC] = true; _seqOut.push([_startR, _startC]);
++          var _curR = _startR, _curC = _startC, _dir = 1;   // 蛇形方向
++          var _guardSeq = rows * cols * 4;
++          while (_seqOut.length < rows * cols && _guardSeq-- > 0) {
++            var _next = null;
++            // ① 同行下一格（蛇形）
++            var _nc0 = _curC + _dir;
++            if (_seqFree(_curR, _nc0)) _next = [_curR, _nc0];
++            // ② 同行走到头 → 下一行，方向反转
++            if (!_next) {
++              var _nr0 = _curR + 1;
++              if (_nr0 < rows) {
++                _dir = -_dir;
++                var _cand0 = (_dir > 0) ? 0 : cols - 1;
++                // 从该行往中间找第一个空格，优先靠近当前列
++                var _best0 = -1, _bd0 = 1e9;
++                for (var _cc0 = 0; _cc0 < cols; _cc0++) {
++                  if (!_seqFree(_nr0, _cc0)) continue;
++                  var _d0 = Math.abs(_cc0 - _curC);
++                  if (_d0 < _bd0) { _bd0 = _d0; _best0 = _cc0; }
++                }
++                if (_best0 >= 0) _next = [_nr0, _best0];
++              }
++            }
++            // ③ 兜底：全场找"与已铺序列曼哈顿距离最近"的空格（保持连通扫描，不跳飞）
++            if (!_next) {
++              var _b1 = null, _bd1 = 1e9;
++              for (var _fr0 = 0; _fr0 < rows; _fr0++) for (var _fc0 = 0; _fc0 < cols; _fc0++) {
++                if (!_seqFree(_fr0, _fc0)) continue;
++                var _d1 = Math.abs(_fr0 - _curR) + Math.abs(_fc0 - _curC);
++                if (_d1 < _bd1) { _bd1 = _d1; _b1 = [_fr0, _fc0]; }
++              }
++              if (!_b1) break;
++              _next = _b1;
++            }
++            _seqVis[_next[0]][_next[1]] = true;
++            _seqOut.push(_next);
++            _curR = _next[0]; _curC = _next[1];
++          }
++          // 用序列序替换 BFS 距离序（保留 dist 在 [2] 位，仅为兼容下游排序字段）
++          if (_seqOut.length === order.length) {
++            order = _seqOut.map(function (x, i) { return [x[0], x[1], i]; });
++            timing.seqFill = { n: order.length };
++          } else {
++            // 空格数与序列长度不一致（有不可达空位）→ 保守：把序列铺到的放前面，其余按原 BFS 补后
++            var _used = {};
++            for (var _ui = 0; _ui < _seqOut.length; _ui++) _used[_seqOut[_ui][0] + ',' + _seqOut[_ui][1]] = 1;
++            var _merged = _seqOut.map(function (x, i) { return [x[0], x[1], i]; });
++            for (var _oi0 = 0; _oi0 < order.length; _oi0++) {
++              var _k0 = order[_oi0][0] + ',' + order[_oi0][1];
++              if (!_used[_k0]) _merged.push([order[_oi0][0], order[_oi0][1], _merged.length]);
++            }
++            order = _merged;
++            timing.seqFill = { n: _seqOut.length, merged: _merged.length };
++          }
++        }
++      }
+       // 【v260·用户裁决】闸门借车：把"需求最晚"的几辆车换到"扇出最大"的浅层格子上。
+       //   理由：全知求解器不会主动拿吃不饱的车，只有它挡在通往一大片车的唯一通路上时才会被迫拿。
+       //   所以"晚熟色 + 高扇出 + 浅层"三者同时成立，才会出现又高又持久的全知压力。
+@@ -3175,13 +3330,127 @@
+           timing.coupledFill = { n: _nc, lag: _LAG, window: _W };
+         } catch (e3) { coupledAssign = null; }
+       }
++      // 【seqFill】序列铺盘时，车单必须**严格按当用时刻 r 升序**落到序列格上：
++      //   免费车（r=0）先上场，之后 r 递增 → 玩家越往后走，手上的车越晚才能装满 = 债。
++      //   同时关掉颜色交错与第 0 行同色限量：它们会打乱序列，而 seqFill 的卖点正是"顺序可控"。
++      if (config.seqFill && _dc) {
++        for (var _sqi = 0; _sqi < list.length; _sqi++) {
++          var _sqv = -1;
++          try { _sqv = demandAt(_dc, list[_sqi].color, list[_sqi].count); } catch (e) { _sqv = -1; }
++          list[_sqi]._sqr = (_sqv >= 0) ? _sqv : 1.0;
++        }
++        // 同 r 时把**容量大的免费车**排前面（先消耗供给），再按原切序稳定排序
++        list.sort(function (a, b) {
++          var d = a._sqr - b._sqr;
++          if (Math.abs(d) > 1e-9) return d;
++          if (a._sqr <= 1e-9) return (b.count - a.count) || (a._seq - b._seq);
++          return a._seq - b._seq;
++        });
++        timing.seqFillList = { n: list.length, rMin: list[0] ? +list[0]._sqr.toFixed(2) : null, rMax: list[list.length - 1] ? +list[list.length - 1]._sqr.toFixed(2) : null };
++      }
++      // ===== 【v297·用户设计B】依赖层铺盘（`depFill`，默认关） =====
++      // 用户 2026-10-20：「把依赖层用在铺盘上——第 L 层的格子只放 L_min ≤ L 的车，
++      //   用它来控制空间阻隔」。
++      //
++      // 与 BFS 暴露距离的区别：
++      //   · BFS 距离是**纯几何**（离第 0 行几格），不知道"谁包着谁"；
++      //   · 这里的层是**依赖层**：色块要先把外面几层清掉才碰得到（`veinLayers` 的 level）。
++      //   于是"这辆车要的东西在第几层能露出来"与"它被放在第几层"可以对齐，
++      //   而不是靠"放得靠上 = 先被取"这种几何假设。
++      //
++      // 实现分两步：
++      //   ① 给棋盘每个空格算**挖掘层** cellLayer：从第 0 行 BFS（与实机激活一致：只有第 0 行初始可点）；
++      //   ② 把车按 L_min（= 该颜色的最浅依赖层）分档，第 cellLayer 层的格子优先放
++      //      L_min 最接近 cellLayer 的车，且强制 L_min ≤ cellLayer + depFillTol
++      //      （tol 允许"深一点的车放到浅一层的格子"，否则浅层格子会空着）。
++      //
++      // 关键收益：深层车被安置在**必须挖很久才能碰到**的位置，
++      //   玩家在中段无法随手挑到它们，也挑不到"一点就满"的浅层车 —— 供给被空间结构约束住。
++      if (config.depFill) {
++        try {
++          var _info = null;
++          try { _info = veinLayers({ rows: rows, cols: cols, blocks: blocksForDep || config._blocks }, {}); } catch (e) { _info = null; }
++          if (_info && _info.colorMinLevel) {
++            // ① 棋盘挖掘层：从第 0 行 BFS，只沿空格扩散（管道/墙算阻断）
++            var _cLayer = [];
++            for (var _cl = 0; _cl < rows; _cl++) { _cLayer.push(new Array(cols).fill(-1)); }
++            var _q = [], _bfs = [[0, 0]];
++            // 起点：第 0 行所有空格
++            for (var _c0 = 0; _c0 < cols; _c0++) {
++              var _x0 = cells[0][_c0];
++              if (_x0 == null) { _cLayer[0][_c0] = 0; _q.push([0, _c0]); }
++            }
++            for (var _h = 0; _h < _q.length; _h++) {
++              var _qr = _q[_h][0], _qc = _q[_h][1];
++              var _nb = [[_qr - 1, _qc], [_qr + 1, _qc], [_qr, _qc - 1], [_qr, _qc + 1]];
++              for (var _ni = 0; _ni < 4; _ni++) {
++                var _nr = _nb[_ni][0], _nc = _nb[_ni][1];
++                if (_nr < 0 || _nr >= rows || _nc < 0 || _nc >= cols) continue;
++                if (_cLayer[_nr][_nc] >= 0) continue;
++                if (cells[_nr][_nc] != null) continue;        // 已被占用（管道/墙/已放车）
++                _cLayer[_nr][_nc] = _cLayer[_qr][_qc] + 1;
++                _q.push([_nr, _nc]);
++              }
++            }
++            var _maxCL = 0;
++            for (var _r3 = 0; _r3 < rows; _r3++) for (var _c3 = 0; _c3 < cols; _c3++) if (_cLayer[_r3][_c3] > _maxCL) _maxCL = _cLayer[_r3][_c3];
++
++            // ② 给每辆车算 L_min，并把**车单按 L_min 升序重排**
++            //
++            // 【v298·修正】一辆车的层 = **它自己像素来源的层**，不是"该颜色的最浅层"。
++            //   为什么：色 32 在层 0 有 327px（贴边）、在层 2 也有 78px（被包住）。
++            //   这两批车应该落到不同位置，但用 colorMinLevel 都算成 0 →
++            //   实测 carLmin=0 / carLmax=0，所有车挤在同一档，空间阻隔根本没建立。
++            //   来源：
++            //     · `layerCut` 切出来的车自带 `layer` 字段（真实来源层）→ 直接用；
++            //     · 其他切法没有层信息 → 退回 colorMinLevel（保守口径，效果有限但不会更差）。
++            for (var _p2 = 0; _p2 < list.length; _p2++) {
++              if (list[_p2].layer != null) {
++                list[_p2]._Lmin = list[_p2].layer;                    // 首选：车自己的来源层
++              } else {
++                var _cm = _info.colorMinLevel[list[_p2].color];
++                list[_p2]._Lmin = (_cm != null) ? _cm : 0;            // 退路：该色最浅层
++              }
++            }
++            var _hasOwnLayer = 0;
++            for (var _hc = 0; _hc < list.length; _hc++) if (list[_hc].layer != null) _hasOwnLayer++;
++            list.sort(function (a, b) {
++              var d = a._Lmin - b._Lmin;
++              if (d !== 0) return d;
++              return (b.count - a.count) || (a._seq - b._seq);   // 同层先放大车（占位稳）
++            });
++
++            // ③ 把**格子序**换成「按挖掘层升序、同层按行列」
++            //    注意：这里只换顺序，不增删格子 → order.length 不变，fi / list 的不变量完全不动。
++            var _cellOrder = [];
++            for (var _r4 = 0; _r4 < rows; _r4++) for (var _c4 = 0; _c4 < cols; _c4++) {
++              if (cells[_r4][_c4] != null) continue;      // 只排空格（与 order 同口径）
++              var _Lc = _cLayer[_r4][_c4];
++              _cellOrder.push([_r4, _c4, _Lc < 0 ? 999 : _Lc]);
++            }
++            _cellOrder.sort(function (a, b) { return a[2] - b[2] || a[0] - b[0] || a[1] - b[1]; });
++            // 用新顺序替换 order（长度不变；多出来的旧项不会再被用到）
++            for (var _oi2 = 0; _oi2 < _cellOrder.length && _oi2 < order.length; _oi2++) {
++              order[_oi2] = [_cellOrder[_oi2][0], _cellOrder[_oi2][1], _cellOrder[_oi2][2]];
++            }
++            timing.depFill = {
++              cells: _cellOrder.length, maxCellLayer: _maxCL,
++              carLmin: list.length ? list[0]._Lmin : null,
++              carLmax: list.length ? list[list.length - 1]._Lmin : null
++            };
++          }
++        } catch (e) { if (typeof timing !== "undefined") timing.depFillErr = String(e && e.message || e); }
++      }
+       var exW = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
++      if (config.seqFill || config.depFill) exW = 0;   // 序列/依赖层铺盘都不做颜色交错（会破坏顺序）
+       for (var oi = 0; oi < order.length && fi < list.length; oi++) {
+         var tr2 = order[oi][0], tc2 = order[oi][1];
+         // 【v280·用户反馈】不要 160 这种超大车。改法：容量上限压到正常区间（capCeil 84），
+         //   同时**限制第 0 行同色车的辆数**——开局可点的只有最前面这几格，
+         //   同色车少摆几辆，开局能装满的数量自然就下来了，不靠"把车做大"。
+-        if (config.row0ColorMax && oi < cols) {
++        // 【seqFill】序列铺盘不做第 0 行同色限量：它靠"免费车先上场、r 递增"控制开局，
++        //   再按颜色换位会把 r 顺序打乱（v290 那种"第一行全同色"的副作用也由 r 排序本身避免）。
++        if (config.row0ColorMax && oi < cols && !config.seqFill) {
+           var _c0m = Math.max(1, parseInt(config.row0ColorMax, 10) || 2);
+           var _seen0 = {};
+           for (var _c4 = 0; _c4 < cols; _c4++) {
+@@ -3331,6 +3600,97 @@
+       bindStat.ice.bound++;
+       if (bindStat.ice.values) bindStat.ice.values.push(bIce.numice);
+     }
++    // 【v297·用户裁决 A】按 gap 分档把冰"散开"，避免同一批冰值一模一样。
++    //
++    // 问题（工作日志 222 节实测）：窄路缺口冰集中在同一片区域，落到的往往是**同色、容量相近**的车，
++    //   于是 r 完全相同（实测四块冰 r 全是 0.204）→ 冰值算出来 [5,5,6,5]，看着"还是同一个数"。
++    //   根因在选择哪几块格子上，不在数值公式 —— 公式是对的，是输入本身没差异。
++    //
++    // 做法：绑完冰之后做一轮重分配。凡是冰值与他人重复的车，把它挪到"gap 落在未占用档位"的
++    //   空闲盒格上（不动链/问号/已有冰），再按新位置重算 numice。
++    //   于是同一关的几块冰分别锁在"等得久/等得中等/等得短"的车上 —— 这才是"时差锁"的语义。
++    try {
++      var _spreadCfg = config && config.iceSpreadByGap !== false;
++      if (_spreadCfg && bindStat.ice.bound > 1 && config && config._demandCurve) {
++        var _dcS = config._demandCurve;
++        var _totS = 0;
++        for (var _r9 = 0; _r9 < rows; _r9++) for (var _c9 = 0; _c9 < cols; _c9++) {
++          var _x9 = cells[_r9][_c9];
++          if (_x9 && _x9.t === 'box') _totS++;
++          else if (_x9 && _x9.t === 'pipe') _totS += (_x9.queue ? _x9.queue.length : 0);
++        }
++        function _gapOfCell(cell) {
++          var need = 1;
++          try { need = demandAt(_dcS, cell.color, cell.count); } catch (e) { need = 1; }
++          var sq = (cell._seq != null) ? cell._seq : 0;
++          var sp = _totS > 1 ? (sq / (_totS - 1)) : 0;
++          return need - sp;
++        }
++        // 收集当前所有冰格
++        var _icedAll = [];
++        for (var _r8 = 0; _r8 < rows; _r8++) for (var _c8 = 0; _c8 < cols; _c8++) {
++          var _x8 = cells[_r8][_c8];
++          if (_x8 && _x8.t === 'box' && _x8.numice > 0) _icedAll.push({ r: _r8, c: _c8, cell: _x8, gap: _gapOfCell(_x8) });
++        }
++        // 【v297·修】按 gap 的**实际极差**归一化分档，不能从 0 开始切。
++        //   实测（工作日志 222 节）：这张图上 gap 分布是 min −0.75 / 中位 −0.23 / max 0.10 ——
++        //   **几乎全是负数**（车按摆位序到达时，颜色早就够用了 → 没有时差可锁）。
++        //   原来写 max(0,gap)/0.15，负值全落进 0 号档 → 45 辆车挤在 1 个桶里，重分配永远挪不动。
++        //   改成以实际 min/max 归一化，档数固定 4，保证同一关里能分出"等得久/中/短"三档。
++        var _gMin = Infinity, _gMax = -Infinity;
++        for (var _gm = 0; _gm < _icedAll.length; _gm++) {
++          if (_icedAll[_gm].gap < _gMin) _gMin = _icedAll[_gm].gap;
++          if (_icedAll[_gm].gap > _gMax) _gMax = _icedAll[_gm].gap;
++        }
++        // 极差太小说明这批冰的时差本来就一样，分档没有意义 → 仍按 4 档归一化，
++        // 但下游会因"目标档位已被占用"而保持原位（挪不动是正确结果，不该硬挪）。
++        var _gSpan = Math.max(1e-6, _gMax - _gMin);
++        var _NB = 4;
++        var _bucketOf = function (g) { return Math.min(_NB - 1, Math.floor((g - _gMin) / _gSpan * _NB)); };
++        var _usedBucket = {};
++        for (var _i8 = 0; _i8 < _icedAll.length; _i8++) _usedBucket[_bucketOf(_icedAll[_i8].gap)] = 1;
++        // 候选空闲格（可放冰、且 gap 落在一个还没被占用的档）
++        var _free = [];
++        for (var _r7 = 0; _r7 < rows; _r7++) for (var _c7 = 0; _c7 < cols; _c7++) {
++          var _x7 = cells[_r7][_c7];
++          if (!_x7 || _x7.t !== 'box') continue;
++          if (_x7.numice > 0 || _x7.chain > 0 || _x7.q) continue;
++          var _g7 = _gapOfCell(_x7);
++          if (_usedBucket[_bucketOf(_g7)]) continue;   // 已有同档的冰 → 不要再放，否则值又重复
++          _free.push({ r: _r7, c: _c7, cell: _x7, gap: _g7 });
++        }
++        // 每个重复档位只保留"gap 最大"的那块，其余挪走
++        var _byBucket = {};
++        for (var _i7 = 0; _i7 < _icedAll.length; _i7++) {
++          var _b7 = _bucketOf(_icedAll[_i7].gap);
++          (_byBucket[_b7] = _byBucket[_b7] || []).push(_icedAll[_i7]);
++        }
++        var _moved = 0;
++        for (var _bk in _byBucket) {
++          var _grp7 = _byBucket[_bk];
++          if (_grp7.length < 2) continue;
++          _grp7.sort(function (a, b) { return b.gap - a.gap; });   // gap 大的保留原位
++          for (var _qi = 1; _qi < _grp7.length && _free.length; _qi++) {
++            var _src = _grp7[_qi];
++            // 挑一个 gap 离它最远的目标（保证冰值拉开）
++            var _bestI = -1, _bestD = -1;
++            for (var _fi9 = 0; _fi9 < _free.length; _fi9++) {
++              var _d9 = Math.abs(_free[_fi9].gap - _src.gap);
++              if (_d9 > _bestD) { _bestD = _d9; _bestI = _fi9; }
++            }
++            if (_bestI < 0) break;
++            var _dst = _free.splice(_bestI, 1)[0];
++            _usedBucket[_bucketOf(_dst.gap)] = 1;
++            _src.cell.numice = 0;
++            _dst.cell.numice = numIceValueFor(cells, rows, cols, _dst.r, _dst.c, config);
++            _moved++;
++          }
++        }
++        bindStat.iceSpread = { iced: _icedAll.length, moved: _moved,
++          buckets: Object.keys(_byBucket).length };
++      }
++    } catch (e) { bindStat.iceSpread = { error: String(e && e.message || e) }; }
++
+     // 锁链（整组绑定，成员不足/不可激活/叠加冲突 → 该组失败）
+     for (var gi = 0; gi < struct.chainGroups.length; gi++) {
+       var grp = struct.chainGroups[gi], mem = grp.members, boxesOfGrp = [], missing = 0;
+@@ -4869,7 +5229,7 @@
+     }
+ 
+     // ③ 填球 + 只绑定预定障碍 + 分阶段守恒
+-    var fill = fillStructureFixed(struct, boxes, baseline, config, timing);
++    var fill = fillStructureFixed(struct, boxes, baseline, config, timing, blocks);
+     if (!fill.ok) {
+       timing.candidatePrepareMs = Date.now() - tAll; timing.candidateTotalMs = timing.candidatePrepareMs;
+       return {
+@@ -4989,6 +5349,28 @@
+     timing.parseMs = Date.now() - tParse;
+     timing.candidatePrepareMs = Date.now() - tAll;
+ 
++    // ===== 【v298·用户裁决A】可达性下限闸门 =====
++    // 在跑求解器之前先问一句："按最保守的打法（只取能立刻装满的车），这关挖得开吗？"
++    //   挖不开 → 结构上会埋死玩家，直接淘汰，不必再花时间求解。
++    // 背景（工作日志 223 节）：depFill 把深层车按依赖层埋进深格后，形状对了（覆盖 83%）
++    //   但稳健通关 0% —— 玩家挖到某层就卡住。全知求解器能过不代表玩家能（它不挑吃不饱的车）。
++    // 开关：`accessGate`（默认跟随 depFill 打开；设为 false 可关）。成本约 1~3ms/候选。
++    var _accessGate = (config.accessGate != null) ? !!config.accessGate : !!config.depFill;
++    if (_accessGate) {
++      var _acc = conservativeSolvable(level, {});
++      timing.accessGate = { ok: _acc.ok, steps: _acc.steps, reason: _acc.reason, picked: _acc.picked, left: _acc.left };
++      if (!_acc.ok) {
++        return {
++          ok: false, reason: 'access', stage: 'access',
++          detail: '可达性下限未过：保守打法第 ' + _acc.steps + ' 步卡住（' + (_acc.reason || '') +
++                  '），目标区还剩 ' + _acc.left + ' 像素挖不到',
++          timing: timing, boxCount: n,
++          blackStat: struct.blackStat, pipeStat: struct.pipeStat, bindStat: fill.bindStat,
++          conservation: fill.conservation
++        };
++      }
++    }
++
+     // ⑥ 1 遍基础贪心 + 最多 3 遍噪声，成功即停
+     var boardSnapshot = { rows: board.rows, cols: board.cols, cells: AntSolver.deepClone(board.cells) };
+     var screen = screenCandidateFixed(parsed, timing, config.bottomOnly, config.instantChain);
+@@ -5040,7 +5422,7 @@
+   function newFlowStats() {
+     return {
+       attempts: 0, success: 0,
+-      fail: { baseline: 0, struct: 0, structSurplus: 0, structHoles: 0, structReach: 0, structPipeExit: 0, pipeCapacity: 0, pipeDepth: 0, rowTrim: 0, bind: 0, conservation: 0, structuralCheck: 0, screen: 0 },
++      fail: { baseline: 0, struct: 0, structSurplus: 0, structHoles: 0, structReach: 0, structPipeExit: 0, pipeCapacity: 0, pipeDepth: 0, rowTrim: 0, bind: 0, conservation: 0, structuralCheck: 0, access: 0, screen: 0 },
+       passHits: { base: 0, noise1: 0, noise2: 0, noise3: 0 },
+       timings: [], failedCandidates: [], conservationFailures: [], bindFailures: []
+     };
+@@ -5553,6 +5935,15 @@
+     //   否则新造出来的前期压力会被旧的前期门（≥3.2 即判不合格）当场判死。
+     //   config.chokeV2 === false 时不传 earlyCap → 逐值回到旧行为（与 v158 一致）。
+     if (!(config && config.chokeV2 === false)) opts.earlyCap = (bufferLimit || 5) - 0.8;
++    // 【v295·用户裁决】卡点判定改「覆盖率」：20%~80% 里暂存≥3 的占比 ≥ coverMin(%) 才算有卡点。
++    //   用户原话：「现在要求 20%-80% 的过程中有 70% 突破暂存≥3（也许 70 太多，加一个滑轮）」。
++    //   coverMin = 0 时退回旧的尖峰判据（逐值不变），方便对照。
++    if (config) {
++      if (config.chokeCoverMin != null) opts.coverMin = +config.chokeCoverMin;
++      if (config.chokeCoverLo != null) opts.coverLo = +config.chokeCoverLo;
++      if (config.chokeCoverHi != null) opts.coverHi = +config.chokeCoverHi;
++      if (config.chokeCoverBuf != null) opts.coverBuf = +config.chokeCoverBuf;
++    }
+     return AntSolver.Analysis.chokepointAudit((solveResult && solveResult.pressureSamples) || [], parsed.totalBoxes, bufferLimit, opts);
+   }
+   // 审核评分(越大越好)：中后期卡点封顶奖励 − 前期越界惩罚 + 合格大奖；用于爬山接受判定
+@@ -6426,6 +6817,10 @@
+     //   与旧写法 (pass || easyPass) **逐关等价**（347 关求解数据实测 347/347 一致），故产能不变。
+     //   档次字样改为「合格 / 简单关·趋势过平 / 不合格」——难易分档不再由审核给，交给难度分。
+     var curveUsable = omniAudit ? (omniAudit.usable != null ? omniAudit.usable : (omniAudit.pass || omniAudit.easyPass)) : false;
++    // 【v295·用户裁决】hardOnly：只认「真·有卡点」(curveOK/pass)，不认 flatTrend（趋势过平）。
++    //   用户原话：「暂时不要简单合格了，现在只生成难的关卡，理解后再生成简单的」。
++    //   关掉 hardOnly 即逐值回到旧行为。
++    if (config && config.hardOnly) curveUsable = !!(omniAudit && omniAudit.pass);
+     evaluation.pass = !!(evaluation.omni.won && evaluation.player.won && curveUsable &&
+       evaluation.omni.peak < limit);
+     evaluation.tier = omniAudit ? (omniAudit.tier || '不合格') : '不合格';
+@@ -7187,7 +7582,12 @@
+     var ge = c.generationEval, a = c.audit;
+     var deliverable = !!(ge && ge.omni && ge.omni.won && ge.player && ge.player.won && ge.omni.peak < c.level.bufferLimit);
+     if (deliverable && a && a.pass) return 3;
+-    if (deliverable && a && a.easyPass) return 2;
++    // 【v295·用户裁决】暂时不要简单合格：「现在只生成难的关卡，理解后再生成简单的」。
++    //   hardOnly 打开时，flatTrend（简单关·趋势过平）**不再算合格**，也不再享受 tier 2 的排序优待
++    //   —— 它直接掉到 tier 1（安全兜底），只在"实在产不出难关"时作为兜底交付，并标 fallback。
++    //   关掉 hardOnly 即逐值回到旧行为（简单关仍占简单关名额）。
++    var _hardOnly = !!(c.config && c.config.hardOnly);
++    if (!_hardOnly && deliverable && a && a.easyPass) return 2;
+     var safe = deliverable && (!a || a.safeEdge !== false);
+     return safe ? 1 : 0;
+   }
+@@ -7877,6 +8277,36 @@
+    *     ③ 冰值 = 该车摆位序 + delay + 1 → 它要等"玩家走到它之后再过两步"才化，
+    *        既不是开局免费车，也不会一直冻着变废格
+    */
++  /**
++   * 【v296】冰值（numice）计算：**相对步长**，上限跟关卡长度走。
++   *
++   * 为什么改：原来 sync / multi 两条路都是 `clamp(..., 2, 12)`，而一关只有 30~45 步。
++   *   实测（工作日志 220 节）这张 36 车、55 车的图上：
++   *     同步模式 gap×总车数 只要 gap ≥ 0.33 就超过 12 → 几乎所有车都被截成 12；
++   *     多点模式 (F−1)+2 在 25%~65% 各点算出来是 24/30/35/35/36 → 也全被截成 12。
++   *   结果冰的数字在关卡里**千篇一律是 12**，等于"统一锁死 1/3 流程"的难度值，
++   *   与用户第 206 节定的语义（"冰是时差，不是难度值"）相反。
++   *
++   * 新口径：
++   *   cap  = ceil(总车数 × capRatio)，夹在 [3, 12]  ← 36 车 → 9；55 车 → 12（封顶）
++   *   v    = round(gap × 总车数 × coef)，夹在 [2, cap]
++   * 于是冰值随时差连续变化，不再挤成一排上限值。
++   *
++   * @param {number} gap     时差（0~1），= 该车当用时刻 − 被点到的进度
++   * @param {number} total   总车数（= 全局倒计时步数的量纲）
++   * @param {object} config  取 iceScaleCoef / iceCapRatio
++   */
++  function iceValueFor(gap, total, config) {
++    var n = Math.max(1, parseInt(total, 10) || 1);
++    var coef = (config && config.iceScaleCoef != null) ? +config.iceScaleCoef : 0.6;
++    if (!(coef > 0)) coef = 0.6;
++    var capRatio = (config && config.iceCapRatio != null) ? +config.iceCapRatio : 0.25;
++    if (!(capRatio > 0)) capRatio = 0.25;
++    var cap = Math.max(3, Math.min(12, Math.ceil(n * capRatio)));
++    var v = Math.round((gap > 0 ? gap : 0) * n * coef);
++    return Math.max(2, Math.min(cap, v));
++  }
++
+   function applyIceSchedule(cells, rows, cols, config) {
+     var dc = config && config._demandCurve;
+     if (!config || !config.iceSchedule || !dc || !dc.startExposed) return { count:0, debug:'missing', hasCfg:!!(config&&config.iceSchedule), hasDc:!!dc, hasSE:!!(dc&&dc.startExposed) };
+@@ -7957,9 +8387,11 @@
+         if (!(_r2 >= 0)) continue;
+         var _gap = _r2 - _s2;
+         if (_gap < 0.04) continue;                     // 点了就能满 → 不需要冰
+-        var _n2 = Math.round(_gap * total);
++        // 【v296】相对步长：v = round(gap × 总车数 × coef)，上限 = ceil(总车数 × 0.25) 夹 [3,12]
++        //   原来写死 clamp(2,12)，gap ≥ 0.33 就被截成 12 → 所有冰一样大（见 iceValueFor 注释）
++        var _n2 = iceValueFor(_gap, total, config);
+         if (_n2 < 2) continue;
+-        _sync.push({ i: _si, gap: _gap, numice: Math.max(2, Math.min(12, _n2)) });
++        _sync.push({ i: _si, gap: _gap, numice: _n2 });
+       }
+       _sync.sort(function (a, b) { return b.gap - a.gap; });   // 时差最大的先冻
+       for (var _k4 = 0; _k4 < _sync.length && frozen.length < N; _k4++) {
+@@ -8000,7 +8432,13 @@
+           if (isFree(cars[_fi2], _p)) _freeAtP++;
+         }
+         var _L2 = Math.max(1, parseInt(config.iceForceSteps, 10) || 2);
+-        var _val2 = Math.max(2, Math.min(12, (_freeAtP - 1) + _L2));
++        // 【v296】多点模式同样改成相对步长：
++        //   原来 = (F−1)+L，F 是"该时刻还能装满的车数"。36 车的图上 F=23~35 → 24~36 → 全被截成 12。
++        //   现在把它换算成"时差"再走同一个 iceValueFor：
++        //     gap ≈ F/总车数 = 那一刻还剩多大比例的供给能吃满 → 与 sync 模式同量纲，可直接比较。
++        var _gap2 = total > 0 ? (_freeAtP / total) : 0;
++        var _val2 = iceValueFor(_gap2, total, config);
++        if (_val2 < _L2) _val2 = Math.min(_L2, Math.max(3, Math.min(12, Math.ceil(total * 0.25))));
+         _cands2.sort(function (a, b) { return b.cap - a.cap || a.d - b.d; });
+         for (var _k2 = 0; _k2 < _cands2.length && _got < _per && frozen.length < N; _k2++) {
+           var _t2 = cars[_cands2[_k2].i], _cell2 = cells[_t2.r][_t2.c];
+@@ -9616,6 +10054,234 @@
+    *   总量守恒：每个像素恰好属于一辆车。config.cutMode === 'layerAware' 才用。
+    *   失败返回 null → 调用方落回默认切法。
+    */
++  /**
++   * 【v297·用户设计】按「依赖层」切车 —— 让容量认识"谁包着谁"。
++   *
++   * 用户 2026-10-20：「铺车和障碍该如何铺，容量该如何定，才能做到卡而有解，这就又回到了读懂依赖关系」。
++   *
++   * 现状问题（工作日志 221 节）：容量 = 像素总量 ÷ 目标车数，与"这次暴露的块多大"无关；
++   *   于是浅层色块（开局就露）与深层色块（要挖很久）被切成一样大的车，
++   *   前者一碰就满（免费车）、后者永远等不到够量（或早早被切碎）——
++   *   压力只能靠冰和摆位去凑，这正是两周来"改了没反应"的根源。
++   *
++   * 本函数用的层是 `veinLayers` 的**真实依赖层**：
++   *   level 0 = 贴边、开局就能碰到的色块；level k = 必须先把 ≤k-1 层清掉才碰得到。
++   *   （注意：`eliminationOrder.round` 是贪心日程轮次，不是这个层，别混用。）
++   *
++   * 切法：
++   *   1) 把色块按 (颜色, 依赖层) 归成"供给单元"；
++   *   2) 每个单元切成 k 辆，k = ceil(该单元像素数 / 该层的容量上限)，
++   *      每辆 ≈ 单元像素数 / k，最后一辆吸收余数（保证守恒）；
++   *   3) 容量上限随层递增：浅层 capShallow（默认取 config.boxSizeMin），
++   *      深层 capDeep（默认取 config.boxSizeMax 的 1.6 倍，夹到 capLayerCeil）。
++   *
++   * 这样天然得到：浅层车小（一点就满 = 供给）、深层车大（等外层清完才装满 = 债务）。
++   * 不需要 capCeil=84 那种硬夹（v292 bigcap 的"86 大车 / 10 碎车"正是硬夹的副作用）。
++   *
++   * @returns {Array|null} [{color,count,layer,pixels}]，守恒不成立时返回 null 落回默认切法
++   */
++  function layerCutBoxes(blocks, config) {
++    if (!blocks || !blocks.length) return null;
++    var R = blocks.length, C = blocks[0].length;
++    var parsed = { rows: R, cols: C, blocks: blocks };
++    var info = null;
++    try { info = veinLayers(parsed, { bottomOnly: !!(config && config.bottomOnly) }); } catch (e) { return null; }
++    if (!info || !info.veins || !info.veins.length) return null;
++
++    var bmin = Math.max(4, parseInt(config.boxSizeMin, 10) || 24);
++    var bmax = Math.max(bmin + 2, parseInt(config.boxSizeMax, 10) || 36);
++    // 浅层用 boxSizeMin（车小 → 一碰就满），深层放大到 1.6×bmax，但不超过显式上限
++    var capShallow = Math.max(bmin, parseInt(config.layerCutCapShallow, 10) || bmin);
++    var capDeepRaw = parseInt(config.layerCutCapDeep, 10) || Math.round(bmax * 1.6);
++    var capCeilLayer = parseInt(config.layerCutCeil, 10) || 160;
++    var capDeep = Math.max(capShallow + 2, Math.min(capCeilLayer, capDeepRaw));
++
++    // 层号 → 该层的容量上限（线性过渡：L=0 用 capShallow，到 maxLevel 用 capDeep）
++    var maxL = Math.max(1, info.maxLevel || 1);
++    function capOf(layer) {
++      var L = Math.max(0, Math.min(maxL, layer));
++      var t = L / maxL;
++      return Math.round(capShallow + (capDeep - capShallow) * t);
++    }
++
++    // 1) 按 (颜色, 层) 归组
++    var groups = {}, order = [];
++    for (var vi = 0; vi < info.veins.length; vi++) {
++      var v = info.veins[vi];
++      if (!(v.pixels > 0)) continue;
++      var key = v.color + '#' + v.level;
++      if (!groups[key]) { groups[key] = { color: v.color, layer: v.level, pixels: 0, blocks: [] }; order.push(key); }
++      groups[key].pixels += v.pixels;
++      groups[key].blocks.push(v);
++    }
++    if (!order.length) return null;
++
++    // 【v297·修】单元太碎必须先合并，否则会切出容量 3 的碎车。
++    //   实测（工作日志 222 节）这张图按 (色,层) 有 58 个单元，其中 22 个 < 10px、最小 1px。
++    //   原样切车 → 69 辆车、最小容量 3，比 v292 bigcap 的碎车问题更严重。
++    //   合并规则：**同一颜色内**，若某层单元 < unitFloor，就把它并进相邻层（优先更浅的一层，
++    //   因为浅层是供给，晚熟的像素并入浅层不影响"什么时候能吃到"的上界）。
++    //   注意只允许同色合并 —— 跨色合并会破坏"这辆车要什么颜色"的对应关系。
++    var unitFloor = Math.max(8, parseInt(config.layerCutUnitFloor, 10) || Math.round(bmin * 0.6));
++    var byColor = {};
++    for (var oi0 = 0; oi0 < order.length; oi0++) {
++      var g0 = groups[order[oi0]];
++      (byColor[g0.color] = byColor[g0.color] || []).push(g0);
++    }
++    var merged = [];
++    for (var ck in byColor) {
++      var list0 = byColor[ck].slice().sort(function (a, b) { return a.layer - b.layer; });
++      var acc = null;
++      for (var li = 0; li < list0.length; li++) {
++        var cur = list0[li];
++        if (!acc) { acc = { color: cur.color, layer: cur.layer, pixels: cur.pixels, blocks: cur.blocks.slice() }; continue; }
++        var accSmall = acc.pixels < unitFloor;
++        var curSmall = cur.pixels < unitFloor;
++        if (accSmall || curSmall) {
++          // 合并：层号取较浅者，像素相加（保证守恒）
++          acc.pixels += cur.pixels;
++          acc.blocks = acc.blocks.concat(cur.blocks);
++          // 层号保留 acc 的（acc 更浅，因为已按层升序）
++          continue;
++        }
++        merged.push(acc);
++        acc = { color: cur.color, layer: cur.layer, pixels: cur.pixels, blocks: cur.blocks.slice() };
++      }
++      if (acc) merged.push(acc);
++    }
++    groups = {}; order = [];
++    for (var mi = 0; mi < merged.length; mi++) {
++      var key2 = merged[mi].color + '#' + merged[mi].layer + '#' + mi;
++      groups[key2] = merged[mi]; order.push(key2);
++    }
++    if (!order.length) return null;
++
++    // 2) 每个单元切车
++    var out = [];
++    var totalPx = 0, sumCap = 0;
++    for (var oi = 0; oi < order.length; oi++) {
++      var g = groups[order[oi]];
++      var cap = capOf(g.layer);
++      var k = Math.max(1, Math.ceil(g.pixels / cap));
++      // 剩余不足以成车时并回上一辆（避免出现容量 < bmin 的碎车）
++      var per = Math.floor(g.pixels / k), rest = g.pixels - per * k;
++      while (per < 4 && k > 1) { k--; per = Math.floor(g.pixels / k); rest = g.pixels - per * k; }
++      for (var q = 0; q < k; q++) {
++        var count = per + (q === k - 1 ? rest : 0);
++        if (count <= 0) continue;
++        out.push({ color: g.color, count: count, layer: g.layer, _layerCut: true });
++        sumCap += count;
++      }
++      totalPx += g.pixels;
++    }
++
++    // 3) 守恒校验：Σ容量 必须等于彩色像素总数，否则整批作废
++    var px = 0;
++    for (var r2 = 0; r2 < R; r2++) for (var c2 = 0; c2 < C; c2++) if (blocks[r2][c2] > 0) px++;
++    if (sumCap !== px) return null;
++
++    // 4) 出场顺序：浅层先、同层内按像素从大到小（大车先占棋盘，小车后补）
++    out.sort(function (a, b) { return (a.layer - b.layer) || (b.count - a.count); });
++    for (var si = 0; si < out.length; si++) out[si].elimSeq = si;
++    out._layerCutStat = {
++      units: order.length, cars: out.length, px: px,
++      maxLevel: info.maxLevel, capShallow: capShallow, capDeep: capDeep,
++      byLayer: info.byLevel
++    };
++    return out;
++  }
++
++  /**
++   * 【v298·用户裁决A】可达性检查：这个棋盘"一路挖得开吗"。
++   *
++   * 为什么需要（工作日志 223 节）：`depFill` 把深层车按依赖层埋进深格后，实测
++   *   **形状对了（曲线 3/3.8/2.8/3.5/4/3.5、覆盖 83%）但稳健通关 0%** ——
++   *   玩家挖到某一层就卡住：需要的那辆车在更深的位置，而他手上的车凑不满目标区当前暴露的颜色。
++   *   这正是"被埋"的结构性翻版。全知求解器能通关不代表玩家能（它不挑"吃不饱"的车）。
++   *
++   * 判据：模拟一个**保守玩家**——每一步只取"取进来就能装满"（canConsume）且不阻塞的车；
++   *   若这样还能把棋盘清空，说明存在一条不需要背债的挖掘路径 → 关卡不会被埋死。
++   *   注意这不是"关卡难度"判据，只是**可达性下限**：通不过 → 这关结构上会卡死，直接淘汰。
++   *
++   * @param {object} level {blocks, bufferLimit, board}
++   * @param {object} opts  {maxSteps} 安全上限
++   * @returns {{ok:boolean, steps:number, reason:string|null, picked:number, left:number}}
++   */
++  function conservativeSolvable(level, opts) {
++    opts = opts || {};
++    var S = AntSolver.Simulator;
++    if (!S || !S.enter || !S.listMoves || !S.applyPick) return { ok: true, steps: 0, reason: 'noSim', picked: 0, left: 0 };
++    // 【v298·修】必须传**解析后**的 level（含 rows/cols/totalBoxes），原始 level 只有 blocks/board，
++    //   模拟器进去后 listMoves 直接返回空 → 一步就判 deadWeight（实测 accessGate 全灭的真因）。
++    if (level && (level.rows == null || level.totalBoxes == null)) {
++      try { level = AntSolver.parseLevel(level); } catch (e) { return { ok: true, steps: 0, reason: 'parseFail', picked: 0, left: 0 }; }
++    }
++    var st;
++    try { st = S.enter(level, { useSlotStart: true }); } catch (e) { return { ok: true, steps: 0, reason: 'enterFail', picked: 0, left: 0 }; }
++    var maxSteps = opts.maxSteps || ((st.totalBoxes || 40) + 80);
++    var _noProgress = 0;   // 【v298】连续"取了但没消掉像素"的步数，超阈值视为卡死
++    var picked = 0;
++    for (var step = 0; step < maxSteps; step++) {
++      if (st.eliminatedPixels >= st.totalPixels) break;      // 目标区清空 = 通关
++      var moves;
++      try { moves = S.listMoves(st) || []; } catch (e) { break; }
++      // 保守玩家：只挑"取进来立刻能装满"的车；若一辆都没有，就挑一辆不阻塞的（被迫背债）
++      // 【v298·修】判据要允许背债 —— 背债是这个游戏的核心机制，
++      //   原来"只取立刻能装满的车"等于要求一条零债务通路，任何有难度的关都不可能通过
++      //   （实测 access: 8/15 全灭）。
++      //   正确口径：模拟一个会背债的玩家——
++      //     ① 优先取"能装满"的车；没有就取"该色在目标区剩余像素最多"的（最可能很快装满）；
++      //     ② 真正的死局只有两种：暂存溢出，或场上全是"死重车"。
++      //   死重车 = 该色在目标区剩余像素 < 该车容量 → 即使取进来也永远清不掉。
++      var pv = null;
++      try { pv = S.previewNextEliminationOrder ? S.previewNextEliminationOrder(st) : null; } catch (e) { pv = null; }
++      var remByColor = (pv && pv.byColor) ? pv.byColor : null;
++      function remainingOf(color) {
++        if (!remByColor) return 1e9;                  // 量不到就别误杀
++        var e = remByColor[color];
++        if (e == null) return 0;
++        // byColor 有线格式 {remaining,...}，也可能直接是数字
++        return (typeof e === 'number') ? e : (e.remaining != null ? e.remaining : 0);
++      }
++      var pickP = null, pickBest = null, bestRem = -1;
++      for (var mi = 0; mi < moves.length; mi++) {
++        var mv = moves[mi];
++        if (mv.blocked) continue;                     // 取则死，绝对不取
++        if (mv.canConsume) { pickP = mv; break; }     // 能装满：最好
++        // 否则按"该色剩余像素多"排序：剩余 < 容量 的是死重车，直接排除
++        var rem = remainingOf(mv.antBox.color);
++        var cnt = (mv.antBox.count != null) ? mv.antBox.count : 1;
++        if (rem < cnt) continue;                      // 死重车：取进来永远清不掉
++        if (rem > bestRem) { bestRem = rem; pickBest = mv; }
++      }
++      var use = pickP || pickBest;
++      if (!use) {
++        // 既没有能装满的、也没有"最终能清掉"的 → 真死局
++        return { ok: false, steps: step, reason: 'deadWeight',
++                 picked: picked, left: (st.totalPixels || 0) - (st.eliminatedPixels || 0) };
++      }
++      var before = st.eliminatedPixels || 0;
++      try { S.applyPick(st, use.r, use.c); } catch (e) { return { ok: false, steps: step, reason: 'applyFail', picked: picked, left: 0 }; }
++      picked++;
++      if ((st.eliminatedPixels || 0) <= before) {
++        // 取了但目标区一个像素都没消掉 → 纯占位动作（背债），连续太多说明卡死
++        _noProgress++;
++        if (_noProgress > 12) {
++          return { ok: false, steps: step, reason: 'stuck', picked: picked, left: 0 };
++        }
++      } else {
++        _noProgress = 0;                     // 有进展就重置
++      }
++      if (st.overflow || st.gameOver) {
++        return { ok: false, steps: step, reason: 'overflow', picked: picked,
++                 left: (st.totalPixels || 0) - (st.eliminatedPixels || 0) };
++      }
++    }
++    var done = (st.eliminatedPixels || 0) >= (st.totalPixels || 1);
++    return { ok: done, steps: picked, reason: done ? null : 'timeout',
++             picked: picked, left: (st.totalPixels || 0) - (st.eliminatedPixels || 0) };
++  }
++
+   function layerAwareBoxes(blocks, config) {
+     var R = blocks.length, C = blocks[0].length;
+     var eo = null;
+@@ -10057,6 +10723,25 @@
+       } catch (e) { /* 落回默认切法 */ }
+     }
+     // 【v207】按层切车（合球第一步；默认关）
++    // ===== 【v297·用户设计】按「依赖层」切车（`cutMode:'layerCut'`，默认关） =====
++    // 与 `layerAware` 的区别（后者用的是贪心日程轮次，不是层，见工作日志 81 节"轮次≠层"）：
++    //   本模式用 `veinLayers` 的**真实依赖层**（色块 4-连通 + 洋葱 BFS），
++    //   即"必须先清掉外面几层，才碰得到它"。
++    //
++    // 切法：把同一颜色、同一依赖层的色块归为一个"供给单元"，再切成若干辆车。
++    //   · 一辆车**不跨颜色、不跨层** —— 这是本模式的核心约束，
++    //     保证"这辆车要什么"与"它什么时候能吃到"一一对应；
++    //   · 容量上限跟着层走：浅层（L=0,1）用小容量 capShallow，深层用 capDeep
++    //     → 浅层车小 = 一上来就能装满（供给）；深层车大 = 必须等外层清完（债务载体）。
++    //
++    // 守恒：每个供给单元的容量和 = 该单元像素数（最后一辆吸收余数），
++    //   函数返回前整体校验 Σ容量 = 彩色像素总数，不守恒直接返回 null 落回默认切法。
++    if (config.cutMode === 'layerCut') {
++      try {
++        var lcb = layerCutBoxes(blocks, config);
++        if (lcb && lcb.length) return lcb;
++      } catch (e) { /* 落回默认切法 */ }
++    }
+     if (config.cutMode === 'layerAware') {
+       try {
+         var lb = layerAwareBoxes(blocks, config);
+@@ -12177,6 +12862,7 @@
+     chokeV2PlayBatch: chokeV2PlayBatch,   // 【v177】"同一关玩 N 遍"：通关率 / 峰窗区间 / 结束位置分布
+     chokeV2Attribute: chokeV2Attribute,   // 【v179】机制归因：拿掉墙/管道/冰/链/问号各跑一遍，看通关率回升多少
+     veinLayers: veinLayers,               // 【v180】矿脉层表：谁包着谁、最深几层（只由图决定）
++    conservativeSolvable: conservativeSolvable,   // 【v298】可达性下限：保守玩家能否一路挖开
+     veinDebt: veinDebt,                   // 【v180】债务 Δ：最优路线 vs 实际路线，每条矿脉晚了多少手才被碰到
+     buriedCountOf: buriedCountOf,         // 【v182】"被埋"计数：稳健一局终局里有几辆车"量够但够不着"
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,13 +3,13 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车接小人 v297 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=297">
++  <title>车接小人 v298 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
++  <link rel="stylesheet" href="css/style.css?v=298">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v297</span></h1>
++    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v298</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -858,20 +858,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=297"></script>
+-  <script src="js/utils.js?v=297"></script>
++  <script src="js/zip.js?v=298"></script>
++  <script src="js/utils.js?v=298"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=297"></script>
+-  <script src="js/simulator.js?v=297"></script>
++  <script src="js/color-libs.js?v=298"></script>
++  <script src="js/simulator.js?v=298"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=297"></script>
+-  <script src="js/solver-strategy.js?v=297"></script>
+-  <script src="js/solver.js?v=297"></script>
+-  <script src="js/playersim.js?v=297"></script>
+-  <script src="js/generator.js?v=297"></script>
+-  <script src="js/analysis.js?v=297"></script>
++  <script src="js/anchor-cut.js?v=298"></script>
++  <script src="js/solver-strategy.js?v=298"></script>
++  <script src="js/solver.js?v=298"></script>
++  <script src="js/playersim.js?v=298"></script>
++  <script src="js/generator.js?v=298"></script>
++  <script src="js/analysis.js?v=298"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=297"></script>
+-  <script src="js/app.js?v=297"></script>
++  <script src="js/level-editor.js?v=298"></script>
++  <script src="js/app.js?v=298"></script>
+ </body>
+ </html>

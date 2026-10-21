@@ -1,0 +1,136 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3927,6 +3927,21 @@
+    *   这样它被挪到深处也只是少一辆早车，不会把某个颜色掐死。
+    * config.designDebt === true 才生效；默认关。
+    */
++  /** 【v204】开局"可点集合"（模拟器口径）：第一帧能被点到的所有盒。 */
++  function initialPickableCells(board, blocks, config) {
++    try {
++      var parsed = AntSolver.parseLevel({ blocks: blocks, bufferLimit: (config && config.bufferLimit) || 5, board: board });
++      var st = AntSolver.Simulator.enter(parsed, { useSlotStart: true });
++      var mv = AntSolver.Simulator.listMoves(st);
++      var out = {};
++      for (var i = 0; i < mv.length; i++) {
++        var m = mv[i];
++        if (m && m.antBox) out[m.r + ',' + m.c] = m.antBox.color;
++      }
++      return out;
++    } catch (e) { return null; }
++  }
++
+   function designDebtPlacement(board, blocks, config) {
+     if (!config || !config.designDebt) return null;
+     var rank = interiorColorRank(blocks, config.bottomOnly);
+@@ -3960,26 +3975,41 @@
+       if (b0 && b0.t === 'box') perColor[b0.color] = (perColor[b0.color] || 0) + 1;
+     }
+     function plain(x) { return x && x.t === 'box' && !(x.chain > 0) && !(x.numice > 0); }
+-    // 第 0 行"现在就能吃满"的车 = 暴露色
++    // 【v204】可点集合 = 模拟器第一帧的合法取盒（不是只看第 0 行）。
++    //   小棋盘上边界格占比高，只看第 0 行会严重低估供给，导致"怎么挪都没用"。
++    var pickMap = initialPickableCells(board, blocks, config);
++    var pickable = {};
+     var before = 0;
+-    for (var c1 = 0; c1 < cols; c1++) { var y1 = cells[0][c1]; if (plain(y1) && isExposed(y1.color)) before++; }
+-    var target = Math.max(0, (config.designRow0Target != null ? parseInt(config.designRow0Target, 10) : 3) || 0);
++    if (pickMap) {
++      for (var pk in pickMap) {
++        var pr = +pk.split(',')[0], pc = +pk.split(',')[1];
++        pickable[pk] = true;
++        var yp = cells[pr] && cells[pr][pc];
++        if (plain(yp) && isExposed(yp.color)) before++;
++      }
++    } else {   // 兜底：退回第 0 行
++      for (var c1 = 0; c1 < cols; c1++) { var y1 = cells[0][c1]; if (plain(y1) && isExposed(y1.color)) { before++; pickable['0,' + c1] = true; } }
++    }
++    var target = Math.max(0, (config.designSupplyTarget != null ? parseInt(config.designSupplyTarget, 10)
++      : (config.designRow0Target != null ? parseInt(config.designRow0Target, 10) : 3)) || 0);
+     var maxMoves = Math.max(1, Math.min(6, parseInt(config.designDebtCount, 10) || 4));
+     var moved = [], cur = before;
+     for (var m = 0; m < maxMoves && cur > target; m++) {
+       // ① donor：第 0 行里"暴露色、且该色在场上还有 ≥3 辆"的车（挪走一辆不会掐死这个色）
+       var donor = null, bestCnt = -1;
+-      for (var c2 = 0; c2 < cols; c2++) {
+-        var y2 = cells[0][c2];
++      for (var pk2 in pickable) {
++        var r2 = +pk2.split(',')[0], c2 = +pk2.split(',')[1];
++        var y2 = cells[r2] && cells[r2][c2];
+         if (!plain(y2) || !isExposed(y2.color)) continue;
+         var cnt2 = perColor[y2.color] || 0;
+-        if (cnt2 >= 3 && cnt2 > bestCnt) { donor = { r: 0, c: c2 }; bestCnt = cnt2; }
++        if (cnt2 >= 3 && cnt2 > bestCnt) { donor = { r: r2, c: c2 }; bestCnt = cnt2; }
+       }
+       if (!donor) break;
+-      // ② source：**完全深埋**（ratio=0）的车里取最靠后的一辆（放上来也不能吃 → 只占位不供给）
++      // ② source：**不可点 + 深埋**的车（换上来也只能看不能吃 → 只占位不供给）
+       var src = null;
+-      for (var r3 = rows - 1; r3 >= 1 && !src; r3--) {
++      for (var r3 = rows - 1; r3 >= 0 && !src; r3--) {
+         for (var c3 = 0; c3 < cols && !src; c3++) {
++          if (pickable[r3 + ',' + c3]) continue;
+           var y3 = cells[r3][c3];
+           if (plain(y3) && isDeep(y3.color)) src = { r: r3, c: c3 };
+         }
+@@ -9389,7 +9419,7 @@
+       for (var _ti = 0; _ti < _variants.length; _ti++) {
+         var _v = _variants[_ti];
+         var _dcfg = Object.assign({}, config, {
+-          designDebt: true, designRow0Target: _v.target, designInflate: _v.inflate, designSweep: false, portfolioK: 1
++          designDebt: true, designSupplyTarget: _v.target, designRow0Target: _v.target, designInflate: _v.inflate, designSweep: false, portfolioK: 1
+         });
+         var _do = flow === 'old' ? produce(blocks, _dcfg) : produceFixed(blocks, _dcfg, opts);
+         _triedD++;
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=197">
++  <link rel="stylesheet" href="css/style.css?v=204">
+ </head>
+ <body>
+   <header>
+@@ -322,7 +322,7 @@
+     <div class="gen-section">
+       <h2>2. 开始生产</h2>
+       <div class="gen-hint" style="line-height:1.8">
+-        参数已固定，不用调：按目标图尺寸自动选预设（小图 / 大图）· 每图多产 3 次择优 · 候选 6 · 单关 5 分钟 · 难度标定 7 轮。
++        参数已固定，不用调：按目标图尺寸自动选预设（小图 / 大图）· 设计扫描（早车档 4~0 + 增容 1.5/2）· 候选 6 · 单关 5 分钟 · 难度标定 7 轮。
+       </div>
+     </div>
+ 
+@@ -823,20 +823,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=197"></script>
+-  <script src="js/utils.js?v=197"></script>
++  <script src="js/zip.js?v=204"></script>
++  <script src="js/utils.js?v=204"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=197"></script>
+-  <script src="js/simulator.js?v=197"></script>
++  <script src="js/color-libs.js?v=204"></script>
++  <script src="js/simulator.js?v=204"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=197"></script>
+-  <script src="js/solver-strategy.js?v=197"></script>
+-  <script src="js/solver.js?v=197"></script>
+-  <script src="js/playersim.js?v=197"></script>
+-  <script src="js/generator.js?v=197"></script>
+-  <script src="js/analysis.js?v=197"></script>
++  <script src="js/anchor-cut.js?v=204"></script>
++  <script src="js/solver-strategy.js?v=204"></script>
++  <script src="js/solver.js?v=204"></script>
++  <script src="js/playersim.js?v=204"></script>
++  <script src="js/generator.js?v=204"></script>
++  <script src="js/analysis.js?v=204"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=197"></script>
+-  <script src="js/app.js?v=197"></script>
++  <script src="js/level-editor.js?v=204"></script>
++  <script src="js/app.js?v=204"></script>
+ </body>
+ </html>

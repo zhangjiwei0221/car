@@ -1,0 +1,204 @@
+--- a/bin/js/simulator.js
++++ b/bin/js/simulator.js
+@@ -841,6 +841,9 @@
+       s.buffer.push({ color: antBox.color, progress: result.eliminated, need: antBox.count, remaining: result.remaining, key: key, slot: slot, start: start, enterStep: s.steps });
+     }
+     s._enterPeak = s.buffer.length;                          // 只读观测：入场后、结算前（同 processChainGroup）
++    // 【v160·修正】"占满上限"本身**不判死**——用户 2026-10-16 明确规则是「满 5 **且一个都消不掉**」才是失败
++    //   （满格但还能消 → 仍活着）。所以这里保持原口径：只有**超过**上限（真的要多占一格）才算溢出。
++    //   "满格且消不掉"的死局由 `isDeadEnd()` + `checkWinLose()` 判（每次刷新都会结算）。
+     if (s.buffer.length > s.bufferLimit) s.overflow = true;
+     autoReleaseBuffer(s);
+   }
+@@ -869,7 +872,7 @@
+     // s._enterPeak 是【只读观测】：把这个「入场后、结算前」的占用留给 applyPick 记进求解路线。
+     // 它就是本行 overflow 判定所用的同一个值 —— 以前判完即被 autoReleaseBuffer 抹掉，从未被记录。
+     s._enterPeak = s.buffer.length;
+-    if (s.buffer.length > s.bufferLimit) s.overflow = true;
++    if (s.buffer.length > s.bufferLimit) s.overflow = true;    // 【v160·修正】同普通盒：超过上限才算溢出
+     autoReleaseBuffer(s);
+   }
+ 
+@@ -1024,7 +1027,7 @@
+     }
+     state._enterPeak = state.buffer.length;
+     // 容量门已保证不会超上限；这里只做防御性断言，真触发说明门漏了（不静默）
+-    if (state.buffer.length > state.bufferLimit) state.overflow = true;
++    if (state.buffer.length > state.bufferLimit) state.overflow = true;    // 【v160·修正】同上
+     return { ok: true, added: added, isChain: !!raw.isChain, link: link, need: cap.need };
+   }
+ 
+@@ -1219,11 +1222,31 @@
+     if (!state || state.gameOver) return false;
+     if (r < 0 || r >= state.boardRows || c < 0 || c >= state.boardCols) return false;
+     if (!isPickable(state, r, c)) return false;
++    // 【v160·修正】这里**不再**拦截"满格时点一个消不掉的盒"：
++    //   用户 2026-10-16 明确的规则是「**满 5 且一个都消不掉**才算失败」（满格本身不是死）。
++    //   所以点这种盒仍走原路径（真取入 → 暂存变 6 → 溢出 → 判死），与"取则死亡"的 blocked 语义一致；
++    //   而"满格且全都消不掉"这种**不需要任何点击就已经死**的局面，由 isDeadEnd()/checkWinLose() 负责立刻结算。
++    //   注：整段只影响手点/演示入口，**求解器走的 `applyPick` 一行不动** → 求解、审核、产能不变。
+     saveHistory();
+     state.capture = true; state.capOps = [];   // 记录动画事件序列
+     applyPick(state, r, c);
+     state.capture = false;
+     checkWinLose();
++    return true;
++  }
++
++  /**
++   * 【v160】死局判定：**没有任何"非阻塞"的取盒**（满格且消不掉 / 只剩放不下的锁链组）。
++   *   为什么单独导出：手点游玩时，死局可能"一个取盒动作都没有"就存在（玩家把最后一格垫满后
++   *   盘面全被冰/链锁住）——如果只在 `pickBox` 之后判一次，就会出现"已经死了却不弹失败窗"。
++   *   页面在每次模拟态刷新时调它，保证死局立刻结算。纯读，不改状态。
++   */
++  function isDeadEnd(s) {
++    if (!s || s.gameOver) return false;
++    if (s.overflow) return true;
++    if (s.buffer.length > s.bufferLimit) return true;
++    var moves = listMoves(s);
++    for (var i = 0; i < moves.length; i++) if (!moves[i].blocked) return false;
+     return true;
+   }
+ 
+@@ -1233,16 +1256,12 @@
+   function checkWinLose() {
+     if (state.eliminatedPixels >= state.totalPixels) { state.gameWon = true; state.gameOver = true; return; }
+     // 暂存区超过上限（含锁链整组入场瞬时超上限）→ 死亡。严格执行"暂存满且无法消除就死亡"。
+-    // 暂存区超过上限（含锁链整组入场瞬时超上限）→ 死亡。严格执行"暂存满且无法消除就死亡"。
++    // 溢出判据 = **超过**上限（要真的多占一格）。"满格且一个都消不掉"由 isDeadEnd 判（见下）。
+     if (state.overflow || state.buffer.length > state.bufferLimit) { state.gameOver = true; state.gameWon = false; return; }
+-    // 死锁 → 死亡：没有任何"可推进"的取盒（blocked 已统一涵盖：普通盒满且消不完 / 锁链组空位不足）
+-    var moves = listMoves(state);
+-    var usable = false;
+-    for (var i = 0; i < moves.length; i++) {
+-      if (moves[i].blocked) continue;
+-      usable = true; break;
+-    }
+-    if (!usable) { state.gameOver = true; state.gameWon = false; }
++    // 【v160】"满格且一个都消不掉" = 死局（用户 2026-10-16 的规则）：由下面的 isDeadEnd 判定统一处理
++    // 死局 → 死亡：**满格且一个都消不掉**（或盘面已无可取盒 / 只剩放不下的锁链组）。
++    //   用户 2026-10-16 定的规则；判据统一收在 isDeadEnd()，页面每次刷新也会调它 → 死局立刻结算、不再"点了才有反应"。
++    if (isDeadEnd(state)) { state.gameOver = true; state.gameWon = false; state.deadEnd = true; }
+   }
+ 
+   // ==================== 可选动作 ====================
+@@ -1383,6 +1402,7 @@
+   return {
+     isActive: isActive, getState: getState, enter: enter, exit: exit, reset: reset,
+     pickBox: pickBox, getAvailableMoves: getAvailableMoves, undo: undo,
++    isDeadEnd: isDeadEnd,   // 【v160】死局判定（满格且消不掉 / 无可取盒）——页面每次模拟态刷新时结算失败
+     floodFillEliminate: floodFillEliminate, floodFillCount: floodFillCount,
+     ringMaskOf: ringMaskOf,          // 「圈」的定义（按图形轮廓分层）——供玩家模拟等复用，避免第二份副本口径漂移
+     setPickLayerMode: setPickLayerMode,   // 「圈」多久重算一次：'frozen' | 'layer' | 'pixel'
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -2760,7 +2760,11 @@
+         if (cap.reason === 'noSlot' || cap.reason === 'noSlotChain') showNoSlotHint(cap);
+         return;
+       }
+-    } else if (!AntSolver.Simulator.isPickable(st, r, c)) return;
++    } else if (!AntSolver.Simulator.isPickable(st, r, c)) {
++      // 【v160】点不动的格子：可能"其实已经死了"（满格 + 剩下全是消不掉的）→ 查一次并结算
++      if (settleDeadEnd()) refreshSimUI();
++      return;
++    }
+     handleBoxClick(r, c);
+   }
+ 
+@@ -2910,6 +2914,7 @@
+     if (pfBusy || !pfQueue.length) return;
+     var st = AntSolver.Simulator.getState();
+     if (!st) { pfQueue = []; return; }
++    settleDeadEnd();                       // 【v160】死局立刻结算（手点主路径：闪白泵每次进来先查一次）
+     if (!visualElim) initVisual(st);
+     var ops = pfQueue.shift();
+     applyAddOps(ops);                     // 车先进轨道
+@@ -3786,6 +3791,21 @@
+     if (currentLevel) { renderLevelInfo(); renderQueues(null); renderTarget(null); }
+   }
+ 
++  /**
++   * 【v160】死局结算：满格且无路可走 → **立刻判失败**，不需要玩家再点任何东西。
++   *   用户 2026-10-16 报的 bug：「无法消除且暂存区五个满的时候，它并没有弹出失败的弹窗」——
++   *   原因是原来只在 `pickBox` 之后判一次死局；若死局在"玩家没点成功任何盒"的情况下成立
++   *   （盘面被冰/链锁住、或最后一格垫满后已无处可取），就永远不会结算、也就永远不弹窗。
++   *   现在把判定挂到每次模拟态刷新上（纯读判定，不改棋盘）。
++   */
++  function settleDeadEnd() {
++    var st = AntSolver.Simulator.getState();
++    if (!st || st.gameOver) return false;
++    if (!(AntSolver.Simulator.isDeadEnd && AntSolver.Simulator.isDeadEnd(st))) return false;
++    st.gameOver = true; st.gameWon = false; st.deadEnd = true;
++    return true;
++  }
++
+   function refreshSimUI() {
+     var state = AntSolver.Simulator.getState();
+     if (!state) return;
+@@ -3799,6 +3819,7 @@
+     // 手点不对应任何一条既定路线，故两幅图都标（side='both'）。
+     var cur = simChartCursor('both');
+     if (cur) redrawCharts(cur);
++    settleDeadEnd();                       // 【v160】死局立刻结算（再统一弹窗）
+     if (state.gameOver) showGameMsg(state.gameWon);
+   }
+ 
+@@ -3808,9 +3829,13 @@
+     var div = document.createElement('div');
+     div.className = 'game-msg'; div.id = 'game-msg';
+     var state = AntSolver.Simulator.getState();
++    // 【v160】失败原因分两种：满格且消不掉（死局）/ 超过上限（溢出）。文案与客户端口径对齐
++    //   （客户端：key15「暂存区上限」= 暂存区已满、key8「失败」= 仓库已满）。
+     div.innerHTML = won
+       ? '<h2 style="color:#8bc34a">🎉 通关！</h2><p>步数: ' + state.steps + '</p>'
+-      : '<h2 style="color:#e0592c">💀 失败</h2><p>暂存区溢出</p>';
++      : ('<h2 style="color:#e0592c">💀 失败</h2><p>' +
++         (state.deadEnd ? '暂存区已满，且无法继续消除' : '暂存区溢出') +
++         (state.buffer ? ('（暂存 ' + state.buffer.length + '/' + state.bufferLimit + '）') : '') + '</p>');
+     if (revive) {
+       var used = revive.revivesUsed || 0, cap = revive.reviveCap != null ? revive.reviveCap : 2;
+       var usedUp = used >= cap;
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=159">
++  <link rel="stylesheet" href="css/style.css?v=160">
+ </head>
+ <body>
+   <header>
+@@ -974,20 +974,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=159"></script>
+-  <script src="js/utils.js?v=159"></script>
++  <script src="js/zip.js?v=160"></script>
++  <script src="js/utils.js?v=160"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=159"></script>
+-  <script src="js/simulator.js?v=159"></script>
++  <script src="js/color-libs.js?v=160"></script>
++  <script src="js/simulator.js?v=160"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=159"></script>
+-  <script src="js/solver-strategy.js?v=159"></script>
+-  <script src="js/solver.js?v=159"></script>
+-  <script src="js/playersim.js?v=159"></script>
+-  <script src="js/generator.js?v=159"></script>
+-  <script src="js/analysis.js?v=159"></script>
++  <script src="js/anchor-cut.js?v=160"></script>
++  <script src="js/solver-strategy.js?v=160"></script>
++  <script src="js/solver.js?v=160"></script>
++  <script src="js/playersim.js?v=160"></script>
++  <script src="js/generator.js?v=160"></script>
++  <script src="js/analysis.js?v=160"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=159"></script>
+-  <script src="js/app.js?v=159"></script>
++  <script src="js/level-editor.js?v=160"></script>
++  <script src="js/app.js?v=160"></script>
+ </body>
+ </html>

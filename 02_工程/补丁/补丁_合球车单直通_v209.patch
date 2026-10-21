@@ -1,0 +1,171 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -8135,6 +8135,100 @@
+     return out.length ? out : null;
+   }
+ 
++  /**
++   * 【v209】合球（按色块 × 层）：把目标图拆成色块、按依赖层排序，
++   *   再按「同色 → 层升序 → 块大小降序」把碎片拼成车（容量 24~36；大色块允许拆多辆）。
++   *   输出车单 [{color,count}]（顺序 = 层升序 = 供给顺序），供 forcedBoxes 直通。
++   *   config.cutMode === 'component' 时启用；失败返回 null 落回默认切法。
++   */
++  function componentBoxes(blocks, config) {
++    var R = blocks.length, C = blocks[0].length;
++    var comp = [], comps = [];
++    for (var r = 0; r < R; r++) { comp.push(new Array(C).fill(-1)); }
++    for (var r2 = 0; r2 < R; r2++) for (var c2 = 0; c2 < C; c2++) {
++      var v = blocks[r2][c2];
++      if (v <= 0 || comp[r2][c2] >= 0) continue;
++      var id = comps.length, stack = [[r2, c2]], pixels = [];
++      comp[r2][c2] = id;
++      while (stack.length) {
++        var cur = stack.pop(); pixels.push(cur);
++        var dirs = [[cur[0]-1,cur[1]],[cur[0]+1,cur[1]],[cur[0],cur[1]-1],[cur[0],cur[1]+1]];
++        for (var di = 0; di < 4; di++) {
++          var nr = dirs[di][0], nc = dirs[di][1];
++          if (nr < 0 || nr >= R || nc < 0 || nc >= C) continue;
++          if (comp[nr][nc] >= 0 || blocks[nr][nc] !== v) continue;
++          comp[nr][nc] = id; stack.push([nr, nc]);
++        }
++      }
++      comps.push({ id: id, color: v, px: pixels.length, pixels: pixels, layer: -1 });
++    }
++    // 色块邻接 → 依赖层（多源 BFS：贴边的块为第 0 层）
++    var adj = [];
++    for (var i = 0; i < comps.length; i++) adj.push({});
++    for (var r3 = 0; r3 < R; r3++) for (var c3 = 0; c3 < C; c3++) {
++      var a = comp[r3][c3]; if (a < 0) continue;
++      var nb = [[r3+1,c3],[r3,c3+1]];
++      for (var k = 0; k < 2; k++) {
++        var nr2 = nb[k][0], nc2 = nb[k][1];
++        if (nr2 >= R || nc2 >= C) continue;
++        var b = comp[nr2][nc2]; if (b < 0 || b === a) continue;
++        adj[a][b] = 1; adj[b][a] = 1;
++      }
++    }
++    var q = [];
++    for (var ci = 0; ci < comps.length; ci++) {
++      var cp = comps[ci], edge = false;
++      for (var pi = 0; pi < cp.pixels.length && !edge; pi++) {
++        var pr = cp.pixels[pi][0], pc = cp.pixels[pi][1];
++        if (pr === 0 || pr === R - 1 || pc === 0 || pc === C - 1) edge = true;
++      }
++      if (edge) { cp.layer = 0; q.push(ci); }
++    }
++    var head = 0;
++    while (head < q.length) {
++      var qi = q[head++];
++      for (var nbKey in adj[qi]) {
++        var ji = +nbKey;
++        if (comps[ji].layer < 0) { comps[ji].layer = comps[qi].layer + 1; q.push(ji); }
++      }
++    }
++    for (var cj = 0; cj < comps.length; cj++) if (comps[cj].layer < 0) comps[cj].layer = 0;
++
++    // 按颜色合并
++    var bmin = parseInt(config.boxSizeMin, 10) || 24;
++    var bmax = parseInt(config.boxSizeMax, 10) || 36;
++    if (bmax < bmin) bmax = bmin;
++    var byColor = {};
++    for (var ck = 0; ck < comps.length; ck++) {
++      var cc = comps[ck];
++      (byColor[cc.color] = byColor[cc.color] || []).push(cc);
++    }
++    var out = [];
++    for (var col in byColor) {
++      var list = byColor[col].slice().sort(function (x, y) {
++        return x.layer - y.layer || y.px - x.px || x.id - y.id;
++      });
++      var cur = 0, effLayer = 0;
++      for (var li = 0; li < list.length; li++) {
++        var rest = list[li].px;
++        while (rest > 0) {
++          var room = bmax - cur;
++          var take = Math.min(room, rest);
++          cur += take; rest -= take;
++          effLayer = Math.max(effLayer, list[li].layer);
++          if (cur >= bmax) { out.push({ color: +col, count: cur, layer: effLayer }); cur = 0; effLayer = 0; }
++        }
++      }
++      if (cur > 0) out.push({ color: +col, count: cur, layer: effLayer });
++    }
++    // 层升序（浅层车先出场）
++    out.sort(function (x, y) { return x.layer - y.layer || x.color - y.color; });
++    var total = 0; for (var oi = 0; oi < out.length; oi++) total += out[oi].count;
++    var pix = 0; for (var rr = 0; rr < R; rr++) for (var ccc = 0; ccc < C; ccc++) if (blocks[rr][ccc] > 0) pix++;
++    if (total !== pix) return null;   // 守恒不成立 → 落回默认
++    return out;
++  }
++
+   function pickBoxSplit(blocks, config) {
+     var boxes = pickBoxSplitRaw(blocks, config);
+     return applyBoxPhase(boxes, config);
+@@ -8157,6 +8251,13 @@
+         if (anchorBoxes && anchorBoxes.length) return anchorBoxes;
+       } catch (e) { /* 落回默认切法 */ }
+     }
++    // 【v209】合球（按色块 × 层；默认关）
++    if (config.cutMode === 'component') {
++      try {
++        var cb = componentBoxes(blocks, config);
++        if (cb && cb.length) return cb;
++      } catch (e) { /* 落回默认切法 */ }
++    }
+     // 【v207】按层切车（合球第一步；默认关）
+     if (config.cutMode === 'layerAware') {
+       try {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=208">
++  <link rel="stylesheet" href="css/style.css?v=209">
+ </head>
+ <body>
+   <header>
+@@ -340,7 +340,8 @@
+           切法
+           <select id="gen-cutmode">
+             <option value="" selected>默认（按趋势）</option>
+-            <option value="layerAware">按层切车</option>
++            <option value="layerAware">按层切车（消除轮次）</option>
++            <option value="component">合球：按色块 × 层</option>
+           </select>
+         </label>
+       </div>
+@@ -843,20 +844,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=208"></script>
+-  <script src="js/utils.js?v=208"></script>
++  <script src="js/zip.js?v=209"></script>
++  <script src="js/utils.js?v=209"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=208"></script>
+-  <script src="js/simulator.js?v=208"></script>
++  <script src="js/color-libs.js?v=209"></script>
++  <script src="js/simulator.js?v=209"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=208"></script>
+-  <script src="js/solver-strategy.js?v=208"></script>
+-  <script src="js/solver.js?v=208"></script>
+-  <script src="js/playersim.js?v=208"></script>
+-  <script src="js/generator.js?v=208"></script>
+-  <script src="js/analysis.js?v=208"></script>
++  <script src="js/anchor-cut.js?v=209"></script>
++  <script src="js/solver-strategy.js?v=209"></script>
++  <script src="js/solver.js?v=209"></script>
++  <script src="js/playersim.js?v=209"></script>
++  <script src="js/generator.js?v=209"></script>
++  <script src="js/analysis.js?v=209"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=208"></script>
+-  <script src="js/app.js?v=208"></script>
++  <script src="js/level-editor.js?v=209"></script>
++  <script src="js/app.js?v=209"></script>
+ </body>
+ </html>

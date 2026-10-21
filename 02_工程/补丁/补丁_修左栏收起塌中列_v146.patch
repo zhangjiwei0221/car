@@ -1,0 +1,132 @@
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+@@ -65,16 +65,23 @@
+ }
+ /* 兼容旧类名（进入模拟游玩时曾用它展开第三列）；现在已经常驻，保留以免旧调用点报错 */
+ .main-layout.with-right { grid-template-columns: 280px minmax(0, 1fr) 352px; }
+-/* 【v144】左栏收起：第一列压成 0，宽度全让给棋盘；中列左上角浮现「展开」按钮 */
+-.main-layout.left-collapsed { grid-template-columns: 0 minmax(0, 1fr) 352px; }
+-.main-layout.left-collapsed #panel-left { display: none; }
+-#btn-expand-left {
+-  position: absolute; left: 10px; top: 8px; z-index: 6;
+-  padding: 3px 10px; font-size: 12px; cursor: pointer;
+-  background: var(--panel); color: var(--text);
+-  border: 1px solid var(--border); border-radius: 4px;
+-}
+-#btn-expand-left:hover { background: var(--amber); border-color: var(--amber); color: #fff; }
++/* 【v146 修 v144 的 bug】左栏收起：**不能**把它 display:none ——
++   那会把它从网格里摘掉，中列与右栏会自动前移一格，中列于是掉进那个 0 宽的第一列，
++   表现就是「收起左栏，连中间的目标区和棋盘一起塌了」。
++   改成把它压成一条窄条（仍是网格项、仍占第 1 列），只留折叠按钮；
++   按钮就地翻转方向当"展开"用，不再另放一个浮动按钮（那个也会被塌掉的中列带走）。 */
++.main-layout.left-collapsed { grid-template-columns: 34px minmax(0, 1fr) 352px; }
++.main-layout.left-collapsed aside#panel-left { padding: 8px 2px; overflow: hidden; }
++.main-layout.left-collapsed aside#panel-left > *:not(.panel-head) { display: none; }
++.main-layout.left-collapsed .panel-head { flex-direction: column; }
++.main-layout.left-collapsed .panel-head h2 { display: none; }
++.main-layout.left-collapsed #btn-collapse-left { width: 100%; padding: 6px 0; font-size: 13px; }
++
++/* 【v146】把三列显式钉到各自的轨道上：即使以后哪块被 display:none（或新增别的块），
++   也不会因为自动排布前移而错位。 */
++.main-layout > #panel-left { grid-column: 1; }
++.main-layout > #panel-center { grid-column: 2; }
++.main-layout > #panel-right { grid-column: 3; }
+ .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+ .panel-head h2 { margin: 0; }
+ #btn-collapse-left {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v145·棋盘自适应</title>
+-  <link rel="stylesheet" href="css/style.css?v=145">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v146·修左栏收起</title>
++  <link rel="stylesheet" href="css/style.css?v=146">
+ </head>
+ <body>
+   <header>
+@@ -55,7 +55,6 @@
+ 
+     <!-- 中间主区域：目标图(上) + 暂存区(中) + 队列棋盘(下) 竖直排列 -->
+     <main id="panel-center">
+-      <button id="btn-expand-left" class="hidden" title="展开左侧「关卡信息」栏">▶ 关卡信息</button>
+       <!-- 目标图 -->
+       <section id="section-target">
+         <h3>目标图 <span id="target-info"></span>
+@@ -836,18 +835,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=145"></script>
+-  <script src="js/utils.js?v=145"></script>
+-  <script src="js/simulator.js?v=145"></script>
+-  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=145"></script>
+-  <script src="js/solver-strategy.js?v=145"></script>
+-  <script src="js/solver.js?v=145"></script>
+-  <script src="js/playersim.js?v=145"></script>
+-  <script src="js/generator.js?v=145"></script>
+-  <script src="js/analysis.js?v=145"></script>
++  <script src="js/zip.js?v=146"></script>
++  <script src="js/utils.js?v=146"></script>
++  <script src="js/simulator.js?v=146"></script>
++  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
++  <script src="js/anchor-cut.js?v=146"></script>
++  <script src="js/solver-strategy.js?v=146"></script>
++  <script src="js/solver.js?v=146"></script>
++  <script src="js/playersim.js?v=146"></script>
++  <script src="js/generator.js?v=146"></script>
++  <script src="js/analysis.js?v=146"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=145"></script>
+-  <script src="js/app.js?v=145"></script>
++  <script src="js/level-editor.js?v=146"></script>
++  <script src="js/app.js?v=146"></script>
+ </body>
+ </html>
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -164,14 +164,26 @@
+     if (hint) hint.classList.toggle('hidden', showGen || showEdit || showSim);
+   }
+ 
+-  /** 【v144】左栏收起/展开。收起后把它那一列压成 0，宽度全给棋盘。 */
++  /**
++   * 【v144 引入 / v146 修正】左栏收起/展开。
++   *
++   * v144 的实现是 `#panel-left { display:none }` —— **错的**：display:none 会把这一块
++   * 从网格里整个摘掉，中列与右栏于是自动前移一格，中列掉进那个 0 宽的第一列，
++   * 表现就是用户看到的「收起左栏，连中间的目标区和棋盘一起塌了」。
++   * v146 改为：左栏仍占第 1 列，但被压成 34px 窄条（只留折叠按钮），按钮就地翻转方向当"展开"用。
++   */
+   function setLeftPanelCollapsed(on) {
+     var ml = document.querySelector('.main-layout');
+-    if (ml) ml.classList.toggle('left-collapsed', !!on);
+-    var expand = document.getElementById('btn-expand-left');
+-    if (expand) expand.classList.toggle('hidden', !on);
++    var cur = ml ? ml.classList.contains('left-collapsed') : false;
++    on = (on == null) ? !cur : !!on;      // 不传参数 = 开关（v146 起折叠/展开是同一个按钮，必须能来回切）
++    if (ml) ml.classList.toggle('left-collapsed', on);
++    var btn = document.getElementById('btn-collapse-left');
++    if (btn) {
++      btn.textContent = on ? '▶' : '◀ 收起';
++      btn.title = on ? '展开左侧「关卡信息」栏' : '收起左侧栏，把宽度让给棋盘';
++    }
+     applyTargetViewportSize();     // 中列变宽了，目标图框体跟着重算
+-    if (currentLevel) { renderTarget(lastTargetElim); }
++    if (typeof lastTargetElim !== 'undefined' && currentLevel) renderTarget(lastTargetElim);
+   }
+ 
+   function applyTargetTransform() {
+@@ -444,8 +456,7 @@
+     // ---- 生成器独立页面 ----
+     bindClick('btn-view-simulator', function () { switchView('simulator'); });
+     // 【v144】左栏收起/展开（收起后把宽度让给棋盘；中列左上角浮现「展开」按钮）
+-    bindClick('btn-collapse-left', function () { setLeftPanelCollapsed(true); });
+-    bindClick('btn-expand-left', function () { setLeftPanelCollapsed(false); });
++    bindClick('btn-collapse-left', function () { setLeftPanelCollapsed(); });   // 不传 = 开关
+     bindClick('btn-view-generator', function () { switchView('generator'); });
+     bindClick('btn-gen-import-txt', importTXT);
+     bindClick('btn-gen-start', batchProduce);

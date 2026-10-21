@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>图片 → 目标图 TXT（像素画转换器）</title>
+<style>
+  :root { --bg:#f4eee1; --panel:#ede3d2; --panel2:#e4d8c1; --border:#d7c8b0; --text:#3c2e1f;
+          --muted:#8a7358; --accent:#d2701f; --btn:#7a5c3c; --btnText:#f7f0e4; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:14px}
+  h1{font-size:17px;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .wrap{display:grid;grid-template-columns:340px 1fr;gap:14px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px}
+  .card h2{font-size:13px;color:var(--muted);margin-bottom:8px}
+  .row{display:flex;align-items:center;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+  .row label{font-size:12px;color:var(--muted);white-space:nowrap}
+  input[type=number],select{width:64px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;background:#fdfaf3;font-size:12px}
+  button{padding:5px 10px;border:none;border-radius:4px;background:var(--btn);color:var(--btnText);font-size:12px;cursor:pointer}
+  button:hover{background:var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.go{background:#2f7d3a;font-size:14px;padding:9px 0;width:100%;font-weight:600}
+  #drop{border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;font-size:12px;color:var(--muted);cursor:pointer}
+  #drop.on{border-color:var(--accent);background:#fdf7ee}
+  #pal{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+  .sw{width:22px;height:22px;border-radius:3px;border:2px solid transparent;cursor:pointer;font-size:9px;
+      display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.6);text-shadow:0 0 2px #fff,0 0 2px #fff}
+  .sw.off{opacity:.25;border-style:dashed;border-color:#999}
+  canvases{display:block}
+  .cvs{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:6px;overflow:auto;max-height:520px}
+  .cvs canvas{image-rendering:pixelated;display:block}
+  #txt{width:100%;height:150px;font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:6px;
+       border:1px solid var(--border);border-radius:4px;background:#fdfaf3}
+  .stat{font-size:12px;color:var(--muted);line-height:1.7}
+  .stat b{color:var(--text)}
+  .swrow{display:flex;align-items:center;gap:6px;font-size:12px}
+  .dot{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.25)}
+  .ok{color:#2f7d3a;font-weight:600}.warn{color:#c0451a;font-weight:600}
+</style>
+</head>
+<body>
+<h1>图片 → 目标图 TXT</h1>
+<div class="sub">每个格子取【色表里最相似的颜色】当色块（默认"主色聚类投票"：同一条线上的抗锯齿像素会合成一个颜色，不再一节一节换色；想用旧的"平均色"口径可在下面切换）；输出格式与游戏/求解器一致（首行 <code>像素矩阵</code>，空格分隔，<code>0</code> = 空位）。全程在本机浏览器里跑，图片不上传。</div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>1. 选图</h2>
+    <div id="drop">点这里选图片，或把图片拖进来<br><span style="font-size:11px">（jpg / png / webp 都行）</span></div>
+    <input type="file" id="file" accept="image/*" style="display:none">
+    <div class="stat" id="srcInfo" style="margin-top:6px"></div>
+
+    <h2 style="margin-top:12px">2. 尺寸（格子数）</h2>
+    <div class="row">
+      <label>列</label><input type="number" id="cols" value="53" min="2" max="200">
+      <label>行</label><input type="number" id="rows" value="53" min="2" max="200">
+      <button id="native">用原图像素</button>
+    </div>
+    <div class="sub" style="margin:0">原图像素就正好是你要的格子数时，点右边那个按钮；否则工具会按格取色（缩小=按格取主色，放大=硬边放大）。</div>
+
+    <h2 style="margin-top:12px">3. 颜色</h2>
+    <div class="row">
+      <label>最多用</label><input type="number" id="maxColors" value="0" min="0" max="34">
+      <label>色（0=不限）</label>
+    </div>
+    <div class="row">
+      <label>去碎色</label><input type="number" id="desp" value="0" min="0" max="64">
+      <label>格以下并入邻色（0=关）</label>
+    </div>
+    <!-- 【2026-10-14】取色方式：默认"主色聚类投票"，解决"一条单色直线被识别成好几段不同色" -->
+    <div class="row">
+      <label title="每个格子里有很多源像素，先各自吸附到色表、再把相近的颜色聚成一簇、最后取最大那簇的代表色。&#10;&#10;这样同一条线（它的抗锯齿像素会散落到好几个相近的暗色上）能合成一个颜色，而不是一节一节换色。&#10;「平均色」是旧口径：先把整格求平均再吸附，遇到细线/渐变会走形。">取色方式</label>
+      <select id="sampleMode">
+        <option value="mode" selected>主色聚类投票(推荐)</option>
+        <option value="avg">平均色(旧口径)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label title="有线稿/描边/细线条的图选它：格子里占比够大的「对比色」会被保留（且要连续两格以上才认，避免噪点）。&#10;带阴影/渐变/照片类的图建议保持「关」，否则会撒出黑点。">细线保护</label>
+      <select id="protectMode">
+        <option value="0" selected>关(最干净)</option>
+        <option value="0.40">弱(对比色≥40%)</option>
+        <option value="0.30">中(≥30%)</option>
+        <option value="0.20">强(≥20%)</option>
+        <option value="0.12">最强(≥12%，细线最多、也最容易撒点)</option>
+      </select>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="bgcut" checked> 把贴边的背景色挖成空位 0</label>
+    </div>
+    <div class="sub" style="margin:-2px 0 6px">⚠ 这一项**不看内容**，只认"四边出现最多的那个色" —— 如果美术自己带了一圈边框（比如整圈粉色勾边），
+      它会被当成背景整片挖掉。转换后下面会报「本图会挖掉 N 格」，数字大得离谱就说明挖错了，把它取消勾选。</div>
+    <!-- 【2026-10-15 v153】取色窗口：AI 放大图/带阴影描边的图，格子四边有抗锯齿与立体倒角，
+         整格参与投票会让深色倒角多投票（实测黑块比真值多约 10%、描边变粗一格）。默认改成格内 75%。 -->
+    <div class="row">
+      <label title="每个格子里取中间多大一片来投票。&#10;&#10;整格：格子四边的抗锯齿/立体倒角也会投票 → 深色倒角会多投票，描边变粗、黑块变多。&#10;格内 75%（推荐）：只看格心那一片，最接近"这格看上去是什么色"。&#10;格内 60%：更保守，细碎花纹多时用。">取色窗口</label>
+      <select id="innerWin">
+        <option value="0.75" selected>格内 75%(推荐)</option>
+        <option value="1">整格(旧口径)</option>
+        <option value="0.6">格内 60%</option>
+      </select>
+    </div>
+    <div class="sub" style="margin:2px 0 4px">参与匹配的颜色（点一下可关掉，关掉的不会被用）：</div>
+    <div class="row" style="margin-bottom:2px">
+      <button id="palAll" style="font-size:11px;padding:2px 8px">全选</button>
+      <button id="palNone" style="font-size:11px;padding:2px 8px">全不选</button>
+      <button id="palReset" style="font-size:11px;padding:2px 8px">恢复默认</button>
+    </div>
+    <div id="pal"></div>
+
+    <div style="margin-top:14px"><button class="go" id="go" disabled>转 换</button></div>
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom:12px">
+      <h2>预览（左：原图 / 右：转换结果，带格线）</h2>
+      <div class="cvs"><canvas id="cv"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>结果</h2>
+      <div class="stat" id="stat">还没有转换。</div>
+      <div style="margin:8px 0"><button id="dl" disabled>⬇ 下载 TXT</button>
+        <button id="dlpng" disabled>⬇ 下载预览 PNG</button>
+        <button id="cp" disabled>复制 TXT</button>
+        <span id="tip" style="font-size:11px;color:var(--muted)"></span></div>
+      <textarea id="txt" spellcheck="false" placeholder="转换后这里出现 TXT 内容（可直接全选复制）"></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 色表（与 bin/js/utils.js 的 AntSolver.COLORS 同源，34 色） ================= */
+var PAL = [
+ {id:1,name:'红色',hex:'#FF3240'},{id:2,name:'浅红',hex:'#FF269F'},{id:3,name:'粉红',hex:'#FF5294'},
+ {id:4,name:'暗粉',hex:'#DF2455'},{id:5,name:'浅粉',hex:'#FF98A3'},{id:6,name:'深红',hex:'#F63C3F'},
+ {id:7,name:'紫色',hex:'#A073E7'},{id:8,name:'浅紫粉',hex:'#E749B6'},{id:9,name:'玫红',hex:'#AD00AC'},
+ {id:10,name:'灰紫',hex:'#C538C3'},{id:11,name:'深紫',hex:'#A032DC'},{id:12,name:'紫红',hex:'#C60174'},
+ {id:13,name:'天蓝',hex:'#00ACF6'},{id:14,name:'浅蓝',hex:'#00E1EF'},{id:15,name:'深棕',hex:'#256A85'},
+ {id:16,name:'深蓝',hex:'#7074B6'},{id:17,name:'灰蓝',hex:'#6F67DC'},{id:18,name:'蓝色',hex:'#6B5BBA'},
+ {id:19,name:'浅黄',hex:'#95E502'},{id:20,name:'绿色',hex:'#01CC64'},{id:21,name:'橄榄绿',hex:'#00AEAD'},
+ {id:22,name:'青蓝',hex:'#04DB01'},{id:23,name:'浅绿',hex:'#02CBA9'},{id:24,name:'深绿',hex:'#018441'},
+ {id:25,name:'黄色',hex:'#FFB900'},{id:26,name:'砖红',hex:'#C15701'},{id:27,name:'浅橙',hex:'#FF9F6A'},
+ {id:28,name:'橙色',hex:'#FF8002'},{id:29,name:'深棕2',hex:'#F69602'},{id:30,name:'棕色',hex:'#F9DA00'},
+ {id:31,name:'浅灰',hex:'#FDE8D6'},{id:32,name:'灰色',hex:'#FFEAB2'},{id:33,name:'深灰',hex:'#010101'},
+ {id:34,name:'中灰',hex:'#BBB6B7'}
+];
+PAL.forEach(function(p){ p.rgb = hexToRgb(p.hex); });
+function hexToRgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+
+/* ================= 核心：取"最相似的颜色" =================
+   用 redmean 加权距离（比裸 RGB 欧氏更接近人眼），对渐变/抗锯齿的图更稳。 */
+function dist2(c, p){
+  var rmean = (c[0]+p[0])/2, dr = c[0]-p[0], dg = c[1]-p[1], db = c[2]-p[2];
+  return (2 + rmean/256)*dr*dr + 4*dg*dg + (2 + (255-rmean)/256)*db*db;
+}
+function nearestId(rgb, ids){
+  var best = -1, bd = Infinity;
+  for (var i=0;i<ids.length;i++){ var p = PAL[ids[i]]; var d = dist2(rgb, p.rgb); if (d<bd){ bd=d; best=p.id; } }
+  return best;
+}
+function idToRgb(id){ return (PAL[id-1]||{rgb:[0,0,0]}).rgb; }
+
+/* 主转换：imgData{data,width,height} + opts → {grid, cols, rows, counts, fragRate} */
+function convert(imgData, opts){
+  var cols = opts.cols, rows = opts.rows, ids = opts.ids;
+  var W = imgData.width, H = imgData.height, D = imgData.data;
+  // ===== ① 分格取色 =====
+  // 【2026-10-14 新默认】主色聚类投票：格内像素先各自吸附到色表 → 把"相近色"聚成一簇 → 取最大那簇的代表色。
+  //   为什么不是平均色：一条单色直线的抗锯齿像素会散落吸附到好几个相近暗色上，平均之后每格混到的比例又不同，
+  //   于是同一条线被识别成一节一节的不同色（用户实测反馈）。聚类投票把那条线重新合成一个颜色。
+  //   opts.sampleMode='avg' 时保留旧口径（先整格求平均再吸附），供对照。
+  var MERGE2 = 150*150;          // 聚类阈值（redmean 距离平方）：把相近色并成一簇
+  var protect = +opts.protect || 0;   // 细线保护阈值（0=关）
+  var WIN = +opts.innerWin || 0.75;   // 【v153】取色窗口：格内取多大一片（1=整格，0.75=格心 75%）
+  var PROTECT_CONTRAST = 0.25;   // 与主色的亮度差要达到这个量级才认（避免把同色系的浅色当"线"）
+  function lumOf(rgb){ return 0.299*rgb[0]+0.587*rgb[1]+0.114*rgb[2]; }
+  function cellInfo(pix, area){
+    // 【2026-10-15】透明底的处理与旧口径对齐：透明像素不参与投票；但**一格几乎全是透明**时
+    //   （外侧边角、图标四周），不能只拿那一两个半透明像素去投票 —— 否则会冒出零散色点，
+    //   而且这些点不是背景色、连"背景挖空"都清不掉（用户反馈"转换结果不行"的一类）。
+    //   规则：不透明像素占比 < 25% 时，按"近白"处理（旧口径就是这么干的），留给背景挖空去清。
+    var opaque = pix.length, total = area || 1;
+    if (opaque === 0 || opaque / total < 0.25) return { main: 31, cand: null };
+    if (opts.sampleMode === 'avg'){
+      var R=0,G=0,B=0;
+      for (var a=0;a<pix.length;a++){ R+=pix[a][0];G+=pix[a][1];B+=pix[a][2]; }
+      var avg=[Math.round(R/pix.length), Math.round(G/pix.length), Math.round(B/pix.length)];
+      return { main: (nearestId(avg, ids)||31), cand: null };
+    }
+    var byId = {};
+    for (var k=0;k<pix.length;k++){ var id = nearestId(pix[k], ids); (byId[id]=byId[id]||[]).push(pix[k]); }
+    var cl = [];
+    Object.keys(byId).sort(function(a,b){ return byId[b].length-byId[a].length; }).forEach(function(id){
+      // 【关键】簇心用【色表里那个颜色】而不是该组像素的均值：
+      //   同一条线的抗锯齿像素会落到"深棕/深蓝"这类相近但不同的色表项上；若拿像素均值当簇心，
+      //   两团的均值离得远就并不到一起（实测 20%+20% 各自不够阈值 → 细线保护整条失效）。
+      var n2 = byId[id].length, pc = idToRgb(+id), s = [pc[0],pc[1],pc[2]];
+      var hit=null;
+      for (var q=0;q<cl.length;q++) if (dist2(s, cl[q].rgb) <= MERGE2){ hit=cl[q]; break; }
+      if (hit){ var t=hit.n+n2;
+        hit.rgb=[(hit.rgb[0]*hit.n+s[0]*n2)/t,(hit.rgb[1]*hit.n+s[1]*n2)/t,(hit.rgb[2]*hit.n+s[2]*n2)/t];
+        hit.n=t;
+      } else cl.push({ rgb:s, n:n2 });
+    });
+    cl.forEach(function(x){ x.share=x.n/pix.length; x.rep=nearestId([Math.round(x.rgb[0]),Math.round(x.rgb[1]),Math.round(x.rgb[2])], ids); });
+    cl.sort(function(a,b){ return b.n-a.n; });
+    var main = cl[0].rep, cand=null, bestDiff=0;
+    if (protect > 0){
+      for (var q2=1;q2<cl.length;q2++){
+        if (cl[q2].share < protect) continue;
+        var diff = Math.abs(lumOf(idToRgb(cl[0].rep)) - lumOf(idToRgb(cl[q2].rep)));
+        if (diff > bestDiff){ bestDiff=diff; cand=cl[q2].rep; }
+      }
+      if (bestDiff < PROTECT_CONTRAST) cand = null;
+    }
+    return { main: main, cand: cand };
+  }
+  var info = [];
+  for (var r=0;r<rows;r++){ var row=[];
+    for (var c=0;c<cols;c++){
+      var x0 = Math.floor(c*W/cols), x1 = Math.max(x0+1, Math.floor((c+1)*W/cols));
+      var y0 = Math.floor(r*H/rows), y1 = Math.max(y0+1, Math.floor((r+1)*H/rows));
+      // 【v153】取色窗口：只取格心那一片（默认 75%），避开四边抗锯齿与立体倒角
+      var kit = (1 - WIN) / 2, kx0 = Math.floor(x0 + (x1-x0)*kit), kx1 = Math.max(kx0+1, Math.ceil(x1 - (x1-x0)*kit));
+      var ky0 = Math.floor(y0 + (y1-y0)*kit), ky1 = Math.max(ky0+1, Math.ceil(y1 - (y1-y0)*kit));
+      var pix=[];
+      for (var y=ky0;y<ky1;y++) for (var x=kx0;x<kx1;x++){ var i=(y*W+x)*4;
+        if (D[i+3] < 16) continue;          // 透明像素不参与投票（bgcut 会把背景挖成 0）
+        pix.push([D[i],D[i+1],D[i+2]]);
+      }
+      row.push(cellInfo(pix, (kx1-kx0)*(ky1-ky0)));
+    }
+    info.push(row); }
+  // ===== ② 成网格：细线保护要求"相邻格也选中【相近的】候选色"（连续两格以上），避免孤立噪点 =====
+  //   为什么是"相近"而不是"相同"：抗锯齿会让同一条线在不同格里落到相近但不同的色表项上（一格深棕一格深蓝），
+  //   要求完全相同会让整条线都保不住（实测踩过）。
+  var grid = info.map(function(row,r){ return row.map(function(cell,c){
+    if (!cell.cand) return cell.main;
+    var nb = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+    for (var q=0;q<nb.length;q++){
+      var n1=info[nb[q][0]]; if (!n1) continue;
+      var nCell=n1[nb[q][1]]; if (!nCell) continue;
+      if (nCell.cand && (nCell.cand === cell.cand || dist2(idToRgb(nCell.cand), idToRgb(cell.cand)) <= MERGE2)) return cell.cand;
+    }
+    return cell.main;
+  }); });
+  // ③ 色数上限：保留用量前 N，其余吸附到其中最近的
+  if (opts.maxColors > 0){
+    var cnt = {}; grid.forEach(function(row){ row.forEach(function(v){ cnt[v]=(cnt[v]||0)+1; }); });
+    var keep = Object.keys(cnt).sort(function(a,b){ return cnt[b]-cnt[a]; }).slice(0, opts.maxColors).map(Number);
+    var keepIdx = keep.map(function(id){ return id-1; });
+    grid = grid.map(function(row){ return row.map(function(id){ return keep.indexOf(id)>=0 ? id : nearestId(idToRgb(id), keepIdx); }); });
+  }
+  // ④ 去碎色：4-连通 < desp 的块并到共享边最长的邻色（多轮）
+  if (opts.desp > 0) grid = despeckle(grid, rows, cols, opts.desp);
+  // ⑤ 背景挖空：贴边出现最多的颜色，其贴边连通片 → 0
+  var bgDug = 0, bgDugId = 0;          // 【v153】如实记下"挖掉了多少格"，供结果区提醒
+  if (opts.bgcut){
+    var tally = {}; var bump=function(id){ tally[id]=(tally[id]||0)+1; };
+    for (var c2=0;c2<cols;c2++){ bump(grid[0][c2]); bump(grid[rows-1][c2]); }
+    for (var r2=0;r2<rows;r2++){ bump(grid[r2][0]); bump(grid[r2][cols-1]); }
+    var bgId = +Object.keys(tally).sort(function(a,b){ return tally[b]-tally[a]; })[0];
+    var seen = grid.map(function(row){ return row.map(function(){ return false; }); });
+    var st = [];
+    for (var c3=0;c3<cols;c3++){ st.push([0,c3],[rows-1,c3]); }
+    for (var r3=0;r3<rows;r3++){ st.push([r3,0],[r3,cols-1]); }
+    while (st.length){ var cur=st.pop(), y4=cur[0], x4=cur[1];
+      if (y4<0||y4>=rows||x4<0||x4>=cols||seen[y4][x4]||grid[y4][x4]!==bgId) continue;
+      seen[y4][x4]=true; grid[y4][x4]=0; bgDug++; bgDugId=bgId;
+      st.push([y4+1,x4],[y4-1,x4],[y4,x4+1],[y4,x4-1]); }
+  }
+  // 统计
+  var counts = {}; grid.forEach(function(row){ row.forEach(function(v){ counts[v]=(counts[v]||0)+1; }); });
+  // ⑥ 【v153】保真度：参考 = 每格"格心 3×3 像素的中位色"（格心那点正是这格看上去的颜色，
+  //     避开上高光/下阴影/四边抗锯齿）→ 与最终结果逐格比。这是"识别得好不好"的可比较数。
+  var fidelity = null, refGrid = null, diffCells = 0;
+  (function(){
+    refGrid = [];
+    var n = 0, same = 0;
+    for (var r5=0;r5<rows;r5++){ var rw=[];
+      for (var c5=0;c5<cols;c5++){
+        var cx = Math.round((c5+0.5)*W/cols), cy = Math.round((r5+0.5)*H/rows), pr=[], pg=[], pb=[], op=0;
+        for (var dy=-1;dy<=1;dy++) for (var dx=-1;dx<=1;dx++){
+          var yy=cy+dy, xx=cx+dx;
+          if (yy<0||yy>=H||xx<0||xx>=W) continue;
+          var ii=(yy*W+xx)*4; if (D[ii+3] < 16) continue;
+          pr.push(D[ii]); pg.push(D[ii+1]); pb.push(D[ii+2]); op++;
+        }
+        var refId = 0;
+        if (op > 0){ pr.sort(function(a,b){return a-b;}); pg.sort(function(a,b){return a-b;}); pb.sort(function(a,b){return a-b;});
+          var m5 = pr.length >> 1; refId = nearestId([pr[m5], pg[m5], pb[m5]], ids) || 31; }
+        rw.push(refId); n++;
+        if ((refId === 0) === (grid[r5][c5] === 0) && (refId === 0 || refId === grid[r5][c5])) same++; else diffCells++;
+      }
+      refGrid.push(rw); }
+    fidelity = n ? same / n : 0;
+  })();
+  return { grid:grid, cols:cols, rows:rows, counts:counts, frag: fragStat(grid, rows, cols),
+           bgDug:bgDug, bgDugId:bgDugId, fidelity:fidelity, diffCells:diffCells, refGrid:refGrid, innerWin:WIN };
+}
+function despeckle(grid, rows, cols, minPx){
+  for (var round=0; round<12; round++){
+    var changed=false, seen=grid.map(function(r){ return r.map(function(){ return false; }); });
+    for (var r=0;r<rows;r++) for (var c=0;c<cols;c++){
+      if (seen[r][c] || !grid[r][c]) continue;
+      var v=grid[r][c], st=[[r,c]], cells=[]; seen[r][c]=true;
+      while (st.length){ var cur=st.pop(); cells.push(cur);
+        var nb=[[1,0],[-1,0],[0,1],[0,-1]];
+        for (var k=0;k<4;k++){ var ny=cur[0]+nb[k][0], nx=cur[1]+nb[k][1];
+          if (ny<0||ny>=rows||nx<0||nx>=cols) continue;
+          if (!seen[ny][nx] && grid[ny][nx]===v){ seen[ny][nx]=true; st.push([ny,nx]); } } }
+      if (cells.length < minPx){
+        var border={};
+        for (var i=0;i<cells.length;i++){ var y=cells[i][0], x=cells[i][1];
+          for (var k2=0;k2<4;k2++){ var ny2=y+nb[k2][0], nx2=x+nb[k2][1];
+            if (ny2<0||ny2>=rows||nx2<0||nx2>=cols) continue;
+            var nv=grid[ny2][nx2]; if (nv && nv!==v) border[nv]=(border[nv]||0)+1; } }
+        var best=Object.keys(border).sort(function(a,b){ return border[b]-border[a]; })[0];
+        if (best){ for (var j=0;j<cells.length;j++) grid[cells[j][0]][cells[j][1]] = +best; changed=true; } } }
+    if (!changed) break; }
+  return grid;
+}
+/* 碎色率（近似口径：同色 4-连通块 < 8 格算"碎"；正式数字以生成器为准） */
+function fragStat(grid, rows, cols){
+  var seen=grid.map(function(r){ return r.map(function(){ return false; }); });
+  var total=0, frag=0, blocks=0, smallBlocks=0;
+  for (var r=0;r<rows;r++) for (var c=0;c<cols;c++){ if (grid[r][c]>0) total++; }
+  for (var r2=0;r2<rows;r2++) for (var c2=0;c2<cols;c2++){
+    if (seen[r2][c2] || !grid[r2][c2]) continue;
+    var v=grid[r2][c2], st=[[r2,c2]], n=0; seen[r2][c2]=true;
+    while (st.length){ var cur=st.pop(); n++;
+      var nb=[[1,0],[-1,0],[0,1],[0,-1]];
+      for (var k=0;k<4;k++){ var ny=cur[0]+nb[k][0], nx=cur[1]+nb[k][1];
+        if (ny<0||ny>=rows||nx<0||nx>=cols) continue;
+        if (!seen[ny][nx] && grid[ny][nx]===v){ seen[ny][nx]=true; st.push([ny,nx]); } } }
+    blocks++; if (n<8){ frag+=n; smallBlocks++; } }
+  return { rate: total? frag/total : 0, total:total, fragPixels:frag, blocks:blocks, smallBlocks:smallBlocks };
+}
+
+/* ================= 界面 ================= */
+var imgData=null, srcW=0, srcH=0, lastResult=null, useIds=PAL.map(function(p){ return p.id; });
+var $=function(id){ return document.getElementById(id); };
+PAL.forEach(function(p){
+  var b=document.createElement('div'); b.className='sw'; b.style.background=p.hex; b.textContent=p.id;
+  b.title=p.name+' '+p.hex; b.dataset.id=p.id;
+  b.onclick=function(){ var id=p.id; if (useIds.indexOf(id)>=0){ if (useIds.length<=1) return; useIds.splice(useIds.indexOf(id),1); b.classList.add('off'); }
+    else { useIds.push(id); b.classList.remove('off'); } };
+  $('pal').appendChild(b);
+});
+$('palAll').onclick=function(){ useIds=PAL.map(function(p){return p.id;}); document.querySelectorAll('.sw').forEach(function(e){e.classList.remove('off');}); };
+$('palNone').onclick=function(){ useIds=[19]; document.querySelectorAll('.sw').forEach(function(e){ e.classList.toggle('off', +e.dataset.id!==19); }); };
+$('palReset').onclick=function(){ useIds=PAL.map(function(p){return p.id;}); document.querySelectorAll('.sw').forEach(function(e){e.classList.remove('off');}); };
+
+$('drop').onclick=function(){ $('file').click(); };
+$('drop').ondragover=function(e){ e.preventDefault(); this.classList.add('on'); };
+$('drop').ondragleave=function(){ this.classList.remove('on'); };
+$('drop').ondrop=function(e){ e.preventDefault(); this.classList.remove('on');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); };
+$('file').onchange=function(e){ if (e.target.files[0]) loadFile(e.target.files[0]); };
+
+function loadFile(f){
+  var img=new Image();
+  img.onload=function(){
+    srcW=img.naturalWidth; srcH=img.naturalHeight;
+    var cv=document.createElement('canvas'); cv.width=srcW; cv.height=srcH;
+    var cx=cv.getContext('2d'); cx.drawImage(img,0,0);
+    imgData=cx.getImageData(0,0,srcW,srcH);
+    $('srcInfo').innerHTML='已载入：<b>'+f.name+'</b><br>原图 '+srcW+'×'+srcH+' 像素';
+    $('go').disabled=false;
+  };
+  img.src=URL.createObjectURL(f);
+}
+$('native').onclick=function(){ if(!srcW) return; $('cols').value=srcW; $('rows').value=srcH; };
+$('go').onclick=function(){
+  if(!imgData){ return; }
+  var opts={ cols:Math.max(2,Math.min(200,+$('cols').value||53)), rows:Math.max(2,Math.min(200,+$('rows').value||53)),
+             maxColors:Math.max(0,+$('maxColors').value||0), desp:Math.max(0,+$('desp').value||0),
+             bgcut:$('bgcut').checked, ids:useIds.slice().sort(function(a,b){return a-b;}).map(function(id){return id-1;}),
+             innerWin:parseFloat(($('innerWin')||{}).value)||0.75,               // 【v153】取色窗口（格内 75% 默认）
+             sampleMode:($('sampleMode')||{}).value==='avg'?'avg':'mode',        // 取色方式：默认主色聚类投票
+             protect:parseFloat(($('protectMode')||{}).value)||0 };              // 细线保护阈值（0=关）
+  var t0=Date.now(); var res=convert(imgData, opts); var ms=Date.now()-t0;
+  lastResult=res;
+  draw(res);
+  var txtLines=res.grid.map(function(row){ return row.join(' '); });
+  var txt='像素矩阵\n'+txtLines.join('\n')+'\n';
+  $('txt').value=txt;
+  var used=Object.keys(res.counts).map(Number).sort(function(a,b){ return res.counts[b]-res.counts[a]; });
+  var html='<b>'+res.cols+' 列 × '+res.rows+' 行</b>　非空格 <b>'+(res.cols*res.rows-(res.counts[0]||0))+'</b>　空位 '+(res.counts[0]||0)+'　色数 '+used.filter(function(v){return v>0;}).length+'　用时 '+ms+'ms<br>';
+  used.forEach(function(id){
+    if (!id) return;
+    var p=PAL[id-1];
+    html+='<div class="swrow"><span class="dot" style="background:'+p.hex+'"></span>'+String(id).padStart(3)+' '+p.name+' <span style="color:#8a7358">'+p.hex+'</span> — <b>'+res.counts[id]+'</b> 格</div>';
+  });
+  var f=res.frag;
+  html+='<div style="margin-top:6px">碎色率 <b>'+(f.rate*100).toFixed(2)+'%</b>（小色块 '+f.smallBlocks+' 个 / '+f.fragPixels+' 格，共 '+f.blocks+' 块）'
+     + (f.rate<=0.22 ? ' <span class="ok">≈ 过闸（上限 22%）</span>' : ' <span class="warn">≈ 超限，把「最多用色」调小或「去碎色」调大</span>')
+     + '<br><span style="font-size:11px">这是近似口径，正式判定以生成器的碎色闸门为准（命令行工具 图片转像素画.js 报的就是正式口径）</span></div>';
+  // 【v153】保真度 + 背景挖空代价：把"识别得好不好"变成一个数字
+  if (res.fidelity != null){
+    var fp = (res.fidelity*100).toFixed(1);
+    html+='<div style="margin-top:6px">保真度 <b>'+fp+'%</b>'
+       + '　<span style="color:#8a7358;font-size:11px">（与「每格中心那点的颜色」逐格比，不一致 '+res.diffCells+' 格）</span><br>'
+       + '<span style="font-size:11px">参考口径：每格中心的 3×3 像素取中位色 —— 也就是"这格看上去是什么色"。'
+       + '保真度低主要来自三件事：① 挖背景挖到了美术（看下一行）；② 源图本身有渐变/高光/阴影，一格里的颜色不是纯色；'
+       + '③ 允许的色板太少，多出来的颜色被并到最近的那个。</span></div>';
+  }
+  if (res.bgDug > 0){
+    var pa = PAL[res.bgDugId-1] || {name:'?', hex:'#000'};
+    html+='<div style="margin-top:6px" class="warn">⚠ 本图挖掉了 <b>'+res.bgDug+'</b> 格'
+       + '（'+(100*res.bgDug/(res.cols*res.rows)).toFixed(1)+'%，颜色 '+res.bgDugId+' '+pa.name+'）'
+       + '　—　如果这是美术自己的边框/底色，请取消勾选「把贴边的背景色挖成空位 0」再转一次。</div>';
+  }
+  $('stat').innerHTML=html;
+  $('dl').disabled=false; $('dlpng').disabled=false; $('cp').disabled=false;
+};
+function draw(res){
+  var S=Math.max(3, Math.min(24, Math.floor(700/Math.max(res.cols, res.rows))));
+  var W=res.cols*S, H=res.rows*S;
+  var cv=$('cv'); cv.width=W*2+16; cv.height=H; cv.style.width=(W*2+16)+'px'; cv.style.height=H+'px';
+  var g=cv.getContext('2d');
+  g.fillStyle='#efe6d5'; g.fillRect(0,0,cv.width,cv.height);
+  // 左：原图（缩到同尺寸，最近邻）
+  g.imageSmoothingEnabled=false;
+  g.drawImage(imgData.data?canvasOf(imgData):null, 0,0,W,H);   // 由 imgData 画
+  // 右：结果
+  for (var r=0;r<res.rows;r++) for (var c=0;c<res.cols;c++){
+    var id=res.grid[r][c];
+    g.fillStyle = id ? PAL[id-1].hex : '#f2f2f2';
+    g.fillRect(W+16+c*S, r*S, S, S);
+    g.strokeStyle='rgba(0,0,0,.10)'; g.strokeRect(W+16+c*S+.5, r*S+.5, S-1, S-1);
+  }
+}
+function canvasOf(imgData){
+  if (canvasOf._c) { }
+  var cv=document.createElement('canvas'); cv.width=imgData.width; cv.height=imgData.height;
+  cv.getContext('2d').putImageData(imgData,0,0); canvasOf._c=cv; return cv;
+}
+function dl(name, text, mime){
+  var blob=new Blob([text], {type:mime||'text/plain;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+$('dl').onclick=function(){ if(lastResult) dl('目标图_'+lastResult.cols+'x'+lastResult.rows+'.txt', $('txt').value); };
+$('cp').onclick=function(){ $('txt').select(); document.execCommand('copy'); $('tip').textContent='已复制'; setTimeout(function(){$('tip').textContent='';},1500); };
+$('dlpng').onclick=function(){
+  if (!lastResult) return;
+  var url=$('cv').toDataURL('image/png');
+  var a=document.createElement('a'); a.href=url; a.download='目标图_'+lastResult.cols+'x'+lastResult.rows+'_预览.png';
+  document.body.appendChild(a); a.click(); a.remove();
+};
+</script>
+</body>
+</html>

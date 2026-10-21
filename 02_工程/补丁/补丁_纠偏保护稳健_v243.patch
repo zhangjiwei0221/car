@@ -1,0 +1,76 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -10413,7 +10413,24 @@
+       if (!alt || !alt.level || !alt.goodV3) return out;
+       var p2 = alt.goodV3.midLateMax;
+       var d2 = (p2 < lo) ? (lo - p2) : (p2 > hi ? (p2 - hi) : 0);
+-      if (d2 < d0) { alt.bandFix = { from: p, to: p2, ice: ni }; return alt; }
++      // 【v243】只比"离带距离"是错的：实测 seed 402 被纠偏从 峰窗3/稳健50 换成 峰窗4/稳健100 ——
++      //   峰窗进了带，但稳健从合格变成不合格，整体反而更差。
++      //   正确顺序：先比为 0 的项数（fails 条数，越少越好），再比带距，最后比稳健离 55% 的远近。
++      var f0 = (gv.fails || []).length, f2 = (alt.goodV3.fails || []).length;
++      // 稳健也要算"离带距离"，不能只看峰窗：稳健 100%（怎么打都过）和 峰窗 2.0（没压力）
++      //   都是 1 条不合格，但前者是"太简单"、后者是"没做出来"，对用户的价值完全不同。
++      var slo = (config && config.targetSteadyMin != null) ? +config.targetSteadyMin : 30;
++      var shi = (config && config.targetSteadyMax != null) ? +config.targetSteadyMax : 80;
++      function dSteady(v) {
++        if (v == null) return 9;
++        return (v < slo) ? (slo - v) / 20 : (v > shi ? (v - shi) / 20 : 0);
++      }
++      var c0 = d0 + dSteady(gv.steadyWonPct), c2 = d2 + dSteady(alt.goodV3.steadyWonPct);
++      var better = false;
++      if (f2 !== f0) better = (f2 < f0);
++      else if (Math.abs(c2 - c0) > 0.05) better = (c2 < c0);
++      else better = ((alt.goodV3.steadyWonPct || 0) > (gv.steadyWonPct || 0));
++      if (better) { alt.bandFix = { from: p, to: p2, ice: ni, failsFrom: f0, failsTo: f2 }; return alt; }
+       return out;
+     } catch (e) { return out; }
+   }
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=242">
++  <link rel="stylesheet" href="css/style.css?v=243">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=242"></script>
+-  <script src="js/utils.js?v=242"></script>
++  <script src="js/zip.js?v=243"></script>
++  <script src="js/utils.js?v=243"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=242"></script>
+-  <script src="js/simulator.js?v=242"></script>
++  <script src="js/color-libs.js?v=243"></script>
++  <script src="js/simulator.js?v=243"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=242"></script>
+-  <script src="js/solver-strategy.js?v=242"></script>
+-  <script src="js/solver.js?v=242"></script>
+-  <script src="js/playersim.js?v=242"></script>
+-  <script src="js/generator.js?v=242"></script>
+-  <script src="js/analysis.js?v=242"></script>
++  <script src="js/anchor-cut.js?v=243"></script>
++  <script src="js/solver-strategy.js?v=243"></script>
++  <script src="js/solver.js?v=243"></script>
++  <script src="js/playersim.js?v=243"></script>
++  <script src="js/generator.js?v=243"></script>
++  <script src="js/analysis.js?v=243"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=242"></script>
+-  <script src="js/app.js?v=242"></script>
++  <script src="js/level-editor.js?v=243"></script>
++  <script src="js/app.js?v=243"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

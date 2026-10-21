@@ -1,0 +1,293 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4606,6 +4606,7 @@
+             + '，停止原因 ' + ((pf && pf.stopReason) || '?') + '，用时 ' + ((result && result.elapsedMs) ? Math.round(result.elapsedMs / 1000) + 's' : '?'), 'gen-log-ok');
+         } catch (e) {}
+         if (!result || !result.level) { alert('这一关没生成出来：' + ((result && result.lastFailReason) || '候选全灭')); return; }
++        genLogGreedyLine(result.level);   // 【v176】单关生成也报贪心线一行
+         loadLevel(result.level);
+         currentGenerationEval = result.generationEval || null;
+         currentEntryMode = result.entryMode || entryModeOf(config);
+@@ -5178,6 +5179,7 @@
+         (v2vio.length ? ('⚠ ' + v2vio.join('、')) : '✓ 达标'),
+         v2vio.length ? 'gen-log-warn' : 'gen-log-ok');
+     }
++    genLogGreedyLine(rec.level);   // 【v176】第三条线「贪心玩家」一行
+     if (curveTxt) {
+       var c3 = rec.choiceCurve;
+       genLog('　　' + c3.spark + curveTxt, (c3.lowPct >= 35 || c3.medFull <= 2) ? 'gen-log-warn' : 'gen-log-ok');
+@@ -6245,6 +6247,47 @@
+   }
+ 
+   /** 一关体检：全知线 + 玩家线各量一遍，再按"取最差"合成一组判据值。 */
++  /**
++   * 【v176】第三条线「贪心玩家」的一关报告（垫槽 / 赌管道 / 峰窗）。
++   *   只在**生产出一关之后**与**关卡体检**时各算一次（一次 ~几十毫秒），**不进候选循环** ——
++   *   所以生成速度与生成结果都不受它影响（用户正在手测 v174/v175 的关，不能让度量把它搅了）。
++   *   口径陷阱（见 generator.js 里 chokeV2GreedyLine 的注释）：贪心线会"走完棋盘但收尾卡死"，
++   *   中途真卡死的关（覆盖 <100%）峰窗会被低估 → 只报数、不进"取最差"的判定。
++   */
++  function greedyLineReport(lv) {
++    var G = AntSolver.Generator;
++    if (!G || !G.chokeV2GreedyLine || !lv) return null;
++    var g = null;
++    try { g = G.chokeV2GreedyLine(lv); } catch (e) { g = null; }
++    if (!g) return null;
++    var a = null;
++    try {
++      a = (AntSolver.Analysis && AntSolver.Analysis.chokepointAudit)
++        ? AntSolver.Analysis.chokepointAudit(g.samples || [], lv.totalBoxes || 0, lv.bufferLimit || 5) : null;
++    } catch (e) { a = null; }
++    return {
++      pads: g.pads, pipeBets: g.pipeBets, pipeBetBufMax: g.pipeBetBufMax, pipeBetWhileFull: g.pipeBetWhileFull,
++      won: g.won, steps: g.steps, coveragePct: g.coveragePct,
++      lateMax: a ? a.lateMax : null, peakBuf: a ? a.peakBuf : null
++    };
++  }
++  /**
++   * 【v176】把贪心线一行打进实时日志（**单关生成**与**批量生产**共用，两处都要能看见）。
++   *   它不是"再判一次合格"，而是回答两个问题：
++   *   ① 这关会不会逼真人先垫（暂存压力真不真）；② 会不会逼真人在**快满槽**时去赌管道（用户 R6）。
++   */
++  function genLogGreedyLine(level) {
++    try {
++      var gRep = level ? greedyLineReport(AntSolver.parseLevel(level)) : null;
++      if (!gRep) return;
++      genLog('　　贪心线　峰窗 ' + (gRep.lateMax == null ? '-' : gRep.lateMax) +
++        '（峰值 ' + (gRep.peakBuf == null ? '-' : gRep.peakBuf) + '）· 覆盖 ' + gRep.coveragePct + '% · ' +
++        (gRep.won ? '走通' : '收尾卡死') +
++        ' · 垫槽 ' + gRep.pads + ' 次 · 赌管道口 ' + gRep.pipeBets + ' 次' +
++        (gRep.pipeBetWhileFull ? ('　⚠ 其中"只剩 1 个空位还得赌" ' + gRep.pipeBetWhileFull + ' 步') : ''),
++        gRep.pipeBetWhileFull ? 'gen-log-warn' : '');
++    } catch (eG) { /* 度量失败不影响生产 */ }
++  }
+   function auditV2OfLevel(lv, em) {
+     var omni = null, pl = null;
+     try { omni = solveByEntryMode(lv, em); } catch (e) { omni = null; }
+@@ -6264,7 +6307,9 @@
+     if (worst.r9 >= 1e9) worst.r9 = 0;
+     if (worst.early34Pct >= 999) worst.early34Pct = 0;
+     if (worst.minPick >= 99) worst.minPick = 0;
+-    return { omni: mo, player: mp, worst: worst };
++    var gd = null;
++    try { gd = greedyLineReport(lv); } catch (e) { gd = null; }   // 【v176】第三条线（只报数）
++    return { omni: mo, player: mp, greedy: gd, worst: worst };
+   }
+ 
+   /** 违反项（参考门；阈值集中在上面的 AUDIT_V2_GATES）。 */
+@@ -6337,11 +6382,12 @@
+     html += '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">';
+     html += '<thead><tr style="background:#3a2c22;color:#f3e9db">' +
+       ['关卡', '玩法', '盒', '独木桥(全知/玩家)', '最长走廊', '最低可点', '无满解(全/玩)', '预算点(全/玩)',
+-       '前期限压(全/玩)', '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4', '参考门判定'].map(function (h) {
++       '前期限压(全/玩)', '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4',
++       '贪心线 峰窗/垫槽/赌管道', '参考门判定'].map(function (h) {
+         return '<th style="padding:3px 6px;border:1px solid #5a4636">' + h + '</th>';
+       }).join('') + '</tr></thead><tbody>';
+     rows.forEach(function (r) {
+-      var w = r.level.worst, o = r.level.omni, p = r.level.player;
++      var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+       var pair = function (a, b) { return (a == null ? '-' : a) + ' / ' + (b == null ? '-' : b); };
+       var td = function (txt, bad, extra) {
+         return '<td style="padding:3px 6px;border:1px solid #5a4636' +
+@@ -6359,6 +6405,10 @@
+         td(pair(o ? o.buf34Pct + '%' : null, p ? p.buf34Pct + '%' : null)) +
+         td(pair(o ? o.buf4Pct + '%' : null, p ? p.buf4Pct + '%' : null)) +
+         td(w.hiBefore70Pct + '%', w.hiBefore70Pct > g.hiBefore70PctMax) +
++        td(gd ? ((gd.lateMax == null ? '-' : gd.lateMax) + ' / ' + gd.pads + ' / ' + gd.pipeBets +
++             (gd.pipeBetWhileFull ? '<br><span style="color:#e0592c">满槽边缘还得赌 ' + gd.pipeBetWhileFull + ' 步</span>' : '') +
++             '<br><span style="color:#8a7358">覆盖 ' + gd.coveragePct + '% · ' + (gd.won ? '走通' : '收尾卡死') + '</span>')
++             : '（关掉v2时不测）', !!(gd && gd.pipeBetWhileFull)) +
+         td(ok ? '✓ 通过' : '✗ ' + r.violations.join('、'), !ok) +
+         '</tr>';
+     });
+@@ -6366,6 +6416,8 @@
+     html += '<div style="font-size:11px;color:#8a7358;margin-top:6px">独木桥 = 场上只有 1 个方块能点（按"步"计，点 A 解锁 B 那种走廊算多处）；末段（进度 ≥90% 或剩余盒 ≤3）豁免。' +
+       '预算判断点 = 可点 ≥2，但"取了立刻能消掉"的选项恰 1 个、其余是"取了会占暂存位"的陷阱项。' +
+       '前期限压 = 0~30% 进度段里暂存落在 3~4 的步数占比（≥' + g.early34MinPct + '% 才算前期有预算压力）。' +
++      '贪心线 = 第三条线（像真人：能消就消、消不掉先垫、没得挑时照拿管道口）= 唯一会"垫槽/赌管道"的线；' +
++      '它的峰窗在"中途就卡死"的关上会被低估，所以<b>只报数、不进上面那套取最差判定</b>。' +
+       '最低可点数 ≥2 与"独木桥 0 处"等价，故只作显示、不重复计违反。</div>';
+     body.innerHTML = html;
+     var csvBtn = document.getElementById('btn-choke-audit-csv');
+@@ -6374,10 +6426,10 @@
+ 
+   function exportChokeAuditCSV() {
+     if (!lastChokeAudit || !lastChokeAudit.length) return;
+-    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,独木桥位置,参考门,违反项,难度分'];
++    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,独木桥位置,参考门,违反项,难度分'];
+     var lines = head;
+     lastChokeAudit.forEach(function (r) {
+-      var w = r.level.worst, o = r.level.omni, p = r.level.player;
++      var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+       var V = function (x) { return x == null ? '' : x; };
+       lines.push(['"' + r.name + '"', '"' + entryModeLabel(r.em) + '"', r.boxes,
+         V(o ? o.bridges : null), V(p ? p.bridges : null), w.bridges, w.maxRun, w.minPick,
+@@ -6386,6 +6438,9 @@
+         V(o ? o.early34Pct : null), V(p ? p.early34Pct : null), w.early34Pct,
+         V(o ? o.buf34Pct : null), V(p ? p.buf34Pct : null), V(o ? o.buf4Pct : null), V(p ? p.buf4Pct : null),
+         w.hiBefore70Pct,
++        V(gd ? gd.lateMax : null), V(gd ? gd.pads : null), V(gd ? gd.pipeBets : null),
++        V(gd ? gd.pipeBetWhileFull : null), V(gd ? gd.coveragePct : null),
++        '"' + (gd ? (gd.won ? '走通' : '收尾卡死') : '') + '"',
+         '"' + ((o && o.bridgeAt.length) ? o.bridgeAt.join('/') + '%' : '') +
+           ((p && p.bridgeAt.length) ? (' 玩家:' + p.bridgeAt.join('/') + '%') : '') + '"',
+         (r.violations.length ? '不通过' : '通过'), '"' + r.violations.join('、') + '"', V(r.difficulty)
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4614,10 +4614,114 @@
+     };
+   }
+ 
+-  /** 一关的 v2 指标：全知线 + 玩家线各量一遍，再"取最差"合成一组判据值。 */
+-  function chokeV2Of(parsed, solveResult, playerResult) {
++  // ==================== 【v176】第三条线「贪心玩家」（Greedy Line） ====================
++  // 由来（工作日志第 26/27 节）：前两条线都**透视管道、且永远走最优**，所以"半满车 / 数字冰锁 / 趁钱
++  //   吃不满 / 赌管道"这些手段在它们那儿量不出来——今天五种加压手段实测全部推不动中后期峰窗，
++  //   根因就是"用量尺量错了对象"。贪心线是唯一会**垫槽**与**赌管道**的线，用它才能看见这些手段。
++  //
++  // 策略（= 真人式，与 /private/tmp/numice_gen/greedy_line_probe.js 逐条一致）：
++  //   ① 能消就消，优先消"暂存区里已有同色"的那辆（= 救车）；
++  //   ② 否则在能消的里面挑"该色场上露头最多"的（= 最能清场）；
++  //   ③ 一个都消不掉 → **先垫**（优先垫暂存区同色的车，否则垫容量最小的 = 最容易凑满的那辆）；
++  //   ④ 没得挑时**照拿管道口的车**（= 真人赌管道）。
++  //
++  // 产出三样东西：
++  //   · pickOrder  → 交给 chokeV2MeasureLine 量选择层指标（独木桥 / 预算判断点 / 无满解步…）；
++  //   · samples    → 交给 chokepointAudit 量中后期峰窗；
++  //   · 真人特征计数：垫槽次数、赌管道口次数、赌管道时的暂存峰值/满槽步数 → 承载用户 R6 约束
++  //     （「管道内的车不能算作正常车辆…必须赌管道时暂存最好 ≤3」）。
++  //
++  // ⚠ **已知口径陷阱：不要把它的峰窗直接并进"取最差"的压力指标里。**
++  //   贪心线经常中途就死，压力样本只覆盖到死点 → 峰窗是被**低估**（不是高估）。
++  //   实测（2026-10-16，四关）：小鹿 全知4.0 / 玩家4.0 / **贪心3.0**；实机第3关 4.0/4.0/**4.0**；
++  //   批次61 3.5/3.5/**4.0**；批次62 3.5/3.0/**3.0**。
++  //   若把它并进 min()：用户亲口认可的小鹿会被判"中后期峰窗仅 3.0"不合格（假阴性）。
++  //   所以本函数默认只做 **R6 管道约束 + 报告/可视化**；要不要拿它改压力门，等用户拍板（日志第 30 节）。
++  function chokeV2GreedyLine(parsed, opts) {
++    var S = AntSolver.Simulator;
++    if (!S || !S.enter || !S.listMoves || !S.applyPick || !parsed) return null;
++    var st;
++    try { st = S.enter(parsed, { useSlotStart: true }); } catch (e) { return null; }
++    var order = [], samples = [], lastDone = st.completedBoxes || 0;
++    var guard = 0, maxSteps = (opts && opts.maxSteps) || 1500;
++    var pads = 0, pipeBets = 0, pipeBetBufMax = 0, pipeBetWhileFull = 0;
++    var limit = parsed.bufferLimit || 5;
++    function isPipeMouth(r, c) {
++      var dr = [-1, 1, 0, 0], dc = [0, 0, -1, 1];
++      for (var i = 0; i < 4; i++) {
++        var nr = r + dr[i], nc = c + dc[i];
++        if (nr < 0 || nr >= st.boardRows || nc < 0 || nc >= st.boardCols) continue;
++        var cc = st.cells[nr] && st.cells[nr][nc];
++        if (cc && cc.t === 'pipe') return true;
++      }
++      return false;
++    }
++    try {
++      while (!st.gameOver && guard++ < maxSteps) {
++        var moves = S.listMoves(st), open = [], i;
++        for (i = 0; i < moves.length; i++) if (!moves[i].blocked) open.push(moves[i]);
++        if (!open.length) break;
++        var bufColors = {};
++        for (i = 0; i < st.buffer.length; i++) bufColors[st.buffer[i].color] = 1;
++        var can = [], pad = [];
++        for (i = 0; i < open.length; i++) (open[i].canConsume ? can : pad).push(open[i]);
++        var pick = null;
++        for (i = 0; i < can.length; i++) if (bufColors[can[i].antBox.color]) { pick = can[i]; break; }   // ① 救车
++        if (!pick && can.length) {                                                                        // ② 最能清场
++          var cnt = {};
++          for (i = 0; i < open.length; i++) { var cc2 = open[i].antBox.color; cnt[cc2] = (cnt[cc2] || 0) + 1; }
++          pick = can.slice().sort(function (a, b) { return (cnt[b.antBox.color] || 0) - (cnt[a.antBox.color] || 0); })[0];
++        }
++        if (!pick) {                                                                                      // ③ 先垫
++          pads++;
++          for (i = 0; i < pad.length; i++) if (bufColors[pad[i].antBox.color]) { pick = pad[i]; break; }
++          if (!pick) pick = pad.slice().sort(function (a, b) { return (a.antBox.count || 0) - (b.antBox.count || 0); })[0];
++        }
++        // ④ 赌管道：拿的是"管道口的车"（里面是什么看不见）= 真人行为。两种情形都记：
++        //    垫出来的（一个都消不掉、只好赌）与顺手消的；并单独记"已经在满槽边缘（空位≤1）还得赌"的步数
++        //    —— 后者就是用户 R6 要约束的情形（「必须赌管道时暂存最好 ≤3」）。
++        var cell = st.cells[pick.r] && st.cells[pick.r][pick.c];
++        if (cell && cell.t === 'box' && isPipeMouth(pick.r, pick.c)) {
++          pipeBets++;
++          if (st.buffer.length > pipeBetBufMax) pipeBetBufMax = st.buffer.length;
++          if (st.buffer.length >= limit - 1) pipeBetWhileFull++;
++        }
++        order.push({ r: pick.r, c: pick.c });
++        S.applyPick(st, pick.r, pick.c);
++        if (st.completedBoxes !== lastDone) { lastDone = st.completedBoxes; samples.push({ done: lastDone, buf: st.buffer.length }); }
++        if (st.gameWon) break;
++      }
++    } catch (e) { /* 回放中断：用已采到的部分，不伪造 */ }
++    if (!order.length) return null;
++    var total = parsed.totalBoxes || 0;
++    return {
++      pickOrder: order, samples: samples, won: !!st.gameWon, gameOver: !!st.gameOver,
++      steps: order.length, completedBoxes: st.completedBoxes || 0,
++      coveragePct: total ? Math.round((st.completedBoxes || 0) / total * 100) : 0,
++      pads: pads, pipeBets: pipeBets, pipeBetBufMax: pipeBetBufMax, pipeBetWhileFull: pipeBetWhileFull
++    };
++  }
++
++  /** 一关的 v2 指标：全知线 + 玩家线（+ 贪心线）各量一遍，再"取最差"合成一组判据值。 */
++  function chokeV2Of(parsed, solveResult, playerResult, greedyOn) {
+     var mo = (solveResult && solveResult.pickOrder) ? chokeV2MeasureLine(parsed, solveResult.pickOrder) : null;
+     var mp = (playerResult && playerResult.pickOrder) ? chokeV2MeasureLine(parsed, playerResult.pickOrder) : null;
++    // 【v176】贪心线：**默认不跑**（`greedyOn === true` 才跑）。
++    //   原因有两条：① 候选循环里每关already要跑一次 PlayerSim，再挂一条完整模拟会直接拖慢生产（用户正嫌慢）；
++    //   ② 它的峰窗有"中途死亡→低估"的口径陷阱（见上文），不适合直接进"取最差"。
++    //   所以正式接法是**在生产完成后 + 关卡体检时各算一次**（app.js 的 greedyLineReport），
++    //   候选循环里的 v2 指标与 v175 完全一致 → 本轮生成结果不变，用户手上正在试的几关不受影响。
++    var gr = null, mg = null, ga = null;
++    if (greedyOn === true) {
++      try { gr = chokeV2GreedyLine(parsed); } catch (e) { gr = null; }
++      if (gr && gr.pickOrder && gr.pickOrder.length) {
++        try { mg = chokeV2MeasureLine(parsed, gr.pickOrder); } catch (e) { mg = null; }
++        try {
++          ga = (AntSolver.Analysis && AntSolver.Analysis.chokepointAudit)
++            ? AntSolver.Analysis.chokepointAudit(gr.samples || [], parsed.totalBoxes || 0, parsed.bufferLimit || 5) : null;
++        } catch (e) { ga = null; }
++      }
++    }
+     if (!mo && !mp) return null;
+     var worst = {
+       bridges: Math.max(mo ? mo.bridges : -1, mp ? mp.bridges : -1),
+@@ -4631,6 +4735,13 @@
+     if (worst.early34Pct >= 999) worst.early34Pct = 0;
+     if (worst.r9 >= 1e9) worst.r9 = 0;
+     if (worst.minPick >= 99) worst.minPick = 0;
++    // 【v176】贪心线的"真人特征"：只带出数字，**不参与任何判定**（不加重罚、不进 min/max）。
++    worst.greedyPads = gr ? gr.pads : null;                 // 垫槽次数（一个都消不掉、必须先占一位）
++    worst.greedyPipeBets = gr ? gr.pipeBets : null;         // 赌管道口次数
++    worst.pipeBetBufMax = gr ? gr.pipeBetBufMax : null;     // 赌管道时的暂存高度
++    worst.pipeBetWhileFull = gr ? gr.pipeBetWhileFull : null;   // R6：已在满槽边缘（空位≤1）还得赌管道的步数
++    worst.greedyWon = gr ? gr.won : null;
++    worst.greedyCoveragePct = gr ? gr.coveragePct : null;
+     // 【v169】中后期压力（30~80% 暂存峰窗）：直接用审核函数的同一口径算两条线，取较小者 = 取最差。
+     try {
+       var _lim = parsed.bufferLimit || 5, _tot = parsed.totalBoxes || 0;
+@@ -4647,7 +4758,15 @@
+       if (ap) cands.push(ap.lateMax);
+       worst.midLatePeak = cands.length ? Math.min.apply(null, cands) : null;   // 取最差
+     } catch (e) { worst.midLatePeak = null; }
+-    return { omni: mo, player: mp, worst: worst, gates: CHOKE_V2_GATES };
++    // 【v176】贪心线的峰窗：只报数、**不并进 worst.midLatePeak**（口径陷阱见函数注释：小鹿 3.0 是死点低估）
++    worst.midLatePeakGreedy = ga ? ga.lateMax : null;
++    // 只带出轻量摘要（不带 pickOrder / samples，避免候选记录变重）
++    var greedyRun = gr ? {
++      won: gr.won, steps: gr.steps, coveragePct: gr.coveragePct,
++      pads: gr.pads, pipeBets: gr.pipeBets, pipeBetBufMax: gr.pipeBetBufMax, pipeBetWhileFull: gr.pipeBetWhileFull,
++      midLatePeak: ga ? ga.lateMax : null, peakBuf: ga ? ga.peakBuf : null
++    } : null;
++    return { omni: mo, player: mp, greedy: mg, greedyRun: greedyRun, worst: worst, gates: CHOKE_V2_GATES };
+   }
+ 
+   /** 违反项（空数组 = 通过参考门）。 */
+@@ -8381,6 +8500,7 @@
+     pressureBoostIce: pressureBoostIce,             // 【v170】冰当墙（定向锁免费选项）；供单测直接调用
+     chokeV2Of: chokeV2Of,                 // 【v157】卡点判据 v2（R1~R9）：全知线/玩家线各量一遍再取最差
+     chokeV2Violations: chokeV2Violations, // 【v157】违反项（空数组=达标）——页面每关日志与报告用
++    chokeV2GreedyLine: chokeV2GreedyLine, // 【v176】第三条线「贪心玩家」：垫槽/赌管道/峰窗（页面每关日志 + 体检用；不进候选循环）
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+     setProgressHook: setProgressHook,     // 【v153】单关进度钩子（worker/界面显示跑到哪了）
+     solveSpaceQuota: solveSpaceQuota,                         // 可用空间配额联立解（含管道兜底），可独立调用体检参数是否自相矛盾

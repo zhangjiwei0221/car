@@ -1,0 +1,621 @@
+diff -ruN a/bin/css/style.css b/bin/css/style.css
+--- a/bin/css/style.css	2026-10-14 16:52:25
++++ b/bin/css/style.css	2026-10-14 16:52:25
+@@ -325,6 +325,8 @@
+   text-shadow: 0 0 3px #000;
+ }
+ .board-cell .ov.ice { top: 1px; left: 2px; color: #bfefff; } /* 冰保持冷蓝(语义) */
++/* 【v138】数字冰：右上角冷蓝"还剩几个球"（与老冰区分：老冰在左上、显示 thaw/durability） */
++.board-cell .ov.numice { top: 1px; right: 2px; color: #9fe8ff; font-weight: 700; text-shadow: 0 0 3px #04384d; }
+ .board-cell .ov.chain { bottom: 1px; right: 2px; font-size: calc(var(--csz, 40px) * 0.28); }
+ 
+ /* 模拟控制（右侧栏里竖排：一行一项，按钮/下拉拉满宽度） */
+@@ -878,6 +880,7 @@
+ .edit-cell.pipe { cursor: pointer; }
+ .edit-cell.pipe.edit-sel { outline: 3px solid var(--accent); outline-offset: -3px; box-shadow: 0 0 10px rgba(210,112,31,.8); z-index: 3; }
+ .edit-cell .ov.ice { position: absolute; left: 1px; top: 0; font-size: 10px; color: #bfe9ff; text-shadow: 0 0 3px #0a3550; pointer-events: none; }
++.edit-cell .ov.numice { position: absolute; right: 1px; top: 0; font-size: 10px; color: #9fe8ff; font-weight: 700; text-shadow: 0 0 3px #04384d; pointer-events: none; }
+ .edit-cell .ov.chain { position: absolute; right: 1px; top: 0; font-size: 10px; pointer-events: none; }
+ 
+ /* 管道队列编辑器 */
+diff -ruN a/bin/index.html b/bin/index.html
+--- a/bin/index.html	2026-10-14 16:52:25
++++ b/bin/index.html	2026-10-14 16:52:25
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒</title>
+-  <link rel="stylesheet" href="css/style.css?v=137">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰</title>
++  <link rel="stylesheet" href="css/style.css?v=138">
+ </head>
+ <body>
+   <header>
+@@ -118,7 +118,7 @@
+             <option value="place" selected>🖐 放车 / 改写</option>
+             <option value="erase">🧽 橡皮（清空该格）</option>
+             <option value="black">⬛ 黑块（障碍）</option>
+-            <option value="ice">❄ 冰块（给车加锁）</option>
++            <option value="numice">🧊 数字冰（还剩几个球）</option>
+             <option value="chain">🔗 锁链（给车加链）</option>
+             <option value="question">❓ 问号（隐藏颜色）</option>
+             <option value="pipe">🪠 管道（放管口/改方向）</option>
+@@ -139,8 +139,8 @@
+           <label>锁链组</label>
+           <input type="number" id="edit-chain-group" value="1" min="1" max="99" style="width:48px" title="同组的车会被一起取走（一取就是整组进暂存）。至少要 2 个成员才成链">
+           <button id="edit-chain-new" title="组号 +1：接下来点的车都进新的一组">＋ 新组</button>
+-          <label>冰块耐久</label>
+-          <input type="number" id="edit-ice-dur" value="3" min="1" max="9" style="width:44px" title="冰块耐久：激活后每取一盒解冻 1，减到 0 才可取">
++          <label title="数字冰：覆盖在这辆车上的按球数倒计时。玩家每取走一个球减 1（锁链一步拿 2 个就减 2），减到 0 破碎、该车恢复可取。&#10;&#10;用法：先填数值 → 用「数字冰」工具点车（加/改）；数值没变再点同一格 = 去掉；吸管会把这个数读进框里。数值必须小于全场球数，否则永远减不到 0（配平面板会红字警告）。&#10;&#10;导出为官方 type 7，param 与实机逐字段一致（单独=标量；与锁链/问号叠加=同序数组）。老冰(type 4)已弃用，导入时自动转成数字冰。">数字冰·还剩几个球</label>
++          <input type="number" id="edit-numice-val" value="3" min="1" max="999" style="width:56px" title="数字冰：还剩几个球（每取走一个球减 1，减到 0 破碎）">
+         </div>
+         <!-- 管道队列：选中一个管道格后出现 -->
+         <div id="edit-pipe-panel" class="edit-pipe hidden">
+@@ -175,7 +175,7 @@
+         </div>
+         <div class="edit-tip">
+           空格 = 空位（真实关卡的车场本来就不铺满，例如关卡1 的 4×7 里第 4 行只占第 3、4 列）。<br>
+-          点空格放车 · 点车 = 按当前颜色/载客量改写 · 按住拖到别的格 = 换位 · 右键 = 清空该格。
++          点空格放车 · 点车 = 按当前颜色/载客量改写 · 按住拖到别的格 = 换位 · 右键 = 清空该格。<br>🧊 数字冰 = 叠在车上的按球数倒计时（实机机制）：每取走 1 个球减 1，锁链一步拿 2 个就减 2，减到 0 破碎。数值在右上「数字冰·还剩几个球」里填；点车加/改，数值没变再点一次＝去掉。<b>老冰已弃用</b>：导入带老冰的关卡时会自动转成数字冰（数值取原耐久），导出的 JSON 里不会再出现 type 4。
+         </div>
+       </section>
+ 
+@@ -806,19 +806,19 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=137"></script>
+-  <script src="js/levels.js?v=137"></script>
+-  <script src="js/utils.js?v=137"></script>
+-  <script src="js/simulator.js?v=137"></script>
++  <script src="js/zip.js?v=138"></script>
++  <script src="js/levels.js?v=138"></script>
++  <script src="js/utils.js?v=138"></script>
++  <script src="js/simulator.js?v=138"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=137"></script>
+-  <script src="js/solver-strategy.js?v=137"></script>
+-  <script src="js/solver.js?v=137"></script>
+-  <script src="js/playersim.js?v=137"></script>
+-  <script src="js/generator.js?v=137"></script>
+-  <script src="js/analysis.js?v=137"></script>
++  <script src="js/anchor-cut.js?v=138"></script>
++  <script src="js/solver-strategy.js?v=138"></script>
++  <script src="js/solver.js?v=138"></script>
++  <script src="js/playersim.js?v=138"></script>
++  <script src="js/generator.js?v=138"></script>
++  <script src="js/analysis.js?v=138"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=137"></script>
+-  <script src="js/app.js?v=137"></script>
++  <script src="js/level-editor.js?v=138"></script>
++  <script src="js/app.js?v=138"></script>
+ </body>
+ </html>
+diff -ruN a/bin/js/app.js b/bin/js/app.js
+--- a/bin/js/app.js	2026-10-14 16:52:25
++++ b/bin/js/app.js	2026-10-14 16:52:25
+@@ -2010,6 +2010,18 @@
+       title = (cell.q ? '问号(已揭示) ' : '') + AntSolver.getColorName(cell.color) + ' ×' + cell.count;
+     }
+     var overlay = '';
++    // 【v138】数字冰：右上角显示"还剩几个球"。模拟态读 state.numice（每取走一球递减，锁链一步扣 2）；
++    //   非模拟态显示作者预设值。破碎后从 state.numice 消失 → 不再显示，也不再灰显。
++    var numIceRemain = null;
++    if (cell.numice > 0 || (state && state.numice && state.numice[r + ',' + c])) {
++      numIceRemain = (state && state.numice && state.numice[r + ',' + c])
++        ? state.numice[r + ',' + c].remaining
++        : cell.numice;
++    }
++    if (numIceRemain != null) {
++      overlay += '<span class="ov numice" title="数字冰：还剩 ' + numIceRemain + ' 个球（每取走一个球减 1，锁链一步 2 个就减 2）">🧊' + numIceRemain + '</span>';
++      title += '｜数字冰还剩 ' + numIceRemain + ' 球';
++    }
+     if (cell.ice > 0) {
+       // 冰块：显示解冻进度 thaw/durability（模拟中）
+       var thawTxt = '❄';
+@@ -2033,6 +2045,8 @@
+     var iceLocked = state && state.frozen && state.frozen[r + ',' + c] &&
+                     !(state.frozen[r + ',' + c].activated && state.frozen[r + ',' + c].thaw >= state.frozen[r + ',' + c].durability);
+     if (iceLocked) cls += ' locked';
++    // 【v138】数字冰未破碎 → 同样灰显（口径与老冰一致：锁着就看着"取不了"）
++    if (state && state.numice && state.numice[r + ',' + c] && state.numice[r + ',' + c].remaining > 0) cls += ' locked';
+     return '<div class="' + cls + '" style="' + style + '" data-r="' + r + '" data-c="' + c + '" title="' + title + '">' +
+            '<span class="cnt">' + label + '</span>' + overlay + '</div>';
+   }
+diff -ruN a/bin/js/level-editor.js b/bin/js/level-editor.js
+--- a/bin/js/level-editor.js	2026-10-14 16:52:25
++++ b/bin/js/level-editor.js	2026-10-14 16:52:25
+@@ -29,16 +29,19 @@
+   var snapshotBlocks = null; // 【v133】进入编辑时的目标图原样（目标区可微调后，这个也要能回退）
+   var curColor = 1;
+   var curCount = 3;
+-  var tool = 'place';      // place | erase | black | ice | chain | question | pipe | pick
++  // 【v138】'ice' → 'numice'：手动摆盘只出【数字冰】(type 7)，老冰(type 4)已弃用（用户 2026-10-14）。
++  var tool = 'place';      // place | erase | black | numice | chain | question | pipe | pick
+   var curDir = 13;         // 【v134】管道方向：11↑ 12→ 13↓ 14←（与官方 type 一致）
+   var curChain = 1;        // 当前锁链组号（同号成一组）
+-  var curIce = 3;          // 冰块耐久（simulator 直接用 cell.ice 当 durability，见 simulator.js:165）
++  // 【v138】数字冰：数值 = 还剩几个球。与实机一致：每取走一个球减 1，锁链一步拿 2 个就减 2，减到 0 破碎。
++  var curNumIce = 3;
++  var restoredIce4 = 0;    // 【v138】本次进入编辑器时，有多少格老冰被转成了数字冰（提示用，转完清零）
+   var selCell = null;      // 当前选中的格子 {r,c}：选中管道时展开队列编辑面板
+   var drag = null;         // { mode:'paint'|'erase'|'black'|'move', from:{r,c}, moved:bool }
+ 
+   function $(id) { return document.getElementById(id); }
+ 
+-  function mkBox() { return { t: 'box', color: curColor, count: curCount, ice: 0, chain: 0, q: false }; }
++  function mkBox() { return { t: 'box', color: curColor, count: curCount, ice: 0, chain: 0, q: false, numice: 0 }; }
+ 
+   function emptyCells(rows, cols) {
+     var cells = [];
+@@ -48,7 +51,7 @@
+ 
+   function cloneCell(cell) {
+     if (!cell) return null;
+-    if (cell.t === 'box') return { t: 'box', color: cell.color, count: cell.count, ice: cell.ice || 0, chain: cell.chain || 0, q: !!cell.q };
++    if (cell.t === 'box') return { t: 'box', color: cell.color, count: cell.count, ice: cell.ice || 0, chain: cell.chain || 0, q: !!cell.q, numice: cell.numice || 0 };
+     if (cell.t === 'black') return { t: 'black' };
+     if (cell.t === 'pipe') return { t: 'pipe', dir: cell.dir, queue: (cell.queue || []).map(function (x) { return { color: x.color, count: x.count }; }), next: cell.next || 0 };
+     return null;
+@@ -74,11 +77,33 @@
+ 
+   function boardFromLevel() {
+     var lv = host.getLevel();
+-    if (lv && lv.board && lv.board.rows > 0 && lv.board.cols > 0) return cloneBoard(lv.board);
++    if (lv && lv.board && lv.board.rows > 0 && lv.board.cols > 0) return convertLegacyIce(cloneBoard(lv.board));
+     // 目标图导入(TXT)后 currentLevel.board 是空的 → 给一块默认车场（行4×列7 = 手工关卡1 的车场形状）
+     return { rows: 4, cols: 7, cells: emptyCells(4, 7) };
+   }
+ 
++  /**
++   * 【v138】老冰(type4) → 数字冰(type7)。用户 2026-10-14：「老冰不要了」。
++   *   为什么不直接删掉：老冰格是真障碍，删掉等于把关卡的封锁整片抽走、配平也跟着变。
++   *   换算口径：老冰耐久（官方导入恒为 3）→ 数字冰"还剩几个球"取同一个数，语义都是"要消掉 3 个才开"。
++   *   转换后补丁棋盘上不再有 cell.ice，导出也永不出现 type:4（toGameFormat：有数字冰就不出 4）。
++   */
++  function convertLegacyIce(board) {
++    var n = 0;
++    if (!board) return board;
++    for (var r = 0; r < board.rows; r++) {
++      for (var c = 0; c < board.cols; c++) {
++        var cell = board.cells[r][c];
++        if (!cell || cell.t !== 'box' || !(cell.ice > 0)) continue;
++        cell.numice = cell.numice > 0 ? cell.numice : (cell.ice || A.NUMICE_DEFAULT || 3);
++        cell.ice = 0;
++        n++;
++      }
++    }
++    if (n > 0) restoredIce4 = n;   // 供 renderAll 提示「原冰块 N 格已转数字冰」
++    return board;
++  }
++
+   // ==================== 渲染 ====================
+   // 与 renderQueues 同一套宽度口径（都取 #target-container；该元素当前不存在 → 回落到 480），
+   // 保证「摆盒棋盘」与「模拟棋盘」看起来是同一块板，来回切换不跳尺寸。
+@@ -133,10 +158,11 @@
+     var label = cell.q ? '?' : cell.count;
+     var title = (cell.q ? '问号(隐藏色，实际是' + A.getColorName(cell.color) + ') ' : '') +
+       A.getColorName(cell.color) + ' ×' + cell.count +
+-      (cell.ice > 0 ? '｜冰块❄耐久' + cell.ice : '') +
++      (cell.numice > 0 ? '｜数字冰🧊还剩' + cell.numice + '个球' : '') +
++      (cell.ice > 0 ? '｜⚠老冰(待转数字冰)' : '') +
+       (cell.chain > 0 ? '｜锁链组' + chainTag(cell.chain) : '');
+     var ov = '';
+-    if (cell.ice > 0) ov += '<span class="ov ice">❄' + cell.ice + '</span>';
++    if (cell.numice > 0) ov += '<span class="ov numice" title="数字冰：每取走一个球减 1（锁链一步 2 个就减 2），减到 0 破碎">🧊' + cell.numice + '</span>';
+     if (cell.chain > 0) ov += '<span class="ov chain" style="color:' + chainColor(cell.chain) + '">🔗' + chainTag(cell.chain) + '</span>';
+     return '<div class="' + cls + '" style="' + style + '"' + pos + ' title="' + title + '">' +
+       '<span class="cnt">' + label + '</span>' +
+@@ -212,6 +238,8 @@
+     var have = {}, haveBoard = {}, havePipe = {};
+     var cars = 0, cap = 0, empty = 0, black = 0, pipes = 0, pipeBoxes = 0, pipeCap = 0;
+     var ice = 0, qm = 0, chainGroups = {}, pipeExitBlocked = 0;
++    // 【v138】数字冰统计：格数 + 最大数值（用于"永不破碎死墙"检查：数值 ≥ 全场球数就永远解不开）
++    var numice = 0, numiceMax = 0;
+     for (var r = 0; r < working.rows; r++) {
+       for (var c = 0; c < working.cols; c++) {
+         var cell = working.cells[r][c];
+@@ -241,6 +269,7 @@
+         if (cell.t === 'box') {
+           cars++; cap += (cell.count || 0);
+           if (cell.ice > 0) ice++;
++          if (cell.numice > 0) { numice++; if (cell.numice > numiceMax) numiceMax = cell.numice; }
+           if (cell.q) qm++;
+           if (cell.chain > 0) chainGroups[cell.chain] = (chainGroups[cell.chain] || 0) + 1;
+           haveBoard[cell.color] = (haveBoard[cell.color] || 0) + (cell.count || 0);
+@@ -253,7 +282,8 @@
+     return { need: need, have: have, haveBoard: haveBoard, havePipe: havePipe, total: total,
+              cap: cap, cars: cars, empty: empty, black: black, pipes: pipes,
+              pipeBoxes: pipeBoxes, pipeCap: pipeCap,
+-             ice: ice, qm: qm, chainGroupCount: chainGroupCount, loneChains: loneChains,
++             ice: ice, numice: numice, numiceMax: numiceMax,
++             qm: qm, chainGroupCount: chainGroupCount, loneChains: loneChains,
+              chainGroups: chainGroups, pipeExitBlocked: pipeExitBlocked };
+   }
+ 
+@@ -267,6 +297,10 @@
+     var list = Object.keys(ids).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; });
+ 
+     var html = '<div class="edit-vhead">每色人数核对 <span>(车上载客' + (s.pipeBoxes ? '，含管道内' : '') + ' / 板上像素)</span></div>';
++    if (restoredIce4 > 0) {
++      html += '<div class="edit-vrow nobad" style="display:block">🧊 本次载入：原冰块（老冰 type4）<b>' + restoredIce4
++        + '</b> 格已自动转成数字冰（数值取原耐久），导出时不会再出现老冰</div>';
++    }
+     if (!list.length) html += '<div class="edit-vrow nobad">还没有目标图，先导入 TXT</div>';
+     var badTotal = 0;
+     for (var i = 0; i < list.length; i++) {
+@@ -291,7 +325,8 @@
+       '车 ' + s.cars + ' 辆 · 载客合计 ' + (s.cap + s.pipeCap) + ' / 板上 ' + s.total + ' 人 · 空位 ' + s.empty +
+       (s.black ? (' · 黑块 ' + s.black) : '') +
+       (s.pipes ? (' · 管道 ' + s.pipes + ' 条（内含 ' + s.pipeBoxes + ' 盒 / ' + s.pipeCap + ' 人）') : '') +
+-      (s.ice ? (' · 冰块 ' + s.ice) : '') +
++      (s.numice ? (' · 数字冰 ' + s.numice) : '') +
++      (s.ice ? (' · ⚠老冰(待转数字冰) ' + s.ice) : '') +
+       (s.chainGroupCount ? (' · 锁链 ' + s.chainGroupCount + ' 组') : '') +
+       (s.qm ? (' · 问号 ' + s.qm) : '') + '<br>' +
+       (badTotal === 0 && s.cars > 0
+@@ -301,6 +336,10 @@
+       // 【v134】障碍类提示：这三条都是"摆得出来但玩不成/不合规"的坑
+       (s.pipeExitBlocked ? ('<br><b class="warn2">⚠ 有 ' + s.pipeExitBlocked + ' 条管道的出口被占住（出口格有车/黑块，或指向盘外）：这些管道吐不出盒</b>') : '') +
+       (s.loneChains ? ('<br><b class="warn2">⚠ 有 ' + s.loneChains + ' 个锁链组只有 1 个成员：规则上会被当成普通车（至少要 2 个才成链）</b>') : '') +
++      // 【v138】数字冰两条硬警告：数太大=死墙；与老冰并存（转换后不该出现，出现就是漏改）
++      ((s.numice && s.numiceMax >= (s.cars + s.pipeBoxes))
++        ? ('<br><b class="warn2">⚠ 数字冰数值 ' + s.numiceMax + ' ≥ 全场球数 ' + (s.cars + s.pipeBoxes) + '：永远减不到 0，等于一堵解不开的死墙</b>') : '') +
++      (s.ice ? ('<br><b class="warn2">⚠ 还有 ' + s.ice + ' 格老冰：本版只用数字冰（导入时应已自动转换，出现这行说明没转干净）</b>') : '') +
+       '</div>';
+     el.innerHTML = html;
+   }
+@@ -344,10 +383,18 @@
+     var cell = working.cells[r][c];
+     if (tool === 'erase') { working.cells[r][c] = null; return null; }
+     if (tool === 'black') { working.cells[r][c] = { t: 'black' }; return null; }
+-    if (tool === 'ice') {
+-      if (!cell || cell.t !== 'box') return '冰块只能加在车上：先用「放车」放一辆，再点冰块';
+-      cell.ice = (cell.ice > 0) ? 0 : curIce;
+-      return cell.ice > 0 ? ('已加冰块：耐久 ' + cell.ice + '（激活后每取一盒解冻 1）') : '已去掉冰块';
++    // 【v138】数字冰（取代老冰）：点车加/去；数值可调 —— 输入框改个数再点同一格＝改数值，
++    //   数值没变再点一次＝去掉。加数字冰时顺带清掉该格老冰（两者互斥，实机也是）。
++    if (tool === 'numice') {
++      if (!cell || cell.t !== 'box') return '数字冰只能加在车上：先用「放车」放一辆，再点数字冰';
++      if (cell.numice > 0) {
++        if (cell.numice === curNumIce) { cell.numice = 0; return '已去掉数字冰'; }
++        cell.numice = curNumIce;
++        return '数字冰还剩球数已改为 ' + curNumIce;
++      }
++      cell.numice = curNumIce;
++      if (cell.ice) { cell.ice = 0; return '已加数字冰：还剩 ' + curNumIce + ' 个球（该格老冰已清掉）'; }
++      return '已加数字冰：还剩 ' + curNumIce + ' 个球（每取走 1 个球减 1，减到 0 破碎）';
+     }
+     if (tool === 'chain') {
+       if (!cell || cell.t !== 'box') return '锁链只能加在车上：先用「放车」放一辆，再点锁链';
+@@ -379,7 +426,12 @@
+     var cell = working.cells[r][c];
+ 
+     if (tool === 'pick') {
+-      if (cell && cell.t === 'box') { curColor = cell.color; curCount = cell.count; renderPalette(); syncControls(); renderBoard(); }
++      if (cell && cell.t === 'box') {
++        curColor = cell.color; curCount = cell.count;
++        // 【v138】吸管也把数字冰数值读进输入框（要"改数值"时先吸一格再改，比手输省事）
++        if (cell.numice > 0) { curNumIce = cell.numice; var ni = $('edit-numice-val'); if (ni) ni.value = curNumIce; }
++        renderPalette(); syncControls(); renderBoard();
++      }
+       else if (cell && cell.t === 'pipe') { selCell = { r: r, c: c }; renderBoard(); }
+       renderPipePanel();
+       return;
+@@ -392,8 +444,8 @@
+       renderValidate();
+       return;
+     }
+-    // 标记类工具（冰块/锁链/问号）与管道：单击生效，不做拖动刷
+-    if (tool === 'ice' || tool === 'chain' || tool === 'question' || tool === 'pipe') {
++    // 标记类工具（数字冰/锁链/问号）与管道：单击生效，不做拖动刷
++    if (tool === 'numice' || tool === 'chain' || tool === 'question' || tool === 'pipe') {
+       drag = null;
+       var hint = applyTool(r, c);
+       if (hint) status(hint);
+@@ -711,6 +763,7 @@
+   // ==================== 生命周期 ====================
+   function enter() {
+     if (editing) return;
++    restoredIce4 = 0;                                  // 【v138】每次进入重新统计"老冰转数字冰"的格数
+     working = boardFromLevel();
+     snapshot = cloneBoard(working);
+     snapshotBlocks = cloneBlocks(host.getBlocks ? host.getBlocks() : null);   // 【v133】目标区原样，供一键回退
+@@ -772,10 +825,11 @@
+       if (cgIn) cgIn.value = curChain;
+       status('锁链组切到 ' + chainTag(curChain) + '（组号 ' + curChain + '）：接下来点的车都进这一组');
+     });
+-    var iceIn = $('edit-ice-dur');
+-    if (iceIn) iceIn.addEventListener('input', function () {
++    // 【v138】数字冰数值输入框（取代「冰块耐久」）：可以随时改，改完点格子即写入
++    var niIn = $('edit-numice-val');
++    if (niIn) niIn.addEventListener('input', function () {
+       var v = parseInt(this.value, 10);
+-      curIce = (isNaN(v) || v < 1) ? 1 : Math.min(9, v);
++      curNumIce = (isNaN(v) || v < 1) ? 1 : Math.min(999, v);
+     });
+     var pq = $('edit-pipe-queue');
+     if (pq) { pq.addEventListener('click', onPipeQueueClick); pq.addEventListener('input', onPipeQueueInput); }
+diff -ruN a/bin/js/simulator.js b/bin/js/simulator.js
+--- a/bin/js/simulator.js	2026-10-14 16:52:25
++++ b/bin/js/simulator.js	2026-10-14 16:52:25
+@@ -68,7 +68,8 @@
+   // ---- 棋盘 cell 深拷贝 ----
+   function cloneCell(cell) {
+     if (cell == null) return null;
+-    if (cell.t === 'box') return { t: 'box', color: cell.color, count: cell.count, ice: cell.ice || 0, chain: cell.chain || 0, q: !!cell.q };
++    // 【v138】数字冰字段必须跟着深拷贝走：漏掉它 = 克隆出来的棋盘没有数字冰（求解器/玩家模拟/撤销全都会瞎）
++    if (cell.t === 'box') return { t: 'box', color: cell.color, count: cell.count, ice: cell.ice || 0, chain: cell.chain || 0, q: !!cell.q, numice: cell.numice || 0 };
+     if (cell.t === 'black') return { t: 'black' };
+     if (cell.t === 'pipe') return { t: 'pipe', dir: cell.dir, queue: (cell.queue || []).map(function(b) { return { color: b.color, count: b.count }; }), next: cell.next || 0, opened: !!cell.opened };
+     return null;
+@@ -110,6 +111,10 @@
+       activated: {},    // 'r,c' -> true（单调激活）
+       removed: {},      // 'r,c' -> true（曾被拿走的格；用于问号"相邻被拿走即揭示"）
+       frozen: {},       // 'r,c' -> {activated, thaw, durability}
++      // 【v138】数字冰：'r,c' -> { remaining: 还剩几个球 }。与老冰 frozen 并存但互斥（同一格不会有两者）。
++      //   语义（与实机一致）：**按球数**倒计时——玩家每取走一个球，该格 remaining 减 1；锁链一步拿 2 个球就一次减 2；
++      //   减到 ≤0 即破碎（从本表移除），此后该格与普通盒一样，仍要满足暴露/可达才可取。
++      numice: {},
+       chainGroups: [],  // [[{r,c},...], ...] 每组2或3连（仅横/竖正交；三连可 L/反L）
+       pressureSamples: [], // 每完成一个球记录 {done,buf}（buf=此刻暂存数，不含本次完成的球）
+       capturePreviewStats: !!(opts && opts.capturePreviewStats), // 仅图表/调试按需采集可消/封锁快照，避免生产批量无谓计算
+@@ -164,6 +169,10 @@
+         if (AntSolver.isBox(cell) && cell.ice > 0) {
+           s.frozen[r + ',' + c] = { activated: false, thaw: 0, durability: cell.ice };
+         }
++        // 【v138】数字冰：把作者预设的剩余球数记进运行态（破碎后就从本表删掉）
++        if (AntSolver.isBox(cell) && cell.numice > 0) {
++          s.numice[r + ',' + c] = { remaining: cell.numice };
++        }
+       }
+     }
+     // 锁链分组：按 chain 组号收集（每组2或3连，仅横/竖正交，三连可 L/反L）
+@@ -221,6 +230,30 @@
+     }
+   }
+ 
++  /**
++   * 【v138】数字冰：按**本步取走的球数**推进倒计时（实机口径）。
++   *   锁链一步拿 2 个球 → 一次扣 2；拿满/超过剩余数即破碎（从运行态移除，此后按普通盒判定）。
++   *   注意：数字冰是"全局球数"倒计时，与激活/暴露无关 —— 所以这里不看 activated。
++   * @param {object} s 模拟态
++   * @param {number} balls 本步取走的球数（= 离场的格子数，锁链整组一起算）
++   */
++  function advanceNumIce(s, balls) {
++    if (!s.numice || !(balls > 0)) return;
++    for (var k in s.numice) {
++      var it = s.numice[k];
++      if (!(it.remaining > 0)) continue;
++      it.remaining -= balls;
++      if (it.remaining <= 0) delete s.numice[k];   // 破碎：恢复成普通盒（仍要暴露才可取）
++    }
++  }
++
++  /** 【v138】数字冰是否还在锁着该格（锁着 → 不可取）。 */
++  function isNumIceLocked(s, r, c) {
++    if (!s || !s.numice) return false;
++    var it = s.numice[r + ',' + c];
++    return !!(it && it.remaining > 0);
++  }
++
+   /** 查(r,c)所在的锁链组（全部成员位置）。返回 [{r,c},...] 或 null。 */
+   function chainGroupMembers(s, r, c) {
+     for (var i = 0; i < s.chainGroups.length; i++) {
+@@ -323,6 +356,7 @@
+     if (!AntSolver.isBox(s.cells[r][c])) return false;
+     if (!s.activated[r + ',' + c]) return false;
+     if (isIceLocked(s, r, c)) return false;
++    if (isNumIceLocked(s, r, c)) return false;   // 【v138】数字冰未破碎 → 不可取
+     if (isChainLocked(s, r, c)) return false;
+     return true;
+   }
+@@ -751,7 +785,8 @@
+           if (!AntSolver.isEmptyCell(s.cells[er][ec])) continue;
+           if (cell.next < cell.queue.length) {
+             var ball = cell.queue[cell.next];
+-            s.cells[er][ec] = { t: 'box', color: ball.color, count: ball.count, ice: 0, chain: 0, q: false };
++            // 【v138】管道吐出来的盒天然没有数字冰（与 initBoardObstacles 口径一致）
++            s.cells[er][ec] = { t: 'box', color: ball.color, count: ball.count, ice: 0, chain: 0, q: false, numice: 0 };
+             cell.next++;
+             changed = true;
+           }
+@@ -1121,6 +1156,7 @@
+     }
+ 
+     advanceIce(s);            // 冰块解冻推进（所有已激活冰块 +1）
++    advanceNumIce(s, picked.length);   // 【v138】数字冰按本步球数倒计时（锁链一步 2/3 个盒就扣 2/3）
+     checkPipeRelease(s);      // 管道释放
+     updateActivation(s);      // 激活相邻（单调）
+ 
+@@ -1173,6 +1209,7 @@
+       boxes.push({ r: r, c: c, color: box.color, count: box.count }); s.cells[r][c] = null; markPipeOpenedIfExit(s, r, c); if (s.removed) s.removed[r + ',' + c] = true;
+     }
+     advanceIce(s);
++    advanceNumIce(s, boxes.length);   // 【v138】数字冰按本步球数倒计时（玩家模拟走这条路径）
+     checkPipeRelease(s);
+     updateActivation(s);
+     return { boxes: boxes, isChain: !!(group && boxes.length > 1) };
+@@ -1316,6 +1353,7 @@
+       buffer: AntSolver.deepClone(state.buffer),
+       activated: AntSolver.deepClone(state.activated),
+       frozen: AntSolver.deepClone(state.frozen),
++      numice: AntSolver.deepClone(state.numice),   // 【v138】数字冰倒计时也要能回退
+       steps: state.steps,
+       eliminatedPixels: state.eliminatedPixels,
+       completedBoxes: state.completedBoxes,
+@@ -1334,6 +1372,7 @@
+     state.buffer = p.buffer;
+     state.activated = p.activated;
+     state.frozen = p.frozen;
++    state.numice = p.numice;    // 【v138】
+     state.steps = p.steps;
+     state.eliminatedPixels = p.eliminatedPixels;
+     state.completedBoxes = p.completedBoxes;
+@@ -1357,6 +1396,9 @@
+     instantChainCount: instantChainCount,
+     elimDispatch: elimDispatch,
+     elimOnMatrix: elimOnMatrix,
++    // 【v138】数字冰：按球数倒计时 / 是否锁着（供单测与外部按球数推进使用）
++    advanceNumIce: advanceNumIce,
++    isNumIceLocked: isNumIceLocked,
+     getNextSlotStart: getNextSlotStart, previewNextEliminationOrder: previewNextEliminationOrder,
+     computeReach: computeReach, isPickable: isPickable, isExposedAt: isExposedAt,
+     createState: createState, processAntBox: processAntBox, autoReleaseBuffer: autoReleaseBuffer,
+diff -ruN a/bin/js/solver-strategy.js b/bin/js/solver-strategy.js
+--- a/bin/js/solver-strategy.js	2026-10-14 16:52:25
++++ b/bin/js/solver-strategy.js	2026-10-14 16:52:25
+@@ -53,6 +53,9 @@
+     var activated = {}; for (var k in state.activated) activated[k] = state.activated[k];
+     var removed = {}; if (state.removed) for (var k2 in state.removed) removed[k2] = state.removed[k2];
+     var frozen = {}; for (var k3 in state.frozen) { var f = state.frozen[k3]; frozen[k3] = { activated: f.activated, thaw: f.thaw, durability: f.durability }; }
++    // 【v138】数字冰运行态也要克隆：不带上它，前瞻分支会把"还没破碎的数字冰"当成可取 →
++    //   求解器算出一条现实里走不通的路线（这类漏字段最难查，必须显式带上）。
++    var numice = {}; if (state.numice) for (var k4 in state.numice) { var itn = state.numice[k4]; numice[k4] = { remaining: itn.remaining }; }
+     var elim = new Array(state.rows);
+     for (var r = 0; r < state.rows; r++) elim[r] = state.eliminated[r].slice();
+     return {
+@@ -60,6 +63,7 @@
+       eliminated: elim, buffer: buf, bufferLimit: state.bufferLimit, totalPixels: state.totalPixels,
+       boardRows: state.boardRows, boardCols: state.boardCols, cells: Sim.cloneCells(state.cells),
+       activated: activated, removed: removed, frozen: frozen, chainGroups: state.chainGroups || [],
++      numice: numice,
+       steps: state.steps, totalBoxes: state.totalBoxes, eliminatedPixels: state.eliminatedPixels,
+       completedBoxes: state.completedBoxes, _linkSeq: state._linkSeq || 0, _keySeq: state._keySeq || 0,
+       capture: false, capturePreviewStats: false, pressureSamples: null, history: [],
+@@ -465,6 +469,7 @@
+ 
+   return {
+     chooseLookahead: chooseLookahead, pickBestMove: pickBestMove,
+-    greedyPick: greedyPick, treePick: treePick
++    greedyPick: greedyPick, treePick: treePick,
++    cloneState: cloneState          // 【v138】导出供单测核对"深拷贝是否带全障碍状态"（数字冰漏拷最难查）
+   };
+ })();
+diff -ruN a/bin/js/utils.js b/bin/js/utils.js
+--- a/bin/js/utils.js	2026-10-14 16:52:25
++++ b/bin/js/utils.js	2026-10-14 16:52:25
+@@ -111,7 +111,7 @@
+     var row = [];
+     for (var c = 0; c < cols; c++) {
+       var g = elevs[c][r];
+-      if (g) row.push({ t: 'box', color: AntSolver.CF_BASE + g.c, count: g.n, ice: 0, chain: 0, q: !!g.h });
++      if (g) row.push({ t: 'box', color: AntSolver.CF_BASE + g.c, count: g.n, ice: 0, chain: 0, q: !!g.h, numice: 0 });
+       else row.push(null);
+     }
+     cells.push(row);
+@@ -160,13 +160,17 @@
+ // 单一来源：生成侧铺冰、官方格式导入还原都取这个值，避免两处各写一个数字而漂移
+ // （2026-08-05 修复前，导入还原写死 2、生成侧是 3，导致导入复算比真实玩法宽松一步）。
+ AntSolver.ICE_DURABILITY_DEFAULT = 3;
++// 【v138】数字冰：数值 = 还剩几个球（全局球数倒计时）。默认值取与老冰耐久同口径的 3，
++//   仅在「老冰转数字冰」这种内部转换时使用；摆盘时的数值由用户自己在编辑器里填。
++AntSolver.NUMICE_DEFAULT = 3;
+ 
+ // ==================== 棋盘（元素区）模型 ====================
+ // 棋盘 = 蚂蚁盒所在的二维网格（复用毛线元素区）。障碍/管道均在棋盘上，不在目标图。
+ // 棋盘尺寸：9 行 × 9~19 列。
+ // cell 格式：
+ //   null                                    空格（可通行）
+-//   { t:'box', color, count, ice, chain, q } 蚂蚁盒（ice=解冻所需相邻消除数0/2/3；chain=配对组号0=无；q=问号隐藏色）
++//   { t:'box', color, count, ice, chain, q, numice } 蚂蚁盒（ice=老冰耐久0/3；chain=配对组号0=无；q=问号隐藏色；
++//                                                    numice=数字冰还剩几个球，0=无，见 v138）
+ //   { t:'black' }                            黑块（永久阻挡）
+ //   { t:'pipe', dir, queue, next }           管道（dir=11上/12右/13下/14左，queue=[{color,count}]，next=已释放数）
+ AntSolver.BOARD_ROWS = 9;
+@@ -186,7 +190,7 @@
+   if (cell == null) return null;
+   if (typeof cell === 'number') {
+     if (cell <= 0) return null;
+-    return { t: 'box', color: cell, count: 1, ice: 0, chain: 0, q: false };
++    return { t: 'box', color: cell, count: 1, ice: 0, chain: 0, q: false, numice: 0 };
+   }
+   if (cell.t === 'black' || cell.b === 1 || cell.id === -1) return { t: 'black' };
+   if (cell.t === 'pipe' || cell.dir >= 11) {
+@@ -198,7 +202,8 @@
+     return {
+       t: 'box',
+       color: cell.color, count: cell.count || 1,
+-      ice: cell.ice || 0, chain: cell.chain || 0, q: !!cell.q
++      ice: cell.ice || 0, chain: cell.chain || 0, q: !!cell.q,
++      numice: cell.numice || 0            // 【v138】数字冰（0=无）
+     };
+   }
+   return null;
+@@ -216,7 +221,7 @@
+     var row = [];
+     for (var c2 = 0; c2 < cols; c2++) {
+       var box = queues[c2][r];
+-      row.push(box ? { t: 'box', color: box.color, count: box.count, ice: 0, chain: 0, q: false } : null);
++      row.push(box ? { t: 'box', color: box.color, count: box.count, ice: 0, chain: 0, q: false, numice: 0 } : null);
+     }
+     cells.push(row);
+   }
+@@ -716,8 +721,13 @@
+ /* ==================== 程序端关卡文件结构 双向转换 ====================
+  * 官方(程序端)关卡本体：{ toprow, blocks:[[数字色]], maprow, mapcol, spools:[[{id,type,param,count}]] }
+  *   - spool: id=颜色(0空/-1黑块)，count=盒容量，type 功能，param 参数
+- *   - 功能 type：0无 / 4冰 / 5链条 / 6问号 / 11-14管道；多功能=升序数组，如 [5,6]
++ *   - 功能 type：0无 / 4老冰 / 5链条 / 6问号 / 7数字冰 / 11-14管道；多功能=升序数组，如 [5,6]
+  *   - 链条 param=组ID(相同=共链)；冰只输出 type:4(耐久1+3逻辑在程序端)；管道 param=队列[{id,count}]
++ *   - 【v138·数字冰】type:7 的 param 与实机（游戏里正在跑的 campaign99 那批）逐字段一致：
++ *       仅数字冰            → param = 剩余球数（标量）      例 {"type":7,"param":11}
++ *       数字冰 + 锁链/问号  → type 数组 + **同序 param 数组** 例 {"type":[5,7],"param":[2,42]}（[链组ID, 球数]）
++ *                                                           例 {"type":[6,7],"param":[0,19]}（[0, 球数]）
++ *     数字冰与老冰互斥：同一格有数字冰时不再输出 type:4。
+  * 本体【不含】bufferLimit/难度/求解等——那些进 关卡数据.json（本地调试）。
+  */
+ 
+@@ -733,11 +743,22 @@
+       return { id: 0, type: cell.dir || 11, param: q, count: 0 };
+     }
+     var types = [];                                                                  // 盒：收集功能
+-    if (cell.ice) types.push(4);
++    if (cell.ice && !cell.numice) types.push(4);   // 老冰；数字冰与老冰互斥（有数字冰就不再出 type4）
+     if (cell.chain) types.push(5);
+     if (cell.q) types.push(6);
++    if (cell.numice) types.push(7);                // 【v138】数字冰：按球数倒计时
+     var type = types.length === 0 ? 0 : (types.length === 1 ? types[0] : types);
+-    var param = cell.chain ? cell.chain : 0;   // 链条组ID→param(相同=共链)；冰/问号不用参数
++    var param;
++    if (cell.numice) {
++      // 【与实机一致】单独数字冰 → 标量；与锁链/问号叠加 → 与 types 同序的 param 数组（无参数项填 0）
++      param = (types.length === 1) ? cell.numice : types.map(function (t) {
++        if (t === 5) return cell.chain || 0;
++        if (t === 7) return cell.numice;
++        return 0;
++      });
++    } else {
++      param = cell.chain ? cell.chain : 0;   // 链条组ID→param(相同=共链)；冰/问号不用参数（沿用原口径）
++    }
+     return { id: cell.color, type: type, param: param, count: cell.count || 0 };
+   }
+   var spools = [];
+@@ -778,11 +799,23 @@
+       return { t: 'pipe', dir: pipeDir, queue: q, next: 0 };
+     }
+     if ((sp.id === 0 || sp.id == null) && types.length === 0) return null;   // 空
++    // 【v138】数字冰 type:7 的两种 param 形态都要认（实机既有标量也有同序数组，见文件头说明）
++    var numIce = 0;
++    if (types.indexOf(7) >= 0) {
++      if (Array.isArray(sp.param)) numIce = parseInt(sp.param[types.indexOf(7)], 10) || 0;
++      else numIce = parseInt(sp.param, 10) || 0;      // 仅数字冰：param 是标量倒计时
++    }
++    var chain = 0;
++    if (types.indexOf(5) >= 0) {
++      chain = Array.isArray(sp.param) ? (parseInt(sp.param[types.indexOf(5)], 10) || 0)
++                                      : (typeof sp.param === 'number' ? sp.param : 0);
++    }
+     return {
+       t: 'box', color: sp.id, count: sp.count || 0,
+       ice: types.indexOf(4) >= 0 ? AntSolver.ICE_DURABILITY_DEFAULT : 0,     // 官方无耐久→按正式口径 3
+-      chain: types.indexOf(5) >= 0 ? (typeof sp.param === 'number' ? sp.param : 0) : 0,
+-      q: types.indexOf(6) >= 0
++      chain: chain,
++      q: types.indexOf(6) >= 0,
++      numice: numIce
+     };
+   }
+   var cells = [];

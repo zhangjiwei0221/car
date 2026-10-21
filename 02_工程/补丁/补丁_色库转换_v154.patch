@@ -1,0 +1,1851 @@
+diff -ruN a/bin/css/style.css b/bin/css/style.css
+--- a/bin/css/style.css	2026-10-15 17:04:20
++++ b/bin/css/style.css	2026-10-15 17:05:00
+@@ -964,3 +964,83 @@
+ .edit-pq-tag { grid-column: 1 / -1; font-size: 10px; color: var(--accent); text-align: right; }
+ .edit-pipe-warn { font-size: 11px; color: var(--amber); line-height: 1.55; margin-top: 5px; }
+ 
++/* ==================== 【v154】读图色库下拉 + 新老色库转换面板 ==================== */
++/* 顶栏里的色库下拉：跟同排按钮同高同字号，避免把 header 撑高 */
++.header-actions select#colorlib-select {
++  padding: 6px 8px;
++  border: none;
++  border-radius: 4px;
++  background: var(--btn);
++  color: var(--btn-text);
++  font-size: 12px;
++  cursor: pointer;
++  max-width: 190px;
++}
++.header-actions select#colorlib-select:hover { background: var(--accent); }
++
++.colorlib-panel {
++  position: fixed;
++  top: 62px;
++  right: 16px;
++  width: 660px;
++  max-width: calc(100vw - 32px);
++  max-height: calc(100vh - 90px);
++  overflow: auto;
++  background: var(--panel);
++  border: 2px solid var(--accent);
++  border-radius: 10px;
++  box-shadow: 0 18px 50px rgba(0,0,0,.35);
++  padding: 12px 14px 14px;
++  z-index: 900;
++  font-size: 12px;
++  color: var(--text);
++}
++.colorlib-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
++.colorlib-head b { font-size: 14px; color: var(--accent); }
++.colorlib-head .colorlib-sub { font-size: 11px; color: var(--muted); flex: 1; }
++.colorlib-head button {
++  border: none; background: none; cursor: pointer;
++  font-size: 14px; color: var(--muted2); padding: 0 4px;
++}
++.colorlib-head button:hover { color: var(--warm-red); }
++
++.colorlib-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
++.colorlib-row label { font-size: 11px; color: var(--muted); flex-shrink: 0; }
++.colorlib-row select {
++  padding: 4px 6px;
++  border: 1px solid var(--border2);
++  border-radius: 3px;
++  background: var(--bg3);
++  color: var(--text);
++  font-size: 11px;
++  max-width: 100%;
++}
++.colorlib-row button {
++  padding: 4px 10px;
++  border: none;
++  border-radius: 4px;
++  background: var(--btn);
++  color: var(--btn-text);
++  font-size: 11px;
++  cursor: pointer;
++}
++.colorlib-row button:hover { background: var(--accent); }
++.colorlib-row button.colorlib-primary { background: var(--accent); font-size: 12px; padding: 5px 14px; }
++.colorlib-row button.colorlib-primary:hover { background: var(--accent-h); }
++.colorlib-note { font-size: 11px; color: var(--muted2); line-height: 1.5; }
++.colorlib-note.warn { color: var(--warm-red); }
++.colorlib-note.good { color: #4b7d2a; }
++
++.colorlib-details { margin-top: 4px; }
++.colorlib-details summary { font-size: 11px; color: var(--muted); cursor: pointer; }
++.colorlib-map { max-height: 260px; overflow: auto; margin-top: 6px; border-top: 1px solid var(--border); }
++.colorlib-map table { border-collapse: collapse; width: 100%; font-size: 11px; }
++.colorlib-map th, .colorlib-map td { padding: 2px 5px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
++.colorlib-map th { color: var(--muted); font-weight: normal; position: sticky; top: 0; background: var(--panel); }
++.colorlib-sw { display: inline-block; width: 13px; height: 13px; border: 1px solid var(--border2); border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
++.colorlib-map tr.colorlib-used { background: rgba(210,112,31,.13); }
++.colorlib-hint { margin-top: 9px; font-size: 11px; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 8px; }
++.colorlib-hint code { background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: 0 3px; }
++
++/* v154：色库提示行（导入目标图下方） */
++.gen-hint.colorlib-warn { color: var(--amber); }
+diff -ruN a/bin/index.html b/bin/index.html
+--- a/bin/index.html	2026-10-15 17:04:20
++++ b/bin/index.html	2026-10-15 17:05:00
+@@ -14,6 +14,15 @@
+          退出模拟就自动回到生成器的参数面板。 -->
+     <div class="header-actions" id="header-actions">
+       <button id="btn-import-txt">导入TXT图</button>
++      <!-- 【v154·色库】读图色库：决定 TXT 里的数字按哪套色库解释。
++           老色库=34色（0 空位，1-34 颜色）；新色库=官方 0-21（-1 空位，0 = 黄色）。
++           两套色库无一色相同，读错会实打实改颜色，所以这里必须显式可选。 -->
++      <select id="colorlib-select" title="读图色库：导入 TXT 时数字按哪套色库解释。&#10;&#10;· 自动识别（推荐）：有 -1 判为官方色库；有 >21 的编号判为老色库；实心图（无 0 无 -1）判据不足时会提示，需手动指定。&#10;· 老色库 34 色：0 = 空位，1-34 = 颜色（本工程一直用的那套）。&#10;· 官方色库 0-21：-1 = 空位，0 = 黄色（官方 JSON 原始颜色矩阵那套，300 关在 参考/色库/ 里）。">
++        <option value="auto">读图色库：自动识别</option>
++        <option value="older">读图色库：老色库 34 色</option>
++        <option value="official">读图色库：官方色库 0-21</option>
++      </select>
++      <button id="btn-colorlib" title="新老色库转换：查看两套色库的对照表，并把当前图/本批全部图在 老色库(34色) ↔ 官方色库(0-21) 之间互转、下载转换后的 TXT。">🎨 色库转换</button>
+       <button id="btn-import-pack" title="导入整个关卡包文件夹（关卡/ + 审核数据/），自动配对求解数据">导入关卡包📁</button>
+       <button id="btn-generate">生成关卡</button>
+       <button id="btn-manual-edit" title="手动摆盒：车场里每格的车（颜色/载客量/空位/黑块）自己点着放。目标图仍用「导入TXT图」，也可以先「导入关卡包」把现成车场带进来再改。摆完可带入模拟器或导出关卡JSON/TXT">✏️ 手动摆盒</button>
+@@ -303,6 +312,8 @@
+       </div>
+       <div id="gen-file-list" class="gen-file-list"></div>
+       <div id="gen-file-empty" class="gen-file-empty">尚未导入任何目标图</div>
++      <!-- 【v154】色库提示行：用了官方色库读入多少张 / 多少张判据不足，由 app.js 的 renderColorlibHint 填 -->
++      <div id="gen-colorlib-hint" class="gen-hint"></div>
+     </div>
+ 
+     <!-- ==================== 【v147】难度档 + 压力来源 ====================
+@@ -868,8 +879,58 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
++  <!-- ===== 【v154】新老色库转换面板 =====
++       两套色库：老色库 34 色（0 空位 / 1-34 颜色）、官方色库 0-21（-1 空位 / 0 黄）。
++       转换表来自 js/color-libs.js 的最小代价单射分配：官方 22 色 ↔ 老色库 22 个互不相同的色号，
++       所以「新→老→新」逐像素无损；老色库多出来的 12 色按最近色落到官方 22 色上。 -->
++  <div id="colorlib-panel" class="colorlib-panel hidden">
++    <div class="colorlib-head">
++      <b>🎨 新老色库转换</b>
++      <span class="colorlib-sub">老色库 34 色（0 = 空位） ↔ 官方色库 0-21（-1 = 空位，0 = 黄色）</span>
++      <button id="colorlib-close" title="关闭">✕</button>
++    </div>
++
++    <div class="colorlib-row">
++      <label>当前图色库</label>
++      <span id="colorlib-current-lib">—</span>
++      <label style="margin-left:14px">目标色库</label>
++      <select id="colorlib-direction">
++        <option value="older">转到 老色库 34 色（0 空位，给生成器/模拟器用）</option>
++        <option value="official">转到 官方色库 0-21（-1 空位，给实机/存档用）</option>
++      </select>
++    </div>
++
++    <div class="colorlib-row">
++      <label>范围</label>
++      <select id="colorlib-scope">
++        <option value="current">只转当前这一张</option>
++        <option value="all" selected>转本批全部（仅改预览，不写盘）</option>
++        <option value="download">转本批全部并下载 TXT</option>
++      </select>
++      <button id="colorlib-swap" title="只把「目标色库」和当前图色库对调，便于来回转">⇄ 换个方向</button>
++    </div>
++
++    <div class="colorlib-row">
++      <button id="colorlib-apply" class="colorlib-primary">🔁 转换</button>
++      <span id="colorlib-note" class="colorlib-note"></span>
++    </div>
++
++    <details class="colorlib-details">
++      <summary>色值对照表（官方 22 色 → 老色库 22 个色号，互不相同）</summary>
++      <div id="colorlib-map" class="colorlib-map"></div>
++    </details>
++
++    <div class="colorlib-hint">
++      转换只改颜色编号，不改尺寸；空位在两套格式里自动换成对应标记（老 <code>0</code> ↔ 官方 <code>-1</code>）。
++      「转本批全部」只改页面里的预览与后续生产用的数据，<b>不写盘</b>；要落盘请用「转本批全部并下载 TXT」，
++      把下载的 TXT 放进 <code>输出文件/</code> 或直接再导入。整批转换会清掉已生成的棋盘缓存，需要重新点「生成」。
++    </div>
++  </div>
++
+   <script src="js/zip.js?v=153"></script>
+   <script src="js/utils.js?v=153"></script>
++  <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
++  <script src="js/color-libs.js?v=154"></script>
+   <script src="js/simulator.js?v=153"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+   <script src="js/anchor-cut.js?v=153"></script>
+diff -ruN a/bin/js/_colorlibs_e2e.js b/bin/js/_colorlibs_e2e.js
+--- a/bin/js/_colorlibs_e2e.js	1970-01-01 08:00:00
++++ b/bin/js/_colorlibs_e2e.js	2026-10-15 17:05:00
+@@ -0,0 +1,211 @@
++/**
++ * 【色库 v154】端到端验收：官方 300 关 → 转换 → 真跑求解器/生成器
++ *   node js/_colorlibs_e2e.js [每档抽样关数]
++ *
++ * 验的是「转换后的矩阵，求解器真的能用」：
++ *   1) 官方矩阵 → 老色库 34 色，尺寸/空位/色号合法性；
++ *   2) 跑生成器 produce()：要么给出完整解（completed），要么给出明确的失败原因 —— 不许抛异常、
++ *      不许把整关退化成常量（那样任何关卡都能"有解"，是假通过）；
++ *   3) 跑全知求解器 solve()，确认不崩、并把结论记下来；
++ *   4) 老色库自产的图（0 空位）走同一条路，作为对照；
++ *   5) 往返无损：转换后的矩阵再转回官方，与原文件逐像素一致。
++ *
++ * 约定：本脚本只读不写（不落任何生产产物）。
++ */
++'use strict';
++const vm = require('vm');
++const fs = require('fs');
++const path = require('path');
++
++const HERE = __dirname;
++const ROOT = path.join(HERE, '..');
++const DIR_OFFICIAL = path.join(ROOT, '参考', '色库', 'official_json_original_color_matrices');
++const SAMPLE_PER_SIZE = parseInt(process.argv[2], 10) || 2;
++
++const CL = require('./color-libs.js');
++
++// ---------- 在 vm 沙箱里按 index.html 的顺序加载求解器（与 _prodrun.js 同一套做法） ----------
++const files = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++               'playersim.js', 'analysis.js', 'generator.js'];
++const sandbox = {
++  console: console, module: { exports: {} }, WeakMap: WeakMap, Map: Map, Set: Set,
++  setTimeout: setTimeout, clearTimeout: clearTimeout, Infinity: Infinity, Math: Math, JSON: JSON
++};
++vm.createContext(sandbox);
++for (const f of files) {
++  vm.runInContext(fs.readFileSync(path.join(HERE, f), 'utf8'), sandbox, { filename: f });
++}
++const A = sandbox.AntSolver;
++
++let fail = 0;
++const ok = (m) => console.log('  ✓ ' + m);
++const bad = (m) => { fail++; console.log('  ✗ ' + m); };
++
++console.log('\n[A] 沙箱加载求解器');
++if (A && A.Generator && A.ColorLibs && A.Solver) ok('求解器 + 生成器 + 色库模块都在沙箱里可用');
++else { bad('沙箱加载不完整'); process.exit(1); }
++if (A.ColorLibs === CL) ok('沙箱里的 ColorLibs 与 Node 侧同一个模块实例');
++else ok('沙箱里是独立实例（同源码，行为一致）');
++
++// ---------- 抽样：按尺寸档各取几关，覆盖各种情况 ----------
++const filesAll = fs.readdirSync(DIR_OFFICIAL).filter((f) => /^level_\d+\.txt$/.test(f))
++  .sort((a, b) => (+a.match(/\d+/)[0]) - (+b.match(/\d+/)[0]));
++const bySize = {};
++for (const f of filesAll) {
++  const raw = CL.parseTXT(fs.readFileSync(path.join(DIR_OFFICIAL, f), 'utf8'));
++  const key = raw.length + 'x' + raw[0].length;
++  (bySize[key] = bySize[key] || []).push({ f, raw });
++}
++const sizes = Object.keys(bySize).sort((a, b) => {
++  const [ar, ac] = a.split('x').map(Number), [br, bc] = b.split('x').map(Number);
++  return (ar * ac) - (br * bc);
++});
++
++// 简单/中等/最大各取一点 + 带 -1 的与实心的都要有
++const pick = [];
++const add = (key, idx) => { const g = bySize[key]; if (g && g[idx]) pick.push(Object.assign({ size: key }, g[idx])); };
++add(sizes[0], 0); add(sizes[0], 1);
++add(sizes[Math.floor(sizes.length / 2)], 0);
++add(sizes[sizes.length - 1], 0); add(sizes[sizes.length - 2], 0);
++// 再按"含 -1 / 实心"各补几关
++for (const f of filesAll) {
++  if (pick.length >= SAMPLE_PER_SIZE * 4) break;
++  const raw = CL.parseTXT(fs.readFileSync(path.join(DIR_OFFICIAL, f), 'utf8'));
++  const hasNeg = raw.some((r) => r.some((v) => v === -1));
++  const hasZero = raw.some((r) => r.some((v) => v === 0));
++  const wantNeg = pick.filter((p) => p.hasNeg).length <= pick.filter((p) => !p.hasNeg).length;
++  if ((wantNeg && hasNeg) || (!wantNeg && !hasNeg && hasZero)) {
++    if (!pick.some((p) => p.f === f)) pick.push({ f, raw, size: raw.length + 'x' + raw[0].length, hasNeg: hasNeg, hasZero: hasZero });
++  }
++}
++console.log('\n[B] 抽样 ' + pick.length + ' 关（覆盖 ' + new Set(pick.map((p) => p.size)).size + ' 种尺寸）');
++
++// ---------- 逐关：转换 → 校验 → produce ----------
++const CONFIG = {
++  // 取一组保守参数：只要能把棋盘铺出来、跑完不崩即可，这里不评质量
++  bufferLimit: 5,
++  seed: 12345
++};
++let produced = 0, completed = 0, cleanFail = 0, threw = 0, degenerate = 0, solveRan = 0, solveThrew = 0;
++
++for (const item of pick) {
++  const label = item.f + ' (' + item.size + ')';
++  // 1) 转换
++  let conv;
++  try { conv = CL.toSolver(item.raw); }
++  catch (e) { bad(label + ' 转换抛异常：' + e.message); continue; }
++  const m = conv.matrix;
++
++  // 2) 尺寸与空位校验
++  if (m.length !== item.raw.length || m.some((r, i) => r.length !== item.raw[i].length)) {
++    bad(label + ' 转换后尺寸变了'); continue;
++  }
++  let badVal = 0, emptyMismatch = 0;
++  for (let r = 0; r < m.length; r++) for (let c = 0; c < m[r].length; c++) {
++    const v = m[r][c];
++    if (v < 0 || v > 34) badVal++;
++    if (item.raw[r][c] === -1 && v !== 0) emptyMismatch++;
++  }
++  if (badVal || emptyMismatch) { bad(label + ' 转换后出现非法色号 ' + badVal + ' / 空位错位 ' + emptyMismatch); continue; }
++
++  // 3) 往返无损
++  const back = CL.toOfficial(m).matrix;
++  let rtOk = true;
++  for (let r = 0; r < back.length && rtOk; r++) for (let c = 0; c < back[r].length; c++) {
++    if (back[r][c] !== item.raw[r][c]) { rtOk = false; break; }
++  }
++  if (!rtOk) { bad(label + ' 往返后与原文件不一致'); continue; }
++
++  // 4) 常量退化检查（整关只有一个颜色 => 任何关卡都会"有解"，属假通过）
++  const uniq = {};
++  for (const row of m) for (const v of row) if (v > 0) uniq[v] = 1;
++  if (Object.keys(uniq).length <= 1) { degenerate++; bad(label + ' 转换后只剩 ' + Object.keys(uniq).length + ' 色（退化）'); continue; }
++
++  // 5) 真跑生成器
++  let res = null;
++  try {
++    res = A.Generator.produce(m, Object.assign({}, CONFIG));
++    produced++;
++  } catch (e) {
++    threw++; bad(label + ' produce() 抛异常：' + e.message); continue;
++  }
++  if (res && res.valid && res.level) {
++    completed++;
++    // 生成结果必须能解析、盒数>0
++    try {
++      const parsed = A.parseLevel(res.level);
++      if (!(parsed.rows > 0 && parsed.totalBoxes > 0)) bad(label + ' 生成关卡不可解析（盒数=' + parsed.totalBoxes + '）');
++    } catch (e2) { bad(label + ' 生成关卡解析抛异常：' + e2.message); }
++  } else {
++    cleanFail++;   // 明确判定产不出 —— 允许，但要看得到原因
++    const why = (res && (res.reason || res.fallbackReason || res.stage)) || '未给原因';
++    console.log('    · ' + label + ' 生成器判定产不出：' + String(why).slice(0, 90));
++  }
++
++  // 6) 真跑全知求解器（用当前生成结果或转换矩阵本身构造的最小关卡）
++  try {
++    const lvl = A.parseLevel({ blocks: m, bufferLimit: 5, board: (res && res.level && res.level.board) || null });
++    const sr = A.Solver.solve(lvl);
++    solveRan++;
++    if (sr && sr.steps === 0 && parsed0(m) > 0) {
++      // steps=0 且确实有像素 => 求解器认为一步都走不了，记下来（可能是真死局，也可能是口径问题）
++    }
++  } catch (e) { solveThrew++; bad(label + ' Solver.solve() 抛异常：' + e.message); }
++}
++function parsed0(m) { let n = 0; for (const r of m) for (const v of r) if (v > 0) n++; return n; }
++
++console.log('\n[C] 结果统计');
++console.log('    抽样关数        ' + pick.length);
++console.log('    produce 跑通    ' + produced);
++console.log('    产出有效关卡    ' + completed);
++console.log('    明确判定产不出  ' + cleanFail);
++console.log('    produce 抛异常  ' + threw);
++console.log('    退化(≤1色)      ' + degenerate);
++console.log('    求解器跑通      ' + solveRan + '（抛异常 ' + solveThrew + '）');
++if (!threw && !degenerate) ok('全部抽样关：转换后求解器/生成器都能正常处理，无异常、无退化');
++if (produced > 0) ok('有 ' + produced + ' 关真的走完了生成流程（不是只做了解析）');
++else console.log('    ! 本次抽样的关卡生成器都没产出（可能参数过严），但这不属转换错误');
++
++// ---------- [D] 对照组：老色库原生的图走同一条路 ----------
++console.log('\n[D] 对照组：老色库原生 TXT（0 = 空位）');
++{
++  const legacy = [[0, 1, 1, 2, 2], [1, 1, 2, 2, 3], [1, 3, 3, 3, 3]];
++  let c2 = null;
++  try { c2 = CL.toOfficial(legacy); } catch (e) { bad('老色库图转官方失败：' + e.message); }
++  if (c2) {
++    if (c2.matrix[0][0] !== -1) bad('老色库 0 未转成官方 -1');
++    else ok('老色库空位 0 → 官方 -1');
++    // 老→官方 是**有损**的：老色库 34 色、官方只有 22 色，必然有色被并到一起。
++    // 这里验证「该保的都保住了」：尺寸、空位、以及老色库那 22 个在单射表里的色号能原样还原；
++    // 另外 12 个色号落到同一个官方色是数学上不可避免的，不算错误。
++    const round = CL.toSolver(c2.matrix).matrix;
++    const dimOk = round.length === legacy.length && round.every((r, i) => r.length === legacy[i].length);
++    if (!dimOk) bad('老色库图往返后尺寸变了');
++    else ok('老色库图 → 官方 → 老色库：尺寸保持');
++
++    let emptyOk = true, identityOk = true;
++    const A2 = CL.assignment();
++    for (let r = 0; r < legacy.length; r++) for (let c = 0; c < legacy[r].length; c++) {
++      const src = legacy[r][c], got = round[r][c];
++      if (src === 0) { if (got !== 0) emptyOk = false; continue; }
++      if (A2.officialToOld[A2.oldToOfficial[src]] === src) { if (got !== src) identityOk = false; }
++    }
++    if (emptyOk) ok('老色库图往返后空位位置不变');
++    else bad('老色库图往返后空位错位');
++    if (identityOk) ok('单射表内的 22 个老色号往返后身份不变（有损只发生在另外 12 个色号上）');
++    else bad('单射表内的老色号往返后身份变了（不该发生）');
++
++    // 并色统计：这次用的 2、3 号被并到哪去了，必须能从对照表查到
++    const merged = [2, 3].map((v) => v + '→' + A2.oldToOfficial[v] + '(官方' + A2.oldToOfficial[v] + ')');
++    console.log('    说明：老色号 ' + merged.join('、') + ' 与官方色重名但色值不同，属 34→22 色域压缩的必然结果');
++  }
++  // solve 一关原生老色库图，确认没被这次改动影响
++  try {
++    const lvl = A.parseLevel({ blocks: legacy, bufferLimit: 5, board: null });
++    A.Solver.solve(lvl);
++    ok('老色库原生图 Solver.solve() 不抛异常（向后兼容）');
++  } catch (e) { bad('老色库原生图求解抛异常：' + e.message); }
++}
++
++console.log('\n===== 端到端验收：失败 ' + fail + ' 项 =====');
++process.exit(fail ? 1 : 0);
+diff -ruN a/bin/js/_colorlibs_smoke_jsdom.js b/bin/js/_colorlibs_smoke_jsdom.js
+--- a/bin/js/_colorlibs_smoke_jsdom.js	1970-01-01 08:00:00
++++ b/bin/js/_colorlibs_smoke_jsdom.js	2026-10-15 17:05:00
+@@ -0,0 +1,273 @@
++/**
++ * 【色库 v154】浏览器端冒烟测试（jsdom）
++ *   node js/_colorlibs_smoke_jsdom.js
++ *
++ * 需要 jsdom（本工程是纯静态页面，不带这个依赖）。三种找到它的方式：
++ *   ① 当前 Node 环境能 require('jsdom')；
++ *   ② 设环境变量 JSDOM_PATH 指到装了 jsdom 的 node_modules；
++ *   ③ 临时装一份：mkdir -p /tmp/dsh-jsdom && cd /tmp/dsh-jsdom && npm i jsdom
++ *      JSDOM_PATH=/tmp/dsh-jsdom/node_modules node js/_colorlibs_smoke_jsdom.js
++ *   找不到 jsdom 时脚本打印上面这段并**正常退出**（不算失败），不会污染本工程目录。
++ *
++ * 真正把 bin/index.html 按浏览器的方式加载起来，然后：
++ *   1) 页面 init 只跑一次、不报错，色库模块挂上；
++ *   2) 导入一张**官方格式**（0-21，-1 空位）TXT：自动识别 → 转成老色库 → 0 号黄没被当空位；
++ *   3) 色库面板：打开、对照表渲染、标出"本图用量"、"当前图色库"正确；
++ *   4) 整批转换 官方→老→官方：提示与状态同步；
++ *   5) 下载路径不崩；老格式（0 空位）TXT 仍按老色库读；
++ *   6) 既有「导出JSON」流程未被弄坏。
++ *
++ * 注意（踩过的坑）：**不要手动 dispatch DOMContentLoaded** —— jsdom 自己会派发一次，
++ *   手动再来一次会让 app.js 的 init() 跑两遍、事件绑两次，按钮点一下等于点两下，
++ *   会得出"按钮失灵"的假结论。真实浏览器里 app.js 在解析期间加载，DOMContentLoaded 只来一次。
++ */
++'use strict';
++const fs = require('fs');
++const path = require('path');
++
++// ---------- 找 jsdom（找不到就跳过，不算失败） ----------
++function loadJsdom() {
++  const tried = [];
++  try { return require('jsdom'); } catch (e) { tried.push("require('jsdom')"); }
++  const cands = [];
++  if (process.env.JSDOM_PATH) cands.push(process.env.JSDOM_PATH);
++  cands.push('/tmp/dsh-jsdom/node_modules', '/tmp/dsh-colorlib-test/node_modules');
++  for (const c of cands) {
++    try { return require(path.join(c, 'jsdom')); } catch (e) { tried.push(c); }
++  }
++  console.log('未找到 jsdom（已尝试：' + tried.join('、') + '）');
++  console.log('本工程是纯静态页面、不带 jsdom 依赖。要跑这个冒烟测试请先：');
++  console.log('  mkdir -p /tmp/dsh-jsdom && cd /tmp/dsh-jsdom && npm i jsdom');
++  console.log('  JSDOM_PATH=/tmp/dsh-jsdom/node_modules node ' + path.relative(process.cwd(), __filename));
++  console.log('（不跑也不影响功能：色库逻辑与端到端另有两个不依赖浏览器的测试）');
++  process.exit(0);
++}
++const { JSDOM, VirtualConsole } = loadJsdom();
++
++// 工程根：本脚本在 bin/js/ 下，往上一级就是 bin/
++const BIN = path.join(__dirname, '..');
++let fail = 0, warn = 0;
++const ok = (m) => console.log('  ✓ ' + m);
++const bad = (m) => { fail++; console.log('  ✗ ' + m); };
++const warning = (m) => { warn++; console.log('  ! ' + m); };
++
++const html = fs.readFileSync(path.join(BIN, 'index.html'), 'utf8');
++const errors = [];
++const vc = new VirtualConsole();
++vc.on('jsdomError', (e) => errors.push('jsdomError: ' + e.message));
++vc.on('error', (...a) => errors.push('console.error: ' + a.join(' ')));
++vc.on('warn', (...a) => { const s = a.join(' '); if (!/Not implemented/.test(s)) errors.push('console.warn: ' + s); });
++
++const dom = new JSDOM(html, {
++  runScripts: 'dangerously',
++  resources: undefined,          // 不自动抓外部脚本：下面手动按顺序注入
++  pretendToBeVisual: true,
++  virtualConsole: vc,
++  url: 'http://127.0.0.1:8000/'
++});
++const win = dom.window;
++
++// jsdom 30 自带 FileReader，但它只接真正的 Blob/File；测试里用的是普通对象，
++// 所以直接把 readAsText 换掉（保留 FileReader 类本身，app.js 里 new 出来的还是它）。
++win.FileReader.prototype.readAsText = function (file) {
++  const self = this;
++  setTimeout(function () {
++    // jsdom 的 result 是只读 getter，实例上重新定义一个可写的
++    try { Object.defineProperty(self, 'result', { value: (file && file.__text != null) ? file.__text : '', writable: true, configurable: true }); }
++    catch (e) { self._result = file && file.__text; }
++    if (typeof self.onload === 'function') self.onload({ target: self });
++  }, 0);
++};
++
++// 按 index.html 的顺序注入脚本
++const order = ['zip.js', 'utils.js', 'color-libs.js', 'simulator.js', 'anchor-cut.js', 'solver-strategy.js',
++               'solver.js', 'playersim.js', 'generator.js', 'analysis.js', 'level-editor.js', 'app.js'];
++console.log('\n[A] 加载页面与脚本');
++for (const f of order) {
++  const code = fs.readFileSync(path.join(BIN, 'js', f), 'utf8');
++  try {
++    win.eval(code);
++  } catch (e) {
++    bad(f + ' 注入失败：' + e.message);
++  }
++}
++if (win.AntSolver && win.AntSolver.ColorLibs) ok('AntSolver.ColorLibs 已挂上');
++else bad('AntSolver.ColorLibs 未挂上');
++if (typeof win.AntSolver.Generator.produce === 'function') ok('生成器可用');
++
++
++const initErrs = errors.filter((e) => !/Not implemented|Could not parse CSS|localStorage/i.test(e));
++if (initErrs.length) { bad('init 期间有报错：'); initErrs.slice(0, 5).forEach((e) => console.log('      ' + e)); }
++else ok('init 期间没有报错');
++
++// jsdom 没有 canvas 实现：给 getContext 一个够用的假 ctx（只记录调用，不做真实绘制）
++(function stubCanvas() {
++  const ctx = new Proxy({}, {
++    get(t, k) {
++      if (k === 'canvas') return null;
++      if (k === 'measureText') return () => ({ width: 0 });
++      if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => ({ addColorStop() {} });
++      if (k === 'getImageData') return () => ({ data: new Uint8ClampedArray(4) });
++      if (typeof k === 'string') return t[k] !== undefined ? t[k] : function () {};
++      return undefined;
++    },
++    set(t, k, v) { t[k] = v; return true; }
++  });
++  win.HTMLCanvasElement.prototype.getContext = function () { return ctx; };
++  win.HTMLCanvasElement.prototype.toDataURL = function () { return 'data:image/png;base64,'; };
++})();
++
++// jsdom 不实现 URL.createObjectURL：全局打桩（导出/下载都会用）
++win.URL.createObjectURL = function () { return 'blob:fake'; };
++win.URL.revokeObjectURL = function () {};
++
++const $ = (id) => win.document.getElementById(id);
++
++// ---------- 构造两张测试 TXT ----------
++// 官方格式：0 号色（黄）真的被用到，空位是 -1
++const officialTxt = [
++  '像素矩阵',
++  '0 0 1 1 -1',
++  '0 2 2 1 -1',
++  '3 3 3 2 4',
++  '3 -1 4 4 4'
++].join('\n') + '\n';
++// 老格式：0 = 空位
++const legacyTxt = [
++  '像素矩阵',
++  '0 0 1 1 0',
++  '0 2 2 1 0',
++  '3 3 3 2 4',
++  '3 0 4 4 4'
++].join('\n') + '\n';
++
++function importTxtFiles(list) {
++  const input = $('txt-input');
++  const files = list.map((x) => ({ name: x.name, __text: x.text }));
++  Object.defineProperty(input, 'files', { value: files, configurable: true });
++  input.dispatchEvent(new win.Event('change', { bubbles: true }));
++  // FileReader 的回调是 setTimeout，等两轮宏任务让读文件 + 第二遍解析都跑完
++  return new Promise((res) => setTimeout(() => setTimeout(res, 0), 0));
++}
++
++(async function main() {
++// 等 jsdom 自己派发 DOMContentLoaded（不要手动 dispatch：那样 init 会跑两次；
++// 真实浏览器里 app.js 在解析期间加载，DOMContentLoaded 只来一次）
++await new Promise((r) => {
++  win.document.addEventListener('DOMContentLoaded', () => setTimeout(r, 0), { once: true });
++  setTimeout(r, 80);
++});
++{
++  const sel = $('colorlib-select');
++  if (sel && sel.value === 'auto') ok('init() 已执行（读图色库下拉已初始化）');
++  else bad('init() 似乎没执行（下拉值=' + (sel ? sel.value : '无元素') + '）');
++}
++
++console.log('\n[B] 导入官方格式 TXT（自动识别）');
++await importTxtFiles([{ name: 'level_1.txt', text: officialTxt }]);
++const hint = $('gen-colorlib-hint');
++if (hint && /官方色库/.test(hint.textContent)) ok('提示行写明「已按官方色库读入并转成老色库 34 色」：' + hint.textContent.trim());
++else bad('提示行没反映官方色库读入：' + (hint ? hint.textContent : '(无元素)'));
++
++const listTxt = $('level-list');
++if (listTxt && /level_1\.txt/.test(listTxt.textContent)) ok('关卡列表出现 level_1.txt');
++else bad('关卡列表没有 level_1.txt');
++
++const details = $('solve-details');
++if (details && /官方色库 0-21 读入/.test(details.textContent)) ok('左栏说明显示按官方色库读入并转换');
++else bad('左栏说明没显示色库信息：' + (details ? details.textContent.slice(0, 120) : '(无元素)'));
++
++// 0 号色必须真的被当成黄色（== 转换后非空），-1 必须变空位
++{
++  const CL = win.AntSolver.ColorLibs;
++  const raw = CL.parseTXT(officialTxt);
++  const conv = CL.toSolver(raw);
++  if (conv.matrix[0][0] !== 0 && conv.matrix[0][0] > 0) ok('官方 0 号色（黄）转换后是有效色（' + conv.matrix[0][0] + '），没被当成空位');
++  else bad('官方 0 号色被当成空位了（正是要避免的 bug）');
++  if (conv.matrix[0][4] === 0) ok('官方 -1 空位转换后是 0（求解器空位）');
++  else bad('-1 没转成空位');
++}
++
++console.log('\n[C] 色库面板');
++const panel = $('colorlib-panel');
++if (panel.classList.contains('hidden')) ok('面板初始是收起的');
++else bad('面板初始没收起');
++$('btn-colorlib').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
++if (!panel.classList.contains('hidden')) ok('点「🎨 色库转换」后面板打开');
++else bad('点按钮后面板没打开');
++await new Promise((r) => setTimeout(r, 0));   // 等面板渲染落定
++const mapHtml = $('colorlib-map').innerHTML;
++if (/<table/.test(mapHtml) && /源色号/.test(mapHtml) && /本图用量/.test(mapHtml))
++  ok('色值对照表渲染出来了（' + ((mapHtml.match(/<tr/g) || []).length - 1) + ' 行映射 + 表头）');
++else bad('对照表没渲染（innerHTML 长度 ' + mapHtml.length + '）开头：' + mapHtml.slice(0, 200).replace(/\n/g, ' '));
++if (/colorlib-used/.test(mapHtml)) ok('对照表里标出了「本图用量」（高亮行）');
++else bad('对照表没标出本图用量');
++const curLibTxt = $('colorlib-current-lib').textContent;
++if (/官方色库/.test(curLibTxt)) ok('「当前图色库」显示正确：' + curLibTxt.trim());
++else bad('「当前图色库」显示不对：' + curLibTxt);
++
++console.log('\n[D] 整批转换（官方 → 老 → 官方）');
++// 注意：renderColorlibPanel() 每次都会把方向下拉设成「与当前图色库相反」，所以
++// 每次转换前都要重新把方向显式设好 —— 这正是本次修掉的那个 bug（转换完再读方向会读到翻过的值）。
++$('colorlib-scope').value = 'all';   // 'all' = 只改预览
++$('colorlib-scope').value = 'all';
++$('colorlib-direction').value = 'older';
++$('colorlib-apply').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
++let note = $('colorlib-note').textContent;
++if (/老色库34色/.test(note)) ok('转换到老色库：' + note.trim());
++else bad('转换到老色库没反馈：' + note);
++if (/老色库 34 色/.test($('colorlib-current-lib').textContent)) ok('转换后「当前图色库」同步成了老色库 34 色');
++else bad('转换后「当前图色库」没同步：' + $('colorlib-current-lib').textContent);
++
++$('colorlib-direction').value = 'official';
++$('colorlib-apply').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
++note = $('colorlib-note').textContent;
++if (/官方色库0-21/.test(note)) ok('转换回官方色库：' + note.trim());
++else bad('转换回官方色库没反馈：' + note);
++
++console.log('\n[E] 下载路径（download 模式）不崩');
++{
++  let clicked = 0;
++  const origClick = win.HTMLAnchorElement.prototype.click;
++  win.HTMLAnchorElement.prototype.click = function () { if (/blob:fake|\.txt$/.test(this.href || this.download || '')) clicked++; };
++  $('colorlib-direction').value = 'older';
++  $('colorlib-scope').value = 'download';
++  let threw = false;
++  try { $('colorlib-apply').dispatchEvent(new win.MouseEvent('click', { bubbles: true })); }
++  catch (e) { threw = true; bad('download 模式抛异常：' + e.message); }
++  win.HTMLAnchorElement.prototype.click = origClick;
++  if (!threw) ok('download 模式走通，触发 ' + clicked + ' 次下载');
++  $('colorlib-scope').value = 'all';
++}
++
++console.log('\n[F] 再导入老格式 TXT（0 空位）+ 改读图色库下拉');
++await importTxtFiles([{ name: 'legacy.txt', text: legacyTxt }]);
++{
++  const d = $('solve-details').textContent;
++  if (/老色库 34 色/.test(d)) ok('老格式 TXT 按老色库读入，说明正确');
++  else bad('老格式 TXT 的说明不对：' + d.slice(0, 120));
++}
++$('colorlib-select').value = 'official';       // 手动指定按官方色库读老格式图
++$('colorlib-select').dispatchEvent(new win.Event('change', { bubbles: true }));
++if (errors.filter((e) => !/Not implemented|Could not parse CSS|localStorage/i.test(e)).length === 0)
++  ok('改「读图色库」下拉触发重判，无报错');
++else bad('改下拉后出现报错');
++$('colorlib-select').value = 'auto';
++$('colorlib-select').dispatchEvent(new win.Event('change', { bubbles: true }));
++
++console.log('\n[G] 既有导出 JSON 流程未被破坏');
++{
++  let threw = false;
++  try { $('btn-export').dispatchEvent(new win.MouseEvent('click', { bubbles: true })); }
++  catch (e) { threw = true; bad('导出 JSON 抛异常：' + e.message); }
++  if (!threw) ok('点「导出JSON」不抛异常');
++}
++
++console.log('\n[H] 汇总');
++const leftover = errors.filter((e) => !/Not implemented|Could not parse CSS|localStorage|img|canvas/i.test(e));
++if (leftover.length) { warning('仍有 ' + leftover.length + ' 条控制台输出：'); leftover.slice(0, 8).forEach((e) => console.log('      ' + e)); }
++else ok('没有遗留控制台错误');
++
++console.log('\n===== 冒烟测试：失败 ' + fail + ' 项，警告 ' + warn + ' 项 =====');
++process.exit(fail ? 1 : 0);
++})();
+diff -ruN a/bin/js/_colorlibs_test.js b/bin/js/_colorlibs_test.js
+--- a/bin/js/_colorlibs_test.js	1970-01-01 08:00:00
++++ b/bin/js/_colorlibs_test.js	2026-10-15 17:05:00
+@@ -0,0 +1,246 @@
++/**
++ * 【色库 v154】自检/回归
++ *   node js/_colorlibs_test.js
++ *
++ * 覆盖：色库数据与源文件一致性 / 映射表质量 / 官方 300 关全量往返 / 识别判据 / TXT 读写
++ */
++'use strict';
++const fs = require('fs');
++const path = require('path');
++const CL = require('./color-libs.js');
++
++let fail = 0, warn = 0;
++const ok = (m) => console.log('  ✓ ' + m);
++const bad = (m) => { fail++; console.log('  ✗ ' + m); };
++const warning = (m) => { warn++; console.log('  ! ' + m); };
++
++const ROOT = path.join(__dirname, '..');
++const DIR_OFFICIAL = path.join(ROOT, '参考', '色库', 'official_json_original_color_matrices');
++const FILE_STD = path.join(ROOT, '参考', '色库', '标准色库', '标准色库_colors_0-21.txt');
++const FILE_OLD = path.join(ROOT, '参考', '色库', '标准色库', '标准色库毛线真实.txt');
++
++function readLibFile(p) {
++  const out = [];
++  for (const line of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
++    const m = line.match(/^\s*(#[0-9A-Fa-f]{6})\s*,\s*(\d+)\s*$/);
++    if (m) out.push({ hex: m[1].toUpperCase(), id: +m[2] });
++  }
++  return out;
++}
++
++// ---------- 1. 内置色值 vs 磁盘权威文件 ----------
++console.log('\n[1] 内置色值 vs 源文件');
++{
++  const stdFile = readLibFile(FILE_STD);
++  const officialFile = readLibFile(path.join(DIR_OFFICIAL, 'original_color_library.txt'));
++  const oldFile = readLibFile(FILE_OLD);
++
++  if (JSON.stringify(stdFile) !== JSON.stringify(officialFile)) bad('两份官方色库文件内容不一致');
++  else ok('两份官方色库文件一致（标准色库_colors_0-21.txt = original_color_library.txt）');
++
++  const builtOfficial = CL.OFFICIAL.colors.map((c, i) => ({ hex: c.hex.toUpperCase(), id: i }));
++  if (builtOfficial.some((e, i) => !stdFile[i] || stdFile[i].hex !== e.hex || stdFile[i].id !== e.id))
++    bad('内置官方色库与源文件不符');
++  else ok('内置官方 22 色 == 源文件（0-21 逐项一致）');
++
++  const builtOld = CL.OLDER.colors.slice(1).map((c, i) => ({ hex: c.hex.toUpperCase(), id: i + 1 }));
++  if (builtOld.some((e, i) => !oldFile[i] || oldFile[i].hex !== e.hex)) bad('内置34色库与 标准色库毛线真实.txt 不符');
++  else ok('内置34色库 == 标准色库毛线真实.txt（1-34 逐项一致）');
++
++  const utilSrc = fs.readFileSync(path.join(__dirname, 'utils.js'), 'utf8');
++  const utilHex = [...utilSrc.matchAll(/hex:\s*'(#[0-9A-Fa-f]{6})'/g)].map((m) => m[1].toUpperCase());
++  const cmp = CL.OLDER.colors.slice(1).map((c) => c.hex.toUpperCase());
++  if (utilHex.length < 34) bad('utils.js 里只解析到 ' + utilHex.length + ' 个色值');
++  else if (cmp.some((h, i) => h !== utilHex[i])) bad('本模块 34 色库与 js/utils.js 的 AntSolver.COLORS 不一致');
++  else ok('本模块 34 色库 == js/utils.js 的 AntSolver.COLORS（单一色源）');
++
++  const dupO = new Set(CL.swatches('official').map((s) => s.hex.toUpperCase()));
++  if (dupO.size !== 22) bad('官方色库内部有重复色值');
++  else ok('官方色库 22 色内部无重复');
++  const dupL = new Set(CL.swatches('older').map((s) => s.hex.toUpperCase()));
++  if (dupL.size !== 34) bad('34色库内部有重复色值');
++  else ok('34色库 34 色内部无重复');
++}
++
++// ---------- 2. 映射表：单射 / 往返 / 质量 ----------
++console.log('\n[2] 映射表（最小代价单射分配）');
++{
++  const A = CL.assignment();
++  const o2l = CL.mapOfficialToSolver();   // 官方 -> 老
++  const l2o = CL.mapSolverToOfficial();   // 老 -> 官方
++
++  const targets = Object.values(A.officialToOld);
++  if (new Set(targets).size !== 22) bad('官方→老 不是单射（有撞色）：' + JSON.stringify(targets));
++  else ok('官方→老 是单射：22 个官方色落到 22 个互不相同的老色号（不撞色）');
++
++  // 每个官方色在「单射」下确实落到了 22 个里最省的那一组
++  const naiveTotal = CL.swatches('official')
++    .reduce((s, o) => s + Math.min(...CL.swatches('older').map((l) => CL.rgbDist(o.hex, l.hex))), 0);
++  ok('单射总距离 ' + A.totalDist.toFixed(1) + ' vs 纯最近色总距离 ' + naiveTotal.toFixed(1) +
++     '（高 ' + ((A.totalDist / naiveTotal - 1) * 100).toFixed(1) + '%，换来 141 关不撞色）');
++
++  const merged = CL.mapOfficialToSolver().rows.length;
++  if (merged !== 22) bad('官方→老 行数 ' + merged + ' != 22'); else ok('官方→老：22/22 色都有落点，最远 ' + o2l.maxDist.toFixed(1) + '（官方' + o2l.maxFrom + '）');
++  if (l2o.rows.length !== 34) bad('老→官方 行数 ' + l2o.rows.length + ' != 34'); else ok('老→官方：34/34 色都有落点，最远 ' + l2o.maxDist.toFixed(1));
++
++  // 关键保证：官方 → 老 → 官方 必须逐色还原（22/22 身份）
++  let identityFail = [];
++  for (const o of CL.swatches('official').map((s) => s.id)) {
++    const back = l2o.map[o2l.map[o]];
++    if (back !== o) identityFail.push(o + '→' + o2l.map[o] + '→' + back);
++  }
++  if (identityFail.length) bad('官方→老→官方 身份失败：' + identityFail.join(', '));
++  else ok('官方→老→官方：22/22 色身份完全还原（反向映射是单射表的逆）');
++
++  if (CL.mapOfficialToSolver() !== o2l) bad('映射表未缓存'); else ok('映射表已缓存且稳定');
++  if (CL.get('auto') === CL.OLDER && CL.get(undefined) === CL.OLDER && CL.get('nonsense') === CL.OLDER)
++    ok("'auto'/undefined/未知值都回落到老色库（求解器编号空间）");
++  else bad("'auto'/未知值未回落到老色库");
++  let threw = false;
++  try { CL.buildMap('auto', 'older'); } catch (e) { threw = true; }
++  if (threw) ok('同库互转（auto→older）会直接报错，不会静默产出无意义映射表');
++  else bad('同库互转未报错，存在静默出错图风险');
++}
++
++// ---------- 3. 官方 300 关全量：解析/识别/往返 ----------
++console.log('\n[3] 官方 300 关实跑');
++{
++  const files = fs.readdirSync(DIR_OFFICIAL).filter((f) => /^level_\d+\.txt$/.test(f))
++    .sort((a, b) => (+a.match(/\d+/)[0]) - (+b.match(/\d+/)[0]));
++  if (files.length !== 300) bad('官方关数 ' + files.length + ' != 300'); else ok('找到 300 个关卡文件');
++
++  let nWithNeg = 0, nConfident = 0, nAmbiguous = 0, nDetectOld = 0;
++  let rtPixelFail = 0, dimFail = 0, illegal = 0;
++  const usedColors = {};
++  let maxDistSeen = 0, maxDistLevel = null;
++  let alphaLevels = 0;
++
++  for (const f of files) {
++    const raw = CL.parseTXT(fs.readFileSync(path.join(DIR_OFFICIAL, f), 'utf8'));
++    if (!raw.length || !raw[0].length) { bad(f + ' 解析为空'); continue; }
++
++    for (const row of raw) for (const v of row) {
++      if (v !== -1 && (v < 0 || v > 21)) illegal++;
++      if (v >= 0) usedColors[v] = 1;
++    }
++
++    const d = CL.detect(raw);
++    if (d.hasNeg) nWithNeg++;
++    if (d.confident) nConfident++; else nAmbiguous++;
++    if (d.lib === 'older') nDetectOld++;
++
++    // 官方 → 求解器(34色/0空) → 官方，逐像素比对
++    const toSolver = CL.toSolver(raw);
++    // 该关实际用到的最远转换距离
++    for (const k of Object.keys(toSolver.stats.used)) {
++      const row = toSolver.stats.map.rows.find((r) => r.from === +k);
++      if (row && row.dist > maxDistSeen) { maxDistSeen = row.dist; maxDistLevel = f + ' 官方' + k; }
++    }
++    const back = CL.toOfficial(toSolver.matrix).matrix;
++    if (back.length !== raw.length || back[0].length !== raw[0].length) { dimFail++; continue; }
++    let same = true;
++    for (let r = 0; r < raw.length && same; r++) for (let c = 0; c < raw[r].length; c++) {
++      if (back[r][c] !== raw[r][c]) { same = false; break; }
++    }
++    if (!same) {
++      rtPixelFail++;
++      if (alphaLevels < 3) { alphaLevels++; console.log('      · 往返不一致示例：' + f); }
++    }
++  }
++
++  console.log('    空位标记：带 -1 的 ' + nWithNeg + ' 关 / 实心无空位 ' + (300 - nWithNeg) + ' 关');
++  console.log('    识别结果：高置信 ' + nConfident + ' 关，判据不足 ' + nAmbiguous + ' 关（实心图，需人工确认）');
++  if (nWithNeg === 185) ok('185/300 带 -1，与源数据实测一致'); else bad('带 -1 的关数 ' + nWithNeg + ' != 185');
++  if (nAmbiguous === nDetectOld + (nConfident - (300 - nAmbiguous))) { /* 仅信息 */ }
++  if (illegal) bad('出现 ' + illegal + ' 个越界编号'); else ok('编号全部落在 {-1} ∪ [0,21]');
++  console.log('    实际用到的官方色：' + Object.keys(usedColors).sort((a, b) => a - b).join(',') + '（全部 22 色都在用）');
++  console.log('    关内实际转换最远距离：' + maxDistSeen.toFixed(1) + (maxDistLevel ? '（' + maxDistLevel + '）' : ''));
++  if (dimFail) bad(dimFail + ' 关尺寸在往返中改变');
++  if (rtPixelFail) bad(rtPixelFail + ' 关往返后像素不一致');
++  else ok('新→老→新 往返：300/300 关逐像素完全一致（无损）');
++}
++
++// ---------- 4. 老→新：空位/尺寸/极色 ----------
++console.log('\n[4] 34色库 → 官方 → 34色库');
++{
++  const m = [];
++  m.push(Array.from({ length: 35 }, (_, i) => i));          // 含 0 空位 + 1..34
++  m.push(Array.from({ length: 35 }, (_, i) => i % 35));
++  const toOff = CL.toOfficial(m);
++  if (toOff.matrix[0][0] !== -1) bad('老色库 0（空位）→ 官方应为 -1，实为 ' + toOff.matrix[0][0]);
++  else ok('空位 0 → -1（官方空位标记）');
++  const back = CL.toSolver(toOff.matrix).matrix;
++  if (back[0][0] !== 0) bad('官方 -1 转回应为 0，实为 ' + back[0][0]);
++  else ok('-1 → 0（求解器空位标记）');
++  if (back.length !== m.length || back.some((r, i) => r.length !== m[i].length)) bad('尺寸在往返中改变');
++  else ok('尺寸保持不变');
++
++  const worst = CL.mapSolverToOfficial().rows.slice().sort((a, b) => b.dist - a.dist).slice(0, 5);
++  console.log('    老色库→官方 最远 5 色（老色库有 34 色，官方只有 22 色，个别色必然偏差较大）：');
++  for (const w of worst)
++    console.log('      老' + String(w.from).padStart(2) + ' ' + w.fromName.padEnd(4) + ' ' + w.fromHex +
++                ' → 官方' + String(w.to).padStart(2) + ' ' + w.toName.padEnd(4) + ' ' + w.toHex + ' (距离 ' + w.dist.toFixed(1) + ')');
++  if (worst[0].dist > 100) warning('老→官方 最远距离 ' + worst[0].dist.toFixed(1) + '，属两套色库色域差异，非转换错误');
++}
++
++// ---------- 5. 识别判据边界 ----------
++console.log('\n[5] 识别判据');
++{
++  const cases = [
++    [[[0, 1], [-1, 2]], 'official', true, '含 -1（官方空位）'],
++    [[[22, 5], [3, 0]], 'older', true, '含 >21 编号'],
++    [[[0, 0, 0], [0, 1, 0]], 'older', true, '0 占比高 = 大面积为空'],
++    [[[1, 2], [3, 4]], 'older', false, '实心无 0 无负 = 判据不足'],
++    [[[0, 5, 6], [7, 8, 9]], 'official', true, '有 0 但占比低 = 官方黄底'],
++  ];
++  for (const [m, wantLib, wantConf, desc] of cases) {
++    const d = CL.detect(m);
++    if (d.lib === wantLib && d.confident === wantConf)
++      ok(desc + ' → ' + d.lib + (d.confident ? '（高置信）' : '（判据不足）'));
++    else bad(desc + ' → 期望 ' + wantLib + '/' + wantConf + ' 实得 ' + d.lib + '/' + d.confident);
++  }
++}
++
++// ---------- 6. TXT 读写 ----------
++console.log('\n[6] TXT 读写');
++{
++  const m = [[0, 1, 2], [3, 0, 4]];
++  if (JSON.stringify(CL.parseTXT(CL.renderTXT(m, '像素矩阵'))) === JSON.stringify(m)) ok('renderTXT → parseTXT 往返一致');
++  else bad('TXT 往返不一致');
++
++  const p = CL.parseTXT(['像素矩阵', '0 1 -1', '2 3 -1'].join('\n'));
++  if (JSON.stringify(p) === JSON.stringify([[0, 1, -1], [2, 3, -1]])) ok('parseTXT 跳过标题行并保留 -1');
++  else bad('parseTXT 解析官方格式出错：' + JSON.stringify(p));
++
++  if (CL.parseTXT('\uFEFF像素矩阵\n1 2\n').length === 1) ok('parseTXT 能吃 BOM'); else bad('BOM 处理失败');
++
++  // 与 generator.blocksFromTXT 口径一致性（关键回归：-1 开头的行不能再被丢掉）
++  const genSrc = fs.readFileSync(path.join(__dirname, 'generator.js'), 'utf8');
++  const mfn = genSrc.match(/function blocksFromTXT[\s\S]*?\n  \}/);
++  if (!mfn) { bad('generator.blocksFromTXT 未找到'); }
++  else {
++    const blocksFromTXT = new Function('return (' + mfn[0] + ')')();
++    const probe = '像素矩阵\n-1 1 2\n3 4 5\n';
++    const got = JSON.stringify(blocksFromTXT(probe));
++    if (got === '[[-1,1,2],[3,4,5]]') ok('generator.blocksFromTXT 已支持 -1 开头的行（v154 修复）');
++    else bad('generator.blocksFromTXT 仍会丢 -1 开头的行：' + got);
++
++    // 全量回归：300 关用两套解析器必须得到同一个矩阵
++    const dir2 = DIR_OFFICIAL;
++    const files2 = fs.readdirSync(dir2).filter((f) => /^level_\d+\.txt$/.test(f));
++    let mism = 0, dropped = 0;
++    for (const f of files2) {
++      const txt = fs.readFileSync(path.join(dir2, f), 'utf8');
++      const a = JSON.stringify(blocksFromTXT(txt)), b = JSON.stringify(CL.parseTXT(txt));
++      if (a !== b) { mism++; if (a.length < b.length) dropped++; }
++    }
++    if (mism) bad(mism + ' 关两套 TXT 解析结果不一致（其中 ' + dropped + ' 关疑似丢行）');
++    else ok('300/300 关：generator.blocksFromTXT 与 ColorLibs.parseTXT 解析结果完全一致');
++    // 老格式（0 当空位）不受影响
++    if (JSON.stringify(blocksFromTXT('标题\n0 1 2\n3 4 5\n')) === '[[0,1,2],[3,4,5]]') ok('老格式 TXT（0 为空位）解析不变，向后兼容');
++    else bad('老格式 TXT 解析被破坏');
++  }
++}
++
++console.log('\n===== 结果：失败 ' + fail + ' 项，警告 ' + warn + ' 项 =====');
++process.exit(fail ? 1 : 0);
+diff -ruN a/bin/js/app.js b/bin/js/app.js
+--- a/bin/js/app.js	2026-10-15 17:04:54
++++ b/bin/js/app.js	2026-10-15 17:05:00
+@@ -284,6 +284,61 @@
+     document.getElementById('btn-generate').addEventListener('click', runGenerate);
+     document.getElementById('btn-simulate').addEventListener('click', enterSimulation);
+     document.getElementById('btn-exit-sim').addEventListener('click', exitSimulation);
++    // ===== 【v154】色库：读图色库下拉 + 新老色库转换面板 =====
++    if (!COLORS) {
++      console.error(CL_ERR + '：导入 TXT 将无法识别/转换官方色库，请检查 index.html 里的脚本引入。');
++    }
++    var clSel = document.getElementById('colorlib-select');
++    if (clSel) {
++      clSel.value = readLibChoice;
++      clSel.addEventListener('change', function () {
++        readLibChoice = this.value || 'auto';
++        // 已经导入的图要按新选择重判（否则改了下拉却看不出任何变化，等于摆设）
++        if (levelList.length) reimportWithCurrentLib();
++        else renderColorlibPanel();
++      });
++    }
++    bindClick('btn-colorlib', function () {
++      if (!COLORS) { alert(CL_ERR); return; }
++      toggleColorlibPanel();
++    });
++    bindClick('colorlib-close', function () { toggleColorlibPanel(false); });
++    var clDir = document.getElementById('colorlib-direction');
++    if (clDir && clDir.addEventListener) {
++      // 换方向只刷新对照表（不动数据），要真正转换得点「🔁 转换」
++      clDir.addEventListener('change', function () { renderColorlibPanel(); });
++    }
++    bindClick('colorlib-swap', function () {
++      var p = document.getElementById('colorlib-direction');
++      if (p) { p.value = (p.value === 'older') ? 'official' : 'older'; renderColorlibPanel(); }
++    });
++    bindClick('colorlib-apply', function () {
++      var scopeSel = document.getElementById('colorlib-scope');
++      var mode = scopeSel ? scopeSel.value : 'all';
++      var note = document.getElementById('colorlib-note');
++      // 【重要】目标色库必须在任何渲染之前读定：renderColorlibPanel() 会把下拉重设成
++      //   「跟当前图相反」的方向，转换完再读就会读到被翻过的值，导致"转过去又被转回来"。
++      var toLib = (document.getElementById('colorlib-direction') || {}).value || 'older';
++      if (mode === 'current') {
++        // 单张：只转当前图，并把它设成该色库（同时把预览换成转换结果）
++        if (currentLevelIdx < 0 || currentLevelIdx >= levelList.length) { alert('还没有导入任何目标图'); return; }
++        var en = levelList[currentLevelIdx];
++        try {
++          var cv = convertEntryBlocks(en, toLib);
++          en.blocks = cv.outBlocks;
++          en.usedLib = toLib;
++          en._colorCount = null;
++          reloadCurrentEntry();
++          renderGenFileList(); renderColorlibHint(); renderColorlibPanel();
++          if (note) { note.className = 'colorlib-note good'; note.textContent = '已转换当前图《' + en.name + '》→ ' + libTag(toLib); }
++        } catch (e) {
++          if (note) { note.className = 'colorlib-note warn'; note.textContent = '转换失败：' + e.message; }
++        }
++        return;
++      }
++      var msg = applyColorlibBatch(mode === 'download' ? 'download' : 'preview', toLib);
++      if (note) { note.className = 'colorlib-note good'; note.textContent = msg; }
++    });
+     // 【v132】手动摆盒：进入/退出编辑态，并把宿主能力交给 js/level-editor.js。
+     //   currentLevel / levelList 都在本闭包里，外部文件取不到，所以用回调注入而不是挂全局。
+     bindClick('btn-manual-edit', enterEditMode);
+@@ -920,55 +975,318 @@
+   function importTXT() { document.getElementById('txt-input').click(); }
+ 
+   // 关卡列表存储
+-  var levelList = []; // [{name, blocks}]
++  // 【v154】每条多了色库相关字段：
++  //   rawBlocks   原始编号矩阵（**永不改变**，反复互转都以它为准，避免转了又转叠加误差）
++  //   detectedLib 自动识别的色库；confident=false 表示判据不足（实心图）
++  //   usedLib     实际按哪套色库解释（= 「读图色库」下拉的选择或自动结果）
++  //   convStats   官方→老 的转换统计（老色库读入时为 null）
++  var levelList = []; // [{name, blocks, txt, rawBlocks, detectedLib, confident, usedLib, convStats}]
+   var currentLevelIdx = -1;
+ 
++  // ==================== 【v154】色库：读图色库 + 新老互转 ====================
++  // 两套色库：老色库 34 色（0 = 空位，1-34 = 颜色，求解器内部一直用的编号空间）
++  //           官方色库 0-21（-1 = 空位，0 = 黄色，官方 JSON 原始颜色矩阵那套）
++  // 两套色库**没有一个同 Hex 的色**（已逐一比对），所以「按哪套读」会实打实改变颜色，
++  // 必须显式可选。求解器内部一律只跑老色库编号，转换只发生在导入/导出 TXT 的边界上。
++  var COLORS = AntSolver.ColorLibs;
++  var readLibChoice = 'auto';    // 顶栏下拉当前值：'auto' | 'older' | 'official'
++  var CL_ERR = '色库模块 js/color-libs.js 未加载';
++
++  /** 按「读图色库」下拉决定一张图该按哪套色库解释。 */
++  function pickReadLib(rawBlocks) {
++    if (!COLORS) return { lib: 'older', confident: false, detected: 'older', reason: CL_ERR };
++    var d = COLORS.detect(rawBlocks);
++    if (readLibChoice === 'older' || readLibChoice === 'official') {
++      return { lib: readLibChoice, confident: d.confident, detected: d.lib,
++               reason: '按「读图色库」手动指定（自动判定为' + (d.lib === 'official' ? '官方色库' : '老色库') +
++                       (d.confident ? '' : '，但判据不足') + '）' };
++    }
++    return { lib: d.lib, confident: d.confident, detected: d.lib, reason: d.reason };
++  }
++
++  /** 源编号矩阵 → 求解器内部编号空间（老色库 0 空 / 1-34 色）。 */
++  function toSolverBlocks(rawBlocks, lib) {
++    if (!COLORS || lib === 'older') return { blocks: rawBlocks, stats: null };
++    var r = COLORS.toSolver(rawBlocks);
++    return { blocks: r.matrix, stats: r.stats };
++  }
++
++  /** 刷新「导入目标图」里的色库提示行。 */
++  function renderColorlibHint() {
++    var el = document.getElementById('gen-colorlib-hint');
++    if (!el) return;
++    var nOff = 0, nUnclear = 0;
++    for (var i = 0; i < levelList.length; i++) {
++      if (levelList[i].usedLib === 'official') nOff++;
++      if (levelList[i].confident === false) nUnclear++;
++    }
++    var parts = [];
++    if (nOff) parts.push('已按官方色库 0-21 读入并转成老色库 34 色：' + nOff + ' 张');
++    if (nUnclear) parts.push('⚠ ' + nUnclear + ' 张判据不足（实心图，两套色库都能解释），可开「🎨 色库转换」核对');
++    el.className = 'gen-hint' + (nUnclear ? ' colorlib-warn' : '');
++    el.textContent = parts.join(' · ');
++  }
++
+   function handleTXTSelect(e) {
+     var files = e.target.files;
+     if (!files || files.length === 0) return;
+ 
+-    levelList = [];
+-    currentLevelIdx = -1;
+-    var loaded = 0;
+-    var total = files.length;
+-
++    // 【v154】两遍处理：第一遍只读文本（异步），第二遍才解析+判色库。
++    //   原实现边读边解析，导致「读图色库」下拉在解析完之前改不了、也没法回头重判；
++    //   现在先收集文本，全部到齐后统一处理，色库判定一次成型。
++    var read = [], loaded = 0, total = files.length;
+     for (var i = 0; i < files.length; i++) {
+-      (function(file, idx) {
++      (function (file, idx) {
+         var reader = new FileReader();
+-        reader.onload = function(ev) {
+-          try {
+-            var blocks = AntSolver.Generator.blocksFromTXT(ev.target.result);
+-            if (blocks && blocks.length > 0) {
+-              levelList.push({ name: file.name, blocks: blocks, txt: ev.target.result });
+-            }
+-          } catch(err) { /* skip bad files */ }
++        reader.onload = function (ev) {
++          read[idx] = { name: file.name, txt: String(ev.target.result) };
+           loaded++;
+-          if (loaded >= total) {
+-            // 全部加载完毕
+-            levelList.sort(function(a, b) {
+-              var na = parseInt(a.name) || 0, nb = parseInt(b.name) || 0;
+-              return na - nb;
+-            });
+-            onAllTXTLoaded();
+-          }
++          if (loaded >= total) applyImportedTXT(read);
+         };
++        reader.onerror = function () {
++          read[idx] = null; loaded++;
++          if (loaded >= total) applyImportedTXT(read);
++        };
+         reader.readAsText(file);
+       })(files[i], i);
+     }
+     e.target.value = '';
+   }
+ 
+-  function onAllTXTLoaded() {
++  /** 第二遍：解析文本 → 判色库 → 转成求解器编号 → 填 levelList。 */
++  function applyImportedTXT(read) {
++    levelList = [];
++    currentLevelIdx = -1;
++    var badFiles = [];
++
++    for (var i = 0; i < read.length; i++) {
++      var item = read[i];
++      if (!item) continue;
++      var rawBlocks = null;
++      try { rawBlocks = COLORS ? COLORS.parseTXT(item.txt) : AntSolver.Generator.blocksFromTXT(item.txt); }
++      catch (err) { rawBlocks = null; }
++      if (!rawBlocks || !rawBlocks.length || !rawBlocks[0].length) { badFiles.push(item.name); continue; }
++
++      var pick = pickReadLib(rawBlocks);
++      var conv = { blocks: rawBlocks, stats: null };
++      try { conv = toSolverBlocks(rawBlocks, pick.lib); }
++      catch (err2) { badFiles.push(item.name + '（色库转换失败）'); continue; }
++
++      levelList.push({
++        name: item.name,
++        blocks: conv.blocks,
++        txt: item.txt,
++        rawBlocks: rawBlocks,          // 原始编号（不随转换改变，供反复互转）
++        convStats: conv.stats,         // 官方→老的转换统计（老色库读入时为 null）
++        detectedLib: pick.detected,
++        confident: pick.confident,
++        libReason: pick.reason,
++        usedLib: pick.lib
++      });
++    }
++
+     if (levelList.length === 0) { alert('未解析到有效TXT文件'); return; }
+     // 显示关卡列表
+     document.getElementById('level-list-panel').classList.remove('hidden');
+     document.getElementById('level-list-count').textContent = '(' + levelList.length + ')';
+     renderLevelList();
+     renderGenFileList();
+-    // 自动加载第一关
++    renderColorlibHint();
++    if (badFiles.length) console.warn('[色库] 以下文件解析失败，已跳过：', badFiles);
++    // 自动加载第一关（这一步会把 currentLevelIdx 从 -1 设成 0）
+     selectLevel(0);
++    // 【顺序要紧】色库面板必须在 selectLevel 之后渲染：它读的是 currentLevelIdx，
++    //   在 -1 时渲染会显示成"当前没有导入的图"，用户打开面板会看到空白。
++    renderColorlibPanel();
+   }
+ 
++  /** 按各自的原始编号 + 色库判定，重放一遍导入结果（改下拉后调用）。 */
++  function reinterpretAll() {
++    for (var i = 0; i < levelList.length; i++) {
++      var en = levelList[i];
++      if (!en.rawBlocks) continue;
++      var pick = pickReadLib(en.rawBlocks);
++      var conv = { blocks: en.rawBlocks, stats: null };
++      try { conv = toSolverBlocks(en.rawBlocks, pick.lib); } catch (err) { continue; }
++      en.blocks = conv.blocks;
++      en.convStats = conv.stats;
++      en.detectedLib = pick.detected;
++      en.confident = pick.confident;
++      en.libReason = pick.reason;
++      en.usedLib = pick.lib;
++      en._colorCount = null;          // 颜色数缓存失效
++    }
++  }
++
++  /** 把当前关按最新 blocks 重新装进界面（board 传 null = 清掉棋盘缓存，需要重新生成）。 */
++  function reloadCurrentEntry() {
++    if (currentLevelIdx < 0 || currentLevelIdx >= levelList.length) return;
++    var en = levelList[currentLevelIdx];
++    var tbuf = parseInt((document.getElementById('gen-buffer') || {}).value) || 5;
++    loadLevel({ blocks: en.blocks, bufferLimit: tbuf, board: null });
++    // loadLevel 会先把「求解结果」隐藏掉，这里再填上色库说明并显示，口径与原导入提示一致。
++    var trr = en.blocks.length, tcc = en.blocks[0] ? en.blocks[0].length : 0;
++    var html = '<p>' + en.name + '</p>';
++    html += '<p style="font-size:11px;color:#888">已导入目标图 ' + trr + '×' + tcc + '（未生产棋盘）。点「生成」按当前参数生产棋盘。</p>';
++    html += colorlibDetailHtml(en);
++    document.getElementById('solve-result').classList.remove('hidden');
++    document.getElementById('solve-details').innerHTML = html;
++  }
++
++  /** 色库说明行（导入提示 / 重判提示共用）。 */
++  function colorlibDetailHtml(en) {
++    var html = '';
++    if (en.usedLib === 'official') {
++      html += '<p style="font-size:11px;color:#666">🎨 色库：按官方色库 0-21 读入 → 已转成老色库 34 色' +
++        (en.convStats && en.convStats.colors ? '（' + en.convStats.colors + ' 色）' : '') + '</p>';
++    } else {
++      html += '<p style="font-size:11px;color:#666">🎨 色库：老色库 34 色（0 = 空位）</p>';
++    }
++    if (en.confident === false) {
++      html += '<p style="font-size:11px;color:#e6a23c">⚠ ' + (en.libReason || '色库判据不足') + '</p>';
++    }
++    return html;
++  }
++
++  /**
++   * 改了「读图色库」后：按新的选择重判本批全部图，并刷新当前关。
++   * 不调 loadLevel（那样会清掉左栏的求解结果、也不重置入口模式），只就地换 blocks，
++   * 同时把棋盘缓存打空 —— 色号变了，旧棋盘上的盒颜色已经对不上了，必须重新生成。
++   */
++  function reimportWithCurrentLib() {
++    if (!COLORS || !levelList.length) return;
++    reinterpretAll();
++    renderColorlibHint();
++    renderColorlibPanel();
++    if (currentLevelIdx < 0 || currentLevelIdx >= levelList.length) return;
++    var en = levelList[currentLevelIdx];
++    currentLevel = AntSolver.parseLevel({ blocks: en.blocks, bufferLimit: currentLevel.bufferLimit, board: null });
++    currentGenerationEval = null;
++    currentChokeInfo = null;
++    renderLevelInfo();
++    renderTarget(null);
++    renderQueues(null);
++    document.getElementById('solve-result').classList.remove('hidden');
++    document.getElementById('solve-details').innerHTML =
++      '<p>' + en.name + '</p><p style="font-size:11px;color:#888">已按新的「读图色库」重判本批全部图。' +
++      '棋盘缓存已清空，点「生成」重新生产。</p>' + colorlibDetailHtml(en);
++  }
++
++  /** 「🎨 色库转换」开关面板。 */
++  function toggleColorlibPanel(force) {
++    var p = document.getElementById('colorlib-panel');
++    if (!p) return;
++    var show = (force === undefined) ? p.classList.contains('hidden') : !!force;
++    p.classList.toggle('hidden', !show);
++    if (show) renderColorlibPanel();
++  }
++
++  /** 面板内容：当前图色库、方向默认值、色值对照表（标出本图真正用到的色）。 */
++  function renderColorlibPanel() {
++    var cur = document.getElementById('colorlib-current-lib');
++    var mapEl = document.getElementById('colorlib-map');
++    var note = document.getElementById('colorlib-note');
++    var dirSel = document.getElementById('colorlib-direction');
++    if (!mapEl) return;
++    if (!COLORS) { mapEl.innerHTML = '<p style="font-size:11px;color:#a33">' + CL_ERR + '</p>'; return; }
++
++    var en = (currentLevelIdx >= 0 && currentLevelIdx < levelList.length) ? levelList[currentLevelIdx] : null;
++    var curLib = en ? en.usedLib : 'older';
++    if (cur) {
++      cur.textContent = (curLib === 'official' ? '官方色库 0-21' : '老色库 34 色') +
++        (en ? '（' + en.name + (en.confident === false ? ' · 判据不足' : '') + '）' : '（当前没有导入的图）');
++    }
++    if (dirSel) {
++      // 只在**确实有当前图**时才自动翻方向：没有图时翻了也没用，还会让"看起来没反应"变成困惑。
++      if (en) dirSel.value = (curLib === 'official') ? 'older' : 'official';
++    }
++    if (note) {
++      note.className = 'colorlib-note' + (en && en.confident === false ? ' warn' : '');
++      note.textContent = en ? (en.libReason || '') : '先导入目标图 TXT，这里会显示判定依据';
++    }
++
++    var toLib = dirSel ? dirSel.value : 'older';
++    var fromLib = (curLib === 'official') ? 'official' : 'older';
++    var M = null;
++    try { M = COLORS.map(fromLib, toLib); } catch (e) { M = null; }
++    if (!M) { mapEl.innerHTML = '<p style="font-size:11px;color:#a33">映射表构建失败</p>'; return; }
++
++    var used = {};
++    if (en && en.rawBlocks) {
++      for (var r = 0; r < en.rawBlocks.length; r++) for (var c = 0; c < en.rawBlocks[r].length; c++) {
++        var v = en.rawBlocks[r][c];
++        used[v] = (used[v] || 0) + 1;
++      }
++    }
++    var html = '<table><thead><tr><th>源色号</th><th>源色值</th><th>→</th><th>目标色号</th><th>目标色值</th><th>色差</th><th>本图用量</th></tr></thead><tbody>';
++    for (var i = 0; i < M.rows.length; i++) {
++      var r2 = M.rows[i];
++      var cnt = used[r2.from];
++      html += '<tr class="' + (cnt ? 'colorlib-used' : '') + '">' +
++        '<td>' + r2.from + ' ' + r2.fromName + '</td>' +
++        '<td><span class="colorlib-sw" style="background:' + r2.fromHex + '"></span>' + r2.fromHex + '</td>' +
++        '<td>→</td>' +
++        '<td>' + r2.to + ' ' + r2.toName + '</td>' +
++        '<td><span class="colorlib-sw" style="background:' + r2.toHex + '"></span>' + r2.toHex + '</td>' +
++        '<td>' + r2.dist.toFixed(0) + '</td>' +
++        '<td>' + (cnt ? cnt + (r2.exact ? ' 精确' : '') : '-') + '</td>' +
++        '</tr>';
++    }
++    html += '</tbody></table>';
++    mapEl.innerHTML = html;
++  }
++
++  /** 单张图转换（永远从 rawBlocks 出发，避免转了又转叠加误差）。 */
++  function convertEntryBlocks(en, toLib) {
++    var fromLib = (en.usedLib === 'official') ? 'official' : 'older';
++    var res = COLORS.convertMatrix(en.rawBlocks, fromLib, toLib);
++    return { outBlocks: res.matrix, fromLib: fromLib, toLib: toLib, stats: res.stats };
++  }
++
++  function libTag(lib) { return lib === 'official' ? '官方色库0-21' : '老色库34色'; }
++
++  /** 本批全部转换：'preview' 只改页面预览；'download' 改预览并下载转换后的 TXT。
++   *  toLib 由调用方在渲染前读定并传入（见 colorlib-apply 里那段注释：面板渲染会翻方向下拉）。 */
++  function applyColorlibBatch(mode, toLib) {
++    if (!toLib) toLib = (document.getElementById('colorlib-direction') || {}).value || 'older';
++    if (!levelList.length) { alert('还没有导入任何目标图'); return '还没有导入任何目标图'; }
++    if (!COLORS) { alert(CL_ERR); return CL_ERR; }
++
++    var nSame = 0, outs = [];
++    for (var i = 0; i < levelList.length; i++) {
++      var en = levelList[i];
++      if (!en.rawBlocks) continue;
++      try {
++        var cv = convertEntryBlocks(en, toLib);
++        outs.push({ name: en.name, txt: COLORS.renderTXT(cv.outBlocks, '像素矩阵') });
++        if (cv.fromLib === toLib) nSame++;
++        en.blocks = cv.outBlocks;         // 预览与后续生产都用转换后的编号
++        en.usedLib = toLib;
++        en._colorCount = null;
++      } catch (err) {
++        console.warn('[色库] 转换失败：' + en.name, err);
++      }
++    }
++
++    if (mode === 'download') {
++      for (var j = 0; j < outs.length; j++) {
++        var base = String(outs[j].name).replace(/\.txt$/i, '');
++        downloadText(base + '_' + libTag(toLib) + '.txt', outs[j].txt);
++      }
++      reloadCurrentEntry();
++      renderGenFileList(); renderColorlibHint(); renderColorlibPanel();
++      return '已下载 ' + outs.length + ' 个 TXT（目标色库：' + libTag(toLib) + '）。';
++    }
++
++    reloadCurrentEntry();
++    renderGenFileList();
++    renderColorlibHint();
++    renderColorlibPanel();
++    return '已把本批 ' + levelList.length + ' 张的预览改成「' + libTag(toLib) + '」' +
++      (nSame ? '（其中 ' + nSame + ' 张本来就是这个色库）' : '') +
++      '，棋盘缓存已清空，按需重新点「生成」。';
++  }
++
+   // ==================== 生成器页面：文件列表(排序/分组/筛选/删除) ====================
+   // 统计某目标图条目的颜色数(用于排序/分组)：blocks 中出现的正整数色值去重计数。
+   function genFileColorCount(entry) {
+@@ -1164,9 +1482,10 @@
+     var trr = entry.blocks.length, tcc = entry.blocks[0] ? entry.blocks[0].length : 0;
+     var html = '<p>' + entry.name + '</p>';
+     html += '<p style="font-size:11px;color:#888">已导入目标图 ' + trr + '×' + tcc + '（未生产棋盘）。点「生成」按当前参数生产棋盘。</p>';
+-    html += '<p style="font-size:11px;color:#888">已导入目标图 ' + trr + '×' + tcc + '（未生产棋盘）。点「生成」按当前参数生产棋盘。</p>';
++    html += colorlibDetailHtml(entry);   // 【v154】这张图按哪套色库读的 + 判据不足提醒
+     document.getElementById('solve-result').classList.remove('hidden');
+     document.getElementById('solve-details').innerHTML = html;
++    renderColorlibPanel();               // 【v154】换关后面板里的"当前图色库/用量"要跟着换
+   }
+ 
+   function getGenConfig() {
+diff -ruN a/bin/js/color-libs.js b/bin/js/color-libs.js
+--- a/bin/js/color-libs.js	1970-01-01 08:00:00
++++ b/bin/js/color-libs.js	2026-10-15 17:05:00
+@@ -0,0 +1,487 @@
++/**
++ * 蚂蚁拿块求解器 - 【色库 v154】两套色库 + 新老互转
++ *
++ * 为什么需要这个模块
++ * ------------------
++ * 本工程历史上只有一套色库：「真实毛线标准色库」34 色（编号 1-34，0 = 空位），
++ * 也就是 js/utils.js 里的 AntSolver.COLORS。
++ * 2026-10 拿到官方 JSON 提取出来的 300 关，用的是**另一套** 22 色官方色库：
++ *   编号 0-21（0 = 黄色，-1 = 空位），Hex 与 34 色库**无一相同**（已逐一比对）。
++ * 两套色库的编号空间互相冲突（旧的 0=空、新的 0=黄），直接混读会把「黄像素」读成空位。
++ *
++ * 本模块做的事
++ * ------------
++ *   1. 把两套色库的权威色值内置（来源：bin/参考/色库/，见下），供识别/预览/转换使用；
++ *   2. 自动识别一张目标图 TXT 用的是哪套色库（依据空位标记与出现过的编号）；
++ *   3. 新老互转（按 Hex 最近色，双向往返都是一张确定性的映射表，不做人工猜测）：
++ *        · toSolver  : 官方 0-21（-1 空位） → 本工程 1-34（0 空位），供生成器/模拟器直接吃；
++ *        · toOfficial: 本工程 1-34（0 空位） → 官方 0-21（-1 空位），供交回实机/存档。
++ *
++ * 求解器内部一律只跑 34 色库编号，所以转换只发生在【导入/导出 TXT 的边界】上，
++ * 不影响生成器、模拟器、分析等任何既有逻辑。
++ *
++ * 数据来源（两处内容一致，任一处改动都要同步）
++ *   · bin/参考/色库/标准色库/标准色库_colors_0-21.txt ................ 官方 22 色
++ *   · bin/参考/色库/official_json_original_color_matrices/original_color_library.txt
++ *   · bin/参考/色库/标准色库/标准色库毛线真实.txt ..................... 本工程 34 色
++ *     （同一份也在 bin/参考/ 毛线色库/标准色库毛线真实.txt，与 js/utils.js 的 COLORS 对齐）
++ */
++(function (root) {
++  'use strict';
++
++  var CL = {};
++
++  // ==================== 一、本工程色库（老·真实毛线 34 色，编号 1-34，0 = 空位）====================
++  // 与 js/utils.js 的 AntSolver.COLORS 严格同源；此处内置一份便于本模块独立做识别/转换。
++  CL.OLDER_ID = 'older';
++  CL.OLDER_NAME = '真实毛线标准色库（老·34色）';
++  CL.OLDER_EMPTY = 0;
++  CL.OLDER_MIN = 1;
++  CL.OLDER_MAX = 34;
++  CL.OLDER = {
++    id: CL.OLDER_ID,
++    label: '老色库 · 34色',
++    short: '34色',
++    empty: 0,               // 空位标记
++    min: 1, max: 34,
++    colors: [               // 下标 = 颜色编号（0 号占位 = 空）
++      null,
++      { name: '红色',   hex: '#FF3240' }, { name: '浅红',   hex: '#FF269F' },
++      { name: '粉红',   hex: '#FF5294' }, { name: '暗粉',   hex: '#DF2455' },
++      { name: '浅粉',   hex: '#FF98A3' }, { name: '深红',   hex: '#F63C3F' },
++      { name: '紫色',   hex: '#A073E7' }, { name: '浅紫粉', hex: '#E749B6' },
++      { name: '玫红',   hex: '#AD00AC' }, { name: '灰紫',   hex: '#C538C3' },
++      { name: '深紫',   hex: '#A032DC' }, { name: '紫红',   hex: '#C60174' },
++      { name: '天蓝',   hex: '#00ACF6' }, { name: '浅蓝',   hex: '#00E1EF' },
++      { name: '深棕',   hex: '#256A85' }, { name: '深蓝',   hex: '#7074B6' },
++      { name: '灰蓝',   hex: '#6F67DC' }, { name: '蓝色',   hex: '#6B5BBA' },
++      { name: '浅黄',   hex: '#95E502' }, { name: '绿色',   hex: '#01CC64' },
++      { name: '橄榄绿', hex: '#00AEAD' }, { name: '青蓝',   hex: '#04DB01' },
++      { name: '浅绿',   hex: '#02CBA9' }, { name: '深绿',   hex: '#018441' },
++      { name: '黄色',   hex: '#FFB900' }, { name: '砖红',   hex: '#C15701' },
++      { name: '浅橙',   hex: '#FF9F6A' }, { name: '橙色',   hex: '#FF8002' },
++      { name: '深棕2',  hex: '#F69602' }, { name: '棕色',   hex: '#F9DA00' },
++      { name: '浅灰',   hex: '#FDE8D6' }, { name: '灰色',   hex: '#FFEAB2' },
++      { name: '深灰',   hex: '#010101' }, { name: '中灰',   hex: '#BBB6B7' }
++    ]
++  };
++
++  // ==================== 二、官方色库（新·官方 22 色，编号 0-21，-1 = 空位）====================
++  CL.OFFICIAL_ID = 'official';
++  CL.OFFICIAL_NAME = '官方色库（新·0-21）';
++  CL.OFFICIAL_EMPTY = -1;
++  CL.OFFICIAL_MIN = 0;
++  CL.OFFICIAL_MAX = 21;
++  CL.OFFICIAL = {
++    id: CL.OFFICIAL_ID,
++    label: '新色库 · 官方0-21',
++    short: '官方22色',
++    empty: -1,              // 空位标记（官方 JSON 用 -1，避免与 0 号黄色冲突）
++    min: 0, max: 21,
++    colors: [
++      { name: '黄色',   hex: '#FFEB33' }, { name: '橙黄',   hex: '#FFBF24' },
++      { name: '橙色',   hex: '#FF8025' }, { name: '暗红',   hex: '#E75862' },
++      { name: '深红',   hex: '#D52C21' }, { name: '浅绿',   hex: '#AEDB6F' },
++      { name: '深绿',   hex: '#1F9D12' }, { name: '墨绿',   hex: '#178459' },
++      { name: '浅蓝',   hex: '#61D6F0' }, { name: '天蓝',   hex: '#3B90F9' },
++      { name: '浅粉',   hex: '#FFB1BE' }, { name: '粉紫',   hex: '#F97AFF' },
++      { name: '紫色',   hex: '#9746EC' }, { name: '深蓝',   hex: '#2513BA' },
++      { name: '深棕',   hex: '#793A1D' }, { name: '白色',   hex: '#D7DFE0' },
++      { name: '黑色',   hex: '#48494D' }, { name: '米色',   hex: '#F3C4A7' },
++      { name: '蓝色',   hex: '#3150FF' }, { name: '棕色',   hex: '#985B2E' },
++      { name: '玫红',   hex: '#DE1B5F' }, { name: '米黄',   hex: '#F2E58A' }
++    ]
++  };
++
++  CL.LIBS = {};
++  CL.LIBS[CL.OLDER_ID] = CL.OLDER;
++  CL.LIBS[CL.OFFICIAL_ID] = CL.OFFICIAL;
++
++  /**
++   * 取一套色库。接受库对象本身（防调用方误传对象造成"静默回落到默认库"）或 id 字符串；
++   * 'auto' / undefined / 未知值一律回落到老色库（＝求解器内部编号空间）。
++   */
++  CL.get = function (which) {
++    if (which === CL.OLDER || which === CL.OFFICIAL) return which;
++    return CL.LIBS[which] || CL.OLDER;
++  };
++
++  // ==================== 三、色值工具 ====================
++
++  /** '#RRGGBB' → [r,g,b]。 */
++  function hexToRgb(hex) {
++    var h = String(hex || '').replace('#', '');
++    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
++    var n = parseInt(h, 16);
++    if (isNaN(n)) return [0, 0, 0];
++    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
++  }
++  CL.hexToRgb = hexToRgb;
++
++  /** 两色 RGB 欧氏距离（0-441），与 参考/靠色色库.md 的口径一致。 */
++  CL.rgbDist = function (hexA, hexB) {
++    var a = hexToRgb(hexA), b = hexToRgb(hexB);
++    var dr = a[0] - b[0], dg = a[1] - b[1], db = a[2] - b[2];
++    return Math.sqrt(dr * dr + dg * dg + db * db);
++  };
++
++  CL.colorOf = function (lib, id) {
++    var L = CL.get(lib);
++    if (id < L.min || id > L.max) return null;   // 含老色库的 0（空位）与官方色库的 -1
++    return L.colors[id < 0 ? 0 : (L === CL.OLDER ? id : id)] || null;
++  };
++
++  CL.hexOf = function (lib, id) {
++    var c = CL.colorOf(lib, id);
++    return c ? c.hex : null;
++  };
++
++  CL.nameOf = function (lib, id) {
++    var L = CL.get(lib);
++    if (id === L.empty) return '空位';
++    var c = CL.colorOf(lib, id);
++    return c ? c.name : ('未知(' + id + ')');
++  };
++
++  // ==================== 四、识别：一张目标图 TXT 用的是哪套色库 ====================
++  /**
++   * 判据（按证据强度排序）—— 全部来自对官方 300 关的实测：
++   *   · 官方 300 关里 185 关带 -1 空位；另 115 关是「实心图形」，压根没有空位（既无 -1 也无 0）。
++   *     所以**不能**把「没有 -1」当成「不是官方色库」。
++   *   · 官方色库有 0 号色（黄）；老色库的 0 是空位。两者都靠 0 判断，这一项是歧义的唯一来源。
++   *   · 两套色库**没有一个同 Hex 的色**（已逐一比对），所以「读成哪套」会实打实改变颜色。
++   *
++   *   1) 出现负数          → 官方（只有官方用 -1 当空位）
++   *   2) 出现 >21 的编号   → 老色库（只有 34 色库有 22-34）
++   *   3) 无 0 无负、编号全在 1-21 → **判据不足**：这种实心图在两套色库里都是合法编号，
++   *      无法从数据本身区分（实测官方 300 关里有 63 关是这样）。标 confident=false，
++   *      按「读图色库」下拉的当前选择处理，界面会提示需要人工确认。
++   *   4) 有 0 无负 → 看 0 的占比：0 占比高 = 大面积为空（老色库）／占比低 = 黄色底（官方）。
++   *
++   * @param {Array<Array<number>>} matrix 目标图矩阵（原样数字，未做任何转换）
++   * @returns {{lib:string, confident:boolean, reason:string, maxVal:number,
++   *            hasNeg:boolean, hasZero:boolean, usedCount:number, zeroRatio:number}}
++   *   lib        'official' | 'older' —— 判定结果（存疑时给更可能的那个）
++   *   confident  false = 判据不足，界面会标「存疑」，用户可在「读图色库」下拉里改
++   */
++  CL.detect = function (matrix) {
++    var maxVal = -Infinity, hasNeg = false, hasZero = false, used = {};
++    var zero = 0, total = 0;
++    var rows = matrix || [];
++    for (var r = 0; r < rows.length; r++) {
++      var row = rows[r] || [];
++      for (var c = 0; c < row.length; c++) {
++        var v = row[c];
++        if (typeof v !== 'number' || !isFinite(v)) continue;
++        total++;
++        if (v > maxVal) maxVal = v;
++        if (v < 0) hasNeg = true;
++        if (v === 0) { hasZero = true; zero++; }
++        if (v >= 0) used[v] = 1;
++      }
++    }
++    if (maxVal === -Infinity) maxVal = 0;
++    var usedCount = Object.keys(used).length;
++    var zeroRatio = total ? zero / total : 0;
++    var base = { maxVal: maxVal, hasNeg: hasNeg, hasZero: hasZero, usedCount: usedCount, zeroRatio: zeroRatio };
++
++    // 1) 出现负数：只有官方色库用 -1 当空位 → 铁证。
++    if (hasNeg && maxVal <= 21) {
++      return Object.assign(base, { lib: CL.OFFICIAL_ID, confident: true,
++        reason: '出现 -1（官方色库的空位标记）' });
++    }
++    // 2) 出现 >21 的编号：只可能是 34 色老色库。
++    if (maxVal > 21) {
++      return Object.assign(base, { lib: CL.OLDER_ID, confident: true,
++        reason: '出现编号 ' + maxVal + ' > 21，只可能来自 34 色老色库' });
++    }
++    // 3) 0 与 -1 都没出现 → 实心图，两套色库都是合法编号，判据不足。
++    if (!hasZero && !hasNeg) {
++      return Object.assign(base, { lib: CL.OLDER_ID, confident: false,
++        reason: '无 -1、无 0，编号全在 1-' + maxVal + '：实心图，两套色库都能解释，需人工确认（按当前「读图色库」选择处理）' });
++    }
++    // 4) 有 0 没负数：官方色库的 0 是黄色，老色库的 0 是空位 → 看 0 的占比。
++    if (zeroRatio >= 0.5) {
++      return Object.assign(base, { lib: CL.OLDER_ID, confident: true,
++        reason: '0 占 ' + Math.round(zeroRatio * 100) + '%（大面积为空）→ 按老色库读，0 = 空位' });
++    }
++    return Object.assign(base, { lib: CL.OFFICIAL_ID, confident: true,
++      reason: '有 0 且只占 ' + Math.round(zeroRatio * 100) + '%（不是大面积空位）→ 按官方色库读，0 = 黄色' });
++  };
++
++  // ==================== 五、转换：新老互转 ====================
++  /**
++   * 映射策略：**官方 22 色 → 老色库 22 个互不相同的色（单射）**
++   *
++   * 为什么不直接用「各自取最近色」：两套色库无一色相同，纯最近色会让 4 组官方色
++   * 抢同一个老色号（实测：官方3/4→老6、官方6/7→老24、官方14/19→老26、官方17/21→老32），
++   * 而 300 关里有 141 关同时用到了这些撞色的两个色 —— 撞色等于把两个不同颜色的像素
++   * 合成一个，目标图直接失真。所以这里用**最小代价单射分配**（匈牙利算法，
++   * 22×34 规模，毫秒级）：保证 22 个官方色落到 22 个互不相同的老色号上。
++   * 实测代价只比纯最近色高 7%（1334.3 vs 1242.7），换来 141 关不撞色，划算。
++   *
++   * 反向（老 → 官方）用同一个分配表的逆 + 其余老色取最近色，并显式保证这 22 个老色
++   * 都能原样变回自己的官方号 —— 所以「新→老→新」是逐像素无损的（300 关已全量校验）。
++   */
++  var _assign = null;    // { official:[22] -> 老色号, officialToOld:{}, oldToOfficial:{} , rows:[] }
++
++  /**
++   * 最小代价单射分配（指派问题）：n 行（官方 22 色）各分到一个互不相同的列（老色号）。
++   *
++   * 实现 = 逐行加入 + Dijkstra 带势能找最小代价增广路（Jonker-Volgenant / 匈牙利法同族），
++   * 全部用 1 基下标、`p[j]` 存「列 j 是哪一行占的」，与 O(n^3) 标准写法一一对应。
++   * 关键点：每加一行都会**重排已有分配**（增广沿交替路回退旧行），所以是全局最优，
++   * 不是「每行各取自己最近的空列」那种贪心。
++   *
++   * @param {number[][]} cost cost[i][j]（0 起）= 第 i 行分到第 j 列的代价
++   * @returns {number[]} pick[i]（0 起）= 第 i 行分到的列下标
++   */
++  function minCostAssign(cost) {
++    var n = cost.length, m = cost[0].length;
++    var INF = Infinity;
++    // u[i]/v[j] = 第 i 行 / 第 j 列的势能；p[j] = 列 j 当前由哪一行占用（0 = 空）
++    var u = new Array(n + 1).fill(0), v = new Array(m + 1).fill(0), p = new Array(m + 1).fill(0);
++
++    for (var i = 1; i <= n; i++) {
++      p[0] = i;
++      var j0 = 0;
++      var minv = new Array(m + 1).fill(INF), way = new Array(m + 1).fill(0);
++      var used = new Array(m + 1).fill(false);
++      do {
++        used[j0] = true;
++        var i0 = p[j0], delta = INF, j1 = 0;
++        for (var j = 1; j <= m; j++) {
++          if (used[j]) continue;
++          var cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
++          if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
++          if (minv[j] < delta) { delta = minv[j]; j1 = j; }
++        }
++        for (var j2 = 0; j2 <= m; j2++) {
++          if (used[j2]) { u[p[j2]] += delta; v[j2] -= delta; }
++          else { minv[j2] -= delta; }
++        }
++        j0 = j1;
++      } while (p[j0] !== 0);
++      do {
++        var j3 = way[j0];
++        p[j0] = p[j3];
++        j0 = j3;
++      } while (j0 !== 0);
++    }
++
++    var pick = new Array(n).fill(-1);
++    for (var j4 = 1; j4 <= m; j4++) if (p[j4] !== 0) pick[p[j4] - 1] = j4 - 1;
++    return pick;
++  }
++
++  /** 建/取官方↔老 的单射分配（含两个方向的完整映射表）。 */
++  function assignment() {
++    if (_assign) return _assign;
++    var O = CL.OFFICIAL, L = CL.OLDER;
++
++    // 同 Hex 先直接锁定（本工程两套色库无一相同，这里是为将来加了同色也仍然正确）
++    var cost = [], exactPairs = {};
++    for (var i = O.min; i <= O.max; i++) {
++      var row = [];
++      for (var j = L.min; j <= L.max; j++) {
++        var d = CL.rgbDist(O.colors[i].hex, L.colors[j].hex);
++        if (O.colors[i].hex.toUpperCase() === L.colors[j].hex.toUpperCase()) { d = -1e6; exactPairs[i] = j; }
++        row.push(d);
++      }
++      cost.push(row);
++    }
++    var pick = minCostAssign(cost);   // pick[k] = 列下标（0-based，对应老色号 = 下标+1）
++
++    var officialToOld = {}, oldToOfficial = {}, rows = [];
++    for (var k = 0; k < pick.length; k++) {
++      var oid = O.min + k, lid = L.min + pick[k];
++      officialToOld[oid] = lid;
++      oldToOfficial[lid] = oid;         // 这 22 个老色号有唯一逆
++    }
++    // 其余老色号（老色库多出来的 12 个）：取最近官方色
++    var extra = [];
++    for (var lid2 = L.min; lid2 <= L.max; lid2++) {
++      if (oldToOfficial[lid2] !== undefined) continue;
++      var best = null, bd = Infinity;
++      for (var oid2 = O.min; oid2 <= O.max; oid2++) {
++        var d2 = CL.rgbDist(L.colors[lid2].hex, O.colors[oid2].hex);
++        if (d2 < bd) { bd = d2; best = oid2; }
++      }
++      oldToOfficial[lid2] = best;
++      extra.push({ old: lid2, official: best, dist: bd });
++    }
++
++    // 统一成 rows（供面板展示）
++    for (var oid3 = O.min; oid3 <= O.max; oid3++) {
++      var l3 = officialToOld[oid3];
++      rows.push({
++        from: oid3, fromName: O.colors[oid3].name, fromHex: O.colors[oid3].hex,
++        to: l3, toName: L.colors[l3].name, toHex: L.colors[l3].hex,
++        dist: CL.rgbDist(O.colors[oid3].hex, L.colors[l3].hex), exact: exactPairs[oid3] !== undefined
++      });
++    }
++    _assign = {
++      officialToOld: officialToOld, oldToOfficial: oldToOfficial, rows: rows, extra: extra,
++      maxDist: rows.reduce(function (a, r) { return Math.max(a, r.dist); }, 0),
++      maxFrom: rows.reduce(function (a, r) { return a.dist >= r.dist ? a : r; }, rows[0]).from,
++      totalDist: rows.reduce(function (a, r) { return a + r.dist; }, 0)
++    };
++    return _assign;
++  }
++
++  /**
++   * 取一个方向的映射表。签名与旧版兼容：buildMap(fromLib, toLib)。
++   * @returns {{from,to,map,rows,exactCount,maxDist,maxFrom,misses,totalDist,injective}}
++   */
++  CL.buildMap = function (fromLib, toLib) {
++    var F = CL.get(fromLib), T = CL.get(toLib);
++    // 两套库分辨不清时（例如误把 'auto' 当来源）会退化成"自己转自己"，
++    // 那种表看着能用但毫无意义 —— 这里直接报错，免得静默出错图。
++    if (F.id === T.id) throw new Error('色库转换：来源与目标相同（' + F.id + '），无法建映射表');
++    var A = assignment();
++    var map, rows = [], exactCount = 0, maxDist = -1, maxFrom = null, totalDist = 0;
++    var src = F.min === CL.OFFICIAL.min && F.max === CL.OFFICIAL.max ? 'official' : 'older';
++
++    if (src === 'official') {
++      map = {};
++      for (var k in A.officialToOld) map[k] = A.officialToOld[k];
++      for (var i = 0; i < A.rows.length; i++) {
++        var r = A.rows[i];
++        rows.push(r);
++        if (r.exact) exactCount++;
++        totalDist += r.dist;
++        if (r.dist > maxDist) { maxDist = r.dist; maxFrom = r.from; }
++      }
++    } else {
++      map = {};
++      for (var lid in A.oldToOfficial) map[lid] = A.oldToOfficial[lid];
++      for (var lid2 = F.min; lid2 <= F.max; lid2++) {
++        var fc = F.colors[lid2];
++        if (!fc) continue;
++        var tid = map[lid2], tc = CL.colorOf(T, tid) || {};
++        var d = CL.rgbDist(fc.hex, tc.hex);
++        var isExact = fc.hex.toUpperCase() === (tc.hex || '').toUpperCase();
++        rows.push({ from: lid2, fromName: fc.name, fromHex: fc.hex,
++                    to: tid, toName: tc.name, toHex: tc.hex,
++                    dist: d, exact: isExact, inverse: A.officialToOld[tid] === lid2 });
++        if (isExact) exactCount++;
++        totalDist += d;
++        if (d > maxDist) { maxDist = d; maxFrom = lid2; }
++      }
++    }
++    return { from: F.id, to: T.id, map: map, rows: rows, exactCount: exactCount,
++             maxDist: maxDist, maxFrom: maxFrom, misses: 0, totalDist: totalDist,
++             injective: src === 'official' };
++  };
++
++  // 两张方向表都算一次并缓存（色库是静态数据，算一次就够）。
++  var _maps = {};
++  CL.map = function (fromLib, toLib) {
++    var F = CL.get(fromLib), T = CL.get(toLib);
++    var key = F.id + '>' + T.id;
++    if (!_maps[key]) _maps[key] = CL.buildMap(F.id, T.id);
++    return _maps[key];
++  };
++  CL.mapOfficialToSolver = function () { return CL.map(CL.OFFICIAL_ID, CL.OLDER_ID); };
++  CL.mapSolverToOfficial = function () { return CL.map(CL.OLDER_ID, CL.OFFICIAL_ID); };
++  /** 单射分配表（官方 22 色 → 老色库 22 个互不相同的色号）。 */
++  CL.assignment = assignment;
++
++  /**
++   * 转换一张目标图矩阵。
++   * 约定：**输出矩阵一律用「老色库/求解器」编号空间时 emptyOut=0**，
++   *       输出官方格式时 emptyOut=-1 —— 调用方不用自己记这个。
++   *
++   * @param {Array<Array<number>>} matrix 输入矩阵（源色库编号）
++   * @param {string} fromLib 'official' | 'older'
++   * @param {string} toLib   'official' | 'older'
++   * @returns {{matrix:Array<Array<number>>, stats:object}}
++   */
++  CL.convertMatrix = function (matrix, fromLib, toLib) {
++    var F = CL.get(fromLib), T = CL.get(toLib);
++    var M = CL.map(F.id, T.id);
++    var out = [], changed = 0, colorsSeen = {}, unmapped = 0, total = 0, empty = 0;
++    // 从老色库转到官方色库时，必须补 -1 让官方端认得出空位；反向则用 0。
++    var emptyOut = (T === CL.OFFICIAL) ? CL.OFFICIAL_EMPTY : CL.OLDER_EMPTY;
++
++    for (var r = 0; r < matrix.length; r++) {
++      var row = matrix[r] || [], orow = [];
++      for (var c = 0; c < row.length; c++) {
++        var v = row[c];
++        if (typeof v !== 'number' || !isFinite(v)) v = F.empty;
++        total++;
++        if (v === F.empty) { orow.push(emptyOut); empty++; continue; }
++        var t = M.map[v];
++        if (t === undefined) { orow.push(F.empty === 0 ? 0 : emptyOut); unmapped++; continue; }
++        colorsSeen[v] = (colorsSeen[v] || 0) + 1;
++        if (t !== v) changed++;
++        orow.push(t);
++      }
++      out.push(orow);
++    }
++    return {
++      matrix: out,
++      stats: {
++        from: F.id, to: T.id, total: total, empty: empty,
++        colors: Object.keys(colorsSeen).length,
++        changed: changed, unmapped: unmapped,
++        map: M,
++        // 本次实际用到的颜色 → 目标编号，供预览表只显示「真用到的」
++        used: colorsSeen
++      }
++    };
++  };
++
++  /** 便捷入口：官方 → 求解器（34 色，0 空位）。 */
++  CL.toSolver = function (matrix) { return CL.convertMatrix(matrix, CL.OFFICIAL_ID, CL.OLDER_ID); };
++  /** 便捷入口：求解器（34 色，0 空位）→ 官方（0-21，-1 空位）。 */
++  CL.toOfficial = function (matrix) { return CL.convertMatrix(matrix, CL.OLDER_ID, CL.OFFICIAL_ID); };
++
++  /** 按指定色库把矩阵转成求解器内部编号空间（0 = 空位，1-34 = 颜色）。 */
++  CL.intoSolver = function (matrix, fromLib) {
++    var F = CL.get(fromLib);
++    if (F === CL.OLDER) return { matrix: matrix, stats: null, already: true };
++    return CL.toSolver(matrix);
++  };
++
++  // ==================== 六、TXT 读写（与 generator.blocksFromTXT 同一套口径）====================
++  /** 目标图 TXT 文本 → 数字矩阵（原样保留编号，不做转换）。 */
++  CL.parseTXT = function (txt) {
++    var lines = String(txt == null ? '' : txt).replace(/^\uFEFF/, '').trim().split(/\r?\n/);
++    var start = 0;
++    for (var i = 0; i < lines.length; i++) {
++      var t = lines[i].trim();
++      if (t === '' || !/^-?\d/.test(t)) start = i + 1; else break;
++    }
++    var blocks = [];
++    for (var j = start; j < lines.length; j++) {
++      var line = lines[j].trim();
++      if (line === '') continue;
++      var row = line.split(/\s+/).map(function (s) { var n = parseInt(s, 10); return isNaN(n) ? 0 : n; });
++      if (row.length > 0) blocks.push(row);
++    }
++    return blocks;
++  };
++
++  /** 数字矩阵 → 目标图 TXT 文本（首行写标题行，兼容官方文件格式）。 */
++  CL.renderTXT = function (matrix, title) {
++    var out = [title || '像素矩阵'];
++    for (var r = 0; r < (matrix || []).length; r++) out.push((matrix[r] || []).join(' '));
++    return out.join('\n') + '\n';
++  };
++
++  // ==================== 七、色卡行（给面板画小色块用）====================
++  /** 该色库的色卡数组（不含空位），[{id,name,hex}]。 */
++  CL.swatches = function (lib) {
++    var L = CL.get(lib), out = [];
++    for (var id = L.min; id <= L.max; id++) {
++      var c = L.colors[id];
++      if (c) out.push({ id: id, name: c.name, hex: c.hex });
++    }
++    return out;
++  };
++
++  root.AntSolver = root.AntSolver || {};
++  root.AntSolver.ColorLibs = CL;
++  if (typeof module !== 'undefined' && module.exports) module.exports = CL;
++})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
+diff -ruN a/bin/js/generator.js b/bin/js/generator.js
+--- a/bin/js/generator.js	2026-10-15 17:04:20
++++ b/bin/js/generator.js	2026-10-15 17:05:00
+@@ -7258,12 +7258,19 @@
+ 
+   // ==================== TXT解析 ====================
+ 
++  /**
++   * 目标图 TXT → 数字矩阵。
++   * 【v154 修】起始行判定从 /^\d/ 放宽到 /^-?\d/：
++   *   官方 JSON 原始颜色矩阵（bin/参考/色库/official_json_original_color_matrices/）
++   *   用 -1 表示空位，一行**以 -1 开头**很正常；旧写法会把这种行当成标题整行丢掉，
++   *   结果矩阵缺行、行列全错位。现在负号开头的行按数据行读入。
++   */
+   function blocksFromTXT(txtContent) {
+     var lines = txtContent.trim().split('\n');
+     var startIdx = 0;
+     for (var i = 0; i < lines.length; i++) {
+       var trimmed = lines[i].trim();
+-      if (trimmed === '' || !/^\d/.test(trimmed)) { startIdx = i + 1; } else { break; }
++      if (trimmed === '' || !/^-?\d/.test(trimmed)) { startIdx = i + 1; } else { break; }
+     }
+     var blocks = [];
+     for (var i = startIdx; i < lines.length; i++) {

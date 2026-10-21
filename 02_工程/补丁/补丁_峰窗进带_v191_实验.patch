@@ -1,0 +1,20 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6213,6 +6213,17 @@
+     //   达标 > 未达标；都达标/都不达标时再比 v2 分（独木桥少、预算判断点多、硬垫步数少、高压不早爆）。
+     var vb = chokeV2Ok(b), va = chokeV2Ok(a);
+     if (vb !== va) return vb > va;
++    // 【v191·实验】峰窗进带优先：先看"在不在 3.2~4.8 带里"，再看离 4.0 多远。
++    //   现行 v183 键是"谁高选谁"，会把峰窗往 5 推——这正是 104/105/110/116 过压的原因。
++    if (cfg && cfg.pressBand) {
++      var qb2 = pressOfCand(b), qa2 = pressOfCand(a);
++      if (qb2 != null && qa2 != null) {
++        var inB = (qb2 >= 3.2 && qb2 <= 4.8), inA2 = (qa2 >= 3.2 && qa2 <= 4.8);
++        if (inB !== inA2) return inB;
++        var db2 = Math.abs(qb2 - 4.0), da2 = Math.abs(qa2 - 4.0);
++        if (Math.abs(db2 - da2) >= 0.3) return db2 < da2;
++      }
++    }
+     // 【v183】压力优先键：两条候选都过了上面两关时，优先"稳健玩家也会被顶住"的那个
+     //   （用已算好的那一局稳健模拟的卡点区峰窗；差 ≥0.5 才认，避免抖动）。
+     var pbP = pressOfCand(b), paP = pressOfCand(a);

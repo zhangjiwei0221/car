@@ -1,0 +1,157 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -6332,8 +6332,10 @@
+       var vr = veinReport(AntSolver.parseLevel(level));
+       if (vr) {
+         var stl = stuckLineOf(b.stuck);
+-        genLog('　　矿脉　' + veinLineOf(vr) + (stl ? ('　· 卡死账：' + stl) : '　· 没卡死'),
+-          stl ? 'gen-log-warn' : 'gen-log-ok');
++        var bu = buriedOf(AntSolver.parseLevel(level));
++        genLog('　　矿脉　' + veinLineOf(vr) + (bu ? ('　· 被埋 ' + bu.buried + ' 辆') : '') +
++          (stl ? ('　· 卡死账：' + stl) : '　· 没卡死'),
++          (bu && bu.buried >= 3) || stl ? 'gen-log-warn' : 'gen-log-ok');
+       }
+     } catch (ePB) { /* 度量失败不影响生产 */ }
+   }
+@@ -6399,6 +6401,18 @@
+     for (var k in v.byLevel) { var lv2 = +k; if (lv2 < 99 && lv2 > deepest) deepest = lv2; }
+     var px = v.pxByLevel[deepest] || 0;
+     return v.count + ' 条 · 最深 ' + deepest + ' 层（该层 ' + px + 'px）';
++  }
++  /** 【v182】被埋辆数（一局稳健玩家的终局统计）；≥3 = 61 号关那种"稳健必死"结构。 */
++  var buriedCache = new Map();
++  function buriedOf(lv) {
++    var G = AntSolver.Generator;
++    if (!G || !G.buriedCountOf || !lv) return null;
++    var hit = buriedCache.get(lv);
++    if (hit !== undefined) return hit;
++    var b = null;
++    try { b = G.buriedCountOf(lv); } catch (e) { b = null; }
++    buriedCache.set(lv, b);
++    return b;
+   }
+   /** 卡死账一句话：色X 还差 a / 盘上剩 b / 可达 c（取最狠的一条）。 */
+   function stuckLineOf(stuck) {
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -5149,6 +5149,32 @@
+     };
+   }
+ 
++  /**
++   * 【v182】**"被埋"计数** —— 61 号关那种死法的结构化度量。
++   *
++   * 定义：跑**一局**稳健玩家，终局没通关时，统计有几辆车是
++   *   ① 还差 > 0（没完工），且 ② 盘上该色剩的量 ≥ 它要的量（量是够的），但 ③ 可达 = 0（够不着）。
++   * 三条同时成立 = 这辆车被别的颜色**埋**住了。
++   *
++   * 实测（v181 卡死账）：小鹿 0、实机第3关 0、批次62 0~1、**批次61 = 4**。
++   * 用途：生成时当**结构闸门**——被埋 ≥3 的候选就是"稳健玩家必死"那一类，直接不要。
++   * 代价：一局稳健模拟（约 20~60ms），比 18 局波动便宜得多，可以进候选循环。
++   */
++  function buriedCountOf(parsed, opts) {
++    var g = null;
++    try { g = simulatePlay(parsed, { policy: 'steady', rnd: (opts && opts.rnd) || function () { return 0; } }); } catch (e) { return null; }
++    if (!g) return null;
++    if (g.won) return { buried: 0, stuck: 0, details: [], coveragePct: g.coveragePct };
++    var list = g.stuck || [], buried = 0, details = [];
++    for (var i = 0; i < list.length; i++) {
++      var s = list[i];
++      if (s.needLeft > 0 && s.boardLeft >= s.needLeft && s.reachable === 0) {
++        buried++; details.push({ color: s.color, needLeft: s.needLeft, boardLeft: s.boardLeft });
++      }
++    }
++    return { buried: buried, stuck: list.length, details: details, coveragePct: g.coveragePct };
++  }
++
+   /** 一关的 v2 指标：全知线 + 玩家线（+ 贪心线）各量一遍，再"取最差"合成一组判据值。 */
+   function chokeV2Of(parsed, solveResult, playerResult, greedyOn) {
+     var mo = (solveResult && solveResult.pickOrder) ? chokeV2MeasureLine(parsed, solveResult.pickOrder) : null;
+@@ -5289,9 +5315,15 @@
+     //   不改变本函数任何既有输出；下游用它做候选排序与"达标才早停"，不做硬门。
+     var chokeV2 = null;
+     try { chokeV2 = chokeV2Of(parsed, solveResult, playerResult); } catch (e) { chokeV2 = null; }
++    // 【v182】"被埋"计数：稳健玩家一局的终局里有几辆车"量够但够不着"（61 号关那种死法）
++    var buried = null;
++    if (!(config && config.buriedGate === false)) {
++      try { buried = buriedCountOf(parsed); } catch (e) { buried = null; }
++    }
+     var obstacles = AntSolver.Analysis && AntSolver.Analysis.obstacleStats ? AntSolver.Analysis.obstacleStats(parsed) : {};
+     var evaluation = {
+       auditV2: chokeV2,   // 【v157】卡点判据 v2：{omni, player, worst, gates}
++      buried: buried,     // 【v182】{buried, stuck, details, coveragePct} 或 null（闸门关闭）
+       omni: {
+         won: !!(solveResult && solveResult.completed), avgBuffer: omniAvg,
+         peak: solveResult ? (solveResult.maxBuffer || 0) : 0,
+@@ -5961,11 +5993,19 @@
+       catch (e) { c._choiceCurve = null; }
+     }
+     return (c._choiceCurve && c._choiceCurve.forcedMid) ? c._choiceCurve.forcedMid : 0;
++  }
++  /** 【v182】候选的"被埋辆数"（缓存；未测量时记 0，避免把没量过的候选误判成坏）。 */
++  function buriedOfCand(c) {
++    var b = c && c.generationEval && c.generationEval.buried;
++    return (b && b.buried != null) ? b.buried : 0;
+   }
+   function candBetter(b, a) {
+     if (a == null) return true;
+     var tb = candTier(b), ta = candTier(a);
+     if (tb !== ta) return tb > ta;
++    // 【v182】结构闸门优先：被埋 ≥3 辆的候选（= 稳健玩家必死那种结构）排在后面
++    var bb = buriedOfCand(b), ba = buriedOfCand(a);
++    if ((bb >= 3) !== (ba >= 3)) return ba >= 3;
+     // 【v157】同档第一优先键：卡点判据 v2（用户 R1~R9）
+     //   达标 > 未达标；都达标/都不达标时再比 v2 分（独木桥少、预算判断点多、硬垫步数少、高压不早爆）。
+     var vb = chokeV2Ok(b), va = chokeV2Ok(a);
+@@ -8953,6 +8993,7 @@
+     chokeV2Attribute: chokeV2Attribute,   // 【v179】机制归因：拿掉墙/管道/冰/链/问号各跑一遍，看通关率回升多少
+     veinLayers: veinLayers,               // 【v180】矿脉层表：谁包着谁、最深几层（只由图决定）
+     veinDebt: veinDebt,                   // 【v180】债务 Δ：最优路线 vs 实际路线，每条矿脉晚了多少手才被碰到
++    buriedCountOf: buriedCountOf,         // 【v182】"被埋"计数：稳健一局终局里有几辆车"量够但够不着"
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+     setProgressHook: setProgressHook,     // 【v153】单关进度钩子（worker/界面显示跑到哪了）
+     solveSpaceQuota: solveSpaceQuota,                         // 可用空间配额联立解（含管道兜底），可独立调用体检参数是否自相矛盾
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=181">
++  <link rel="stylesheet" href="css/style.css?v=182">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=181"></script>
+-  <script src="js/utils.js?v=181"></script>
++  <script src="js/zip.js?v=182"></script>
++  <script src="js/utils.js?v=182"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=181"></script>
+-  <script src="js/simulator.js?v=181"></script>
++  <script src="js/color-libs.js?v=182"></script>
++  <script src="js/simulator.js?v=182"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=181"></script>
+-  <script src="js/solver-strategy.js?v=181"></script>
+-  <script src="js/solver.js?v=181"></script>
+-  <script src="js/playersim.js?v=181"></script>
+-  <script src="js/generator.js?v=181"></script>
+-  <script src="js/analysis.js?v=181"></script>
++  <script src="js/anchor-cut.js?v=182"></script>
++  <script src="js/solver-strategy.js?v=182"></script>
++  <script src="js/solver.js?v=182"></script>
++  <script src="js/playersim.js?v=182"></script>
++  <script src="js/generator.js?v=182"></script>
++  <script src="js/analysis.js?v=182"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=181"></script>
+-  <script src="js/app.js?v=181"></script>
++  <script src="js/level-editor.js?v=182"></script>
++  <script src="js/app.js?v=182"></script>
+ </body>
+ </html>

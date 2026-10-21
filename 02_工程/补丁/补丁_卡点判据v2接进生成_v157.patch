@@ -1,0 +1,421 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3655,6 +3655,12 @@
+     var budget = config.timeBudgetMs != null ? config.timeBudgetMs : 300000;
+     var requireHard = !!config.requireHardPass;
+     setCurveScore(!!config.curveScore);   // 【v151】曲线评分开关（默认关；见 CURVE_SCORE_ON 注释）
++    // 【v157】卡点判据 v2（R1~R9）：达标才算"可以早停"。因为实测 v2 通过率很低（好关标尺下现批次 0~13%），
++    //   若一直搜到 v2 达标会把每关时间预算烧满 → 这里给"多搜几个候选"设上限（默认 1 个），
++    //   到点就用已评估候选里 v2 最好的那个收尾（candBetter 里的 v2 键负责挑）。config.chokeV2 === false 可整段关掉。
++    var v2On = !(config.chokeV2 === false);
++    var v2Patience = (config.chokeV2Patience != null) ? config.chokeV2Patience : 1;
++    var v2Extra = 0, v2Stop = false;
+     var t0 = Date.now(), timedOut = false;
+     PROGRESS_T0 = t0; PROGRESS_LAST = 0;      // 【v153】进度计时基准（每个 produce 重置）
+     // 【仅底部入口】生产前门：源图在底部规则下若有永久不可达像素，直接判"结构不适配"，
+@@ -3753,7 +3759,7 @@
+       if (c) { c.timedOut = timedOut; c.elapsedMs = Date.now() - t0; }
+       GENPERF.totalMs = Date.now() - t0;
+       if (!GENPERF.stopReason) {
+-        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (candPass(c, requireHard) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
++        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (candPass(c, requireHard, config) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
+       }
+       var out = finalizeProduce(c, K, evaluated);
+       if (out && fragGate && fragGate.ok === false) out.fragmentWarn = fragGate.detail;   // 【v153】如实带出"碎色超上限但已放行"
+@@ -3785,6 +3791,7 @@
+     }
+     for (var k = 0; k < K; k++) {
+       if (timeUp()) break;
++      if (v2Stop) break;                       // 【v157】v2 已多搜够数 → 收手
+       GENPERF.baseCandidates++;
+       // 【v115】每个候选独立采样一组区间参数 —— 用户裁决「不同的候选都可以随机选取参数限制范围内」，
+       // 目的是解决「当前批次关卡都是同样的参数，输出的关卡结构会同质化」。
+@@ -3799,21 +3806,28 @@
+       mergeFlowStats(flowStats, base.flowStats);
+       if (!base.valid) continue;
+       consider(base);
+-      if (candPass(base, requireHard)) return done(base);
++      if (candPass(base, requireHard, config)) return done(base);
++      // 【v157】旧门过了但 v2 没达标 → 不算"可以停"，再给它 v2Patience 个候选的机会
++      if (v2On && candPassLegacy(base, requireHard) && ++v2Extra > v2Patience) v2Stop = true;
++      if (v2Stop) break;
+       var layer = [base];
+       for (var round = 1; round <= N && layer.length; round++) {
+         if (timeUp()) break;
++        if (v2Stop) break;
+         var next = [];
+         for (var li = 0; li < layer.length; li++) {
+           if (timeUp()) break;
++          if (v2Stop) break;
+           for (var b = 0; b < B; b++) {
+             if (timeUp()) break;
++            if (v2Stop) break;
+             GENPERF.chokeVariants++;
+             var child = makeChokeVariantFixed(layer[li], blocks, config, round, flowStats);
+             if (!child) continue;
+             consider(child);
+             reportProgress({ phase: 'variant', k: k + 1, K: K, round: round, N: N, evaluated: evaluated, tier: candTier(child) });
+-            if (candPass(child, requireHard)) return done(child);
++            if (candPass(child, requireHard, config)) return done(child);
++            if (v2On && candPassLegacy(child, requireHard) && ++v2Extra > v2Patience) v2Stop = true;
+             next.push(child);
+           }
+         }
+@@ -3860,6 +3874,133 @@
+    * 完整棋盘已经包含尺寸、冰/链/问号、换球、管道、分散黑块和窄路墙，因此这些结构的真实影响
+    * 统一反映在两侧 pressureSamples / lockRatio 中；不修改 Analysis.difficulty 的既有权重。
+    */
++  // ==================== 【v157】卡点判据 v2（用户 R1~R9，接进生成算法） ====================
++  // 需求（用户 2026-10-16 口述定稿，见 01_交接文档/工作日志_20261012.md 第二十五节）：
++  //   · 独木桥：场上**只有 1 个方块能点**（其余被数字冰锁/链锁/不可达挡住）→ 一关最多 1 处，**按步计**，末段豁免；
++  //   · 预算判断点（R9）：可点 ≥2，但"取了立刻能消掉（不占暂存）"的选项恰 1 个、其余是"取了会占暂存位"的陷阱项
++  //     —— 这是用户要刻意做的核心体验（"这种游戏本质上就是对预算的判断"）；
++  //   · 无满解步数：一个都消不掉、必须硬垫的步数 → 要少；
++  //   · 暂存 ≥4 的高压尽量留在 70% 之后（用户：「出现这种情况最好是 70% 以后」）。
++  //   两条线（全知线 / 玩家线）都测，判据**取最差**（用户 2026-10-16 定：「取最差吧」）。
++  //
++  // 【本版接法 = 路径 A（用户 2026-10-16 批准「先写进生成算法里，我亲自体验几关」）】：
++  //   ① 候选比较键（candBetter）里，同档先比 v2 达标与否、再比 v2 分 → **同等条件下优先选 v2 好的那个候选**；
++  //   ② 早停条件升级为「旧合格门 **且** v2 达标」；为避免烧满时间预算，最多再多搜 v2Patience 个候选就收手。
++  //   ⚠ **不作为硬门**：v2 不达标的关照样产出（否则按实测通过率 0~13% 会几乎产不出关），
++  //     只是"在评估过的候选里挑 v2 最好的那个"。阈值（GATES）目前从单一好关反推，属暂定，等用户试玩反馈校准。
++  var CHOKE_V2_TAIL_PCT = 0.90, CHOKE_V2_TAIL_BOXES = 3;
++  var CHOKE_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10 };
++
++  /** 沿一条既定路线（pickOrder）逐步回放，量出这条线上的 v2 指标（与页面「关卡体检」同口径）。 */
++  function chokeV2MeasureLine(parsed, order) {
++    var S = AntSolver.Simulator;
++    if (!S || !S.enter || !S.listMoves || !S.applyPick || !parsed || !order || !order.length) return null;
++    var st;
++    try { st = S.enter(parsed, { useSlotStart: true }); } catch (e) { return null; }
++    var n = 0, bridges = 0, bridgeAt = [], run = 0, maxRun = 0, soft = 0, r9 = 0, r9At = [];
++    var minPick = 99, buf34 = 0, buf4 = 0, hiBefore70 = 0, stepsBefore70 = 0, noGood = 0;
++    try {
++      for (var i = 0; i < order.length; i++) {
++        var p = order[i];
++        if (!p || p.r == null) continue;
++        var moves = S.listMoves(st);
++        var pickable = moves.length, safe = 0, good = 0, traps = 0;
++        for (var j = 0; j < moves.length; j++) {
++          var m = moves[j];
++          if (m.blocked) continue;
++          safe++;
++          if (m.canConsume) good++; else traps++;
++        }
++        var prog = st.totalBoxes ? (st.completedBoxes / st.totalBoxes) : 0;
++        var leftBoxes = 0;
++        for (var r = 0; r < st.boardRows; r++) for (var c = 0; c < st.boardCols; c++) {
++          var cc = st.cells[r][c]; if (cc && cc.t === 'box') leftBoxes++;
++        }
++        var tail = (prog >= CHOKE_V2_TAIL_PCT) || (leftBoxes <= CHOKE_V2_TAIL_BOXES);
++        var buf = st.buffer.length, pc = Math.round(prog * 100);
++        n++;
++        if (buf >= 3 && buf <= 4) buf34++;
++        if (buf >= 4) buf4++;
++        if (prog < 0.70) { stepsBefore70++; if (buf >= 4) hiBefore70++; }
++        if (pickable < minPick) minPick = pickable;
++        if (pickable === 1) {
++          if (!tail) { bridges++; bridgeAt.push(pc); }
++          run++; if (run > maxRun) maxRun = run;
++        } else run = 0;
++        if (pickable >= 2 && safe === 1) soft++;
++        if (pickable >= 2 && good === 1 && traps >= 1) { r9++; r9At.push(pc); }
++        if (good === 0) noGood++;
++        S.applyPick(st, p.r, p.c);   // 锁链组整组拿走时会返回 false，忽略
++        if (st.gameOver) break;
++      }
++    } catch (e) { /* 回放中断：用已采到的部分，不伪造 */ }
++    if (!n) return null;
++    return {
++      steps: n, bridges: bridges, bridgeAt: bridgeAt, maxRun: maxRun, soft: soft,
++      r9: r9, r9At: r9At, minPick: minPick === 99 ? 0 : minPick,
++      buf34Pct: Math.round(buf34 / n * 100), buf4Pct: Math.round(buf4 / n * 100),
++      hiBefore70Pct: stepsBefore70 ? Math.round(hiBefore70 / stepsBefore70 * 100) : 0,
++      noGood: noGood
++    };
++  }
++
++  /** 一关的 v2 指标：全知线 + 玩家线各量一遍，再"取最差"合成一组判据值。 */
++  function chokeV2Of(parsed, solveResult, playerResult) {
++    var mo = (solveResult && solveResult.pickOrder) ? chokeV2MeasureLine(parsed, solveResult.pickOrder) : null;
++    var mp = (playerResult && playerResult.pickOrder) ? chokeV2MeasureLine(parsed, playerResult.pickOrder) : null;
++    if (!mo && !mp) return null;
++    var worst = {
++      bridges: Math.max(mo ? mo.bridges : -1, mp ? mp.bridges : -1),
++      maxRun: Math.max(mo ? mo.maxRun : -1, mp ? mp.maxRun : -1),
++      noGood: Math.max(mo ? mo.noGood : -1, mp ? mp.noGood : -1),
++      hiBefore70Pct: Math.max(mo ? mo.hiBefore70Pct : -1, mp ? mp.hiBefore70Pct : -1),
++      r9: Math.min(mo ? mo.r9 : 1e9, mp ? mp.r9 : 1e9),
++      minPick: Math.min(mo ? mo.minPick : 99, mp ? mp.minPick : 99)
++    };
++    if (worst.r9 >= 1e9) worst.r9 = 0;
++    if (worst.minPick >= 99) worst.minPick = 0;
++    return { omni: mo, player: mp, worst: worst, gates: CHOKE_V2_GATES };
++  }
++
++  /** 违反项（空数组 = 通过参考门）。 */
++  function chokeV2Violations(w) {
++    var v = [];
++    if (!w) return ['无指标'];
++    if (w.bridges > CHOKE_V2_GATES.bridgeMax) v.push('独木桥×' + w.bridges + '处');
++    if (w.r9 < CHOKE_V2_GATES.r9Min) v.push('预算判断点仅' + w.r9 + '处');
++    if (w.noGood > CHOKE_V2_GATES.noGoodMax) v.push('无满解' + w.noGood + '步');
++    if (w.hiBefore70Pct > CHOKE_V2_GATES.hiBefore70PctMax) v.push('70%前≥4占' + w.hiBefore70Pct + '%');
++    return v;
++  }
++  function chokeV2Pass(w) { return chokeV2Violations(w).length === 0; }
++
++  /** 候选的 v2 指标（带缓存：同一候选只量一次）。 */
++  function chokeV2OfCand(c) {
++    if (!c || !c.level || !c.solveResult) return null;
++    if (c._chokeV2 === undefined) {
++      var v2 = null;
++      // 兜底路径只量全知线（玩家线一般已由 evaluateGeneration 量好并挂在 generationEval.auditV2 上）
++      try { v2 = chokeV2Of(AntSolver.parseLevel(c.level), c.solveResult, null); } catch (e) { v2 = null; }
++      c._chokeV2 = v2;
++    }
++    return c._chokeV2;
++  }
++  function chokeV2Ok(c) {
++    var v2 = (c && c.generationEval && c.generationEval.auditV2) ? c.generationEval.auditV2 : chokeV2OfCand(c);
++    return !!(v2 && chokeV2Pass(v2.worst));
++  }
++  /** v2 分（越大越好）：只用来在**同一档**候选之间排序，不参与合格判定。 */
++  function chokeV2Score(c) {
++    var v2 = (c && c.generationEval && c.generationEval.auditV2) ? c.generationEval.auditV2 : chokeV2OfCand(c);
++    if (!v2) return -1e6;
++    var w = v2.worst, s = 0;
++    s += (w.bridges <= CHOKE_V2_GATES.bridgeMax) ? 12 : (-9 * w.bridges);          // 独木桥：达标奖励，超一处重罚
++    s += Math.min(w.r9, 24) * 2;                                                   // 预算判断点：多多益善（封顶 24 处）
++    s += (w.noGood <= CHOKE_V2_GATES.noGoodMax) ? 10 : (-3 * w.noGood);             // 必须硬垫的步数
++    s -= Math.max(0, w.hiBefore70Pct - CHOKE_V2_GATES.hiBefore70PctMax) * 0.4;      // 高压跑到 70% 之前
++    return s;
++  }
++
+   function evaluateGeneration(solveResult, parsed, config) {
+     GENPERF.evalCalls++;                           // 埋点：生成评价次数(内含玩家模拟)
+     var _te = Date.now();
+@@ -3883,8 +4024,13 @@
+     var playerPreview = AntSolver.Analysis && AntSolver.Analysis.dynamicPreviewMetrics
+       ? AntSolver.Analysis.dynamicPreviewMetrics(playerSamples, totalBoxes) : null;
+     var omniAvg = averageSampleBuffer(omniSamples), playerAvg = averageSampleBuffer(playerSamples);
++    // 【v157】卡点判据 v2（R1~R9）：沿全知线与玩家线各量一遍，判据取最差。纯指标计算，
++    //   不改变本函数任何既有输出；下游用它做候选排序与"达标才早停"，不做硬门。
++    var chokeV2 = null;
++    try { chokeV2 = chokeV2Of(parsed, solveResult, playerResult); } catch (e) { chokeV2 = null; }
+     var obstacles = AntSolver.Analysis && AntSolver.Analysis.obstacleStats ? AntSolver.Analysis.obstacleStats(parsed) : {};
+     var evaluation = {
++      auditV2: chokeV2,   // 【v157】卡点判据 v2：{omni, player, worst, gates}
+       omni: {
+         won: !!(solveResult && solveResult.completed), avgBuffer: omniAvg,
+         peak: solveResult ? (solveResult.maxBuffer || 0) : 0,
+@@ -4275,7 +4421,7 @@
+       if (c) { c.timedOut = timedOut; c.elapsedMs = Date.now() - t0; }
+       GENPERF.totalMs = Date.now() - t0;
+       if (!GENPERF.stopReason) {
+-        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (candPass(c, requireHard) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
++        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (candPass(c, requireHard, config) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
+       }
+       var out = finalizeProduce(c, K, evaluated);
+       if (out) {
+@@ -4288,12 +4434,18 @@
+       return out;
+     }
+     // K 个候选，各初生成(合法性门)；未合格则展开 B 分支 × N 轮 卡点制造树；任一变体合格即停；超时随时兜底退出。
++    var v2Extra = 0, v2Stop = false;   // 【v157】卡点判据 v2 的"多搜几个候选"计数（与 produceFixed 同口径）
+     for (var k = 0; k < K; k++) {
+       if (timeUp()) break;
++      if (v2Stop) break;
+       GENPERF.baseCandidates++;                    // 埋点：基础候选数
+       var base = tagAudit(generateFromBlocks(blocks, config));
+       consider(base);
+-      if (candPass(base, requireHard)) return done(base);   // 初生成即合格
++      // 【v157】早停同样要求卡点判据 v2 达标；多搜 v2Patience 个候选为上限（与 produceFixed 同口径）
++      if (candPass(base, requireHard, config)) return done(base);   // 初生成即合格（旧门 + v2）
++      if (!(config.chokeV2 === false) && candPassLegacy(base, requireHard) &&
++          ++v2Extra > ((config.chokeV2Patience != null) ? config.chokeV2Patience : 1)) v2Stop = true;
++      if (v2Stop) break;
+       if (!base.valid) continue;                                        // 不可解候选不展开树
+       var layer = [base];
+       for (var round = 1; round <= N && layer.length; round++) {
+@@ -4307,7 +4459,9 @@
+             var child = makeChokeVariant(layer[li], blocks, config, round);
+             if (!child) continue;
+             consider(child);
+-            if (candPass(child, requireHard)) return done(child);   // 合格即停
++            if (candPass(child, requireHard, config)) return done(child);   // 合格即停（旧门 + v2）
++            if (!(config.chokeV2 === false) && candPassLegacy(child, requireHard) &&
++                ++v2Extra > ((config.chokeV2Patience != null) ? config.chokeV2Patience : 1)) { v2Stop = true; break; }
+             next.push(child);
+           }
+         }
+@@ -4551,17 +4705,35 @@
+     if (a == null) return true;
+     var tb = candTier(b), ta = candTier(a);
+     if (tb !== ta) return tb > ta;
+-    // 同档：先看"30~80% 里有没有真卡点"（有 > 无），再看曲线分/审核分
++    // 【v157】同档第一优先键：卡点判据 v2（用户 R1~R9）
++    //   达标 > 未达标；都达标/都不达标时再比 v2 分（独木桥少、预算判断点多、硬垫步数少、高压不早爆）。
++    var vb = chokeV2Ok(b), va = chokeV2Ok(a);
++    if (vb !== va) return vb > va;
++    var sb = chokeV2Score(b), sa = chokeV2Score(a);
++    if (sb !== sa) return sb > sa;
++    // 旧键保留（v151/v153）：30~80% 里有没有真卡点（有 > 无），再看曲线分/审核分
+     var mb = (midChokeOf(b) > 0) ? 1 : 0, ma = (midChokeOf(a) > 0) ? 1 : 0;
+     if (mb !== ma) return mb > ma;
+     return candScore(b) > candScore(a);
+   }
+   // requireHard=true 时只认【困难合格】(真实卡点，omniAudit.pass)；简单合格(趋势符合)不算早停条件，继续搜索。
+-  function candPass(c, requireHard) {
++  function candPassLegacy(c, requireHard) {
+     if (!c || !c.generationEval || !c.generationEval.pass) return false;
+     if (requireHard) return !!(c.audit && c.audit.pass);
+     return true;
+   }
++  /**
++   * 【v157】早停条件 = 旧合格门 **且** 卡点判据 v2 达标（用户 R1~R9）。
++   *   · 可关掉：config.chokeV2 === false 时逐值回到旧行为（只认旧门）。
++   *   · v2 指标缺失（老关卡/异常）时**不拦**——宁可按旧门早停，也不因为量不出指标就把这一关无限搜下去。
++   */
++  function candPass(c, requireHard, config) {
++    if (!candPassLegacy(c, requireHard)) return false;
++    if (config && config.chokeV2 === false) return true;
++    var v2 = c.generationEval && c.generationEval.auditV2;
++    if (!v2) return true;
++    return chokeV2Pass(v2.worst);
++  }
+   function tagAudit(c) { if (c && !c.audit && c.generationEval) c.audit = c.generationEval.omni.audit; return c; }
+   // 通用：取 pickOrder 进度落在 [lo,hi) 的【普通盒】坐标(去重)
+   function routeBoxesInRange(board, pickOrder, lo, hi) {
+@@ -7489,6 +7661,9 @@
+     pipeMinFillOf: pipeMinFillOf,                             // 生效的单管最少装盒数
+     applyBeatProps: applyBeatProps,       // 【v153】债务节拍→道具落位（冰/链）
+     midChokeOf: midChokeOf,               // 【v153】30~80% 区间内的卡点数（同档候选首选键）
++    chokeV2Of: chokeV2Of,                 // 【v157】卡点判据 v2（R1~R9）：全知线/玩家线各量一遍再取最差
++    chokeV2Violations: chokeV2Violations, // 【v157】违反项（空数组=达标）——页面每关日志与报告用
++    CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+     setProgressHook: setProgressHook,     // 【v153】单关进度钩子（worker/界面显示跑到哪了）
+     solveSpaceQuota: solveSpaceQuota,                         // 可用空间配额联立解（含管道兜底），可独立调用体检参数是否自相矛盾
+     pipeCountByConservation: pipeCountByConservation,          // 守恒反推管道数（usableSpaceTarget 关闭时生效）
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4737,6 +4737,9 @@
+       // 【v120】卡点手段的落地位置清单（用户：报告与模拟游玩的关卡信息要显示卡点类型的信息和位置）。
+       //   每条 {type,cn,r,c,detail}；detail 里带该类型的实际参数取值（簇大小/半径/端数/叠冰数…）。
+       chokeMarks: result.chokeMarks || null,
++      // 【v157】卡点判据 v2（用户 R1~R9）指标：{omni, player, worst, gates}。
++      //   生产侧记录 + 每关日志 + 批次 CSV 都用它，方便"边生产边看这批关在 v2 口径下长什么样"。
++      chokeV2: (result.generationEval && result.generationEval.auditV2) || null,
+       // 【v115】卡点类型改「检查次数 × 概率」后，数量本身是随机量，只记 chokeCount 无法判断
+       //   「这关只出 1 种」是参数设小了还是抽样波动。这里把设定值(rolls/prob)、实测命中(hits)、
+       //   理论期望(expected，含池截断的精确式)与池大小一并记下，供批量实测均值与期望对照。
+@@ -4845,6 +4848,7 @@
+       // v115：卡点概率机制的设定/实测/期望 + 本关候选采样到的区间参数（服务端落 JSONL 与 CSV）
+       chokePlan: rec.chokePlan || null, sampledConfig: rec.sampledConfig || null,
+       choiceCurve: rec.choiceCurve || null,   // 【v151】选择余地曲线
++      chokeV2: rec.chokeV2 || null,           // 【v157】卡点判据 v2（R1~R9）：独木桥/预算判断点/无满解/高压位置
+       // v116：棋盘结构实测（可用空间/墙/管道/藏盒）—— 用户要的「报告里的可用空间指标」
+       boardStat: rec.boardStat || null,
+       difficulty: rec.difficulty, grade: rec.grade, obstacleNames: rec.obstacleNames,
+@@ -4866,6 +4870,7 @@
+         bufferLimit: rec.level ? rec.level.bufferLimit : null,
+         blocks: rec.level ? rec.level.blocks : null, board: rec.level ? rec.level.board : null,
+         audit: rec.audit || null, generationEval: rec.generationEval || null, solve: rec.solve || null,
++        chokeV2: rec.chokeV2 || null,   // 【v157】卡点判据 v2（R1~R9）明细（无损数据里，单关级复查用）
+         fallback: !!rec.fallback, fallbackTier: rec.fallbackTier, fallbackType: rec.fallbackType, fallbackReason: rec.fallbackReason,
+         // v115：完整内部数据里同样保留采样值与卡点计划，便于单关级复查（不只看汇总 CSV）
+         sampledConfig: rec.sampledConfig || null, chokePlan: rec.chokePlan || null,
+@@ -4998,6 +5003,18 @@
+     }
+     genLog(entry.name + '  ' + dt + 's  ' + tierTxt + (rec.valid ? ('  难度' + rec.difficulty + '[' + rec.grade + ']') : '') + idleTxt,
+       rec.fallback ? 'gen-log-warn' : (rec.audit && (rec.audit.tier === '合格' || rec.audit.tier === '困难合格') ? 'gen-log-ok' : ''));
++    // 【v157】卡点判据 v2 一行（用户 R1~R9）：独木桥 / 预算判断点 / 无满解 / 70%前≥4，全知线与玩家线都报，
++    //   判定按"取最差"。用户要"边生产边看数据是否符合预期"，所以这里直接打在日志里，不用另外导表。
++    if (rec.chokeV2) {
++      var v2w = rec.chokeV2.worst, v2o = rec.chokeV2.omni, v2p = rec.chokeV2.player;
++      var v2vio = AntSolver.Generator.chokeV2Violations ? AntSolver.Generator.chokeV2Violations(v2w) : [];
++      genLog('　　卡点v2　独木桥 ' + (v2o ? v2o.bridges : '-') + '/' + (v2p ? v2p.bridges : '-') +
++        '（最差 ' + v2w.bridges + '）· 预算判断点 ' + (v2o ? v2o.r9 : '-') + '/' + (v2p ? v2p.r9 : '-') +
++        '（最差 ' + v2w.r9 + '）· 无满解 ' + (v2o ? v2o.noGood : '-') + '/' + (v2p ? v2p.noGood : '-') +
++        '（最差 ' + v2w.noGood + '）· 70%前≥4 ' + v2w.hiBefore70Pct + '%　' +
++        (v2vio.length ? ('⚠ ' + v2vio.join('、')) : '✓ 达标'),
++        v2vio.length ? 'gen-log-warn' : 'gen-log-ok');
++    }
+     if (curveTxt) {
+       var c3 = rec.choiceCurve;
+       genLog('　　' + c3.spark + curveTxt, (c3.lowPct >= 35 || c3.medFull <= 2) ? 'gen-log-warn' : 'gen-log-ok');
+@@ -5581,7 +5598,8 @@
+     var dataLevels = [];   // 汇总到 关卡数据/关卡数据.json（含【完整内部 board】→ 无损还原 + 审核/求解/难度），本地调试用
+ 
+     // CSV 分析报告表头
+-    var csv = ['关卡,目标图入口模式,尺寸,棋盘,盒数,可解,难度分,难度等级,障碍,峰值暂存,均暂存,50%后均暂,50%后峰窗,求解遍可通率,审核合格,合格档,是否兜底,兜底类型,生成诊断分,全知后期封锁,玩家后期封锁,玩家暂存峰,玩家通关,卡点@,前期峰窗,中期峰窗,后期峰窗,不合格原因'];
++    // 【v157】表尾追加卡点判据 v2 五列（新列一律加在表尾，避免历史表错位）
++    var csv = ['关卡,目标图入口模式,尺寸,棋盘,盒数,可解,难度分,难度等级,障碍,峰值暂存,均暂存,50%后均暂,50%后峰窗,求解遍可通率,审核合格,合格档,是否兜底,兜底类型,生成诊断分,全知后期封锁,玩家后期封锁,玩家暂存峰,玩家通关,卡点@,前期峰窗,中期峰窗,后期峰窗,不合格原因,卡点v2_独木桥_,卡点v2_预算判断点_,卡点v2_无满解_,卡点v2_70%前≥4占比,卡点v2_判定'];
+     // 索引.csv（2026-08-05 §导出对齐）：与 348关工具导入包 的 索引.csv 同口径，
+     // 一行一关标出三件套是否齐全，供人工/QA 核对。工具导入时会忽略本文件（只认 .txt/.json）。
+     var idxRows = ['关卡名,目标图入口模式,难度分,难度等级,审核合格,合格档,是否可解,求解步数,总盒数,总像素,TXT,关卡,求解数据'];
+@@ -5679,7 +5697,19 @@
+         Math.round((gop.lateAvgLockRatio || 0) * 100) + '%', Math.round((gpp.lateAvgLockRatio || 0) * 100) + '%',
+         ge.player.peak || 0, (ge.player.won ? '是' : '否'),
+         (au.lateAt != null ? au.lateAt + '%' : '-'),
+-        au.earlyMax, au.midMax, au.lateMax, '"' + (au.reasons.join('；') || '') + '"'
++        au.earlyMax, au.midMax, au.lateMax, '"' + (au.reasons.join('；') || '') + '"',
++        // 【v157】卡点判据 v2（R1~R9）：全知线_玩家线 形式，判定按取最差
++        (function () {
++          var v2 = r.chokeV2 || (r.generationEval && r.generationEval.auditV2);
++          if (!v2) return ',,,,';
++          var o = v2.omni, p = v2.player, w = v2.worst;
++          var vio = AntSolver.Generator.chokeV2Violations ? AntSolver.Generator.chokeV2Violations(w) : [];
++          return (o ? o.bridges : '-') + '_' + (p ? p.bridges : '-') + ',' +
++            (o ? o.r9 : '-') + '_' + (p ? p.r9 : '-') + ',' +
++            (o ? o.noGood : '-') + '_' + (p ? p.noGood : '-') + ',' +
++            w.hiBefore70Pct + '%,' +
++            '"' + (vio.length ? ('不通过:' + vio.join('、')) : '通过') + '"';
++        })()
+       ].join(','));
+       // 索引行：三件套齐全性按本轮【实际写出的文件】判断，不假定
+       idxRows.push([
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=156">
++  <link rel="stylesheet" href="css/style.css?v=157">
+ </head>
+ <body>
+   <header>
+@@ -971,20 +971,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=156"></script>
+-  <script src="js/utils.js?v=156"></script>
++  <script src="js/zip.js?v=157"></script>
++  <script src="js/utils.js?v=157"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=156"></script>
+-  <script src="js/simulator.js?v=156"></script>
++  <script src="js/color-libs.js?v=157"></script>
++  <script src="js/simulator.js?v=157"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=156"></script>
+-  <script src="js/solver-strategy.js?v=156"></script>
+-  <script src="js/solver.js?v=156"></script>
+-  <script src="js/playersim.js?v=156"></script>
+-  <script src="js/generator.js?v=156"></script>
+-  <script src="js/analysis.js?v=156"></script>
++  <script src="js/anchor-cut.js?v=157"></script>
++  <script src="js/solver-strategy.js?v=157"></script>
++  <script src="js/solver.js?v=157"></script>
++  <script src="js/playersim.js?v=157"></script>
++  <script src="js/generator.js?v=157"></script>
++  <script src="js/analysis.js?v=157"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=156"></script>
+-  <script src="js/app.js?v=156"></script>
++  <script src="js/level-editor.js?v=157"></script>
++  <script src="js/app.js?v=157"></script>
+ </body>
+ </html>

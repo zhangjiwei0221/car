@@ -1,0 +1,95 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -9341,7 +9341,24 @@
+     //   config.portfolioK === 1（默认）时逐值等于改动前。
+     var _pk = Math.max(1, Math.min(10, parseInt(config && config.portfolioK, 10) || 1));
+     var out = null;
+-    if (_pk <= 1) {
++    // 【v201·实验】设计扫描：把"饥荒强度"当成一个可搜索的设计参数（第0行保留几辆早车 = 3/2/1），
++    //   每个取值真跑一关、按最终 goodV3 择优。耗时 ×3，用户已确认"几分钟正常"。
++    if (config && config.designSweep) {
++      var _targets = [3, 2, 1], _bestD = null, _bestDT = null, _triedD = 0, _passD = 0, _bestTarget = null;
++      for (var _ti = 0; _ti < _targets.length; _ti++) {
++        var _dcfg = Object.assign({}, config, {
++          designDebt: true, designRow0Target: _targets[_ti], designSweep: false, portfolioK: 1
++        });
++        var _do = flow === 'old' ? produce(blocks, _dcfg) : produceFixed(blocks, _dcfg, opts);
++        _triedD++;
++        var _dt = portfolioTuple(_do);
++        if (_do && _do.goodV3 && _do.goodV3.pass) _passD++;
++        if (_do && (!_bestD || portfolioBetter(_dt, _bestDT))) { _bestD = _do; _bestDT = _dt; _bestTarget = _targets[_ti]; }
++        if (_bestD && _bestD.goodV3 && _bestD.goodV3.pass) break;
++      }
++      out = _bestD;
++      if (out) out.designSweep = { targets: _targets, tried: _triedD, passes: _passD, bestTarget: _bestTarget };
++    } else if (_pk <= 1) {
+       out = flow === 'old' ? produce(blocks, config) : produceFixed(blocks, config, opts);
+     } else {
+       var _best = null, _bestT = null, _tried = 0, _passes = 0;
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4482,8 +4482,9 @@
+     var big = Math.max(R, C) > 45;
+     var preset = big ? FIXED_PRESETS.large : FIXED_PRESETS.small;
+     var out = Object.assign({}, cfg, preset, {
+-      candidateCount: 6, portfolioK: 3, timeBudgetMs: 300000, difficultyRounds: 7,
+-      goodV3: true, requireHardPass: false, seed: null
++      candidateCount: 6, portfolioK: 1, timeBudgetMs: 300000, difficultyRounds: 7,
++      goodV3: true, requireHardPass: false, seed: null,
++      designSweep: true, designDebt: true   // 【v201】饥荒强度 3/2/1 扫描，按最终 goodV3 择优
+     });
+     try {
+       genLog('固定参数：' + (big ? '大图' : '小图') + '预设（' + R + '×' + C + '）· 每图多产 3 次 · 候选 6 · 单关 5 分钟',
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=197">
++  <link rel="stylesheet" href="css/style.css?v=201">
+ </head>
+ <body>
+   <header>
+@@ -322,7 +322,7 @@
+     <div class="gen-section">
+       <h2>2. 开始生产</h2>
+       <div class="gen-hint" style="line-height:1.8">
+-        参数已固定，不用调：按目标图尺寸自动选预设（小图 / 大图）· 每图多产 3 次择优 · 候选 6 · 单关 5 分钟 · 难度标定 7 轮。
++        参数已固定，不用调：按目标图尺寸自动选预设（小图 / 大图）· 设计扫描（饥荒强度 3/2/1）· 候选 6 · 单关 5 分钟 · 难度标定 7 轮。
+       </div>
+     </div>
+ 
+@@ -823,20 +823,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=197"></script>
+-  <script src="js/utils.js?v=197"></script>
++  <script src="js/zip.js?v=201"></script>
++  <script src="js/utils.js?v=201"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=197"></script>
+-  <script src="js/simulator.js?v=197"></script>
++  <script src="js/color-libs.js?v=201"></script>
++  <script src="js/simulator.js?v=201"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=197"></script>
+-  <script src="js/solver-strategy.js?v=197"></script>
+-  <script src="js/solver.js?v=197"></script>
+-  <script src="js/playersim.js?v=197"></script>
+-  <script src="js/generator.js?v=197"></script>
+-  <script src="js/analysis.js?v=197"></script>
++  <script src="js/anchor-cut.js?v=201"></script>
++  <script src="js/solver-strategy.js?v=201"></script>
++  <script src="js/solver.js?v=201"></script>
++  <script src="js/playersim.js?v=201"></script>
++  <script src="js/generator.js?v=201"></script>
++  <script src="js/analysis.js?v=201"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=197"></script>
+-  <script src="js/app.js?v=197"></script>
++  <script src="js/level-editor.js?v=201"></script>
++  <script src="js/app.js?v=201"></script>
+ </body>
+ </html>

@@ -1,0 +1,150 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3101,7 +3101,7 @@
+     // 【v260】铺完之后做闸门借车（此时盒子才是障碍，扇出才有意义）
+     var _gbStat = null;
+     try { _gbStat = gateBorrowAfterFill(cells, rows, cols, config); } catch (e) { _gbStat = null; }
+-    if (_gbStat) bindStat.gateBorrow = _gbStat;
++    if (_gbStat) timing.gateBorrow = _gbStat;   // bindStat 此时还没声明，先挂 timing
+     var rest = list.slice(fi);
+     timing.fillMs = Date.now() - tFill;
+     // 检查点1：填球完成（rest 为独立待放计数）
+@@ -7681,10 +7681,12 @@
+     var K = Math.max(0, Math.min(6, parseInt(config && config.gateBorrow, 10) || 0));
+     if (K <= 0) return null;
+     var dc = config._demandCurve;
+-    if (!dc || !dc.curve) return null;
+-    function exposedCount(r0, c0) {
+-      var R2 = [], seen = [];
+-      for (var r = 0; r < rows; r++) { R2.push([]); seen.push([]); for (var c = 0; c < cols; c++) { R2[r].push(false); seen[r].push(false); } }
++    if (!dc || !dc.curve) return { k: 0, why: 'noDemandCurve' };
++    // 扇出 = 拿掉这格后，**可点**的盒数增加多少（不是"可达"）。
++    //   棋盘铺满时所有格子本来就可达，只有"可点"才会因为开路而增加。
++    function pickableCount(r0, c0) {
++      var R2 = [];
++      for (var r = 0; r < rows; r++) { R2.push([]); for (var c = 0; c < cols; c++) R2[r].push(false); }
+       var q = [];
+       for (var c0s = 0; c0s < cols; c0s++) {
+         var x0 = cells[0][c0s];
+@@ -7704,22 +7706,26 @@
+       for (var rr = 0; rr < rows; rr++) for (var cc = 0; cc < cols; cc++) {
+         var b = cells[rr][cc];
+         if (!b || b.t !== 'box') continue;
++        if (rr === r0 && cc === c0) continue;              // 被拿掉的那个不算
+         if (rr === 0) { n++; continue; }
+-        if (R2[rr-1][cc] || R2[rr+1] && R2[rr+1][cc] || R2[rr][cc-1] || R2[rr][cc+1]) n++;
++        var up = (rr > 0) && R2[rr-1][cc], dn = (rr < rows-1) && R2[rr+1][cc];
++        var lf = (cc > 0) && R2[rr][cc-1], rt = (cc < cols-1) && R2[rr][cc+1];
++        if (up || dn || lf || rt) n++;
+       }
+       return n;
+     }
+-    var base = exposedCount(-1, -1);
++    var base = pickableCount(-1, -1);
+     var cands = [];
+-    for (var r = 1; r < rows; r++) for (var c = 0; c < cols; c++) {
++    // 闸门只可能是【当前可点】的盒子：第 0 行 + 贴着可达区的。内层的盒子拿掉也开不出路。
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+       var b2 = cells[r][c];
+       if (!b2 || b2.t !== 'box') continue;
+-      var fo = exposedCount(r, c) - base;
++      var before = (r === 0) ? 1 : 0;                       // 它自己原本是否可点
++      var fo = pickableCount(r, c) - base + before;
+       if (fo > 0) cands.push({ r: r, c: c, fan: fo, cell: b2 });
+     }
+-    if (!cands.length) return null;
++    if (!cands.length) return { k: 0, why: 'noGate', base: base };
+     cands.sort(function (a, b) { return b.fan - a.fan; });
+-    // 需求最晚的车（按 demandAt 排序，取尾部）
+     var all = [];
+     for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) {
+       var b3 = cells[r3][c3];
+@@ -7727,27 +7733,28 @@
+       all.push({ r: r3, c: c3, cell: b3, dm: demandAt(dc, b3.color, b3.count) });
+     }
+     all.sort(function (a, b) { return b.dm - a.dm; });
+-    var picked = {}, swaps = [];
++    var used = {}, swaps = [];
+     for (var i = 0; i < cands.length && swaps.length < K; i++) {
+       var gate = cands[i], key = gate.r + ',' + gate.c;
+-      if (picked[key]) continue;
++      if (used[key]) continue;
+       var donor = null;
+       for (var j = 0; j < all.length; j++) {
+         var dk = all[j].r + ',' + all[j].c;
+-        if (picked[dk] || dk === key) continue;
+-        if (all[j].dm <= 0.6) break;          // 只借"确实晚熟"的车
++        if (used[dk] || dk === key) continue;
++        if (all[j].dm < 0.55) break;                       // 只借真晚熟的
+         donor = all[j]; break;
+       }
+       if (!donor) break;
+-      picked[key] = 1; picked[donor.r + ',' + donor.c] = 1;
+-      var t = { color: gate.cell.color, count: gate.cell.count };
++      used[key] = 1; used[donor.r + ',' + donor.c] = 1;
++      var tc = gate.cell.color, tn = gate.cell.count;
+       gate.cell.color = donor.cell.color; gate.cell.count = donor.cell.count;
+-      donor.cell.color = t.color; donor.cell.count = t.count;
+-      swaps.push({ gate: [gate.r, gate.c], fan: gate.fan, donated: [donor.r, donor.c] });
+-    }
+-    return swaps.length ? { k: swaps.length, swaps: swaps } : null;
++      donor.cell.color = tc; donor.cell.count = tn;
++      swaps.push({ gate: [gate.r, gate.c], fan: gate.fan, from: [donor.r, donor.c] });
++    }
++    return { k: swaps.length, swaps: swaps, base: base };
+   }
+ 
++
+   function ensureRow0Opening(level) {
+     var board = level && level.board;
+     if (!board || !board.cells || !board.cells.length) return null;
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=260">
++  <link rel="stylesheet" href="css/style.css?v=261">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=260"></script>
+-  <script src="js/utils.js?v=260"></script>
++  <script src="js/zip.js?v=261"></script>
++  <script src="js/utils.js?v=261"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=260"></script>
+-  <script src="js/simulator.js?v=260"></script>
++  <script src="js/color-libs.js?v=261"></script>
++  <script src="js/simulator.js?v=261"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=260"></script>
+-  <script src="js/solver-strategy.js?v=260"></script>
+-  <script src="js/solver.js?v=260"></script>
+-  <script src="js/playersim.js?v=260"></script>
+-  <script src="js/generator.js?v=260"></script>
+-  <script src="js/analysis.js?v=260"></script>
++  <script src="js/anchor-cut.js?v=261"></script>
++  <script src="js/solver-strategy.js?v=261"></script>
++  <script src="js/solver.js?v=261"></script>
++  <script src="js/playersim.js?v=261"></script>
++  <script src="js/generator.js?v=261"></script>
++  <script src="js/analysis.js?v=261"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=260"></script>
+-  <script src="js/app.js?v=260"></script>
++  <script src="js/level-editor.js?v=261"></script>
++  <script src="js/app.js?v=261"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

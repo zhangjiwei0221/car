@@ -1,0 +1,181 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -93,6 +93,9 @@
+   var genFileFilter = { color: null };  // 文件列表当前筛选(点分组标题筛该组；null=不筛选)
+   var genBatchRunning = false, genBatchAborted = false;
+   var genBatchResults = [];             // 本批已产出记录(实时展示 + 收尾打包共用同一引用)
++  // 【v140】结果表「带入棋盘」按钮的回查表：按【渲染顺序】存放记录。
++  //   必须单独存一份：表格支持按难度/名称排序与按档位分组，渲染下标与 results 下标不再对应。
++  var genResultRows = [];
+   var genBatchStartAt = 0;
+   // ===== 批量生产后台线程池（ANT-GEN-PARALLEL-WORKERPOOL-20260820，用户 2026-08-20 批准）=====
+   // 改动前：单个 genWorker + 单个游标，严格「produce 一关 → 落库确认 → 再派下一关」，同一时刻只有 1 关在算。
+@@ -418,6 +421,19 @@
+     if (resultSortSel) resultSortSel.addEventListener('change', function () { renderGenResultTable(genBatchResults); });
+     var resultGroupSel = document.getElementById('gen-result-group');
+     if (resultGroupSel) resultGroupSel.addEventListener('change', function () { renderGenResultTable(genBatchResults); });
++    // 【v140】结果表「🎮 带入棋盘」：用事件委托绑一次即可 —— 表格每次排序/分组都整体重绘，
++    //   逐行绑会随重绘反复叠加监听。按 data-rec 从 genResultRows 回查记录（渲染顺序 ≠ results 顺序）。
++    (function () {
++      var body = document.getElementById('gen-result-body');
++      if (!body) return;
++      body.addEventListener('click', function (ev) {
++        var btn = ev.target && ev.target.closest ? ev.target.closest('.gen-result-load') : null;
++        if (!btn || btn.classList.contains('off')) return;
++        var idx = parseInt(btn.getAttribute('data-rec'), 10);
++        if (isNaN(idx) || !genResultRows[idx]) return;
++        genLoadToBoard(genResultRows[idx]);
++      });
++    })();
+     // 参数分组手风琴：点标题展开/收起对应分组体
+     var accHeads = document.querySelectorAll('.gen-accordion-head');
+     for (var ai = 0; ai < accHeads.length; ai++) {
+@@ -4776,13 +4792,21 @@
+       return a.order - b.order;
+     });
+ 
++    genResultRows = [];   // 每渲染一次重建（按钮以 data-rec 指向本表下标）
+     function rowHtml(x) {
+       var r = x.r;
++      var ri = genResultRows.length; genResultRows.push(r);
++      // 【v140】「带入棋盘」：把关卡直接装进模拟器，省掉「导出 → 导入关卡包 → 重算压力图」三步。
++      //   被前置闸门拦下的源图（没有关卡结构）不显示按钮，改成一句说明，避免点了没反应。
++      var act = r.level
++        ? '<button class="gen-result-load" data-rec="' + ri + '" title="把关卡直接载入模拟器棋盘（连同生成时的入口模式、压力样本与卡点信息一起带过去），不用先导出再导入">🎮 带入棋盘</button>'
++        : '<span class="gen-result-load off" title="这一关被前置闸门拦下，没有关卡结构可载入">无结构</span>';
+       return '<div class="gen-result-row">' +
+         '<span class="gen-tier-dot ' + genTierClass(r) + '"></span>' +
+         '<span class="gen-result-name" title="' + r.name + '">' + r.name + '</span>' +
+         '<span class="gen-result-tier">' + genTierLabel(r) + '</span>' +
+         '<span class="gen-result-diff">' + (r.valid ? (r.difficulty + '[' + r.grade + ']') : '-') + '</span>' +
++        act +
+         '</div>';
+     }
+ 
+@@ -4804,6 +4828,53 @@
+     body.innerHTML = html;
+   }
+ 
++  /**
++   * 【v140】生成结果 → 直接带入棋盘（用户 2026-10-15：「生成器生成之后，能不能加入直接带入棋盘」）。
++   *
++   * 以前要看刚生产出来的关卡，必须「下载 ZIP / 导出 JSON」→ 切到模拟器 →「导入关卡包」→ 等它重算
++   * 两幅压力图。这里把这四步并成一步：直接把该关的结构装进模拟器并进入模拟态。
++   *
++   * 一并带过去的三样生成侧信息（导入路径拿不到，因为关卡本体不含它们）：
++   *   · 入口模式（四边 / 仅底部 / 瞬时连锁）—— 必须同步到「消除模式」下拉，
++   *     否则底部模式生产的关卡会被当成四边入口来玩，看到的局面是错的；
++   *   · 生成时的全知/玩家压力样本 —— 直接复用，压力图秒出，且与生产报告里的曲线是同一份数据；
++   *   · 卡点类型与位置 —— 关卡信息面板照生产期口径显示。
++   *
++   * 兜底关与不合格关同样可载入：它们有完整结构，正是需要人工看看"到底差在哪"的那一批。
++   */
++  function genLoadToBoard(rec) {
++    if (!rec) return;
++    if (!rec.level) { alert('这一关被前置闸门拦下，没有关卡结构可载入。'); return; }
++    var lv;
++    try { lv = AntSolver.parseLevel(rec.level); }
++    catch (e) { alert('载入失败：' + ((e && e.message) || e)); return; }
++    if (!lv || !lv.board || !lv.board.rows) { alert('这一关没有棋盘结构，无法载入。'); return; }
++
++    stopAutoPlay(); stopAnim(); stopFlash(); stopLive();
++    // loadLevel 会把三项生成侧缓存清空、并把入口模式复位成四边 —— 所以赋值必须【在它之后】。
++    loadLevel(lv);
++    currentEntryMode = rec.entryMode || 'fourSide';
++    syncElimModeSelect(elimModeOfEntry(currentEntryMode));
++    currentGenerationEval = rec.generationEval || null;
++    currentImportedSolve = (rec.solve && rec.solve.pressureSamples && rec.solve.pressureSamples.length) ? {
++      completed: !!rec.solve.completed, steps: rec.solve.steps, maxBuffer: rec.solve.maxBuffer,
++      progress: rec.solve.progress, pressureSamples: rec.solve.pressureSamples,
++      pickOrder: rec.solve.pickOrder || []
++    } : null;
++    // 卡点信息：口径与生成路径的 chokeInfoOf(result) 一致，只是数据来自落库前的 rec。
++    currentChokeInfo = (rec.chokeMarks || rec.chokePlan) ? {
++      plan: rec.chokePlan ? {
++        count: rec.chokeCount || 0, pool: rec.chokePlan.pool, expected: rec.chokePlan.expected,
++        cn: rec.chokeTypesCN || []
++      } : null,
++      marks: rec.chokeMarks || null,
++      dropped: (rec.chokeFallback && rec.chokeFallback.dropped) || null
++    } : null;
++    renderLevelInfo();   // 重渲染一次，把上面三项（入口模式/卡点信息）带进「关卡信息」面板
++    switchView('simulator');
++    enterSimulation();
++  }
++
+   // ==================== 关卡库 导入/导出 ====================
+   /**
+    * 导入关卡库（JSON）：支持三种格式
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v139·老冰已下线</title>
+-  <link rel="stylesheet" href="css/style.css?v=139">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v140·生成结果可带入棋盘</title>
++  <link rel="stylesheet" href="css/style.css?v=140">
+ </head>
+ <body>
+   <header>
+@@ -729,6 +729,7 @@
+         <!-- 4. 结果 -->
+         <section id="gen-result-card" class="gen-card hidden">
+           <h2>4. 生产结果 <span id="gen-result-count"></span></h2>
++          <div class="gen-hint" style="margin:-4px 0 6px">每一行末尾的「🎮 带入棋盘」可把这关直接装进模拟器（连同入口模式、生成时的压力样本与卡点信息），不用先导出再导入。</div>
+           <div class="gen-row">
+             <button id="btn-gen-download" class="gen-btn-primary hidden">⬇ 下载关卡包 ZIP</button>
+             <span id="gen-download-hint" class="gen-download-hint"></span>
+@@ -810,18 +811,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=139"></script>
+-  <script src="js/utils.js?v=139"></script>
+-  <script src="js/simulator.js?v=139"></script>
+-  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=139"></script>
+-  <script src="js/solver-strategy.js?v=139"></script>
+-  <script src="js/solver.js?v=139"></script>
+-  <script src="js/playersim.js?v=139"></script>
+-  <script src="js/generator.js?v=139"></script>
+-  <script src="js/analysis.js?v=139"></script>
++  <script src="js/zip.js?v=140"></script>
++  <script src="js/utils.js?v=140"></script>
++  <script src="js/simulator.js?v=140"></script>
++  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
++  <script src="js/anchor-cut.js?v=140"></script>
++  <script src="js/solver-strategy.js?v=140"></script>
++  <script src="js/solver.js?v=140"></script>
++  <script src="js/playersim.js?v=140"></script>
++  <script src="js/generator.js?v=140"></script>
++  <script src="js/analysis.js?v=140"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=139"></script>
+-  <script src="js/app.js?v=139"></script>
++  <script src="js/level-editor.js?v=140"></script>
++  <script src="js/app.js?v=140"></script>
+ </body>
+ </html>
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+@@ -765,6 +765,18 @@
+ .gen-result-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ .gen-result-tier { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 90px; }
+ .gen-result-diff { font-size: 11px; color: var(--text); flex-shrink: 0; width: 70px; text-align: right; }
++/* 【v140】结果行「🎮 带入棋盘」：把关卡直接装进模拟器，省掉导出→导入→重算三步 */
++.gen-result-load {
++  flex-shrink: 0; font-size: 11px; padding: 2px 8px; cursor: pointer;
++  background: var(--panel2); color: var(--text);
++  border: 1px solid var(--border); border-radius: 4px;
++}
++.gen-result-load:hover { background: var(--amber); border-color: var(--amber); color: #2b1c0f; }
++.gen-result-load.off {
++  cursor: default; opacity: .45; color: var(--muted);
++  background: transparent; border-style: dashed;
++}
++.gen-result-load.off:hover { background: transparent; border-color: var(--border); color: var(--muted); }
+ 
+ /* ==================================================================================
+    【v132 · 手动摆盒】编辑器样式（2026-10-13）

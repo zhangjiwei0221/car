@@ -1,0 +1,153 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -5981,6 +5981,44 @@
+   // 兜底/候选优先级分档(0=最差…3=最好)：只依据【审核压力曲线 tier + 双方是否可通关】，不掺难度分(难度分是独立的第二套指标，见 §生产审核评分体系.md)。
+   //   3=困难合格(真实卡点) / 2=简单合格(趋势符合) / 1=安全兜底(全知+玩家均可通关、未触死亡边界，但压力曲线未达标——至少是能玩的关) / 0=其余(不可解/玩家打不通/触死亡边界)。
+   // 3/2 档【同时要求】双方可通关(与 evaluateGeneration.pass 的门槛口径一致)——压力曲线再漂亮，玩家实际打不通就不算"合格"，只能降到 1 档兜底。
++  /**
++   * 【v184】好关判据 v3（收尾标记）：对所有变体/救援都做完的【最终 level】评六条。
++   *   只标记、不参与搜索、不重跑：不合格也照常落库，只记 goodV3（config.goodV3 === false 可关）。
++   *   成本 = 18 局玩家模拟（0.3~1.2s/关）。
++   *   六条与 03_工具/好关评分/评分.js 同一口径：可解 / 稳健通关≥50% / 被埋=0 / 前期峰窗≤2 /
++   *   中后期峰窗 3.2~4.8 / 策略差≤34。
++   */
++  function goodV3Of(cand) {
++    var lv;
++    try { lv = AntSolver.parseLevel(cand.level); } catch (e) { return null; }
++    var sr = cand.solveResult || {}, a = cand.audit || {};
++    var b = (cand.generationEval && cand.generationEval.buried) || {};
++    var play = null;
++    try { play = chokeV2PlayBatch(lv, { n: 18 }); } catch (e) { play = null; }
++    var buried = (b.buried != null) ? b.buried : null;
++    var steady = play ? play.steadyWonPct : null;
++    var spread = play ? play.spreadPct : null;
++    var early = (a.earlyMax != null) ? a.earlyMax : null;
++    // 【口径】峰窗用【18 局中位】，不用审核那条单线（见工作日志 31.3「压力报区间、不报单点」）；
++    //   量不到 18 局时才退回 audit.midLateMax。两者都记下来，方便对账。
++    var midLateAudit = (a.midLateMax != null) ? a.midLateMax : null;
++    var midLate = (play && play.lateMax && play.lateMax.p50 != null) ? play.lateMax.p50 : midLateAudit;
++    var fails = [];
++    if (!sr.completed) fails.push('可解');
++    if (steady == null || steady < 50) fails.push('稳健通关<50%');
++    if (buried == null || buried !== 0) fails.push('被埋>0');
++    if (early == null || early > 2.0) fails.push('前期峰窗>2');
++    if (midLate == null || midLate < 3.2 || midLate > 4.8) fails.push('峰窗不在3.2~4.8');
++    if (spread == null || spread > 34) fails.push('策略差>34');
++    return {
++      pass: fails.length === 0, fails: fails,
++      steadyWonPct: steady, spreadPct: spread, buried: buried,
++      earlyMax: early, midLateMax: midLate, midLateAudit: midLateAudit,
++      peakMin: play ? play.lateMax.min : null,
++      peakMax: play ? play.lateMax.max : null,
++      peakMean: play ? play.lateMax.mean : null
++    };
++  }
+   function candTier(c) {
+     if (!c || !c.valid) return 0;
+     var ge = c.generationEval, a = c.audit;
+@@ -6669,6 +6707,17 @@
+       } catch (e) { cand.difficultyCalibError = String(e && e.message || e); }
+     }
+ 
++    // 【v184】好关判据 v3 收尾标记：只记录，不影响选择与合格判定
++    if (cand && cand.level && cand.solveResult && (!cand.config || cand.config.goodV3 !== false)) {
++      try {
++        var _gv3 = goodV3Of(cand);
++        if (_gv3) {
++          cand.goodV3 = _gv3;
++          if (cand.generationEval) cand.generationEval.goodV3 = _gv3;
++        }
++      } catch (e) { cand.goodV3Error = String((e && e.message) || e); }
++    }
++
+     return cand;
+   }
+ 
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4608,6 +4608,7 @@
+         if (!result || !result.level) { alert('这一关没生成出来：' + ((result && result.lastFailReason) || '候选全灭')); return; }
+         genLogGreedyLine(result.level);   // 【v176】单关生成也报贪心线一行
+         genLogPlayBatch(result.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
++        genLogGoodV3(result);             // 【v184】好关判据 v3（六条全过？）
+         loadLevel(result.level);
+         currentGenerationEval = result.generationEval || null;
+         currentEntryMode = result.entryMode || entryModeOf(config);
+@@ -5182,6 +5183,7 @@
+     }
+     genLogGreedyLine(rec.level);   // 【v176】第三条线「贪心玩家」一行
+     genLogPlayBatch(rec.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
++    genLogGoodV3(result);          // 【v184】好关判据 v3（六条全过？）
+     if (curveTxt) {
+       var c3 = rec.choiceCurve;
+       genLog('　　' + c3.spark + curveTxt, (c3.lowPct >= 35 || c3.medFull <= 2) ? 'gen-log-warn' : 'gen-log-ok');
+@@ -6277,7 +6279,25 @@
+    * 【v176】把贪心线一行打进实时日志（**单关生成**与**批量生产**共用，两处都要能看见）。
+    *   它不是"再判一次合格"，而是回答两个问题：
+    *   ① 这关会不会逼真人先垫（暂存压力真不真）；② 会不会逼真人在**快满槽**时去赌管道（用户 R6）。
++   */
++  /**
++   * 【v184】好关判据 v3 的收尾标记（由生成器 finalizeProduce 打，18 局口径）。
++   *   只报数、不影响生产；六条全过 = ✅，否则列出未过项。
+    */
++  function genLogGoodV3(res) {
++    try {
++      var g = res && res.goodV3;
++      if (!g) return;
++      genLog('　　好关v3　' + (g.pass ? '✅ 6/6 全过' : ('✗ ' + g.fails.join('、'))) +
++        '　· 稳健 ' + (g.steadyWonPct == null ? '-' : g.steadyWonPct + '%') +
++        ' · 峰窗 ' + (g.midLateMax == null ? '-' : g.midLateMax) +
++        (g.peakMin != null ? '(' + g.peakMin + '~' + g.peakMax + ')' : '') +
++        ' · 被埋 ' + (g.buried == null ? '-' : g.buried) +
++        ' · 策略差 ' + (g.spreadPct == null ? '-' : g.spreadPct) +
++        ' · 前期 ' + (g.earlyMax == null ? '-' : g.earlyMax),
++        g.pass ? 'gen-log-ok' : 'gen-log-warn');
++    } catch (eG) { /* 度量失败不影响生产 */ }
++  }
+   function genLogGreedyLine(level) {
+     try {
+       var gRep = level ? greedyLineReport(AntSolver.parseLevel(level)) : null;
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=183">
++  <link rel="stylesheet" href="css/style.css?v=184">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=183"></script>
+-  <script src="js/utils.js?v=183"></script>
++  <script src="js/zip.js?v=184"></script>
++  <script src="js/utils.js?v=184"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=183"></script>
+-  <script src="js/simulator.js?v=183"></script>
++  <script src="js/color-libs.js?v=184"></script>
++  <script src="js/simulator.js?v=184"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=183"></script>
+-  <script src="js/solver-strategy.js?v=183"></script>
+-  <script src="js/solver.js?v=183"></script>
+-  <script src="js/playersim.js?v=183"></script>
+-  <script src="js/generator.js?v=183"></script>
+-  <script src="js/analysis.js?v=183"></script>
++  <script src="js/anchor-cut.js?v=184"></script>
++  <script src="js/solver-strategy.js?v=184"></script>
++  <script src="js/solver.js?v=184"></script>
++  <script src="js/playersim.js?v=184"></script>
++  <script src="js/generator.js?v=184"></script>
++  <script src="js/analysis.js?v=184"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=183"></script>
+-  <script src="js/app.js?v=183"></script>
++  <script src="js/level-editor.js?v=184"></script>
++  <script src="js/app.js?v=184"></script>
+ </body>
+ </html>

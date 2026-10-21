@@ -1,0 +1,80 @@
+--- a/bin/js/simulator.js
++++ b/bin/js/simulator.js
+@@ -348,6 +348,56 @@
+         if (rr < n && h[rr].k < h[m].k) m = rr;
+         if (m === i) break; var t = h[m]; h[m] = h[i]; h[i] = t; i = m; } }
+     return top;
++  }
++
++  // ===== 【2026-10-12 口径】目标像素消除顺序 =====
++  // 用户指定：以【目标区左下角 (rows-1, 0)】为基准，按【曼哈顿距离】最短优先取像素；
++  //   并且【优先取外围（未被阻挡的），一层吃完再进下一层】，层内仍按曼哈顿距离最短优先。
++  // 排序键 = (层号, 到左下角的曼哈顿距离, 更靠下更靠左)：
++  //   · 层号：第 0 层 = 初始就露在外面的那一圈（紧贴外部空腔 / 贴边界）；
++  //           第 k 层 = 要先吃掉第 k-1 层才碰得到的像素（逐层向内 BFS 得到）。
++  //   · 层号只由 blocks / 尺寸 / 入口模式决定，整局不变 —— 这就是“外围 / 一层一层”的含义。
++  // 旧的「离盒起点距离 → 入口源(底>左>右>顶) → 依赖波深度」不再参与像素排序。
++  // 按 blocks 数组身份 + 入口模式缓存：同一关卡反复调用只算一次。
++  var _layerCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
++  function layerMaskOf(blocks, rows, cols, bottomOnly) {
++    var key = bottomOnly ? 1 : 0, per = null;
++    if (_layerCache) { per = _layerCache.get(blocks); if (per && per[key]) return per[key]; }
++    var layer = new Int32Array(rows * cols); layer.fill(-1);
++    var seedEmpty = AntSolver.outsideReachSeed(blocks, rows, cols, bottomOnly); // 初始与外界连通的空格
++    var dirs4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++    var q = [], i, d, r, c;
++    // 第 0 层：紧贴外部空腔（或贴边界）的像素 —— 即“未被阻挡的外围”
++    for (r = 0; r < rows; r++) {
++      for (c = 0; c < cols; c++) {
++        if (blocks[r][c] <= 0) continue;
++        var ok = false;
++        if (bottomOnly) { if (r === rows - 1) ok = true; }
++        else if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) ok = true;
++        if (!ok) {
++          for (d = 0; d < 4; d++) {
++            var nr = r + dirs4[d][0], nc = c + dirs4[d][1];
++            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) { ok = true; break; }
++            if (seedEmpty[nr][nc]) { ok = true; break; }
++          }
++        }
++        if (ok) { layer[r * cols + c] = 0; q.push(r * cols + c); }
++      }
++    }
++    // 逐层向内推进
++    for (i = 0; i < q.length; i++) {
++      var id = q[i], cr = (id / cols) | 0, cc = id % cols, L = layer[id];
++      for (d = 0; d < 4; d++) {
++        var nr2 = cr + dirs4[d][0], nc2 = cc + dirs4[d][1];
++        if (nr2 < 0 || nr2 >= rows || nc2 < 0 || nc2 >= cols) continue;
++        if (blocks[nr2][nc2] <= 0) continue;
++        var id2 = nr2 * cols + nc2;
++        if (layer[id2] >= 0) continue;
++        layer[id2] = L + 1; q.push(id2);
++      }
++    }
++    if (_layerCache) { if (!per) { per = {}; _layerCache.set(blocks, per); } per[key] = layer; }
++    return layer;
+   }
+ 
+   // 每次取盒均按像素级动态依赖波消除：底→左→右→顶的入口优先；消一格即刷新其解锁区域。
+@@ -398,10 +448,16 @@
+       return rows - 1 - r;                               // 右：下→上（横向进入时由右向左）
+     }
+     function keyOf(r, c, source, depth) {
+-      var base = source * SOURCE_SPAN + depth * AREA + tieOf(r, c, source);
+-      // 手动模式仍以"离盒起点"优先；同起点距离内再遵循动态依赖波，保持原玩家口径。
+-      if (start) return (Math.abs(r - start.r) + Math.abs(c - start.c)) * (4 * SOURCE_SPAN) + base;
+-      return base;
++      // 【2026-10-13 口径】小人（目标像素）选取顺序（用户指定）：
++      //   ① 层号升序 —— 先取无遮挡的那一层；这层取完（不够）再进下一层
++      //   ② 层内【由下到上】—— 行号大的先
++      //   ③ 同行内【由左到右】—— 列号小的先
++      // 注：上一版的「到左下角曼哈顿距离」按本次要求替换为 ②③ 的行列优先。
++      // 旧的起点距离/入口源/依赖波深度不再参与排序（source/depth/start 保留仅作兼容）。
++      var layer = layerMaskOf(blocks, rows, cols, bottomOnly);
++      var L = layer[r * cols + c]; if (L < 0) L = 0;
++      var seq = (rows - 1 - r) * cols + c;   // 由下到上、由左到右
++      return L * (rows * cols + 1) + seq;
+     }
+     function pushCandidate(r, c, source, depth) {
+       var id = r * cols + c, k = keyOf(r, c, source, depth);

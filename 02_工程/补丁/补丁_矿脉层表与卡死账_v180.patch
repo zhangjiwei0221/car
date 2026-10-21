@@ -1,0 +1,402 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -6327,6 +6327,13 @@
+           .map(function (x) { return x.cn + (x.deltaWon >= 0 ? '+' : '') + x.deltaWon; }).join('、');
+         genLog('　　归因　' + attrLineOf(at) + (detail ? ('　（单拿各：' + detail + '）') : ''),
+           (at.main && at.main.deltaWon > 0) ? 'gen-log-warn' : '');
++      }
++      // 【v180】矿脉层表（只由图决定）+ 卡死账（这条路线到底欠在哪）
++      var vr = veinReport(AntSolver.parseLevel(level));
++      if (vr) {
++        var stl = stuckLineOf(b.stuck);
++        genLog('　　矿脉　' + veinLineOf(vr) + (stl ? ('　· 卡死账：' + stl) : '　· 没卡死'),
++          stl ? 'gen-log-warn' : 'gen-log-ok');
+       }
+     } catch (ePB) { /* 度量失败不影响生产 */ }
+   }
+@@ -6370,7 +6377,35 @@
+     if (bestD <= 0 && allD <= 0) return '不是功能块（拿掉全部仍无回升）→ 在切球/容量/摆位';
+     if (allD > bestD) return '叠加型：全拿掉 +' + allD + '（单拿最多 +' + bestD + '）';
+     return '主因 ' + best.cn + ' +' + bestD + '（全拿掉 +' + allD + '）';
++  }
++  /**
++   * 【v180】矿脉层表（只由图决定，与玩家/切法无关）：几条矿脉、最深第几层、每层多少像素。
++   *   这是"拆图"的第一个坐标：层越深 = 越晚才能碰到；最深层的像素就是"最后才开门"的那批。
++   */
++  var veinCache = new Map();
++  function veinReport(lv) {
++    var G = AntSolver.Generator;
++    if (!G || !G.veinLayers || !lv) return null;
++    var hit = veinCache.get(lv);
++    if (hit) return hit;
++    var v = null;
++    try { v = G.veinLayers(lv, {}); } catch (e) { v = null; }
++    if (v) veinCache.set(lv, v);
++    return v;
+   }
++  function veinLineOf(v) {
++    if (!v) return '';
++    var deepest = 0;
++    for (var k in v.byLevel) { var lv2 = +k; if (lv2 < 99 && lv2 > deepest) deepest = lv2; }
++    var px = v.pxByLevel[deepest] || 0;
++    return v.count + ' 条 · 最深 ' + deepest + ' 层（该层 ' + px + 'px）';
++  }
++  /** 卡死账一句话：色X 还差 a / 盘上剩 b / 可达 c（取最狠的一条）。 */
++  function stuckLineOf(stuck) {
++    if (!stuck || !stuck.length) return '';
++    var s = stuck[0];
++    return '色' + s.color + ' 还差 ' + s.needLeft + ' / 盘上剩 ' + s.boardLeft + ' / 可达 ' + s.reachable;
++  }
+   function auditV2OfLevel(lv, em) {
+     var omni = null, pl = null;
+     try { omni = solveByEntryMode(lv, em); } catch (e) { omni = null; }
+@@ -6396,7 +6431,9 @@
+     try { pb = playBatchReport(lv, 16); } catch (e) { pb = null; }   // 【v177】同一关玩 16 遍
+     var at = null;
+     try { at = attributeReport(lv, pb); } catch (e) { at = null; }     // 【v179】机制归因（只对可疑关跑）
+-    return { omni: mo, player: mp, greedy: gd, playBatch: pb, attr: at, worst: worst };
++    var vr = null;
++    try { vr = veinReport(lv); } catch (e) { vr = null; }               // 【v180】矿脉层表
++    return { omni: mo, player: mp, greedy: gd, playBatch: pb, attr: at, vein: vr, worst: worst };
+   }
+ 
+   /** 违反项（参考门；阈值集中在上面的 AUDIT_V2_GATES）。 */
+@@ -6470,13 +6507,14 @@
+     html += '<thead><tr style="background:#3a2c22;color:#f3e9db">' +
+       ['关卡', '玩法', '盒', '独木桥(全知/玩家)', '最长走廊', '最低可点', '无满解(全/玩)', '预算点(全/玩)',
+        '前期限压(全/玩)', '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4',
+-       '贪心线 峰窗/垫槽/赌管道', '18 遍波动', '归因', '参考门判定'].map(function (h) {
++       '贪心线 峰窗/垫槽/赌管道', '18 遍波动', '归因', '矿脉（条/最深）', '卡死账', '参考门判定'].map(function (h) {
+         return '<th style="padding:3px 6px;border:1px solid #5a4636">' + h + '</th>';
+       }).join('') + '</tr></thead><tbody>';
+     rows.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+       var pb = r.level.playBatch || null;                                                   // 【v177】16 遍波动
+       var at = r.level.attr || null;                                                        // 【v179】机制归因
++      var vr = r.level.vein || null;                                                        // 【v180】矿脉层表
+       var pbSpread = (pb && pb.lateMax.max != null && pb.lateMax.min != null) ? +(pb.lateMax.max - pb.lateMax.min).toFixed(1) : null;
+       var pbBad = !!(pb && ((pb.steadyWonPct != null && pb.steadyWonPct < 50) ||
+                             (pb.spreadPct != null && pb.spreadPct >= 50) ||
+@@ -6511,6 +6549,8 @@
+              : '-', pbBad) +
+         td(at ? attrLineOf(at) : (pb ? '<span style="color:#8a7358">稳，不用归因</span>' : '-'),
+            !!(at && at.main && at.main.deltaWon > 0)) +
++        td(vr ? veinLineOf(vr) : '-') +
++        td(pb && pb.stuck ? ('<span style="color:#e0592c">' + stuckLineOf(pb.stuck) + '</span>') : '—', !!(pb && pb.stuck)) +
+         td(ok ? '✓ 通过' : '✗ ' + r.violations.join('、'), !ok) +
+         '</tr>';
+     });
+@@ -6530,7 +6570,7 @@
+ 
+   function exportChokeAuditCSV() {
+     if (!lastChokeAudit || !lastChokeAudit.length) return;
+-    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,波动局数,稳健通关%,最好通关%,最差通关%,策略差%,波动峰窗最小,波动峰窗最大,波动峰窗均值,波动峰窗中位,卡死中段,卡死前段,归因,归因主因Δ%,全拿掉Δ%,独木桥位置,参考门,违反项,难度分'];
++    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,波动局数,稳健通关%,最好通关%,最差通关%,策略差%,波动峰窗最小,波动峰窗最大,波动峰窗均值,波动峰窗中位,卡死中段,卡死前段,归因,归因主因Δ%,全拿掉Δ%,矿脉条数,矿脉最深层,卡死账,独木桥位置,参考门,违反项,难度分'];
+     var lines = head;
+     lastChokeAudit.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+@@ -6554,6 +6594,9 @@
+         '"' + (r.level.attr ? attrLineOf(r.level.attr) : '') + '"',
+         V(r.level.attr && r.level.attr.main ? r.level.attr.main.deltaWon : null),
+         V(r.level.attr ? (r.level.attr.items.filter(function (x) { return x.kind === 'all'; })[0] || {}).deltaWon : null),
++        V(r.level.vein ? r.level.vein.count : null),
++        V(r.level.vein ? r.level.vein.maxLevel : null),
++        '"' + ((r.level.playBatch && r.level.playBatch.stuck) ? stuckLineOf(r.level.playBatch.stuck) : '') + '"',
+         '"' + ((o && o.bridgeAt.length) ? o.bridgeAt.join('/') + '%' : '') +
+           ((p && p.bridgeAt.length) ? (' 玩家:' + p.bridgeAt.join('/') + '%') : '') + '"',
+         (r.violations.length ? '不通过' : '通过'), '"' + r.violations.join('、') + '"', V(r.difficulty)
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4751,13 +4751,42 @@
+     //   正确口径 = 像素全消（与 PlayerSim 第 632 行同一判据）。
+     var cleared = !!(st.eliminatedPixels != null && st.totalPixels != null && st.totalPixels > 0
+                      && st.eliminatedPixels >= st.totalPixels);
++    // 【v180】"卡死账"：没通关时，逐条暂存里的车算三笔账 ——
++    //   needLeft  = 这辆车还差几个像素；boardLeft = 盘上这个颜色还剩几个；
++    //   reachable = 其中**现在够得着**的几个（贴边或贴着已消格）。
++    //   死因读法：boardLeft < needLeft → **车切得比图里剩的还胖**（切球/容量问题，不是玩家问题）；
++    //             boardLeft ≥ needLeft 但 reachable = 0 → 颜色被包住（路线/结构问题）。
++    var stuck = null;
++    if (!cleared && st.buffer && st.buffer.length) {
++      var leftByColor = {}, reachByColor = {};
++      for (var rr = 0; rr < st.boardRows; rr++) {
++        for (var cc3 = 0; cc3 < st.boardCols; cc3++) {
++          if (st.eliminated[rr][cc3]) continue;
++          var col3 = st.blocks[rr][cc3];
++          if (col3 <= 0) continue;
++          leftByColor[col3] = (leftByColor[col3] || 0) + 1;
++          if (rr === 0 || cc3 === 0 || rr === st.boardRows - 1 || cc3 === st.boardCols - 1 ||
++              st.eliminated[rr - 1][cc3] || st.eliminated[rr + 1][cc3] || st.eliminated[rr][cc3 - 1] || st.eliminated[rr][cc3 + 1]) {
++            reachByColor[col3] = (reachByColor[col3] || 0) + 1;
++          }
++        }
++      }
++      stuck = st.buffer.map(function (b) {
++        var needLeft = (b.remaining != null) ? b.remaining : Math.max(0, (b.need || 0) - (b.progress || 0));
++        return {
++          color: b.color, needLeft: needLeft,
++          boardLeft: leftByColor[b.color] || 0,
++          reachable: reachByColor[b.color] || 0
++        };
++      }).sort(function (a, b2) { return b2.needLeft - a.needLeft; });
++    }
+     return {
+       pickOrder: order, samples: samples, won: (!!st.gameWon || cleared), cleared: cleared,
+       gameOver: !!st.gameOver,
+       steps: order.length, completedBoxes: st.completedBoxes || 0,
+       coveragePct: total ? Math.round((st.completedBoxes || 0) / total * 100) : 0,
+       pads: pads, pipeBets: pipeBets, pipeBetBufMax: pipeBetBufMax, pipeBetWhileFull: pipeBetWhileFull,
+-      policy: policy
++      policy: policy, stuck: stuck
+     };
+   }
+ 
+@@ -4804,7 +4833,8 @@
+           peakBuf: a ? a.peakBuf : 0,
+           // 卡点区根本没有样本的局（早死 / 样本没落进窗口）→ 记 null，不当 0 混进 min/mean（否则"波动"里全是假的 0）。
+           //   `lateAt` 是审核函数在窗口里真正扫到位置才会填的字段，比"覆盖≥30%"更准。
+-          lateMax: (a && a.lateAt != null) ? a.lateMax : null
++          lateMax: (a && a.lateAt != null) ? a.lateMax : null,
++          stuck: g.won ? null : (g.stuck || null)          // 【v180】卡死账
+         });
+       }
+     }
+@@ -4844,6 +4874,11 @@
+     }
+     var rates = byPolicy.map(function (b) { return b.wonRatePct; });
+     var steady = byPolicy.length ? byPolicy[0] : null;
++    // 【v180】代表样本的"卡死账"：取第一条稳健玩家没通关的局（最能说明"稳健怎么会输"）
++    var stuck = null;
++    for (i = 0; i < runs.length; i++) {
++      if (runs[i].policy === 'steady' && !runs[i].won && runs[i].stuck) { stuck = runs[i].stuck; break; }
++    }
+     return {
+       n: runs.length, perPolicy: per, seed: seed, policies: policies, byPolicy: byPolicy,
+       steadyWonPct: steady ? steady.wonRatePct : null,          // 主指标：稳健玩家通关率
+@@ -4853,11 +4888,172 @@
+       wonRatePct: Math.round(finish.win / runs.length * 100),
+       lateMax: stat('lateMax'), peakBuf: stat('peakBuf'),
+       pads: stat('pads'), pipeBets: stat('pipeBets'),
+-      finish: finish, runs: runs
++      finish: finish, stuck: stuck, runs: runs
++    };
++  }
++
++  // ==================== 【v180】矿脉层表 + 债务 Δ（"拆图"的第一块） ====================
++  /**
++   * 矿脉 = 目标图里**4-连通、同色**的一片像素。它是"拆图/合球"的最小单位：
++   *   切球 = 把若干矿脉分给同一辆车；摆车顺序 = 决定哪条矿脉先被啃。
++   *
++   * `veinLayers` 只算**静态结构**（与玩家无关）：
++   *   level 0 = 现在就够得着的矿脉（贴边 or 贴着外部连通的空白）；
++   *   level k = 必须先把 ≤k-1 层啃掉才能碰到的矿脉（洋葱第几层）。
++   * 这就是用户要的那张"谁包着谁"的表——它只由图决定，换切法、换顺序都不会变。
++   */
++  function veinLayers(parsed, opts) {
++    var rows = parsed.rows, cols = parsed.cols, blocks = parsed.blocks;
++    if (!blocks || !rows || !cols) return null;
++    var bottomOnly = !!(opts && opts.bottomOnly);
++    var seed;
++    try { seed = AntSolver.outsideReachSeed(blocks, rows, cols, bottomOnly); } catch (e) { return null; }
++    var id = new Int32Array(rows * cols).fill(-1);
++    var veins = [], r, c, d;
++    var DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++    // 1) 标矿脉（4-连通同色）
++    for (r = 0; r < rows; r++) {
++      for (c = 0; c < cols; c++) {
++        var col = blocks[r][c];
++        if (col <= 0 || id[r * cols + c] >= 0) continue;
++        var vid = veins.length;
++        var vein = { id: vid, color: col, pixels: 0, cells: [], level: -1, touches: false };
++        var q = [[r, c]];
++        id[r * cols + c] = vid;
++        for (var h = 0; h < q.length; h++) {
++          var cr = q[h][0], cc = q[h][1];
++          vein.pixels++; vein.cells.push(cr * cols + cc);
++          if (cr === 0 || cc === 0 || cr === rows - 1 || cc === cols - 1) vein.touches = true;
++          if (!vein.touches && seed[cr - 1] && (seed[cr - 1][cc] || seed[cr + 1][cc] || seed[cr][cc - 1] || seed[cr][cc + 1])) vein.touches = true;
++          for (d = 0; d < 4; d++) {
++            var nr = cr + DIRS[d][0], nc = cc + DIRS[d][1];
++            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
++            if (blocks[nr][nc] !== col || id[nr * cols + nc] >= 0) continue;
++            id[nr * cols + nc] = vid; q.push([nr, nc]);
++          }
++        }
++        veins.push(vein);
++      }
++    }
++    // 2) 矿脉之间的相邻关系
++    var adj = veins.map(function () { return {}; });
++    for (r = 0; r < rows; r++) {
++      for (c = 0; c < cols; c++) {
++        var a = id[r * cols + c];
++        if (a < 0) continue;
++        for (d = 0; d < 4; d++) {
++          var nr2 = r + DIRS[d][0], nc2 = c + DIRS[d][1];
++          if (nr2 < 0 || nr2 >= rows || nc2 < 0 || nc2 >= cols) continue;
++          var b = id[nr2 * cols + nc2];
++          if (b >= 0 && b !== a) { adj[a][b] = 1; adj[b][a] = 1; }
++        }
++      }
++    }
++    // 3) 洋葱分层（BFS）
++    var frontier = [];
++    for (var i = 0; i < veins.length; i++) if (veins[i].touches) { veins[i].level = 0; frontier.push(i); }
++    var lv = 0;
++    while (frontier.length) {
++      var next = [];
++      for (i = 0; i < frontier.length; i++) {
++        for (var k in adj[frontier[i]]) {
++          var j = +k;
++          if (veins[j].level >= 0) continue;
++          veins[j].level = lv + 1; next.push(j);
++        }
++      }
++      frontier = next; lv++;
++    }
++    var unreached = 0, byLevel = {}, pxByLevel = {};
++    for (i = 0; i < veins.length; i++) {
++      if (veins[i].level < 0) { veins[i].level = 99; unreached++; }
++      byLevel[veins[i].level] = (byLevel[veins[i].level] || 0) + 1;
++      pxByLevel[veins[i].level] = (pxByLevel[veins[i].level] || 0) + veins[i].pixels;
++    }
++    var maxLevel = 0;
++    for (i = 0; i < veins.length; i++) if (veins[i].level < 99 && veins[i].level > maxLevel) maxLevel = veins[i].level;
++    // 每个颜色的最浅层（该色的"入口"在第几层）
++    var colorMinLevel = {};
++    for (i = 0; i < veins.length; i++) {
++      var cc2 = veins[i].color;
++      if (colorMinLevel[cc2] == null || veins[i].level < colorMinLevel[cc2]) colorMinLevel[cc2] = veins[i].level;
++    }
++    return {
++      veins: veins, count: veins.length, maxLevel: maxLevel, unreached: unreached,
++      byLevel: byLevel, pxByLevel: pxByLevel, colorMinLevel: colorMinLevel, id: id, rows: rows, cols: cols
+     };
+   }
+ 
+   /**
++   * 沿一条既定路线回放，记下**每条矿脉第一次被碰到的第几手**（1 起）。
++   * 判据与模拟器一致：该矿脉有任一像素"贴边 or 贴着已消除格"就算打开。
++   */
++  function veinFirstTouch(parsed, layerInfo, order) {
++    var S = AntSolver.Simulator;
++    var veins = layerInfo.veins;
++    if (!S || !S.enter || !S.applyPick || !order || !order.length) return null;
++    var st;
++    try { st = S.enter(parsed, { useSlotStart: true }); } catch (e) { return null; }
++    var open = new Array(veins.length).fill(0);     // 0 = 还没打开
++    var cols = layerInfo.cols, rows = layerInfo.rows;
++    function isOpen(cellIdx) {
++      var r = (cellIdx / cols) | 0, c = cellIdx % cols;
++      if (r === 0 || c === 0 || r === rows - 1 || c === cols - 1) return true;
++      var e = st.eliminated;
++      return !!(e[r - 1][c] || e[r + 1][c] || e[r][c - 1] || e[r][c + 1]);
++    }
++    function scan(step) {
++      for (var i = 0; i < veins.length; i++) {
++        if (open[i]) continue;
++        for (var j = 0; j < veins[i].cells.length; j++) {
++          if (isOpen(veins[i].cells[j])) { open[i] = step; break; }
++        }
++      }
++    }
++    scan(0);   // 开局就能碰到的
++    for (var s = 0; s < order.length; s++) {
++      try { S.applyPick(st, order[s].r, order[s].c); } catch (e) { break; }
++      scan(s + 1);
++      if (st.gameOver) break;
++    }
++    var out = {};
++    for (var k = 0; k < veins.length; k++) out[veins[k].id] = open[k];
++    return out;
++  }
++
++  /**
++   * 【v180】债务 Δ：同一关、同一条矿脉，**最优路线第几手碰到** vs **这条路线第几手才碰到**。
++   *   Δ = 实际 − 最优 ≥ 0。Δ 大的那几条矿脉，就是这条路线"欠下的债"——也是卡点的来源。
++   * 单位统一为"手"（pick），所以可以横比；层数（L）另算，用来说明"谁包着谁"。
++   */
++  function veinDebt(parsed, opts) {
++    opts = opts || {};
++    var info = veinLayers(parsed, { bottomOnly: !!opts.bottomOnly });
++    if (!info) return null;
++    var omni = opts.omniOrder || null, run = opts.runOrder || null;
++    var tOpt = omni ? veinFirstTouch(parsed, info, omni) : null;
++    var tRun = run ? veinFirstTouch(parsed, info, run) : null;
++    var list = [], i;
++    for (i = 0; i < info.veins.length; i++) {
++      var v = info.veins[i];
++      var o = tOpt ? tOpt[v.id] : null, u = tRun ? tRun[v.id] : null;
++      if (!o || !u) continue;                       // 有一边没碰到（没打开）→ 不进债务表
++      var d = u - o;
++      if (d <= 0) continue;
++      list.push({ id: v.id, color: v.color, level: v.level, pixels: v.pixels, optStep: o, runStep: u, delta: d });
++    }
++    list.sort(function (a, b) { return (b.delta - a.delta) || (b.pixels - a.pixels); });
++    var total = 0;
++    for (i = 0; i < list.length; i++) total += list[i].delta;
++    return {
++      count: info.count, maxLevel: info.maxLevel, unreached: info.unreached,
++      byLevel: info.byLevel, pxByLevel: info.pxByLevel, colorMinLevel: info.colorMinLevel,
++      debt: list, topDebt: list.slice(0, 3), totalDebt: total,
++      debtsCount: list.length
++    };
++  }
++
++  /**
+    * 【v179】**机制归因**（用户 2026-10-17 选 2：把"稳健被坑"的关拆到机制上）。
+    *
+    * 做法 = **消融实验**（ablation），不是拍脑袋分类：
+@@ -8752,6 +8948,8 @@
+     simulatePlay: simulatePlay,           // 【v177】"玩一遍"模拟器（policy: steady/bold/random + 随机源）
+     chokeV2PlayBatch: chokeV2PlayBatch,   // 【v177】"同一关玩 N 遍"：通关率 / 峰窗区间 / 结束位置分布
+     chokeV2Attribute: chokeV2Attribute,   // 【v179】机制归因：拿掉墙/管道/冰/链/问号各跑一遍，看通关率回升多少
++    veinLayers: veinLayers,               // 【v180】矿脉层表：谁包着谁、最深几层（只由图决定）
++    veinDebt: veinDebt,                   // 【v180】债务 Δ：最优路线 vs 实际路线，每条矿脉晚了多少手才被碰到
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+     setProgressHook: setProgressHook,     // 【v153】单关进度钩子（worker/界面显示跑到哪了）
+     solveSpaceQuota: solveSpaceQuota,                         // 可用空间配额联立解（含管道兜底），可独立调用体检参数是否自相矛盾
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=179">
++  <link rel="stylesheet" href="css/style.css?v=180">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=179"></script>
+-  <script src="js/utils.js?v=179"></script>
++  <script src="js/zip.js?v=180"></script>
++  <script src="js/utils.js?v=180"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=179"></script>
+-  <script src="js/simulator.js?v=179"></script>
++  <script src="js/color-libs.js?v=180"></script>
++  <script src="js/simulator.js?v=180"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=179"></script>
+-  <script src="js/solver-strategy.js?v=179"></script>
+-  <script src="js/solver.js?v=179"></script>
+-  <script src="js/playersim.js?v=179"></script>
+-  <script src="js/generator.js?v=179"></script>
+-  <script src="js/analysis.js?v=179"></script>
++  <script src="js/anchor-cut.js?v=180"></script>
++  <script src="js/solver-strategy.js?v=180"></script>
++  <script src="js/solver.js?v=180"></script>
++  <script src="js/playersim.js?v=180"></script>
++  <script src="js/generator.js?v=180"></script>
++  <script src="js/analysis.js?v=180"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=179"></script>
+-  <script src="js/app.js?v=179"></script>
++  <script src="js/level-editor.js?v=180"></script>
++  <script src="js/app.js?v=180"></script>
+ </body>
+ </html>

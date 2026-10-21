@@ -1,0 +1,520 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -2482,6 +2482,13 @@
+     var blackTarget = spaceQuota
+       ? spaceQuota.blackTarget
+       : Math.floor(cellCap * (config.blackPercent || 0) / 100);
++    // 【v167】"墙当上限"：用户 2026-10-16「黑块的比例最多是 4%」——
++    //   把要放的墙**压到上限**（默认 4%），压掉的部分**留空位**（不再补成墙；阻挡改由数字冰/锁链承担）。
++    if (config.blackAsCapOnly) {
++      var capPct0 = (config.blackPercentCapPct != null) ? config.blackPercentCapPct : 4;
++      var capN0 = Math.floor(cellCap * capPct0 / 100);
++      if (blackTarget > capN0) blackTarget = capN0;
++    }
+     var blackCap = Math.floor(cellCap * 0.25);
+     if (blackTarget > blackCap) blackTarget = blackCap;
+     var extraBlack = Math.max(0, blackTarget - wallBlacks);
+@@ -2499,13 +2506,23 @@
+     for (var r2 = 0; r2 < rows; r2++) for (var c2 = 0; c2 < cols; c2++) if (cells[r2][c2] == null) nullNow++;
+     var surplusStat = { need: 0, filled: 0, coords: [] };
+     if (nullNow > n) {
+-      surplusStat = fillSurplusWithBlack(cells, rows, cols, nullNow - n, gapProtect);
++      var surplusWant = nullNow - n;
++      if (config.blackAsCapOnly) {   // 【v167】只补到墙的上限，剩下的**留空位**
++        var capPct1 = (config.blackPercentCapPct != null) ? config.blackPercentCapPct : 4;
++        var room1 = Math.floor(cellCap * capPct1 / 100) - countCellsOfType(cells, 'black');
++        surplusWant = Math.max(0, Math.min(surplusWant, room1));
++      }
++      surplusStat = fillSurplusWithBlack(cells, rows, cols, surplusWant, gapProtect);
+       blackStat.surplusFilled = surplusStat.filled;
+       blackStat.actualTotal = countCellsOfType(cells, 'black');
+       nullNow = 0;
+       for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) if (cells[r3][c3] == null) nullNow++;
+       if (nullNow > n) {
+-        return { ok: false, reason: 'structSurplus', detail: '空格' + nullNow + ' > 盒数' + n + '，多余空格无法全部转黑块', structureBuildMs: Date.now() - tStruct, blackStat: blackStat };
++        if (!config.blackAsCapOnly) {
++          return { ok: false, reason: 'structSurplus', detail: '空格' + nullNow + ' > 盒数' + n + '，多余空格无法全部转黑块', structureBuildMs: Date.now() - tStruct, blackStat: blackStat };
++        }
++        // 【v167】墙当上限模式下，多出来的空格**合法保留为空位**（不淘汰候选）
++        blackStat.emptyLeft = nullNow - n;
+       }
+     }
+ 
+@@ -3467,8 +3484,307 @@
+     if (!out.traps.length) return null;
+     out.applied = out.traps.length;
+     return out;
++  }
++
++  /**
++   * 【v163】定向"抉择投放"（用户 #2 的正确放法：利用功能块让玩家多一些抉择）。
++   *
++   * 与 v162（负结果，按盒序乱放）的区别：**先求解、看清每一步有几个"能填满"的选项**，再下手：
++   *   ① 沿父候选的通关路线逐步统计"能填满一辆车的选项数"；
++   *   ② 只挑**进度 30~80% 且该步有 ≥2 个能填满选项**的位置（= 玩家此刻有余地、正在挑）；
++   *   ③ 在该步把多余的"能填满"的车**扩容成一口吃不满**（容量从同色别的车搬 → 守恒不变），
++   *      **只留 1 个能填满** → 从"随便选都对"变成"只有一个对"= 预算判断点（v2 的 r9）；
++   *   ④ 一关最多动 2 辆；不动盒数/颜色/障碍，**不加墙**。
++   *
++   * 为什么不用自己再判优劣：本函数只在 `makeChokeVariantFixed` 里被调用，而那里**改完会重新求解 + 重新审核**，
++   *   并且父候选与变体一起进 `candBetter` 比较（同档先比 v2 达标、再比 v2 分）——
++   *   **达不到"预算判断点变多、独木桥/无满解不变差"的变体自然选不上**，等于自带筛选。
++   *
++   * config.choiceTrapDirected === false 可关。
++   */
++  function choiceTrapDirected(level, parent, config, blocks) {
++    var S = AntSolver.Simulator;
++    var pickOrder = (parent && parent.solveResult && parent.solveResult.pickOrder) || null;
++    if (!S || !S.enter || !S.listMoves || !S.applyPick || !pickOrder || !pickOrder.length) return null;
++    var board = level.board, cells = board.cells;
++    var minCap = Math.max(2, config.boxSizeMin || 2), maxCap = Math.max(minCap, config.boxSizeMax || 52);
++    var targetCap = Math.max(minCap, Math.round(maxCap * (config.choiceTrapScale != null ? config.choiceTrapScale : 0.85)));
++    var st;
++    try { st = S.enter(AntSolver.parseLevel({ blocks: level.blocks, bufferLimit: level.bufferLimit, board: board }), { useSlotStart: true }); }
++    catch (e) { return null; }
++    var found = [];
++    try {
++      for (var i = 0; i < pickOrder.length; i++) {
++        var p = pickOrder[i];
++        if (!p || p.r == null) continue;
++        var moves = S.listMoves(st);
++        var prog = st.totalBoxes ? (st.completedBoxes / st.totalBoxes) : 0;
++        var fill = [];
++        for (var j = 0; j < moves.length; j++) {
++          var m = moves[j];
++          if (!m.blocked && m.canConsume) fill.push(m);      // "能填满一辆车"的选项
++        }
++        if (fill.length >= 2 && prog >= 0.30 && prog <= 0.80) found.push({ prog: prog, fill: fill });
++        S.applyPick(st, p.r, p.c);
++        if (st.gameOver) break;
++      }
++    } catch (e) { /* 回放中断：用已采到的部分 */ }
++    return choiceTrapApply(board, found, minCap, maxCap, targetCap);
++  }
++
++  /** 在选中的那一步"只留 1 个能填满的选项"，其余扩容成半满陷阱（容量同色内搬运，守恒不变）。 */
++  function choiceTrapApply(board, found, minCap, maxCap, targetCap) {
++    if (!found || !found.length) return null;
++    var cells = board.cells;
++    // 优先取进度居中（30~80% 的中间），一次只做一处，最多动 2 辆
++    found.sort(function (a, b) { return Math.abs(a.prog - 0.55) - Math.abs(b.prog - 0.55); });
++    for (var fi = 0; fi < found.length; fi++) {
++      var fill = found[fi].fill, applied = 0, changes = [];
++      for (var k = 0; k < fill.length; k++) {
++        if (applied >= 2) break;
++        if (k >= fill.length - 1) break;                 // 至少留 1 个"能填满"的正确选项
++        var cell = cells[fill[k].r] && cells[fill[k].r][fill[k].c];
++        if (!cell || cell.t !== 'box') continue;
++        if (cell.q || cell.chain || cell.numice > 0) continue;   // 已挂别的功能块 → 不叠
++        if (cell.count >= targetCap) continue;
++        var donors = [];
++        for (var r = 0; r < board.rows; r++) for (var c = 0; c < board.cols; c++) {
++          var d = cells[r][c];
++          if (!d || d.t !== 'box' || d === cell || d.color !== cell.color) continue;
++          if (d.chain || d.q || d.count <= minCap) continue;
++          donors.push(d);
++        }
++        donors.sort(function (a, b) { return b.count - a.count; });
++        var want = targetCap - cell.count, moved = 0;
++        for (var q = 0; q < donors.length && moved < want; q++) {
++          var take = Math.min(donors[q].count - minCap, want - moved);
++          if (take > 0) { donors[q].count -= take; cell.count += take; moved += take; }
++        }
++        if (moved > 0) { changes.push({ r: fill[k].r, c: fill[k].c, color: cell.color, to: cell.count, moved: moved }); applied++; }
++      }
++      if (applied > 0) return { applied: applied, at: Math.round(found[fi].prog * 100) + '%', fillBefore: fill.length, changes: changes };
++    }
++    return null;
++  }
++
++  /**
++   * 【v165】修剪无用墙（用户 #1：墙的存在必须有意义 = 它要改变玩家的可点选择数）。
++   *
++   * 判据（便宜、不需要求解）：把某块墙临时当成"空位"，重算**开局露头集合**——
++   *   · 如果因此有**新的盒子被激活**（可点）→ 这块墙在**堵路**（挡住了空腔往里的通路）→ **保留**；
++   *   · 如果什么盒子都没多出来 → 它只是占格、对"谁什么时候能点"毫无影响 → **改成空位**。
++   *
++   * 为什么改成"空位"而不是删掉格子：棋盘格数 = 盒 + 墙 + 管道 + 空位，改成空位**不动盒数、
++   *   不动每辆车的容量、不动棋盘尺寸**（守恒完全不变），只是少一块阻挡、盘面更开阔。
++   *
++   * ⚠ 本轮判据只看**开局**露头（不求解，成本 O(格数)/块）。已知局限：中后段才起作用、开局看不出来的墙
++   *   会被一并改成空位——这是"多做减法"的保守方向（宁可少一块阻挡，也不留一块没意义的墙）。
++   *   config.pruneWalls === false 可关；跟随 v2 开关（关 v2 时不生效，保证回退契约）。
++   */
++  function wallPruneActivation(board, skip) {
++    var rows = board.rows, cols = board.cols, cells = board.cells;
++    function walkable(r, c) {
++      if (skip && skip[0] === r && skip[1] === c) return true;   // 这块墙"假装是空位"
++      var x = cells[r][c];
++      if (!x) return true;
++      return x.t === 'empty';
++    }
++    var reach = [], q = [], r, c;
++    for (r = 0; r < rows; r++) { var rowA = []; for (c = 0; c < cols; c++) rowA.push(false); reach.push(rowA); }
++    for (c = 0; c < cols; c++) if (walkable(0, c)) { reach[0][c] = true; q.push([0, c]); }
++    var D4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++    while (q.length) {
++      var cur = q.pop();
++      for (var d = 0; d < 4; d++) {
++        var nr = cur[0] + D4[d][0], nc = cur[1] + D4[d][1];
++        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
++        if (reach[nr][nc]) continue;
++        if (!walkable(nr, nc)) continue;
++        reach[nr][nc] = true; q.push([nr, nc]);
++      }
++    }
++    var set = {};
++    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
++      var x2 = cells[r][c];
++      if (!x2 || x2.t !== 'box') continue;
++      var ok = (r === 0);
++      for (var e = 0; e < 4 && !ok; e++) {
++        var ar = r + D4[e][0], ac = c + D4[e][1];
++        if (ar < 0 || ar >= rows || ac < 0 || ac >= cols) continue;
++        if (reach[ar][ac]) ok = true;
++      }
++      if (ok) set[r + ',' + c] = 1;
++    }
++    return set;
+   }
+ 
++  function pruneUselessWalls(board, config) {
++    var rows = board.rows, cols = board.cols, cells = board.cells;
++    var walls = [];
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var x = cells[r][c];
++      if (x && x.t === 'black') walls.push([r, c]);
++    }
++    if (!walls.length) return null;
++    var base = wallPruneActivation(board, null);
++    var kept = [], pruned = [];
++    for (var i = 0; i < walls.length; i++) {
++      var rc = walls[i];
++      var cand = wallPruneActivation(board, rc);
++      var adds = 0;
++      for (var k in cand) if (!base[k]) adds++;
++      if (adds > 0) kept.push(rc);                 // 堵路 → 留
++      else { cells[rc[0]][rc[1]] = { t: 'empty' }; pruned.push(rc); }   // 纯占格 → 变空位
++    }
++    if (!pruned.length) return null;               // 没剪过 → 不挂字段（保持"不动则本体一致"）
++    return { wallsBefore: walls.length, wallsKept: kept.length, pruned: pruned.length, prunedAt: pruned };
++  }
++
++  /**
++   * 【v170】"冰当墙用"：定向把免费选项锁到中段（用户 2026-10-16：
++   *   「数字冰就能够起到墙的作用，而且还更加灵活，因为会在某个时间点打开，从而引起其他盒子的路径的变化」；
++   *    并明确「不要固定死冰/墙/链的数量——这些都是做难度时可以选择的变量」）。
++   *
++   * 目标不是"放几块冰"，而是**把中后期峰窗顶到压力门**（`config.midLatePeakMin`，默认 3.5）：
++   *   ① 沿父候选通关路线，找**中后段（30~85%）里压力不足**（暂存 < 目标-0.5）的步；
++   *   ② 在这些步上，把"**本来能填满**"的车挂数字冰（N = 6~12 手后解冻）→ 把免费选项锁到中段，
++   *      逼玩家先垫暂存 → 峰窗上升；
++   *   ③ **一次只加一处**（同一处最多 2 辆）；数量由外层搜索决定：变体反复加压，达不到门的被
++   *      `candBetter` 直接淘汰（改完由 makeChokeVariantFixed 重新求解 + 重新审核）。
++   *
++   * 语义务必与实机一致：`numice = 剩余球数`（再取走 N 个盒就解冻）；未解冻前该车不可点（isNumIceLocked）。
++   * config.iceAsWall === false 可关。
++   */
++  function pressureBoostIce(level, parent, config, blocks) {
++    var S = AntSolver.Simulator;
++    var pickOrder = (parent && parent.solveResult && parent.solveResult.pickOrder) || null;
++    if (!S || !S.enter || !S.listMoves || !pickOrder || !pickOrder.length) return null;
++    var board = level.board, cells = board.cells, limit = level.bufferLimit || 5;
++    var st;
++    try { st = S.enter(AntSolver.parseLevel({ blocks: level.blocks, bufferLimit: limit, board: board }), { useSlotStart: true }); }
++    catch (e) { return null; }
++    var target = (config.midLatePeakMin != null) ? config.midLatePeakMin : (CHOKE_V2_GATES.midLatePeakMin || 3.5);
++    var wantBuf = Math.max(2, Math.round(target - 0.5));      // 想把中途暂存顶到的高度
++    var cands = [];
++    try {
++      for (var i = 0; i < pickOrder.length; i++) {
++        var p = pickOrder[i];
++        if (!p || p.r == null) continue;
++        var moves = S.listMoves(st);
++        var prog = st.totalBoxes ? (st.completedBoxes / st.totalBoxes) : 0;
++        var buf = st.buffer.length, fill = [], pad = [];
++        for (var j = 0; j < moves.length; j++) {
++          var m = moves[j];
++          if (m.blocked) continue;
++          if (m.canConsume) fill.push(m); else pad.push(m);   // pad = 能点但一口填不满（"只能垫"）
++        }
++        if (prog >= 0.30 && prog <= 0.85 && buf < wantBuf && fill.length >= 1) {
++          cands.push({ prog: prog, buf: buf, fill: fill, pad: pad, step: i });
++        }
++        S.applyPick(st, p.r, p.c);
++        if (st.gameOver) break;
++      }
++    } catch (e) { /* 回放中断：用已采到的部分 */ }
++    if (!cands.length) return null;
++    // 优先救"最缺压力"的那一步（暂存最低；同分取进度靠中）
++    cands.sort(function (a, b) { return (a.buf - b.buf) || (Math.abs(a.prog - 0.55) - Math.abs(b.prog - 0.55)); });
++    // 【v171 修正】只在**这一步"能填满"的车全部锁掉、且仍留至少一辆"只能垫"的可点车**时才落地 ——
++    //   否则玩家/求解器会绕开被锁的车（v170 首轮实测：锁 1~2 辆 → 峰窗一点不动）。
++    for (var ci = 0; ci < cands.length; ci++) {
++      var t = cands[ci], added = [];
++      if (!t.pad.length) continue;                                 // 锁完就没得点 = 死局 → 换下一步
++      for (var k = 0; k < t.fill.length; k++) {
++        var rc = t.fill[k], cell = cells[rc.r] && cells[rc.r][rc.c];
++        if (!cell || cell.t !== 'box') continue;
++        if (cell.numice > 0 || cell.chain || cell.q) { added.push({ r: rc.r, c: rc.c, skipped: '已挂其它功能块' }); continue; }
++        var n = (config.iceAsWallSteps != null) ? config.iceAsWallSteps : (6 + (t.step % 7));
++        cell.numice = Math.max(2, n);
++        added.push({ r: rc.r, c: rc.c, color: cell.color, steps: cell.numice, at: Math.round(t.prog * 100) + '%' });
++      }
++      var real = added.filter(function (x) { return !x.skipped; });
++      if (real.length) return { applied: real.length, probedSteps: cands.length, wantBuf: wantBuf,
++                                padLeft: t.pad.length, at: Math.round(t.prog * 100) + '%', marks: real };
++    }
++    return null;
++  }
++
++  /**
++   * 【v172】切球层加压（用户 2026-10-16 批准的方向）：**中段成片变成"一口吃不满"**。
++   *
++   * 为什么不是前面那几招：v162（按盒序扩容）/ v163（单点陷阱）/ v170-v171（定向锁冰）都只能改**一两辆**，
++   *   而峰窗是"**持续多步的高占用**"——改一辆会被局部化解（垫进去→下一步就消掉）。
++   *   本招改成**成片**：在 40~80% 区间里，把"**本来能填满**"的车**连同容量一起抬到超过该色此刻的露头量**
++   *   （`count > blob[color]`）→ 玩家在中段**无论选哪辆都吃不饱**，被迫连续垫槽 → 暂存持续高 → 峰窗才可能上来。
++   *
++   * 守恒：容量只在该色内部搬运（从同色别的车扣），总量不变；不动盒数、不动颜色、不动障碍。
++   * 只改结构（不改实机协议字段）；改完由 makeChokeVariantFixed **重新求解 + 重新审核**，达不到门的变体自然被淘汰。
++   * config.capSqueeze === false 可关；capSqueezeMax 控制"一次最多改几辆"（默认 4）。
++   */
++  function midgameCapacitySqueeze(level, parent, config, blocks) {
++    var S = AntSolver.Simulator;
++    var pickOrder = (parent && parent.solveResult && parent.solveResult.pickOrder) || null;
++    if (!S || !S.enter || !S.listMoves || !S.applyPick || !pickOrder || !pickOrder.length) return null;
++    var board = level.board, cells = board.cells, limit = level.bufferLimit || 5;
++    var minCap = Math.max(2, config.boxSizeMin || 2);
++    var maxCap = Math.max(minCap + 1, config.boxSizeMax || 52);
++    var st;
++    try { st = S.enter(AntSolver.parseLevel({ blocks: level.blocks, bufferLimit: limit, board: board }), { useSlotStart: true }); }
++    catch (e) { return null; }
++    var target = (config.midLatePeakMin != null) ? config.midLatePeakMin : 3.5;
++    var wantBuf = Math.max(3, Math.round(target - 0.5));
++    var maxN = (config.capSqueezeMax != null) ? config.capSqueezeMax : 4;
++    var mul = (config.capSqueezeMul != null) ? config.capSqueezeMul : 1.25;
++    var changed = [], dbg = { steps: pickOrder.length, candSteps: 0, blobFail: 0, tried: 0, noDonor: 0 };
++    try {
++      for (var i = 0; i < pickOrder.length && changed.length < maxN; i++) {
++        var p = pickOrder[i];
++        if (!p || p.r == null) continue;
++        var prog = st.totalBoxes ? (st.completedBoxes / st.totalBoxes) : 0;
++        var buf = st.buffer.length;
++        if (prog >= 0.40 && prog <= 0.80 && buf < wantBuf) {
++          dbg.candSteps++;
++          var blob = null;
++          try { blob = exposedBlobByColor(st.eliminated, st.blocks, st.rows, st.cols); } catch (e2) { blob = null; }
++          if (!blob) dbg.blobFail++;
++          if (blob) {
++            var moves = S.listMoves(st);
++            for (var j = 0; j < moves.length && changed.length < maxN; j++) {
++              var m = moves[j];
++              if (m.blocked || !m.canConsume) continue;
++              var cell = cells[m.r] && cells[m.r][m.c];
++              if (!cell || cell.t !== 'box') continue;
++              if (cell.numice > 0 || cell.chain || cell.q) continue;
++              var E = blob[cell.color] || 0;
++              if (E <= 0) continue;
++              var want = Math.min(Math.round(E * mul) + 1, maxCap);
++              dbg.tried++;
++              if (want <= cell.count) continue;                 // 已经吃不饱 → 不用动
++              var donors = [];
++              for (var r = 0; r < board.rows; r++) for (var c = 0; c < board.cols; c++) {
++                var d = cells[r][c];
++                if (!d || d.t !== 'box' || d === cell || d.color !== cell.color) continue;
++                if (d.chain || d.q || d.numice > 0 || d.count <= minCap) continue;
++                donors.push(d);
++              }
++              donors.sort(function (a, b) { return b.count - a.count; });
++              var moved = 0, need = want - cell.count;
++              for (var q = 0; q < donors.length && moved < need; q++) {
++                var take = Math.min(donors[q].count - minCap, need - moved);
++                if (take > 0) { donors[q].count -= take; cell.count += take; moved += take; }
++              }
++              if (moved > 0) changed.push({ r: m.r, c: m.c, color: cell.color, to: cell.count, wasExposed: E, moved: moved, at: Math.round(prog * 100) + '%', buf: buf });
++              else dbg.noDonor++;
++            }
++          }
++        }
++        S.applyPick(st, p.r, p.c);
++        if (st.gameOver) break;
++      }
++    } catch (e) { /* 回放中断：用已采到的部分 */ }
++    if (!changed.length) return config.capSqueezeDebug ? { applied: 0, wantBuf: wantBuf, dbg: dbg } : null;
++    return { applied: changed.length, wantBuf: wantBuf, dbg: dbg, marks: changed };
++  }
++
+   function applyBeatProps(board, config) {
+     var props = (config && config.beatProps) || null;
+     if (!props || !props.length) return null;
+@@ -3528,6 +3844,8 @@
+ 
+   function buildOneCandidateAttempt(blocks, config, opts) {
+     opts = opts || {};
++    // 【v174】散点策略跟随卡点判据 v2 开关：关掉 v2 → 完全回到旧的"最大化最小距离"（口径不变/可回退）。
++    DISPERSED_MAXMIN = (config && config.chokeV2 === false);
+     var timing = newCandidateTiming();
+     var tAll = Date.now();
+ 
+@@ -3609,6 +3927,19 @@
+         var ctStat = choiceTrap(board, blocks, config);
+         if (ctStat) board.choiceTrapStat = ctStat;   // 只在真落地时挂诊断字段
+       } catch (e) { board.choiceTrapStat = { applied: 0, error: String(e && e.message || e) }; }
++    }
++
++    // ③c3 【v165】修剪无用墙：只保留"堵住了某个盒子露头"的墙，其余改成空位（守恒不变）
++    // ⚠ 2026-10-16 首轮实测（v165_wall_prune_check.js，各 4 关）：判据"只看开局露头"有**致命缺陷**——
++    //   当盘面**没有空位**（格 = 盒 + 墙）时，开局可达空腔为空 → 所有墙都被判成"没影响" → **全被剪光**（6.5 → 0 块）。
++    //   后果：平均可点 4.65 → 6.20、窄选择 22.5% → 8.75%（好），但**预算判断点 8.5 → 3.0（卡点大幅变弱）**。
++    //   → 因此**默认关闭**；正确做法是把判据换成"沿求解路线的多点快照"（每块墙一次回放，约 0.3~1s/关）。
++    //   config.pruneWalls === true 可开（实验用）。
++    if (config.pruneWalls === true && config.chokeV2 !== false) {
++      try {
++        var wpStat = pruneUselessWalls(board, config);
++        if (wpStat) board.wallPruneStat = wpStat;
++      } catch (e) { board.wallPruneStat = { error: String(e && e.message || e) }; }
+     }
+ 
+     // ③d 【v161】锁链相邻性兜底：同组的两/三辆车必须 4-邻接连通（用户：「不能跨过中间的车」）。
+@@ -3882,6 +4213,44 @@
+     var parsed = AntSolver.parseLevel(level);
+     // 卡点分支重求解必须与候选筛选/最终审核同一入口模式与消除口径，
+     // 否则卡点是按一种规则制造的、审核却按另一种判。
++    // 【v172】切球层加压：中段成片变成"一口吃不满"（唯一的"能持续抬高占用"的手段，见函数头说明）
++    // ⚠ 2026-10-16 首轮实测：**没生效**（两臂都是"成片改 0 辆"、峰窗 3.0 → 3.0）——
++    //   触发条件/诊断字段至少在变体路径上没有落地，需要先定位"为什么 0 辆"。定位清楚前默认关。
++    //   config.capSqueeze === true 可开（实验）。
++    if (config.capSqueeze === true && config.chokeV2 !== false) {
++      try {
++        var sq = midgameCapacitySqueeze(level, parent, config, blocks);
++        if (sq) level.board.capSqueezeStat = sq;
++      } catch (e) { level.board.capSqueezeStat = { error: String(e && e.message || e) }; }
++    }
++
++    // 【v170】"冰当墙用"：压力不足就定向挂冰（数量不预设——由外层反复加压直到达标决定）
++    // ⚠ 2026-10-16 首轮实测（v170_icewall_check.js，各 4 关）：**只锁住 1~2 辆"能填满"的车无法提高峰窗**
++    //   （中后期峰窗 2.17 → 2.17，冰 9.67 → 11.0 块）。原因与 v162 同源：**只要还有别的免费选项，
++    //   玩家/求解器就绕开被锁的那辆**。正确做法：该步"能填满"的车要**全部锁住**，并**至少留一辆
++    //   '能点但填不满'的车**（否则变成死局）→ 逼玩家先垫 → 才出压力。在改成这个之前默认关。
++    //   config.iceAsWall === true 可开（实验）。
++    if (config.iceAsWall === true && config.chokeV2 !== false) {
++      try {
++        var pb2 = pressureBoostIce(level, parent, config, blocks);
++        if (pb2) level.board.iceAsWallStat = pb2;
++      } catch (e) { level.board.iceAsWallStat = { error: String(e && e.message || e) }; }
++    }
++
++    // 【v163】定向抉择投放：在"这一步有 ≥2 个能填满的选项"处，把多余的改成半满陷阱（只留 1 个对的）。
++    //   放在最终 solve 之前 → 改完立刻重新求解 + 重新审核；达不到效果的变体在 candBetter 里自然选不上。
++    // ⚠ 2026-10-16 复查：开启本招后，`v157` 那条"生产时挂上的 v2 指标 == 事后在最终关卡上重算"的断言
++    //   会失败（实测一组：挂上 r9=5,5 vs 重算 4,3）。单独探针（v163_invariant_probe.js）显示不变式
++    //   本身没被系统性破坏（开关两种状态都自洽）→ 应为**特定关卡上的口径敏感性**（本招改变了选中的候选，
++    //   撞上本来就存在的分叉）。在查清之前**默认关闭**，避免把"指标不可信"带进生产。
++    //   config.choiceTrapDirected === true 可开（实验用）。
++    if (config.choiceTrapDirected === true && config.chokeV2 !== false) {
++      try {
++        var ctd = choiceTrapDirected(level, parent, config, blocks);
++        if (ctd) level.board.choiceTrapStat = ctd;
++      } catch (e) { level.board.choiceTrapStat = { applied: 0, error: String(e && e.message || e) }; }
++    }
++
+     var r = AntSolver.Solver.solve(parsed, { capturePreviewStats: true, bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain });
+     if (!r.completed) return null;
+     var ge = evaluateGeneration(r, parsed, config);
+@@ -4183,7 +4552,10 @@
+   var CHOKE_V2_TAIL_PCT = 0.90, CHOKE_V2_TAIL_BOXES = 3;
+   // 【v159】新增第 5 条：前期限压覆盖率 ≥20%（用户 2026-10-16：实测最新几关 0~30% 段的
+   //   "暂存 3~4"占比是 0%，前期完全没有预算压力）。含义见日志第二十五节 §12。
+-  var CHOKE_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10, early34MinPct: 20 };
++  // 【v169】新增"中后期压力"硬门（用户 2026-10-16：「把这种压力作为硬性规定。在生成的时候，
++  //   只挑选那些中后期压力有超过 3、4 的关卡」）：
++  //   midLatePeakMin = 中后期（30~80% 进度）**暂存峰窗**的下限（峰窗 = 5% 滑窗内的暂存均值最大值）。
++  var CHOKE_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10, early34MinPct: 20, midLatePeakMin: 3.5 };   // 【v169】"中后期压力硬门"（用户要 3~4 → 取 3.5；两条线取最差）
+ 
+   /** 沿一条既定路线（pickOrder）逐步回放，量出这条线上的 v2 指标（与页面「关卡体检」同口径）。 */
+   function chokeV2MeasureLine(parsed, order) {
+@@ -4259,6 +4631,22 @@
+     if (worst.early34Pct >= 999) worst.early34Pct = 0;
+     if (worst.r9 >= 1e9) worst.r9 = 0;
+     if (worst.minPick >= 99) worst.minPick = 0;
++    // 【v169】中后期压力（30~80% 暂存峰窗）：直接用审核函数的同一口径算两条线，取较小者 = 取最差。
++    try {
++      var _lim = parsed.bufferLimit || 5, _tot = parsed.totalBoxes || 0;
++      var ao = (solveResult && solveResult.pressureSamples && AntSolver.Analysis && AntSolver.Analysis.chokepointAudit)
++        ? AntSolver.Analysis.chokepointAudit(solveResult.pressureSamples, _tot, _lim) : null;
++      var ap = (playerResult && playerResult.pressureSamples && AntSolver.Analysis && AntSolver.Analysis.chokepointAudit)
++        ? AntSolver.Analysis.chokepointAudit(playerResult.pressureSamples, _tot, _lim) : null;
++      // 【v169 口径纠正】用户说的"中后期压力"= **30~100% 卡点区**的暂存峰窗（与现有审核同口径，`lateMax`）。
++      //   实测这三关：小鹿 4.0/4.0、实机第3关 4.0/3.5、批次62 3.5/3.0；用 30~80% 窗口则只有 4/3/2.5 太严。
++      worst.midLatePeakOmni = ao ? ao.lateMax : null;
++      worst.midLatePeakPlayer = ap ? ap.lateMax : null;
++      var cands = [];
++      if (ao) cands.push(ao.lateMax);
++      if (ap) cands.push(ap.lateMax);
++      worst.midLatePeak = cands.length ? Math.min.apply(null, cands) : null;   // 取最差
++    } catch (e) { worst.midLatePeak = null; }
+     return { omni: mo, player: mp, worst: worst, gates: CHOKE_V2_GATES };
+   }
+ 
+@@ -4271,6 +4659,10 @@
+     if (w.noGood > CHOKE_V2_GATES.noGoodMax) v.push('无满解' + w.noGood + '步');
+     if (w.hiBefore70Pct > CHOKE_V2_GATES.hiBefore70PctMax) v.push('70%前≥4占' + w.hiBefore70Pct + '%');
+     if (w.early34Pct < CHOKE_V2_GATES.early34MinPct) v.push('前期限压仅' + w.early34Pct + '%');
++    // 【v169】中后期压力硬门：两条线里较差的那条也要达到峰窗下限
++    if (w.midLatePeak != null && w.midLatePeak < CHOKE_V2_GATES.midLatePeakMin) {
++      v.push('中后期峰窗仅' + w.midLatePeak + '（< ' + CHOKE_V2_GATES.midLatePeakMin + '）');
++    }
+     return v;
+   }
+   function chokeV2Pass(w) { return chokeV2Violations(w).length === 0; }
+@@ -4300,6 +4692,7 @@
+     s += (w.noGood <= CHOKE_V2_GATES.noGoodMax) ? 10 : (-3 * w.noGood);             // 必须硬垫的步数
+     s -= Math.max(0, w.hiBefore70Pct - CHOKE_V2_GATES.hiBefore70PctMax) * 0.4;      // 高压跑到 70% 之前
+     s += Math.min(w.early34Pct || 0, 40) * 0.6;                                     // 【v159】前期限压覆盖率：越高越好（封顶 40%）
++    s += Math.min(w.midLatePeak || 0, 4.5) * 8;                                     // 【v169】中后期峰窗：越高越好（硬门之外的择优键）
+     return s;
+   }
+ 
+@@ -7687,12 +8080,32 @@
+    * 分散选取（最远点采样 FPS）：随机起点，之后每次选"离已选点最远"的候选，
+    * 使障碍最大化分散、避免连续聚集。（minDist 仅作历史签名保留，未使用。）
+    */
++  var DISPERSED_MAXMIN = false;   // 【v174】false = 新的"随机 + 最小距离"（默认）；true = 旧的"最大化最小距离"（回退用）
+   function pickDispersed(cands, count, minDist) {
+     if (count <= 0 || !cands.length) return [];
+     var pool = cands.slice();
+     shuffle(pool); // 随机化：起点与并列打破都随机
+     count = Math.min(count, pool.length);
+     function cheby(a, b) { return Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c)); }
++    // 【v174】默认改成"随机顺序 + 最小距离约束"。
++    //   为什么：原实现是**最大化最小距离**（每次挑"离已选点最远"的点），而**离中心最远的地方永远是边角** →
++    //   于是冰/问号/黑块/锁链**系统性地被推到棋盘角落**。用户 2026-10-16 的观察正是这个：
++    //   「同一张目标图反复点生成关卡，总是在左上角田字方格、两个锁链各锁两个」。
++    //   新做法保持"彼此至少隔 minDist"（分散语义不变），但不再系统性地挑极端位置；距离不够时逐级放宽重试。
++    if (!DISPERSED_MAXMIN) {
++      var picked2 = [], used2 = {};
++      for (var d = minDist; d >= 0 && picked2.length < count; d--) {
++        for (var i2 = 0; i2 < pool.length && picked2.length < count; i2++) {
++          var k2 = pool[i2].r + ',' + pool[i2].c;
++          if (used2[k2]) continue;
++          var ok2 = true;
++          for (var j2 = 0; j2 < picked2.length; j2++) if (cheby(pool[i2], picked2[j2]) < d) { ok2 = false; break; }
++          if (!ok2) continue;
++          picked2.push(pool[i2]); used2[k2] = 1;
++        }
++      }
++      return picked2;
++    }
+ 
+     var picked = [pool[0]];
+     var used = {}; used[pool[0].r + ',' + pool[0].c] = true;
+@@ -7964,6 +8377,8 @@
+     applyBeatProps: applyBeatProps,       // 【v153】债务节拍→道具落位（冰/链）
+     midChokeOf: midChokeOf,               // 【v153】30~80% 区间内的卡点数（同档候选首选键）
+     enforceChainAdjacency: enforceChainAdjacency,   // 【v161】锁链相邻性修复（同组必须 4-邻接连通）；供体检/单测直接调用
++    midgameCapacitySqueeze: midgameCapacitySqueeze, // 【v172】切球层加压（中段成片吃不饱）；供单测直接调用
++    pressureBoostIce: pressureBoostIce,             // 【v170】冰当墙（定向锁免费选项）；供单测直接调用
+     chokeV2Of: chokeV2Of,                 // 【v157】卡点判据 v2（R1~R9）：全知线/玩家线各量一遍再取最差
+     chokeV2Violations: chokeV2Violations, // 【v157】违反项（空数组=达标）——页面每关日志与报告用
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）

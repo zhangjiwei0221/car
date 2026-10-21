@@ -1,0 +1,76 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4628,7 +4628,9 @@
+       boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: true,
+       // 【v238】目标车数也随棋盘走：36 是 7×7 的数字，放到 6×6（36 格）就是 100% 填满、一格空位都不剩。
+       targetCarCount: _boardAuto ? 36 : _targetCars0,
+-      valvePlan: true, valveMode: 'largest', valveIceSteps: 10,
++      // 【v254】阀门补冰关掉：它是"没有绑定能力时硬凑压力"的老补丁，会在排程之外
++      //   再往第 0 行塞 1~2 块冰（实测 6 个格子 4 块冰就是这么来的）。排程已能定点施压。
++      valvePlan: false, valveMode: 'largest', valveIceSteps: 10,
+       maxPipes: 1, pipeFloorCount: 1, pipeFallbackCount: 1,   // 【v228】管道只留 1 条
+       // 【v248】管道深度 2 → 6：实测 35×35（1225 px）在 6×7 盘上切出 34~37 盒，
+       //   而 42 格 - 配额墙 5 格 = 37 个位置，经常差 3~5 盒装不下；管道深度只有 2 → pipeCapacity 10/10 全灭。
+@@ -4646,10 +4648,10 @@
+       //   降到 10%（8~12）：约 4 块，第 0 行最多 1 块。
+       // 【v253】随机冰降到 0：冰只由「顺序闸门」（下面三项）和阀门补冰产生，不再随机撒。
+       // row0IceMax 必须 >= 排程数量：排程冻的就是「需求最早」的车，而它们在 v239 之后正好排在第 0 行。
+-      icePercent: 0, icePercentMin: 0, icePercentMax: 0, row0IceMax: 4,
++      icePercent: 0, icePercentMin: 0, icePercentMax: 0, row0IceMax: 2,
+       // 【v253·用户裁决】冰当"顺序闸门"：只冻开局就能装满的车，冻 3 辆、各滞后 2 步。
+       //   随机撒冰停用（icePercent 仍留一点做背景障碍）。
+-      iceSchedule: true, iceScheduleCount: 3, iceScheduleDelay: 4
++      iceSchedule: true, iceScheduleCount: 2, iceScheduleDelay: 3
+     });
+     try {
+       genLog('模式：容量 ' + _capMin + '~' + _capMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=253">
++  <link rel="stylesheet" href="css/style.css?v=254">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=253"></script>
+-  <script src="js/utils.js?v=253"></script>
++  <script src="js/zip.js?v=254"></script>
++  <script src="js/utils.js?v=254"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=253"></script>
+-  <script src="js/simulator.js?v=253"></script>
++  <script src="js/color-libs.js?v=254"></script>
++  <script src="js/simulator.js?v=254"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=253"></script>
+-  <script src="js/solver-strategy.js?v=253"></script>
+-  <script src="js/solver.js?v=253"></script>
+-  <script src="js/playersim.js?v=253"></script>
+-  <script src="js/generator.js?v=253"></script>
+-  <script src="js/analysis.js?v=253"></script>
++  <script src="js/anchor-cut.js?v=254"></script>
++  <script src="js/solver-strategy.js?v=254"></script>
++  <script src="js/solver.js?v=254"></script>
++  <script src="js/playersim.js?v=254"></script>
++  <script src="js/generator.js?v=254"></script>
++  <script src="js/analysis.js?v=254"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=253"></script>
+-  <script src="js/app.js?v=253"></script>
++  <script src="js/level-editor.js?v=254"></script>
++  <script src="js/app.js?v=254"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

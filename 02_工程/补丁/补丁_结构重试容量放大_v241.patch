@@ -1,0 +1,81 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4848,12 +4848,29 @@
+       GENPERF.boardMs += Date.now() - tb;
+       recordAttempt(stats, res);
+       last = res;
+-      if (!res.ok) continue;
++      if (!res.ok) {
++        // 【v241】结构重试：pipeCapacity 的真实含义是"车比格多"。
++        //   实测（40×40 / 6×7·7×7·6×8，seed 402/403/405/406/407）：切出 43~51 盒，
++        //   溢出 3~5 盒，而管道容量只有 2（1 条 × 深度 2）→ 直接判死。
++        //   处理：下一轮把容量放大 12%（车数随之少约 12%），只放大一次；
++        //   正常出关的候选不会走到这里，路径零影响。
++        if (res.reason === 'pipeCapacity' && !config._structScale) {
++          var _sMin0 = parseInt(config.boxSizeMin, 10) || 30;
++          var _sMax0 = parseInt(config.boxSizeMax, 10) || 40;
++          config = Object.assign({}, config, {
++            boxSizeMin: Math.round(_sMin0 * 1.12),
++            boxSizeMax: Math.round(_sMax0 * 1.12),
++            _structScale: 1.12
++          });
++        }
++        continue;
++      }
+       var ge = evaluateGeneration(res.solveResult, res.parsed, config);
+       var diff = computeDifficulty(res.solveResult, res.parsed, config, ge);
+       return {
+         level: res.level, valid: true, solveResult: res.solveResult, difficulty: diff,
+         generationEval: ge, config: config, retries: attempt, structural: res.structural,
++        structScale: config._structScale || null,   // 【v241】1.12 = 走的是"容量放大 12% 重试"这条路径
+         flow: 'new_fixed', flowStats: stats, candidateTiming: res.timing,
+         baselineSolution: res.baselineSolution, conservation: res.conservation,
+         blackStat: res.blackStat, pipeStat: res.pipeStat, bindStat: res.bindStat,
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=240">
++  <link rel="stylesheet" href="css/style.css?v=241">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=240"></script>
+-  <script src="js/utils.js?v=240"></script>
++  <script src="js/zip.js?v=241"></script>
++  <script src="js/utils.js?v=241"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=240"></script>
+-  <script src="js/simulator.js?v=240"></script>
++  <script src="js/color-libs.js?v=241"></script>
++  <script src="js/simulator.js?v=241"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=240"></script>
+-  <script src="js/solver-strategy.js?v=240"></script>
+-  <script src="js/solver.js?v=240"></script>
+-  <script src="js/playersim.js?v=240"></script>
+-  <script src="js/generator.js?v=240"></script>
+-  <script src="js/analysis.js?v=240"></script>
++  <script src="js/anchor-cut.js?v=241"></script>
++  <script src="js/solver-strategy.js?v=241"></script>
++  <script src="js/solver.js?v=241"></script>
++  <script src="js/playersim.js?v=241"></script>
++  <script src="js/generator.js?v=241"></script>
++  <script src="js/analysis.js?v=241"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=240"></script>
+-  <script src="js/app.js?v=240"></script>
++  <script src="js/level-editor.js?v=241"></script>
++  <script src="js/app.js?v=241"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

@@ -1,0 +1,97 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -5164,7 +5164,15 @@
+     var g = null;
+     try { g = simulatePlay(parsed, { policy: 'steady', rnd: (opts && opts.rnd) || function () { return 0; } }); } catch (e) { return null; }
+     if (!g) return null;
+-    if (g.won) return { buried: 0, stuck: 0, details: [], coveragePct: g.coveragePct };
++    // 峰窗先算（通关的局也要，后面排序要用）
++    var lm = null;
++    try {
++      if (AntSolver.Analysis && AntSolver.Analysis.chokepointAudit) {
++        var a0 = AntSolver.Analysis.chokepointAudit(g.samples || [], parsed.totalBoxes || 0, parsed.bufferLimit || 5);
++        if (a0 && a0.lateAt != null) lm = a0.lateMax;
++      }
++    } catch (e) { lm = null; }
++    if (g.won) return { buried: 0, stuck: 0, details: [], coveragePct: g.coveragePct, lateMax: lm, won: true };
+     var list = g.stuck || [], buried = 0, details = [];
+     for (var i = 0; i < list.length; i++) {
+       var s = list[i];
+@@ -5172,7 +5180,9 @@
+         buried++; details.push({ color: s.color, needLeft: s.needLeft, boardLeft: s.boardLeft });
+       }
+     }
+-    return { buried: buried, stuck: list.length, details: details, coveragePct: g.coveragePct };
++    // 【v183】顺手把这一局的**卡点区峰窗**带出来：生成时用它优先"稳健玩家也会被顶住"的候选。
++    //   这是不花额外开销的：这一局本来就要跑（为"被埋"计数）。
++    return { buried: buried, stuck: list.length, details: details, coveragePct: g.coveragePct, lateMax: lm, won: !!g.won };
+   }
+ 
+   /** 一关的 v2 指标：全知线 + 玩家线（+ 贪心线）各量一遍，再"取最差"合成一组判据值。 */
+@@ -5999,6 +6009,11 @@
+     var b = c && c.generationEval && c.generationEval.buried;
+     return (b && b.buried != null) ? b.buried : 0;
+   }
++  /** 【v183】候选的"稳健线峰窗"（同一局模拟顺带量出来的）；没量到返回 null。 */
++  function pressOfCand(c) {
++    var b = c && c.generationEval && c.generationEval.buried;
++    return (b && b.lateMax != null) ? b.lateMax : null;
++  }
+   function candBetter(b, a) {
+     if (a == null) return true;
+     var tb = candTier(b), ta = candTier(a);
+@@ -6010,6 +6025,10 @@
+     //   达标 > 未达标；都达标/都不达标时再比 v2 分（独木桥少、预算判断点多、硬垫步数少、高压不早爆）。
+     var vb = chokeV2Ok(b), va = chokeV2Ok(a);
+     if (vb !== va) return vb > va;
++    // 【v183】压力优先键：两条候选都过了上面两关时，优先"稳健玩家也会被顶住"的那个
++    //   （用已算好的那一局稳健模拟的卡点区峰窗；差 ≥0.5 才认，避免抖动）。
++    var pbP = pressOfCand(b), paP = pressOfCand(a);
++    if (pbP != null && paP != null && Math.abs(pbP - paP) >= 0.5) return pbP > paP;
+     var sb = chokeV2Score(b), sa = chokeV2Score(a);
+     if (sb !== sa) return sb > sa;
+     // 旧键保留（v151/v153）：30~80% 里有没有真卡点（有 > 无），再看曲线分/审核分
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=182">
++  <link rel="stylesheet" href="css/style.css?v=183">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=182"></script>
+-  <script src="js/utils.js?v=182"></script>
++  <script src="js/zip.js?v=183"></script>
++  <script src="js/utils.js?v=183"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=182"></script>
+-  <script src="js/simulator.js?v=182"></script>
++  <script src="js/color-libs.js?v=183"></script>
++  <script src="js/simulator.js?v=183"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=182"></script>
+-  <script src="js/solver-strategy.js?v=182"></script>
+-  <script src="js/solver.js?v=182"></script>
+-  <script src="js/playersim.js?v=182"></script>
+-  <script src="js/generator.js?v=182"></script>
+-  <script src="js/analysis.js?v=182"></script>
++  <script src="js/anchor-cut.js?v=183"></script>
++  <script src="js/solver-strategy.js?v=183"></script>
++  <script src="js/solver.js?v=183"></script>
++  <script src="js/playersim.js?v=183"></script>
++  <script src="js/generator.js?v=183"></script>
++  <script src="js/analysis.js?v=183"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=182"></script>
+-  <script src="js/app.js?v=182"></script>
++  <script src="js/level-editor.js?v=183"></script>
++  <script src="js/app.js?v=183"></script>
+ </body>
+ </html>

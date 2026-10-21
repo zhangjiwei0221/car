@@ -1,0 +1,76 @@
+--- a/bin/js/simulator.js
++++ b/bin/js/simulator.js
+@@ -348,6 +348,52 @@
+         if (rr < n && h[rr].k < h[m].k) m = rr;
+         if (m === i) break; var t = h[m]; h[m] = h[i]; h[i] = t; i = m; } }
+     return top;
++  }
++
++  // ===== 【2026-10-13 口径】目标像素的“圈” = 图形自身的轮廓层 =====
++  // 用户原话：“先选没被遮挡住的……沿着外框走，能识别到的就是未被遮挡住的。”
++  // 所以“圈”按【像素连通性】算，不按图片的几何边框算：
++  //   第 0 圈 = 与“外部连通的空白”相邻、或贴着图片边缘的像素（开局就能识别到的外框）；
++  //   第 k 圈 = 要先吃掉第 k-1 圈才露出来的像素。
++  // 只由 blocks / 尺寸 / 入口模式决定，开局算一次并缓存（同一关卡反复调用不重复计算）。
++  var _ringCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
++  function ringMaskOf(blocks, rows, cols, bottomOnly) {
++    var key = bottomOnly ? 1 : 0, per = null;
++    if (_ringCache) { per = _ringCache.get(blocks); if (per && per[key]) return per[key]; }
++    var N = rows * cols;
++    var ring = new Int32Array(N); ring.fill(-1);
++    var seedEmpty = AntSolver.outsideReachSeed(blocks, rows, cols, bottomOnly);   // 与外界连通的空白
++    var dirs4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++    var q = [], i, d, r, c;
++    for (r = 0; r < rows; r++) {
++      for (c = 0; c < cols; c++) {
++        if (blocks[r][c] <= 0) continue;
++        var ok = false;
++        if (bottomOnly) { if (r === rows - 1) ok = true; }
++        else if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) ok = true;
++        if (!ok) {
++          for (d = 0; d < 4; d++) {
++            var nr = r + dirs4[d][0], nc = c + dirs4[d][1];
++            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) { ok = true; break; }
++            if (seedEmpty[nr][nc]) { ok = true; break; }
++          }
++        }
++        if (ok) { ring[r * cols + c] = 0; q.push(r * cols + c); }
++      }
++    }
++    for (i = 0; i < q.length; i++) {
++      var id = q[i], cr = (id / cols) | 0, cc = id % cols, L = ring[id];
++      for (d = 0; d < 4; d++) {
++        var nr2 = cr + dirs4[d][0], nc2 = cc + dirs4[d][1];
++        if (nr2 < 0 || nr2 >= rows || nc2 < 0 || nc2 >= cols) continue;
++        if (blocks[nr2][nc2] <= 0) continue;
++        var id2 = nr2 * cols + nc2;
++        if (ring[id2] >= 0) continue;
++        ring[id2] = L + 1; q.push(id2);
++      }
++    }
++    if (_ringCache) { if (!per) { per = {}; _ringCache.set(blocks, per); } per[key] = ring; }
++    return ring;
+   }
+ 
+   // 每次取盒均按像素级动态依赖波消除：底→左→右→顶的入口优先；消一格即刷新其解锁区域。
+@@ -398,10 +444,16 @@
+       return rows - 1 - r;                               // 右：下→上（横向进入时由右向左）
+     }
+     function keyOf(r, c, source, depth) {
+-      var base = source * SOURCE_SPAN + depth * AREA + tieOf(r, c, source);
+-      // 手动模式仍以"离盒起点"优先；同起点距离内再遵循动态依赖波，保持原玩家口径。
+-      if (start) return (Math.abs(r - start.r) + Math.abs(c - start.c)) * (4 * SOURCE_SPAN) + base;
+-      return base;
++      // 【2026-10-13 口径·按图形轮廓分圈】目标像素选取顺序：
++      //   ① 圈号升序 —— 第 0 圈 = 开局就能识别到的外框（贴着外部连通空白/图片边缘的像素）；
++      //      外圈走完（或走完仍不够）才进第 1 圈。圈号按【像素连通性】算，见 ringMaskOf。
++      //   ② 圈内由下到上 —— 行号大的先（所以每圈都从它的“左下角”起步）
++      //   ③ 同行由左到右 —— 列号小的先
++      // 走到的格子取不到（颜色不符 / 还没露出来）就跳过，继续沿这圈走。
++      // 旧的起点距离 / 入口源 / 依赖波深度不再参与排序（start/source/depth 保留仅作兼容）。
++      var ring = ringMaskOf(blocks, rows, cols, bottomOnly);
++      var R = ring[r * cols + c]; if (R < 0) R = 0;
++      return R * (rows * cols + 1) + (rows - 1 - r) * cols + c;
+     }
+     function pushCandidate(r, c, source, depth) {
+       var id = r * cols + c, k = keyOf(r, c, source, depth);

@@ -1,0 +1,96 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -8504,12 +8504,48 @@
+     var total = 0; for (var oi = 0; oi < out.length; oi++) total += out[oi].count;
+     var pix = 0; for (var rr = 0; rr < R; rr++) for (var ccc = 0; ccc < C; ccc++) if (blocks[rr][ccc] > 0) pix++;
+     if (total !== pix) return null;   // 守恒不成立 → 落回默认
++    return out;
++  }
++
++  /**
++   * 【v218】清理"微型车"：容量 < minCount 的车，把它的像素并进同色的其它车（容量有空间的），
++   *   合并后总量守恒；实在并无可并（该色只有这一辆）就保留。
++   *   用户实测：合球切法会产出容量 1 的车，看起来像 bug。
++   */
++  function fixTinyBoxes(boxes, minCount) {
++    if (!boxes || boxes.length < 2 || !(minCount > 1)) return boxes;
++    var out = boxes.map(function (b) { return { color: b.color, count: b.count, layer: b.layer }; });
++    for (var pass = 0; pass < 3; pass++) {
++      var moved = false;
++      for (var i = out.length - 1; i >= 0; i--) {
++        if (out[i].count >= minCount) continue;
++        // 找同色、有空间的车（容量上限 = 同色最大容量或 48）
++        var cap = 48;
++        for (var j = 0; j < out.length; j++) if (out[j].color === out[i].color && out[j].count > cap) cap = out[j].count;
++        var need = out[i].count, donor = -1;
++        for (var k = 0; k < out.length; k++) {
++          if (k === i || out[k].color !== out[i].color) continue;
++          if (cap - out[k].count >= 1) { donor = k; break; }
++        }
++        if (donor < 0) continue;
++        var room = cap - out[donor].count;
++        var take = Math.min(room, need);
++        out[donor].count += take;
++        out[i].count -= take;
++        if (out[i].count <= 0) { out.splice(i, 1); }
++        moved = true;
++      }
++      if (!moved) break;
++    }
+     return out;
+   }
+ 
+   function pickBoxSplit(blocks, config) {
+     var boxes = pickBoxSplitRaw(blocks, config);
+-    return applyBoxPhase(boxes, config);
++    boxes = applyBoxPhase(boxes, config);
++    // 【v218】收尾清理微型车（<3px），避免出现容量 1 的车
++    try { boxes = fixTinyBoxes(boxes, Math.max(3, parseInt(config.boxSizeMin, 10) > 0 ? 3 : 3)); } catch (e) { }
++    return boxes;
+   }
+ 
+   function pickBoxSplitRaw(blocks, config) {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=217">
++  <link rel="stylesheet" href="css/style.css?v=218">
+ </head>
+ <body>
+   <header>
+@@ -859,20 +859,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=217"></script>
+-  <script src="js/utils.js?v=217"></script>
++  <script src="js/zip.js?v=218"></script>
++  <script src="js/utils.js?v=218"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=217"></script>
+-  <script src="js/simulator.js?v=217"></script>
++  <script src="js/color-libs.js?v=218"></script>
++  <script src="js/simulator.js?v=218"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=217"></script>
+-  <script src="js/solver-strategy.js?v=217"></script>
+-  <script src="js/solver.js?v=217"></script>
+-  <script src="js/playersim.js?v=217"></script>
+-  <script src="js/generator.js?v=217"></script>
+-  <script src="js/analysis.js?v=217"></script>
++  <script src="js/anchor-cut.js?v=218"></script>
++  <script src="js/solver-strategy.js?v=218"></script>
++  <script src="js/solver.js?v=218"></script>
++  <script src="js/playersim.js?v=218"></script>
++  <script src="js/generator.js?v=218"></script>
++  <script src="js/analysis.js?v=218"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=217"></script>
+-  <script src="js/app.js?v=217"></script>
++  <script src="js/level-editor.js?v=218"></script>
++  <script src="js/app.js?v=218"></script>
+ </body>
+ </html>

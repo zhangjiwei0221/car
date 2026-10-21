@@ -1,0 +1,79 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4588,7 +4588,7 @@
+     //   正是「容量跟着棋盘走」才成立的形态（工作日志 96）。棋盘不同，容量必须不同。
+     var out = Object.assign({}, cfg, preset, {
+       // 【v257】候选 2→3；早停要求"峰窗≥3.5 且 稳健≤70"，不再拿第一个勉强及格的收工
+-      candidateCount: 3, portfolioK: 8, timeBudgetMs: 25000, difficultyRounds: 2,
++      candidateCount: 4, portfolioK: 8, timeBudgetMs: 25000, difficultyRounds: 2,
+       earlyStopPeak: 3.5, earlyStopSteady: 70,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
+       goodV3: true, requireHardPass: false, seed: null,
+       designSweep: false, designDebt: false, // 【v224】单套参数，取消扫描（之前每张图跑 11 变体 × 6 候选 × 7 轮，太慢）
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -10896,6 +10896,17 @@
+           var _fr = (config && config.carFillRatio != null) ? +config.carFillRatio : 0.86;
+           var _rm = parseInt(_cfg.boardRowsMax, 10) || 0, _cm = parseInt(_cfg.boardColsMax, 10) || 0;
+           if (_rm > 0 && _cm > 0) applyFillRatio(_cfg, blocks, config, _rm, _cm, _fr);
++          // 【v258·用户问"自己定尺寸会生成多少候选"】固定尺寸时棋盘不变，
++          //   原来 8 次尝试只是在同一尺寸上重摇随机数 —— 多样性很差。
++          //   现在每次换一组"容量 ±8% / 冰排程 2~3 块 / 延迟 3~5 步"，8 次尝试才有真正的结构差异。
++          var _vseq = [[1.00, 2, 3], [1.06, 2, 4], [0.94, 3, 3], [1.12, 2, 5]][_pi % 4];
++          var _bmin0 = parseInt(_cfg.boxSizeMin, 10) || 33;
++          var _bmax0 = parseInt(_cfg.boxSizeMax, 10) || 39;
++          _cfg.boxSizeMin = Math.max(14, Math.round(_bmin0 * _vseq[0]));
++          _cfg.boxSizeMax = Math.max(_cfg.boxSizeMin + 4, Math.round(_bmax0 * _vseq[0]));
++          _cfg.iceScheduleCount = _vseq[1];
++          _cfg.iceScheduleDelay = _vseq[2];
++          _cfg._attemptVariant = { capScale: _vseq[0], iceCount: _vseq[1], iceDelay: _vseq[2] };
+         }
+         if (config && config.seed != null && !isNaN(+config.seed)) _cfg.seed = (+config.seed) + _pi;
+         var _o = flow === 'old' ? produce(blocks, _cfg) : produceFixed(blocks, _cfg, opts);
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=257">
++  <link rel="stylesheet" href="css/style.css?v=258">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=257"></script>
+-  <script src="js/utils.js?v=257"></script>
++  <script src="js/zip.js?v=258"></script>
++  <script src="js/utils.js?v=258"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=257"></script>
+-  <script src="js/simulator.js?v=257"></script>
++  <script src="js/color-libs.js?v=258"></script>
++  <script src="js/simulator.js?v=258"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=257"></script>
+-  <script src="js/solver-strategy.js?v=257"></script>
+-  <script src="js/solver.js?v=257"></script>
+-  <script src="js/playersim.js?v=257"></script>
+-  <script src="js/generator.js?v=257"></script>
+-  <script src="js/analysis.js?v=257"></script>
++  <script src="js/anchor-cut.js?v=258"></script>
++  <script src="js/solver-strategy.js?v=258"></script>
++  <script src="js/solver.js?v=258"></script>
++  <script src="js/playersim.js?v=258"></script>
++  <script src="js/generator.js?v=258"></script>
++  <script src="js/analysis.js?v=258"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=257"></script>
+-  <script src="js/app.js?v=257"></script>
++  <script src="js/level-editor.js?v=258"></script>
++  <script src="js/app.js?v=258"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

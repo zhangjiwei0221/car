@@ -1,0 +1,23 @@
+--- a/bin/js/simulator.js
++++ b/bin/js/simulator.js
+@@ -398,10 +398,16 @@
+       return rows - 1 - r;                               // 右：下→上（横向进入时由右向左）
+     }
+     function keyOf(r, c, source, depth) {
+-      var base = source * SOURCE_SPAN + depth * AREA + tieOf(r, c, source);
+-      // 手动模式仍以"离盒起点"优先；同起点距离内再遵循动态依赖波，保持原玩家口径。
+-      if (start) return (Math.abs(r - start.r) + Math.abs(c - start.c)) * (4 * SOURCE_SPAN) + base;
+-      return base;
++      // 【2026-10-13 口径·按圈】目标像素选取顺序（用户给例子确认过）：
++      //   ① 圈号升序 —— 第 0 圈 = 最外一圈；外圈整圈走完（或走完仍不够）才进下一圈。
++      //      圈号 = 到图片边缘的距离 = min(r, c, 行数-1-r, 列数-1-c)。
++      //      所以「往里一格」的像素不会插队：底行吃掉后 (行-1, 列+1) 虽然已可达，也要等整圈走完。
++      //   ② 圈内由下到上 —— 行号大的先
++      //   ③ 同行由左到右 —— 列号小的先
++      // 走到的格子若当前取不到（被挡/颜色不符），跳过、继续沿这圈走；下一个圈同样从它的左下角起步。
++      // 旧的起点距离/入口源/依赖波深度不再参与排序（source/depth/start 保留仅作兼容）。
++      var ring = Math.min(r, c, rows - 1 - r, cols - 1 - c);
++      return ring * (rows * cols + 1) + (rows - 1 - r) * cols + c;
+     }
+     function pushCandidate(r, c, source, depth) {
+       var id = r * cols + c, k = keyOf(r, c, source, depth);

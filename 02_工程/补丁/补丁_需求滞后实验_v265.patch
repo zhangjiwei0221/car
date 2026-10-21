@@ -1,0 +1,69 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -2951,6 +2951,16 @@
+     if (_dc) {
+       for (var dmi = 0; dmi < list.length; dmi++) list[dmi]._dm = demandAt(_dc, list[dmi].color, list[dmi].count);
+       list.sort(function (a, b) { return (a._dm - b._dm) || (a._seq - b._seq); });
++      // 【v265·用户目标】需求滞后 L：把整列车单循环左移 L 位再铺。
++      //   效果 = 每辆车都比"它该出现的时刻"早 L 步 → 前沿上常驻 L 辆吃不饱的车 → 持续债务。
++      //   注意：v2 那次"平移无效"的结论是在 _demandCurve 恒为 null（v253 前）时测的，
++      //   当时根本没按需求排序，平移当然没意义。这一轮排序是真的，值得重做。
++      var _lag = Math.max(0, Math.min(10, parseInt(config.fillLag, 10) || 0));
++      if (_lag > 0 && list.length > _lag + 2) {
++        var _rot = list.splice(0, _lag);
++        list = list.concat(_rot);
++        timing.fillLag = _lag;
++      }
+     }
+ 
+     // 单扫填球：空格→普通盒；管道本体→入队 1 个
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=264">
++  <link rel="stylesheet" href="css/style.css?v=265">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=264"></script>
+-  <script src="js/utils.js?v=264"></script>
++  <script src="js/zip.js?v=265"></script>
++  <script src="js/utils.js?v=265"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=264"></script>
+-  <script src="js/simulator.js?v=264"></script>
++  <script src="js/color-libs.js?v=265"></script>
++  <script src="js/simulator.js?v=265"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=264"></script>
+-  <script src="js/solver-strategy.js?v=264"></script>
+-  <script src="js/solver.js?v=264"></script>
+-  <script src="js/playersim.js?v=264"></script>
+-  <script src="js/generator.js?v=264"></script>
+-  <script src="js/analysis.js?v=264"></script>
++  <script src="js/anchor-cut.js?v=265"></script>
++  <script src="js/solver-strategy.js?v=265"></script>
++  <script src="js/solver.js?v=265"></script>
++  <script src="js/playersim.js?v=265"></script>
++  <script src="js/generator.js?v=265"></script>
++  <script src="js/analysis.js?v=265"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=264"></script>
+-  <script src="js/app.js?v=264"></script>
++  <script src="js/level-editor.js?v=265"></script>
++  <script src="js/app.js?v=265"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

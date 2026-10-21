@@ -1,0 +1,184 @@
+--- a/bin/js/simulator.js
++++ b/bin/js/simulator.js
+@@ -64,6 +64,37 @@
+     return best;
+   }
+ 
++  /**
++   * 【v143】暂存区同色多车「争用同色像素」时的取用次序 —— 单一来源，三处共用（本文件的
++   *   autoReleaseBuffer 与 settleStep、以及 playersim.js 的玩家模拟），避免留第二份规则副本。
++   *
++   * 用户 2026-10-15 定：「暂存区有两辆颜色为 A 的车，当目标区颜色 A 出来后，
++   * 应该先进【容量少的】那个」。于是主判据由原来的"距离优先"改为【剩余容量优先】：
++   *
++   *   ① 剩余容量（还差几个球）升序 —— 先装满的先走、先腾出槽位。两辆刚进暂存时剩余=容量，
++   *      就是字面上的"容量少的先"；已经装了一部分的按"还差多少"排，同样是"先装满先走"。
++   *   ② 平手 → 离各自暂存起点的最近可达同色像素更近者先（原口径，降级为第一平手判据）。
++   *   ③ 再平手 → 先进暂存的先（下标 / key），保证确定性。
++   *
++   * 瞬时连锁模式不走本函数：那边按用户 2026-08-03 的裁决严格【先进先得】。
++   *
++   * @param {Array} items 等价项数组，每项至少要有 need / progress
++   * @param {function} distOf (item, index) => 距离；无起点信息时返回 Infinity 即可（该键自动失效）
++   * @returns {Array<number>} items 的下标，按取用次序排列
++   */
++  function contendOrder(items, distOf) {
++    var n = items.length, idx = [], rem = [];
++    for (var i = 0; i < n; i++) {
++      idx.push(i);
++      var r = items[i].need - items[i].progress;
++      rem[i] = r > 0 ? r : Infinity;      // 已装满的排最后（调用方本来也会跳过它们）
++    }
++    var d = [];
++    for (var j = 0; j < n; j++) d[j] = (rem[j] === Infinity) ? Infinity : distOf(items[j], j);
++    idx.sort(function (a, b) { return (rem[a] - rem[b]) || (d[a] - d[b]) || (a - b); });
++    return idx;
++  }
++
+   // ---- 棋盘 cell 深拷贝 ----
+   function cloneCell(cell) {
+     if (cell == null) return null;
+@@ -846,18 +877,20 @@
+     var changed = true;
+     while (changed) {
+       changed = false;
+-      // 1) 推进每个暂存球的消除。手动游玩：按【距离优先】(离各自起点最近可达同色像素更近者先消)，
++      // 1) 推进每个暂存球的消除。取用次序见 contendOrder（v143：剩余容量少的先）。
+       //    每球用自己的起点(slot 映射)取像素；求解器/生成：按暂存序、最底最左。
+       var order = [];
+       for (var i = 0; i < s.buffer.length; i++) order.push(i);
+       // 瞬时连锁模式：严格【先进先得】（用户 2026-08-03 裁决 + 需求 §四）。
+       // 暂存数组本身就是进入顺序，因此这里不做任何重排；前一个同色订单未完成且无可达同色时，
+       // 后进入的同色订单也不会越过它抢像素——因为轮到它时可达同色集合已经为空。
++      // 【v143】取用次序改由 contendOrder 统一给（剩余容量少的先 → 距离近的先 → 先进暂存的先）。
++      //   原实现是"距离优先"；本次按用户裁决把主判据换成剩余容量，距离降为第一平手判据。
+       if (s.instantChain) { /* 保持 buffer 原序 = 进入顺序 */ }
+-      else if (s.useSlotStart && s.buffer.length > 1) {   // 单球无需排序，省去 peek 开销
+-        var distCache = {};
+-        for (var oi = 0; oi < order.length; oi++) { var bi = s.buffer[order[oi]]; distCache[order[oi]] = (bi.need - bi.progress) > 0 ? peekNearestDist(s, bi.color, bi.start) : Infinity; }
+-        order.sort(function (a, b) { return (distCache[a] - distCache[b]) || (a - b); });
++      else if (s.buffer.length > 1) {   // 单球无需排序，省去 peek 开销
++        order = contendOrder(s.buffer, function (bi) {
++          return (s.useSlotStart && bi.start) ? peekNearestDist(s, bi.color, bi.start) : Infinity;
++        });
+       }
+       for (var od = 0; od < order.length; od++) {
+         var item = s.buffer[order[od]];
+@@ -1003,7 +1036,7 @@
+    * @returns {{eaten:number, released:number, over:boolean}}
+    *
+    * 争抢次序沿用 `autoReleaseBuffer` 的既有口径，不另立一套：
+-   *   瞬时连锁 → 严格先进先得（buffer 原序）；其余 → 距离优先（离各自暂存槽起点最近的先消）。
++   *   瞬时连锁 → 严格先进先得（buffer 原序）；其余 → 【剩余容量少的先】（contendOrder，v143 改）。
+    */
+   function settleStep(dtMs, ratePerSec) {
+     if (!state || state.gameOver) return { eaten: 0, released: 0, over: true };
+@@ -1029,14 +1062,12 @@
+     // 与 autoReleaseBuffer 同一排序口径
+     var order = [];
+     for (var oi = 0; oi < s.buffer.length; oi++) order.push(oi);
++    // 【v143】与 autoReleaseBuffer 同一口径（contendOrder，单一来源）：剩余容量少的先。
+     if (s.instantChain) { /* 先进先得：保持 buffer 原序 */ }
+-    else if (s.useSlotStart && s.buffer.length > 1) {
+-      var distCache = {};
+-      for (var di = 0; di < order.length; di++) {
+-        var bi = s.buffer[order[di]];
+-        distCache[order[di]] = (bi.need - bi.progress) > 0 ? peekNearestDist(s, bi.color, bi.start) : Infinity;
+-      }
+-      order.sort(function (a, b) { return (distCache[a] - distCache[b]) || (a - b); });
++    else if (s.buffer.length > 1) {
++      order = contendOrder(s.buffer, function (bi) {
++        return (s.useSlotStart && bi.start) ? peekNearestDist(s, bi.color, bi.start) : Infinity;
++      });
+     }
+ 
+     // 逐盒吃掉本次预算。**一次只吃 1 像素再轮到下一盒** → 多盒交替推进，
+@@ -1365,6 +1396,8 @@
+     // 【v141】锁链组是否被「组内某成员的数字冰」锁着 —— 供界面把"同组陪锁"的格子也灰显
+     //   （否则它看着正常、点下去却毫无反应，正是本工程一直想避免的那种手感问题）。
+     isChainLocked: isChainLocked,
++    // 【v143】暂存区同色多车争用次序（剩余容量少的先）—— 供 playersim 复用，避免第二份规则副本
++    contendOrder: contendOrder,
+     getNextSlotStart: getNextSlotStart, previewNextEliminationOrder: previewNextEliminationOrder,
+     computeReach: computeReach, isPickable: isPickable, isExposedAt: isExposedAt,
+     createState: createState, processAntBox: processAntBox, autoReleaseBuffer: autoReleaseBuffer,
+--- a/bin/js/playersim.js
++++ b/bin/js/playersim.js
+@@ -8,7 +8,7 @@
+  *
+  * 起点规则：暂存槽 i(0..limit-1) → 目标图 (row0, col=floor(i/limit*cols))；
+  *   起点【固定】为暂存槽映射位置(不随消除移动)；每次取"离该固定起点最短距离(曼哈顿)"的可达同色像素。
+- *   同色多球共享像素池，按【距离优先】(离各自固定起点更近者先取；平手按先放先取)每 tick 各取1个。
++ *   同色多球共享像素池，按【剩余容量少的先】取用（v143；规则本体在 Simulator.contendOrder）。
+  *   异色并发，仅通过可达性耦合。可达性用【局部增量刷新】：消一个像素只通知其4邻居。
+  */
+ var AntSolver = AntSolver || {};
+@@ -554,11 +554,19 @@
+         tickSettleSweeps = settleRounds;
+       } else {
+         // ===== 原口径(1 tick：每球各吃1像素) =====
+-        // 【距离优先】：谁的最近可达同色像素更近谁先取(而非先放先取)；平手按入列先后(key)。
+-        // 同色多球共享像素池 → 更近起点的球抢到争用像素；异色互不争用。
+-        var order = balls.slice();
+-        for (var od = 0; od < order.length; od++) order[od]._d = order[od].progress >= order[od].need ? Infinity : peekNearestDist(order[od].color, order[od].ar, order[od].ac);
+-        order.sort(function (a, b) { return (a._d - b._d) || (a.key - b.key); });
++        // 【v143·剩余容量优先】同色多球共享像素池时的取用次序（用户 2026-10-15 定：
++        //   「两辆同色的车在暂存区，目标图那颜色出来后应该先进容量少的那个」）。
++        //   **规则本体在 Simulator.contendOrder，单一来源**，这里只传"距离"这个平手判据，
++        //   不再自带一份排序（本文件过去就因为自带第二份排序踩过口径分裂的坑）。
++        //   次序：剩余容量升序 → 离各自起点最近可达同色像素升序 → 先进暂存者（下标=key 序）。
++        var order = [];
++        if (Sim.contendOrder) {
++          var ordIdx = Sim.contendOrder(balls, function (b) { return peekNearestDist(b.color, b.ar, b.ac); });
++          for (var oq = 0; oq < ordIdx.length; oq++) order.push(balls[ordIdx[oq]]);
++        } else {
++          order = balls.slice();
++          order.sort(function (a, b) { return ((a.need - a.progress) - (b.need - b.progress)) || (a.key - b.key); });
++        }
+         for (var oi = 0; oi < order.length; oi++) {
+           var ball = order[oi];
+           if (ball.progress >= ball.need) continue;
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v142·结果表实时刷新</title>
+-  <link rel="stylesheet" href="css/style.css?v=142">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v143·同色取用改容量优先</title>
++  <link rel="stylesheet" href="css/style.css?v=143">
+ </head>
+ <body>
+   <header>
+@@ -811,18 +811,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=142"></script>
+-  <script src="js/utils.js?v=142"></script>
+-  <script src="js/simulator.js?v=142"></script>
+-  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=142"></script>
+-  <script src="js/solver-strategy.js?v=142"></script>
+-  <script src="js/solver.js?v=142"></script>
+-  <script src="js/playersim.js?v=142"></script>
+-  <script src="js/generator.js?v=142"></script>
+-  <script src="js/analysis.js?v=142"></script>
++  <script src="js/zip.js?v=143"></script>
++  <script src="js/utils.js?v=143"></script>
++  <script src="js/simulator.js?v=143"></script>
++  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
++  <script src="js/anchor-cut.js?v=143"></script>
++  <script src="js/solver-strategy.js?v=143"></script>
++  <script src="js/solver.js?v=143"></script>
++  <script src="js/playersim.js?v=143"></script>
++  <script src="js/generator.js?v=143"></script>
++  <script src="js/analysis.js?v=143"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=142"></script>
+-  <script src="js/app.js?v=142"></script>
++  <script src="js/level-editor.js?v=143"></script>
++  <script src="js/app.js?v=143"></script>
+ </body>
+ </html>

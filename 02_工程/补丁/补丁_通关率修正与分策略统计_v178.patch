@@ -1,0 +1,242 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -6310,17 +6310,27 @@
+   function genLogPlayBatch(level) {
+     try {
+       if (!level) return;
+-      var b = playBatchReport(AntSolver.parseLevel(level), 16);
++      var b = playBatchReport(AntSolver.parseLevel(level), 18);
+       if (!b) return;
+       var f = function (x) { return x == null ? '-' : x; };
+       var spread = (b.lateMax.max != null && b.lateMax.min != null) ? +(b.lateMax.max - b.lateMax.min).toFixed(1) : null;
+-      genLog('　　玩16遍　峰窗 ' + f(b.lateMax.min) + '~' + f(b.lateMax.max) + '（均 ' + f(b.lateMax.mean) +
+-        '）· 通关 ' + b.finish.win + '/' + b.n +
+-        ' · 结束：收尾 ' + b.finish.tail + ' / 中段 ' + b.finish.mid + ' / 前段 ' + b.finish.front +
+-        (spread != null && spread >= 1.5 ? ('　⚠ 波动 ' + spread + ' 个点 = 看运气') : ''),
+-        (spread != null && spread >= 1.5) ? 'gen-log-warn' : 'gen-log-ok');
++      genLog('　　玩' + b.n + '遍　' + policyLineOf(b) +
++        ' · 峰窗 ' + f(b.lateMax.min) + '~' + f(b.lateMax.max) + '（均 ' + f(b.lateMax.mean) + '）' +
++        (spread != null && spread >= 1.5 ? (' ⚠ 波动 ' + spread + ' 个点=看运气') : '') +
++        (b.spreadPct != null && b.spreadPct >= 50 ? (' ⚠ 策略差 ' + b.spreadPct + ' 个点=稳健玩家被坑') : ''),
++        (b.steadyWonPct != null && b.steadyWonPct < 50) || (b.spreadPct != null && b.spreadPct >= 50)
++          ? 'gen-log-warn' : 'gen-log-ok');
+     } catch (ePB) { /* 度量失败不影响生产 */ }
+   }
++  /** 「稳健 5/6 · 冒险 3/6 · 乱点 4/6」——按玩家类型分开报，别把不同打法混成一个数。 */
++  function policyLineOf(b) {
++    var names = { steady: '稳健', bold: '冒险', random: '乱点' };
++    var out = [];
++    (b.byPolicy || []).forEach(function (x) {
++      out.push((names[x.policy] || x.policy) + ' ' + x.won + '/' + x.n);
++    });
++    return out.join(' · ') || ('通关 ' + (b.finish ? b.finish.win : '?') + '/' + b.n);
++  }
+   function auditV2OfLevel(lv, em) {
+     var omni = null, pl = null;
+     try { omni = solveByEntryMode(lv, em); } catch (e) { omni = null; }
+@@ -6425,6 +6435,9 @@
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+       var pb = r.level.playBatch || null;                                                   // 【v177】16 遍波动
+       var pbSpread = (pb && pb.lateMax.max != null && pb.lateMax.min != null) ? +(pb.lateMax.max - pb.lateMax.min).toFixed(1) : null;
++      var pbBad = !!(pb && ((pb.steadyWonPct != null && pb.steadyWonPct < 50) ||
++                            (pb.spreadPct != null && pb.spreadPct >= 50) ||
++                            (pbSpread != null && pbSpread >= 1.5)));
+       var pair = function (a, b) { return (a == null ? '-' : a) + ' / ' + (b == null ? '-' : b); };
+       var td = function (txt, bad, extra) {
+         return '<td style="padding:3px 6px;border:1px solid #5a4636' +
+@@ -6448,10 +6461,11 @@
+              : '（关掉v2时不测）', !!(gd && gd.pipeBetWhileFull)) +
+         td(pb ? ((pb.lateMax.min == null ? '-' : pb.lateMax.min) + '~' + (pb.lateMax.max == null ? '-' : pb.lateMax.max) +
+              '（均 ' + (pb.lateMax.mean == null ? '-' : pb.lateMax.mean) + '）' +
+-             '<br><span style="color:#8a7358">通关 ' + pb.finish.win + '/' + pb.n +
+-             ' · 收尾' + pb.finish.tail + ' 中段' + pb.finish.mid + ' 前段' + pb.finish.front + '</span>' +
+-             (pbSpread != null && pbSpread >= 1.5 ? '<br><span style="color:#e0592c">波动 ' + pbSpread + ' 个点=看运气</span>' : ''))
+-             : '-', !!(pbSpread != null && pbSpread >= 1.5)) +
++             '<br>' + policyLineOf(pb) +
++             '<br><span style="color:#8a7358">卡死：中段' + pb.finish.mid + ' 前段' + pb.finish.front + '</span>' +
++             (pbSpread != null && pbSpread >= 1.5 ? '<br><span style="color:#e0592c">波动 ' + pbSpread + ' 个点=看运气</span>' : '') +
++             (pb.spreadPct != null && pb.spreadPct >= 50 ? '<br><span style="color:#e0592c">策略差 ' + pb.spreadPct + ' 个点=稳健被坑</span>' : ''))
++             : '-', pbBad) +
+         td(ok ? '✓ 通过' : '✗ ' + r.violations.join('、'), !ok) +
+         '</tr>';
+     });
+@@ -6471,7 +6485,7 @@
+ 
+   function exportChokeAuditCSV() {
+     if (!lastChokeAudit || !lastChokeAudit.length) return;
+-    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,波动峰窗最小,波动峰窗最大,波动峰窗均值,波动峰窗中位,波动局数,波动通关数,波动收尾,波动中段,波动前段,独木桥位置,参考门,违反项,难度分'];
++    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,波动局数,稳健通关%,最好通关%,最差通关%,策略差%,波动峰窗最小,波动峰窗最大,波动峰窗均值,波动峰窗中位,卡死中段,卡死前段,独木桥位置,参考门,违反项,难度分'];
+     var lines = head;
+     lastChokeAudit.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+@@ -6487,10 +6501,11 @@
+         V(gd ? gd.lateMax : null), V(gd ? gd.pads : null), V(gd ? gd.pipeBets : null),
+         V(gd ? gd.pipeBetWhileFull : null), V(gd ? gd.coveragePct : null),
+         '"' + (gd ? (gd.won ? '走通' : '收尾卡死') : '') + '"',
++        V(pb ? pb.n : null), V(pb ? pb.steadyWonPct : null), V(pb ? pb.bestWonPct : null),
++        V(pb ? pb.worstWonPct : null), V(pb ? pb.spreadPct : null),
+         V(pb && pb.lateMax ? pb.lateMax.min : null), V(pb && pb.lateMax ? pb.lateMax.max : null),
+         V(pb && pb.lateMax ? pb.lateMax.mean : null), V(pb && pb.lateMax ? pb.lateMax.p50 : null),
+-        V(pb ? pb.n : null), V(pb ? pb.finish.win : null),
+-        V(pb ? pb.finish.tail : null), V(pb ? pb.finish.mid : null), V(pb ? pb.finish.front : null),
++        V(pb ? pb.finish.mid : null), V(pb ? pb.finish.front : null),
+         '"' + ((o && o.bridgeAt.length) ? o.bridgeAt.join('/') + '%' : '') +
+           ((p && p.bridgeAt.length) ? (' 玩家:' + p.bridgeAt.join('/') + '%') : '') + '"',
+         (r.violations.length ? '不通过' : '通过'), '"' + r.violations.join('、') + '"', V(r.difficulty)
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4745,8 +4745,15 @@
+     } catch (e) { /* 回放中断：用已采到的部分，不伪造 */ }
+     if (!order.length) return null;
+     var total = parsed.totalBoxes || 0;
++    // 【v177 修正】胜负**不能只看 `st.gameWon`**：求解器走的 `Simulator.applyPick` 不调 checkWinLose
++    //   （只有手点入口 pickBox 会），所以"像素全消完"这一局 gameWon 仍是 false。
++    //   实测小鹿：40/40 盒、1105/1105 像素、暂存 0，却 gameWon=false —— 上一版因此把"通关"误报成"收尾卡死"。
++    //   正确口径 = 像素全消（与 PlayerSim 第 632 行同一判据）。
++    var cleared = !!(st.eliminatedPixels != null && st.totalPixels != null && st.totalPixels > 0
++                     && st.eliminatedPixels >= st.totalPixels);
+     return {
+-      pickOrder: order, samples: samples, won: !!st.gameWon, gameOver: !!st.gameOver,
++      pickOrder: order, samples: samples, won: (!!st.gameWon || cleared), cleared: cleared,
++      gameOver: !!st.gameOver,
+       steps: order.length, completedBoxes: st.completedBoxes || 0,
+       coveragePct: total ? Math.round((st.completedBoxes || 0) / total * 100) : 0,
+       pads: pads, pipeBets: pipeBets, pipeBetBufMax: pipeBetBufMax, pipeBetWhileFull: pipeBetWhileFull,
+@@ -4776,39 +4783,57 @@
+    */
+   function chokeV2PlayBatch(parsed, opts) {
+     opts = opts || {};
+-    var n = Math.max(1, Math.min(opts.n || 16, 200));
++    var per = Math.max(1, Math.min(opts.perPolicy != null ? opts.perPolicy : (opts.n ? Math.ceil(opts.n / 3) : 6), 40));
++    var policies = opts.policies || ['steady', 'bold', 'random'];
+     var seed = (opts.seed != null ? opts.seed : 20261017) >>> 0;
+-    var policies = opts.policies || ['steady', 'steady', 'bold', 'random'];
+     var s = seed || 1;
+     function rnd() { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }
+     var A = AntSolver.Analysis;
+     var total = parsed.totalBoxes || 0, lim = parsed.bufferLimit || 5;
+-    var runs = [], i;
+-    for (i = 0; i < n; i++) {
+-      var pol = policies[i % policies.length];
+-      var g = null;
+-      try { g = simulatePlay(parsed, { policy: pol, rnd: rnd }); } catch (e) { g = null; }
+-      if (!g) continue;
+-      var a = null;
+-      try { a = (A && A.chokepointAudit) ? A.chokepointAudit(g.samples || [], total, lim) : null; } catch (e) { a = null; }
+-      runs.push({
+-        policy: pol, won: !!g.won, coveragePct: g.coveragePct, steps: g.steps,
+-        pads: g.pads, pipeBets: g.pipeBets, pipeBetWhileFull: g.pipeBetWhileFull,
+-        peakBuf: a ? a.peakBuf : 0,
+-        // 覆盖 <30% 就跑死的局，卡点区根本没有样本 → 记 null（不当 0 混进 min/mean，否则"波动"里全是假的 0）
+-        lateMax: (a && g.coveragePct >= 30) ? a.lateMax : null
+-      });
++    var runs = [], pi, i;
++    for (pi = 0; pi < policies.length; pi++) {
++      for (i = 0; i < per; i++) {
++        var g = null;
++        try { g = simulatePlay(parsed, { policy: policies[pi], rnd: rnd }); } catch (e) { g = null; }
++        if (!g) continue;
++        var a = null;
++        try { a = (A && A.chokepointAudit) ? A.chokepointAudit(g.samples || [], total, lim) : null; } catch (e) { a = null; }
++        runs.push({
++          policy: policies[pi], won: !!g.won, coveragePct: g.coveragePct, steps: g.steps,
++          pads: g.pads, pipeBets: g.pipeBets, pipeBetWhileFull: g.pipeBetWhileFull,
++          peakBuf: a ? a.peakBuf : 0,
++          // 卡点区根本没有样本的局（早死 / 样本没落进窗口）→ 记 null，不当 0 混进 min/mean（否则"波动"里全是假的 0）。
++          //   `lateAt` 是审核函数在窗口里真正扫到位置才会填的字段，比"覆盖≥30%"更准。
++          lateMax: (a && a.lateAt != null) ? a.lateMax : null
++        });
++      }
+     }
+     if (!runs.length) return null;
+-    function stat(key) {
+-      var v = [], k;
+-      for (k = 0; k < runs.length; k++) if (runs[k][key] != null) v.push(runs[k][key]);
++    function stat(key, arr) {
++      var src = arr || runs, v = [], k;
++      for (k = 0; k < src.length; k++) if (src[k][key] != null) v.push(src[k][key]);
+       if (!v.length) return { min: null, max: null, mean: null, p50: null };
+       v.sort(function (a2, b2) { return a2 - b2; });
+       var sum = 0;
+       for (k = 0; k < v.length; k++) sum += v[k];
+       return { min: v[0], max: v[v.length - 1], mean: +(sum / v.length).toFixed(2), p50: v[Math.floor(v.length / 2)] };
+     }
++    // 【v177.1】按玩家类型分开统计：**稳健玩家通关率**才是"这关能不能过"的主指标；
++    //   各类型之间的差（spreadPct）说明"这关是不是吃策略"——差值大 = 稳健玩家被坑、乱走反而能过。
++    var byPolicy = [];
++    for (pi = 0; pi < policies.length; pi++) {
++      var pr = runs.filter(function (r) { return r.policy === policies[pi]; });
++      if (!pr.length) continue;
++      var w = 0, covSum = 0, padSum = 0, k;
++      for (k = 0; k < pr.length; k++) { if (pr[k].won) w++; covSum += pr[k].coveragePct; padSum += pr[k].pads; }
++      byPolicy.push({
++        policy: policies[pi], n: pr.length, won: w,
++        wonRatePct: Math.round(w / pr.length * 100),
++        coveragePct: Math.round(covSum / pr.length),
++        padsMean: +(padSum / pr.length).toFixed(2),
++        lateMax: stat('lateMax', pr)
++      });
++    }
+     var finish = { win: 0, tail: 0, mid: 0, front: 0 };
+     for (i = 0; i < runs.length; i++) {
+       var r = runs[i];
+@@ -4817,8 +4842,14 @@
+       else if (r.coveragePct >= 30) finish.mid++;
+       else finish.front++;
+     }
++    var rates = byPolicy.map(function (b) { return b.wonRatePct; });
++    var steady = byPolicy.length ? byPolicy[0] : null;
+     return {
+-      n: runs.length, seed: seed, policies: policies,
++      n: runs.length, perPolicy: per, seed: seed, policies: policies, byPolicy: byPolicy,
++      steadyWonPct: steady ? steady.wonRatePct : null,          // 主指标：稳健玩家通关率
++      bestWonPct: rates.length ? Math.max.apply(null, rates) : null,
++      worstWonPct: rates.length ? Math.min.apply(null, rates) : null,
++      spreadPct: rates.length ? Math.max.apply(null, rates) - Math.min.apply(null, rates) : null,
+       wonRatePct: Math.round(finish.win / runs.length * 100),
+       lateMax: stat('lateMax'), peakBuf: stat('peakBuf'),
+       pads: stat('pads'), pipeBets: stat('pipeBets'),
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=177">
++  <link rel="stylesheet" href="css/style.css?v=178">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=177"></script>
+-  <script src="js/utils.js?v=177"></script>
++  <script src="js/zip.js?v=178"></script>
++  <script src="js/utils.js?v=178"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=177"></script>
+-  <script src="js/simulator.js?v=177"></script>
++  <script src="js/color-libs.js?v=178"></script>
++  <script src="js/simulator.js?v=178"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=177"></script>
+-  <script src="js/solver-strategy.js?v=177"></script>
+-  <script src="js/solver.js?v=177"></script>
+-  <script src="js/playersim.js?v=177"></script>
+-  <script src="js/generator.js?v=177"></script>
+-  <script src="js/analysis.js?v=177"></script>
++  <script src="js/anchor-cut.js?v=178"></script>
++  <script src="js/solver-strategy.js?v=178"></script>
++  <script src="js/solver.js?v=178"></script>
++  <script src="js/playersim.js?v=178"></script>
++  <script src="js/generator.js?v=178"></script>
++  <script src="js/analysis.js?v=178"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=177"></script>
+-  <script src="js/app.js?v=177"></script>
++  <script src="js/level-editor.js?v=178"></script>
++  <script src="js/app.js?v=178"></script>
+ </body>
+ </html>

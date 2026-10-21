@@ -1,0 +1,20 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6298,14 +6298,14 @@
+     if (early == null || early > 2.0) fails.push('前期峰窗>2');
+     if (midLate == null || midLate < 3.2 || midLate > 4.8) fails.push('峰窗不在3.2~4.8');
+     if (steadyGap == null || steadyGap > 17) fails.push('稳打落后>17');
+-    // 【v199·用户裁决 2】以原版 choke v2 为准：无满解（硬垫）> 3 步判不合格。
+-    //   理由：原版 CHOKE_V2_GATES.noGoodMax = 3；v198 的 seed 404 硬垫 5 步却被 goodV3 放过，两套判据打架。
++    // 【v200·用户裁决 B】验收回到原版真实口径：`curveOK`（有卡点 + 前期不出卡点 + 不触死亡边界），
++    //   已在上面「峰窗 3.2~4.8 / 前期≤2 / 可解」三条里完整体现，**不再把"硬垫≤3"当硬门**。
++    //   硬垫（noGood）保留为**排序/参考指标**（原版就是拿它当 choke v2 的打分键，不是验收线）。
+     var _v2 = null, _noGood = null;
+     try {
+       _v2 = (cand.generationEval && cand.generationEval.auditV2) ? cand.generationEval.auditV2 : chokeV2OfCand(cand);
+       _noGood = (_v2 && _v2.worst) ? _v2.worst.noGood : null;
+     } catch (e) { _noGood = null; }
+-    if (_noGood == null || _noGood > 3) fails.push('硬垫>3');
+     return {
+       pass: fails.length === 0, fails: fails,
+       steadyWonPct: steady, spreadPct: spread, bestWonPct: bestWon, steadyGap: steadyGap, buried: buried,

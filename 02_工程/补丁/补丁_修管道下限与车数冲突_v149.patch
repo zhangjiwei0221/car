@@ -1,0 +1,85 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3591,8 +3591,9 @@
+         lastFailReason: 'fragmentGateBlocked'
+       };
+     }
+-    // 【v145】棋盘自适应（用户 2026-10-15）：默认由车数反推行列范围，不再要用户先填。
+-    if (config.boardAuto !== false) config = applyAutoBoardRange(blocks, config);
++    // 【v145/v149】开工前把互相打架的参数调相容：管道下限撑不起车数就降下来（两种模式都做），
++    //   棋盘范围默认由车数反推（仅自适应模式）。
++    config = applyAutoBoardRange(blocks, config);
+     // 【v137】棋盘范围 × 车数 预检（用户 2026-10-14 批准）。
+     //   与上面两个前门同一位置、同一返回结构：命中「必然淘汰」时直接判结构不适配、不进候选、不烧时间预算，
+     //   并把原因与建议写进 structural.reason（→ 逐关记录的「错误」字段，页面日志同一条）。
+@@ -5916,6 +5917,32 @@
+   }
+ 
+   /**
++   * 【v149】管道下限的相容性检查：**车数少到装不下那么多管道时，自动把它降到撑得起来的值**。
++   *
++   * 症状（v148 实测，硬证据）：27×32 那张图用锚点切只切出 **14 辆车**，配「管道下限 4 条 + 单管最少 4 盒」
++   *   → 要 4×4 = **16 个溢出盒**，可总共才 14 辆车 → **20/20 候选全部栽在结构层 `usablePipeShort`**。
++   *   同配置换趋势切（16 辆车）勉强能过 —— 所以用户看到的是"换个切盒方式就产不出关了"。
++   *
++   * 为什么是"降到能凑出来的最大值"而不是"报错"：管道装的是【溢出】，车少时本来就没什么可溢出的；
++   *   这跟 v145「棋盘自适应」是同一个思路 —— **参数互相打架时自动调成相容，并如实告知**，而不是让整批全灭。
++   *   生成器本来就有"低于绝对下限就直接去除管道"的设计（pipeFloorCount），本函数只是把它【提前到选盘之前】。
++   *
++   * 判据：要求溢出不超过总车数的一半（板上至少留一半车），
++   *   而 P 条管道每条至少 fill 个盒 ⇒ 溢出 ≥ P×fill  ⇒  P ≤ ⌊(cars/2) / fill⌋。
++   *   例：14 车 / fill 4 → 最多 1 条；52 车 → 6 条；76 车 → 9 条（这两种不受影响，口径不变）。
++   *
++   * @returns {object|null} null = 本来就不冲突（口径不变）
++   */
++  function clampPipeDemand(cars, config) {
++    var mp = parseInt(config && config.minPipes, 10) || 0;
++    if (mp <= 0) return null;                       // 本来就没要求管道
++    var fill = Math.max(1, pipeMinFillOf(config));
++    var maxPipes = Math.floor((cars / 2) / fill);
++    if (mp <= maxPipes) return null;                // 撑得起来 → 不动
++    return { from: mp, to: Math.max(0, maxPipes), cars: cars, fill: fill };
++  }
++
++  /**
+    * 【v145】棋盘自适应：不用你填行列范围，由「这张图切出多少辆车」直接反推。
+    *
+    * 用户 2026-10-15 原话：「我觉得他这个比如失败的时候，说『棋盘的范围跟这个车子的数量不匹配』，
+@@ -5929,16 +5956,23 @@
+    * 反推失败（切不出车）时原样返回，交回原有兜底。
+    */
+   function applyAutoBoardRange(blocks, config) {
+-    if (!config || config.boardAuto === false) return config;   // 手动模式：原样
++    if (!config) return config;
+     if (!blocks || !blocks.length || !blocks[0]) return config;
+     var sc = null;
+     try { sc = sampleCarCount(blocks, config); } catch (e) { sc = null; }
+     if (!sc) return config;
+-    var r = suggestBoardRange(sc.nMed, config);
+-    if (!r) return config;
+-    var o = withBoardRange(config, r);
+-    o._autoBoardRange = { cars: sc.nMed, carsMin: sc.nMin, carsMax: sc.nMax, range: r };
+-    return o;
++    var o = config;
++    // ① 【v149】管道下限相容性：**与 boardAuto 无关，两种模式都做**
++    //    —— 这是"参数自相矛盾"，不是尺寸偏好问题；手填棋盘范围也一样会全灭。
++    var clamp = clampPipeDemand(sc.nMed, o);
++    if (clamp) { o = Object.assign({}, o, { minPipes: clamp.to, _autoPipeClamp: clamp }); }
++    // ② 【v145】棋盘自适应（只在这一档开启时做）
++    if (o.boardAuto === false) return o;
++    var r = suggestBoardRange(sc.nMed, o);
++    if (!r) return o;
++    var o2 = withBoardRange(o, r);
++    o2._autoBoardRange = { cars: sc.nMed, carsMin: sc.nMin, carsMax: sc.nMax, range: r };
++    return o2;
+   }
+ 
+   function preflightBoardFit(blocks, config) {
+@@ -7019,6 +7053,7 @@
+     suggestBoardRange: suggestBoardRange,
+     applyAutoBoardRange: applyAutoBoardRange,
+     applyBoxPhase: applyBoxPhase,           // 【v147】错位量：旋转车在棋盘上的排位
++    clampPipeDemand: clampPipeDemand,       // 【v149】管道下限相容性：车少时自动降级
+     cutSpanPixels: cutSpanPixels,           // 【v148】切盒跨度：趋势序 ↔ 等深线序
+     pixelDepthMap: pixelDepthMap,
+     withBoardRange: withBoardRange,

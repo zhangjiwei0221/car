@@ -1,0 +1,926 @@
+/* 浅色调主题（暖米/amber）：全局背景改为浅暖米，文字改深棕，强调保留暖橙 */
+:root {
+  --bg: #f4eee1;        /* 页面底色（浅暖米） */
+  --bg2: #e9dcc6;       /* 目标图/棋盘底（浅暖） */
+  --bg3: #fdfaf3;       /* 输入框/空槽底（近白） */
+  --panel: #ede3d2;     /* 面板/头部 */
+  --panel2: #e4d8c1;    /* 暂存/控制条面板 */
+  --border: #d7c8b0;    /* 分隔线 */
+  --border2: #c4af8d;   /* 边框 */
+  --accent: #d2701f;    /* 暖橙强调（浅底加深更清晰） */
+  --accent-h: #e8823c;  /* 悬停亮橙 */
+  --warm-red: #c0451a;  /* 暖红（警示/黑块） */
+  --text: #3c2e1f;      /* 深棕文字（浅底可读） */
+  --muted: #8a7358;     /* 次要文字 */
+  --muted2: #66513a;    /* 三级文字 */
+  --amber: #b9821a;     /* 琥珀（进度/管道数字，浅底加深） */
+  --btn: #7a5c3c;       /* 按钮暖棕（浅底上作强调） */
+  --btn-text: #f7f0e4;  /* 按钮浅字 */
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+header h1 { font-size: 16px; color: var(--accent); white-space: nowrap; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.header-actions button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  background: var(--btn);
+  color: var(--btn-text);
+  transition: background .2s;
+}
+.header-actions button:hover:not(:disabled) { background: var(--accent); }
+.header-actions button:disabled { opacity: .4; cursor: default; }
+.header-actions .btn-warn { background: var(--warm-red); }
+.header-actions .sep { color: var(--border2); margin: 0 4px; }
+
+.main-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: calc(100vh - 48px);
+}
+/* 进入「模拟游玩」后展开第三列 → 左(关卡信息) | 中(目标图/暂存/棋盘) | 右(模拟控制+压力图) */
+.main-layout.with-right { grid-template-columns: 280px minmax(0, 1fr) 352px; }
+
+/* 右侧栏：模拟控制 + 暂存压力图 */
+aside#panel-right {
+  background: var(--panel);
+  padding: 12px;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+aside#panel-right.hidden { display: none; }
+aside#panel-right section { max-width: 100%; }
+
+/* 左侧面板 */
+aside#panel-left {
+  background: var(--panel);
+  padding: 12px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+aside h2 { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+aside h3 { font-size: 12px; color: var(--muted2); margin: 12px 0 6px; }
+#status-content { font-size: 12px; line-height: 1.8; }
+#status-content p { color: var(--muted2); }
+#solve-details { font-size: 11px; line-height: 1.6; }
+#solve-details .pass { color: #8bc34a; font-weight: bold; }
+#solve-details .fail { color: var(--accent); font-weight: bold; }
+
+/* 中间主区域 */
+main#panel-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 20px;
+  overflow-y: auto;
+  gap: 12px;
+}
+
+section { width: 100%; max-width: 600px; }
+section h3 {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+section h3 span { color: var(--muted); font-weight: normal; }
+
+/* 目标图视口（任务 ANT-TARGET-UI-GROW-20260805 改造）
+   原先写死 max-width:520px / max-height:380px，放大只能在这个固定框内缩放 canvas。
+   现改为由 --tgt-w / --tgt-h 两个变量控制框体尺寸，放大按钮直接调这两个变量 →
+   UI 框本身变大，图跟着变大，不需要再靠拖拽去看局部。
+   基础尺寸也从 520×380 提到 640×460（用户要求「增加模拟游玩的目标图UI大小」）。 */
+#target-viewport {
+  position: relative;
+  overflow: hidden;
+  --tgt-w: 640px;
+  --tgt-h: 460px;
+  width: var(--tgt-w);
+  height: var(--tgt-h);
+  max-width: 100%;                 /* 窄屏时不溢出父容器 */
+  margin: 0 auto;
+  background: var(--bg2);
+  border-radius: 6px;
+  transition: width .12s ease, height .12s ease;
+}
+#target-canvas {
+  display: block;
+  border-radius: 4px;
+  transform-origin: 0 0;
+  cursor: grab;
+  touch-action: none;
+}
+#target-canvas.grabbing { cursor: grabbing; }
+.zoom-btn {
+  font-size: 11px;
+  padding: 1px 7px;
+  background: var(--btn);
+  color: var(--btn-text);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.zoom-btn:hover { background: var(--accent); }
+
+/* 暂存区 */
+#section-buffer {
+  background: var(--panel2);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+#buffer-slots {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.buffer-slot {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  border: 2px dashed var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #000;
+  font-weight: bold;
+  transition: all .2s;
+}
+.buffer-slot { position: relative; overflow: hidden; }
+.buffer-slot.filled { border-style: solid; border-color: rgba(255,255,255,.2); }
+.buffer-slot.empty { background: var(--bg3); }
+.buf-cnt { pointer-events: none; }
+.buf-start { position: absolute; left: 2px; bottom: 0; font-size: 8px; line-height: 1; color: rgba(0,0,0,.45); pointer-events: none; }
+.buffer-slot.empty .buf-start { color: var(--muted); }
+.buffer-slot.linked { border-color: var(--amber); }
+.buffer-slot.linked.done { border-color: var(--accent); opacity: .8; }
+/* 玩家版复活演示：被复活选中的暂存盒/棋盘盒短暂高亮，区分于普通消除 */
+.buffer-slot.reviving { outline: 2px solid #ff5a5a; box-shadow: 0 0 8px rgba(255,90,90,.8); }
+.board-cell.reviving { outline: 2px solid #ff5a5a; box-shadow: 0 0 8px rgba(255,90,90,.8); }
+/* ===== 求解路线叠加（任务 ANT-SIM-CHAIN-ROUTE-20260805）=====
+   在棋盘格子上叠一个取盒顺序序号角标。纯可视化，不影响模拟逻辑。
+   .board-cell 原本未使用 ::after，这里独占，不与既有 .ov 角标（冰/锁链/问号）冲突。 */
+.board-cell.route-step::after {
+  content: attr(data-route);
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  min-width: calc(var(--csz, 40px) * 0.46);
+  font-size: calc(var(--csz, 40px) * 0.30);
+  font-weight: bold; line-height: 1.25;
+  color: #fff; background: rgba(20,16,12,.78);
+  border: 1px solid rgba(255,255,255,.55); border-radius: 4px;
+  padding: 0 2px; text-align: center;
+  pointer-events: none; z-index: 4;
+  text-shadow: 0 1px 2px rgba(0,0,0,.9);
+}
+/* 路线分段配色：早期→中期→后期，让顺序走向一眼可辨 */
+.board-cell.route-early::after { background: rgba(60,130,60,.85); }
+.board-cell.route-mid::after   { background: rgba(190,130,30,.88); }
+.board-cell.route-late::after  { background: rgba(190,60,40,.88); }
+/* 下一步要取的盒：额外描边，突出“接下来点这个” */
+.board-cell.route-next { outline: 3px solid #ffd54f; box-shadow: 0 0 10px rgba(255,213,79,.9); z-index: 3; }
+/* 【v121·任务AL】暂存放不下的盒：明确标出「点不了」。
+   改前这些盒带着 .pickable 看起来能点，点下去会走到「先放进第 6 个盒变 6/5 再判死」那条路。
+   现在点击被拒绝，所以必须让它在视觉上就与可取盒区分，否则点了没反应会被当成页面卡住。 */
+.board-cell.box.noslot {
+  cursor: not-allowed;
+  filter: grayscale(.55) brightness(.72);
+  border-color: rgba(224, 89, 44, .75);
+}
+.board-cell.box.noslot::before {
+  content: '✋';
+  position: absolute; top: 1px; left: 2px;
+  font-size: calc(var(--csz, 40px) * 0.26);
+  opacity: .95; pointer-events: none; z-index: 4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
+}
+/* 玩家版路线角标（v121·任务AK③）：与全知版双路线叠加时用真实 <span> 而不是第二个伪元素 ——
+   .board-cell::after 已被全知版的序号独占（content:attr(data-route)），抢同一个伪元素会互相覆盖。
+   放右下角、蓝色，与正中的全知序号区分。
+   （v121·AL 补正：`::before` 当时并未被占用，上一版注释写的「被其它状态用于图示」不准确；
+     现在 `.board-cell.box.noslot::before` 用了它，但那与路线叠加互斥——放不下的盒不参与路线显示。） */
+.board-cell .route-pbadge {
+  position: absolute; right: 1px; bottom: 1px;
+  min-width: calc(var(--csz, 40px) * 0.32);
+  font-size: calc(var(--csz, 40px) * 0.24);
+  font-weight: bold; line-height: 1.2;
+  color: #fff; background: rgba(30,110,180,.92);
+  border: 1px solid rgba(255,255,255,.6); border-radius: 3px;
+  padding: 0 2px; text-align: center;
+  pointer-events: none; z-index: 5;
+  text-shadow: 0 1px 2px rgba(0,0,0,.9);
+}
+/* 求解路线按钮的开启态（沿用项目既有 .active 视觉口径） */
+#btn-show-route.active { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
+#stat-revive { color: #ff8a65; }
+#stat-revive.flash { animation: revive-flash .6s ease; }
+@keyframes revive-flash { 0% { color: #ff5a5a; transform: scale(1.15); } 100% { color: #ff8a65; transform: scale(1); } }
+.buffer-slot .buf-link {
+  position: absolute;
+  top: -2px; right: -2px;
+  font-size: 10px;
+  text-shadow: 0 0 2px #000;
+}
+
+/* 蚂蚁盒棋盘（元素区网格）：与目标区上下等宽、居中、视觉一体 */
+#section-board { max-width: 100%; }
+/* 棋盘居中(1fr|auto|1fr)；折线柱状图已移到右侧栏，这里只留棋盘 */
+#board-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; width: 100%; }
+#board-queues { grid-column: 2; display: flex; justify-content: center; }
+#board-charts { width: 100%; }
+#board-charts.hidden { display: none; }
+.chart-title { font-size: 12px; color: var(--muted2); margin-bottom: 4px; }
+.chart-cap { font-size: 11px; color: var(--muted); margin-top: 3px; }
+#board-charts canvas { background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; }
+#board-queues {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.ant-board {
+  display: grid;
+  gap: var(--cgap, 6px);
+  background: var(--bg2);
+  padding: 8px;
+  border-radius: 6px;
+}
+.board-cell {
+  width: var(--csz, 40px);
+  height: var(--csz, 40px);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--csz, 40px) * 0.36);
+  font-weight: bold;
+  color: #000;
+  border: 2px solid transparent;
+  position: relative;
+  box-sizing: border-box;
+}
+.board-cell.empty { background: #ded1bb; border-color: #cbb99e; }
+.board-cell.black {
+  background: #3a1410;
+  border: 2px solid var(--warm-red);
+}
+.board-cell.black .blk-x {
+  color: #ff5a2c;
+  font-size: calc(var(--csz, 40px) * 0.6);
+  font-weight: 900;
+  text-shadow: 0 0 4px rgba(211,84,0,.85);
+}
+.board-cell.pipe {
+  background: #4a3620;
+  color: #ffdca0;
+  font-size: calc(var(--csz, 40px) * 0.42);
+}
+.board-cell.pipe .pipe-n {
+  position: absolute;
+  right: 3px; bottom: 1px;
+  font-size: calc(var(--csz, 40px) * 0.24);
+  color: var(--amber);
+}
+.board-cell.box { cursor: default; }
+.board-cell.box .cnt { pointer-events: none; }
+.board-cell.pickable {
+  cursor: pointer;
+  border-color: #fff;
+  box-shadow: 0 0 12px rgba(255,236,200,.65);
+}
+.board-cell.pickable:hover { transform: scale(1.1); z-index: 2; }
+.board-cell.locked { filter: grayscale(0.5) brightness(0.7); }
+.board-cell .ov {
+  position: absolute;
+  font-size: calc(var(--csz, 40px) * 0.24);
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+/* 【v138】数字冰：右上角冷蓝"还剩几个球"（与老冰区分：老冰在左上、显示 thaw/durability） */
+.board-cell .ov.numice { top: 1px; right: 2px; color: #9fe8ff; font-weight: 700; text-shadow: 0 0 3px #04384d; }
+.board-cell .ov.chain { bottom: 1px; right: 2px; font-size: calc(var(--csz, 40px) * 0.28); }
+
+/* 模拟控制（右侧栏里竖排：一行一项，按钮/下拉拉满宽度） */
+#sim-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  background: var(--panel2);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+#sim-controls h3 { margin-bottom: 0; }
+.ctl-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ctl-row > label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.ctl-row select { flex: 1 1 auto; min-width: 0; }
+.ctl-row input[type=number] { flex: 0 0 68px; width: 68px; }
+.ctl-row input[type=range] { flex: 1 1 70px; min-width: 0; }
+.ctl-row > span { font-size: 11px; color: #888; white-space: nowrap; min-width: 62px; text-align: right; }
+.ctl-group { display: flex; flex-direction: column; gap: 6px; }
+.ctl-group .ctl-title { font-size: 11px; color: var(--muted); }
+#sim-controls button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  background: var(--btn);
+  color: var(--btn-text);
+}
+#sim-controls button:hover { background: var(--accent); }
+#sim-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+#sim-stats b { color: var(--text); }
+
+.placeholder { color: #7a6a58; font-size: 12px; text-align: center; padding: 30px 0; }
+.hidden { display: none !important; }
+
+/* 游戏结束消息 */
+.game-msg {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 24px 40px;
+  z-index: 1000;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.game-msg h2 { font-size: 20px; margin-bottom: 8px; }
+.game-msg p { color: var(--muted2); font-size: 14px; }
+.game-msg button {
+  margin-top: 12px;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+
+/* 生成器面板 */
+#generator-panel {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+#generator-panel h2 {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.gen-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.gen-row label {
+  font-size: 11px;
+  color: var(--muted);
+  width: 56px;
+  flex-shrink: 0;
+}
+.gen-row input[type="number"],
+.gen-row select {
+  flex: 1;
+  padding: 3px 6px;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  background: var(--bg3);
+  color: var(--text);
+  font-size: 11px;
+}
+.gen-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.gen-row span {
+  font-size: 10px;
+  color: var(--muted);
+  width: 28px;
+}
+
+/* ========== 双端滑块（v116，参数区间上下限都可拖动） ==========
+   用户裁决：「把上下限做成左右端可拖动的，而不是左端可拖动，右端变成填入」。
+   做法：两个原生 <input type=range> 绝对叠放在同一条轨道上，各自只保留【滑钮】可点
+   （容器轨道 pointer-events:none，只有 ::thumb 恢复 auto），
+   下方另画一条自绘轨道 + 高亮段表示当前区间。
+   为什么不用 div 自己造滑钮：原生 range 自带键盘操作（←/→、Home/End）与无障碍语义，
+   自造的 div 需要另写一套且容易漏掉可访问性。
+   ⚠ 两个滑钮重合（hi === lo）表示「不启用区间」，见 app.js 的 readRange。 */
+.gen-dual {
+  position: relative;
+  flex: 1;
+  height: 18px;
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+}
+.gen-dual-track {
+  position: absolute;
+  left: 6px;                       /* 让轨道两端与滑钮圆心对齐（滑钮宽 12px） */
+  right: 6px;
+  height: 3px;
+  background: var(--border2);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.gen-dual-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+/* 两个 range 铺满容器、透明轨道；只有滑钮可交互 */
+.gen-dual input[type="range"] {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.gen-dual input[type="range"]:focus { outline: none; }
+.gen-dual input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--accent);   /* 键盘聚焦可见（拖不到时可用方向键微调） */
+}
+.gen-dual input[type="range"]::-webkit-slider-runnable-track {
+  height: 18px;
+  background: transparent;
+  border: none;
+}
+.gen-dual input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid var(--muted2);
+  cursor: pointer;
+}
+.gen-dual input[type="range"]::-moz-range-track {
+  height: 18px;
+  background: transparent;
+  border: none;
+}
+.gen-dual input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid var(--muted2);
+  cursor: pointer;
+}
+/* 上限滑钮压在上层：两钮重合时（= 不启用区间）优先抓到它往右拉开区间 */
+.gen-dual input.gen-dual-hi { z-index: 3; }
+.gen-dual input.gen-dual-lo { z-index: 2; }
+/* 下限已到最右端时反转层级，否则下限被压住拖不回来 */
+.gen-dual.at-max input.gen-dual-lo { z-index: 3; }
+.gen-dual.at-max input.gen-dual-hi { z-index: 2; }
+/* 区间读数比普通 span 宽（要显示 "18~26%" 这种两端值） */
+.gen-row span.gen-dual-val {
+  width: 58px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.gen-row span.gen-dual-val.is-range { color: var(--accent); }   /* 启用区间时高亮，一眼看出哪些参数在波动 */
+
+
+/* 关卡列表 */
+#level-list-panel {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+#level-list-panel h2 {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+#level-list-panel h2 span { color: var(--muted); font-weight: normal; }
+.level-item {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.level-item:hover { background: var(--panel2); color: var(--text); }
+.level-item.active { background: var(--btn); color: #fff; font-weight: bold; }
+
+/* 批量分析结果 */
+#analysis-result {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+#analysis-result h2 { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.analysis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.analysis-table th {
+  color: var(--muted);
+  text-align: left;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+}
+.analysis-table td {
+  color: var(--muted2);
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+.analysis-table .grade-简单 { color: #8bc34a; }
+.analysis-table .grade-普通 { color: var(--amber); }
+.analysis-table .grade-困难 { color: #ff9f4d; }
+.analysis-table .grade-极难 { color: var(--accent); font-weight: bold; }
+
+
+/* ==================== 视图切换（模拟器 / 生成器） ==================== */
+.view-switch { display: flex; gap: 4px; margin-left: 4px; }
+.view-switch-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  background: var(--bg3);
+  color: var(--muted2);
+  cursor: pointer;
+  font-size: 12px;
+}
+.view-switch-btn:hover { background: var(--panel2); }
+.view-switch-btn.active { background: var(--btn); color: var(--btn-text); border-color: var(--btn); }
+.view.hidden { display: none !important; }
+
+/* ==================== 生成器独立页面 ==================== */
+.gen-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: calc(100vh - 48px);
+}
+#gen-panel-left {
+  background: var(--panel);
+  padding: 12px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+#gen-panel-main {
+  padding: 16px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.gen-section {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.gen-section h2 { font-size: 12px; color: var(--muted); margin: 0; }
+.gen-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.gen-card h2 { font-size: 13px; color: var(--text); margin-bottom: 10px; }
+
+/* 参数分组手风琴 */
+.gen-accordion-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  user-select: none;
+}
+.gen-accordion-head h2 { margin: 0; }
+.gen-acc-arrow { font-size: 10px; color: var(--muted); transition: transform .15s; }
+.gen-accordion-head.collapsed .gen-acc-arrow { transform: rotate(-90deg); }
+.gen-accordion-body { overflow: hidden; }
+.gen-accordion-body.collapsed { display: none; }
+
+/* 按钮尺寸变体 */
+.gen-btn-wide { flex: 1; padding: 8px; background: var(--btn); color: var(--btn-text); border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.gen-btn-wide:hover { background: var(--accent); }
+.gen-btn-sm { padding: 4px 8px; background: var(--btn); color: var(--btn-text); border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; }
+.gen-btn-sm:hover { background: var(--accent); }
+.gen-btn-danger { background: var(--warm-red); }
+.gen-btn-danger:hover { background: #d9541f; }
+.gen-btn-primary {
+  flex: 1; padding: 10px 16px; background: var(--accent); color: #fff;
+  border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;
+}
+.gen-btn-primary:hover { background: var(--accent-h); }
+.gen-btn-primary:disabled { opacity: .5; cursor: default; }
+
+/* 文件列表（导入的目标图）：排序/分组/筛选/删除 */
+.gen-file-list { max-height: 320px; overflow-y: auto; margin-top: 6px; }
+.gen-file-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 16px 0; }
+.gen-file-group-head {
+  font-size: 11px; color: var(--muted2); background: var(--panel2);
+  padding: 4px 8px; border-radius: 3px; margin: 6px 0 3px; cursor: pointer;
+}
+.gen-file-group-head span { color: var(--muted); }
+.gen-file-group-head.active { background: var(--btn); color: var(--btn-text); }
+.gen-file-group-head.active span { color: var(--btn-text); }
+.gen-file-filter-bar { font-size: 11px; color: var(--muted2); margin-bottom: 6px; }
+.gen-file-filter-bar button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 11px; }
+.gen-file-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 6px; font-size: 11px; color: var(--muted2);
+  border-radius: 3px;
+}
+.gen-file-item:hover { background: var(--panel2); }
+.gen-file-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gen-file-meta { color: var(--muted); font-size: 10px; flex-shrink: 0; }
+.gen-file-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 11px; flex-shrink: 0; }
+.gen-file-del:hover { color: var(--warm-red); }
+
+/* 生产进度可视化 */
+#gen-progress-bar-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+#gen-progress-bar { flex: 1; height: 14px; background: var(--bg3); border-radius: 7px; overflow: hidden; border: 1px solid var(--border2); }
+#gen-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--accent-h)); transition: width .25s; }
+#gen-progress-pct { font-size: 12px; color: var(--muted2); min-width: 90px; text-align: right; }
+.gen-progress-current { font-size: 12px; color: var(--muted2); margin-bottom: 10px; min-height: 16px; }
+.gen-progress-time { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.gen-download-hint { font-size: 11px; color: var(--muted); align-self: center; }
+/* 逐关落库状态条：默认灰、成功绿、警告橙、失败红 */
+.gen-persist-status { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.gen-persist-status.ok { color: #2e7d32; }
+.gen-persist-status.warn { color: #e07c00; }
+.gen-persist-status.err { color: #c62828; font-weight: 600; }
+
+.gen-stat-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.gen-chip {
+  font-size: 11px; padding: 4px 10px; border-radius: 12px;
+  background: var(--bg3); color: var(--muted2); border: 1px solid var(--border2);
+}
+.gen-chip b { color: var(--text); margin-left: 3px; }
+.gen-chip-hard { border-color: #8bc34a; }
+.gen-chip-hard b { color: #6a9c33; }
+.gen-chip-easy { border-color: var(--amber); }
+.gen-chip-easy b { color: var(--amber); }
+.gen-chip-fallback { border-color: #ff8a65; }
+.gen-chip-fallback b { color: #ff8a65; }
+.gen-chip-fail { border-color: var(--warm-red); }
+.gen-chip-fail b { color: var(--warm-red); }
+
+/* 实时日志流 */
+.gen-log-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 12px; margin-bottom: 4px;
+}
+.gen-log-head span { font-size: 11px; color: var(--muted); }
+.gen-log {
+  height: 160px; overflow-y: auto;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+  padding: 6px 8px; font-family: monospace; font-size: 11px;
+}
+.gen-log-line { color: var(--muted2); line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.gen-log-line.gen-log-ok { color: #6a9c33; }
+.gen-log-line.gen-log-warn { color: var(--amber); }
+.gen-log-line.gen-log-err { color: var(--warm-red); }
+
+/* 结果表 */
+#gen-result-body { max-height: 480px; overflow-y: auto; margin-top: 8px; }
+.gen-result-group-head {
+  font-size: 11px; color: var(--muted2); background: var(--panel2);
+  padding: 4px 8px; border-radius: 3px; margin: 8px 0 3px;
+}
+.gen-result-group-head span { color: var(--muted); }
+.gen-result-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; font-size: 12px; color: var(--muted2);
+  border-bottom: 1px solid var(--border);
+}
+.gen-result-row:hover { background: var(--panel2); }
+.gen-tier-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.gen-tier-hard { background: #8bc34a; }
+.gen-tier-easy { background: var(--amber); }
+.gen-tier-fallback { background: #ff8a65; }
+.gen-tier-fail { background: var(--warm-red); }
+.gen-result-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gen-result-tier { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 90px; }
+.gen-result-diff { font-size: 11px; color: var(--text); flex-shrink: 0; width: 70px; text-align: right; }
+/* 【v140】结果行「🎮 带入棋盘」：把关卡直接装进模拟器，省掉导出→导入→重算三步 */
+.gen-result-load {
+  flex-shrink: 0; font-size: 11px; padding: 2px 8px; cursor: pointer;
+  background: var(--panel2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px;
+}
+.gen-result-load:hover { background: var(--amber); border-color: var(--amber); color: #2b1c0f; }
+.gen-result-load.off {
+  cursor: default; opacity: .45; color: var(--muted);
+  background: transparent; border-style: dashed;
+}
+.gen-result-load.off:hover { background: transparent; border-color: var(--border); color: var(--muted); }
+
+/* ==================================================================================
+   【v132 · 手动摆盒】编辑器样式（2026-10-13）
+   一块独立的编辑棋盘 + 右栏工具条。与模拟棋盘共用 .ant-board / .board-cell 口径，
+   所以「摆盒棋盘」和「模拟棋盘」看起来是同一块板，来回切换不跳尺寸。
+   ================================================================================== */
+#edit-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  background: var(--panel2);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+#edit-controls h3 { margin-bottom: 0; }
+#edit-controls button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  background: var(--btn);
+  color: var(--btn-text);
+}
+#edit-controls button:hover { background: var(--accent); }
+/* 「带入模拟器」是这一栏的主动作，给一个更醒目的底色 */
+#edit-controls .edit-primary { background: #2f7d3a; }
+#edit-controls .edit-primary:hover { background: #3d9c4b; }
+#edit-controls .ctl-row > label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+#edit-controls .edit-x { color: var(--muted); font-size: 11px; }
+.edit-tip {
+  font-size: 11px; color: var(--muted); line-height: 1.65;
+  border-top: 1px dashed var(--border); padding-top: 6px;
+}
+
+/* 调色板：色块上直接印颜色编号（与关卡数据里的数字一一对应，方便对着颜色对照表核对） */
+.edit-palette { display: flex; flex-wrap: wrap; gap: 4px; }
+.edit-swatch {
+  width: 28px; height: 28px; padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  font-size: 10px; font-weight: bold;
+  color: rgba(0, 0, 0, .7);
+  text-shadow: 0 0 2px rgba(255, 255, 255, .95), 0 0 2px rgba(255, 255, 255, .95);
+  cursor: pointer;
+}
+.edit-swatch:hover { transform: scale(1.12); }
+.edit-swatch.active { border-color: var(--bg3); box-shadow: 0 0 0 2px var(--accent); }
+
+/* 校验面板：每色「车上载客 / 板上像素」，不匹配整行标红；点一行 = 切到该色并填好还差的数量 */
+.edit-validate {
+  font-size: 11px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.edit-vhead { color: var(--muted2); font-weight: 600; margin-bottom: 4px; }
+.edit-vhead span { color: var(--muted); font-weight: 400; }
+.edit-vrow {
+  display: grid;
+  grid-template-columns: 12px 58px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 3px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.edit-vrow:hover { background: var(--panel2); }
+.edit-vrow.bad { color: #c0451a; }
+.edit-vrow .edit-vsw { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .25); }
+.edit-vrow .edit-vname { color: var(--muted2); }
+.edit-vrow .edit-vnum { color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+.edit-vrow .edit-vtag { color: var(--muted); text-align: right; }
+.edit-vrow.bad .edit-vtag { color: #c0451a; font-weight: 600; }
+.edit-vfoot { margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border); color: var(--muted); line-height: 1.6; }
+.edit-vfoot .ok { color: #2f7d3a; }
+.edit-vfoot .warn2 { color: var(--amber); }
+.edit-vlink { color: var(--accent); text-decoration: underline; }
+
+/* 编辑棋盘 */
+.edit-board-hint { font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 6px; }
+#edit-board-queues { display: flex; justify-content: center; overflow-x: auto; padding-bottom: 6px; }
+.edit-board { background: repeating-linear-gradient(45deg, #e6d8c0 0 6px, #e2d3b9 6px 12px); }
+.edit-cell { cursor: pointer; }
+.edit-cell:hover { outline: 3px solid #ffd54f; outline-offset: -3px; z-index: 3; }
+/* 放车工具下「点一下会被改写成这个样子」的预览：与当前颜色/载客量相同的车描虚线 */
+.edit-cell.box.edit-hit { outline: 2px dashed rgba(255, 255, 255, .95); outline-offset: -4px; }
+.edit-cell .edit-cid {
+  position: absolute; right: 2px; bottom: 0;
+  font-size: 10px; font-weight: normal; opacity: .6;
+  pointer-events: none;
+}
+
+/* ==================================================================================
+   【v133 · 目标区微调画笔】样式
+   画笔开启时目标图显示十字光标，提示"这里点了会改像素"（此时拖拽平移被让位给上色）。
+   ================================================================================== */
+#target-viewport.painting #target-canvas,
+#target-viewport.painting #target-canvas.grabbing { cursor: crosshair; }
+#edit-controls button.active { background: var(--accent); }
+#edit-controls button:disabled { opacity: .45; cursor: not-allowed; }
+#edit-paint-tip { border-top: none; padding-top: 0; }
+
+/* ==================================================================================
+   【v134 · 管道 / 锁链 / 数字冰 / 问号 手动编辑】样式
+   ================================================================================== */
+/* 编辑棋盘上的管道格：可点、被选中时高亮 */
+.edit-cell.pipe { cursor: pointer; }
+.edit-cell.pipe.edit-sel { outline: 3px solid var(--accent); outline-offset: -3px; box-shadow: 0 0 10px rgba(210,112,31,.8); z-index: 3; }
+.edit-cell .ov.numice { position: absolute; right: 1px; top: 0; font-size: 10px; color: #9fe8ff; font-weight: 700; text-shadow: 0 0 3px #04384d; pointer-events: none; }
+.edit-cell .ov.chain { position: absolute; right: 1px; top: 0; font-size: 10px; pointer-events: none; }
+
+/* 管道队列编辑器 */
+.edit-pipe {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 7px 8px;
+}
+.edit-pipe.hidden { display: none; }
+.edit-pipe-head { font-size: 12px; font-weight: 600; color: var(--muted2); }
+.edit-pipe-head span { font-weight: 400; color: var(--muted); font-size: 11px; }
+.edit-pipe-hint { font-size: 11px; color: var(--muted); margin: 3px 0 5px; line-height: 1.5; }
+.edit-pipe-queue { display: flex; flex-direction: column; gap: 3px; max-height: 210px; overflow-y: auto; }
+.edit-pq-empty { font-size: 11px; color: var(--muted); padding: 4px 2px; }
+.edit-pq-row {
+  display: grid;
+  grid-template-columns: 16px 20px 1fr 52px 22px 22px 22px;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 3px;
+  border-radius: 3px;
+  background: var(--panel2);
+}
+.edit-pq-row.is-next { outline: 2px solid var(--accent); outline-offset: -2px; }
+.edit-pq-no { font-size: 10px; color: var(--muted); text-align: center; }
+.edit-pq-sw { width: 20px; height: 20px; border: 1px solid rgba(0,0,0,.25); border-radius: 3px; cursor: pointer; padding: 0; }
+.edit-pq-name { font-size: 11px; color: var(--muted2); }
+.edit-pq-cnt { width: 52px; padding: 2px 3px; font-size: 11px; }
+.edit-pq-row button[data-act] { padding: 1px 0; font-size: 11px; line-height: 1.1; }
+.edit-pq-row button[data-act]:disabled { opacity: .35; cursor: not-allowed; }
+.edit-pq-tag { grid-column: 1 / -1; font-size: 10px; color: var(--accent); text-align: right; }
+.edit-pipe-warn { font-size: 11px; color: var(--amber); line-height: 1.55; margin-top: 5px; }

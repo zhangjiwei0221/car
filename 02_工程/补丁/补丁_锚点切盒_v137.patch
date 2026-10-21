@@ -1,0 +1,755 @@
+diff -ruN a/bin/index.html b/bin/index.html
+--- a/bin/index.html	2026-10-14 16:29:34
++++ b/bin/index.html	2026-10-14 16:29:34
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算</title>
+-  <link rel="stylesheet" href="css/style.css?v=136">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒</title>
++  <link rel="stylesheet" href="css/style.css?v=137">
+ </head>
+ <body>
+   <header>
+@@ -354,6 +354,13 @@
+               </select>
+             </div>
+             <div class="gen-row">
++              <label title="目标图怎么切成一辆辆车。&#10;&#10;趋势切(默认)=现有口径：按目标图【底→顶、行内左→右】的趋势流装箱，出来的车像从图的最下层一路剥上去。盒容量下限/上限/策略就是这一条的旋钮。&#10;&#10;锚点切盒(v137 新移植)=把图按【左下角 + 右下角】两个锚点测地切成 A 片(左) / B 片(右)，出场顺序【A 片整车先出、B 片后出】(进度错位)：同一种颜色前半场来一次、后半场又来一次，玩家手上会一直压着没放完的颜色 → 暂存压力被顶起来。这是目前唯一能自动做出『真卡点』的切法。&#10;&#10;⚠ 锚点切盒用【平均盒容量】切(均值取盒容量下限/上限的中值、单盒下限取下限值)，不吃『盒容量策略』那个下拉；车数也会和趋势切不同 —— 换到锚点切之后，先看它切出多少辆车，再按这个车数调棋盘行列范围（棋盘格数 ≈ 车数 ÷ 0.74）。&#10;&#10;锚点切盒拿不到盒时自动退回趋势切，不会把关卡生产卡死。不选它 = 生产口径与本次改动前逐字节一致。&#10;&#10;⚠ 选「仅底部入口」玩法时又选了锚点切盒：切盒仍按锚点走（它只按图形几何切、不看入口），底部专用那套切法就不生效了；要底部专用切法请选回趋势切。">切盒方式</label>
++              <select id="gen-box-cut">
++                <option value="trend" selected>趋势切(默认)</option>
++                <option value="anchor">锚点切盒·A片先出B片后出</option>
++              </select>
++            </div>
++            <div class="gen-row">
+               <label>暂存上限</label>
+               <input type="number" id="gen-buffer" min="3" max="7" value="5">
+             </div>
+@@ -799,17 +806,19 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=136"></script>
+-  <script src="js/levels.js?v=136"></script>
+-  <script src="js/utils.js?v=136"></script>
+-  <script src="js/simulator.js?v=136"></script>
+-  <script src="js/solver-strategy.js?v=136"></script>
+-  <script src="js/solver.js?v=136"></script>
+-  <script src="js/playersim.js?v=136"></script>
+-  <script src="js/generator.js?v=136"></script>
+-  <script src="js/analysis.js?v=136"></script>
++  <script src="js/zip.js?v=137"></script>
++  <script src="js/levels.js?v=137"></script>
++  <script src="js/utils.js?v=137"></script>
++  <script src="js/simulator.js?v=137"></script>
++  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
++  <script src="js/anchor-cut.js?v=137"></script>
++  <script src="js/solver-strategy.js?v=137"></script>
++  <script src="js/solver.js?v=137"></script>
++  <script src="js/playersim.js?v=137"></script>
++  <script src="js/generator.js?v=137"></script>
++  <script src="js/analysis.js?v=137"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=136"></script>
+-  <script src="js/app.js?v=136"></script>
++  <script src="js/level-editor.js?v=137"></script>
++  <script src="js/app.js?v=137"></script>
+ </body>
+ </html>
+diff -ruN a/bin/js/anchor-cut.js b/bin/js/anchor-cut.js
+--- a/bin/js/anchor-cut.js	1970-01-01 08:00:00
++++ b/bin/js/anchor-cut.js	2026-10-14 16:29:34
+@@ -0,0 +1,342 @@
++// ==================== 锚点切盒（AntSolver.AnchorCut）· 主bin v137 移植版 ====================
++// 【来源】逐字节移植自 数字冰沙盒/bin/js/anchor-cut.js（sha256 9741406f35636a1a88be3df12b2fd3cceca8ba1b69d69eff355c7ff93e00d448），
++//   本文件除本段说明外与来源逐字节一致；算法本体一行未改。
++// 【移植范围】只接"切盒"这一刀：generator.pickBoxSplit 在 config.boxCutMode==='anchor' 时改调
++//   AntSolver.AnchorCut.cutBoxes(blocks, config)。**不动填盘、不动 BFS 吐球、不动障碍系统**
++//   （沙盒那边的 fillMode:'anchorBfs' 还顺带换了 BfsFill 填盘并封锁老冰，主bin 一律不涉及）。
++// 【默认行为】boxCutMode 默认 'trend'（= 原 baseFillBoxes 趋势切），不选它则本文件永不被调用，
++//   现有生产口径与本次改动前完全一致（验证见 01_交接文档/工作日志_20261012.md 对应章节）。
++// 【产出契约】与 baseFillBoxes 一致：[{color, count, elimSeq}]，elimSeq = 该盒的出场顺序下标。
++// 【分组语义】双锚点(左下/右下)把目标图测地切成 A 片(左) / B 片(右)，elimSeq 上 **A 片整车先出、B 片后出**
++//   （"进度错位"）——同一种颜色会前半场出现一次、后半场再出现一次，用于把玩家的暂存压力顶起来。
++// 【接入参数】generator.DEFAULT_CONFIG 里的 boxCutMode / anchorMode / anchorBigBoxMax /
++//   anchorBoxAvg / anchorMinBoxCap / anchorRoleAwareCut 由 pickBoxSplit 组装后传入本模块。
++
++// ==================== 锚点扫描切盒（AntSolver.AnchorCut）====================
++// 移植自原型 _kiro临时/09.16-数字冰沙盒/_原型-锚点扫描初始球队列.js（选项A + 模型A + 进度错位）。
++// 数字冰分支(fillMode:'anchorBfs')用它替换 pickBoxSplit：
++//   目标图(实心, bg=0) → 分隔色感知 band → 双锚点(左下/右下)测地分区 → 每(组,色)切盒
++//   → 小色整块归一(选项A) → 大盒≤5 促成 → 进度错位合成 elimSeq(A组先, B组后)。
++// 产出契约与 baseFillBoxes 一致：[{color, count, elimSeq}]。目标图无背景(合格库空格0=0)，全部当色。
++(function () {
++  'use strict';
++  var AntSolver = (typeof window !== 'undefined' ? window : globalThis).AntSolver || {};
++  (typeof window !== 'undefined' ? window : globalThis).AntSolver = AntSolver;
++  var DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++  function grid(rows, cols, v) { var g = []; for (var r = 0; r < rows; r++) { var row = []; for (var c = 0; c < cols; c++) row.push(v); g.push(row); } return g; }
++
++  // 分隔色感知 band：从外部 0-1 BFS，同色前进 band 不变、跨色 band+1。bg=0 视为空(实心图无 0 格→全部当色)。
++  function colorBands(b, rows, cols, bg) {
++    var isPic = function (r, c) { return r >= 0 && r < rows && c >= 0 && c < cols && b[r][c] !== bg; };
++    var band = grid(rows, cols, Infinity), dq = [], r, c;
++    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
++      if (!isPic(r, c)) continue;
++      var t = (r === 0 || r === rows - 1 || c === 0 || c === cols - 1);
++      if (!t) for (var d = 0; d < 4; d++) if (!isPic(r + DIRS[d][0], c + DIRS[d][1])) { t = true; break; }
++      if (t) { band[r][c] = 0; dq.push([r, c]); }
++    }
++    var h = 0;
++    while (h < dq.length) {
++      var cur = dq[h++], cr = cur[0], cc = cur[1], bc = band[cr][cc], col = b[cr][cc];
++      for (var dd = 0; dd < 4; dd++) {
++        var nr = cr + DIRS[dd][0], nc = cc + DIRS[dd][1];
++        if (!isPic(nr, nc)) continue;
++        var w = (b[nr][nc] === col) ? 0 : 1;
++        if (bc + w < band[nr][nc]) { band[nr][nc] = bc + w; if (w === 0) dq.splice(h, 0, [nr, nc]); else dq.push([nr, nc]); }
++      }
++    }
++    return band;
++  }
++
++  // 测地多源 BFS：每像素归最近锚点(走图案像素)；组内球按 (band,dist) 有序。
++  function anchorScan(b, rows, cols, bg, band, anchorPts) {
++    var isPic = function (r, c) { return r >= 0 && r < rows && c >= 0 && c < cols && b[r][c] !== bg; };
++    var seeds = anchorPts.map(function (a) {
++      var best = null, bd = Infinity, r, c;
++      for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) if (isPic(r, c)) { var dd = Math.abs(r - a.r) + Math.abs(c - a.c); if (dd < bd) { bd = dd; best = { r: r, c: c }; } }
++      return best;
++    });
++    var owner = grid(rows, cols, -1), dist = grid(rows, cols, Infinity), q = [];
++    seeds.forEach(function (s, i) { if (s && dist[s.r][s.c] === Infinity) { dist[s.r][s.c] = 0; owner[s.r][s.c] = i; q.push([s.r, s.c]); } });
++    var h = 0;
++    while (h < q.length) {
++      var cur = q[h++], r = cur[0], c = cur[1], o = owner[r][c], nd = dist[r][c] + 1;
++      for (var d = 0; d < 4; d++) { var nr = r + DIRS[d][0], nc = c + DIRS[d][1]; if (!isPic(nr, nc) || dist[nr][nc] !== Infinity) continue; dist[nr][nc] = nd; owner[nr][nc] = o; q.push([nr, nc]); }
++    }
++    // 兜底：孤立块就近曼哈顿归属
++    for (var rr = 0; rr < rows; rr++) for (var cc = 0; cc < cols; cc++) if (isPic(rr, cc) && owner[rr][cc] < 0) {
++      var bi = 0, bdv = Infinity; anchorPts.forEach(function (a, i) { var dd = Math.abs(rr - a.r) + Math.abs(cc - a.c); if (dd < bdv) { bdv = dd; bi = i; } }); owner[rr][cc] = bi; dist[rr][cc] = 9999;
++    }
++    var groups = anchorPts.map(function () { return []; });
++    for (var r2 = 0; r2 < rows; r2++) for (var c2 = 0; c2 < cols; c2++) if (isPic(r2, c2)) groups[owner[r2][c2]].push({ r: r2, c: c2, color: b[r2][c2], band: band[r2][c2], dist: dist[r2][c2] });
++    groups.forEach(function (g) { g.sort(function (x, y) { return (x.band - y.band) || (x.dist - y.dist) || (y.r - x.r) || (x.c - y.c); }); });
++    return { groups: groups };
++  }
++
++  // 选项A：某色在各组计数出现 (0,30) 碎片 → 整色并入其最大组，不跨组拆。
++  function mergeSliverColors(groups) {
++    var info = {}, G = groups.length;
++    groups.forEach(function (g, gi) { g.forEach(function (x) { var it = info[x.color] || (info[x.color] = { cnt: [], balls: [] }); if (!it.cnt.length) { for (var i = 0; i < G; i++) { it.cnt.push(0); it.balls.push([]); } } it.cnt[gi]++; it.balls[gi].push(x); }); });
++    var out = groups.map(function () { return []; });
++    for (var col in info) {
++      var it = info[col], sliver = it.cnt.some(function (c) { return c > 0 && c < 30; });
++      if (sliver) { var mg = 0; for (var i = 1; i < G; i++) if (it.cnt[i] > it.cnt[mg]) mg = i; for (var j = 0; j < G; j++) out[mg].push.apply(out[mg], it.balls[j]); }
++      else for (var k = 0; k < G; k++) out[k].push.apply(out[k], it.balls[k]);
++    }
++    out.forEach(function (g) { g.sort(function (x, y) { return (x.band - y.band) || (x.dist - y.dist) || (y.r - x.r) || (x.c - y.c); }); });
++    return out;
++  }
++
++  function colorName(id) {
++    return AntSolver.getColorName ? AntSolver.getColorName(id) : String(id);
++  }
++  function colorBrightness(id) {
++    var hex = AntSolver.getColorCSS ? AntSolver.getColorCSS(id) : '';
++    var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
++    if (!m) return 0.5;
++    var n = parseInt(m[1], 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
++    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
++  }
++  function clamp(v, lo, hi) {
++    if (v < lo) return lo;
++    if (v > hi) return hi;
++    return v;
++  }
++
++  // 目标图颜色角色识别：
++  // - blocker：轮廓/阻隔色。典型特征是深色/灰黑、高跨色边界、跨多个 band，适合拆成小容量多盒并分散释放。
++  // - mass：大块连色。典型特征是最大同色连通块占比高、同色邻接强，适合合并成少量大盒快速消除。
++  function analyzeColorRoles(blocks, band, opts) {
++    opts = opts || {};
++    var rows = blocks.length, cols = blocks[0].length, bg = 0, stats = {}, r, c;
++    function ensure(color) {
++      var k = String(color);
++      if (!stats[k]) stats[k] = {
++        color: color, name: colorName(color), total: 0, minBand: Infinity, maxBand: -Infinity,
++        sameEdges: 0, diffEdges: 0, emptyEdges: 0, components: 0, maxComp: 0
++      };
++      return stats[k];
++    }
++    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
++      var color = blocks[r][c];
++      if (color === bg) continue;
++      var s = ensure(color);
++      s.total++;
++      var b = band && band[r] ? band[r][c] : 0;
++      if (b < s.minBand) s.minBand = b;
++      if (b > s.maxBand) s.maxBand = b;
++      for (var d = 0; d < DIRS.length; d++) {
++        var nr = r + DIRS[d][0], nc = c + DIRS[d][1];
++        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || blocks[nr][nc] === bg) s.emptyEdges++;
++        else if (blocks[nr][nc] === color) s.sameEdges++;
++        else s.diffEdges++;
++      }
++    }
++    var seen = grid(rows, cols, 0), q = [];
++    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
++      var col = blocks[r][c];
++      if (col === bg || seen[r][c]) continue;
++      var head = 0, cnt = 0; seen[r][c] = 1; q.length = 0; q.push([r, c]);
++      while (head < q.length) {
++        var cur = q[head++], cr = cur[0], cc = cur[1]; cnt++;
++        for (var dd = 0; dd < DIRS.length; dd++) {
++          var rr = cr + DIRS[dd][0], cc2 = cc + DIRS[dd][1];
++          if (rr < 0 || rr >= rows || cc2 < 0 || cc2 >= cols || seen[rr][cc2] || blocks[rr][cc2] !== col) continue;
++          seen[rr][cc2] = 1; q.push([rr, cc2]);
++        }
++      }
++      var ss = ensure(col);
++      ss.components++;
++      if (cnt > ss.maxComp) ss.maxComp = cnt;
++    }
++    var maxTotal = 1;
++    Object.keys(stats).forEach(function (k) { if (stats[k].total > maxTotal) maxTotal = stats[k].total; });
++    var blockerMax = opts.blockerMaxColors != null ? opts.blockerMaxColors : 1;
++    var massMax = opts.massMaxColors != null ? opts.massMaxColors : 3;
++    var list = Object.keys(stats).map(function (k) {
++      var s = stats[k], name = s.name || '', bright = colorBrightness(s.color);
++      var darkName = /黑|深灰/.test(name) ? 1 : (/中灰|灰色|深棕|灰蓝/.test(name) ? 0.55 : 0);
++      var darkScore = Math.max(darkName, bright < 0.14 ? 1 : (bright < 0.32 ? 0.65 : 0));
++      var boundaryRatio = s.diffEdges / Math.max(1, s.diffEdges + s.sameEdges);
++      var bandSpan = (s.maxBand > s.minBand && isFinite(s.minBand)) ? clamp((s.maxBand - s.minBand) / Math.max(1, s.maxBand), 0, 1) : 0;
++      var compScore = clamp(s.components / 10, 0, 1);
++      var maxCompRatio = s.total ? s.maxComp / s.total : 0;
++      var blockerScore = 0.42 * boundaryRatio + 0.22 * bandSpan + 0.26 * darkScore + 0.10 * compScore;
++      var massScore = 0.38 * (s.total / maxTotal) + 0.38 * maxCompRatio + 0.24 * (1 - boundaryRatio);
++      s.brightness = +bright.toFixed(3);
++      s.boundaryRatio = +boundaryRatio.toFixed(3);
++      s.bandSpan = +bandSpan.toFixed(3);
++      s.maxCompRatio = +maxCompRatio.toFixed(3);
++      s.blockerScore = +blockerScore.toFixed(3);
++      s.massScore = +massScore.toFixed(3);
++      s.role = 'normal';
++      return s;
++    });
++    var blockerCandidates = list.filter(function (s) {
++      var darkEnough = s.color === 33 || /黑|深灰/.test(s.name || '') || s.brightness < 0.16;
++      return s.total >= 20 && (
++        (darkEnough && s.boundaryRatio >= 0.08) ||
++        (s.boundaryRatio >= 0.38 && s.bandSpan >= 0.18 && s.maxCompRatio <= 0.98)
++      );
++    }).sort(function (a, b) { return b.blockerScore - a.blockerScore || b.total - a.total; });
++    if (!blockerCandidates.length) {
++      blockerCandidates = list.filter(function (s) { return s.total >= 20; })
++        .sort(function (a, b) { return b.blockerScore - a.blockerScore || b.total - a.total; })
++        .slice(0, 1);
++    }
++    for (var bi = 0; bi < Math.min(blockerMax, blockerCandidates.length); bi++) blockerCandidates[bi].role = 'blocker';
++    var massCandidates = list.filter(function (s) {
++      return s.role !== 'blocker' && s.total >= 45 && s.maxComp >= 30 && s.maxCompRatio >= 0.30;
++    }).sort(function (a, b) { return b.massScore - a.massScore || b.total - a.total; });
++    if (!massCandidates.length) {
++      massCandidates = list.filter(function (s) { return s.role !== 'blocker' && s.total >= 45; })
++        .sort(function (a, b) { return b.massScore - a.massScore || b.total - a.total; })
++        .slice(0, 1);
++    }
++    for (var mi = 0; mi < Math.min(massMax, massCandidates.length); mi++) massCandidates[mi].role = 'mass';
++    var roleByColor = {};
++    list.forEach(function (s) { roleByColor[s.color] = s; });
++    return { colors: list.sort(function (a, b) { return b.total - a.total; }), byColor: roleByColor };
++  }
++
++  // 模型A切盒：每(组,色)偶分成 [30,70]；再促成 ≤bigMax 个大盒(相邻合并到[71,100])。
++  function cutBoxesA(groupsIn, opts) {
++    var bigMax = opts.bigMax != null ? opts.bigMax : 5;
++    // 目标平均容量（用户裁定 35-45，取 ~40）。每(组,色)按 N/avg 切，clamp 使单盒容量落在 [30, hi]。
++    //   hi 由 avg 定：avg≤~45 时上界取 ~2×avg-30 附近（这里用 min(70, avg+15) 让盒不偏离均值太远，但≥50 兼容中盒）。
++    var avg = opts.avg != null ? opts.avg : 40;
++    // 单盒下限（用户「55px 图不够大→统一降低平均盒容量」需要放开原写死的 30）。默认 30 = 旧行为。
++    var minBox = opts.minBox != null ? opts.minBox : 30;
++    // 单盒上界：不再无条件≥50（那会顶死低 avg）。取 max(avg+15, minBox+10) 上限 70 →
++    //   avg40/minBox30 得 55(与旧一致)；avg25/minBox20 得 40(允许小盒)。
++    var hiCap = Math.min(70, Math.max(avg + 15, minBox + 10));
++    var tierOf = function (n) { return n >= 71 ? '大' : (n >= 51 ? '中' : (n >= minBox ? '小' : '欠')); };
++    var roles = opts.colorRoles && opts.colorRoles.byColor ? opts.colorRoles.byColor : {};
++    function roleFor(color) { return roles[color] || null; }
++    function splitParams(color) {
++      var role = roleFor(color), roleName = role && role.role;
++      if (roleName === 'blocker') {
++        var heavyRatio = role && role.total >= 600 ? 0.68 : (role && role.total >= 450 ? 0.62 : 0.56);
++        var bMin = opts.blockerMinBox != null ? opts.blockerMinBox : Math.max(18, Math.round(avg * 0.45));
++        var bAvg = opts.blockerAvg != null ? opts.blockerAvg : Math.max(bMin + 2, Math.round(avg * heavyRatio));
++        var bHi = opts.blockerHiCap != null ? opts.blockerHiCap : Math.max(bAvg + 4, Math.round(avg * 0.92));
++        return { role: 'blocker', min: bMin, avg: bAvg, hi: bHi };
++      }
++      if (roleName === 'mass') {
++        var mMin = opts.massMinBox != null ? opts.massMinBox : Math.max(minBox, Math.round(avg * 0.80));
++        var mAvg = opts.massAvg != null ? opts.massAvg : Math.max(mMin + 4, Math.round(avg * 1.45));
++        var mHi = opts.massHiCap != null ? opts.massHiCap : Math.max(mAvg + 8, Math.min(110, Math.round(avg * 1.85)));
++        return { role: 'mass', min: mMin, avg: mAvg, hi: mHi };
++      }
++      return { role: 'normal', min: minBox, avg: avg, hi: hiCap };
++    }
++    var groups = mergeSliverColors(groupsIn), boxes = [];
++    groups.forEach(function (g, gi) {
++      var byColor = {}; g.forEach(function (x) { (byColor[x.color] || (byColor[x.color] = [])).push(x); });
++      for (var colS in byColor) {
++        var arr = byColor[colS], N = arr.length, color = +colS;
++        var sp = splitParams(color);
++        if (N < sp.min) { boxes.push({ group: gi, color: color, count: N, minBand: arr[0].band, tier: '欠', role: sp.role }); continue; }
++        // k = 目标盒数(按 avg)，clamp 到 [ceil(N/hiCap), floor(N/minBox)] 保证单盒 ∈ [minBox, hiCap]。
++        var k = Math.round(N / sp.avg); k = Math.max(Math.ceil(N / sp.hi), Math.min(k, Math.floor(N / sp.min))); if (k < 1) k = 1;
++        var base = Math.floor(N / k), extra = N % k, idx = 0;
++        for (var j = 0; j < k; j++) { var cnt = base + (j < extra ? 1 : 0); var slice = arr.slice(idx, idx + cnt); idx += cnt; boxes.push({ group: gi, color: color, count: cnt, minBand: slice[0].band, tier: tierOf(cnt), role: sp.role }); }
++      }
++    });
++    // 大盒促成：阻隔色不参与；大块连色优先，避免把轮廓/黑色重新合并成大容量突破球。
++    var made = 0, byGC = {};
++    boxes.forEach(function (b, i) { var key = b.group + '|' + b.color; (byGC[key] || (byGC[key] = [])).push(i); });
++    var keys = Object.keys(byGC).filter(function (key) {
++      var first = boxes[byGC[key][0]];
++      return first && first.role !== 'blocker';
++    }).sort(function (a, z) {
++      var ba = boxes[byGC[a][0]], bz = boxes[byGC[z][0]];
++      var ra = ba && ba.role === 'mass' ? 1 : 0, rz = bz && bz.role === 'mass' ? 1 : 0;
++      return (rz - ra) || (byGC[z].length - byGC[a].length);
++    });
++    for (var ki = 0; ki < keys.length && made < bigMax; ki++) {
++      var idxs = byGC[keys[ki]];
++      for (var t = 0; t + 1 < idxs.length && made < bigMax; t++) {
++        var i1 = idxs[t], i2 = idxs[t + 1];
++        if (!boxes[i1] || !boxes[i2]) continue;
++        var s = boxes[i1].count + boxes[i2].count;
++        if (s >= 71 && s <= 110) { boxes[i1] = { group: boxes[i1].group, color: boxes[i1].color, count: s, minBand: Math.min(boxes[i1].minBand, boxes[i2].minBand), tier: '大', role: boxes[i1].role }; boxes[i2] = null; made++; t++; }
++      }
++    }
++    return { boxes: boxes.filter(Boolean), bigUsed: made, colorRoles: opts.colorRoles || null };
++  }
++
++  /**
++   * 主入口。blocks=目标图(实心)，config 可选 { anchors:[{r,c}...] 或 anchorMode:'double'|'single', bigBoxMax }。
++   * 返回 [{color, count, elimSeq}]（进度错位：A 组按 minBand 升序在前，B 组在后）。
++   */
++  function cutBoxes(blocks, config) {
++    config = config || {};
++    var rows = blocks.length, cols = blocks[0].length, bg = 0;
++    var band = colorBands(blocks, rows, cols, bg);
++    var anchors = config.anchors;
++    if (!anchors) {
++      if (config.anchorMode === 'single') anchors = [{ r: rows - 1, c: Math.floor(cols / 2) }];
++      else anchors = [{ r: rows - 1, c: 0 }, { r: rows - 1, c: cols - 1 }]; // 默认双锚点 左下+右下
++    }
++    var scan = anchorScan(blocks, rows, cols, bg, band, anchors);
++    var colorRoles = config.roleAwareCutEnabled === false ? null : analyzeColorRoles(blocks, band, {
++      blockerMaxColors: config.blockerRoleMaxColors,
++      massMaxColors: config.massRoleMaxColors
++    });
++    var cr = cutBoxesA(scan.groups, {
++      bigMax: config.bigBoxMax != null ? config.bigBoxMax : 5,
++      avg: config.boxAvg != null ? config.boxAvg : 40,   // 平均容量目标（用户 35-45，默认 40）
++      minBox: config.boxMinCap != null ? config.boxMinCap : 30,   // 单盒下限（大棋盘小图时下调，默认 30）
++      colorRoles: colorRoles,
++      blockerMinBox: config.blockerBoxMin,
++      blockerAvg: config.blockerBoxAvg,
++      blockerHiCap: config.blockerBoxHi,
++      massMinBox: config.massBoxMin,
++      massAvg: config.massBoxAvg,
++      massHiCap: config.massBoxHi
++    });
++    function orderGroupBoxes(g) {
++      function baseSort(x, y) { return (x.minBand - y.minBand) || (y.count - x.count); }
++      var blockers = [], others = [];
++      g.forEach(function (b) { (b.role === 'blocker' ? blockers : others).push(b); });
++      others.sort(baseSort);
++      blockers.sort(baseSort);
++      if (!blockers.length) return others;
++      if (!others.length) return blockers;
++      // 核心阻隔色拆小后必须跨阶段释放：把 blocker 均匀插入其它颜色序列，
++      // 避免同一进度窗口连续出现大量黑/深灰小盒，既保留阻隔预算，又不制造同色刷屏。
++      var L = g.length, slots = new Array(L), used = {};
++      function nearestFree(pos) {
++        pos = Math.max(0, Math.min(L - 1, pos));
++        if (!used[pos]) return pos;
++        for (var d = 1; d < L; d++) {
++          if (pos - d >= 0 && !used[pos - d]) return pos - d;
++          if (pos + d < L && !used[pos + d]) return pos + d;
++        }
++        return -1;
++      }
++      for (var i = 0; i < blockers.length; i++) {
++        var want = Math.floor((i + 0.5) * L / blockers.length);
++        var at = nearestFree(want);
++        if (at >= 0) { slots[at] = blockers[i]; used[at] = 1; }
++      }
++      var oi = 0;
++      for (var p = 0; p < L; p++) if (!slots[p]) slots[p] = others[oi++];
++      return slots.filter(Boolean);
++    }
++    // 进度错位：按组序(A=0先, B=1后)，组内基础按 minBand 升序(外→内)，并将阻隔色均匀插入各阶段。
++    var byGroup = anchors.map(function () { return []; });
++    cr.boxes.forEach(function (b) { byGroup[b.group].push(b); });
++    var ordered = [];
++    byGroup.forEach(function (g) { ordered.push.apply(ordered, orderGroupBoxes(g)); });
++    return ordered.map(function (b, i) { return { color: b.color, count: b.count, elimSeq: i, role: b.role, group: b.group, minBand: b.minBand }; });
++  }
++
++  AntSolver.AnchorCut = {
++    colorBands: colorBands, anchorScan: anchorScan, mergeSliverColors: mergeSliverColors,
++    analyzeColorRoles: analyzeColorRoles,
++    cutBoxesA: cutBoxesA, cutBoxes: cutBoxes
++  };
++  if (typeof module !== 'undefined' && module.exports) module.exports = AntSolver.AnchorCut;
++})();
+diff -ruN a/bin/js/app.js b/bin/js/app.js
+--- a/bin/js/app.js	2026-10-14 16:29:34
++++ b/bin/js/app.js	2026-10-14 16:29:34
+@@ -488,6 +488,10 @@
+     // v110 补入：底部并行吐球路数（ANT-GEN-BOTTOM-PARALLEL-V3-20260826）。
+     // 它决定底部消除的盒队列交错程度，直接影响产出结构，必须随方案走。
+     'gen-box-parallel',
++    // v137 补入：切盒方式（趋势切 / 锚点切盒）。
++    // 与上面几个是同一性质的坑：不进白名单 = 存了方案也存不住、加载后回落 HTML 默认值「趋势切」，
++    // 用户以为在用锚点切盒、实际跑的是趋势切（静默回退，最难查的那种）。
++    'gen-box-cut',
+     // v114 补入：填盘局部交错窗口（ANT-GEN-FILL-INTERLEAVE-20260827）。
+     // 它决定盒怎么摆到棋盘（前几行是否一整排同色），直接影响产出结构，必须随方案走。
+     'gen-fill-interleave',
+@@ -1002,6 +1006,10 @@
+       // 生成器侧会据此贯通盒切分、候选筛选、卡点、全知求解、玩家模拟、审核与难度。
+       bottomOnly: ((document.getElementById('gen-bottom-only') || {}).value === '1'),
+       instantChain: ((document.getElementById('gen-bottom-only') || {}).value === '2'),
++      // ===== 【v137】切盒方式（用户 2026-10-14 批准）=====
++      // 'anchor' = 锚点切盒（双锚点分成 A/B 两片，A 片整车先出、B 片后出；用来把暂存压力顶起来）
++      // 其余/缺控件 = 'trend'（现有几何趋势切）——不选它，生产口径与本次改动前逐字节一致。
++      boxCutMode: ((document.getElementById('gen-box-cut') || {}).value === 'anchor') ? 'anchor' : 'trend',
+       // ===== v99 瞬时连锁专用参数（其他两种模式忽略；缺控件时退回原行为）=====
+       // 管道数下限：0 = 不约束（原行为）
+       minPipes: parseInt((document.getElementById('gen-min-pipes') || {}).value) || 0,
+@@ -3810,7 +3818,9 @@
+     if (!result || !result.level) {
+       var why = (result && result.lastFailReason) || 'noCandidate';
+       var detail = (result && result.structural && result.structural.reason) || '';
+-      var cn = { fragmentGateBlocked: '碎色超限', bottomEntryInfeasible: '底部入口不可达', noCandidate: '候选全灭' };
++      var cn = { fragmentGateBlocked: '碎色超限', bottomEntryInfeasible: '底部入口不可达',
++                 boardRangeMismatch: '棋盘范围与车数不匹配',   // 【v137】可读原因：预检判定必然淘汰，附建议行列
++                 noCandidate: '候选全灭' };
+       return {
+         name: entry.name, txt: entry.txt || null, level: null, valid: false,
+         gateBlocked: true, gateReason: why, gateReasonCN: cn[why] || why,
+@@ -4059,6 +4069,11 @@
+     var tierTxt = rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '合格' : '不可解'));
+     genLog(entry.name + '  ' + dt + 's  ' + tierTxt + (rec.valid ? ('  难度' + rec.difficulty + '[' + rec.grade + ']') : ''),
+       rec.fallback ? 'gen-log-warn' : (rec.audit && (rec.audit.tier === '合格' || rec.audit.tier === '困难合格') ? 'gen-log-ok' : ''));
++    // 【v137】棋盘范围偏大/偏小的提醒（没到"必然淘汰"那一档，所以照常跑，只是先让你看见）。
++    // 命中"必然淘汰"的那一档走上面 gateBlocked 分支，直接给可读原因 + 建议行列。
++    if (result && result.boardFit && result.boardFit.warn) {
++      genLog('⚠ ' + entry.name + '  ' + result.boardFit.warn, 'gen-log-warn');
++    }
+     if (genPersist.enabled) {
+       genPersistOne('result', inputIndex, genPersistPayload(entry, rec, result), next);
+     } else if (typeof next === 'function') next();
+@@ -4444,9 +4459,27 @@
+           var q = (j && j.qualified != null) ? j.qualified : '?';
+           var u = (j && j.unqualified != null) ? j.unqualified : '?';
+           var er = (j && j.errors != null) ? j.errors : '?';
+-          var msg = (genBatchAborted ? '生产已停止' : '生产完成') + '　输出目录：' + relDir + '　合格 ' + q + ' / 不合格 ' + u + ' / 异常 ' + er;
++          // 【v137】把「跳过」和它的原因一起写在完成行里。
++          //   原先只有「合格 0 / 不合格 0 / 异常 0」——被前置闸门/预检挡掉的输入完全隐形，
++          //   用户看到的就是「什么都没产出，也没说为什么」（原话就是这一条）。
++          var skipped = [], skipByName = {};
++          results.forEach(function (r) {
++            if (r && r.gateBlocked) {
++              var why = r.gateReasonCN || r.gateReason || '未知原因';
++              skipped.push(r.name + '（' + why + '）');
++              skipByName[why] = (skipByName[why] || 0) + 1;
++            }
++          });
++          var skipStr = skipped.length
++            ? ('　跳过 ' + skipped.length + '（' + Object.keys(skipByName).map(function (k) { return k + ' ×' + skipByName[k]; }).join('；') + '）')
++            : '';
++          var msg = (genBatchAborted ? '生产已停止' : '生产完成') + '　输出目录：' + relDir + '　合格 ' + q + ' / 不合格 ' + u + ' / 异常 ' + er + skipStr;
+           genLog(msg, 'gen-log-ok');
+           genPersistStatusEl(msg, 'ok');
++          // 跳过的每一关都把原因摊开写（最多 5 条），不用去翻逐关记录才知道为什么没产出。
++          if (skipped.length) {
++            genLog('（跳过明细）' + skipped.slice(0, 5).join('；') + (skipped.length > 5 ? ('；…共 ' + skipped.length + ' 关') : ''), 'gen-log-warn');
++          }
+           var curEl2 = document.getElementById('gen-progress-current');
+           if (curEl2) curEl2.textContent = (genBatchAborted ? '已停止' : '已完成') + '，输出目录：' + relDir;
+         })
+@@ -4476,6 +4509,14 @@
+       ' · 有卡点合格: ' + hardCount + ' · 简单关·趋势过平: ' + easyCount +
+       ((fallbackTimeout + fallbackExhausted) ? ' · 兜底(超时' + fallbackTimeout + '/穷尽' + fallbackExhausted + ')' : '') +
+       ' · 难度分布: ' + gradeStr);
++    // 【v137】兜底模式同样把「跳过」与原因摊开（与正式落库路径口径一致）
++    var skippedFB = results.filter(function (r) { return r && r.gateBlocked; });
++    if (skippedFB.length) {
++      var fbByName = {};
++      skippedFB.forEach(function (r) { var w = r.gateReasonCN || r.gateReason || '未知原因'; fbByName[w] = (fbByName[w] || 0) + 1; });
++      genLog('跳过 ' + skippedFB.length + ' 关（' + Object.keys(fbByName).map(function (k) { return k + ' ×' + fbByName[k]; }).join('；') + '）；明细：'
++        + skippedFB.slice(0, 5).map(function (r) { return r.name + '（' + (r.gateReasonCN || '') + '）'; }).join('；'), 'gen-log-warn');
++    }
+ 
+     // 结果表(排序/分组展示，见 renderGenResultTable)：先出结果表，再打包下载，用户能立刻看到每关明细。
+     var resultCard = document.getElementById('gen-result-card');
+diff -ruN a/bin/js/generator.js b/bin/js/generator.js
+--- a/bin/js/generator.js	2026-10-14 16:29:34
++++ b/bin/js/generator.js	2026-10-14 16:29:34
+@@ -40,6 +40,20 @@
+     // polar 模式专用（其他模式忽略）：两端窄带的命中概率与窄带宽度占区间比例
+     boxSizePolarBias: 0.7,
+     boxSizePolarBandRatio: 0.25,
++    // ===== 盒切分方式（v137，用户 2026-10-14 批准移植）=====
++    // 'trend'（默认）= 现有几何趋势流切分（baseFillBoxes / 底部模式 baseFillBoxesBottom）；
++    // 'anchor'        = 锚点切盒（AntSolver.AnchorCut，双锚点分成 A/B 两片，**A 片整车先出、B 片后出**）。
++    //   ★ 默认 'trend' 时 pickBoxSplit 里那段分支整段不进 → 现有生产口径与本次改动前逐字节一致。
++    //   为什么要它：趋势切永远挑"当前最好摸的颜色"，玩家手上不攒色 → 实测 14 组参数后期峰窗最高只到 2.0
++    //   （合格线 3.2 / 简单关线 2.5），压力调不出来；锚点切盒靠"同色前后各来一次"把暂存顶起来。
++    boxCutMode: 'trend',
++    // —— 锚点切盒专用参数（仅 boxCutMode:'anchor' 生效；沿用沙盒 anchor-cut.js 的原生字段名）——
++    // 双锚点 = 左下 + 右下；'single' = 只留底部中点（A/B 退化为单组，对照用）
++    anchorMode: 'double',
++    anchorBigBoxMax: 5,        // 最多促成几个「大盒」（≥71 像素的整车，用于吃掉大块连色）
++    anchorBoxAvg: null,        // 目标平均盒容量；null → 取 boxSizeMin/Max 中值（用户拍板：不新增输入框）
++    anchorMinBoxCap: null,     // 单盒容量下限；null → 取 boxSizeMin
++    anchorRoleAwareCut: true,  // 按颜色角色切（阻隔色拆成小盒分阶段释放、大块连色合并成大盒）
+     // ===== 底部消除·多色并行吐球（v110，任务 ANT-GEN-BOTTOM-PARALLEL-V3-20260826）=====
+     // 只作用于 bottomOnly 分支的盒切分（baseFillBoxesBottom），四方向分支不受影响。
+     // 同时保持 P 个颜色在累积单盒进度，tick 轮询、装满即挤出 → 盒队列天然交错。
+@@ -3486,6 +3500,22 @@
+         lastFailReason: 'fragmentGateBlocked'
+       };
+     }
++    // 【v137】棋盘范围 × 车数 预检（用户 2026-10-14 批准）。
++    //   与上面两个前门同一位置、同一返回结构：命中「必然淘汰」时直接判结构不适配、不进候选、不烧时间预算，
++    //   并把原因与建议写进 structural.reason（→ 逐关记录的「错误」字段，页面日志同一条）。
++    //   boardFitGuard 三态：'block'(默认，确实必然淘汰就拦) / 'warn'(只在日志提醒，照常跑) / 'off'(不检查)。
++    var boardFitGuard = config.boardFitGuard || 'block';
++    var boardFit = (boardFitGuard === 'off') ? null : preflightBoardFit(blocks, config);
++    if (boardFit && !boardFit.ok && boardFitGuard === 'block') {
++      return {
++        level: null, valid: false, flow: 'new_fixed',
++        entryMode: (config.instantChain ? 'fourSideInstantChain' : (config.bottomOnly ? 'bottomOnly' : 'fourSide')),
++        boardFit: boardFit,
++        timedOut: false, elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++        structural: { ok: false, reason: boardFit.detail },
++        lastFailReason: 'boardRangeMismatch'
++      };
++    }
+     // 【卡点类型计划】每关抽一次，经 config._chokePlan 透传给候选层与卡点变体层。
+     //   在这里抽而不在候选层抽的理由：候选层会被 maxRetries 重试、K 个候选各跑一遍，
+     //   逐次重抽会让同一关累计用到远超配额的类型，违背用户要求①（每关按数量）与②（不重合）。
+@@ -3508,17 +3538,23 @@
+       }
+       var out = finalizeProduce(c, K, evaluated);
+       if (!out) {
++        // 【v137】失败也要带出「为什么全灭」：候选淘汰计数 + 棋盘预检结论（原先只剩「候选全灭：」四个字）。
++        var diag = diagnoseNoCandidate(flowStats, boardFit);
+         return {
+           level: null, valid: false, flow: 'new_fixed', flowStats: flowStats,
+           timedOut: timedOut, elapsedMs: Date.now() - t0, candidates: K, treeEvaluated: evaluated,
+           // 失败也要带出本关抽了哪些卡点类型——否则「开了类型后产不出关」时无从判断是哪种类型导致，
+           // 会变成又一个观测盲区。
+-          chokePlan: levelChokePlan, lastFailReason: 'noCandidate',
++          chokePlan: levelChokePlan,
++          lastFailReason: diag ? diag.reason : 'noCandidate',
++          structural: diag ? { ok: false, reason: diag.detail, failCounts: flowStats.fail } : null,
++          boardFit: boardFit || null,
+           perf: getGenPerf()
+         };
+       }
+       out.flow = 'new_fixed';
+       if (!out.chokePlan) out.chokePlan = levelChokePlan;   // 变体分支未透传时兜底补上
++      if (boardFit) out.boardFit = boardFit;                // 成功也带上预检（供页面提示 warn，不改结果）
+       out.flowStats = flowStats;
+       out.perf = getGenPerf();
+       out.perf.solver = (AntSolver.Solver && AntSolver.Solver.getPerf) ? AntSolver.Solver.getPerf() : null;
+@@ -5492,8 +5528,34 @@
+    *   bottomOnly=true  → baseFillBoxesBottom（底部依赖流）
+    *   baseFillByElimOrder!==false → baseFillBoxes（默认：几何趋势流）
+    *   否则 → solverGuidedBoxes（旧的"贪心可达最多色"序，其内部也已按 config.bottomOnly 取可达口径）
++   *   【v137】boxCutMode==='anchor' → AntSolver.AnchorCut（锚点切盒，A 片先出/B 片后出；默认不走）
+    */
++  /**
++   * 【v137】锚点切盒的配置组装：把生成器的通用参数翻译成 AnchorCut 需要的口径。
++   * 用户 2026-10-14 拍板：均值取 boxSizeMin/Max 的中值、单盒下限取 boxSizeMin，**不新增输入框**。
++   */
++  function anchorCutConfig(config) {
++    var bMin = config.boxSizeMin || 35, bMax = config.boxSizeMax || 80;
++    if (bMax < bMin) { var t = bMin; bMin = bMax; bMax = t; }
++    return {
++      anchors: config.anchorAnchors || null,
++      anchorMode: config.anchorMode || 'double',
++      bigBoxMax: config.anchorBigBoxMax != null ? config.anchorBigBoxMax : 5,
++      boxAvg: config.anchorBoxAvg != null ? config.anchorBoxAvg : Math.round((bMin + bMax) / 2),
++      boxMinCap: config.anchorMinBoxCap != null ? config.anchorMinBoxCap : bMin,
++      roleAwareCutEnabled: config.anchorRoleAwareCut !== false
++    };
++  }
++
+   function pickBoxSplit(blocks, config) {
++    // ===== v137 锚点切盒（可选；boxCutMode 默认 'trend'，不进这段）=====
++    //   失败（拿不到盒/抛错）就落回默认切法 —— 新模式不许把关卡生产整死。
++    if (config.boxCutMode === 'anchor' && AntSolver.AnchorCut && AntSolver.AnchorCut.cutBoxes) {
++      try {
++        var anchorBoxes = AntSolver.AnchorCut.cutBoxes(blocks, anchorCutConfig(config));
++        if (anchorBoxes && anchorBoxes.length) return anchorBoxes;
++      } catch (e) { /* 落回默认切法 */ }
++    }
+     // 瞬时连锁模式固定四方向：绝不走底部依赖流分支（需求 §七.3：不得继承底部单入口结构限制）。
+     // 盒切分本身复用现有四方向口径，不新写第二套可达算法（需求 §十二）。
+     if (config.instantChain) {
+@@ -5503,7 +5565,137 @@
+     return config.baseFillByElimOrder !== false ? baseFillBoxes(blocks, config) : solverGuidedBoxes(blocks, config);
+   }
+ 
++  /* ==================== 【v137】棋盘范围 × 车数 预检 ====================
++   * 用户 2026-10-14 批准：「把『棋盘范围跟车数不匹配』做成开工前的拦截提示，免得再出现 0/0/0 却看不出原因」。
++   *
++   * 【症状】页面上只有「生产完成　合格 0 / 不合格 0 / 异常 0」，看不出为什么。实测（用户 Level4_目标图_27x32.txt，
++   *   641 像素 / 5 色 / 约 20 辆车，行列 8~9 × 11~16）：8 个候选全部栽在结构层的 structSurplus，
++   *   detail = 「空格63 > 盒数20，多余空格无法全部转黑块」，而这条 detail 一路被折叠成 lastFailReason:'noCandidate'
++   *   → 落到记录里只剩「候选全灭：」四个字。
++   *
++   * 【必然淘汰的判据】结构层第③步「多余空格转黑块」的硬上限是 **45% 格数**（fillSurplusWithBlack 的 cap），
++   *   所以任何尺寸下最终空格 ≥ 55% 格数；而「空格 > 盒数」即淘汰（structSurplus）。
++   *   ⇒ 当 **车数 < 0.55 × 范围内能取到的最小格数** 时，无论随机到哪个尺寸都必然淘汰。
++   *
++   * 【口径：宁可漏报，不误杀】
++   *   · 车数 n = 切盒跑 3 次取**最小**值（盒容量是随机采样，取最小=最保守）。
++   *   · 最小/最大格数 = 方案范围内形态合法(列−行∈{1,2})的组合 ∪ 可用空间目标的「逐行向下缩小」路径
++   *     （行 ≥ max(6, rowsMin−3)、列 = 行+1/行+2），取最小/最大面积。
++   *   · 只在「必然淘汰」时拦截（boardFitGuard:'block'，默认）；其余只 warn（偏大/偏小），不改生产结果。
++   */
++  function boardCellsExtent(config) {
++    var rMin = clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20);
++    var rMax = clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20);
++    var cMin = clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30);
++    var cMax = clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30);
++    var minA = Infinity, maxA = 0, minDim = null, maxDim = null, legal = 0;
++    function consider(r, c) {
++      if (!boardShapeOk(r, c)) return;
++      var a = r * c; legal++;
++      if (a < minA) { minA = a; minDim = { rows: r, cols: c }; }
++      if (a > maxA) { maxA = a; maxDim = { rows: r, cols: c }; }
++    }
++    for (var r = rMin; r <= rMax; r++) for (var c = cMin; c <= cMax; c++) consider(r, c);
++    // 可用空间目标开启时，chooseBoardDimsFixed 允许「逐行向下缩小」到范围外（shrinkFloor = max(6, rMin-3)）
++    if (parseFloat(config.usableSpaceTarget) > 0) {
++      var floorR = Math.max(6, rMin - 3);
++      for (var sr = floorR; sr < rMin; sr++) { consider(sr, sr + 1); consider(sr, sr + 2); }
++    }
++    return { rowsMin: rMin, rowsMax: rMax, colsMin: cMin, colsMax: cMax,
++             cellsMin: minA, cellsMax: maxA, minDim: minDim, maxDim: maxDim, legalDims: legal };
++  }
++
++  /** 车数十几个 → 建议的行列范围（列−行∈{1,2} 的合法形态，给成「r~r+1 行 × r+1~r+2 列」） */
++  function suggestBoardRange(cars) {
++    var need = Math.max(4, Math.ceil(cars / 0.74));   // 0.74 = 现有可用空间目标的实测推荐值
++    for (var r = 3; r <= 8; r++) {
++      if (r * (r + 2) >= need) return { rowsMin: r, rowsMax: r + 1, colsMin: r + 1, colsMax: r + 2 };
++    }
++    return null;
++  }
++
++  function preflightBoardFit(blocks, config) {
++    var ext = boardCellsExtent(config);
++    var res = { ok: true, reason: null, detail: '', warn: null,
++                cars: null, cellsMin: ext.cellsMin, cellsMax: ext.cellsMax,
++                range: { rowsMin: ext.rowsMin, rowsMax: ext.rowsMax, colsMin: ext.colsMin, colsMax: ext.colsMax },
++                minDim: ext.minDim, maxDim: ext.maxDim, suggest: null };
++    if (!isFinite(ext.cellsMin) || ext.cellsMin <= 0) return res;   // 范围内没有形态合法的尺寸：不表态，交给现有兜底
++    // 【关键】预检**不许扰动生产的随机流**：盒容量是随机采样的，若在这里白抽几次 Math.random，
++    //   后面所有候选拿到的随机数就整体移位 → 「默认口径不变」就只剩口头承诺（实测会真的产出不同关卡）。
++    //   做法：切盒那 3 次用三个固定值顶替 Math.random（覆盖容量区间低/中/高三处），结束后立刻还原。
++    // 【判定用哪个数】取 3 次采样的【中位数】当拦截依据，另记最小/最大用于提示文案。三条口径实测对比：
++    //   · 用【最小】车数（最严）：会把正常能出关的配置也拦掉——用户那张 27×32 小图，容量一抽大车就少，
++    //     实测 4~5×6~7 这种本来能出关的配置被误杀（所以不采用）。
++    //   · 用【最大】车数（最松）：只有在"车最多也装不满最小盘"时才拦，绝不会误杀，但会放过一批
++    //     事实上必死的输入（用户那批 8~9×11~16 就是这种：车最多 24、最小盘 42 格，卡在临界点上）。
++    //   · 取【中位数】（本版采用）：拿"典型那次切盒"去比，既保住小图正常配置不误杀，
++    //     又能把用户那批这种"典型情况下装不满"的输入拦下来。boardFitGuard:'warn' 可改成只看提示不拦。
++    var nMin = Infinity, nMax = 0, nAll = [], savedRandom = Math.random;
++    var probe = [0.15, 0.5, 0.85];
++    try {
++      for (var i = 0; i < probe.length; i++) {
++        var v = probe[i];
++        Math.random = function () { return v; };
++        var b = null;
++        try { b = pickBoxSplit(blocks, config); } catch (e) { b = null; }
++        if (b && b.length) { nAll.push(b.length); if (b.length < nMin) nMin = b.length; if (b.length > nMax) nMax = b.length; }
++      }
++    } finally { Math.random = savedRandom; }
++    if (!nMax) return res;
++    nAll.sort(function (a, b2) { return a - b2; });
++    var nMed = nAll[Math.floor(nAll.length / 2)];   // 中位数：典型情况下的车数
++    var n = nMed;
++    res.cars = nMax; res.carsMed = nMed; res.carsMin = isFinite(nMin) ? nMin : nMax;
++    res.carsSamples = nAll.slice();
++    var rng = ext.rowsMin + '~' + ext.rowsMax + ' × ' + ext.colsMin + '~' + ext.colsMax;
++    if (n < 0.55 * ext.cellsMin) {
++      var sug = suggestBoardRange(n);
++      res.ok = false; res.reason = 'boardRangeMismatch'; res.suggest = sug;
++      res.detail = '这张图切出约 ' + res.carsMin + '~' + nMax + ' 辆车（典型 ' + nMed + ' 辆），而棋盘范围 ' + rng + ' 最小也是 '
++        + ext.minDim.rows + '×' + ext.minDim.cols + '=' + ext.cellsMin + ' 格；'
++        + '多余空格最多只能补成 45% 的黑块，剩下的空格必然多于车数 → 每个候选都会在结构层被淘汰'
++        + '（页面上表现为「合格 0 / 不合格 0 / 异常 0」）。'
++        + (sug ? '建议把行数范围改成 ' + sug.rowsMin + '~' + sug.rowsMax + '、列数范围改成 ' + sug.colsMin + '~' + sug.colsMax + ' 再试；'
++               : '建议把行列范围整体调小，或把盒容量调小让车变多（车数 ≈ 目标图像素数 ÷ 每车容量）。')
++        + '也可以直接把「切盒方式」换成锚点切盒后重试（它按平均容量切，车数与趋势切不同）。';
++      return res;
++    }
++    if (nMax < 0.75 * ext.cellsMin) {
++      var sug2 = suggestBoardRange(n);
++      res.suggest = sug2;
++      res.warn = '棋盘范围偏大：这张图切出约 ' + res.carsMin + '~' + nMax + ' 辆车，范围内最小盘 ' + ext.minDim.rows + '×' + ext.minDim.cols
++        + ' 格也偏空，容易整批候选全灭。'
++        + (sug2 ? ('建议行数 ' + sug2.rowsMin + '~' + sug2.rowsMax
++            + '、列数 ' + sug2.colsMin + '~' + sug2.colsMax + '。') : '');
++    } else if (res.carsMin > ext.cellsMax) {
++      res.warn = '棋盘范围偏小：车数至少 ' + res.carsMin + ' > 范围内最大盘 ' + ext.maxDim.rows + '×' + ext.maxDim.cols
++        + '=' + ext.cellsMax + ' 格，大量盒要走管道，可能撞管道容量/深度上限。';
++    }
++    return res;
++  }
++
+   /**
++   * 【v137】候选全灭时，把"到底为什么全灭"翻译成一句人话。
++   * 依据 = 各候选淘汰计数（flowStats.fail，由 recordAttempt 累加）+ 棋盘预检的结论。
++   * 原先该字段只有「候选全灭：」四个字（内层 detail 被折叠掉了），现在带上计数与主因。
++   */
++  function diagnoseNoCandidate(flowStats, fit) {
++    var f = (flowStats && flowStats.fail) || {}, total = 0, k;
++    for (k in f) total += (f[k] || 0);
++    if (!total) return null;
++    if (f.structSurplus && f.structSurplus >= total * 0.5) {
++      return { reason: 'boardRangeMismatch',
++               detail: (fit && fit.detail) ? fit.detail
++                 : ('结构层淘汰 ' + f.structSurplus + '/' + total + ' 次都是「多余空格 > 盒数」：棋盘比车数大太多，请把行列范围调小或把盒容量调小。') };
++    }
++    var top = null;
++    for (k in f) if (f[k] > 0 && (!top || f[k] > f[top])) top = k;
++    return { reason: 'noCandidate',
++             detail: '候选淘汰主因「' + top + '」' + f[top] + '/' + total + ' 次；全部计数 ' + JSON.stringify(f) };
++  }
++
++  /**
+    * 【仅底部入口】生产前可达性检查（原需求 §四 / 方案 C1）。
+    *
+    * 为什么必须查：Simulator.floodFillEliminate 的 reachable() 只从【底边】与【已消除格】扩散，
+@@ -6502,6 +6694,12 @@
+     // ===== 仅底部入口模式（ANT-GEN-BOTTOM-ONLY-20260729）=====
+     baseFillBoxesBottom: baseFillBoxesBottom,               // 底部依赖流盒切分（bottomOnly 分支）
+     pickBoxSplit: pickBoxSplit,                             // 盒切分分发点（新旧流程共用）
++    // 【v137】锚点切盒与棋盘预检：导出以便单测/脚本核对（不改变调用方行为）
++    anchorCutConfig: anchorCutConfig,                       // 锚点切盒参数组装
++    preflightBoardFit: preflightBoardFit,                   // 棋盘范围 × 车数 预检
++    boardCellsExtent: boardCellsExtent,                     // 方案范围内合法棋盘的最小/最大格数
++    suggestBoardRange: suggestBoardRange,                   // 由车数反推建议行列范围
++    diagnoseNoCandidate: diagnoseNoCandidate,               // 候选全灭的原因翻译
+     checkBottomEntryFeasibility: checkBottomEntryFeasibility, // 生产前可达性检查（可独立调用做源图体检）
+     // ===== 生产前置碎色闸门（ANT-GEN-FRAGMENT-GATE-20260824）=====
+     computeFragmentation: computeFragmentation,               // 只算碎色率，可独立调用做源图体检

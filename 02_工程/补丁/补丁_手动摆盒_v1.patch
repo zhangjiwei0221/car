@@ -1,0 +1,1466 @@
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白</title>
+-  <link rel="stylesheet" href="css/style.css?v=131">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算</title>
++  <link rel="stylesheet" href="css/style.css?v=136">
+ </head>
+ <body>
+   <header>
+@@ -18,9 +18,11 @@
+       <button id="btn-import-pack" title="导入整个关卡包文件夹（关卡/ + 审核数据/），自动配对求解数据">导入关卡包📁</button>
+       <button id="btn-generate">生成关卡</button>
+       <button id="btn-sample">示例100关</button>
++      <button id="btn-manual-edit" title="手动摆盒：车场里每格的车（颜色/载客量/空位/黑块）自己点着放。目标图仍用「导入TXT图」，也可以先「导入关卡包」把现成车场带进来再改。摆完可带入模拟器或导出关卡JSON/TXT">✏️ 手动摆盒</button>
+       <span class="sep">|</span>
+       <button id="btn-simulate" disabled>模拟游玩</button>
+       <button id="btn-exit-sim" class="hidden btn-warn">退出模拟</button>
++      <button id="btn-exit-edit" class="hidden btn-warn">退出摆盒</button>
+       <span class="sep">|</span>
+       <button id="btn-export" disabled>导出JSON</button>
+       <button id="btn-export-lib">导出关卡库</button>
+@@ -79,11 +81,104 @@
+         <div id="board-row">
+           <div id="board-queues"></div>
+         </div>
++        <!-- 【v132·手动摆盒】编辑态专用棋盘（与模拟棋盘分开，互不覆盖） -->
++        <div id="edit-board-wrap" class="hidden">
++          <div id="edit-board-hint" class="edit-board-hint"></div>
++          <div id="edit-board-queues"></div>
++        </div>
+       </section>
+     </main>
+ 
+     <!-- 右侧栏：模拟控制 + 暂存压力图（点「模拟游玩」后才展开 = 页面整体呈「左信息 | 中棋盘 | 右控制」三列） -->
+     <aside id="panel-right" class="hidden">
++      <!-- ==================== 【v132】手动摆盒工具条 ====================
++           进入「✏️ 手动摆盒」时显示（此时模拟控制栏隐藏），与模拟游玩共用右侧这一栏。
++           校验口径 = 生产侧那条守恒：每色车的载客量之和 == 小人板上该色像素数。 -->
++      <section id="edit-controls" class="hidden">
++        <h3>手动摆盒</h3>
++        <div class="ctl-row">
++          <label>车场</label>
++          <input type="number" id="edit-rows" value="4" min="1" max="40" style="width:52px" title="车场行数">
++          <span class="edit-x">×</span>
++          <input type="number" id="edit-cols" value="7" min="1" max="40" style="width:52px" title="车场列数">
++          <button id="edit-resize" title="按上面的行列重设车场尺寸（左上角原有内容保留）">重设</button>
++        </div>
++        <div class="ctl-row edit-row-top">
++          <label>颜色</label>
++        </div>
++        <div id="edit-palette" class="edit-palette"></div>
++        <div class="ctl-row">
++          <label>载客量</label>
++          <input type="number" id="edit-count" value="3" min="1" max="99" style="width:56px" title="一辆车装几个小人（真机通常 3）">
++          <span style="font-size:11px;color:#8a7358">点棋盘空格放车</span>
++        </div>
++        <div class="ctl-row">
++          <label>工具</label>
++          <select id="edit-tool" title="放车=点空格放/点车改写；橡皮=清空该格；黑块=永久阻挡；冰块/锁链/问号=给已放好的车加标记（单击切换）；管道=放管口并在下面编辑它的队列；吸管=把该格的颜色与载客量读进控件">
++            <option value="place" selected>🖐 放车 / 改写</option>
++            <option value="erase">🧽 橡皮（清空该格）</option>
++            <option value="black">⬛ 黑块（障碍）</option>
++            <option value="ice">❄ 冰块（给车加锁）</option>
++            <option value="chain">🔗 锁链（给车加链）</option>
++            <option value="question">❓ 问号（隐藏颜色）</option>
++            <option value="pipe">🪠 管道（放管口/改方向）</option>
++            <option value="pick">💧 吸管（取该格）</option>
++          </select>
++        </div>
++        <!-- 【v134】管道/锁链/冰块 参数行 -->
++        <div class="ctl-row">
++          <label>管道方向</label>
++          <select id="edit-pipe-dir" title="管道的出口方向（11↑ 12→ 13↓ 14←）。出口格空着时，队首那辆车才会被吐到出口格上；出口被占就不吐">
++            <option value="11">↑ 向上</option>
++            <option value="12">→ 向右</option>
++            <option value="13" selected>↓ 向下</option>
++            <option value="14">← 向左</option>
++          </select>
++        </div>
++        <div class="ctl-row">
++          <label>锁链组</label>
++          <input type="number" id="edit-chain-group" value="1" min="1" max="99" style="width:48px" title="同组的车会被一起取走（一取就是整组进暂存）。至少要 2 个成员才成链">
++          <button id="edit-chain-new" title="组号 +1：接下来点的车都进新的一组">＋ 新组</button>
++          <label>冰块耐久</label>
++          <input type="number" id="edit-ice-dur" value="3" min="1" max="9" style="width:44px" title="冰块耐久：激活后每取一盒解冻 1，减到 0 才可取">
++        </div>
++        <!-- 管道队列：选中一个管道格后出现 -->
++        <div id="edit-pipe-panel" class="edit-pipe hidden">
++          <div class="edit-pipe-head">管道队列 <span id="edit-pipe-info"></span></div>
++          <div class="edit-pipe-hint">按出场顺序：上面的先出。队首一格空出来就吐一辆。</div>
++          <div id="edit-pipe-queue" class="edit-pipe-queue"></div>
++          <div class="ctl-row">
++            <button id="edit-pipe-add" title="把右栏当前选中的颜色+载客量加到队尾">＋ 加一辆（队尾）</button>
++            <button id="edit-pipe-clear" title="清空这条管道的队列（管道本体保留，只当障碍用）">清空队列</button>
++          </div>
++          <div id="edit-pipe-warn" class="edit-pipe-warn"></div>
++        </div>
++        <!-- 【v133】目标区微调画笔：开启后，点/拖上方目标图 = 改单个像素（不做改尺寸/整片填充）。
++             与目标图原本的「拖拽平移」互斥；需要平移就先把画笔关掉。 -->
++        <div class="ctl-row">
++          <button id="edit-paint-target" title="开启后在目标图上点或拖 = 改像素：放车工具=用当前颜色上色；橡皮=擦成空位；吸管=取该像素颜色。Ctrl/⌘+Z 撤回。只做微调，不改尺寸">✏️ 改目标图：关</button>
++          <button id="edit-paint-undo" title="撤回上一次目标区改动（Ctrl/⌘+Z 同效）" disabled>↩ 撤回</button>
++        </div>
++        <div id="edit-paint-tip" class="edit-tip"></div>
++        <div class="ctl-row">
++          <button id="edit-clear" title="清空整个车场（小人板不动，可「回到关卡原样」恢复）">🧹 清空车场</button>
++          <button id="edit-defaults" title="把车场恢复到进入摆盒时的原样（导入进来时是什么样就回到什么样）">↺ 回到关卡原样</button>
++        </div>
++        <div id="edit-validate" class="edit-validate"></div>
++        <div class="ctl-row">
++          <button id="edit-try-solve" title="用当前车场跑一遍全知求解，看能不能全清（不改任何数据）">🧪 试解一遍</button>
++          <button id="edit-apply" class="edit-primary" title="把当前车场装进模拟器，直接游玩/求解">▶ 带入模拟器</button>
++        </div>
++        <div class="ctl-row">
++          <button id="edit-export-json" title="导出官方 5 键关卡JSON（toprow/blocks/maprow/mapcol/spools），可直接给生产/审核用">⬇ 导出关卡JSON</button>
++          <button id="edit-export-txt" title="导出小人板 TXT（空格分隔数字，0 = 空）">⬇ 导出TXT</button>
++        </div>
++        <div class="edit-tip">
++          空格 = 空位（真实关卡的车场本来就不铺满，例如关卡1 的 4×7 里第 4 行只占第 3、4 列）。<br>
++          点空格放车 · 点车 = 按当前颜色/载客量改写 · 按住拖到别的格 = 换位 · 右键 = 清空该格。
++        </div>
++      </section>
++
+       <!-- 模拟控制栏 -->
+       <section id="sim-controls">
+         <h3>模拟控制</h3>
+@@ -704,15 +799,17 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=131"></script>
+-  <script src="js/levels.js?v=131"></script>
+-  <script src="js/utils.js?v=131"></script>
+-  <script src="js/simulator.js?v=131"></script>
+-  <script src="js/solver-strategy.js?v=131"></script>
+-  <script src="js/solver.js?v=131"></script>
+-  <script src="js/playersim.js?v=131"></script>
+-  <script src="js/generator.js?v=131"></script>
+-  <script src="js/analysis.js?v=131"></script>
+-  <script src="js/app.js?v=131"></script>
++  <script src="js/zip.js?v=136"></script>
++  <script src="js/levels.js?v=136"></script>
++  <script src="js/utils.js?v=136"></script>
++  <script src="js/simulator.js?v=136"></script>
++  <script src="js/solver-strategy.js?v=136"></script>
++  <script src="js/solver.js?v=136"></script>
++  <script src="js/playersim.js?v=136"></script>
++  <script src="js/generator.js?v=136"></script>
++  <script src="js/analysis.js?v=136"></script>
++  <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
++  <script src="js/level-editor.js?v=136"></script>
++  <script src="js/app.js?v=136"></script>
+ </body>
+ </html>
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+@@ -764,3 +764,150 @@
+ .gen-result-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ .gen-result-tier { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 90px; }
+ .gen-result-diff { font-size: 11px; color: var(--text); flex-shrink: 0; width: 70px; text-align: right; }
++
++/* ==================================================================================
++   【v132 · 手动摆盒】编辑器样式（2026-10-13）
++   一块独立的编辑棋盘 + 右栏工具条。与模拟棋盘共用 .ant-board / .board-cell 口径，
++   所以「摆盒棋盘」和「模拟棋盘」看起来是同一块板，来回切换不跳尺寸。
++   ================================================================================== */
++#edit-controls {
++  display: flex;
++  flex-direction: column;
++  gap: 8px;
++  align-items: stretch;
++  background: var(--panel2);
++  border-radius: 6px;
++  padding: 10px 12px;
++}
++#edit-controls h3 { margin-bottom: 0; }
++#edit-controls button {
++  padding: 6px 10px;
++  border: none;
++  border-radius: 4px;
++  cursor: pointer;
++  font-size: 12px;
++  background: var(--btn);
++  color: var(--btn-text);
++}
++#edit-controls button:hover { background: var(--accent); }
++/* 「带入模拟器」是这一栏的主动作，给一个更醒目的底色 */
++#edit-controls .edit-primary { background: #2f7d3a; }
++#edit-controls .edit-primary:hover { background: #3d9c4b; }
++#edit-controls .ctl-row > label { font-size: 11px; color: var(--muted); white-space: nowrap; }
++#edit-controls .edit-x { color: var(--muted); font-size: 11px; }
++.edit-tip {
++  font-size: 11px; color: var(--muted); line-height: 1.65;
++  border-top: 1px dashed var(--border); padding-top: 6px;
++}
++
++/* 调色板：色块上直接印颜色编号（与关卡数据里的数字一一对应，方便对着颜色对照表核对） */
++.edit-palette { display: flex; flex-wrap: wrap; gap: 4px; }
++.edit-swatch {
++  width: 28px; height: 28px; padding: 0;
++  border: 2px solid transparent;
++  border-radius: 4px;
++  font-size: 10px; font-weight: bold;
++  color: rgba(0, 0, 0, .7);
++  text-shadow: 0 0 2px rgba(255, 255, 255, .95), 0 0 2px rgba(255, 255, 255, .95);
++  cursor: pointer;
++}
++.edit-swatch:hover { transform: scale(1.12); }
++.edit-swatch.active { border-color: var(--bg3); box-shadow: 0 0 0 2px var(--accent); }
++
++/* 校验面板：每色「车上载客 / 板上像素」，不匹配整行标红；点一行 = 切到该色并填好还差的数量 */
++.edit-validate {
++  font-size: 11px;
++  background: var(--bg2);
++  border: 1px solid var(--border);
++  border-radius: 4px;
++  padding: 6px 8px;
++  max-height: 240px;
++  overflow-y: auto;
++}
++.edit-vhead { color: var(--muted2); font-weight: 600; margin-bottom: 4px; }
++.edit-vhead span { color: var(--muted); font-weight: 400; }
++.edit-vrow {
++  display: grid;
++  grid-template-columns: 12px 58px 1fr auto;
++  align-items: center;
++  gap: 6px;
++  padding: 2px 3px;
++  border-radius: 3px;
++  cursor: pointer;
++}
++.edit-vrow:hover { background: var(--panel2); }
++.edit-vrow.bad { color: #c0451a; }
++.edit-vrow .edit-vsw { width: 12px; height: 12px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .25); }
++.edit-vrow .edit-vname { color: var(--muted2); }
++.edit-vrow .edit-vnum { color: var(--text); font-family: ui-monospace, Menlo, monospace; }
++.edit-vrow .edit-vtag { color: var(--muted); text-align: right; }
++.edit-vrow.bad .edit-vtag { color: #c0451a; font-weight: 600; }
++.edit-vfoot { margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border); color: var(--muted); line-height: 1.6; }
++.edit-vfoot .ok { color: #2f7d3a; }
++.edit-vfoot .warn2 { color: var(--amber); }
++.edit-vlink { color: var(--accent); text-decoration: underline; }
++
++/* 编辑棋盘 */
++.edit-board-hint { font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 6px; }
++#edit-board-queues { display: flex; justify-content: center; overflow-x: auto; padding-bottom: 6px; }
++.edit-board { background: repeating-linear-gradient(45deg, #e6d8c0 0 6px, #e2d3b9 6px 12px); }
++.edit-cell { cursor: pointer; }
++.edit-cell:hover { outline: 3px solid #ffd54f; outline-offset: -3px; z-index: 3; }
++/* 放车工具下「点一下会被改写成这个样子」的预览：与当前颜色/载客量相同的车描虚线 */
++.edit-cell.box.edit-hit { outline: 2px dashed rgba(255, 255, 255, .95); outline-offset: -4px; }
++.edit-cell .edit-cid {
++  position: absolute; right: 2px; bottom: 0;
++  font-size: 10px; font-weight: normal; opacity: .6;
++  pointer-events: none;
++}
++
++/* ==================================================================================
++   【v133 · 目标区微调画笔】样式
++   画笔开启时目标图显示十字光标，提示"这里点了会改像素"（此时拖拽平移被让位给上色）。
++   ================================================================================== */
++#target-viewport.painting #target-canvas,
++#target-viewport.painting #target-canvas.grabbing { cursor: crosshair; }
++#edit-controls button.active { background: var(--accent); }
++#edit-controls button:disabled { opacity: .45; cursor: not-allowed; }
++#edit-paint-tip { border-top: none; padding-top: 0; }
++
++/* ==================================================================================
++   【v134 · 管道 / 锁链 / 冰块 / 问号 手动编辑】样式
++   ================================================================================== */
++/* 编辑棋盘上的管道格：可点、被选中时高亮 */
++.edit-cell.pipe { cursor: pointer; }
++.edit-cell.pipe.edit-sel { outline: 3px solid var(--accent); outline-offset: -3px; box-shadow: 0 0 10px rgba(210,112,31,.8); z-index: 3; }
++.edit-cell .ov.ice { position: absolute; left: 1px; top: 0; font-size: 10px; color: #bfe9ff; text-shadow: 0 0 3px #0a3550; pointer-events: none; }
++.edit-cell .ov.chain { position: absolute; right: 1px; top: 0; font-size: 10px; pointer-events: none; }
++
++/* 管道队列编辑器 */
++.edit-pipe {
++  background: var(--bg2);
++  border: 1px solid var(--border2);
++  border-radius: 5px;
++  padding: 7px 8px;
++}
++.edit-pipe.hidden { display: none; }
++.edit-pipe-head { font-size: 12px; font-weight: 600; color: var(--muted2); }
++.edit-pipe-head span { font-weight: 400; color: var(--muted); font-size: 11px; }
++.edit-pipe-hint { font-size: 11px; color: var(--muted); margin: 3px 0 5px; line-height: 1.5; }
++.edit-pipe-queue { display: flex; flex-direction: column; gap: 3px; max-height: 210px; overflow-y: auto; }
++.edit-pq-empty { font-size: 11px; color: var(--muted); padding: 4px 2px; }
++.edit-pq-row {
++  display: grid;
++  grid-template-columns: 16px 20px 1fr 52px 22px 22px 22px;
++  align-items: center;
++  gap: 4px;
++  padding: 2px 3px;
++  border-radius: 3px;
++  background: var(--panel2);
++}
++.edit-pq-row.is-next { outline: 2px solid var(--accent); outline-offset: -2px; }
++.edit-pq-no { font-size: 10px; color: var(--muted); text-align: center; }
++.edit-pq-sw { width: 20px; height: 20px; border: 1px solid rgba(0,0,0,.25); border-radius: 3px; cursor: pointer; padding: 0; }
++.edit-pq-name { font-size: 11px; color: var(--muted2); }
++.edit-pq-cnt { width: 52px; padding: 2px 3px; font-size: 11px; }
++.edit-pq-row button[data-act] { padding: 1px 0; font-size: 11px; line-height: 1.1; }
++.edit-pq-row button[data-act]:disabled { opacity: .35; cursor: not-allowed; }
++.edit-pq-tag { grid-column: 1 / -1; font-size: 10px; color: var(--accent); text-align: right; }
++.edit-pipe-warn { font-size: 11px; color: var(--amber); line-height: 1.55; margin-top: 5px; }
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -61,6 +61,13 @@
+     return { bottomOnly: em === 'bottomOnly', instantChain: em === 'fourSideInstantChain' };
+   }
+   var simulating = false;
++  // 【v132】手动摆盒编辑态：true 时棋盘区显示 js/level-editor.js 的编辑板，
++  //   模拟控制栏换成摆盒工具条（详见 enterEditMode / exitEditMode）。
++  var editMode = false;
++  // 【v135】摆盒进入时的关卡指纹：用来判断"手改过没有"。
++  //   压力图优先复用【导入时那份求解数据/生成诊断】。手改车场之后那份数据描述的是旧布局，
++  //   直接复用会在图上画出**旧曲线**（比"不刷新"更糟：看起来像新结果）。所以一旦指纹变了就作废它。
++  var editSig = null;
+   var autoPlayTimer = null;
+   // 求解路线叠加状态（任务 ANT-SIM-CHAIN-ROUTE-20260805）。
+   // 声明放在这里而不是紧邻其函数：renderQueues 渲染每个格子时会读它，
+@@ -181,9 +188,16 @@
+     if (!canvas || canvas._zoomBound) return;
+     canvas._zoomBound = true;
+     var dragging = false, sx = 0, sy = 0;
+-    canvas.addEventListener('pointerdown', function (e) { dragging = true; canvas.classList.add('grabbing'); sx = e.clientX - targetPan.x; sy = e.clientY - targetPan.y; try { canvas.setPointerCapture(e.pointerId); } catch (x) { } });
+-    canvas.addEventListener('pointermove', function (e) { if (!dragging) return; targetPan.x = e.clientX - sx; targetPan.y = e.clientY - sy; clampTargetPan(); });
+-    function endDrag() { dragging = false; canvas.classList.remove('grabbing'); }
++    canvas.addEventListener('pointerdown', function (e) {
++      // 【v133】目标区画笔开启时，在目标图上按下 = 上色（或擦除/吸管），此时不平移。
++      if (tgtPaint) { tgtPainting = true; tgtPaintAt(e); try { canvas.setPointerCapture(e.pointerId); } catch (x) { } return; }
++      dragging = true; canvas.classList.add('grabbing'); sx = e.clientX - targetPan.x; sy = e.clientY - targetPan.y; try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
++    });
++    canvas.addEventListener('pointermove', function (e) {
++      if (tgtPaint) { if (tgtPainting) tgtPaintAt(e); return; }   // 按住拖动 = 连续刷
++      if (!dragging) return; targetPan.x = e.clientX - sx; targetPan.y = e.clientY - sy; clampTargetPan();
++    });
++    function endDrag() { dragging = false; tgtPainting = false; canvas.classList.remove('grabbing'); }
+     canvas.addEventListener('pointerup', endDrag);
+     canvas.addEventListener('pointercancel', endDrag);
+     // 滚轮缩放（以视口为中心）
+@@ -217,6 +231,40 @@
+     document.getElementById('btn-generate').addEventListener('click', runGenerate);
+     document.getElementById('btn-simulate').addEventListener('click', enterSimulation);
+     document.getElementById('btn-exit-sim').addEventListener('click', exitSimulation);
++    // 【v132】手动摆盒：进入/退出编辑态，并把宿主能力交给 js/level-editor.js。
++    //   currentLevel / levelList 都在本闭包里，外部文件取不到，所以用回调注入而不是挂全局。
++    bindClick('btn-manual-edit', enterEditMode);
++    bindClick('btn-exit-edit', exitEditMode);
++    // 【v133】目标区画笔：Ctrl/⌘+Z 撤回（只在摆盒 + 画笔开启时接管，避免影响其它输入框）
++    document.addEventListener('keydown', function (e) {
++      if (!editMode || !tgtPaint) return;
++      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); tgtPaintUndo(); }
++    });
++    if (AntSolver.LevelEditor) {
++      AntSolver.LevelEditor.init({
++        getLevel: function () { return currentLevel; },
++        getName: function () {
++          var e = (levelList && currentLevelIdx >= 0) ? levelList[currentLevelIdx] : null;
++          return (e && e.name) ? e.name : '手动关卡';
++        },
++        setBoard: editInstallBoard,
++        getBlocks: function () { return currentLevel ? currentLevel.blocks : null; },
++        setBlocks: editInstallBlocks,
++        paint: {
++          toggle: tgtPaintToggle,
++          isOn: function () { return tgtPaint; },
++          undo: tgtPaintUndo,
++          canUndo: function () { return tgtPaintStack.length > 0; }
++        },
++        play: function () { exitEditMode(); if (currentLevel) enterSimulation(); },
++        explain: function (html) {
++          var box = document.getElementById('solve-result');
++          if (box) box.classList.remove('hidden');
++          document.getElementById('solve-details').innerHTML = html;
++        },
++        download: downloadText
++      });
++    }
+     document.getElementById('btn-undo').addEventListener('click', doUndo);
+     document.getElementById('btn-reset').addEventListener('click', doReset);
+     document.getElementById('btn-auto-step').addEventListener('click', autoStep);
+@@ -1171,6 +1219,9 @@
+   }
+ 
+   function loadLevel(json) {
++    // 【v132】换关/导入时若正处在手动摆盒编辑态，先退出编辑态（否则编辑板会留在屏幕上、
++    //   且它的「原样快照」还是上一关的，容易把上一关的车场摆到这一关）。
++    if (editMode) exitEditMode();
+     stopAutoPlay();
+     currentImportedSolve = null;   // 默认无导入求解数据（生成/TXT关卡→需要时重新求解）
+     currentGenerationEval = null;
+@@ -2777,8 +2828,215 @@
+     document.getElementById('status-title').textContent = '关卡信息';
+     removeGameMsg();
+     if (currentLevel) { renderTarget(null); renderQueues(null); renderLevelInfo(); }
++  }
++
++  // ==================== 【v132·手动摆盒】编辑态 ====================
++  // 需求（用户 2026-10-13）：「当前求解器中的关卡是自动生成的，我想手动的摆放关卡」。
++  //   一关 = 小人板(目标图，来自导入的 TXT) + 车场(棋盘上每格的车：颜色 + 载客量)。
++  //   小人板本来就能导入，缺的是【车场能自己摆】。编辑器本体在 js/level-editor.js，
++  //   这里只负责：进出编辑态、把编辑结果装回 currentLevel、以及给它调用宿主的能力。
++  function editBoxCount(board) {
++    var n = 0;
++    for (var r = 0; r < board.rows; r++) {
++      for (var c = 0; c < board.cols; c++) {
++        var cell = board.cells[r][c];
++        if (AntSolver.isBox(cell)) n++;
++        else if (AntSolver.isPipe(cell)) n += (cell.queue ? cell.queue.length : 0);
++      }
++    }
++    return n;
++  }
++
++  /** 把编辑中的车场装回当前关卡（顺手刷新「关卡信息」与棋盘统计）。 */
++  function editInstallBoard(board) {
++    if (!currentLevel || !board) return;
++    currentLevel.board = AntSolver.normBoard(board);
++    currentLevel.totalBoxes = editBoxCount(currentLevel.board);
++    renderLevelInfo();
++    if (!simulating) renderQueues(null);
++    editCheckDirty();
++  }
++
++  /**
++   * 【v135】手改之后，把"导入/生成时算出来的旧结论"作废：
++   *   · currentImportedSolve —— 关卡包里那一轮求解（旧布局的压力样本）
++   *   · currentGenerationEval —— 生成诊断里的全知/玩家压力样本（旧布局的）
++   *   · currentChokeInfo —— 卡点类型与位置（只描述"生成时把卡点造在哪"，手改后位置已不可信）
++   * 不清的话，进入「模拟游玩」时两张压力图会拿旧曲线当新结果画出来 —— 实测过：清空车场之后
++   * 图上仍显示原关的"通关·峰值3"。清掉之后会按当前布局【现算】。
++   */
++  function editCheckDirty() {
++    if (!currentLevel) return;
++    var sig = JSON.stringify([currentLevel.blocks, currentLevel.board]);
++    if (editSig == null) { editSig = sig; return; }   // 首次（刚进摆盒）：只记基线，不算改动
++    if (sig === editSig) return;
++    editSig = sig;
++    currentImportedSolve = null;
++    currentGenerationEval = null;
++    currentChokeInfo = null;
++  }
++
++  /** 重算「每色像素数 / 总像素」——目标区被改过之后必须重算，否则核对面板还在按老图算。 */
++  function editRecomputeCounts() {
++    var counts = {}, total = 0;
++    for (var r = 0; r < currentLevel.rows; r++) {
++      for (var c = 0; c < currentLevel.cols; c++) {
++        var id = currentLevel.blocks[r][c];
++        if (id > 0) { total++; counts[id] = (counts[id] || 0) + 1; }
++      }
++    }
++    currentLevel.colorCounts = counts;
++    currentLevel.totalPixels = total;
++  }
++
++  /** 把（改过的）目标图装回当前关卡。注意：车场不动，所以改完目标区后「每色人数核对」会立刻不等。 */
++  function editInstallBlocks(blocks) {
++    if (!currentLevel || !blocks || !blocks.length) return;
++    currentLevel.blocks = blocks;
++    currentLevel.rows = blocks.length;
++    currentLevel.cols = blocks[0] ? blocks[0].length : 0;
++    editRecomputeCounts();
++    renderTarget(lastTargetElim);
++    renderLevelInfo();
++    if (AntSolver.LevelEditor && AntSolver.LevelEditor.onLevelChanged) AntSolver.LevelEditor.onLevelChanged();
++    editCheckDirty();     // 【v135】目标区被改过 → 旧求解数据同样作废
++  }
++
++  // ==================== 【v133·摆盒】目标区微调画笔 ====================
++  // 需求（用户 2026-10-13）：「在求解器上加入这个功能吧，就是我可能会微调目标区的一点像素」。
++  //   改前目标图只能整张导入；现在在「手动摆盒」里可以直接点/拖改单个像素
++  //   （画笔 = 当前颜色；橡皮工具 = 擦成空位；吸管工具 = 把该像素的颜色读给画笔），带撤回。
++  //   只做微调：不提供改尺寸/整片填充（要那些用 参考/目标图TXT编辑器_可手动框选版）。
++  //   与目标图原有的「拖拽平移」互斥：画笔开启时按下 = 上色，不再平移；滚轮缩放照旧，方便放大到单格细调。
++  var tgtPaint = false;         // 画笔开关
++  var tgtPainting = false;      // 本次按下是否正在连续刷
++  var tgtPaintStack = [];       // 撤回栈 [{r,c,from,to}]
++  var TGT_PAINT_STACK_MAX = 500;
++
++  function tgtCellFromEvent(e) {
++    var canvas = document.getElementById('target-canvas');
++    if (!canvas || !currentLevel || !targetLayout || !targetLayout.step) return null;
++    var rect = canvas.getBoundingClientRect();
++    if (!rect || !rect.width || !canvas.width) return null;
++    // 画布没有 CSS 缩放（style.width = canvas.width），这里的比值是防御性的，正常就是 1
++    var x = (e.clientX - rect.left) * (canvas.width / rect.width);
++    var y = (e.clientY - rect.top) * (canvas.height / rect.height);
++    var step = targetLayout.step;
++    var c = Math.floor(x / step), r = Math.floor(y / step);
++    if (r < 0 || c < 0 || r >= currentLevel.rows || c >= currentLevel.cols) return null;
++    return { r: r, c: c };
+   }
+ 
++  function tgtPaintAt(e) {
++    if (!tgtPaint) return;
++    var pos = tgtCellFromEvent(e);
++    if (!pos) return;
++    var L = AntSolver.LevelEditor;
++    var mode = (L && L.toolMode) ? L.toolMode() : 'place';
++    if (mode === 'pick') {                                  // 吸管：只把颜色读给画笔，不改图
++      var picked = currentLevel.blocks[pos.r][pos.c];
++      if (picked > 0 && L && L.setColor) L.setColor(picked);
++      return;
++    }
++    var col;
++    if (mode === 'erase') col = 0;
++    else if (mode === 'black') col = 0;                      // 目标图没有黑块，按「擦掉」处理，免得点了没反应
++    else col = (L && L.currentColor) ? L.currentColor() : 1;
++    var from = currentLevel.blocks[pos.r][pos.c];
++    if (from === col) return;
++    tgtPaintStack.push({ r: pos.r, c: pos.c, from: from, to: col });
++    if (tgtPaintStack.length > TGT_PAINT_STACK_MAX) tgtPaintStack.shift();
++    currentLevel.blocks[pos.r][pos.c] = col;
++    editRecomputeCounts();
++    renderTarget(lastTargetElim);
++    renderLevelInfo();
++    if (L && L.onLevelChanged) L.onLevelChanged();
++    if (L && L.onPaintChanged) L.onPaintChanged(tgtPaintStack.length);
++  }
++
++  function tgtPaintUndo() {
++    if (!tgtPaintStack.length || !currentLevel) return;
++    var op = tgtPaintStack.pop();
++    currentLevel.blocks[op.r][op.c] = op.from;
++    editRecomputeCounts();
++    renderTarget(lastTargetElim);
++    renderLevelInfo();
++    if (AntSolver.LevelEditor && AntSolver.LevelEditor.onLevelChanged) AntSolver.LevelEditor.onLevelChanged();
++    if (AntSolver.LevelEditor && AntSolver.LevelEditor.onPaintChanged) AntSolver.LevelEditor.onPaintChanged(tgtPaintStack.length);
++  }
++
++  /** 开关目标区画笔（由摆盒面板的按钮调用）。on 省略 = 取反。 */
++  function tgtPaintToggle(on) {
++    tgtPaint = (on == null) ? !tgtPaint : !!on;
++    if (!tgtPaint) tgtPainting = false;
++    var vp = document.getElementById('target-viewport');
++    if (vp) vp.classList.toggle('painting', tgtPaint);
++    if (AntSolver.LevelEditor && AntSolver.LevelEditor.onPaintChanged) AntSolver.LevelEditor.onPaintChanged(tgtPaintStack.length);
++    return tgtPaint;
++  }
++
++  /** 下载一个文本文件（导出关卡JSON / TXT 用）。 */
++  function downloadText(fname, text) {
++    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
++    var url = URL.createObjectURL(blob);
++    var a = document.createElement('a');
++    a.href = url; a.download = fname;
++    a.style.display = 'none';
++    document.body.appendChild(a);
++    a.click();
++    setTimeout(function () { URL.revokeObjectURL(url); if (a.parentNode) a.parentNode.removeChild(a); }, 60000);
++  }
++
++  function enterEditMode() {
++    if (!currentLevel || !currentLevel.blocks || !currentLevel.rows) {
++      alert('请先导入目标图（TXT）或导入关卡，再来手动摆盒');
++      return;
++    }
++    if (simulating) exitSimulation();
++    editMode = true;
++    editSig = null;          // 【v135】重新记基线：进入摆盒这一刻的关卡状态
++    setSimLayout(true);                                     // 展开右栏（与模拟游玩同一套三列布局）
++    document.getElementById('sim-controls').classList.add('hidden');
++    var bc = document.getElementById('board-charts'); if (bc) bc.classList.add('hidden');
++    document.getElementById('edit-controls').classList.remove('hidden');
++    document.getElementById('btn-exit-edit').classList.remove('hidden');
++    document.getElementById('btn-manual-edit').classList.add('active');
++    document.getElementById('board-row').classList.add('hidden');
++    document.getElementById('edit-board-wrap').classList.remove('hidden');
++    document.getElementById('btn-simulate').disabled = true;
++    document.getElementById('status-title').textContent = '手动摆盒';
++    applyTargetViewportSize();
++    AntSolver.LevelEditor.enter();
++    var box = document.getElementById('solve-result');
++    if (box) {
++      box.classList.remove('hidden');
++      document.getElementById('solve-details').innerHTML =
++        '<p style="color:#d2701f">✏️ 手动摆盒</p>' +
++        '<p style="font-size:11px;color:#8a7358">右栏选颜色与载客量 → 点棋盘空格放车；点已有车 = 按当前颜色改写；' +
++        '按住拖动 = 换位（拖到别的车上则互换）；右键 = 清空该格。空位是合法的，不必铺满。<br>' +
++        '摆完点「▶ 带入模拟器」直接玩/求解，或「⬇ 导出关卡JSON」存成官方 5 键格式。<br>' +
++        '<span style="color:#8a7358">改过之后，右侧那两张暂存压力图会在「带入模拟器」时<b>按新布局现算</b>' +
++        '（导入时那份旧曲线会作废，不会拿旧数据糊弄你）。</span></p>';
++    }
++  }
++
++  function exitEditMode() {
++    if (!editMode) return;
++    editMode = false;
++    tgtPaintToggle(false);          // 【v133】退出摆盒时顺手关掉目标区画笔，免得回到普通视图后拖不动图
++    if (AntSolver.LevelEditor) AntSolver.LevelEditor.exit();
++    document.getElementById('sim-controls').classList.remove('hidden');
++    document.getElementById('edit-controls').classList.add('hidden');
++    document.getElementById('btn-exit-edit').classList.add('hidden');
++    document.getElementById('btn-manual-edit').classList.remove('active');
++    document.getElementById('board-row').classList.remove('hidden');
++    document.getElementById('edit-board-wrap').classList.add('hidden');
++    document.getElementById('btn-simulate').disabled = !currentLevel;
++    document.getElementById('status-title').textContent = '关卡信息';
++    setSimLayout(false);
++    if (currentLevel) { renderLevelInfo(); renderQueues(null); renderTarget(null); }
++  }
++
+   function refreshSimUI() {
+     var state = AntSolver.Simulator.getState();
+     if (!state) return;
+--- /dev/null
++++ b/bin/js/level-editor.js
+@@ -0,0 +1,849 @@
++/**
++ * 蚂蚁拿块求解器 · 手动摆盒编辑器（v132 新增，2026-10-13）
++ *
++ * 【需求】用户原话：「当前求解器中的关卡是自动生成的，我想手动的摆放关卡」。
++ *   现状：一关 = 小人板(目标图, 来自导入的 TXT) + 车场(棋盘上每格的车：颜色 + 载客量)。
++ *   小人板能导入，但车场永远由生成器自动铺 —— 手工摆一关只能先写成 official 5 键 JSON
++ *   (toprow/blocks/maprow/mapcol/spools) 再从「导入关卡包📁」读进来，而且进来之后不能改。
++ *   本模块给求解器补上「车场可以手摆」这一环。
++ *
++ * 【职责边界】本文件只做编辑交互与渲染；关卡状态、面板刷新、进入模拟、文件下载都由
++ *   app.js 通过 init(host) 注入的 host 回调提供 —— 因为 currentLevel / levelList 都在
++ *   AntSolver.App 的闭包里，外部文件拿不到，硬塞全局反而更容易出错。
++ *
++ * 【操作口径】
++ *   · 点空格 → 按当前颜色/载客量放一辆车（按住拖动 = 连续刷）
++ *   · 点已有车 → 按当前颜色与载客量【改写】它（同一格按下再拖到别处 = 换位）
++ *   · 右键 → 清空该格；橡皮工具同理
++ *   · 空位是合法的：真实关卡的车场本来就不铺满（例如关卡1 的 4×7 里第 4 行只占第 3、4 列）
++ *   · 校验按「每色车的载客量之和 == 小人板上该色像素数」实时算 —— 这就是生产口径那条守恒
++ *     （测试关卡/关卡1.json：六色 12/12/6/9/15/15，合计 69）
++ */
++(function () {
++  var A = (typeof AntSolver !== 'undefined') ? AntSolver : (window.AntSolver = window.AntSolver || {});
++
++  var host = null;
++  var editing = false;
++  var working = null;      // { rows, cols, cells[][] }：null = 空位 / {t:'box'} / {t:'black'}
++  var snapshot = null;     // 进入编辑时的车场原样，供「回到关卡原样」
++  var snapshotBlocks = null; // 【v133】进入编辑时的目标图原样（目标区可微调后，这个也要能回退）
++  var curColor = 1;
++  var curCount = 3;
++  var tool = 'place';      // place | erase | black | ice | chain | question | pipe | pick
++  var curDir = 13;         // 【v134】管道方向：11↑ 12→ 13↓ 14←（与官方 type 一致）
++  var curChain = 1;        // 当前锁链组号（同号成一组）
++  var curIce = 3;          // 冰块耐久（simulator 直接用 cell.ice 当 durability，见 simulator.js:165）
++  var selCell = null;      // 当前选中的格子 {r,c}：选中管道时展开队列编辑面板
++  var drag = null;         // { mode:'paint'|'erase'|'black'|'move', from:{r,c}, moved:bool }
++
++  function $(id) { return document.getElementById(id); }
++
++  function mkBox() { return { t: 'box', color: curColor, count: curCount, ice: 0, chain: 0, q: false }; }
++
++  function emptyCells(rows, cols) {
++    var cells = [];
++    for (var r = 0; r < rows; r++) { var row = []; for (var c = 0; c < cols; c++) row.push(null); cells.push(row); }
++    return cells;
++  }
++
++  function cloneCell(cell) {
++    if (!cell) return null;
++    if (cell.t === 'box') return { t: 'box', color: cell.color, count: cell.count, ice: cell.ice || 0, chain: cell.chain || 0, q: !!cell.q };
++    if (cell.t === 'black') return { t: 'black' };
++    if (cell.t === 'pipe') return { t: 'pipe', dir: cell.dir, queue: (cell.queue || []).map(function (x) { return { color: x.color, count: x.count }; }), next: cell.next || 0 };
++    return null;
++  }
++
++  function cloneBoard(b) {
++    var rows = (b && b.rows) || 0, cols = (b && b.cols) || 0;
++    var cells = [];
++    for (var r = 0; r < rows; r++) {
++      var row = [];
++      for (var c = 0; c < cols; c++) row.push(cloneCell(b.cells[r] ? b.cells[r][c] : null));
++      cells.push(row);
++    }
++    return { rows: rows, cols: cols, cells: cells };
++  }
++
++  function cloneBlocks(blocks) {
++    if (!blocks) return null;
++    var out = [];
++    for (var r = 0; r < blocks.length; r++) out.push((blocks[r] || []).slice());
++    return out;
++  }
++
++  function boardFromLevel() {
++    var lv = host.getLevel();
++    if (lv && lv.board && lv.board.rows > 0 && lv.board.cols > 0) return cloneBoard(lv.board);
++    // 目标图导入(TXT)后 currentLevel.board 是空的 → 给一块默认车场（行4×列7 = 手工关卡1 的车场形状）
++    return { rows: 4, cols: 7, cells: emptyCells(4, 7) };
++  }
++
++  // ==================== 渲染 ====================
++  // 与 renderQueues 同一套宽度口径（都取 #target-container；该元素当前不存在 → 回落到 480），
++  // 保证「摆盒棋盘」与「模拟棋盘」看起来是同一块板，来回切换不跳尺寸。
++  function metrics() {
++    var frameEl = $('target-container');
++    var frameW = frameEl ? frameEl.clientWidth : 0;
++    if (!frameW || frameW < 100) frameW = 480;
++    var gap = 6, pad = 8;
++    var csz = Math.floor((frameW - pad * 2 - gap * (working.cols - 1)) / Math.max(1, working.cols));
++    var cszH = Math.floor((540 - pad * 2 - gap * (working.rows - 1)) / Math.max(1, working.rows));
++    if (cszH < csz) csz = cszH;
++    if (csz < 14) csz = 14;
++    if (csz > 80) csz = 80;
++    return { csz: csz, gap: gap, frameW: frameW };
++  }
++
++  function textColorFor(colorId) {
++    var rgb = hexToRgb(A.getColorCSS(colorId));
++    if (!rgb) return '#fff';
++    var lum = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
++    return lum < 140 ? '#fff' : '#000';
++  }
++  function hexToRgb(s) {
++    if (!s) return null; s = String(s).trim();
++    var m = /^#?([0-9a-f]{6})$/i.exec(s);
++    if (m) { var n = parseInt(m[1], 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }; }
++    var m3 = /^#?([0-9a-f]{3})$/i.exec(s);
++    if (m3) { var h = m3[1]; return { r: parseInt(h[0] + h[0], 16), g: parseInt(h[1] + h[1], 16), b: parseInt(h[2] + h[2], 16) }; }
++    return null;
++  }
++
++  function cellHtml(cell, r, c) {
++    var base = 'board-cell edit-cell';
++    var pos = ' data-r="' + r + '" data-c="' + c + '"';
++    if (!cell) return '<div class="' + base + ' empty"' + pos + '></div>';
++    if (cell.t === 'black') return '<div class="' + base + ' black"' + pos + ' title="黑块(阻挡)"><span class="blk-x">✕</span></div>';
++    if (cell.t === 'pipe') {
++      // 【v134】管道现在可编辑：箭头=方向，右下数字=队列还没吐出来的盒数；点它就在右栏展开队列编辑器。
++      var arrow = PIPE_ARROWS[cell.dir] || '▼';
++      var remain = (cell.queue || []).length - (cell.next || 0);
++      return '<div class="' + base + ' pipe edit-pipe-cell' + (selCell && selCell.r === r && selCell.c === c ? ' edit-sel' : '') + '"' + pos +
++        ' title="管道（' + (PIPE_DIR_CN[cell.dir] || '?') + '）队列 ' + remain + ' 辆未出 —— 点它可编辑队列">' +
++        arrow + '<span class="pipe-n">' + remain + '</span></div>';
++    }
++    var same = (cell.color === curColor && cell.count === curCount);
++    var cls = base + ' box' + (tool === 'place' && same ? ' edit-hit' : '');
++    // 问号未揭示：与模拟棋盘同口径（深底 + ?），不显示真实颜色
++    var style = cell.q
++      ? 'background:#6b5a4a;color:#fff'
++      : 'background:' + A.getColorCSS(cell.color) + ';color:' + textColorFor(cell.color);
++    if (cell.chain > 0) style += ';outline:3px solid ' + chainColor(cell.chain) + ';outline-offset:-3px';
++    var label = cell.q ? '?' : cell.count;
++    var title = (cell.q ? '问号(隐藏色，实际是' + A.getColorName(cell.color) + ') ' : '') +
++      A.getColorName(cell.color) + ' ×' + cell.count +
++      (cell.ice > 0 ? '｜冰块❄耐久' + cell.ice : '') +
++      (cell.chain > 0 ? '｜锁链组' + chainTag(cell.chain) : '');
++    var ov = '';
++    if (cell.ice > 0) ov += '<span class="ov ice">❄' + cell.ice + '</span>';
++    if (cell.chain > 0) ov += '<span class="ov chain" style="color:' + chainColor(cell.chain) + '">🔗' + chainTag(cell.chain) + '</span>';
++    return '<div class="' + cls + '" style="' + style + '"' + pos + ' title="' + title + '">' +
++      '<span class="cnt">' + label + '</span>' +
++      '<span class="edit-cid">' + cell.color + '</span>' + ov +
++      '</div>';
++  }
++
++  // 管道方向（与官方 type 11~14 一致）与锁链组标识（同模拟棋盘：A/B/C…）
++  var PIPE_ARROWS = { 11: '▲', 12: '▶', 13: '▼', 14: '◀' };
++  var PIPE_DIR_CN = { 11: '向上', 12: '向右', 13: '向下', 14: '向左' };
++  var CHAIN_COLORS = ['#ff3b30', '#34c759', '#ffcc00', '#5ac8fa', '#af52de', '#ff9500', '#00e5ff', '#ff2d95', '#a3e635', '#f472b6'];
++  function chainTag(group) { return String.fromCharCode(65 + ((group - 1) % 26)); }
++  function chainColor(group) { return CHAIN_COLORS[((group - 1) % CHAIN_COLORS.length + CHAIN_COLORS.length) % CHAIN_COLORS.length]; }
++
++  function renderBoard() {
++    var wrap = $('edit-board-queues');
++    if (!wrap || !working) return;
++    var m = metrics();
++    var html = '<div class="ant-board edit-board" style="width:' + m.frameW + 'px;--csz:' + m.csz + 'px;--cgap:' + m.gap + 'px;grid-template-columns:repeat(' + working.cols + ',var(--csz))">';
++    for (var r = 0; r < working.rows; r++) {
++      for (var c = 0; c < working.cols; c++) html += cellHtml(working.cells[r][c], r, c);
++    }
++    html += '</div>';
++    wrap.innerHTML = html;
++  }
++
++  function updateCellDom(r, c) {
++    var wrap = $('edit-board-queues');
++    if (!wrap) return;
++    var el = wrap.querySelector('.edit-cell[data-r="' + r + '"][data-c="' + c + '"]');
++    if (!el) return;
++    el.outerHTML = cellHtml(working.cells[r][c], r, c);
++  }
++
++  function paletteColors() {
++    var seen = {};
++    var lv = host.getLevel();
++    if (lv && lv.colorCounts) {
++      Object.keys(lv.colorCounts).forEach(function (k) { var id = parseInt(k, 10); if (id > 0) seen[id] = 1; });
++    }
++    if (working) {
++      for (var r = 0; r < working.rows; r++) {
++        for (var c = 0; c < working.cols; c++) {
++          var cell = working.cells[r][c];
++          if (cell && cell.t === 'box' && cell.color > 0) seen[cell.color] = 1;
++        }
++      }
++    }
++    var out = Object.keys(seen).map(function (k) { return parseInt(k, 10); })
++      .sort(function (a, b) { return a - b; });
++    if (!out.length) { for (var i = 1; i <= 12; i++) out.push(i); }   // 没有目标图时给一排默认色
++    return out;
++  }
++
++  function renderPalette() {
++    var el = $('edit-palette');
++    if (!el) return;
++    var colors = paletteColors();
++    var html = '';
++    for (var i = 0; i < colors.length; i++) {
++      var id = colors[i];
++      html += '<button class="edit-swatch' + (id === curColor ? ' active' : '') + '" data-color="' + id + '"' +
++        ' style="background:' + A.getColorCSS(id) + '"' +
++        ' title="' + A.getColorName(id) + '（编号 ' + id + '）">' + id + '</button>';
++    }
++    el.innerHTML = html;
++  }
++
++  function stats() {
++    var lv = host.getLevel() || {};
++    var need = {}, total = 0;
++    if (lv.colorCounts) for (var k in lv.colorCounts) { need[k] = lv.colorCounts[k]; total += lv.colorCounts[k]; }
++    var have = {}, haveBoard = {}, havePipe = {};
++    var cars = 0, cap = 0, empty = 0, black = 0, pipes = 0, pipeBoxes = 0, pipeCap = 0;
++    var ice = 0, qm = 0, chainGroups = {}, pipeExitBlocked = 0;
++    for (var r = 0; r < working.rows; r++) {
++      for (var c = 0; c < working.cols; c++) {
++        var cell = working.cells[r][c];
++        if (!cell) { empty++; continue; }
++        if (cell.t === 'black') { black++; continue; }
++        // 【2026-10-13 修正】管道格自己不带人，但**管道队列里装的盒是真盒子、真要装人**。
++        //   生产侧的守恒口径就是这么算的（generator.js · verifyConservation：「棋盘盒数 + 管道内盒数」，
++        //   且每色 count 总和 == 目标图该色像素数）。只数棋盘上的盒会漏掉整条管道的载客量，
++        //   于是一个完全正确的成品关（例如 55×55 那关：管道里另有 1023 人）会被误判成「还差 1023」。
++        if (cell.t === 'pipe') {
++          pipes++;
++          // 出口检查：出口被占着就不吐盒；出口在盘外 / 被黑块永久占住 = 队列永远出不来
++          var pv = A.PIPE_DIRS[cell.dir] || [1, 0];
++          var pr2 = r + pv[0], pc2 = c + pv[1];
++          if (pr2 < 0 || pr2 >= working.rows || pc2 < 0 || pc2 >= working.cols || working.cells[pr2][pc2]) pipeExitBlocked++;
++          var q = cell.queue || [];
++          for (var qi = 0; qi < q.length; qi++) {
++            var qb = q[qi];
++            if (!qb || !(qb.color > 0) || !(qb.count > 0)) continue;
++            pipeBoxes++;
++            pipeCap += qb.count;
++            havePipe[qb.color] = (havePipe[qb.color] || 0) + qb.count;
++            have[qb.color] = (have[qb.color] || 0) + qb.count;
++          }
++          continue;
++        }
++        if (cell.t === 'box') {
++          cars++; cap += (cell.count || 0);
++          if (cell.ice > 0) ice++;
++          if (cell.q) qm++;
++          if (cell.chain > 0) chainGroups[cell.chain] = (chainGroups[cell.chain] || 0) + 1;
++          haveBoard[cell.color] = (haveBoard[cell.color] || 0) + (cell.count || 0);
++          have[cell.color] = (have[cell.color] || 0) + (cell.count || 0);
++        }
++      }
++    }
++    var chainGroupCount = 0, loneChains = 0;
++    Object.keys(chainGroups).forEach(function (g) { chainGroupCount++; if (chainGroups[g] < 2) loneChains++; });
++    return { need: need, have: have, haveBoard: haveBoard, havePipe: havePipe, total: total,
++             cap: cap, cars: cars, empty: empty, black: black, pipes: pipes,
++             pipeBoxes: pipeBoxes, pipeCap: pipeCap,
++             ice: ice, qm: qm, chainGroupCount: chainGroupCount, loneChains: loneChains,
++             chainGroups: chainGroups, pipeExitBlocked: pipeExitBlocked };
++  }
++
++  function renderValidate() {
++    var el = $('edit-validate');
++    if (!el || !working) return;
++    var s = stats();
++    var ids = {};
++    Object.keys(s.need).forEach(function (k) { ids[k] = 1; });
++    Object.keys(s.have).forEach(function (k) { ids[k] = 1; });
++    var list = Object.keys(ids).map(function (k) { return parseInt(k, 10); }).sort(function (a, b) { return a - b; });
++
++    var html = '<div class="edit-vhead">每色人数核对 <span>(车上载客' + (s.pipeBoxes ? '，含管道内' : '') + ' / 板上像素)</span></div>';
++    if (!list.length) html += '<div class="edit-vrow nobad">还没有目标图，先导入 TXT</div>';
++    var badTotal = 0;
++    for (var i = 0; i < list.length; i++) {
++      var id = list[i];
++      var nd = s.need[id] || 0, hv = s.have[id] || 0;
++      var diff = nd - hv;
++      var ok = diff === 0;
++      if (!ok) badTotal += Math.abs(diff);
++      var tag = ok ? '✓' : (diff > 0 ? ('还差 ' + diff) : ('多 ' + (-diff)));
++      if (!nd && hv > 0) tag = '板上没这色';
++      var bb = s.haveBoard[id] || 0, pb = s.havePipe[id] || 0;
++      html += '<div class="edit-vrow' + (ok ? '' : ' bad') + (nd === 0 && hv > 0 ? ' warn' : '') + '" data-color="' + id + '"' +
++        ' title="' + A.getColorName(id) + '：棋盘上的车 ' + bb + ' 人' + (pb ? (' + 管道里 ' + pb + ' 人') : '') +
++        ' = ' + hv + '；板上该色像素 ' + nd + '。点这一行 = 换成这个颜色，并把载客量填成' +
++        (diff > 0 ? ('还差的 ' + diff) : '默认值') + '">' +
++        '<span class="edit-vsw" style="background:' + A.getColorCSS(id) + '"></span>' +
++        '<span class="edit-vname">' + A.getColorName(id) + '</span>' +
++        '<span class="edit-vnum">' + hv + ' / ' + nd + '</span>' +
++        '<span class="edit-vtag">' + tag + '</span></div>';
++    }
++    html += '<div class="edit-vfoot">' +
++      '车 ' + s.cars + ' 辆 · 载客合计 ' + (s.cap + s.pipeCap) + ' / 板上 ' + s.total + ' 人 · 空位 ' + s.empty +
++      (s.black ? (' · 黑块 ' + s.black) : '') +
++      (s.pipes ? (' · 管道 ' + s.pipes + ' 条（内含 ' + s.pipeBoxes + ' 盒 / ' + s.pipeCap + ' 人）') : '') +
++      (s.ice ? (' · 冰块 ' + s.ice) : '') +
++      (s.chainGroupCount ? (' · 锁链 ' + s.chainGroupCount + ' 组') : '') +
++      (s.qm ? (' · 问号 ' + s.qm) : '') + '<br>' +
++      (badTotal === 0 && s.cars > 0
++        ? '<b class="ok">✓ 配平：每色载客量（含管道内）都等于板上该色人数</b>'
++        : ((s.cars + s.pipeBoxes) === 0 ? '<b class="warn2">还没放车：右栏选颜色后点棋盘空格</b>'
++          : '<b class="warn2">✗ 还有 ' + badTotal + ' 人不匹配（<span class="edit-vlink">点上面某一行</span>可自动切换到该色并填好还差的数量）</b>')) +
++      // 【v134】障碍类提示：这三条都是"摆得出来但玩不成/不合规"的坑
++      (s.pipeExitBlocked ? ('<br><b class="warn2">⚠ 有 ' + s.pipeExitBlocked + ' 条管道的出口被占住（出口格有车/黑块，或指向盘外）：这些管道吐不出盒</b>') : '') +
++      (s.loneChains ? ('<br><b class="warn2">⚠ 有 ' + s.loneChains + ' 个锁链组只有 1 个成员：规则上会被当成普通车（至少要 2 个才成链）</b>') : '') +
++      '</div>';
++    el.innerHTML = html;
++  }
++
++  function syncControls() {
++    var ri = $('edit-rows'), ci = $('edit-cols'), ki = $('edit-count');
++    if (ri && working) ri.value = working.rows;
++    if (ci && working) ci.value = working.cols;
++    if (ki) ki.value = curCount;
++  }
++
++  function status(text) {
++    var el = $('edit-board-hint');
++    if (el) el.textContent = text;
++  }
++
++  function renderAll(commit) {
++    renderBoard();
++    renderPipePanel();
++    renderValidate();
++    syncControls();
++    status('车场 ' + working.rows + '×' + working.cols + ' · 空格=空位 · 点空格放车 / 点车改写 / 拖动换位 / 右键清空');
++    if (commit) host.setBoard(working);
++  }
++
++  // ==================== 编辑交互 ====================
++  function cellAt(target) {
++    var el = target && target.closest ? target.closest('.edit-cell') : null;
++    if (!el) return null;
++    var r = parseInt(el.getAttribute('data-r'), 10), c = parseInt(el.getAttribute('data-c'), 10);
++    if (isNaN(r) || isNaN(c)) return null;
++    // 【v134】越界防御：棋盘外的坐标一律忽略。没有这道闸门时，一个越界的格子会被
++    //   直接写进 cells（那一行长度超过 cols），统计与导出都看不见它 —— 静默脏数据。
++    if (!working || r < 0 || c < 0 || r >= working.rows || c >= working.cols) return null;
++    return { r: r, c: c };
++  }
++
++  // 【v134】把「冰块/锁链/问号」做成【可点击切换】的标记工具，管道做成「放/改方向 + 队列编辑」。
++  //   这三个标记只作用在【车】上（空格先放车再加），这样口径简单：标记是车的属性。
++  function applyTool(r, c) {
++    var cell = working.cells[r][c];
++    if (tool === 'erase') { working.cells[r][c] = null; return null; }
++    if (tool === 'black') { working.cells[r][c] = { t: 'black' }; return null; }
++    if (tool === 'ice') {
++      if (!cell || cell.t !== 'box') return '冰块只能加在车上：先用「放车」放一辆，再点冰块';
++      cell.ice = (cell.ice > 0) ? 0 : curIce;
++      return cell.ice > 0 ? ('已加冰块：耐久 ' + cell.ice + '（激活后每取一盒解冻 1）') : '已去掉冰块';
++    }
++    if (tool === 'chain') {
++      if (!cell || cell.t !== 'box') return '锁链只能加在车上：先用「放车」放一辆，再点锁链';
++      cell.chain = (cell.chain === curChain) ? 0 : curChain;
++      return cell.chain ? ('已加入锁链组 ' + chainTag(cell.chain) + '（同组的车会被一起取走）') : '已移出锁链组';
++    }
++    if (tool === 'question') {
++      if (!cell || cell.t !== 'box') return '问号只能加在车上：先用「放车」放一辆，再点问号';
++      cell.q = !cell.q;
++      return cell.q ? '已设为问号：玩法上先隐藏颜色，取到时才揭示' : '已取消问号';
++    }
++    if (tool === 'pipe') {
++      if (cell && cell.t === 'pipe') { cell.dir = curDir; selCell = { r: r, c: c }; return '管道方向 → ' + PIPE_DIR_CN[curDir]; }
++      working.cells[r][c] = { t: 'pipe', dir: curDir, queue: [], next: 0 };
++      selCell = { r: r, c: c };
++      return '已放管道（' + PIPE_DIR_CN[curDir] + '）：在右栏「管道队列」里加车，队首先出。管道本身永久占格';
++    }
++    working.cells[r][c] = mkBox();
++    return null;
++  }
++
++  function onDown(e) {
++    if (!editing) return;
++    if (e.button !== 0) return;
++    var pos = cellAt(e.target);
++    if (!pos) return;
++    e.preventDefault();
++    var r = pos.r, c = pos.c;
++    var cell = working.cells[r][c];
++
++    if (tool === 'pick') {
++      if (cell && cell.t === 'box') { curColor = cell.color; curCount = cell.count; renderPalette(); syncControls(); renderBoard(); }
++      else if (cell && cell.t === 'pipe') { selCell = { r: r, c: c }; renderBoard(); }
++      renderPipePanel();
++      return;
++    }
++    if (tool === 'erase' || tool === 'black') {
++      drag = { mode: tool, from: { r: r, c: c }, moved: false };
++      applyTool(r, c);
++      updateCellDom(r, c);
++      renderPipePanel();
++      renderValidate();
++      return;
++    }
++    // 标记类工具（冰块/锁链/问号）与管道：单击生效，不做拖动刷
++    if (tool === 'ice' || tool === 'chain' || tool === 'question' || tool === 'pipe') {
++      drag = null;
++      var hint = applyTool(r, c);
++      if (hint) status(hint);
++      renderBoard();          // 标记会改变格子外观（角标/描边），整块重绘最省心（棋盘不大）
++      renderPipePanel();
++      renderValidate();
++      host.setBoard(working);
++      return;
++    }
++    // 放车工具
++    // 管道格不许被"放车"覆盖（里面有队列，误覆盖会静默丢数据）→ 改成选中它、展开队列编辑器
++    if (cell && cell.t === 'pipe') { selCell = { r: r, c: c }; renderBoard(); renderPipePanel(); return; }
++    if (cell && cell.t === 'box') {
++      drag = { mode: 'move', from: { r: r, c: c }, moved: false };   // 按下已有车 → 可能是"改写"，也可能是"拖走"
++      return;
++    }
++    drag = { mode: 'paint', from: { r: r, c: c }, moved: false };
++    applyTool(r, c);
++    updateCellDom(r, c);
++    renderValidate();
++  }
++
++  function onOver(e) {
++    if (!editing || !drag) return;
++    var pos = cellAt(e.target);
++    if (!pos) return;
++    var r = pos.r, c = pos.c;
++    if (r === drag.from.r && c === drag.from.c && !drag.moved) return;
++    if (drag.mode === 'move') { drag.hover = { r: r, c: c }; return; }
++    drag.moved = true;
++    var cur = working.cells[r][c];
++    if (drag.mode === 'paint' && cur && cur.t === 'box') return;   // 刷过已有车不误删
++    if (cur && cur.t === 'pipe') return;                           // 【v134】拖动刷不许碰管道：里面有队列，蹭过去就丢数据
++    applyTool(r, c);
++    updateCellDom(r, c);
++    renderValidate();
++  }
++
++  function onUp(e) {
++    if (!editing || !drag) return;
++    var d = drag; drag = null;
++    if (d.mode === 'move') {
++      var pos = cellAt(e.target);
++      if (!pos) { renderBoard(); return; }
++      if (pos.r === d.from.r && pos.c === d.from.c) {
++        // 原地点击 = 按当前颜色/载客量改写这辆车
++        working.cells[pos.r][pos.c] = mkBox();
++      } else {
++        var moving = working.cells[d.from.r][d.from.c];
++        var dest = working.cells[pos.r][pos.c];
++        var back = (dest && dest.t === 'box') ? dest : null;   // 目标格有车 → 互换；黑块/空位 → 直接盖过去
++        working.cells[pos.r][pos.c] = moving;
++        working.cells[d.from.r][d.from.c] = back;
++      }
++      renderAll(true);
++      return;
++    }
++    if (d.moved) renderAll(true); else { renderValidate(); host.setBoard(working); }
++  }
++
++  function onContext(e) {
++    if (!editing) return;
++    var pos = cellAt(e.target);
++    if (!pos) return;
++    e.preventDefault();
++    working.cells[pos.r][pos.c] = null;
++    updateCellDom(pos.r, pos.c);
++    renderValidate();
++    host.setBoard(working);
++  }
++
++  function onPaletteClick(e) {
++    var btn = e.target && e.target.closest ? e.target.closest('.edit-swatch') : null;
++    if (!btn) return;
++    curColor = parseInt(btn.getAttribute('data-color'), 10) || 1;
++    tool = ($('edit-tool') || {}).value || tool;
++    var sel = $('edit-tool'); if (sel && sel.value !== 'place') { sel.value = 'place'; tool = 'place'; }
++    renderPalette();
++    renderBoard();
++    renderValidate();
++  }
++
++  function onValidateClick(e) {
++    var row = e.target && e.target.closest ? e.target.closest('.edit-vrow[data-color]') : null;
++    if (!row) return;
++    var id = parseInt(row.getAttribute('data-color'), 10);
++    if (!id) return;
++    curColor = id;
++    var s = stats();
++    var diff = (s.need[id] || 0) - (s.have[id] || 0);
++    if (diff > 0) curCount = diff;
++    tool = 'place';
++    var sel = $('edit-tool'); if (sel) sel.value = 'place';
++    renderPalette();
++    renderBoard();
++    renderValidate();
++  }
++
++  // ==================== 工具条动作 ====================
++  // ---------- 【v134】管道队列编辑器 ----------
++  // 管道在官方格式里是 {id:0, type:11~14, param:[{id,count},…]}：type = 方向，param = 队列（队首先出）。
++  // 这里就让"队列"可点可改：改颜色 / 改载客 / 上移下移（= 调出场顺序）/ 增删。
++  function pipeAt() {
++    if (!selCell || !working) return null;
++    var row = working.cells[selCell.r];
++    var cell = row ? row[selCell.c] : null;
++    return (cell && cell.t === 'pipe') ? cell : null;
++  }
++
++  function renderPipePanel() {
++    var panel = $('edit-pipe-panel');
++    if (!panel) return;
++    var cell = pipeAt();
++    if (!cell) { panel.classList.add('hidden'); return; }
++    panel.classList.remove('hidden');
++    var q = cell.queue || [];
++    var info = $('edit-pipe-info');
++    if (info) {
++      info.textContent = '第 ' + (selCell.r + 1) + ' 行 第 ' + (selCell.c + 1) + ' 列 · ' + (PIPE_DIR_CN[cell.dir] || '?') +
++        ' · 队列 ' + q.length + ' 辆';
++    }
++    var html = '';
++    if (!q.length) html = '<div class="edit-pq-empty">队列空的：点下面「＋ 加一辆」。空队列的管道只当障碍用。</div>';
++    for (var i = 0; i < q.length; i++) {
++      var b = q[i];
++      var isNext = (i === (cell.next || 0));
++      html += '<div class="edit-pq-row' + (isNext ? ' is-next' : '') + '" data-i="' + i + '">' +
++        '<span class="edit-pq-no" title="出场顺序">' + (i + 1) + '</span>' +
++        '<button class="edit-pq-sw" data-act="color" style="background:' + A.getColorCSS(b.color) + '"' +
++          ' title="点一下 = 把右栏当前选中的颜色（' + A.getColorName(curColor) + '）换成这辆"></button>' +
++        '<span class="edit-pq-name">' + A.getColorName(b.color) + '</span>' +
++        '<input type="number" class="edit-pq-cnt" data-act="count" value="' + b.count + '" min="1" max="999" title="这辆装几个人">' +
++        '<button data-act="up" title="上移（更早出场）"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
++        '<button data-act="down" title="下移（更晚出场）"' + (i === q.length - 1 ? ' disabled' : '') + '>↓</button>' +
++        '<button data-act="del" title="删掉这辆">✕</button>' +
++        (isNext ? '<span class="edit-pq-tag">下一个出</span>' : '') +
++        '</div>';
++    }
++    var qe = $('edit-pipe-queue');
++    if (qe) qe.innerHTML = html;
++    var w = $('edit-pipe-warn');
++    if (w) {
++      var dv = A.PIPE_DIRS[cell.dir] || [1, 0];
++      var er = selCell.r + dv[0], ec = selCell.c + dv[1];
++      var msgs = [];
++      if (er < 0 || er >= working.rows || ec < 0 || ec >= working.cols) {
++        msgs.push('出口在棋盘外 —— 队列永远出不来');
++      } else {
++        var ecell = working.cells[er][ec];
++        if (ecell) msgs.push('出口格（第 ' + (er + 1) + ' 行 第 ' + (ec + 1) + ' 列）现在被' +
++          (ecell.t === 'black' ? '黑块' : (ecell.t === 'pipe' ? '另一个管道' : '一辆车')) +
++          '占着：被占着就不吐盒，永久占住 = 永远出不来');
++      }
++      if (!q.length) msgs.push('队列为空 = 这个管道只当障碍用（真机上线包里也有这种）');
++      w.innerHTML = msgs.map(function (m) { return '<div>· ' + m + '</div>'; }).join('');
++    }
++  }
++
++  function pipeMove(i, d) {
++    var cell = pipeAt(); if (!cell) return;
++    var q = cell.queue, j = i + d;
++    if (j < 0 || j >= q.length) return;
++    var t = q[i]; q[i] = q[j]; q[j] = t;
++    afterPipeEdit();
++  }
++  function afterPipeEdit() { renderPipePanel(); renderValidate(); host.setBoard(working); status('管道队列已改：共 ' + (pipeAt() ? pipeAt().queue.length : 0) + ' 辆'); }
++
++  function onPipeQueueClick(e) {
++    var row = e.target && e.target.closest ? e.target.closest('.edit-pq-row') : null;
++    if (!row) return;
++    var cell = pipeAt(); if (!cell) return;
++    var i = parseInt(row.getAttribute ? row.getAttribute('data-i') : null, 10);
++    if (isNaN(i)) return;
++    var btn = e.target.closest ? e.target.closest('[data-act]') : null;
++    var act = btn ? btn.getAttribute('data-act') : null;
++    if (act === 'count') return;                       // 数字框交给 input 事件
++    if (act === 'up') pipeMove(i, -1);
++    else if (act === 'down') pipeMove(i, 1);
++    else if (act === 'del') { cell.queue.splice(i, 1); if ((cell.next || 0) > cell.queue.length) cell.next = cell.queue.length; afterPipeEdit(); }
++    else if (act === 'color') { cell.queue[i].color = curColor; afterPipeEdit(); }
++  }
++
++  function onPipeQueueInput(e) {
++    if (!e || !e.target || !e.target.getAttribute) return;
++    if (e.target.getAttribute('data-act') !== 'count') return;
++    var row = e.target.closest ? e.target.closest('.edit-pq-row') : null;
++    var cell = pipeAt(); if (!row || !cell) return;
++    var i = parseInt(row.getAttribute('data-i'), 10);
++    if (isNaN(i)) return;
++    var v = parseInt(e.target.value, 10);
++    if (isNaN(v) || v < 1) v = 1;
++    if (v > 999) v = 999;
++    cell.queue[i].count = v;
++    renderValidate(); host.setBoard(working);
++  }
++
++  // 【v133】目标区画笔相关的对外接口与提示（真正的上色在 app.js 里做，因为目标图画布归它管）
++  function currentColor() { return curColor; }
++  function setColor(id) {
++    if (!(id > 0)) return;
++    curColor = id;
++    renderPalette(); renderBoard(); renderValidate(); onPaintChanged();
++  }
++  function toolMode() { return tool; }
++
++  function paintToolHint() {
++    if (tool === 'erase') return '擦成空位（0）';
++    if (tool === 'pick') return '吸管：点一下就取该像素的颜色当画笔';
++    if (tool === 'black') return '目标图没有黑块 → 按「擦掉」处理';
++    return '用 ' + A.getColorName(curColor) + '（编号 ' + curColor + '）上色';
++  }
++
++  function onPaintChanged() {
++    var on = !!(host && host.paint && host.paint.isOn && host.paint.isOn());
++    var btn = $('edit-paint-target');
++    if (btn) {
++      btn.textContent = on ? '✏️ 改目标图：开' : '✏️ 改目标图：关';
++      if (on) btn.classList.add('active'); else btn.classList.remove('active');
++    }
++    var undoBtn = $('edit-paint-undo');
++    if (undoBtn) undoBtn.disabled = !(host && host.paint && host.paint.canUndo && host.paint.canUndo());
++    var tip = $('edit-paint-tip');
++    if (tip) {
++      tip.innerHTML = on
++        ? '<b>目标区画笔已开</b>：在目标图上<b>点或拖</b> = 改像素。当前工具 → ' + paintToolHint() +
++          '。<br>撤回：右边的「↩ 撤回」按钮或 Ctrl/⌘+Z。格子太小就先用「🔍＋」放大再改（此时拖拽平移不可用，关掉画笔即可平移）。'
++        : '目标区微调：点右边按钮开启画笔，之后在目标图上点/拖就能改像素（配合「工具」下拉：' +
++          '橡皮 = 擦成空位、吸管 = 取该像素颜色）。<br>改完记得看下面「每色人数核对」——目标图变了，车场就要跟着补或减。';
++    }
++  }
++
++  /** 目标区被改过（app.js 里改完会回来喊一声）：调色板要按新颜色重生成，核对要重算。 */
++  function onLevelChanged() {
++    if (!editing) return;
++    renderPalette();
++    renderValidate();
++  }
++
++  function resizeBoard() {
++    var rows = parseInt(($('edit-rows') || {}).value, 10);
++    var cols = parseInt(($('edit-cols') || {}).value, 10);
++    if (isNaN(rows) || rows < 1) rows = 1;
++    if (isNaN(cols) || cols < 1) cols = 1;
++    if (rows > 40) rows = 40;
++    if (cols > 40) cols = 40;
++    var next = { rows: rows, cols: cols, cells: emptyCells(rows, cols) };
++    for (var r = 0; r < rows; r++) {
++      for (var c = 0; c < cols; c++) {
++        if (r < working.rows && c < working.cols) next.cells[r][c] = working.cells[r][c];   // 原地改尺寸时保留左上角已有内容
++      }
++    }
++    working = next;
++    renderAll(true);
++  }
++
++  function resetOrigin() {
++    if (!snapshot) return;
++    working = cloneBoard(snapshot);
++    // 【v133】目标区也一起回到原样：否则「回到关卡原样」只回退了车场，
++    //   目标图还留着改过的像素，用户会以为没生效。
++    if (snapshotBlocks && host.setBlocks) host.setBlocks(cloneBlocks(snapshotBlocks));
++    renderAll(true);
++  }
++
++  function trySolve() {
++    var el = $('edit-validate');
++    var lv = host.getLevel();
++    if (!lv || !lv.blocks) return;
++    host.setBoard(working);
++    var parsed = A.parseLevel({ blocks: lv.blocks, bufferLimit: lv.bufferLimit || 5, board: A.normBoard(working) });
++    var t0 = Date.now();
++    var res = null;
++    try { res = A.Solver.solve(parsed); } catch (err) { host.explain('<p class="fail">求解异常: ' + err.message + '</p>'); return; }
++    var ms = Date.now() - t0;
++    var s = stats();
++    var html = '<p class="' + (res.completed ? 'pass' : 'fail') + '">' + (res.completed ? '✅ 试解：能全清（可解）' : '⚠️ 试解：解不掉（先看下面的配平）') + '</p>';
++    html += '<p>取盒步数: ' + res.steps + ' · 用时 ' + ms + 'ms</p>';
++    html += '<p style="font-size:11px;color:#8a7358">每色配平: ' + (function () {
++      var parts = [], ids = {};
++      Object.keys(s.need).forEach(function (k) { ids[k] = 1; });
++      Object.keys(s.have).forEach(function (k) { ids[k] = 1; });
++      Object.keys(ids).map(Number).sort(function (a, b) { return a - b; }).forEach(function (id) {
++        parts.push(A.getColorName(id) + ' ' + (s.have[id] || 0) + '/' + (s.need[id] || 0));
++      });
++      return parts.join(' · ');
++    })() + '</p>';
++    if (!res.completed) html += '<p style="font-size:11px;color:#e6a23c">配平对但解不掉，通常是车场取不出去（同一列被堵死/暂存放不下）。把车分散到不同列、别把同色堆成一条竖列再试。</p>';
++    host.explain(html);
++    if (el) el.scrollTop = el.scrollHeight;
++  }
++
++  function exportJson() {
++    var lv = host.getLevel();
++    host.setBoard(working);
++    var parsed = A.parseLevel({ blocks: lv.blocks, bufferLimit: lv.bufferLimit || 5, board: A.normBoard(working) });
++    var json = A.toGameFormat(parsed);
++    host.download(host.getName().replace(/\.[^.]+$/, '') + '.json', JSON.stringify(json, null, 2));
++    status('已导出关卡JSON：' + host.getName().replace(/\.[^.]+$/, '') + '.json（官方 5 键 toprow/blocks/maprow/mapcol/spools）');
++  }
++
++  function exportTxt() {
++    var lv = host.getLevel();
++    var blocks = lv.blocks || [];
++    var lines = [];
++    for (var r = 0; r < blocks.length; r++) lines.push(blocks[r].join(' '));
++    host.download(host.getName().replace(/\.[^.]+$/, '') + '.txt', lines.join('\n') + '\n');
++    status('已导出TXT：' + blocks.length + ' 行（空格分隔数字，0 = 空）');
++  }
++
++  function applyToSim() {
++    host.setBoard(working);
++    host.play();
++  }
++
++  // ==================== 生命周期 ====================
++  function enter() {
++    if (editing) return;
++    working = boardFromLevel();
++    snapshot = cloneBoard(working);
++    snapshotBlocks = cloneBlocks(host.getBlocks ? host.getBlocks() : null);   // 【v133】目标区原样，供一键回退
++    editing = true;
++    tool = 'place';
++    drag = null;
++    selCell = null;
++    var sel = $('edit-tool'); if (sel) sel.value = 'place';
++    // 默认颜色取目标图里第一个出现的颜色（没有就用 1）
++    var colors = paletteColors(); curColor = colors[0] || 1;
++    var cnt = $('edit-count'); curCount = cnt ? (parseInt(cnt.value, 10) || 3) : 3;
++    if (curCount < 1) curCount = 1;
++    renderPalette();
++    renderAll(true);
++    onPaintChanged();     // 【v133】同步画笔按钮/撤回按钮/tip 文案（默认都是关）
++  }
++
++  function exit() {
++    editing = false;
++    drag = null;
++    selCell = null;
++    var pp = $('edit-pipe-panel'); if (pp) pp.classList.add('hidden');
++    working = null;
++    snapshot = null;
++    snapshotBlocks = null;
++  }
++
++  function bind() {
++    var wrap = $('edit-board-queues');
++    if (wrap) {
++      wrap.addEventListener('mousedown', onDown);
++      wrap.addEventListener('mouseover', onOver);
++      wrap.addEventListener('contextmenu', onContext);
++    }
++    document.addEventListener('mouseup', onUp);
++    var pal = $('edit-palette');
++    if (pal) pal.addEventListener('click', onPaletteClick);
++    var val = $('edit-validate');
++    if (val) val.addEventListener('click', onValidateClick);
++    var tsel = $('edit-tool');
++    if (tsel) tsel.addEventListener('change', function () { tool = this.value; renderBoard(); onPaintChanged(); });
++    // 【v134】管道/锁链/冰块的参数控件
++    var dirSel = $('edit-pipe-dir');
++    if (dirSel) {
++      dirSel.value = String(curDir);
++      dirSel.addEventListener('change', function () {
++        curDir = parseInt(this.value, 10) || 13;
++        status('管道方向 → ' + PIPE_DIR_CN[curDir] + '（点空格 = 放新管道；点已有管道 = 只改方向，队列不动）');
++      });
++    }
++    var cgIn = $('edit-chain-group');
++    if (cgIn) cgIn.addEventListener('input', function () {
++      var v = parseInt(this.value, 10);
++      curChain = (isNaN(v) || v < 1) ? 1 : Math.min(99, v);
++    });
++    var cgNew = $('edit-chain-new');
++    if (cgNew) cgNew.addEventListener('click', function () {
++      curChain = Math.min(99, curChain + 1);
++      if (cgIn) cgIn.value = curChain;
++      status('锁链组切到 ' + chainTag(curChain) + '（组号 ' + curChain + '）：接下来点的车都进这一组');
++    });
++    var iceIn = $('edit-ice-dur');
++    if (iceIn) iceIn.addEventListener('input', function () {
++      var v = parseInt(this.value, 10);
++      curIce = (isNaN(v) || v < 1) ? 1 : Math.min(9, v);
++    });
++    var pq = $('edit-pipe-queue');
++    if (pq) { pq.addEventListener('click', onPipeQueueClick); pq.addEventListener('input', onPipeQueueInput); }
++    var pAdd = $('edit-pipe-add');
++    if (pAdd) pAdd.addEventListener('click', function () {
++      var cell = pipeAt(); if (!cell) return;
++      cell.queue.push({ color: curColor, count: curCount });
++      afterPipeEdit();
++    });
++    var pClear = $('edit-pipe-clear');
++    if (pClear) pClear.addEventListener('click', function () {
++      var cell = pipeAt(); if (!cell) return;
++      cell.queue = []; cell.next = 0;
++      afterPipeEdit();
++    });
++    var cnt = $('edit-count');
++    if (cnt) cnt.addEventListener('input', function () {
++      var v = parseInt(this.value, 10); if (isNaN(v) || v < 1) v = 1; if (v > 99) v = 99;
++      curCount = v;
++      if (tool === 'place') renderBoard();     // 「点已有车=改写」的预览高亮跟着载客量变
++      renderValidate();
++    });
++    var resize = $('edit-resize');
++    if (resize) resize.addEventListener('click', resizeBoard);
++    var clear = $('edit-clear');
++    if (clear) clear.addEventListener('click', function () {
++      if (!confirm('清空整个车场？（小人板不动，随时可以点「回到关卡原样」恢复）')) return;
++      working = { rows: working.rows, cols: working.cols, cells: emptyCells(working.rows, working.cols) };
++      renderAll(true);
++    });
++    var back = $('edit-defaults');
++    if (back) back.addEventListener('click', function () {
++      if (!confirm('把车场与目标区都恢复到进入摆盒时的原样？')) return;
++      resetOrigin();
++    });
++    // 【v133】目标区画笔：开关 + 撤回（真正的上色逻辑在 app.js，它管着目标图画布）
++    var ptBtn = $('edit-paint-target');
++    if (ptBtn) ptBtn.addEventListener('click', function () {
++      if (!host.paint) return;
++      host.paint.toggle();
++      onPaintChanged();
++    });
++    var puBtn = $('edit-paint-undo');
++    if (puBtn) puBtn.addEventListener('click', function () {
++      if (host.paint) host.paint.undo();
++      onPaintChanged();
++    });
++    var solveBtn = $('edit-try-solve');
++    if (solveBtn) solveBtn.addEventListener('click', trySolve);
++    var apply = $('edit-apply');
++    if (apply) apply.addEventListener('click', applyToSim);
++    var ej = $('edit-export-json');
++    if (ej) ej.addEventListener('click', exportJson);
++    var et = $('edit-export-txt');
++    if (et) et.addEventListener('click', exportTxt);
++  }
++
++  A.LevelEditor = {
++    init: function (h) { host = h; if (document.readyState !== 'loading') bind(); else document.addEventListener('DOMContentLoaded', bind); },
++    enter: enter,
++    exit: exit,
++    isEditing: function () { return editing; },
++    board: function () { return working; },
++    // 【v133】供 app.js 的目标区画笔调用
++    currentColor: currentColor,
++    setColor: setColor,
++    toolMode: toolMode,
++    onLevelChanged: onLevelChanged,
++    onPaintChanged: onPaintChanged
++  };
++})();

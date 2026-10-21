@@ -1,0 +1,81 @@
+--- a/bin/js/simulator.js
++++ b/bin/js/simulator.js
+@@ -308,6 +308,11 @@
+       if (m.r === r && m.c === c) continue;
+       if (!AntSolver.isBox(s.cells[m.r][m.c])) continue; // 已消除(整组同取，通常不会) → 忽略
+       if (!s.activated[m.r + ',' + m.c]) return true;    // 有成员未激活 → 锁
++      // 【v141 修复】组内只要有成员被【数字冰】锁着 → 整组不可点。
++      //   这条判据原本是给老冰写的（`isIceLocked`），v139 删老冰时被一并删掉、却没补上数字冰的等价判断，
++      //   于是"同组另一辆没冰的车"仍可被点，一点就把整组（含被锁那辆）连体取走 —— 与实机行为不符。
++      //   注意不能只靠 isPickable 里那条自身判据：那条只挡"点被锁的那一辆"，挡不住"点它的邻居"。
++      if (isNumIceLocked(s, m.r, m.c)) return true;      // 有成员被数字冰锁着 → 锁
+     }
+     return false;
+   }
+@@ -1357,6 +1362,9 @@
+     // 数字冰：按球数倒计时 / 是否锁着（供单测与外部按球数推进使用）
+     advanceNumIce: advanceNumIce,
+     isNumIceLocked: isNumIceLocked,
++    // 【v141】锁链组是否被「组内某成员的数字冰」锁着 —— 供界面把"同组陪锁"的格子也灰显
++    //   （否则它看着正常、点下去却毫无反应，正是本工程一直想避免的那种手感问题）。
++    isChainLocked: isChainLocked,
+     getNextSlotStart: getNextSlotStart, previewNextEliminationOrder: previewNextEliminationOrder,
+     computeReach: computeReach, isPickable: isPickable, isExposedAt: isExposedAt,
+     createState: createState, processAntBox: processAntBox, autoReleaseBuffer: autoReleaseBuffer,
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -2041,6 +2041,10 @@
+     }
+     // 数字冰未破碎 → 灰显（锁着就看着"取不了"）。老冰已下线，这是唯一的锁定灰显来源。
+     if (state && state.numice && state.numice[r + ',' + c] && state.numice[r + ',' + c].remaining > 0) cls += ' locked';
++    // 【v141】锁链组里"陪锁"的那一辆：它自己没冰，但同组有人被数字冰锁着 → 整组点不了，
++    //   同样灰显。不显示的话它看着完全正常、点下去没反应（与上面 .noslot 要解决的问题同类）。
++    if (state && !pickable && !noSlot && cell.chain > 0 &&
++        AntSolver.Simulator.isChainLocked && AntSolver.Simulator.isChainLocked(state, r, c)) cls += ' locked';
+     return '<div class="' + cls + '" style="' + style + '" data-r="' + r + '" data-c="' + c + '" title="' + title + '">' +
+            '<span class="cnt">' + label + '</span>' + overlay + '</div>';
+   }
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v140·生成结果可带入棋盘</title>
+-  <link rel="stylesheet" href="css/style.css?v=140">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v141·修锁链×数字冰可越权点</title>
++  <link rel="stylesheet" href="css/style.css?v=141">
+ </head>
+ <body>
+   <header>
+@@ -811,18 +811,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=140"></script>
+-  <script src="js/utils.js?v=140"></script>
+-  <script src="js/simulator.js?v=140"></script>
+-  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=140"></script>
+-  <script src="js/solver-strategy.js?v=140"></script>
+-  <script src="js/solver.js?v=140"></script>
+-  <script src="js/playersim.js?v=140"></script>
+-  <script src="js/generator.js?v=140"></script>
+-  <script src="js/analysis.js?v=140"></script>
++  <script src="js/zip.js?v=141"></script>
++  <script src="js/utils.js?v=141"></script>
++  <script src="js/simulator.js?v=141"></script>
++  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
++  <script src="js/anchor-cut.js?v=141"></script>
++  <script src="js/solver-strategy.js?v=141"></script>
++  <script src="js/solver.js?v=141"></script>
++  <script src="js/playersim.js?v=141"></script>
++  <script src="js/generator.js?v=141"></script>
++  <script src="js/analysis.js?v=141"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=140"></script>
+-  <script src="js/app.js?v=140"></script>
++  <script src="js/level-editor.js?v=141"></script>
++  <script src="js/app.js?v=141"></script>
+ </body>
+ </html>

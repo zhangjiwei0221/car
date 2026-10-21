@@ -1,0 +1,428 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3215,7 +3215,119 @@
+    *     · 管道   ：由结构层的配额决定（本函数不碰管道，避免与守恒/配额打架）
+    *   只改 cells 上的 numice / chain 两个字段，**不改盒数与容量** → 守恒不受影响；
+    *   改完由调用方继续跑结构性卡死检验与求解，破坏可解性的候选照旧淘汰。
++   */
++  /**
++   * 【v159】开局加压（用户 2026-10-16 批准）。
++   *
++   * 背景（实测）：最新几关 0~30% 段的"暂存 3~4"占比是 0%，前期完全没有预算压力；
++   *   原因是现有手段（债务节拍 35/60/80、卡点变体）全在中后段发力，没有任何工具给开局造压力。
++   *
++   * 用户批准的两招（另两招：节拍第一笔提前已改在自动档；(d) 开局管道口本轮未做）：
++   *   (b) 开局半满车：把开局段（盒序最前的 30%）的车扩容到"该色开局露头量 × 倍数"，
++   *       容量从同色后段车搬过来 —— 守恒不变，但开局这辆车一口吃不满了，玩家要么垫着要么等；
++   *   (c) 开局锁链：从开局段挑两辆不同色的车绑一组链 —— 一次占两个暂存槽。
++   *
++   * 前提（用户强调）：加压力的同时必须有解。本函数只动"容量分配"与"链"，不动盒数、不动总量；
++   *   守恒不变（容量只在同色内搬运）；可解性由下游同一套"全知求解 + 审核 + 玩家模拟"把关，
++   *   做不到的候选照旧被淘汰 —— 即"先出压力，再由门保证有解"。
++   * 管道赌博约束（用户：必须赌管道时暂存须 ≤3）属 R6，本轮未做（玩家模拟仍透视管道）。
++   *
++   * config.earlyPressure === false 可整段关掉（回退逐值回到 v158）；earlyInflateMul 调扩容倍数。
+    */
++  function earlyPressure(board, blocks, config) {
++    var rows = board.rows, cols = board.cols, cells = board.cells;
++    var minCap = Math.max(2, config.boxSizeMin || 2), maxCap = Math.max(minCap, config.boxSizeMax || 52);
++    var all = [];
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var x = cells[r][c];
++      if (x && x.t === 'box') all.push({ r: r, c: c, cell: x, seq: (x._seq != null ? x._seq : (r * cols + c)) });
++    }
++    if (all.length < 6) return null;
++    all.sort(function (a, b) { return a.seq - b.seq; });
++    var nEarly = Math.max(3, Math.round(all.length * 0.15));   // 【v159】真正的"开局车"：最靠前的 15%（至少 3 辆）
++    var early = all.slice(0, nEarly);
++
++    // 目标图各色的"开局露头量"（未消除状态下的可达像素数）→ 扩容目标 = 露头量 × 倍数
++    var R = blocks.length, C = blocks[0].length, zeroElim = [];
++    for (var r2 = 0; r2 < R; r2++) { var rowA = []; for (var c2 = 0; c2 < C; c2++) rowA.push(false); zeroElim.push(rowA); }
++    var blob = null;
++    try { blob = exposedBlobByColor(zeroElim, blocks, R, C); } catch (e) { blob = null; }
++    var out = { inflate: [], chain: null, ice: iced === undefined ? [] : iced };
++
++    // (b) 开局半满车：扩容（最多动 3 辆，避免把整个开局都变成巨盒）
++    var mul = (config.earlyInflateMul != null) ? config.earlyInflateMul : 1.5;
++    for (var i = 0; i < early.length && out.inflate.length < 2; i++) {
++      var e0 = early[i], cell = e0.cell;
++      if (cell.q || cell.chain) continue;
++      var E = blob ? (blob[cell.color] || 0) : 0;
++      // 【v159】目标容量 = 接近上限（默认 boxSizeMax 的 85%）；若该色开局露头量更大，
++      //   则取"露头量 × 倍数"，两者取大 —— 唯一目的：让开局这辆车一口吃不饱（要么垫、要么等露头）。
++      var t1 = Math.round(maxCap * (config.earlyInflateScale != null ? config.earlyInflateScale : 0.85));
++      var t2 = E > 0 ? Math.round(E * mul) : 0;
++      var target = Math.min(maxCap, Math.max(minCap, Math.max(t1, t2)));
++      if (target <= cell.count) continue;                 // 这份容量本来就够装 → 无需加压
++      var donors = [];
++      for (var j = 0; j < all.length; j++) {
++        var d = all[j];
++        if (d.cell === cell || d.cell.color !== cell.color) continue;
++        if (d.cell.chain || d.cell.q) continue;
++        if (d.seq <= e0.seq) continue;                    // 只从更晚出场的同色车搬容量
++        donors.push(d.cell);
++      }
++      donors.sort(function (a, b) { return b.count - a.count; });
++      var moved = 0;
++      for (var k = 0; k < donors.length && cell.count < target; k++) {
++        var take = Math.min(donors[k].count - minCap, target - cell.count);
++        if (take > 0) { donors[k].count -= take; cell.count += take; moved += take; }
++      }
++      if (moved > 0) out.inflate.push({ r: e0.r, c: e0.c, color: cell.color, to: cell.count, movedFromDeck: moved });
++    }
++
++    // (b2) 【v159】开局数字冰：把开局"本来就能装满"的车锁住几手。
++    //   为什么必须有这一条：实测把开局车扩容（半满车）**不会**产生压力 —— 玩家/求解器会直接绕开它，
++    //   先去拿那些能装满的。只有把"免费车位"锁掉（数字冰 = 再取走 N 个盒才解冻），玩家才被迫
++    //   先吃半满的车垫着，前期暂存才升得起来。这是本轮真正起作用的那一招。
++    var iced = [];
++    // ⚠ 实测结论（2026-10-16）：开局数字冰**默认关**。它确实能逼出前期暂存，但代价是
++    //   无满解步数 3→11、独木桥 0→10 —— 与用户"无满解要少、独木桥≤1"的要求直接冲突。
++    //   要开：config.earlyIce = true（实验用）。真正该走的路线是"让模拟玩家会贪心垫半满车"（第三条线），见日志。
++    if (config.earlyIce === true) {
++      var iceSteps = (config.earlyIceSteps != null) ? config.earlyIceSteps : 8;
++      for (var i2 = 0; i2 < early.length && iced.length < 2; i2++) {
++        var ic = early[i2].cell;
++        if (ic.q || ic.chain || ic.numice > 0) continue;
++        var E2 = blob ? (blob[ic.color] || 0) : 0;
++        if (E2 < ic.count) continue;                    // 只锁"开局就能装满"的那种：锁掉免费的才逼得出压力
++        ic.numice = Math.max(2, iceSteps);
++        iced.push({ r: early[i2].r, c: early[i2].c, color: ic.color, steps: ic.numice });
++      }
++    }
++
++    // (c) 开局锁链：开局段两辆不同色的车绑一组（一次占两个暂存槽）
++    if (config.earlyChain !== false) {
++      var maxGid = 0;
++      for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) { var y = cells[r3][c3]; if (y && y.chain > maxGid) maxGid = y.chain; }
++      var pick2 = [];
++      for (var m = 0; m < early.length && pick2.length < 2; m++) {
++        var f = early[m], fc = f.cell;
++        if (fc.q || fc.chain) continue;
++        if (pick2.length && pick2[0].cell.color === fc.color) continue;   // 两辆必须不同色
++        pick2.push(f);
++      }
++      if (pick2.length === 2) {
++        var gid = maxGid + 1;
++        pick2[0].cell.chain = gid; pick2[1].cell.chain = gid;
++        out.chain = { gid: gid, cells: [[pick2[0].r, pick2[0].c], [pick2[1].r, pick2[1].c]],
++                      colors: [pick2[0].cell.color, pick2[1].cell.color] };
++      }
++    }
++    out.ice = iced;
++    if (!out.inflate.length && !out.chain && !out.ice.length) return null;
++    out.applied = out.inflate.length + (out.chain ? 1 : 0) + out.ice.length;
++    out.earlyCells = nEarly;
++    return out;
++  }
++
+   function applyBeatProps(board, config) {
+     var props = (config && config.beatProps) || null;
+     if (!props || !props.length) return null;
+@@ -3332,6 +3444,17 @@
+       if (beatStat) board.beatStat = beatStat;
+     } catch (e) { board.beatStat = { applied: 0, error: String(e && e.message || e) }; }
+ 
++    // ③c 【v159】开局加压：给开局段的车"扩容成半满车" + 绑一组开局锁链（用户 2026-10-16 批准，
++    //   见 earlyPressure 上方说明）。config.earlyPressure === false 可关掉（回退逐值回到 v158 行为）。
++    // 跟随卡点判据 v2 的开关：config.chokeV2 === false ⇒ 整段不生效（保证"关掉 v2 = 逐值回到 v158"，
++    //   v149 口径不变测试就是靠这条守住回退契约）。config.earlyPressure === false 也可单独关。
++    if (config.earlyPressure !== false && config.chokeV2 !== false) {
++      try {
++        var epStat = earlyPressure(board, blocks, config);
++        if (epStat) board.earlyPressureStat = epStat;   // 只在真落地时挂诊断字段（不落地时保持本体一致）
++      } catch (e) { board.earlyPressureStat = { applied: 0, error: String(e && e.message || e) }; }
++    }
++
+     // ④ 结构性卡死检验（带球后的完整检查）
+     var tSdc = Date.now();
+     var sdc = structuralDeadlockCheck(board);
+@@ -3838,9 +3961,15 @@
+     return done(best);
+   }
+ 
+-  function auditFor(solveResult, parsed, bufferLimit) {
++  function auditFor(solveResult, parsed, bufferLimit, config) {
+     if (!AntSolver.Analysis || !AntSolver.Analysis.chokepointAudit) return null;
+-    return AntSolver.Analysis.chokepointAudit((solveResult && solveResult.pressureSamples) || [], parsed.totalBoxes, bufferLimit);
++    var opts = {};
++    // 【v159】卡点判据 v2 开启时提前期门：允许前期中压（3~4）、仍禁爆压/触顶（触顶由 safeEdge 管）。
++    //   配套 earlyPressure（开局半满车 + 开局锁链）与自动档"第一笔节拍提前到 15%"——
++    //   否则新造出来的前期压力会被旧的前期门（≥3.2 即判不合格）当场判死。
++    //   config.chokeV2 === false 时不传 earlyCap → 逐值回到旧行为（与 v158 一致）。
++    if (!(config && config.chokeV2 === false)) opts.earlyCap = (bufferLimit || 5) - 0.8;
++    return AntSolver.Analysis.chokepointAudit((solveResult && solveResult.pressureSamples) || [], parsed.totalBoxes, bufferLimit, opts);
+   }
+   // 审核评分(越大越好)：中后期卡点封顶奖励 − 前期越界惩罚 + 合格大奖；用于爬山接受判定
+   // 【v118 修正常量来源】原先这里**重复写死** `bufferLimit − 1.5 / − 2.5`，而不是读审核返回值。
+@@ -3889,7 +4018,9 @@
+   //   ⚠ **不作为硬门**：v2 不达标的关照样产出（否则按实测通过率 0~13% 会几乎产不出关），
+   //     只是"在评估过的候选里挑 v2 最好的那个"。阈值（GATES）目前从单一好关反推，属暂定，等用户试玩反馈校准。
+   var CHOKE_V2_TAIL_PCT = 0.90, CHOKE_V2_TAIL_BOXES = 3;
+-  var CHOKE_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10 };
++  // 【v159】新增第 5 条：前期限压覆盖率 ≥20%（用户 2026-10-16：实测最新几关 0~30% 段的
++  //   "暂存 3~4"占比是 0%，前期完全没有预算压力）。含义见日志第二十五节 §12。
++  var CHOKE_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10, early34MinPct: 20 };
+ 
+   /** 沿一条既定路线（pickOrder）逐步回放，量出这条线上的 v2 指标（与页面「关卡体检」同口径）。 */
+   function chokeV2MeasureLine(parsed, order) {
+@@ -3899,6 +4030,7 @@
+     try { st = S.enter(parsed, { useSlotStart: true }); } catch (e) { return null; }
+     var n = 0, bridges = 0, bridgeAt = [], run = 0, maxRun = 0, soft = 0, r9 = 0, r9At = [];
+     var minPick = 99, buf34 = 0, buf4 = 0, hiBefore70 = 0, stepsBefore70 = 0, noGood = 0;
++    var earlySteps = 0, early34 = 0;   // 【v159】0~30% 段：步数 与 其中暂存落在 3~4 的步数
+     try {
+       for (var i = 0; i < order.length; i++) {
+         var p = order[i];
+@@ -3922,6 +4054,7 @@
+         if (buf >= 3 && buf <= 4) buf34++;
+         if (buf >= 4) buf4++;
+         if (prog < 0.70) { stepsBefore70++; if (buf >= 4) hiBefore70++; }
++        if (prog < 0.30) { earlySteps++; if (buf >= 3 && buf <= 4) early34++; }   // 【v159】前期限压
+         if (pickable < minPick) minPick = pickable;
+         if (pickable === 1) {
+           if (!tail) { bridges++; bridgeAt.push(pc); }
+@@ -3940,7 +4073,9 @@
+       r9: r9, r9At: r9At, minPick: minPick === 99 ? 0 : minPick,
+       buf34Pct: Math.round(buf34 / n * 100), buf4Pct: Math.round(buf4 / n * 100),
+       hiBefore70Pct: stepsBefore70 ? Math.round(hiBefore70 / stepsBefore70 * 100) : 0,
+-      noGood: noGood
++      noGood: noGood,
++      earlySteps: earlySteps, early34: early34,
++      early34Pct: earlySteps ? Math.round(early34 / earlySteps * 100) : 0
+     };
+   }
+ 
+@@ -3954,9 +4089,11 @@
+       maxRun: Math.max(mo ? mo.maxRun : -1, mp ? mp.maxRun : -1),
+       noGood: Math.max(mo ? mo.noGood : -1, mp ? mp.noGood : -1),
+       hiBefore70Pct: Math.max(mo ? mo.hiBefore70Pct : -1, mp ? mp.hiBefore70Pct : -1),
++      early34Pct: Math.min(mo ? mo.early34Pct : 999, mp ? mp.early34Pct : 999),   // 【v159】下限指标 → 取小（与"取最差"同义）
+       r9: Math.min(mo ? mo.r9 : 1e9, mp ? mp.r9 : 1e9),
+       minPick: Math.min(mo ? mo.minPick : 99, mp ? mp.minPick : 99)
+     };
++    if (worst.early34Pct >= 999) worst.early34Pct = 0;
+     if (worst.r9 >= 1e9) worst.r9 = 0;
+     if (worst.minPick >= 99) worst.minPick = 0;
+     return { omni: mo, player: mp, worst: worst, gates: CHOKE_V2_GATES };
+@@ -3970,6 +4107,7 @@
+     if (w.r9 < CHOKE_V2_GATES.r9Min) v.push('预算判断点仅' + w.r9 + '处');
+     if (w.noGood > CHOKE_V2_GATES.noGoodMax) v.push('无满解' + w.noGood + '步');
+     if (w.hiBefore70Pct > CHOKE_V2_GATES.hiBefore70PctMax) v.push('70%前≥4占' + w.hiBefore70Pct + '%');
++    if (w.early34Pct < CHOKE_V2_GATES.early34MinPct) v.push('前期限压仅' + w.early34Pct + '%');
+     return v;
+   }
+   function chokeV2Pass(w) { return chokeV2Violations(w).length === 0; }
+@@ -3998,6 +4136,7 @@
+     s += Math.min(w.r9, 24) * 2;                                                   // 预算判断点：多多益善（封顶 24 处）
+     s += (w.noGood <= CHOKE_V2_GATES.noGoodMax) ? 10 : (-3 * w.noGood);             // 必须硬垫的步数
+     s -= Math.max(0, w.hiBefore70Pct - CHOKE_V2_GATES.hiBefore70PctMax) * 0.4;      // 高压跑到 70% 之前
++    s += Math.min(w.early34Pct || 0, 40) * 0.6;                                     // 【v159】前期限压覆盖率：越高越好（封顶 40%）
+     return s;
+   }
+ 
+@@ -4010,7 +4149,7 @@
+   function _evaluateGenerationInner(solveResult, parsed, config) {
+     var totalBoxes = parsed.totalBoxes || 0, limit = parsed.bufferLimit || 5;
+     var omniSamples = (solveResult && solveResult.pressureSamples) || [];
+-    var omniAudit = auditFor(solveResult, parsed, limit);
++    var omniAudit = auditFor(solveResult, parsed, limit, config);
+     var omniPreview = AntSolver.Analysis && AntSolver.Analysis.dynamicPreviewMetrics
+       ? AntSolver.Analysis.dynamicPreviewMetrics(omniSamples, totalBoxes) : null;
+     var playerResult = null;
+--- a/bin/js/analysis.js
++++ b/bin/js/analysis.js
+@@ -674,6 +674,11 @@
+     var late = scanWindow(pts, CHOKE_LO, CHOKE_HI - winLate, winLate);   // 卡点区[30%,100%]，5%窗 ← 判定用
+     var midLate = scanWindow(pts, CHOKE_LO, TAIL_LO - winLate, winLate); // 子段·中后期[30%,80%]，仅记录
+     var tail = scanWindow(pts, TAIL_LO, 1 - winLate, winLate);           // 子段·后期[80%,100%]，仅记录
++    // 【v159】前期门可放宽：opts.earlyCap 默认 = 卡点线 high（**与改动前逐值一致**）。
++    //   生成器在"卡点判据 v2"开启时传 earlyCap = 上限 − 0.8（5 → 4.2）：允许前期走到中压(3~4)、
++    //   仍禁止爆压与触顶（触顶由 safeEdge 独立把关）。用户 2026-10-16：「允许到 3~4，但仍禁止爆压/触顶」。
++    var earlyCap = (opts.earlyCap != null) ? opts.earlyCap : high;
++    res.earlyCap = +earlyCap.toFixed(2);
+     res.earlyMax = early.max; res.lateMax = late.max; res.lateAt = late.at;
+     res.midLateMax = midLate.max; res.midLateAt = midLate.at;
+     res.tailMax = tail.max; res.tailAt = tail.at;
+@@ -696,7 +701,7 @@
+     res.hasChoke = late.max >= high;
+     // 【v118】前期判据改为「不得出现卡点」：比的是卡点线 high，不再是中压线 mid。
+     //   用户原话「只要求前期压力不出现卡点即可」——前期允许到中压，只是不能形成卡点。
+-    res.earlyOK = early.max < high;
++    res.earlyOK = early.max < earlyCap;   // 【v159】默认 earlyCap===high，行为与改动前逐值一致
+     // 暂存峰值需【低于上限】(留 ≥1 空位余量)：触达上限=死亡边界=不合格(全知被迫塞满=真人必死的非法卡点)
+     // 用户本轮未要求去掉这条，保留 —— 去掉等于把「真人必死」的关也判合格。
+     res.safeEdge = peak < L;
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4327,7 +4327,10 @@
+       vein.forEach(function (v) { if (firstRound[v.color] == null || v.round < firstRound[v.color]) firstRound[v.color] = v.round; });
+       var cumAll = [], acc = 0;
+       for (var d3 = 1; d3 <= rounds; d3++) { acc += (layerTot[d3] || 0); cumAll[d3] = acc; }
+-      var poss = beats >= 3 ? [35, 60, 80] : [40, 70];
++      // 【v159】第一笔节拍从 35% 提前到 15%（用户 2026-10-16 批准：「第一笔提前到 ~15% 可以」）——
++      //   配合生成器的 earlyPressure（开局半满车 + 开局锁链）一起给前期造压力。
++      //   注意：这里是"目标图像素进度"轴，v2 指标里的 0~30% 是"盒进度"轴，两者不同轴但同向。
++      var poss = beats >= 3 ? [15, 60, 80] : [15, 70];
+       for (var b2 = 0; b2 < poss.length; b2++) {
+         var targetPx = poss[b2] / 100 * P, rStar = 1;
+         for (var d4 = 1; d4 <= rounds; d4++) if (cumAll[d4] >= targetPx) { rStar = d4; break; }
+@@ -5108,7 +5111,8 @@
+       genLog('　　卡点v2　独木桥 ' + (v2o ? v2o.bridges : '-') + '/' + (v2p ? v2p.bridges : '-') +
+         '（最差 ' + v2w.bridges + '）· 预算判断点 ' + (v2o ? v2o.r9 : '-') + '/' + (v2p ? v2p.r9 : '-') +
+         '（最差 ' + v2w.r9 + '）· 无满解 ' + (v2o ? v2o.noGood : '-') + '/' + (v2p ? v2p.noGood : '-') +
+-        '（最差 ' + v2w.noGood + '）· 70%前≥4 ' + v2w.hiBefore70Pct + '%　' +
++        '（最差 ' + v2w.noGood + '）· 前期限压 ' + (v2o ? v2o.early34Pct + '%' : '-') + '/' + (v2p ? v2p.early34Pct + '%' : '-') +
++        '（最差 ' + v2w.early34Pct + '%）· 70%前≥4 ' + v2w.hiBefore70Pct + '%　' +
+         (v2vio.length ? ('⚠ ' + v2vio.join('、')) : '✓ 达标'),
+         v2vio.length ? 'gen-log-warn' : 'gen-log-ok');
+     }
+@@ -6118,7 +6122,7 @@
+   var AUDIT_V2_TAIL_PCT = 0.90;    // 末段豁免：进度 ≥90%
+   var AUDIT_V2_TAIL_BOXES = 3;     // 末段豁免：棋盘剩余盒总数 ≤3
+   // 参考门（从"小鹿"这一关反推的初值；样本少，待用户再多给几关好关后校准）
+-  var AUDIT_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10 };
++  var AUDIT_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10, early34MinPct: 20 };
+   var lastChokeAudit = null;
+ 
+   /** 沿一条既定路线（pickOrder）逐步回放，量出这条线上的指标。 */
+@@ -6129,6 +6133,7 @@
+     try { st = S.enter(lv, { useSlotStart: true }); } catch (e) { return null; }
+     var n = 0, bridges = 0, bridgeAt = [], run = 0, maxRun = 0, soft = 0, r9 = [];
+     var minPick = 99, buf34 = 0, buf4 = 0, hiBefore70 = 0, stepsBefore70 = 0, noGood = 0;
++    var earlySteps = 0, early34 = 0;   // 【v159】0~30% 段：步数 与 其中暂存落在 3~4 的步数
+     try {
+       for (var i = 0; i < order.length; i++) {
+         var p = order[i];
+@@ -6152,6 +6157,7 @@
+         if (buf >= 3 && buf <= 4) buf34++;
+         if (buf >= 4) buf4++;
+         if (prog < 0.70) { stepsBefore70++; if (buf >= 4) hiBefore70++; }
++        if (prog < 0.30) { earlySteps++; if (buf >= 3 && buf <= 4) early34++; }   // 【v159】前期限压
+         if (pickable < minPick) minPick = pickable;
+         if (pickable === 1) {                    // 独木桥：按步计（末段豁免）
+           if (!tail) { bridges++; bridgeAt.push(pc); }
+@@ -6170,7 +6176,9 @@
+       r9: r9.length, r9At: r9, minPick: minPick === 99 ? 0 : minPick,
+       buf34Pct: Math.round(buf34 / n * 100), buf4Pct: Math.round(buf4 / n * 100),
+       hiBefore70Pct: stepsBefore70 ? Math.round(hiBefore70 / stepsBefore70 * 100) : 0,
+-      noGood: noGood
++      noGood: noGood,
++      earlySteps: earlySteps, early34: early34,
++      early34Pct: earlySteps ? Math.round(early34 / earlySteps * 100) : 0
+     };
+   }
+ 
+@@ -6187,10 +6195,12 @@
+       maxRun: Math.max(mo ? mo.maxRun : -1, mp ? mp.maxRun : -1),
+       noGood: Math.max(mo ? mo.noGood : -1, mp ? mp.noGood : -1),
+       hiBefore70Pct: Math.max(mo ? mo.hiBefore70Pct : -1, mp ? mp.hiBefore70Pct : -1),
++      early34Pct: Math.min(mo ? mo.early34Pct : 999, mp ? mp.early34Pct : 999),   // 【v159】下限指标→取小
+       r9: Math.min(mo ? mo.r9 : 1e9, mp ? mp.r9 : 1e9),
+       minPick: Math.min(mo ? mo.minPick : 99, mp ? mp.minPick : 99)
+     };
+     if (worst.r9 >= 1e9) worst.r9 = 0;
++    if (worst.early34Pct >= 999) worst.early34Pct = 0;
+     if (worst.minPick >= 99) worst.minPick = 0;
+     return { omni: mo, player: mp, worst: worst };
+   }
+@@ -6202,6 +6212,7 @@
+     if (w.r9 < AUDIT_V2_GATES.r9Min) v.push('预算判断点仅' + w.r9 + '处');
+     if (w.noGood > AUDIT_V2_GATES.noGoodMax) v.push('无满解' + w.noGood + '步');
+     if (w.hiBefore70Pct > AUDIT_V2_GATES.hiBefore70PctMax) v.push('70%前≥4占' + w.hiBefore70Pct + '%');
++    if (w.early34Pct < AUDIT_V2_GATES.early34MinPct) v.push('前期限压仅' + w.early34Pct + '%');
+     return v;
+   }
+ 
+@@ -6260,11 +6271,11 @@
+     html += ' · 用时 ' + Math.round(ms / 1000) + 's';
+     html += ' <button id="btn-choke-audit-csv" style="margin-left:6px;padding:2px 8px;background:#6b4f34;color:#f3e9db;border:none;border-radius:3px;cursor:pointer">⬇ 体检报告CSV</button>';
+     html += '<br>参考门（阈值从"小鹿"反推，待你确认）：非末段独木桥 ≤' + g.bridgeMax + ' 处 · 预算判断点 ≥' + g.r9Min +
+-      ' 处 · 无满解 ≤' + g.noGoodMax + ' 步 · 70% 之前 ≥4 占比 ≤' + g.hiBefore70PctMax + '%</div>';
++      ' 处 · 无满解 ≤' + g.noGoodMax + ' 步 · 70% 之前 ≥4 占比 ≤' + g.hiBefore70PctMax + '% · 前期限压 ≥' + g.early34MinPct + '%</div>';
+     html += '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">';
+     html += '<thead><tr style="background:#3a2c22;color:#f3e9db">' +
+       ['关卡', '玩法', '盒', '独木桥(全知/玩家)', '最长走廊', '最低可点', '无满解(全/玩)', '预算点(全/玩)',
+-       '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4', '参考门判定'].map(function (h) {
++       '前期限压(全/玩)', '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4', '参考门判定'].map(function (h) {
+         return '<th style="padding:3px 6px;border:1px solid #5a4636">' + h + '</th>';
+       }).join('') + '</tr></thead><tbody>';
+     rows.forEach(function (r) {
+@@ -6282,6 +6293,7 @@
+         td(w.maxRun) + td(w.minPick) +
+         td(pair(o ? o.noGood : null, p ? p.noGood : null), w.noGood > g.noGoodMax) +
+         td(pair(o ? o.r9 : null, p ? p.r9 : null), w.r9 < g.r9Min) +
++        td(pair(o ? o.early34Pct + '%' : null, p ? p.early34Pct + '%' : null), w.early34Pct < g.early34MinPct) +
+         td(pair(o ? o.buf34Pct + '%' : null, p ? p.buf34Pct + '%' : null)) +
+         td(pair(o ? o.buf4Pct + '%' : null, p ? p.buf4Pct + '%' : null)) +
+         td(w.hiBefore70Pct + '%', w.hiBefore70Pct > g.hiBefore70PctMax) +
+@@ -6291,6 +6303,7 @@
+     html += '</tbody></table></div>';
+     html += '<div style="font-size:11px;color:#8a7358;margin-top:6px">独木桥 = 场上只有 1 个方块能点（按"步"计，点 A 解锁 B 那种走廊算多处）；末段（进度 ≥90% 或剩余盒 ≤3）豁免。' +
+       '预算判断点 = 可点 ≥2，但"取了立刻能消掉"的选项恰 1 个、其余是"取了会占暂存位"的陷阱项。' +
++      '前期限压 = 0~30% 进度段里暂存落在 3~4 的步数占比（≥' + g.early34MinPct + '% 才算前期有预算压力）。' +
+       '最低可点数 ≥2 与"独木桥 0 处"等价，故只作显示、不重复计违反。</div>';
+     body.innerHTML = html;
+     var csvBtn = document.getElementById('btn-choke-audit-csv');
+@@ -6299,7 +6312,7 @@
+ 
+   function exportChokeAuditCSV() {
+     if (!lastChokeAudit || !lastChokeAudit.length) return;
+-    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,独木桥位置,参考门,违反项,难度分'];
++    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,独木桥位置,参考门,违反项,难度分'];
+     var lines = head;
+     lastChokeAudit.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player;
+@@ -6308,6 +6321,7 @@
+         V(o ? o.bridges : null), V(p ? p.bridges : null), w.bridges, w.maxRun, w.minPick,
+         V(o ? o.noGood : null), V(p ? p.noGood : null), w.noGood,
+         V(o ? o.r9 : null), V(p ? p.r9 : null), w.r9,
++        V(o ? o.early34Pct : null), V(p ? p.early34Pct : null), w.early34Pct,
+         V(o ? o.buf34Pct : null), V(p ? p.buf34Pct : null), V(o ? o.buf4Pct : null), V(p ? p.buf4Pct : null),
+         w.hiBefore70Pct,
+         '"' + ((o && o.bridgeAt.length) ? o.bridgeAt.join('/') + '%' : '') +
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=158">
++  <link rel="stylesheet" href="css/style.css?v=159">
+ </head>
+ <body>
+   <header>
+@@ -974,20 +974,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=158"></script>
+-  <script src="js/utils.js?v=158"></script>
++  <script src="js/zip.js?v=159"></script>
++  <script src="js/utils.js?v=159"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=158"></script>
+-  <script src="js/simulator.js?v=158"></script>
++  <script src="js/color-libs.js?v=159"></script>
++  <script src="js/simulator.js?v=159"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=158"></script>
+-  <script src="js/solver-strategy.js?v=158"></script>
+-  <script src="js/solver.js?v=158"></script>
+-  <script src="js/playersim.js?v=158"></script>
+-  <script src="js/generator.js?v=158"></script>
+-  <script src="js/analysis.js?v=158"></script>
++  <script src="js/anchor-cut.js?v=159"></script>
++  <script src="js/solver-strategy.js?v=159"></script>
++  <script src="js/solver.js?v=159"></script>
++  <script src="js/playersim.js?v=159"></script>
++  <script src="js/generator.js?v=159"></script>
++  <script src="js/analysis.js?v=159"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=158"></script>
+-  <script src="js/app.js?v=158"></script>
++  <script src="js/level-editor.js?v=159"></script>
++  <script src="js/app.js?v=159"></script>
+ </body>
+ </html>

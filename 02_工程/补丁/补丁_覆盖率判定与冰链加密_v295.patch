@@ -1,0 +1,276 @@
+--- a/bin/js/analysis.js
++++ b/bin/js/analysis.js
+@@ -698,7 +698,40 @@
+     res.midMaxLegacy = scanWindow(pts, 0.2, 0.5 - 0.05, 0.05).max;
+     res.highLegacy = +highLegacy.toFixed(2);
+     res.hasChokeLegacy = lateLegacy.max >= highLegacy;
+-    res.hasChoke = late.max >= high;
++    // ==================== 【v295·用户裁决】卡点判定由「尖峰」改「覆盖率」 ====================
++    // 用户原话：「把有卡点改成覆盖率，现在要求 20%-80% 的过程中有 70% 突破暂存≥3（也许 70 太多，加一个滑轮）」。
++    //
++    // 为什么必须改：旧判据 hasChoke = late.max >= high，只要 30%~100% 里**任意一个 5% 窗口**均值摸到
++    //   卡点线(3.2) 就算"有卡点"。它不要求持续、也不要求次数 —— 曲线在 35% 尖一下 3.2、
++    //   其余全程贴 0~1，照样判"合格"。这与用户要的"20~80% 基本维持 3、最高 4"正好错位：
++    //   用户要的是**平台**，旧判据认的是**尖峰**。
++    //   实测证据（工作日志 219 节）：同一关审核线 lateMax=3.0 判"无卡点"→简单关，
++    //   而 18 局中位 midLate=4.00 —— 两把尺子打架。
++    //
++    // 新判据：在 [coverLo, coverHi]（默认 20%~80%）区间里，统计"暂存 ≥ coverBuf"的采样点占比，
++    //   达到 coverMin(%) 才算"有卡点"。窗口/阈值都可配。
++    var COVER_LO = (opts.coverLo != null) ? +opts.coverLo : 0.20;
++    var COVER_HI = (opts.coverHi != null) ? +opts.coverHi : 0.80;
++    var COVER_BUF = (opts.coverBuf != null) ? +opts.coverBuf : 3;
++    var COVER_MIN = (opts.coverMin != null) ? +opts.coverMin : 0;   // 0 = 不启用覆盖率判据（回到旧口径）
++    var _cTot = 0, _cHit = 0, _cPeak = 0, _cSum = 0;
++    for (var _ci = 0; _ci < pts.length; _ci++) {
++      var _cp = pts[_ci].p;
++      if (_cp < COVER_LO || _cp > COVER_HI) continue;
++      _cTot++;
++      if (pts[_ci].buf >= COVER_BUF) _cHit++;
++      if (pts[_ci].buf > _cPeak) _cPeak = pts[_ci].buf;
++      _cSum += pts[_ci].buf;
++    }
++    res.coverLo = COVER_LO; res.coverHi = COVER_HI; res.coverBuf = COVER_BUF;
++    res.coverPct = _cTot ? Math.round(_cHit / _cTot * 100) : 0;
++    res.coverSamples = _cTot;
++    res.coverPeak = _cPeak;
++    res.coverAvg = _cTot ? +(_cSum / _cTot).toFixed(2) : 0;
++    res.coverMin = COVER_MIN;
++    // 覆盖率判据：启用时（coverMin > 0）以它为准；未启用时退回旧的尖峰判据（逐值不变）
++    res.hasChokePeak = late.max >= high;                 // 旧口径，保留供对照
++    res.hasChoke = (COVER_MIN > 0) ? (res.coverPct >= COVER_MIN) : res.hasChokePeak;
+     // 【v118】前期判据改为「不得出现卡点」：比的是卡点线 high，不再是中压线 mid。
+     //   用户原话「只要求前期压力不出现卡点即可」——前期允许到中压，只是不能形成卡点。
+     res.earlyOK = early.max < earlyCap;   // 【v159】默认 earlyCap===high，行为与改动前逐值一致
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3029,6 +3029,100 @@
+         order.push([or2, oc2, dist[or2][oc2] < 0 ? 999 : dist[or2][oc2]]);
+       }
+       order.sort(function (a, b) { return a[2] - b[2] || a[0] - b[0] || a[1] - b[1]; });
++
++      // ===== 【seqFill·序列铺盘】把"格子铺放顺序"从 BFS 距离换成**沿前沿推进的单链遍历** =====
++      // 为什么需要它：
++      //   BFS 距离只在前期近似等于"玩家第几步能点到"。中段前沿会同时展开一大片，
++      //   玩家能点到的有六七辆，而车单是按"第 i 辆在第 i 步上场"排的 → 序列失效。
++      //   实测（工作日志第 217 节）：现行切法下 r 中位 0.20、上限 0.60，
++      //   20~80% 的后半段在数学上不可能有债 —— 就是被这个脱钩锁死的。
++      //
++      // 做法：从第 0 行出发做一次"蛇形 + 邻接优先"的确定性遍历：
++      //   保证 seq 上相邻的两个格子在棋盘上也相邻 → 取走第 k 格就激活第 k+1 格，
++      //   于是"车单顺序 = 实际取用顺序"在几何上成立（近似，允许玩家在前沿小范围换序）。
++      //   玩家仍可自由选择（不改变规则），只是**可选集合**被收窄到计划的那几辆。
++      if (config.seqFill) {
++        var _seqVis = [], _seqOut = [];
++        for (var _vi = 0; _vi < rows; _vi++) { _seqVis.push([]); for (var _vj = 0; _vj < cols; _vj++) _seqVis[_vi].push(false); }
++        function _seqFree(rr, cc) {
++          if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) return false;
++          if (_seqVis[rr][cc]) return false;
++          var x = cells[rr][cc];
++          return x == null;                       // 只排空格（管道/墙不参与填盒）
++        }
++        // 起点：第 0 行最左的空格；之后每一步在"当前格的 4 邻"里挑，
++        //   优先同行（蛇形推进），其次向下一行；都没有就退回"离已铺序列最近的格子"。
++        var _startC = -1, _startR = 0;
++        for (var _sc0 = 0; _sc0 < cols; _sc0++) if (_seqFree(0, _sc0)) { _startC = _sc0; break; }
++        // 【兜底】第 0 行可能被管道/障碍占满（实测 6×7 上会这样）→ 改从全盘第一个空格起步。
++        //   起点不是第 0 行时，序列的前几格要等玩家挖下去才激活，顺序性会差一些，
++        //   但比"整个 seqFill 静默失效、退回 BFS"好：至少顺序仍然是单链的。
++        if (_startC < 0) {
++          var _fb = null;
++          for (var _fr1 = 0; _fr1 < rows && !_fb; _fr1++) for (var _fc1 = 0; _fc1 < cols; _fc1++) {
++            if (_seqFree(_fr1, _fc1)) { _fb = [_fr1, _fc1]; break; }
++          }
++          if (_fb) { _startR = _fb[0]; _startC = _fb[1]; }
++        }
++        timing.seqFillStart = { r: _startR, c: _startC };
++        if (_startC >= 0) {
++          _seqVis[_startR][_startC] = true; _seqOut.push([_startR, _startC]);
++          var _curR = _startR, _curC = _startC, _dir = 1;   // 蛇形方向
++          var _guardSeq = rows * cols * 4;
++          while (_seqOut.length < rows * cols && _guardSeq-- > 0) {
++            var _next = null;
++            // ① 同行下一格（蛇形）
++            var _nc0 = _curC + _dir;
++            if (_seqFree(_curR, _nc0)) _next = [_curR, _nc0];
++            // ② 同行走到头 → 下一行，方向反转
++            if (!_next) {
++              var _nr0 = _curR + 1;
++              if (_nr0 < rows) {
++                _dir = -_dir;
++                var _cand0 = (_dir > 0) ? 0 : cols - 1;
++                // 从该行往中间找第一个空格，优先靠近当前列
++                var _best0 = -1, _bd0 = 1e9;
++                for (var _cc0 = 0; _cc0 < cols; _cc0++) {
++                  if (!_seqFree(_nr0, _cc0)) continue;
++                  var _d0 = Math.abs(_cc0 - _curC);
++                  if (_d0 < _bd0) { _bd0 = _d0; _best0 = _cc0; }
++                }
++                if (_best0 >= 0) _next = [_nr0, _best0];
++              }
++            }
++            // ③ 兜底：全场找"与已铺序列曼哈顿距离最近"的空格（保持连通扫描，不跳飞）
++            if (!_next) {
++              var _b1 = null, _bd1 = 1e9;
++              for (var _fr0 = 0; _fr0 < rows; _fr0++) for (var _fc0 = 0; _fc0 < cols; _fc0++) {
++                if (!_seqFree(_fr0, _fc0)) continue;
++                var _d1 = Math.abs(_fr0 - _curR) + Math.abs(_fc0 - _curC);
++                if (_d1 < _bd1) { _bd1 = _d1; _b1 = [_fr0, _fc0]; }
++              }
++              if (!_b1) break;
++              _next = _b1;
++            }
++            _seqVis[_next[0]][_next[1]] = true;
++            _seqOut.push(_next);
++            _curR = _next[0]; _curC = _next[1];
++          }
++          // 用序列序替换 BFS 距离序（保留 dist 在 [2] 位，仅为兼容下游排序字段）
++          if (_seqOut.length === order.length) {
++            order = _seqOut.map(function (x, i) { return [x[0], x[1], i]; });
++            timing.seqFill = { n: order.length };
++          } else {
++            // 空格数与序列长度不一致（有不可达空位）→ 保守：把序列铺到的放前面，其余按原 BFS 补后
++            var _used = {};
++            for (var _ui = 0; _ui < _seqOut.length; _ui++) _used[_seqOut[_ui][0] + ',' + _seqOut[_ui][1]] = 1;
++            var _merged = _seqOut.map(function (x, i) { return [x[0], x[1], i]; });
++            for (var _oi0 = 0; _oi0 < order.length; _oi0++) {
++              var _k0 = order[_oi0][0] + ',' + order[_oi0][1];
++              if (!_used[_k0]) _merged.push([order[_oi0][0], order[_oi0][1], _merged.length]);
++            }
++            order = _merged;
++            timing.seqFill = { n: _seqOut.length, merged: _merged.length };
++          }
++        }
++      }
+       // 【v260·用户裁决】闸门借车：把"需求最晚"的几辆车换到"扇出最大"的浅层格子上。
+       //   理由：全知求解器不会主动拿吃不饱的车，只有它挡在通往一大片车的唯一通路上时才会被迫拿。
+       //   所以"晚熟色 + 高扇出 + 浅层"三者同时成立，才会出现又高又持久的全知压力。
+@@ -3175,13 +3269,34 @@
+           timing.coupledFill = { n: _nc, lag: _LAG, window: _W };
+         } catch (e3) { coupledAssign = null; }
+       }
++      // 【seqFill】序列铺盘时，车单必须**严格按当用时刻 r 升序**落到序列格上：
++      //   免费车（r=0）先上场，之后 r 递增 → 玩家越往后走，手上的车越晚才能装满 = 债。
++      //   同时关掉颜色交错与第 0 行同色限量：它们会打乱序列，而 seqFill 的卖点正是"顺序可控"。
++      if (config.seqFill && _dc) {
++        for (var _sqi = 0; _sqi < list.length; _sqi++) {
++          var _sqv = -1;
++          try { _sqv = demandAt(_dc, list[_sqi].color, list[_sqi].count); } catch (e) { _sqv = -1; }
++          list[_sqi]._sqr = (_sqv >= 0) ? _sqv : 1.0;
++        }
++        // 同 r 时把**容量大的免费车**排前面（先消耗供给），再按原切序稳定排序
++        list.sort(function (a, b) {
++          var d = a._sqr - b._sqr;
++          if (Math.abs(d) > 1e-9) return d;
++          if (a._sqr <= 1e-9) return (b.count - a.count) || (a._seq - b._seq);
++          return a._seq - b._seq;
++        });
++        timing.seqFillList = { n: list.length, rMin: list[0] ? +list[0]._sqr.toFixed(2) : null, rMax: list[list.length - 1] ? +list[list.length - 1]._sqr.toFixed(2) : null };
++      }
+       var exW = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
++      if (config.seqFill) exW = 0;      // 序列铺盘不做颜色交错（会破坏顺序）
+       for (var oi = 0; oi < order.length && fi < list.length; oi++) {
+         var tr2 = order[oi][0], tc2 = order[oi][1];
+         // 【v280·用户反馈】不要 160 这种超大车。改法：容量上限压到正常区间（capCeil 84），
+         //   同时**限制第 0 行同色车的辆数**——开局可点的只有最前面这几格，
+         //   同色车少摆几辆，开局能装满的数量自然就下来了，不靠"把车做大"。
+-        if (config.row0ColorMax && oi < cols) {
++        // 【seqFill】序列铺盘不做第 0 行同色限量：它靠"免费车先上场、r 递增"控制开局，
++        //   再按颜色换位会把 r 顺序打乱（v290 那种"第一行全同色"的副作用也由 r 排序本身避免）。
++        if (config.row0ColorMax && oi < cols && !config.seqFill) {
+           var _c0m = Math.max(1, parseInt(config.row0ColorMax, 10) || 2);
+           var _seen0 = {};
+           for (var _c4 = 0; _c4 < cols; _c4++) {
+@@ -5553,6 +5668,15 @@
+     //   否则新造出来的前期压力会被旧的前期门（≥3.2 即判不合格）当场判死。
+     //   config.chokeV2 === false 时不传 earlyCap → 逐值回到旧行为（与 v158 一致）。
+     if (!(config && config.chokeV2 === false)) opts.earlyCap = (bufferLimit || 5) - 0.8;
++    // 【v295·用户裁决】卡点判定改「覆盖率」：20%~80% 里暂存≥3 的占比 ≥ coverMin(%) 才算有卡点。
++    //   用户原话：「现在要求 20%-80% 的过程中有 70% 突破暂存≥3（也许 70 太多，加一个滑轮）」。
++    //   coverMin = 0 时退回旧的尖峰判据（逐值不变），方便对照。
++    if (config) {
++      if (config.chokeCoverMin != null) opts.coverMin = +config.chokeCoverMin;
++      if (config.chokeCoverLo != null) opts.coverLo = +config.chokeCoverLo;
++      if (config.chokeCoverHi != null) opts.coverHi = +config.chokeCoverHi;
++      if (config.chokeCoverBuf != null) opts.coverBuf = +config.chokeCoverBuf;
++    }
+     return AntSolver.Analysis.chokepointAudit((solveResult && solveResult.pressureSamples) || [], parsed.totalBoxes, bufferLimit, opts);
+   }
+   // 审核评分(越大越好)：中后期卡点封顶奖励 − 前期越界惩罚 + 合格大奖；用于爬山接受判定
+@@ -6426,6 +6550,10 @@
+     //   与旧写法 (pass || easyPass) **逐关等价**（347 关求解数据实测 347/347 一致），故产能不变。
+     //   档次字样改为「合格 / 简单关·趋势过平 / 不合格」——难易分档不再由审核给，交给难度分。
+     var curveUsable = omniAudit ? (omniAudit.usable != null ? omniAudit.usable : (omniAudit.pass || omniAudit.easyPass)) : false;
++    // 【v295·用户裁决】hardOnly：只认「真·有卡点」(curveOK/pass)，不认 flatTrend（趋势过平）。
++    //   用户原话：「暂时不要简单合格了，现在只生成难的关卡，理解后再生成简单的」。
++    //   关掉 hardOnly 即逐值回到旧行为。
++    if (config && config.hardOnly) curveUsable = !!(omniAudit && omniAudit.pass);
+     evaluation.pass = !!(evaluation.omni.won && evaluation.player.won && curveUsable &&
+       evaluation.omni.peak < limit);
+     evaluation.tier = omniAudit ? (omniAudit.tier || '不合格') : '不合格';
+@@ -7187,7 +7315,12 @@
+     var ge = c.generationEval, a = c.audit;
+     var deliverable = !!(ge && ge.omni && ge.omni.won && ge.player && ge.player.won && ge.omni.peak < c.level.bufferLimit);
+     if (deliverable && a && a.pass) return 3;
+-    if (deliverable && a && a.easyPass) return 2;
++    // 【v295·用户裁决】暂时不要简单合格：「现在只生成难的关卡，理解后再生成简单的」。
++    //   hardOnly 打开时，flatTrend（简单关·趋势过平）**不再算合格**，也不再享受 tier 2 的排序优待
++    //   —— 它直接掉到 tier 1（安全兜底），只在"实在产不出难关"时作为兜底交付，并标 fallback。
++    //   关掉 hardOnly 即逐值回到旧行为（简单关仍占简单关名额）。
++    var _hardOnly = !!(c.config && c.config.hardOnly);
++    if (!_hardOnly && deliverable && a && a.easyPass) return 2;
+     var safe = deliverable && (!a || a.safeEdge !== false);
+     return safe ? 1 : 0;
+   }
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,13 +3,13 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车接小人 v294 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=294">
++  <title>车接小人 v295 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
++  <link rel="stylesheet" href="css/style.css?v=295">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v294</span></h1>
++    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v295</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -858,20 +858,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=294"></script>
+-  <script src="js/utils.js?v=294"></script>
++  <script src="js/zip.js?v=295"></script>
++  <script src="js/utils.js?v=295"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=294"></script>
+-  <script src="js/simulator.js?v=294"></script>
++  <script src="js/color-libs.js?v=295"></script>
++  <script src="js/simulator.js?v=295"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=294"></script>
+-  <script src="js/solver-strategy.js?v=294"></script>
+-  <script src="js/solver.js?v=294"></script>
+-  <script src="js/playersim.js?v=294"></script>
+-  <script src="js/generator.js?v=294"></script>
+-  <script src="js/analysis.js?v=294"></script>
++  <script src="js/anchor-cut.js?v=295"></script>
++  <script src="js/solver-strategy.js?v=295"></script>
++  <script src="js/solver.js?v=295"></script>
++  <script src="js/playersim.js?v=295"></script>
++  <script src="js/generator.js?v=295"></script>
++  <script src="js/analysis.js?v=295"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=294"></script>
+-  <script src="js/app.js?v=294"></script>
++  <script src="js/level-editor.js?v=295"></script>
++  <script src="js/app.js?v=295"></script>
+ </body>
+ </html>

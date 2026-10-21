@@ -1,0 +1,124 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4058,6 +4058,7 @@
+       var ms = Date.now() - (genInFlightT0[inputIndex] || Date.now());
+       rec._idx = inputIndex; rec._elapsedMs = ms;
+       genBatchResults.push(rec);
++      genRenderResultsLive();
+       genLog(entry.name + '  ' + (ms / 1000).toFixed(1) + 's  已跳过·' + rec.gateReasonCN +
+         (rec.gateDetail ? ('（' + rec.gateDetail + '）') : ''), 'gen-log-warn');
+       if (genPersist.enabled) {
+@@ -4077,6 +4078,7 @@
+     // 耗时按【本关自己的派发时刻】算。原先用全局 genBatch.itemT0，并发下会被后派发的关覆写 → 所有关耗时全错。
+     rec._elapsedMs = Date.now() - (genInFlightT0[inputIndex] || Date.now());
+     genBatchResults.push(rec);
++    genRenderResultsLive();
+     var dt = (rec._elapsedMs / 1000).toFixed(1);
+     var tierTxt = rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '合格' : '不可解'));
+     genLog(entry.name + '  ' + dt + 's  ' + tierTxt + (rec.valid ? ('  难度' + rec.difficulty + '[' + rec.grade + ']') : ''),
+@@ -4094,6 +4096,7 @@
+   function genOnError(entry, msg, inputIndex, next) {
+     var rec = { name: entry ? entry.name : '(未知)', valid: false, audit: null, difficulty: 0, grade: '-', fallback: false, error: msg, _idx: inputIndex };
+     genBatchResults.push(rec);
++    genRenderResultsLive();
+     genLog(rec.name + '  异常: ' + msg, 'gen-log-err');
+     if (genPersist.enabled) {
+       // 无关卡结构：服务只存源图 + 失败记录，绝不生成假关卡 JSON
+@@ -4782,6 +4785,24 @@
+     if (r.audit && r.audit.tier === '简单合格') return 'gen-tier-easy';
+     return 'gen-tier-fail';
+   }
++  /**
++   * 【v142】结果表随生产【实时刷新】。
++   *
++   * 原来结果表只在整批结束时才渲染一次 —— 一批几十关要跑十几分钟，期间「生产结果」那张卡片
++   * 一直是 hidden、表里一行都没有，用户会以为"没有这个功能"。
++   * 现在每落一关就刷新一行；并保留滚动位置，避免往下翻看时被拽回顶部。
++   */
++  function genRenderResultsLive() {
++    var card = document.getElementById('gen-result-card');
++    if (card) card.classList.remove('hidden');
++    var cntEl = document.getElementById('gen-result-count');
++    if (cntEl) cntEl.textContent = '（进行中 ' + genBatchResults.length + ' 关）';
++    var body = document.getElementById('gen-result-body');
++    var keepTop = body ? body.scrollTop : 0;
++    renderGenResultTable(genBatchResults);
++    if (body) body.scrollTop = keepTop;
++  }
++
+   function renderGenResultTable(results) {
+     var body = document.getElementById('gen-result-body');
+     if (!body) return;
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+@@ -765,16 +765,18 @@
+ .gen-result-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ .gen-result-tier { font-size: 11px; color: var(--muted); flex-shrink: 0; width: 90px; }
+ .gen-result-diff { font-size: 11px; color: var(--text); flex-shrink: 0; width: 70px; text-align: right; }
+-/* 【v140】结果行「🎮 带入棋盘」：把关卡直接装进模拟器，省掉导出→导入→重算三步 */
++/* 【v140】结果行「🎮 带入棋盘」：把关卡直接装进模拟器，省掉导出→导入→重算三步。
++   【v142】默认就做成醒目的琥珀色（原来是灰底、只在悬停时才变色，在米色页面上很不起眼、
++   容易被当成装饰而忽略；用户反馈"没看到这个选项"）。 */
+ .gen-result-load {
+-  flex-shrink: 0; font-size: 11px; padding: 2px 8px; cursor: pointer;
+-  background: var(--panel2); color: var(--text);
+-  border: 1px solid var(--border); border-radius: 4px;
+-}
+-.gen-result-load:hover { background: var(--amber); border-color: var(--amber); color: #2b1c0f; }
++  flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 3px 10px; cursor: pointer;
++  background: #f7ecd2; color: #7a5410;
++  border: 1px solid #c9a45c; border-radius: 4px; white-space: nowrap;
++}
++.gen-result-load:hover { background: var(--amber); border-color: var(--amber); color: #fff; }
+ .gen-result-load.off {
+-  cursor: default; opacity: .45; color: var(--muted);
+-  background: transparent; border-style: dashed;
++  cursor: default; font-weight: 400; opacity: .5; color: var(--muted);
++  background: transparent; border-style: dashed; border-color: var(--border);
+ }
+ .gen-result-load.off:hover { background: transparent; border-color: var(--border); color: var(--muted); }
+ 
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v141·修锁链×数字冰可越权点</title>
+-  <link rel="stylesheet" href="css/style.css?v=141">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v142·结果表实时刷新</title>
++  <link rel="stylesheet" href="css/style.css?v=142">
+ </head>
+ <body>
+   <header>
+@@ -811,18 +811,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=141"></script>
+-  <script src="js/utils.js?v=141"></script>
+-  <script src="js/simulator.js?v=141"></script>
+-  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=141"></script>
+-  <script src="js/solver-strategy.js?v=141"></script>
+-  <script src="js/solver.js?v=141"></script>
+-  <script src="js/playersim.js?v=141"></script>
+-  <script src="js/generator.js?v=141"></script>
+-  <script src="js/analysis.js?v=141"></script>
++  <script src="js/zip.js?v=142"></script>
++  <script src="js/utils.js?v=142"></script>
++  <script src="js/simulator.js?v=142"></script>
++  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
++  <script src="js/anchor-cut.js?v=142"></script>
++  <script src="js/solver-strategy.js?v=142"></script>
++  <script src="js/solver.js?v=142"></script>
++  <script src="js/playersim.js?v=142"></script>
++  <script src="js/generator.js?v=142"></script>
++  <script src="js/analysis.js?v=142"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=141"></script>
+-  <script src="js/app.js?v=141"></script>
++  <script src="js/level-editor.js?v=142"></script>
++  <script src="js/app.js?v=142"></script>
+ </body>
+ </html>

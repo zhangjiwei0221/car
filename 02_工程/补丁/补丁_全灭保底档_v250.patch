@@ -1,0 +1,92 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -10754,6 +10754,41 @@
+       if (out) out.portfolio = { K: _pk, tried: _tried, passes: _passes, tuple: _bestT };
+       // 【v242】带外纠偏一次（只在这里触发，不在每个候选里跑，避免 ×8 的成本）
+       if (out) { try { out = bandFixOnce(out, blocks, config); } catch (e) {} }
++      // 【v250·保底】全灭时再试一档"宽松盘"：用户明确「黑块不是不许存在，可以配合管道」。
++      //   宽松档 = 填满率 0.80（留 20% 给墙+管道）+ 管道最多 2 条/深度 6 + 只要求可解。
++      //   目的不是出好关，是"至少有一关可玩"，避免整张图白跑。
++      if (!out || !out.level) {
++        try {
++          var _fr2 = 0.80;
++          var _rr2 = parseInt(config.boardRowsMax, 10) || 7;
++          var _cc2 = parseInt(config.boardColsMax, 10) || 8;
++          var _cells2 = _rr2 * _cc2;
++          var _px2 = 0;
++          for (var _r2 = 0; _r2 < blocks.length; _r2++)
++            for (var _c2 = 0; _c2 < blocks[_r2].length; _c2++) if (blocks[_r2][_c2] > 0) _px2++;
++          var _cars2 = Math.max(4, Math.round(_cells2 * _fr2));
++          var _cap2 = Math.max(14, Math.round(_px2 / Math.max(1, _cars2)));
++          var safeCfg = Object.assign({}, config, {
++            boardHardRange: true, boardAuto: false,
++            boardRowsMin: _rr2, boardRowsMax: _rr2, boardColsMin: _cc2, boardColsMax: _cc2,
++            targetCarCount: _cars2,
++            boxSizeMin: Math.max(14, Math.round(_cap2 * 0.9)),
++            boxSizeMax: Math.max(Math.max(14, Math.round(_cap2 * 0.9)) + 6, Math.round(_cap2 * 1.1)),
++            usableSpaceTarget: _fr2,
++            minPipes: 0, maxPipes: 2, pipeMaxDepth: 6, pipeMinFill: 2,
++            portfolioK: 1, candidateCount: 1, difficultyRounds: 1,
++            acceptMode: 'solvable', goodV3: false, requireHardPass: false,
++            designSweep: false, designDebt: false, targetSweep: false,
++            timeBudgetMs: Math.min(20000, (config.timeBudgetMs || 25000))
++          });
++          var safe = null;
++          try { safe = produceFixed(blocks, safeCfg, {}); } catch (e) { safe = null; }
++          if (safe && safe.level) {
++            safe.safeFallback = { fill: _fr2, cars: _cars2, cap: _cap2, pipes: 2, note: '全灭兜底：宽松盘（允许墙+2条管道）' };
++            out = safe;
++          }
++        } catch (e) { /* 兜底也失败就保持全灭 */ }
++      }
+     }
+     // 唯一出口处统一标记本关的【目标图入口模式】，供批次记录 / CSV / 生产报告识别。
+     // 只写在生产侧结果对象上，【不写入关卡本体】——关卡 JSON 协议保持不变(用户决定 D1)。
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=249">
++  <link rel="stylesheet" href="css/style.css?v=250">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=249"></script>
+-  <script src="js/utils.js?v=249"></script>
++  <script src="js/zip.js?v=250"></script>
++  <script src="js/utils.js?v=250"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=249"></script>
+-  <script src="js/simulator.js?v=249"></script>
++  <script src="js/color-libs.js?v=250"></script>
++  <script src="js/simulator.js?v=250"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=249"></script>
+-  <script src="js/solver-strategy.js?v=249"></script>
+-  <script src="js/solver.js?v=249"></script>
+-  <script src="js/playersim.js?v=249"></script>
+-  <script src="js/generator.js?v=249"></script>
+-  <script src="js/analysis.js?v=249"></script>
++  <script src="js/anchor-cut.js?v=250"></script>
++  <script src="js/solver-strategy.js?v=250"></script>
++  <script src="js/solver.js?v=250"></script>
++  <script src="js/playersim.js?v=250"></script>
++  <script src="js/generator.js?v=250"></script>
++  <script src="js/analysis.js?v=250"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=249"></script>
+-  <script src="js/app.js?v=249"></script>
++  <script src="js/level-editor.js?v=250"></script>
++  <script src="js/app.js?v=250"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

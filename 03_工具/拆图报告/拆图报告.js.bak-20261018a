@@ -1,0 +1,521 @@
+#!/usr/bin/env node
+/**
+ * 拆图报告 —— 一张目标图的「结构」与两种切法的对照
+ *
+ *   node 拆图报告.js <目标图.txt> [输出.html]
+ *
+ * 只读：不生成关卡、不写生产目录，只输出一份 HTML 报告。
+ *
+ * 报告里有三张同样的图，三种看法：
+ *   ① 原图色     —— 颜色号
+ *   ② 层（静态） —— 谁包着谁；层 0 = 现在就够得着。只由图决定，换切法/换顺序都不变。
+ *   ③ 序号（日程）—— 求解器里那个「🔢序号」= 贪心剥皮的一种走法。换一种吃法就变。
+ *
+ * 然后拿两种切法各切一份车单，在「纯切球层」干跑一遍（不进棋盘、不含障碍）：
+ *   A 按日程切（= 现在生成器/切球规划器的口径：矿脉按轮次+颜色，按平均容量劈车）
+ *   B 按层切（= 每层每色单独成车：开壳车与被包车天然分开）
+ * 看两种切法各自逼出多少债、要等多久才能还、有没有颜色被埋。
+ *
+ * 注意：干跑不含棋盘与障碍，所以它看不到「61 那种被棋盘卡死」的死法；
+ *       它只能回答「切法本身会把压力做成什么样」。
+ */
+'use strict';
+
+const vm = require('vm');
+const fs = require('fs');
+const path = require('path');
+
+const HERE = __dirname;
+const BINJS = path.join(HERE, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
+               'playersim.js', 'analysis.js', 'generator.js'];
+
+function loadEngine() {
+  const sandbox = {
+    console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
+    WeakMap, Map, Set, setTimeout, clearTimeout, Infinity, Math, JSON
+  };
+  vm.createContext(sandbox);
+  for (const f of FILES) {
+    vm.runInContext(fs.readFileSync(path.join(BINJS, f), 'utf8'), sandbox, { filename: f });
+  }
+  return sandbox.AntSolver;
+}
+
+// ---------------------------------------------------------------- 工具
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const pct = (a, b) => (b ? (100 * a / b) : 0);
+const fmt = (x, n = 1) => (Math.round(x * Math.pow(10, n)) / Math.pow(10, n)).toFixed(n);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// 色号 → 稳定色相
+function colorHue(id) {
+  const h = (id * 47 + 17) % 360;
+  return `hsl(${h},68%,55%)`;
+}
+const LAYER_PAL = ['#1f6fb2', '#2fa4a8', '#6cc07a', '#d9c04a', '#e08a3c', '#c8553d', '#8e3b8e', '#5b4b8a', '#3a3a3a'];
+function layerColor(lv) { return lv === 99 ? '#ff00ff' : LAYER_PAL[Math.min(lv, LAYER_PAL.length - 1)]; }
+
+// ---------------------------------------------------------------- 载入 + 解析
+const A = loadEngine();
+const G = A.Generator;
+
+if (process.argv.length < 3) {
+  console.error('用法: node 拆图报告.js <目标图.txt> [输出.html]');
+  process.exit(1);
+}
+const SRC = path.resolve(process.argv[2]);
+const OUT = process.argv[3] ? path.resolve(process.argv[3])
+  : path.join(HERE, '拆图报告_' + path.basename(SRC, '.txt') + '.html');
+
+const raw = fs.readFileSync(SRC, 'utf8');
+const blocks = G.blocksFromTXT(raw);
+const R = blocks.length, C = blocks[0].length;
+const parsed = A.parseLevel({ blocks, bufferLimit: 5 });
+
+let P = 0; const colTot = {};
+for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+  const v = blocks[r][c];
+  if (v > 0) { P++; colTot[v] = (colTot[v] || 0) + 1; }
+}
+const COLOR_N = Object.keys(colTot).length;
+
+// ---------------------------------------------------------------- 结构：层 + 日程
+const layerInfo = G.veinLayers(parsed, {});
+const eo = A.eliminationOrder(blocks, R, C, false);
+const layers = layerInfo.veins.map(v => v.level);
+const maxLevel = layerInfo.maxLevel;
+const roundOf = (r, c) => eo.round[r][c] || 0;
+const veinIdOf = (r, c) => layerInfo.id[r * C + c];
+
+// 每层：矿脉数 / 像素 / 颜色
+const levelStat = {};
+for (const v of layerInfo.veins) {
+  const L = v.level;
+  levelStat[L] = levelStat[L] || { veins: 0, px: 0, colors: {}, colorVeins: {} };
+  levelStat[L].veins++; levelStat[L].px += v.pixels;
+  levelStat[L].colors[v.color] = (levelStat[L].colors[v.color] || 0) + v.pixels;
+  levelStat[L].colorVeins[v.color] = (levelStat[L].colorVeins[v.color] || 0) + 1;
+}
+// 每轮（日程）：颜色 / 像素
+const roundStat = {};
+for (const o of eo.order) {
+  const k = o.round;
+  roundStat[k] = roundStat[k] || { colors: {}, px: 0 };
+  roundStat[k].colors[o.color] = (roundStat[k].colors[o.color] || 0) + 1;
+  roundStat[k].px++;
+}
+
+// ---------------------------------------------------------------- 切法 A：按日程切（= 生产默认 solverGuidedBoxes 的确定性版）
+// 生产的真实切法（generator.js solverGuidedBoxes）：反复做三件事——
+//   ① 统计每种颜色"此刻可达"多少像素；② 选可达最多的那个颜色；
+//   ③ 按本盒容量吃满它（吃不满就只吃这么多，盒子的 count = 实际吃到的量）。
+// 所以这个切法【按定义就不会产生债】：盒子的大小永远等于它能吃到的量。
+// 这里把"本盒容量"固定成平均容量（生产里是区间随机采样），并省掉 mergeSmallTailBoxes。
+function buildPlanBySchedule() {
+  const N0 = Math.max(40, Math.min(55, Math.round(P / 22)));
+  const cap = Math.max(2, Math.round(P / N0));
+  const Sim = A.Simulator;
+  let eliminated = A.outsideReachSeed(blocks, R, C, false);
+  const cars = [];
+  let guard = R * C + 100;
+  while (guard-- > 0) {
+    const colors = new Set();
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+      if (!eliminated[r][c] && blocks[r][c] > 0) colors.add(blocks[r][c]);
+    }
+    if (!colors.size) break;
+    let best = null, bestN = 0;
+    for (const col of colors) {
+      const scratch = eliminated.map(row => row.slice());
+      const n = Sim.floodFillEliminate(scratch, blocks, R, C, col, cap, null, null, false);
+      if (n > bestN) { bestN = n; best = col; }
+    }
+    if (best === null || bestN <= 0) break;
+    const consumed = Sim.floodFillEliminate(eliminated, blocks, R, C, best, cap, null, null, false);
+    if (consumed <= 0) break;
+    cars.push({ color: best, cap: consumed, round: cars.length + 1 });
+  }
+  return { name: 'A · 按日程切（生产默认）', cars, N: cars.length,
+    note: '每次选"此刻可达像素最多"的颜色，按平均容量封箱；盒子大小 = 实际吃到的量 → 按定义不产生债' };
+}
+
+// ---------------------------------------------------------------- 切法 B：按层切
+function buildPlanByLayer() {
+  const groups = [];   // (层, 颜色) → 像素数、vein 列表
+  for (const v of layerInfo.veins) {
+    const key = v.level + ':' + v.color;
+    let g = groups.find(x => x.key === key);
+    if (!g) { g = { key, level: v.level, color: v.color, size: 0, veins: [] }; groups.push(g); }
+    g.size += v.pixels; g.veins.push(v.id);
+  }
+  const N0 = Math.max(40, Math.min(55, Math.round(P / 22)));
+  const avgCap = P / N0;
+  const k = groups.map(g => Math.max(1, Math.round(g.size / avgCap)));
+  const cars = [];
+  groups.forEach((g, i) => {
+    const base = Math.floor(g.size / k[i]), extra = g.size - base * k[i];
+    for (let j = 0; j < k[i]; j++) {
+      cars.push({ color: g.color, cap: base + (j < extra ? 1 : 0), level: g.level, veins: g.veins });
+    }
+  });
+  // 序列 = 层号升序（开壳车先出），同层按颜色、容量降序
+  cars.sort((a, b) => (a.level - b.level) || (a.color - b.color) || (b.cap - a.cap));
+  return { name: 'B · 按层切', cars, groups, N: cars.length, avgCap, note: '(层, 颜色) 单独成车：开壳车与被包车天然分开；序列按层号升序' };
+}
+
+// 小容量车合并：小于 MIN_CAR 的车并进同色车（B 优先同层/最近层，A 同色任意）。
+// 生产里也有 mergeSmallTailBoxes 做同一件事，这里对两种切法用同一规则，避免"1px 车"污染对比。
+const MIN_CAR = 12;
+function mergeSmallCars(plan, hasLevel) {
+  const cars = plan.cars;
+  let guard = cars.length * 3 + 10;
+  while (guard-- > 0) {
+    let si = -1;
+    for (let i = 0; i < cars.length; i++) if (cars[i].cap < MIN_CAR && cars.length > 1) { si = i; break; }
+    if (si < 0) break;
+    const c = cars[si];
+    // 目标：同色、尽量靠前（生产口径是"与前一盒求和均分"）。
+    // 靠前合并 = 多出来的容量在"货更多"的时刻吃，不会凭空造债；靠后合并会造债。
+    let ti = -1, bestKey = Infinity;
+    for (let j = 0; j < cars.length; j++) {
+      if (j === si || cars[j].color !== c.color) continue;
+      const dl = hasLevel ? Math.abs((cars[j].level || 0) - (c.level || 0)) : 0;
+      const key = dl * 10000 + Math.min(j, si);   // 层差优先，其次位置靠前
+      if (key < bestKey) { bestKey = key; ti = j; }
+    }
+    if (ti < 0) {   // 同色只有这一辆，就没法并；标出来
+      c._lonely = true; break;
+    }
+    cars[ti].cap += c.cap;
+    cars.splice(si, 1);
+  }
+  return plan;
+}
+
+const planA = buildPlanBySchedule();
+const planB = buildPlanByLayer();
+// 两种切法都不合并：保留"碎车"这个真实代价，让对比是同口径的。
+// （生产里 A 会走 mergeSmallTailBoxes，B 还缺一条对应的合并规则——这正是下一步要设计的东西。）
+
+// ---------------------------------------------------------------- 纯切球层干跑
+// 用引擎自己的 floodFillEliminate（圈序：动态外圈→由下到上→由左到右），保证与求解器逐格同口径。
+// 不含棋盘、不含障碍：车随时可点，只看"切法本身"会逼出多少债。
+function dryRun(plan) {
+  const Sim = A.Simulator;
+  const eliminated = A.outsideReachSeed(blocks, R, C, false);
+  const buffer = [];   // {color, need, since}
+  const steps = [];
+  let peakCars = 0, over = 0, totalDebtPx = 0, maxSingleDebt = 0, maxCure = 0, curedCount = 0, debtCount = 0;
+
+  function release(stepNo) {
+    for (let i = buffer.length - 1; i >= 0; i--) {
+      const b = buffer[i];
+      const got = Sim.floodFillEliminate(eliminated, blocks, R, C, b.color, b.need, null, null, false);
+      b.need -= got;
+      if (b.need <= 0) {
+        buffer.splice(i, 1); curedCount++;
+        const d = stepNo - b.since;
+        if (d > maxCure) maxCure = d;
+      }
+    }
+  }
+
+  plan.cars.forEach((car, idx) => {
+    const taken = Sim.floodFillEliminate(eliminated, blocks, R, C, car.color, car.cap, null, null, false);
+    let debt = car.cap - taken;
+    if (taken < car.cap) {          // 引擎吃不满时实际只吃这么多；差额就是这笔债
+      buffer.push({ color: car.color, need: debt, since: idx }); debtCount++;
+      totalDebtPx += debt;
+      if (debt > maxSingleDebt) maxSingleDebt = debt;
+    }
+    release(idx);
+    const bufCars = buffer.filter(b => b.need > 0).length;
+    const bufPx = buffer.reduce((a, b) => a + b.need, 0);
+    if (bufCars > 5) over++;
+    if (bufCars > peakCars) peakCars = bufCars;
+    steps.push({ i: idx, color: car.color, cap: car.cap, taken, debt, bufCars, bufPx });
+  });
+  release(plan.cars.length);
+
+  // 终局
+  const remain = {}; const reachCnt = {};
+  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+    const v = blocks[r][c];
+    if (v <= 0 || eliminated[r][c]) continue;
+    remain[v] = (remain[v] || 0) + 1;
+  }
+  for (const k of Object.keys(remain)) {
+    const scratch = eliminated.map(row => row.slice());
+    reachCnt[k] = Sim.floodFillEliminate(scratch, blocks, R, C, +k, Infinity, null, null, false);
+  }
+  const buried = Object.keys(remain).filter(k => remain[k] > 0 && !reachCnt[k]).map(Number);
+  const leftPx = Object.values(remain).reduce((a, b) => a + b, 0);
+  const uncleared = buffer.filter(b => b.need > 0).map(b => ({ color: b.color, need: b.need }));
+
+  return {
+    steps, peakCars, over, totalDebtPx, maxSingleDebt, maxCure, buried, leftPx, uncleared,
+    curedCount, debtCount, N: plan.cars.length
+  };
+}
+
+planA.run = dryRun(planA);
+planB.run = dryRun(planB);
+
+// ---------------------------------------------------------------- 车单统计
+function planStats(plan) {
+  const caps = plan.cars.map(c => c.cap);
+  const s = { N: caps.length, min: caps.length ? Math.min(...caps) : 0, max: caps.length ? Math.max(...caps) : 0,
+    sum: caps.reduce((a, b) => a + b, 0) };
+  s.avg = s.sum / caps.length;
+  const perColor = {};
+  for (const c of plan.cars) {
+    perColor[c.color] = perColor[c.color] || { cars: 0, cap: 0 };
+    perColor[c.color].cars++; perColor[c.color].cap += c.cap;
+  }
+  // 守恒
+  const bad = [];
+  for (const k of Object.keys(colTot)) {
+    if (!perColor[k] || perColor[k].cap !== colTot[k]) bad.push({ color: +k, need: colTot[k], got: perColor[k] ? perColor[k].cap : 0 });
+  }
+  s.perColor = perColor; s.conservationBad = bad;
+  s.inRange = caps.filter(x => x >= 14 && x <= 29).length;
+  return s;
+}
+const statA = planStats(planA), statB = planStats(planB);
+
+// ---------------------------------------------------------------- SVG
+function gridSVG(getFill, getLabel) {
+  const cell = 11, pad = 2;
+  let out = `<svg width="${C * cell + pad * 2}" height="${R * cell + pad * 2}" viewBox="0 0 ${C * cell + pad * 2} ${R * cell + pad * 2}" shape-rendering="crispEdges">`;
+  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+    const v = blocks[r][c];
+    const x = pad + c * cell, y = pad + r * cell;
+    const fill = v > 0 ? getFill(r, c, v) : '#ffffff';
+    out += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="#f0ece4" stroke-width="0.5"/>`;
+  }
+  return out + '</svg>';
+}
+const svgColor = gridSVG((r, c, v) => colorHue(v));
+const svgLayer = gridSVG((r, c) => layerColor(veinIdOf(r, c) >= 0 ? layers[veinIdOf(r, c)] : 0));
+const svgRound = gridSVG((r, c) => {
+  const q = roundOf(r, c);
+  const t = eo.rounds > 1 ? (q - 1) / (eo.rounds - 1) : 0;
+  const l = 92 - 62 * t;             // 浅 → 深
+  return `hsl(28,${55 + 25 * t}%,${l}%)`;
+});
+
+// 债务曲线
+function curveSVG(run, color) {
+  const W = 520, H = 130, padL = 28, padB = 18;
+  const N = run.steps.length;
+  const maxY = 6;
+  const x = i => padL + (W - padL - 8) * (i / Math.max(1, N - 1));
+  const y = v => H - padB - (H - padB - 10) * (v / maxY);
+  let d = '';
+  run.steps.forEach((s, i) => { d += (i ? 'L' : 'M') + fmt(x(i), 1) + ',' + fmt(y(s.bufCars), 1); });
+  let g = '';
+  for (let v = 0; v <= maxY; v += 1) {
+    g += `<line x1="${padL}" y1="${fmt(y(v), 1)}" x2="${W - 8}" y2="${fmt(y(v), 1)}" stroke="#eee6d8" stroke-width="1"/>`;
+    g += `<text x="${padL - 6}" y="${fmt(y(v) + 3, 1)}" font-size="9" fill="#9a8a74" text-anchor="end">${v}</text>`;
+  }
+  g += `<line x1="${padL}" y1="${fmt(y(5), 1)}" x2="${W - 8}" y2="${fmt(y(5), 1)}" stroke="#d9534f" stroke-width="1" stroke-dasharray="4 3"/>`;
+  g += `<text x="${W - 10}" y="${fmt(y(5) - 4, 1)}" font-size="9" fill="#d9534f" text-anchor="end">暂存上限 5 辆车</text>`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>${run.steps.map((s, i) => `<circle cx="${fmt(x(i), 1)}" cy="${fmt(y(s.bufCars), 1)}" r="1.8" fill="${color}"/>`).join('')}</svg>`;
+}
+
+// ---------------------------------------------------------------- HTML
+const colorsList = Object.keys(colTot).map(Number).sort((a, b) => a - b);
+const layerRows = Object.keys(levelStat).map(Number).sort((a, b) => a - b).map(L => {
+  const s = levelStat[L];
+  const cols = Object.keys(s.colors).map(Number).sort((a, b) => s.colors[b] - s.colors[a])
+    .map(k => `<span class="chip" style="background:${colorHue(k)}" title="${k}号色 ${s.colors[k]}px / ${s.colorVeins[k]}条矿脉">${k}</span>`).join('');
+  const carsHere = planB.cars.filter(c => c.level === L).length;
+  return `<tr><td class="num">${L}</td><td class="num">${s.veins}</td><td class="num">${s.px}</td>
+    <td class="num">${Object.keys(s.colors).length}</td><td class="num">${carsHere}</td><td>${cols}</td></tr>`;
+}).join('');
+
+function carTable(plan) {
+  return plan.cars.map((c, i) => {
+    const lv = (c.level != null) ? c.level : (c.round != null ? '#' + c.round : '-');
+    return `<tr><td class="num">${i + 1}</td><td><span class="chip" style="background:${colorHue(c.color)}">${c.color}</span></td>
+      <td class="num">${c.cap}</td><td class="num">${lv}</td></tr>`;
+  }).join('');
+}
+
+function metricRows() {
+  const rows = [
+    ['车辆数', planA.run.N, planB.run.N],
+    ['峰值暂存（辆）', planA.run.peakCars, planB.run.peakCars],
+    ['超过上限 5 的步数', planA.run.over, planB.run.over],
+    ['总债（像素）', planA.run.totalDebtPx, planB.run.totalDebtPx],
+    ['单笔最大债（像素）', planA.run.maxSingleDebt, planB.run.maxSingleDebt],
+    ['最长解药距离（步）', planA.run.maxCure, planB.run.maxCure],
+    ['结清笔数 / 总笔数', `${planA.run.curedCount}/${planA.run.debtCount}`, `${planB.run.curedCount}/${planB.run.debtCount}`],
+    ['终局剩余像素', planA.run.leftPx, planB.run.leftPx],
+    ['被埋颜色数', planA.run.buried.length, planB.run.buried.length],
+    ['容量 &lt;10 的小车', planA.cars.filter(c => c.cap < 10).length, planB.cars.filter(c => c.cap < 10).length],
+  ];
+  return rows.map(r => `<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td></tr>`).join('');
+}
+
+function checks(plan, st, run) {
+  return [
+    ['守恒：每色车容量和 = 图上像素', st.conservationBad.length === 0 ? ['通过', 'ok'] : ['违反', 'bad'], st.conservationBad.length ? st.conservationBad.map(b => `${b.color}号 差${b.need - b.got}`).join('；') : `${COLOR_N} 色全对`],
+    ['不超暂存上限', run.over === 0 ? ['通过', 'ok'] : ['违反', 'bad'], `峰值 ${run.peakCars} 辆，超限 ${run.over} 步`],
+    ['每笔债有解药', run.uncleared.length === 0 ? ['通过', 'ok'] : ['有未结清', 'warn'], run.uncleared.length ? run.uncleared.map(u => `${u.color}号 欠${u.need}`).join('；') : `最长等 ${run.maxCure} 步`],
+    ['没有颜色被埋', run.buried.length === 0 ? ['通过', 'ok'] : ['被埋', 'bad'], run.buried.length ? run.buried.map(c => c + '号').join('、') : '终局无孤立色'],
+    ['容量落在 14~29 的比例', st.inRange === st.N ? ['通过', 'ok'] : ['部分在外', 'warn'], `${st.inRange}/${st.N} 辆；容量 ${st.min}~${st.max}`],
+  ].map(r => `<tr><td>${r[0]}</td><td><span class="tag ${r[1][1]}">${r[1][0]}</span></td><td class="muted">${r[2]}</td></tr>`).join('');
+}
+
+const css = `
+*{box-sizing:border-box}body{margin:0;padding:28px 34px 80px;background:#fbf8f1;color:#3d3226;
+font:13px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:34px 0 12px;padding-bottom:6px;border-bottom:2px solid #e6dcc8}
+h3{font-size:13.5px;margin:18px 0 8px}
+.meta{color:#8a7a62;font-size:12px}
+.row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.card{background:#fff;border:1px solid #e8dfcd;border-radius:8px;padding:14px 16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.views{display:flex;gap:18px;flex-wrap:wrap}
+.view{background:#fff;border:1px solid #e8dfcd;border-radius:8px;padding:10px}
+.view h3{margin:0 0 6px;font-size:12.5px}.view .sub{font-size:11px;color:#8a7a62;margin-top:6px;max-width:450px}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{padding:5px 8px;border-bottom:1px solid #efe8da;text-align:left}
+th{background:#f6f1e6;font-weight:600;color:#6b5a44}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;min-width:18px;padding:0 4px;border-radius:4px;color:#fff;font-size:10.5px;text-align:center;text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.tag{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px}
+.tag.ok{background:#e4f2e4;color:#2f6b34}.tag.warn{background:#fdf1d8;color:#8a6100}.tag.bad{background:#fbe3e1;color:#a02a22}
+.muted{color:#8a7a62}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:#6b5a44}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.note{background:#fff8e8;border-left:3px solid #e0b25c;padding:10px 14px;border-radius:0 6px 6px 0;font-size:12px;color:#6b5a44;margin-top:12px}
+.big{font-size:26px;font-weight:700;line-height:1.2}
+.kpi{display:flex;gap:28px;flex-wrap:wrap;margin:10px 0 4px}
+.kpi div{min-width:110px}.kpi .label{font-size:11px;color:#8a7a62}
+code{background:#f3ecdd;padding:1px 5px;border-radius:4px;font-size:11.5px}
+`;
+
+const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>拆图报告 · ${esc(path.basename(SRC))}</title><style>${css}</style></head><body>
+
+<h1>拆图报告 · ${esc(path.basename(SRC))}</h1>
+<div class="meta">${R} × ${C} · ${P} 像素 · ${COLOR_N} 色 · 矿脉 ${layerInfo.count} 条 · 最深 ${maxLevel} 层 · 贪心日程 ${eo.rounds} 轮
+　|　只读报告，不改任何生成逻辑</div>
+
+<div class="card" style="margin-top:14px"><h3 style="margin-top:0">一句话结论</h3>
+<ul style="margin:4px 0 0 18px;padding:0;line-height:1.9">
+<li><b>A · 按日程切（生产默认）：</b>纯切球层<b>总债 ${planA.run.totalDebtPx}px</b>（峰值 ${planA.run.peakCars} 辆）。
+  ${planA.run.totalDebtPx === 0 ? '盒子大小永远等于它能吃到的量——<b>切球本身一点压力都不产生，紧张感全部来自后面的摆位和障碍</b>。' : ''}</li>
+<li><b>B · 按层切：</b>总债 <b>${planB.run.totalDebtPx}px</b>、峰值 <b>${planB.run.peakCars} 辆</b>（上限 5）、
+  最长解药 <b>${planB.run.maxCure} 步</b>、单笔最大 <b>${planB.run.maxSingleDebt}px</b>。
+  ${planB.run.over ? '<b style="color:#a02a22">有 ' + planB.run.over + ' 步超过上限</b>。' : '没超上限。'}</li>
+<li><b>代价（B 的碎车）：</b>B 产生了 <b>${planB.cars.filter(c => c.cap < 10).length} 辆</b> &lt;10px 的小车（A 是 ${planA.cars.filter(c => c.cap < 10).length} 辆）——
+  因为层内碎色多，同一层同一色的碎片只能各自成车。<b>按层切要能用，先得有一条"碎车合并"规则</b>（把同色相邻层的小片并起来，
+  但不能像生产那样"与前一盒求和均分"，那会把容量撑到超过当时的可吃量）。</li>
+<li><b>差别在哪：</b>A 的车"到货才切"，所以不需要等；B 的车按层排，<b>开壳车先出、被包车后出</b>，
+  于是"车比货早到"这件事是被<b>设计</b>出来的——压力第一次出现在切球这一层，而不是全推给障碍。</li>
+</ul></div>
+
+<div class="note"><b>先看这一句。</b>下面三张图是同一张图：左=颜色，中=<b>层</b>（谁包着谁，只由几何决定），
+右=<b>序号</b>（求解器里那个 🔢，贪心剥皮的一种走法）。<b>层是唯一的，序号不是</b>——换一种吃法，序号就会变。
+你说的"每个颜色选择不同、暴露顺序不同"正是这个意思；而层表不会因为你怎么选而变。</div>
+
+<h2>一、三张图</h2>
+<div class="views">
+  <div class="view"><h3>① 原图色</h3>${svgColor}
+    <div class="legend">${colorsList.map(c => `<span><i style="background:${colorHue(c)}"></i>${c}号 ${colTot[c]}px</span>`).join('')}</div></div>
+  <div class="view"><h3>② 层（静态，换切法不变）</h3>${svgLayer}
+    <div class="legend">${Array.from({ length: maxLevel + 1 }, (_, i) => `<span><i style="background:${layerColor(i)}"></i>第 ${i} 层</span>`).join('')}
+    ${layerInfo.unreached ? `<span><i style="background:#ff00ff"></i>不可达 ${layerInfo.unreached} 条</span>` : ''}</div>
+    <div class="sub">第 0 层 = 现在就够得着；第 k 层 = 必须先啃掉 ≤k−1 层。这就是"洋葱剖面"。</div></div>
+  <div class="view"><h3>③ 序号（贪心日程，会变）</h3>${svgRound}
+    <div class="legend"><span><i style="background:hsl(28,55%,92%)"></i>第 1 轮</span><span><i style="background:hsl(28,80%,30%)"></i>第 ${eo.rounds} 轮</span></div>
+    <div class="sub">求解器「🔢序号」标的就是这个：每轮选"当前可达像素最多"的颜色整片吃掉。它只是一种走法。</div></div>
+</div>
+
+<h2>二、层表（这张图由什么组成）</h2>
+<div class="card"><table>
+<tr><th>层</th><th>矿脉数</th><th>像素</th><th>颜色数</th><th>按层切的车数</th><th>颜色（按像素降序）</th></tr>
+${layerRows}
+</table>
+<div class="note">车数口径：<b>按像素÷22（夹 40~55）定平均容量，然后按矿脉/层的像素数自然劈车，不强行凑车数</b>——
+生产里会强行凑到目标车数，那一步会把个别车撑到 40+，这里刻意不做，好让两种切法在同一口径下比。</div>
+<div class="note">"颜色数"这一列就是<b>静态的菜单宽度</b>：某层只有 1 个颜色 = 那一段只能按唯一路线走；
+≥3 色 = 那一段天然有得选。这是不用玩就能看出来的东西。</div></div>
+
+<h2>三、两种切法的车单</h2>
+<div class="two">
+  <div class="card"><h3>A · 按日程切（生产默认口径）</h3>
+    <div class="muted">${planA.note}</div>
+    <div class="kpi">
+      <div><div class="label">车辆数</div><div class="big">${statA.N}</div></div>
+      <div><div class="label">容量区间</div><div class="big">${statA.min}~${statA.max}</div></div>
+      <div><div class="label">平均容量</div><div class="big">${fmt(statA.avg)}</div></div>
+    </div>
+    <table><tr><th>#</th><th>色</th><th>容量</th><th>取盒序</th></tr>${carTable(planA)}</table>
+  </div>
+  <div class="card"><h3>B · 按层切（新口径）</h3>
+    <div class="muted">${planB.note}</div>
+    <div class="kpi">
+      <div><div class="label">车辆数</div><div class="big">${statB.N}</div></div>
+      <div><div class="label">容量区间</div><div class="big">${statB.min}~${statB.max}</div></div>
+      <div><div class="label">平均容量</div><div class="big">${fmt(statB.avg)}</div></div>
+    </div>
+    <table><tr><th>#</th><th>色</th><th>容量</th><th>层</th></tr>${carTable(planB)}</table>
+  </div>
+</div>
+
+<h2>四、纯切球层干跑（不进棋盘、不含障碍）</h2>
+<div class="two">
+  <div class="card"><h3>A · 按日程切</h3>${curveSVG(planA.run, '#1f6fb2')}
+    <div class="muted">曲线 = 每取一辆车之后，暂存里还欠着的车数（上限 5）。</div>
+  </div>
+  <div class="card"><h3>B · 按层切</h3>${curveSVG(planB.run, '#c8553d')}
+    <div class="muted">曲线 = 每取一辆车之后，暂存里还欠着的车数（上限 5）。</div>
+  </div>
+</div>
+<div class="card"><table><tr><th>指标</th><th>A 按日程切</th><th>B 按层切</th></tr>${metricRows()}</table></div>
+
+<h2>五、判据</h2>
+<div class="two">
+  <div class="card"><h3>A · 按日程切</h3><table><tr><th>判据</th><th>结果</th><th>说明</th></tr>${checks(planA, statA, planA.run)}</table></div>
+  <div class="card"><h3>B · 按层切</h3><table><tr><th>判据</th><th>结果</th><th>说明</th></tr>${checks(planB, statB, planB.run)}</table></div>
+</div>
+
+<h2>六、这份报告不能告诉你什么</h2>
+<div class="card"><ul style="margin:6px 0 0 18px;padding:0">
+<li><b>看不到棋盘</b>：车摆在哪个格子、哪一格先解锁，会决定"这辆车此刻能不能点"。而 61 那种死法（暂存里 4 个颜色全被埋）是<b>切法 + 摆位</b>一起造成的。</li>
+<li><b>看不到障碍</b>：冰/链/管道/墙都会改"菜单什么时侯出现哪辆车"，这里一概没有。</li>
+<li><b>看不到真人</b>：干跑用的是"每次取最底最左的可达像素"这一条固定规则；真人会挑，玩家模型也会挑。</li>
+<li>所以它只回答一个问题：<b>这个切法本身，会把债务做成什么样</b>。棋盘与障碍是下一层的事。</li>
+</ul></div>
+
+<div class="meta" style="margin-top:26px">生成时间 ${new Date().toLocaleString('zh-CN', { hour12: false })} · 脚本 <code>03_工具/拆图报告/拆图报告.js</code></div>
+</body></html>`;
+
+fs.writeFileSync(OUT, html, 'utf8');
+
+// ---------------------------------------------------------------- 控制台摘要
+console.log('=== 拆图报告 ===');
+console.log(`图: ${path.basename(SRC)}  ${R}x${C}  ${P}px  ${COLOR_N}色  矿脉${layerInfo.count}条  最深${maxLevel}层  日程${eo.rounds}轮`);
+console.log('层表:');
+Object.keys(levelStat).map(Number).sort((a, b) => a - b).forEach(L => {
+  const s = levelStat[L];
+  console.log(`  第${L}层: ${s.veins}条 / ${s.px}px / ${Object.keys(s.colors).length}色 [${Object.keys(s.colors).map(Number).sort((a, b) => s.colors[b] - s.colors[a]).join(',')}]`);
+});
+for (const [tag, p, st] of [['A 按日程切', planA, statA], ['B 按层切', planB, statB]]) {
+  const r = p.run;
+  console.log(`\n${tag}: ${st.N}辆 容量${st.min}~${st.max} 峰值${r.peakCars}辆 超限${r.over}步 总债${r.totalDebtPx}px 最大单笔${r.maxSingleDebt}px 最长解药${r.maxCure}步 埋${r.buried.length}色 剩${r.leftPx}px`);
+  if (r.buried.length) console.log(`   被埋: ${r.buried.map(c => c + '号').join(',')}`);
+  if (r.uncleared.length) console.log(`   未结清: ${r.uncleared.map(u => u.color + '号欠' + u.need).join(',')}`);
+}
+console.log('\n小容量车(<10px): A=' + planA.cars.filter(c=>c.cap<10).length + '  B=' + planB.cars.filter(c=>c.cap<10).length);
+console.log('B 每层车数: ' + Object.keys(planB.groups||{}).length);
+const byLv = {};
+planB.cars.forEach(c => { byLv[c.level] = (byLv[c.level]||0)+1; });
+console.log('B 分层车数: ' + Object.keys(byLv).sort((a,b)=>a-b).map(k=>'第'+k+'层='+byLv[k]+'辆').join(' '));
+console.log('B 前8辆: ' + planB.cars.slice(0,8).map(c=>c.color+'号/'+c.cap+'px/L'+c.level).join('  '));
+console.log('\n报告: ' + OUT);

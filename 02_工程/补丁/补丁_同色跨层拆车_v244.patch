@@ -1,0 +1,133 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4573,6 +4573,12 @@
+       boardColsMin: _norm.colsMin,
+       boardColsMax: _norm.colsMax,
+       cutPixelOrder: 'peel',                // 【v220】像素顺序：外层优先 + 由下到上 + 由左到右
++      // 【v244·用户裁决 2】同色跨层拆两辆：一个颜色既有浅层又有深层像素时，按层各切一块，
++      //   深层那块必须等浅层清完才攒得够 → 天然长债。不改车数、不改容量区间。
++      //   ⚠ 实测（40×40，6 seed）：开 = 0/6 合格（峰窗被推到 5、单关 40~60s、405 还撞 screen 8/10）；
++      //     关 = 2/6。拆出来的盒数 +4~5，把压力推过头了。**默认关**，留作实验开关。
++      //     要再试的话先改这个：splitByLayer: true + layerSplitShallow: 2
++      splitByLayer: false, layerSplitShallow: 2,
+       fillOrder: 'exposure',                // 【v220】铺球：按暴露距离（第 k 辆 ≈ 第 k 步出现）
+       debtCarCap: _debtCap,                 // 【v221】债车目标容量（由自适应均值推出）
+       cutMode: _cutMode                     // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -8984,6 +8984,16 @@
+       }
+       boxes = _arr;
+     }
++    // 【v244】同色跨层拆两辆（用户裁决 2）：浅层一块、深层一块分开切，深层那辆必须等。
++    try {
++      if (config.splitByLayer) {
++        var _lbs = splitBoxesByLayer(blocks, config, boxes);
++        if (_lbs && _lbs.length) {
++          if (_lbs._layerSplit) config._layerSplitStat = _lbs._layerSplit;
++          boxes = _lbs;
++        }
++      }
++    } catch (e) { }
+     // 【v218】收尾清理微型车（<3px），避免出现容量 1 的车
+     try { boxes = fixTinyBoxes(boxes, Math.max(3, parseInt(config.boxSizeMin, 10) > 0 ? 3 : 3)); } catch (e) { }
+     // 【v228】车数不够目标 → 拆大车（填满棋盘、让"大容量+小棋盘"成立）
+@@ -9741,6 +9751,52 @@
+     var q = count > 0 ? count : 1;
+     for (var i = 0; i < arr.length; i++) if (arr[i][0] >= q) return arr[i][1];
+     return 1;
++  }
++
++  /**
++   * 【v244·用户裁决】同色跨层拆两辆：一个颜色如果既有浅层像素又有深层像素，
++   *   就按"浅层一块 / 深层一块"分别切车，而不是像原来那样按容量平均切。
++   *   效果：深层那一块的容量必须等前几层被清掉才攒得够 → 天然的长债，不需要改车数。
++   *   只在"浅层和深层都够一辆车"时才拆（sh≥boxMin 且 dp≥boxMin），否则该色原样保留。
++   *   守恒：两段各自 splitIntoBoxes 的和 = 该色总像素，逐位对上才替换，否则原样退回。
++   */
++  function splitBoxesByLayer(blocks, config, boxes) {
++    if (!boxes || !boxes.length) return boxes;
++    var R = blocks.length, C = blocks[0].length;
++    var eo = null;
++    try { eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly); } catch (e) { return boxes; }
++    if (!eo || !eo.round) return boxes;
++    var stat = {}, shCap = (config.layerSplitShallow != null) ? Math.max(1, parseInt(config.layerSplitShallow, 10) || 2) : 2;
++    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
++      var col = blocks[r][c];
++      if (col <= 0) continue;
++      var L = eo.round[r][c] || 1;
++      var st = stat[col] || (stat[col] = { sh: 0, dp: 0 });
++      if (L <= shCap) st.sh++; else st.dp++;
++    }
++    var bmin = parseInt(config.boxSizeMin, 10) || 24;
++    var bmax = parseInt(config.boxSizeMax, 10) || 36;
++    if (bmax < bmin) bmax = bmin;
++    var byColor = {}, order = [];
++    for (var i = 0; i < boxes.length; i++) {
++      var b = boxes[i];
++      if (!byColor[b.color]) { byColor[b.color] = []; order.push(b.color); }
++      byColor[b.color].push(b);
++    }
++    var out = [], splitColors = 0, addedBoxes = 0;
++    for (var ci = 0; ci < order.length; ci++) {
++      var color = order[ci], arr = byColor[color];
++      var P = 0; for (var ai = 0; ai < arr.length; ai++) P += arr[ai].count;
++      var s = stat[color];
++      if (!s || s.sh < bmin || s.dp < bmin) { for (var ai2 = 0; ai2 < arr.length; ai2++) out.push(arr[ai2]); continue; }
++      var parts = splitIntoBoxes(s.sh, bmin, bmax).concat(splitIntoBoxes(s.dp, bmin, bmax));
++      var sum = 0; for (var pi = 0; pi < parts.length; pi++) sum += parts[pi];
++      if (sum !== P) { for (var ai3 = 0; ai3 < arr.length; ai3++) out.push(arr[ai3]); continue; }
++      splitColors++; addedBoxes += (parts.length - arr.length);
++      for (var pj = 0; pj < parts.length; pj++) out.push({ color: color, count: parts[pj] });
++    }
++    out._layerSplit = { colors: splitColors, added: addedBoxes };
++    return out.length ? out : boxes;
+   }
+ 
+   function splitIntoBoxes(pixelCount, boxMin, boxMax) {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=243">
++  <link rel="stylesheet" href="css/style.css?v=244">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=243"></script>
+-  <script src="js/utils.js?v=243"></script>
++  <script src="js/zip.js?v=244"></script>
++  <script src="js/utils.js?v=244"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=243"></script>
+-  <script src="js/simulator.js?v=243"></script>
++  <script src="js/color-libs.js?v=244"></script>
++  <script src="js/simulator.js?v=244"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=243"></script>
+-  <script src="js/solver-strategy.js?v=243"></script>
+-  <script src="js/solver.js?v=243"></script>
+-  <script src="js/playersim.js?v=243"></script>
+-  <script src="js/generator.js?v=243"></script>
+-  <script src="js/analysis.js?v=243"></script>
++  <script src="js/anchor-cut.js?v=244"></script>
++  <script src="js/solver-strategy.js?v=244"></script>
++  <script src="js/solver.js?v=244"></script>
++  <script src="js/playersim.js?v=244"></script>
++  <script src="js/generator.js?v=244"></script>
++  <script src="js/analysis.js?v=244"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=243"></script>
+-  <script src="js/app.js?v=243"></script>
++  <script src="js/level-editor.js?v=244"></script>
++  <script src="js/app.js?v=244"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

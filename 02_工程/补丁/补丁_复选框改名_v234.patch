@@ -1,0 +1,57 @@
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=233">
++  <link rel="stylesheet" href="css/style.css?v=234">
+ </head>
+ <body>
+   <header>
+@@ -334,10 +334,10 @@
+         <span class="gen-hint">~</span>
+         <input type="number" id="gen-cols-max" value="10" min="4" max="30" style="width:52px">
+         <label style="margin-left:16px" title="勾上 = 棋盘尺寸按车数自适应（上面四个数字被忽略）；不勾 = 严格用上面的范围。">
+-          <input type="checkbox" id="gen-board-auto"> 自适应
++          <input type="checkbox" id="gen-board-auto"> 棋盘自适应（勾上=自动选尺寸，勾掉=用左边行列）
+         </label>
+         <label style="margin-left:16px" title="按棋盘大小反推每辆车的容量：让车数 ≈ 可放盒格数，避免装不下或多出太多空格。">
+-          <input type="checkbox" id="gen-autobox"> 容量随棋盘自适应（小棋盘自动开）
++          <input type="checkbox" id="gen-autobox"> 容量自适应
+         </label>
+         <label style="margin-left:16px" title="切法：默认=按消除趋势平均切；合球=同色同层单独成车。">
+           切法
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=233"></script>
+-  <script src="js/utils.js?v=233"></script>
++  <script src="js/zip.js?v=234"></script>
++  <script src="js/utils.js?v=234"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=233"></script>
+-  <script src="js/simulator.js?v=233"></script>
++  <script src="js/color-libs.js?v=234"></script>
++  <script src="js/simulator.js?v=234"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=233"></script>
+-  <script src="js/solver-strategy.js?v=233"></script>
+-  <script src="js/solver.js?v=233"></script>
+-  <script src="js/playersim.js?v=233"></script>
+-  <script src="js/generator.js?v=233"></script>
+-  <script src="js/analysis.js?v=233"></script>
++  <script src="js/anchor-cut.js?v=234"></script>
++  <script src="js/solver-strategy.js?v=234"></script>
++  <script src="js/solver.js?v=234"></script>
++  <script src="js/playersim.js?v=234"></script>
++  <script src="js/generator.js?v=234"></script>
++  <script src="js/analysis.js?v=234"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=233"></script>
+-  <script src="js/app.js?v=233"></script>
++  <script src="js/level-editor.js?v=234"></script>
++  <script src="js/app.js?v=234"></script>
+ </body>
+ </html>

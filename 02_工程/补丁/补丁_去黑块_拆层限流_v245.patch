@@ -1,0 +1,103 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4469,6 +4469,11 @@
+       //   在那之前保持 8%（该值只作目标带用）。
+       // 【v168】黑块 0：自动档不再放任何墙（用户：「黑块依旧，整把有 5 个…我不信这个黑块不能去掉」）。
+       blackPercent: 0, blackPercentMin: 0, blackPercentMax: 0,
++      // 【v245】黑块真正的来源不是 blackPercent，而是「可用空间配额」：usableSpaceTarget 0.86
++      //   意味着 14% 的格子"不该有车"，配额把它全塞成墙 → 6×8 盘实测 5~6 块黑。
++      //   把目标抬到 0.97，配额只剩 1 格可分配 → 实测黑块 5~6 → 1。
++      //   配套：车数占格比 0.86 → 0.97（车要填得满，否则空格仍会被补成墙）。
++      usableSpaceTarget: 0.97, carFillRatio: 0.97,
+       blackAsCapOnly: true, blackPercentCapPct: 0,
+       icePercent: ice, icePercentMin: ice, icePercentMax: ice,
+       chainCount: chain, chainCountMin: chain, chainCountMax: chain,
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -9782,13 +9782,25 @@
+       var b = boxes[i];
+       if (!byColor[b.color]) { byColor[b.color] = []; order.push(b.color); }
+       byColor[b.color].push(b);
++    }
++    // 【v245·限流】只拆"深层占比最高"的前 N 个颜色（默认 2）：全拆会把 +4~5 盒一次塞进来，
++    //   实测直接顶到峰窗 5。限流后预期只 +1~2 盒，步长才对得上 3.2~4 的窄带。
++    var maxSplit = (config.layerSplitMax != null) ? Math.max(1, parseInt(config.layerSplitMax, 10) || 2) : 2;
++    var eligible = [];
++    for (var ei = 0; ei < order.length; ei++) {
++      var ecol = order[ei], es = stat[ecol];
++      if (!es || es.sh < bmin || es.dp < bmin) continue;
++      eligible.push({ color: ecol, ratio: es.dp / (es.sh + es.dp) });
+     }
++    eligible.sort(function (a, b) { return b.ratio - a.ratio; });
++    var allowSplit = {};
++    for (var el = 0; el < eligible.length && el < maxSplit; el++) allowSplit[eligible[el].color] = 1;
+     var out = [], splitColors = 0, addedBoxes = 0;
+     for (var ci = 0; ci < order.length; ci++) {
+       var color = order[ci], arr = byColor[color];
+       var P = 0; for (var ai = 0; ai < arr.length; ai++) P += arr[ai].count;
+       var s = stat[color];
+-      if (!s || s.sh < bmin || s.dp < bmin) { for (var ai2 = 0; ai2 < arr.length; ai2++) out.push(arr[ai2]); continue; }
++      if (!s || s.sh < bmin || s.dp < bmin || !allowSplit[color]) { for (var ai2 = 0; ai2 < arr.length; ai2++) out.push(arr[ai2]); continue; }
+       var parts = splitIntoBoxes(s.sh, bmin, bmax).concat(splitIntoBoxes(s.dp, bmin, bmax));
+       var sum = 0; for (var pi = 0; pi < parts.length; pi++) sum += parts[pi];
+       if (sum !== P) { for (var ai3 = 0; ai3 < arr.length; ai3++) out.push(arr[ai3]); continue; }
+@@ -10682,7 +10694,12 @@
+           _cfg.boardRowsMin = _bd[0]; _cfg.boardRowsMax = _bd[0];
+           _cfg.boardColsMin = _bd[1]; _cfg.boardColsMax = _bd[1];
+           _cfg.boardHardRange = true; _cfg.boardAuto = false; _cfg.boardAllowSquare = true;
+-          _cfg.targetCarCount = Math.round(_bd[0] * _bd[1] * 0.86);
++          // 【v245】车数占格比可调：0.86 会让"车比格少 14%"，那些空格最后被配额填成黑块
++          //   （实测 6×7 盘出 5~6 块墙）。用户要求"尽量用数字冰代替黑块"，这里把比例调到 ~0.96，
++          //   空格只剩 1~2 个，墙自然就没了；多出来的车由冰/链承担压力。
++          var _fillRatio = (config && config.carFillRatio != null) ? +config.carFillRatio : 0.86;
++          if (!(_fillRatio > 0.3 && _fillRatio <= 1)) _fillRatio = 0.86;
++          _cfg.targetCarCount = Math.max(4, Math.round(_bd[0] * _bd[1] * _fillRatio));
+           // 【v238】容量也随这次选的棋盘反推（原先只有 app 侧算一次，换尺寸后容量不跟着变）：
+           //   每辆容量 ≈ 彩色像素 ÷ 目标车数，区间 ±12%。这样 6×7/7×7/6×8/7×8 各自有各自的容量，
+           //   不会出现"小棋盘配大车装不下 / 大棋盘配小车太空"。
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=244">
++  <link rel="stylesheet" href="css/style.css?v=245">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=244"></script>
+-  <script src="js/utils.js?v=244"></script>
++  <script src="js/zip.js?v=245"></script>
++  <script src="js/utils.js?v=245"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=244"></script>
+-  <script src="js/simulator.js?v=244"></script>
++  <script src="js/color-libs.js?v=245"></script>
++  <script src="js/simulator.js?v=245"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=244"></script>
+-  <script src="js/solver-strategy.js?v=244"></script>
+-  <script src="js/solver.js?v=244"></script>
+-  <script src="js/playersim.js?v=244"></script>
+-  <script src="js/generator.js?v=244"></script>
+-  <script src="js/analysis.js?v=244"></script>
++  <script src="js/anchor-cut.js?v=245"></script>
++  <script src="js/solver-strategy.js?v=245"></script>
++  <script src="js/solver.js?v=245"></script>
++  <script src="js/playersim.js?v=245"></script>
++  <script src="js/generator.js?v=245"></script>
++  <script src="js/analysis.js?v=245"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=244"></script>
+-  <script src="js/app.js?v=244"></script>
++  <script src="js/level-editor.js?v=245"></script>
++  <script src="js/app.js?v=245"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

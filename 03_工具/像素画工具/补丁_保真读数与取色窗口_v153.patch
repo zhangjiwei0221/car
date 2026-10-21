@@ -1,0 +1,206 @@
+--- a/03_工具/像素画工具/图片转像素画.html
++++ b/03_工具/像素画工具/图片转像素画.html
+@@ -87,6 +87,18 @@
+     <div class="row">
+       <label><input type="checkbox" id="bgcut" checked> 把贴边的背景色挖成空位 0</label>
+     </div>
++    <div class="sub" style="margin:-2px 0 6px">⚠ 这一项**不看内容**，只认"四边出现最多的那个色" —— 如果美术自己带了一圈边框（比如整圈粉色勾边），
++      它会被当成背景整片挖掉。转换后下面会报「本图会挖掉 N 格」，数字大得离谱就说明挖错了，把它取消勾选。</div>
++    <!-- 【2026-10-15 v153】取色窗口：AI 放大图/带阴影描边的图，格子四边有抗锯齿与立体倒角，
++         整格参与投票会让深色倒角多投票（实测黑块比真值多约 10%、描边变粗一格）。默认改成格内 75%。 -->
++    <div class="row">
++      <label title="每个格子里取中间多大一片来投票。&#10;&#10;整格：格子四边的抗锯齿/立体倒角也会投票 → 深色倒角会多投票，描边变粗、黑块变多。&#10;格内 75%（推荐）：只看格心那一片，最接近"这格看上去是什么色"。&#10;格内 60%：更保守，细碎花纹多时用。">取色窗口</label>
++      <select id="innerWin">
++        <option value="0.75" selected>格内 75%(推荐)</option>
++        <option value="1">整格(旧口径)</option>
++        <option value="0.6">格内 60%</option>
++      </select>
++    </div>
+     <div class="sub" style="margin:2px 0 4px">参与匹配的颜色（点一下可关掉，关掉的不会被用）：</div>
+     <div class="row" style="margin-bottom:2px">
+       <button id="palAll" style="font-size:11px;padding:2px 8px">全选</button>
+@@ -158,6 +170,7 @@
+   //   opts.sampleMode='avg' 时保留旧口径（先整格求平均再吸附），供对照。
+   var MERGE2 = 150*150;          // 聚类阈值（redmean 距离平方）：把相近色并成一簇
+   var protect = +opts.protect || 0;   // 细线保护阈值（0=关）
++  var WIN = +opts.innerWin || 0.75;   // 【v153】取色窗口：格内取多大一片（1=整格，0.75=格心 75%）
+   var PROTECT_CONTRAST = 0.25;   // 与主色的亮度差要达到这个量级才认（避免把同色系的浅色当"线"）
+   function lumOf(rgb){ return 0.299*rgb[0]+0.587*rgb[1]+0.114*rgb[2]; }
+   function cellInfo(pix, area){
+@@ -206,12 +219,15 @@
+     for (var c=0;c<cols;c++){
+       var x0 = Math.floor(c*W/cols), x1 = Math.max(x0+1, Math.floor((c+1)*W/cols));
+       var y0 = Math.floor(r*H/rows), y1 = Math.max(y0+1, Math.floor((r+1)*H/rows));
++      // 【v153】取色窗口：只取格心那一片（默认 75%），避开四边抗锯齿与立体倒角
++      var kit = (1 - WIN) / 2, kx0 = Math.floor(x0 + (x1-x0)*kit), kx1 = Math.max(kx0+1, Math.ceil(x1 - (x1-x0)*kit));
++      var ky0 = Math.floor(y0 + (y1-y0)*kit), ky1 = Math.max(ky0+1, Math.ceil(y1 - (y1-y0)*kit));
+       var pix=[];
+-      for (var y=y0;y<y1;y++) for (var x=x0;x<x1;x++){ var i=(y*W+x)*4;
++      for (var y=ky0;y<ky1;y++) for (var x=kx0;x<kx1;x++){ var i=(y*W+x)*4;
+         if (D[i+3] < 16) continue;          // 透明像素不参与投票（bgcut 会把背景挖成 0）
+         pix.push([D[i],D[i+1],D[i+2]]);
+       }
+-      row.push(cellInfo(pix, (x1-x0)*(y1-y0)));
++      row.push(cellInfo(pix, (kx1-kx0)*(ky1-ky0)));
+     }
+     info.push(row); }
+   // ===== ② 成网格：细线保护要求"相邻格也选中【相近的】候选色"（连续两格以上），避免孤立噪点 =====
+@@ -237,6 +253,7 @@
+   // ④ 去碎色：4-连通 < desp 的块并到共享边最长的邻色（多轮）
+   if (opts.desp > 0) grid = despeckle(grid, rows, cols, opts.desp);
+   // ⑤ 背景挖空：贴边出现最多的颜色，其贴边连通片 → 0
++  var bgDug = 0, bgDugId = 0;          // 【v153】如实记下"挖掉了多少格"，供结果区提醒
+   if (opts.bgcut){
+     var tally = {}; var bump=function(id){ tally[id]=(tally[id]||0)+1; };
+     for (var c2=0;c2<cols;c2++){ bump(grid[0][c2]); bump(grid[rows-1][c2]); }
+@@ -248,12 +265,37 @@
+     for (var r3=0;r3<rows;r3++){ st.push([r3,0],[r3,cols-1]); }
+     while (st.length){ var cur=st.pop(), y4=cur[0], x4=cur[1];
+       if (y4<0||y4>=rows||x4<0||x4>=cols||seen[y4][x4]||grid[y4][x4]!==bgId) continue;
+-      seen[y4][x4]=true; grid[y4][x4]=0;
++      seen[y4][x4]=true; grid[y4][x4]=0; bgDug++; bgDugId=bgId;
+       st.push([y4+1,x4],[y4-1,x4],[y4,x4+1],[y4,x4-1]); }
+   }
+   // 统计
+   var counts = {}; grid.forEach(function(row){ row.forEach(function(v){ counts[v]=(counts[v]||0)+1; }); });
+-  return { grid:grid, cols:cols, rows:rows, counts:counts, frag: fragStat(grid, rows, cols) };
++  // ⑥ 【v153】保真度：参考 = 每格"格心 3×3 像素的中位色"（格心那点正是这格看上去的颜色，
++  //     避开上高光/下阴影/四边抗锯齿）→ 与最终结果逐格比。这是"识别得好不好"的可比较数。
++  var fidelity = null, refGrid = null, diffCells = 0;
++  (function(){
++    refGrid = [];
++    var n = 0, same = 0;
++    for (var r5=0;r5<rows;r5++){ var rw=[];
++      for (var c5=0;c5<cols;c5++){
++        var cx = Math.round((c5+0.5)*W/cols), cy = Math.round((r5+0.5)*H/rows), pr=[], pg=[], pb=[], op=0;
++        for (var dy=-1;dy<=1;dy++) for (var dx=-1;dx<=1;dx++){
++          var yy=cy+dy, xx=cx+dx;
++          if (yy<0||yy>=H||xx<0||xx>=W) continue;
++          var ii=(yy*W+xx)*4; if (D[ii+3] < 16) continue;
++          pr.push(D[ii]); pg.push(D[ii+1]); pb.push(D[ii+2]); op++;
++        }
++        var refId = 0;
++        if (op > 0){ pr.sort(function(a,b){return a-b;}); pg.sort(function(a,b){return a-b;}); pb.sort(function(a,b){return a-b;});
++          var m5 = pr.length >> 1; refId = nearestId([pr[m5], pg[m5], pb[m5]], ids) || 31; }
++        rw.push(refId); n++;
++        if ((refId === 0) === (grid[r5][c5] === 0) && (refId === 0 || refId === grid[r5][c5])) same++; else diffCells++;
++      }
++      refGrid.push(rw); }
++    fidelity = n ? same / n : 0;
++  })();
++  return { grid:grid, cols:cols, rows:rows, counts:counts, frag: fragStat(grid, rows, cols),
++           bgDug:bgDug, bgDugId:bgDugId, fidelity:fidelity, diffCells:diffCells, refGrid:refGrid, innerWin:WIN };
+ }
+ function despeckle(grid, rows, cols, minPx){
+   for (var round=0; round<12; round++){
+@@ -333,6 +375,7 @@
+   var opts={ cols:Math.max(2,Math.min(200,+$('cols').value||53)), rows:Math.max(2,Math.min(200,+$('rows').value||53)),
+              maxColors:Math.max(0,+$('maxColors').value||0), desp:Math.max(0,+$('desp').value||0),
+              bgcut:$('bgcut').checked, ids:useIds.slice().sort(function(a,b){return a-b;}).map(function(id){return id-1;}),
++             innerWin:parseFloat(($('innerWin')||{}).value)||0.75,               // 【v153】取色窗口（格内 75% 默认）
+              sampleMode:($('sampleMode')||{}).value==='avg'?'avg':'mode',        // 取色方式：默认主色聚类投票
+              protect:parseFloat(($('protectMode')||{}).value)||0 };              // 细线保护阈值（0=关）
+   var t0=Date.now(); var res=convert(imgData, opts); var ms=Date.now()-t0;
+@@ -352,6 +395,21 @@
+   html+='<div style="margin-top:6px">碎色率 <b>'+(f.rate*100).toFixed(2)+'%</b>（小色块 '+f.smallBlocks+' 个 / '+f.fragPixels+' 格，共 '+f.blocks+' 块）'
+      + (f.rate<=0.22 ? ' <span class="ok">≈ 过闸（上限 22%）</span>' : ' <span class="warn">≈ 超限，把「最多用色」调小或「去碎色」调大</span>')
+      + '<br><span style="font-size:11px">这是近似口径，正式判定以生成器的碎色闸门为准（命令行工具 图片转像素画.js 报的就是正式口径）</span></div>';
++  // 【v153】保真度 + 背景挖空代价：把"识别得好不好"变成一个数字
++  if (res.fidelity != null){
++    var fp = (res.fidelity*100).toFixed(1);
++    html+='<div style="margin-top:6px">保真度 <b>'+fp+'%</b>'
++       + '　<span style="color:#8a7358;font-size:11px">（与「每格中心那点的颜色」逐格比，不一致 '+res.diffCells+' 格）</span><br>'
++       + '<span style="font-size:11px">参考口径：每格中心的 3×3 像素取中位色 —— 也就是"这格看上去是什么色"。'
++       + '保真度低主要来自三件事：① 挖背景挖到了美术（看下一行）；② 源图本身有渐变/高光/阴影，一格里的颜色不是纯色；'
++       + '③ 允许的色板太少，多出来的颜色被并到最近的那个。</span></div>';
++  }
++  if (res.bgDug > 0){
++    var pa = PAL[res.bgDugId-1] || {name:'?', hex:'#000'};
++    html+='<div style="margin-top:6px" class="warn">⚠ 本图挖掉了 <b>'+res.bgDug+'</b> 格'
++       + '（'+(100*res.bgDug/(res.cols*res.rows)).toFixed(1)+'%，颜色 '+res.bgDugId+' '+pa.name+'）'
++       + '　—　如果这是美术自己的边框/底色，请取消勾选「把贴边的背景色挖成空位 0」再转一次。</div>';
++  }
+   $('stat').innerHTML=html;
+   $('dl').disabled=false; $('dlpng').disabled=false; $('cp').disabled=false;
+ };
+--- a/03_工具/像素画工具/图片转像素画.js
++++ b/03_工具/像素画工具/图片转像素画.js
+@@ -31,6 +31,9 @@
+ const DESPECKLE = +opt('despeckle', 8);
+ const SAMPLE = (opt('sample', 'mode') === 'avg') ? 'avg' : 'mode';   // 【2026-10-14】默认改成主色聚类投票
+ const PROTECT = +opt('protect', 0);                                  // 细线保护（0=关）
++// 【v153】取色窗口：格内取中间多大一片投票。默认 0.75 —— AI 放大图/带阴影描边的图，
++//   格子四边有一圈抗锯齿与立体倒角，整格投进去会让深色倒角多投票（实测黑块比真值多约 10%、描边变粗一格）。
++const INNER = (() => { const v = +opt('inner', 0.75); return v > 0 && v <= 1 ? v : 0.75; })();
+ const OUTDIR = opt('outdir', '.');
+ // 找工程里的 bin/js（色表 + 碎色闸门用）：--bin 优先；否则从本文件往上找，
+ // 这样整个包随便挪目录都不用改脚本。
+@@ -189,8 +192,12 @@
+   for (let c = 0; c < COLS; c++) {
+     const x0 = Math.floor(c * sw / COLS), x1 = Math.max(x0 + 1, Math.floor((c + 1) * sw / COLS));
+     const y0 = Math.floor(r * sh / ROWS), y1 = Math.max(y0 + 1, Math.floor((r + 1) * sh / ROWS));
++    // 【v153】只看格心那一片（默认 75%），避开四边抗锯齿与立体倒角
++    const kit = (1 - INNER) / 2;
++    const kx0 = Math.floor(x0 + (x1 - x0) * kit), kx1 = Math.max(kx0 + 1, Math.ceil(x1 - (x1 - x0) * kit));
++    const ky0 = Math.floor(y0 + (y1 - y0) * kit), ky1 = Math.max(ky0 + 1, Math.ceil(y1 - (y1 - y0) * kit));
+     const pix = [];
+-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) pix.push(srcPx(x, y));
++    for (let y = ky0; y < ky1; y++) for (let x = kx0; x < kx1; x++) pix.push(srcPx(x, y));
+     row.push(cellToId(pix));
+   }
+   info.push(row);
+@@ -247,6 +254,7 @@
+ if (DESPECKLE > 0) grid = despeckle(grid, DESPECKLE);
+ 
+ // ---------- 4.5 背景 → 空位(0)：贴边那一色整片挖空 ----------
++let bgDug = 0, bgDugId = 0;     // 【v153】如实记下"挖掉了多少格"，供结果提醒
+ if (BG !== 'none') {
+   // 取四边出现最多的颜色当背景色（含四角）
+   const tally = {};
+@@ -267,9 +275,35 @@
+     seen[y][x] = true; grid[y][x] = 0; cleared++;
+     stack.push([y + 1, x], [y - 1, x], [y, x + 1], [y, x - 1]);
+   }
+-  if (cleared) console.log('背景识别：贴边那色（' + bgId + ' ' + PAL.find(p => p.id === bgId).name + '）连通片挖成空位，共 ' + cleared + ' 格');
++  if (cleared) { bgDug = cleared; bgDugId = bgId;
++    console.log('背景识别：贴边那色（' + bgId + ' ' + PAL.find(p => p.id === bgId).name + '）连通片挖成空位，共 ' + cleared + ' 格'); }
+ }
+ 
++// ---------- 4.6 【v153】保真度：与"每格格心 3×3 像素的中位色"逐格比 ----------
++//   格心那一点正是"这格看上去是什么色"，避开了上高光/下阴影/四边抗锯齿 → 拿它当参考。
++//   这个数就是"识别得好不好"的度量：低了先看背景挖掉多少格，再看源图是不是带渐变/阴影。
++let fidelity = null, diffCells = 0;
++{
++  let same = 0, n = 0;
++  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
++    const cx = Math.round((c + 0.5) * sw / COLS), cy = Math.round((r + 0.5) * sh / ROWS);
++    const R = [], G = [], B = [];
++    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
++      const yy = cy + dy, xx = cx + dx;
++      if (yy < 0 || yy >= sh || xx < 0 || xx >= sw) continue;
++      const p = srcPx(xx, yy);
++      if (p[0] === 255 && p[1] === 255 && p[2] === 255 && lower.endsWith('.txt')) continue;
++      R.push(p[0]); G.push(p[1]); B.push(p[2]);
++    }
++    let refId = 0;
++    if (R.length) { R.sort((a, b) => a - b); G.sort((a, b) => a - b); B.sort((a, b) => a - b);
++      const m = R.length >> 1; refId = nearest([R[m], G[m], B[m]], ALL_IDS) || 31; }
++    n++;
++    if ((refId === 0) === (grid[r][c] === 0) && (refId === 0 || refId === grid[r][c])) same++; else diffCells++;
++  }
++  fidelity = n ? same / n : 0;
++}
++
+ // ---------- 5. 出文件 + 报告 ----------
+ fs.mkdirSync(OUTDIR, { recursive: true });
+ const base = NAME + '_' + COLS + 'x' + ROWS;
+@@ -291,6 +325,9 @@
+ const cnt = {}; grid.forEach(row => row.forEach(v => cnt[v] = (cnt[v] || 0) + 1));
+ console.log('\n产出：' + path.join(OUTDIR, base + '.txt') + '（' + COLS + ' 列 × ' + ROWS + ' 行）');
+ console.log('       ' + path.join(OUTDIR, base + '_预览.png'));
++console.log('保真度：' + (fidelity * 100).toFixed(1) + '%（与「每格格心 3×3 中位色」逐格比，不一致 ' + diffCells + ' 格；取色窗口 格内 ' + Math.round(INNER * 100) + '%）');
++if (bgDug) console.log('⚠ 背景挖空吃掉了 ' + bgDug + ' 格（' + (100 * bgDug / (COLS * ROWS)).toFixed(1) + '%，颜色 ' +
++  bgDugId + ' ' + PAL.find(p => p.id === bgDugId).name + '）—— 如果这是美术自带的边框/底色，请加 --bg none 再转一次。');
+ console.log('每色格数：');
+ Object.keys(cnt).map(Number).sort((a, b) => b - a).forEach(id => {
+   const p = PAL.find(x => x.id === id);

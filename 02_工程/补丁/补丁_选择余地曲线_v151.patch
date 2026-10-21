@@ -1,0 +1,404 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3452,9 +3452,18 @@
+    * 卡点完成后以【卡点前棋盘实况】为独立基线再做一次守恒比对——卡点手段只换色/量与容量，
+    * 总盒数与分色总量必须不变，若变化必为缺陷。
+    */
++  /** 【v151】取（或按需算）某个候选的"选择余地"曲线，供增减压与报告用。 */
++  function ensureCurve(c) {
++    if (!c || !c.level || !c.solveResult) return null;
++    if (c._choiceCurve === undefined) {
++      try { c._choiceCurve = choiceCurve(AntSolver.parseLevel(c.level), c.solveResult); }
++      catch (e) { c._choiceCurve = null; }
++    }
++    return c._choiceCurve;
++  }
+   function makeChokeVariantFixed(parent, blocks, config, round, flowStats) {
+     if (round >= 2 && parent.audit && Math.random() < 0.3) {
+-      var pa = applyPressureAdjust(config, parent.audit, parent.level.bufferLimit);
++      var pa = applyPressureAdjust(config, parent.audit, parent.level.bufferLimit, ensureCurve(parent));
+       GENPERF.regenVariants++;
+       // 【v116 修正】这一支不是"改盒"，是**从头重建棋盘**的新候选，因此必须和 produceFixed 的候选循环
+       // 一样先按区间采样一次。原先直接把 pa.cfg 交下去，后果有两条：
+@@ -3557,6 +3566,7 @@
+     var N = Math.max(0, config.rounds != null ? config.rounds : 2);
+     var budget = config.timeBudgetMs != null ? config.timeBudgetMs : 300000;
+     var requireHard = !!config.requireHardPass;
++    setCurveScore(!!config.curveScore);   // 【v151】曲线评分开关（默认关；见 CURVE_SCORE_ON 注释）
+     var t0 = Date.now(), timedOut = false;
+     // 【仅底部入口】生产前门：源图在底部规则下若有永久不可达像素，直接判"结构不适配"，
+     //   不进入候选生成，也不消耗时间预算——避免把源图问题误报成生成器超时(原需求 §四)。
+@@ -4053,8 +4063,32 @@
+     return { cfg: adj, 明细: det };
+   }
+ 
+-  function applyPressureAdjust(config, audit, bufferLimit) {
+-    if (!audit) return { cfg: config, dir: 0 };
++  /**
++   * 【v151】"选择余地"曲线也进增减压决策，而且**优先级高于压力曲线**。
++   *
++   *   理由（用户 2026-10-15）：「不用纠结黑块集不集中，只要不会造成『黑块的存在，让玩家几乎没有选择、
++   *   只是按照我们既定的路线走』就行」。也就是说 —— **把曲线压平的不是"难度"，是"没有选择"**。
++   *   所以：曲线被压平（≤1 的步数占比高 / 中位选项数太低 / 开局就没得选）时，
++   *   一律走【减压】且步幅更大（×0.7、锁链 −2），不管压力曲线那边是不是在喊"欠压要增压"。
++   *   代价是：靠堆障碍来造卡点这条路被压住了 —— 这是刻意的，用户要的是"有选择里的卡点"。
++   */
++  function curveFlattened(curve) {
++    if (!curve || !curve.n || curve.n < 8) return false;      // 步数太少不表态
++    return (curve.lowPct >= 35) || (curve.medFull <= 2) || (curve.opening <= 1);
++  }
++  function applyPressureAdjust(config, audit, bufferLimit, curve) {
++    if (!audit) {
++      if (CURVE_SCORE_ON && curveFlattened(curve)) {
++        var adjOnly = Object.assign({}, config);
++        ['icePercent', 'questionPercent', 'blackPercent'].forEach(function (k) {
++          if (typeof adjOnly[k] === 'number') adjOnly[k] = Math.max(0, Math.round(adjOnly[k] * 0.7));
++        });
++        if (typeof adjOnly.chainCount === 'number') adjOnly.chainCount = Math.max(0, adjOnly.chainCount - 2);
++        adjOnly._curveFlat = true;
++        return { cfg: adjOnly, dir: -1 };
++      }
++      return { cfg: config, dir: 0 };
++    }
+     // 【v118 修正常量来源】同 auditScoreOf：原先写死 −1.5/−2.5，卡点线改成 L−1.8 后会与合格门不一致。
+     //   改为读审核返回的 high/mid。`audit.midMax` 自 v118 起恒为 0（中期段移除），
+     //   故「中期过压」那一支自然失效，与「只要求前期不出现卡点」的新口径一致。
+@@ -4066,7 +4100,16 @@
+     var dir = 0;
+     if ((audit.earlyMax || 0) >= mid || (audit.midMax || 0) >= high) dir = -1;   // 前期过压 → 减压
+     else if ((audit.lateMax || 0) < high) dir = 1;                               // 中后期欠压(无卡点) → 增压
++    // 【v151】曲线被压平 → 强制减压（优先级高于上面两条：没有选择不是难度）
++    var flat = CURVE_SCORE_ON && curveFlattened(curve);   // 【v151】同上：开关关着就不动生产
++    if (flat) dir = -1;
+     if (dir === 0) return { cfg: config, dir: 0 };
++    if (flat) {
++      var ret = (config.proportionalDifficultyAdjust)
++        ? (function () { var pr = scaleDifficultyProportional(config, 0.7, config.proportionalFloorRatio); pr.cfg._proportionalAdjust = pr.明细; pr.cfg._curveFlat = true; return { cfg: pr.cfg, dir: -1 }; })()
++        : null;
++      if (ret) return ret;
++    }
+     // 【同比缩放接入点①】开启后走等比例让分，不再「挑最便宜的参数往端点推」。
+     //   原逻辑对 chainCount 是绝对 ±1（1 组一次归零），对百分比是 ×1.05/×0.95。
+     if (config.proportionalDifficultyAdjust) {
+@@ -4074,11 +4117,12 @@
+       pr.cfg._proportionalAdjust = pr.明细;
+       return { cfg: pr.cfg, dir: dir };
+     }
+-    var f = 1 + dir * 0.05, adj = Object.assign({}, config);
++    var f = 1 + dir * (flat ? 0.30 : 0.05), adj = Object.assign({}, config);
+     ['icePercent', 'questionPercent', 'blackPercent'].forEach(function (k) {
+       if (typeof adj[k] === 'number') adj[k] = Math.max(0, Math.round(adj[k] * f));
+     });
+-    if (typeof adj.chainCount === 'number') adj.chainCount = Math.max(0, adj.chainCount + dir);
++    if (typeof adj.chainCount === 'number') adj.chainCount = Math.max(0, adj.chainCount + dir * (flat ? 2 : 1));
++    if (flat) adj._curveFlat = true;
+     if (typeof adj.swapRatio === 'number') adj.swapRatio = Math.max(0, Math.min(1, adj.swapRatio + dir * 0.05));
+     return { cfg: adj, dir: dir };
+   }
+@@ -4178,7 +4222,156 @@
+   }
+ 
+   // ---- P3 卡点树辅助 ----
+-  function candScore(c) { return (c && c.generationEval) ? c.generationEval.score : (c && c.audit ? auditScoreOf(c.audit, c.level.bufferLimit) : -1e9); }
++  /**
++   * 【v151】「选择余地」曲线 —— 把用户说的"没灵气"变成一条可算的曲线。
++   *
++   * 用户 2026-10-15 原话：「不用纠结黑块集不集中，只要不会造成『黑块（障碍）的存在，
++   * 让玩家几乎没有说什么选择，只是按照我们既定的路线走』就行……黑块换成管道也是同样的意思，
++   * 都会堵路；换成数字冰和锁链也会挡路，但意义不一样（数字冰引导玩家先去走别的路线再回来，
++   * 锁链可以在暂存区能接受的情况下选择，从而打开路线）。」
++   *
++   * 所以判据不盯"哪个障碍多不多"，只盯**它导致的结果**：
++   *
++   *   每步「能吃满的选项数」 = 当前非阻塞可选盒里，该颜色一口气能吃掉 ≥ 该盒容量 的个数。
++   *     · ≥3  → 玩家有得选（可以自己规划）
++   *     · ≤1  → 只能按既定路线走（"没有灵气"）
++   *   黑块 / 数字冰 / 锁链 / 问号 / 管道 都只是让这条数掉下去的工具，工具本身不考核。
++   *
++   * 目标形状：**前中期宽松（≥3）、关键处（30~80%）允许 1~3 个被迫点、末段可以收紧**。
++   * 反例：极难档实测把曲线从 20% 起一路压平在 1~2 —— 那不是"更难"，是"没有选择"。
++   */
++  var CURVE_DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++
++  /** 每个颜色"此刻一口气能吃掉多少像素" = 所有【含至少一个已露头像素】的同色 4-连通块之和。一次 O(N) 扫描。 */
++  function exposedBlobByColor(eliminated, blocks, rows, cols) {
++    var vis = {}, out = {}, q = [];
++    for (var r0 = 0; r0 < rows; r0++) for (var c0 = 0; c0 < cols; c0++) {
++      if (eliminated[r0][c0]) continue;
++      var col = blocks[r0][c0]; if (col <= 0) continue;
++      var id0 = r0 * cols + c0; if (vis[id0]) continue;
++      var reach = (r0 === 0 || r0 === rows - 1 || c0 === 0 || c0 === cols - 1);
++      if (!reach) for (var d = 0; d < 4; d++) {
++        var nr = r0 + CURVE_DIRS[d][0], nc = c0 + CURVE_DIRS[d][1];
++        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) { reach = true; break; }
++        if (eliminated[nr][nc]) { reach = true; break; }
++      }
++      if (!reach) continue;
++      var n = 0; q.length = 0; q.push(id0); vis[id0] = 1;
++      while (q.length) {
++        var id = q.pop(); n++;
++        var r = (id / cols) | 0, c = id % cols;
++        for (var d2 = 0; d2 < 4; d2++) {
++          var nr2 = r + CURVE_DIRS[d2][0], nc2 = c + CURVE_DIRS[d2][1];
++          if (nr2 < 0 || nr2 >= rows || nc2 < 0 || nc2 >= cols) continue;
++          var id2 = nr2 * cols + nc2;
++          if (vis[id2] || eliminated[nr2][nc2] || blocks[nr2][nc2] !== col) continue;
++          vis[id2] = 1; q.push(id2);
++        }
++      }
++      out[col] = (out[col] || 0) + n;
++    }
++    return out;
++  }
++
++  /** 曲线火花线（0~8 档）。 */
++  var CURVE_SPARK = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
++  // 【v151】曲线评分默认【关】：它只改"同档候选谁胜出"，而实测在用户那张图 + 极难档下
++  //   候选池整体都是扁的，挑不出好曲线 —— 没证明改善之前不动生产口径（保持逐字节可复现）。
++  //   曲线【统计与火花线】始终计算并落进日志/逐关记录（纯可见性，零风险）。
++  //   打开方式：方案/配置里设 curveScore:true（界面在「难度」段有勾选框）。
++  var CURVE_SCORE_ON = false;
++  function setCurveScore(on) { CURVE_SCORE_ON = !!on; }
++  function isCurveScore() { return CURVE_SCORE_ON; }
++  function curveSpark(steps) {
++    var out = '';
++    for (var i = 0; i < steps.length; i++) {
++      var v = steps[i].full; if (v > 7) v = 7;
++      out += CURVE_SPARK[v < 0 ? 0 : v];
++    }
++    return out;
++  }
++
++  /**
++   * 沿【求解路线】回放一遍，逐步统计"能吃满的选项数"。
++   * @returns {object|null} { steps, opening, medFull, forcedN, forcedMid, forcedAt, lowPct, low2Pct, spark }
++   */
++  function choiceCurve(parsed, solveResult) {
++    if (!parsed || !solveResult || !solveResult.pickOrder || !solveResult.pickOrder.length) return null;
++    var S = AntSolver.Simulator;
++    if (!S || !S.enter || !S.listMoves) return null;
++    var st;
++    try { st = S.enter(parsed, { useSlotStart: true }); } catch (e) { return null; }
++    var rows = st.rows, cols = st.cols, limit = parsed.bufferLimit || 5;
++    var order = solveResult.pickOrder.slice().sort(function (a, b) { return (a.step || 0) - (b.step || 0); });
++    var steps = [];
++    try {
++      for (var i = 0; i < order.length; i++) {
++        var p = order[i];
++        if (p.chainIndex > 0) continue;          // 锁链组的非触发成员：整组已随触发盒一起离场
++        var blob = exposedBlobByColor(st.eliminated, st.blocks, rows, cols);
++        var mv = S.listMoves(st), full = 0;
++        for (var j = 0; j < mv.length; j++) {
++          if (mv[j].blocked) continue;
++          var cell = st.cells[mv[j].r] && st.cells[mv[j].r][mv[j].c];
++          if (!cell) continue;
++          if ((blob[cell.color] || 0) >= cell.count) full++;
++        }
++        var prog = st.totalBoxes ? (st.completedBoxes / st.totalBoxes) : 0;
++        steps.push({ prog: +prog.toFixed(4), full: full, free: limit - st.buffer.length });
++        if (!S.applyPick(st, p.r, p.c)) break;
++        if (st.gameOver) break;
++      }
++    } catch (e) { /* 回放失败：返回已采到的部分 */ }
++    if (!steps.length) return null;
++    var n = steps.length, low = 0, low2 = 0, frees = [];
++    var forced = [];
++    for (var k = 0; k < n; k++) {
++      if (steps[k].full <= 1) low++;
++      if (steps[k].full <= 2) low2++;
++      if (steps[k].full <= 1 && steps[k].free <= 2) forced.push(steps[k].prog);
++    }
++    var sortedFull = steps.map(function (x) { return x.full; }).sort(function (a, b) { return a - b; });
++    var mid = sortedFull[Math.floor(sortedFull.length / 2)];
++    var forcedMid = forced.filter(function (p2) { return p2 >= 0.30 && p2 <= 0.80; }).length;
++    return {
++      steps: steps, n: n, opening: steps[0].full, medFull: mid,
++      forcedN: forced.length, forcedMid: forcedMid,
++      forcedAt: forced.map(function (p3) { return Math.round(p3 * 100); }),
++      lowPct: Math.round(low / n * 100), low2Pct: Math.round(low2 / n * 100),
++      spark: curveSpark(steps)
++    };
++  }
++
++  /**
++   * 曲线打分（叠在既有 candScore 上，只影响"同档候选谁胜出"，不改合格门）。
++   *   ① 平时要有得选：中位能吃满的选项数越高越好（封顶 6，避免刷分）
++   *   ② 不能全程被迫：full≤1 的步数占比越高扣得越狠
++   *   ③ 被迫点位置：落在 30~80% 的 1~3 个加分；一个都没有中性；超过 3 个扣分
++   *   ④ 开局就要有得选：开局能吃满 <3 直接扣
++   */
++  function choiceCurveScore(cur) {
++    if (!cur) return 0;
++    var s = 0;
++    s += Math.min(cur.medFull, 6) * 3;
++    s -= cur.lowPct * 0.6;
++    if (cur.forcedMid >= 1 && cur.forcedMid <= 3) s += 10;
++    else if (cur.forcedMid > 3) s -= 6;
++    s += (cur.opening >= 3) ? 6 : -6;
++    return s;
++  }
++
++  function candScore(c) {
++    var base = (c && c.generationEval) ? c.generationEval.score : (c && c.audit ? auditScoreOf(c.audit, c.level.bufferLimit) : -1e9);
++    // 【v151】叠一层"选择余地"分：同档候选里优先选"平时有得选、关键处被迫"的那种。
++    if (c && c.level && c.solveResult && c._curveScore == null) {
++      try {
++        var cur = choiceCurve(AntSolver.parseLevel(c.level), c.solveResult);
++        c._choiceCurve = cur;
++        c._curveScore = cur ? choiceCurveScore(cur) : 0;
++      } catch (e) { c._curveScore = 0; }
++    }
++    return base + (CURVE_SCORE_ON ? (c && c._curveScore || 0) : 0);
++  }
+   // 兜底/候选优先级分档(0=最差…3=最好)：只依据【审核压力曲线 tier + 双方是否可通关】，不掺难度分(难度分是独立的第二套指标，见 §生产审核评分体系.md)。
+   //   3=困难合格(真实卡点) / 2=简单合格(趋势符合) / 1=安全兜底(全知+玩家均可通关、未触死亡边界，但压力曲线未达标——至少是能玩的关) / 0=其余(不可解/玩家打不通/触死亡边界)。
+   // 3/2 档【同时要求】双方可通关(与 evaluateGeneration.pass 的门槛口径一致)——压力曲线再漂亮，玩家实际打不通就不算"合格"，只能降到 1 档兜底。
+@@ -4630,7 +4823,7 @@
+   //   其余为【卡点制造】(clone 父 board + 后期段扰动)；重解+结构校验通过才返回，破坏可解则丢弃(null)。
+   function makeChokeVariant(parent, blocks, config, round) {
+     if (round >= 2 && parent.audit && Math.random() < 0.3) {
+-      var pa = applyPressureAdjust(config, parent.audit, parent.level.bufferLimit);
++      var pa = applyPressureAdjust(config, parent.audit, parent.level.bufferLimit, ensureCurve(parent));
+       GENPERF.regenVariants++;                     // 埋点：走"压力调整重新建盘"的变体数
+       var regen = generateFromBlocks(blocks, Object.assign({}, pa.cfg, { maxRetries: 2, candidateCount: 1 }));
+       return regen.valid ? tagAudit(regen) : null;
+@@ -4736,6 +4929,11 @@
+ 
+   function finalizeProduce(cand, K, evaluated) {
+     if (!cand) return cand;
++    // 【v151】最终这一关的"选择余地"曲线（candScore 里已算过就复用）
++    try {
++      if (!cand._choiceCurve && cand.level && cand.solveResult) cand._choiceCurve = choiceCurve(AntSolver.parseLevel(cand.level), cand.solveResult);
++      cand.choiceCurve = cand._choiceCurve || null;
++    } catch (e) { cand.choiceCurve = null; }
+     cand.candidates = K;
+     cand.treeEvaluated = evaluated;
+     // 死亡边界救援必须在算档次与改写 audit.pass 之前——救援会替换 level/solveResult/audit，
+@@ -7048,6 +7246,12 @@
+     // 【v137】锚点切盒与棋盘预检：导出以便单测/脚本核对（不改变调用方行为）
+     anchorCutConfig: anchorCutConfig,                       // 锚点切盒参数组装
+     preflightBoardFit: preflightBoardFit,                   // 棋盘范围 × 车数 预检
++    // 【v151】「选择余地」曲线：每步有几个"能吃满"的选项（供闸门/报告/界面共用）
++    choiceCurve: choiceCurve,
++    setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
++    isCurveScore: isCurveScore,
++    choiceCurveScore: choiceCurveScore,
++    exposedBlobByColor: exposedBlobByColor,
+     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
+     sampleCarCount: sampleCarCount,
+     suggestBoardRange: suggestBoardRange,
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -547,6 +547,7 @@
+     'gen-narrow-gap-ice-count','gen-bigbox-cap-min','gen-bigbox-cap-max',
+     'gen-numice-delay',   // 【v139】数字冰延后%（不进白名单 = 存了方案也存不住）
+     'gen-board-mode',     // 【v145】棋盘自适应/手动（不进白名单 = 存了方案也存不住）
++    'gen-curve-score',    // 【v151】按选择余地曲线挑关卡（实验）
+     'gen-inflate-count','gen-inflate-amount','gen-rare-targets',
+     'gen-choke-pos-min','gen-choke-pos-max',
+     'gen-choke-iceCluster','gen-choke-chainCluster','gen-choke-questionCluster',
+@@ -1370,6 +1371,8 @@
+       chainCount: parseInt(document.getElementById('gen-chains').value) || 0,
+       questionPercent: parseInt((document.getElementById('gen-surprise') || {}).value) || 0,
+       // 【v145】棋盘自适应：默认 true —— 行列范围由车数反推，手填范围降级为"偏好"（装不下会自动兜底）。
++      // 【v151】按「选择余地」曲线挑关卡（实验，默认关）
++      curveScore: !!((document.getElementById('gen-curve-score') || {}).checked),
+       boardAuto: ((document.getElementById('gen-board-mode') || {}).value !== 'manual'),
+       boardRowsMin: parseInt((document.getElementById('gen-rows-min') || {}).value) || 9,
+       boardRowsMax: parseInt((document.getElementById('gen-rows-max') || {}).value) || 9,
+@@ -4120,6 +4123,7 @@
+       // 【v145】棋盘自适应：本关用的行列是反推来的、还是手填范围兜底来的，随记录带走（只进生产侧记录）
+       _autoBoardRange: (result.config && result.config._autoBoardRange) || null,
+       _autoPipeClamp: (result.config && result.config._autoPipeClamp) || null,   // 【v149】管道下限被降级的记录
++      choiceCurve: result.choiceCurve || null,   // 【v151】选择余地曲线（统计+火花线，进逐关记录）
+       boardAutoFallback: (result.boardFit && result.boardFit.autoFallback) || null,
+       steps: sr.steps, maxBuffer: sr.maxBuffer, progress: sr.progress,
+       difficulty: result.difficulty ? result.difficulty.score : 0,
+@@ -4190,6 +4194,7 @@
+       chokeMarks: rec.chokeMarks || null,   // v120 卡点位置清单
+       // v115：卡点概率机制的设定/实测/期望 + 本关候选采样到的区间参数（服务端落 JSONL 与 CSV）
+       chokePlan: rec.chokePlan || null, sampledConfig: rec.sampledConfig || null,
++      choiceCurve: rec.choiceCurve || null,   // 【v151】选择余地曲线
+       // v116：棋盘结构实测（可用空间/墙/管道/藏盒）—— 用户要的「报告里的可用空间指标」
+       boardStat: rec.boardStat || null,
+       difficulty: rec.difficulty, grade: rec.grade, obstacleNames: rec.obstacleNames,
+@@ -4318,6 +4323,15 @@
+     genMaybeAutoMap(rec);
+     var dt = (rec._elapsedMs / 1000).toFixed(1);
+     var tierTxt = rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '合格' : '不可解'));
++    // 【v151】"选择余地"曲线（用户 2026-10-15 定的核心指标）：每步有几个"能吃满"的选项。
++    //   ≥3 有得选 / ≤1 只能按既定路线走。这是判断"有没有灵气"的唯一判据，黑块/冰/链都只是工具。
++    var curveTxt = '';
++    if (rec.choiceCurve) {
++      var c2 = rec.choiceCurve;
++      curveTxt = '　选择余地 开局' + c2.opening + ' 中位' + c2.medFull +
++        ' ≤1占' + c2.lowPct + '% 被迫点' + c2.forcedN + (c2.forcedMid ? ('(中段' + c2.forcedMid + ')') : '') +
++        (typeof AntSolver.Generator.choiceCurveScore === 'function' ? (' 分' + Math.round(AntSolver.Generator.choiceCurveScore(c2))) : '');
++    }
+     // 【v147】空转比（取盒后暂存没降的步数占比）—— 批量时横向比较"压力是从哪来的"
+     var idleTxt = '';
+     if (rec.solve && rec.solve.stepStats && rec.solve.stepStats.length) {
+@@ -4327,6 +4341,10 @@
+     }
+     genLog(entry.name + '  ' + dt + 's  ' + tierTxt + (rec.valid ? ('  难度' + rec.difficulty + '[' + rec.grade + ']') : '') + idleTxt,
+       rec.fallback ? 'gen-log-warn' : (rec.audit && (rec.audit.tier === '合格' || rec.audit.tier === '困难合格') ? 'gen-log-ok' : ''));
++    if (curveTxt) {
++      var c3 = rec.choiceCurve;
++      genLog('　　' + c3.spark + curveTxt, (c3.lowPct >= 35 || c3.medFull <= 2) ? 'gen-log-warn' : 'gen-log-ok');
++    }
+     // 【v137】棋盘范围偏大/偏小的提醒（没到"必然淘汰"那一档，所以照常跑，只是先让你看见）。
+     // 命中"必然淘汰"的那一档走上面 gateBlocked 分支，直接给可读原因 + 建议行列。
+     if (result && result.boardFit && result.boardFit.warn) {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v150·右栏随模拟态切换</title>
+-  <link rel="stylesheet" href="css/style.css?v=150">
++  <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
++  <link rel="stylesheet" href="css/style.css?v=151">
+ </head>
+ <body>
+   <header>
+@@ -332,6 +332,9 @@
+       </div>
+       <div class="gen-hint" id="gen-preset-info">—</div>
+       <div class="gen-row">
++        <label class="gen-hint" title="【v151·实验，默认关】打开后，生成器在同档候选里优先挑「选择余地曲线」形状好的：&#10;  曲线 = 每步有几个「能吃满」的选项（≥3 有得选、≤1 只能按既定路线走）。&#10;  曲线被压平（≤1 占比 ≥35% 或 中位 ≤2）时还会强制降压（障碍 ×0.7、锁链 −2）。&#10;&#10;⚠ 为什么默认关：它只改「同档候选谁胜出」。实测在你那张 32×27 图上，极难档的候选池整体都是扁的，&#10;  挑不出好曲线 —— 没证明能改善之前不动生产口径（保持逐字节可复现）。&#10;  曲线统计与火花线无论开关都会算、都会写进日志与逐关记录。"> <input type="checkbox" id="gen-curve-score"> 按「选择余地」曲线挑关卡（实验）</label>
++      </div>
++      <div class="gen-row">
+         <label class="gen-hint" title="引擎内部兜底项（棋盘尺寸、管道三级兜底、填盘交错、候选数、时间预算、卡点逐类参数…）。&#10;平时不用看；要精细控制时再打开。"> <input type="checkbox" id="gen-show-advanced"> 显示高级参数</label>
+       </div>
+     </div>
+@@ -865,18 +868,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=150"></script>
+-  <script src="js/utils.js?v=150"></script>
+-  <script src="js/simulator.js?v=150"></script>
++  <script src="js/zip.js?v=151"></script>
++  <script src="js/utils.js?v=151"></script>
++  <script src="js/simulator.js?v=151"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=150"></script>
+-  <script src="js/solver-strategy.js?v=150"></script>
+-  <script src="js/solver.js?v=150"></script>
+-  <script src="js/playersim.js?v=150"></script>
+-  <script src="js/generator.js?v=150"></script>
+-  <script src="js/analysis.js?v=150"></script>
++  <script src="js/anchor-cut.js?v=151"></script>
++  <script src="js/solver-strategy.js?v=151"></script>
++  <script src="js/solver.js?v=151"></script>
++  <script src="js/playersim.js?v=151"></script>
++  <script src="js/generator.js?v=151"></script>
++  <script src="js/analysis.js?v=151"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=150"></script>
+-  <script src="js/app.js?v=150"></script>
++  <script src="js/level-editor.js?v=151"></script>
++  <script src="js/app.js?v=151"></script>
+ </body>
+ </html>

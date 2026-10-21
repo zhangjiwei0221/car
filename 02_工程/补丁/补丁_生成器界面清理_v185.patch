@@ -1,0 +1,122 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -997,6 +997,14 @@
+   // 应用方案到输入控件（并触发 input 事件更新滑块标签）
+   function applyScheme(inputs) {
+     if (!inputs) return;
++    // 【v185】载入方案 = 你要的就是这份数值：自动切到「方案/手调」。
++    //   原因：自动档会用"按图推"的值覆盖方案里的盒容量/障碍数量，载入后看起来"没生效"。
++    var _pm = document.getElementById('gen-param-mode');
++    if (_pm && _pm.value !== 'manual') {
++      _pm.value = 'manual';
++      try { _pm.dispatchEvent(new Event('change')); } catch (e) {}
++      genLog('参数来源已切到「方案 / 手调」（自动档会覆盖方案里的盒容量与障碍数量）', 'gen-log-warn');
++    }
+     SCHEME_INPUTS.forEach(function (id) {
+       if (!(id in inputs)) return;
+       var el = document.getElementById(id); if (!el) return;
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=184">
++  <link rel="stylesheet" href="css/style.css?v=185">
+ </head>
+ <body>
+   <header>
+@@ -319,28 +319,14 @@
+       <div id="gen-colorlib-hint" class="gen-hint"></div>
+     </div>
+ 
+-    <!-- ==================== 【v147】难度档 + 压力来源 ====================
+-         参数分层的第一层：平时只需要动这两处。
+-         难度档 = 一整套难度旋钮的预设（障碍量 / 卡点类型 / 简单关比例 / 切盒方式），
+-                  它会把具体数值写进下面那些控件里，所以"自动"与"手动微调"是同一套数字，不会打架。
+-         压力来源 = 在难度档之上做减法：取消勾选就等于把那一类障碍清零。 -->
+     <div class="gen-section">
+       <h2>2. 生成设置</h2>
+       <!-- 【v153】自动档：只填「关卡时长」，盒容量与功能块数量全部由规则推（实测口径见工作日志第二十二节） -->
+       <div class="gen-row">
+-        <label title="自动档：按「像素数 ÷ 目标车数」推盒容量，再按「债务节拍」推冰/锁链/问号/管道的数量。&#10;手动档：下面所有旋钮由你自己调（原有行为，逐值不变）。">参数档位</label>
++        <label title="自动：按「像素数 ÷ 目标车数」推盒容量与障碍数量 —— 注意：**自动会覆盖参数方案里的对应数值**。&#10;手动：完全按「参数方案 / 高级参数」里的数值走。&#10;载入方案时会自动切到手动（否则方案不生效）。">参数来源</label>
+         <select id="gen-param-mode" style="flex:1">
+-          <option value="auto" selected>自动（推荐：只填关卡时长）</option>
+-          <option value="manual">手动（下面全部自己调）</option>
+-        </select>
+-      </div>
+-      <div class="gen-row">
+-        <label title="一次设定三项决定「一批要跑多久」的旋钮：候选数 / 难度轮数 / 单关时间预算。&#10;&#10;实测：单关最长可以烧满时间预算（默认 5 分钟），一批 6 张图并发 6 线程 → 全批约等于【单关最慢那一关】。&#10;快速档适合调参数/试图；精产档适合正式出库。">生产档位</label>
+-        <!-- 【v170】难度档（快速/标准/精产）暂时下线：用户「把这个难度档暂时先删掉…现在就是要做卡点很明显的关卡」 -->
+-        <select id="gen-speed-tier" hidden style="flex:1">
+-          <option value="fast">快速（候选3 · 轮数2 · 2分钟/关）</option>
+-          <option value="std">标准（候选4 · 轮数4 · 3分钟/关）</option>
+-          <option value="pro" selected>精产（候选6 · 轮数7 · 5分钟/关）</option>
++          <option value="auto" selected>自动（按图推，会覆盖方案）</option>
++          <option value="manual">方案 / 手调（按下面数值走）</option>
+         </select>
+       </div>
+       <div class="gen-row" id="gen-auto-row">
+@@ -349,28 +335,6 @@
+         <span class="gen-hint">步数（车数）；0=自动</span>
+       </div>
+             <div class="gen-hint" id="gen-auto-info">自动档：盒容量 / 冰 / 锁链 / 问号 / 管道 数量都由规则推，日志里会写出每一个数是怎么来的。</div>
+-      <div class="gen-row">
+-        <label title="一整套难度旋钮的预设。选它之后下面「障碍设置 / 批量生产参数」里的具体数值会被写进去；&#10;你自己再动过任何一项，这里会自动变成「自定义」。&#10;&#10;极难档会顺带把「切盒方式」换成锚点切盒 —— 实测那是目前唯一能自动做出真卡点的切法。">难度档</label>
+-        <select id="gen-preset" style="flex:1">
+-          <option value="简单">简单（障碍少、六成是简单关）</option>
+-          <option value="标准" selected>标准</option>
+-          <option value="困难">困难（障碍多、卡点类型 3 种）</option>
+-          <option value="极难">极难（障碍最多 + 锚点切盒）</option>
+-          <option value="自定义">自定义</option>
+-        </select>
+-      </div>
+-      <div class="gen-row" style="flex-wrap:wrap;gap:8px">
+-        <label title="在难度档之上做减法：取消勾选就等于把那一类障碍清零（数字冰/锁链/问号/窄路/管道）。">压力来源</label>
+-        <label class="gen-hint"><input type="checkbox" id="gen-src-numice" checked> 数字冰</label>
+-        <label class="gen-hint"><input type="checkbox" id="gen-src-chain" checked> 锁链</label>
+-        <label class="gen-hint"><input type="checkbox" id="gen-src-question" checked> 问号</label>
+-        <label class="gen-hint"><input type="checkbox" id="gen-src-narrow" checked> 窄路</label>
+-        <label class="gen-hint"><input type="checkbox" id="gen-src-pipe" checked> 管道</label>
+-      </div>
+-      <div class="gen-hint" id="gen-preset-info">—</div>
+-      <div class="gen-row">
+-        <label class="gen-hint" title="【v151·实验，默认关】打开后，生成器在同档候选里优先挑「选择余地曲线」形状好的：&#10;  曲线 = 每步有几个「能吃满」的选项（≥3 有得选、≤1 只能按既定路线走）。&#10;  曲线被压平（≤1 占比 ≥35% 或 中位 ≤2）时还会强制降压（障碍 ×0.7、锁链 −2）。&#10;&#10;⚠ 为什么默认关：它只改「同档候选谁胜出」。实测在你那张 32×27 图上，极难档的候选池整体都是扁的，&#10;  挑不出好曲线 —— 没证明能改善之前不动生产口径（保持逐字节可复现）。&#10;  曲线统计与火花线无论开关都会算、都会写进日志与逐关记录。"> <input type="checkbox" id="gen-curve-score"> 按「选择余地」曲线挑关卡（实验）</label>
+-      </div>
+     </div>
+ 
+     <!-- 参数方案 -->
+@@ -975,20 +939,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=184"></script>
+-  <script src="js/utils.js?v=184"></script>
++  <script src="js/zip.js?v=185"></script>
++  <script src="js/utils.js?v=185"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=184"></script>
+-  <script src="js/simulator.js?v=184"></script>
++  <script src="js/color-libs.js?v=185"></script>
++  <script src="js/simulator.js?v=185"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=184"></script>
+-  <script src="js/solver-strategy.js?v=184"></script>
+-  <script src="js/solver.js?v=184"></script>
+-  <script src="js/playersim.js?v=184"></script>
+-  <script src="js/generator.js?v=184"></script>
+-  <script src="js/analysis.js?v=184"></script>
++  <script src="js/anchor-cut.js?v=185"></script>
++  <script src="js/solver-strategy.js?v=185"></script>
++  <script src="js/solver.js?v=185"></script>
++  <script src="js/playersim.js?v=185"></script>
++  <script src="js/generator.js?v=185"></script>
++  <script src="js/analysis.js?v=185"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=184"></script>
+-  <script src="js/app.js?v=184"></script>
++  <script src="js/level-editor.js?v=185"></script>
++  <script src="js/app.js?v=185"></script>
+ </body>
+ </html>

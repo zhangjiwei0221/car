@@ -1,0 +1,24 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6066,12 +6066,15 @@
+     // 车太少 / 管道配太多 → 溢出根本凑不出来 → 直接按"全部车上盘"给盘，管道交给生成器自己决定去留
+     var cTop = (cTarget < cAll * 0.5) ? cAll : cTarget;
+     if (!(cTop > 0)) cTop = cAll;
+-    // 取"最接近 cTop"的合法行数（|r(r+2) − cTop| 最小）
+-    var rHi = 3, bestD = Infinity;
+-    for (var r = 3; r <= 20; r++) {
+-      var d = Math.abs(r * (r + 2) - cTop);
+-      if (d < bestD) { bestD = d; rHi = r; }
+-    }
++    // 【v151 修一个 v145 的真 bug】取「**最小的、装得下 cTop 的**合法行数」。
++    //   ⚠ 曾经写的是"取 |r(r+2) − cTop| 最小的行数"（argmin）—— 那**允许往下取**：
++    //     19 车 × 极难档时 cTop=26，最接近的是 4×6=24（比 26 还小），
++    //     于是条带下端 4×5=20 格比需求还小，下游 chooseBoardDimsFixed 就挑了那个最小的盘，
++    //     19 辆车被硬塞进去（板上只放 15 盒、其余进管道）→ 开局"能吃满"的选项天然只有 2 个
++    //     → 「选择余地」曲线天生是扁的。**这就是"没灵气"的第一因。**
++    //   现在的判据与"只往上、不下探"的注释一致：r(r+2) ≥ cTop 的最小 r。
++    var rHi = 20;
++    for (var r = 3; r <= 20; r++) { if (r * (r + 2) >= cTop) { rHi = r; break; } }
+     // 【只往上、不下探】条带 = 「r ~ r+1 行 × r+1 ~ r+2 列」（与 v137 的建议格式同形）。
+     //   往下放会让 chooseBoardDimsFixed 随机挑到极小的盘：实测条带放到 r−3 时，
+     //   16 辆车被挑到 3×4=12 格（盘上只放 7 辆、其余全塞管道），完全不像一关。

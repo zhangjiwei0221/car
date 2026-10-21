@@ -1,0 +1,118 @@
+补丁 v314 —— 纠偏/兜底不能再串到新版流程（用户：管道里塞了 45 辆车）
+基线：v313（?v=313）
+应用：在 02_工程/完整主bin快照_20261012 下 `patch -p1 < 本文件`
+
+病灶：bandFixOnce（带外纠偏）和"全灭兜底"都写死调用 produceFixed（新版流程）。
+      新版按结构/层铺盒，不认 boxSizeMin/Max → 用户设 30~60，纠偏一次就变成
+      74 辆 8~25 的车（6×6 盘 + 管道 45 辆）。
+
+改动：
+ 1. 新增 runFlowOnce()：按 config.generatorFlow 选产线（'old' → produce，否则 produceFixed）
+ 2. bandFixOnce / 全灭兜底 改用 runFlowOnce
+ 3. 新增 capsOffRange()：关卡里 >12% 的车低于 下限×0.85 → 判为走错产线，纠偏结果不采纳
+ 4. 兜底在旧流程下 targetCarCount 置 0（同 v313 的理由）
+
+--- a/bin/js/generator.js	2026-10-20 20:07:29
++++ b/bin/js/generator.js	2026-10-20 20:17:29
+@@ -9912,7 +9912,7 @@
+       if (tail.count >= boxMin) continue;
+       var total = prev.count + tail.count;
+       // 【v313·用户裁决】平分后两半仍低于下限（如 55 = 50+5 → 28/27 < 30）时，
+-      //   只要整块没超上限 10%，就合成一辆整块 —— 宁可一辆 55，也不要两辆 27。
++      //   只要整块不超过 max(上限×1.1, 下限×1.9)，就合成一辆整块 —— 宁可一辆 55，也不要两辆 27。
+       if (Math.floor(total / 2) < boxMin && total <= Math.max(boxMax * 1.1, boxMin * 1.9)) { prev.count = total; tail.__drop = true; continue; }
+       prev.count = Math.ceil(total / 2); tail.count = Math.floor(total / 2);
+     }
+@@ -9978,7 +9978,7 @@
+       if (tail.count >= boxMin) continue;
+       var total = prev.count + tail.count;
+       // 【v313·用户裁决】平分后两半仍低于下限（如 55 = 50+5 → 28/27 < 30）时，
+-      //   只要整块没超上限 10%，就合成一辆整块 —— 宁可一辆 55，也不要两辆 27。
++      //   只要整块不超过 max(上限×1.1, 下限×1.9)，就合成一辆整块 —— 宁可一辆 55，也不要两辆 27。
+       if (Math.floor(total / 2) < boxMin && total <= Math.max(boxMax * 1.1, boxMin * 1.9)) { prev.count = total; tail.__drop = true; continue; }
+       prev.count = Math.ceil(total / 2); tail.count = Math.floor(total / 2);
+     }
+@@ -12572,7 +12572,44 @@
+   /** 【v194】一图多产的比较元组：先比六条过几条，再比离带距离，再比稳健通关率。 */
+   var _PRESSURE_FIRST = false;   // 【v215】压力优先：可解的前提上，峰窗越高越好
+   var _AUDIT_FIRST = false;      // 【v216】全知线优先：看"最优解自己扛多少"，不是玩家容错低
++  /**
++   * 【v314·用户裁决】任何"重产一次"的分支都必须走**当前选定的那条产线**。
++   *   泄漏点：bandFixOnce（带外纠偏）和全灭兜底都写死调用 produceFixed —— 新版流程
++   *   按结构/层铺盒，不认 boxSizeMin/Max。结果用户设 30~60，纠偏一变就成了
++   *   74 辆 8~25 的车（管道塞 45 辆，棋盘 6×6），用户：「管道里塞了 45 辆车，怎么突然会这样」。
++   */
++  function runFlowOnce(blocks, config, opts) {
++    try {
++      if (config && config.generatorFlow === 'old') return produce(blocks, config);
++      return produceFixed(blocks, config, opts || {});
++    } catch (e) { return null; }
++  }
++
+   /**
++   * 【v314】关卡里"低于用户容量下限"的车占比过高 → 这条产线没按容量走（多半是串到了新版流程）。
++   *   容忍 15% 的余量（同色尾盒合并会把下限打穿一点）；超过 12% 的车低于 下限×0.85 就判为走错线。
++   */
++  function capsOffRange(level, config) {
++    try {
++      var mn = parseInt(config && config.boxSizeMin, 10) || 0;
++      if (!(mn > 0)) return false;
++      var cells = level && level.board && level.board.cells;
++      if (!cells) return false;
++      var caps = [], r, c, i, x;
++      for (r = 0; r < cells.length; r++) for (c = 0; c < cells[r].length; c++) {
++        x = cells[r][c];
++        if (!x) continue;
++        if (x.t === 'box') caps.push(x.count);
++        else if (x.t === 'pipe' && x.queue) for (i = 0; i < x.queue.length; i++) caps.push(x.queue[i].count);
++      }
++      if (caps.length < 4) return false;
++      var bad = 0;
++      for (i = 0; i < caps.length; i++) if (caps[i] < mn * 0.85) bad++;
++      return (bad / caps.length) > 0.12;
++    } catch (e) { return false; }
++  }
++
++  /**
+    * 【v242】带外纠偏一次：portfolio 选出的关如果峰窗不在目标带里，用"冰量"做一次比例修正再产一遍。
+    *   为什么用冰：实测冰是最直接的压力旋钮（冰锁住浅层车 = 砍供给），而且不需要重算切法。
+    *   只在带外时触发一次，带内不动；成本 = 一次额外 produceFixed（5~15s）。
+@@ -12601,8 +12638,10 @@
+       cfg2.icePercent = ni; cfg2.icePercentMin = ni; cfg2.icePercentMax = ni;
+       cfg2._deadlineAt = 0;
+       var alt = null;
+-      try { alt = produceFixed(blocks, cfg2, {}); } catch (e) { alt = null; }
++      // 【v314】走当前产线；并且纠偏产出的关必须还在用户的容量区间里，否则不采纳
++      try { alt = runFlowOnce(blocks, cfg2, {}); } catch (e) { alt = null; }
+       if (!alt || !alt.level || !alt.goodV3) return out;
++      if (capsOffRange(alt.level, cfg2)) return out;
+       var p2 = alt.goodV3.midLateMax;
+       var d2 = (p2 < lo) ? (lo - p2) : (p2 > hi ? (p2 - hi) : 0);
+       // 【v243】只比"离带距离"是错的：实测 seed 402 被纠偏从 峰窗3/稳健50 换成 峰窗4/稳健100 ——
+@@ -12983,7 +13022,7 @@
+           var safeCfg = Object.assign({}, config, {
+             boardHardRange: true, boardAuto: false,
+             boardRowsMin: _rr2, boardRowsMax: _rr2, boardColsMin: _cc2, boardColsMax: _cc2,
+-            targetCarCount: _cars2,
++            targetCarCount: (config.generatorFlow === 'old') ? 0 : _cars2,   // 【v314】旧流程不拆车
+             // 【v306·用户裁决】兜底也不能无视用户设的球容量：有就用用户的，没有才按密度算。
+             //   之前这里写死 max(14, px/cars*0.9)，所以兜底关会出现 14~20 的小车。
+             boxSizeMin: (config.boxSizeMin != null ? +config.boxSizeMin : Math.max(14, Math.round(_cap2 * 0.9))),
+@@ -12996,7 +13035,7 @@
+             timeBudgetMs: Math.min(20000, (config.timeBudgetMs || 25000))
+           });
+           var safe = null;
+-          try { safe = produceFixed(blocks, safeCfg, {}); } catch (e) { safe = null; }
++          try { safe = runFlowOnce(blocks, safeCfg, {}); } catch (e) { safe = null; }   // 【v314】兜底也走当前产线
+           if (safe && safe.level) {
+             safe.safeFallback = { fill: _fr2, cars: _cars2, cap: _cap2, pipes: 2, note: '全灭兜底：宽松盘（允许墙+2条管道）' };
+             out = safe;
+@@ -13023,6 +13062,8 @@
+     // ===== 纠偏版（R01-R07）入口与可单测的内部函数 =====
+     // 旧版导出全部保留不动；新版通过 *Fixed 名称并列导出，生产脚本显式选择调用哪一套。
+     produceFixed: produceFixed,
++    runFlowOnce: runFlowOnce,               // 【v314】按 generatorFlow 选产线（纠偏/兜底复用）
++    capsOffRange: capsOffRange,             // 【v314】关卡容量是否跑出用户区间（走错产线的哨兵）
+     // 【同比难度缩放 · 用户 2026-09-02】导出以便单测与落库追溯；生产路径由
+     //   proportionalDifficultyAdjust（缺省 false）门控，不导出也会被内部调用。
+     scaleDifficultyProportional: scaleDifficultyProportional,

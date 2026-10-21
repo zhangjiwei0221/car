@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>车接小人 v339 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+  <link rel="stylesheet" href="css/style.css?v=339">
+</head>
+<body>
+  <header>
+    <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v339</span></h1>
+    <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+         右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+         退出模拟就自动回到生成器的参数面板。 -->
+    <div class="header-actions" id="header-actions">
+      <button id="btn-import-txt">导入TXT图</button>
+      <!-- 【v154·色库】读图色库：决定 TXT 里的数字按哪套色库解释。
+           老色库=34色（0 空位，1-34 颜色）；新色库=官方 0-21（-1 空位，0 = 黄色）。
+           两套色库无一色相同，读错会实打实改颜色，所以这里必须显式可选。 -->
+      <select id="colorlib-select" title="读图色库：导入 TXT 时数字按哪套色库解释。&#10;&#10;· 自动识别（推荐）：有 -1 判为官方色库；有 >21 的编号判为老色库；实心图（无 0 无 -1）判据不足时会提示，需手动指定。&#10;· 老色库 34 色：0 = 空位，1-34 = 颜色（本工程一直用的那套）。&#10;· 官方色库 0-21：-1 = 空位，0 = 黄色（官方 JSON 原始颜色矩阵那套，300 关在 参考/色库/ 里）。">
+        <option value="auto">读图色库：自动识别</option>
+        <option value="older">读图色库：老色库 34 色</option>
+        <option value="official">读图色库：官方色库 0-21</option>
+      </select>
+      <button id="btn-colorlib" title="新老色库转换：查看两套色库的对照表，并把当前图/本批全部图在 老色库(34色) ↔ 官方色库(0-21) 之间互转、下载转换后的 TXT。">🎨 色库转换</button>
+      <button id="btn-import-pack" title="导入整个关卡包文件夹（关卡/ + 审核数据/），自动配对求解数据">导入关卡包📁</button>
+      <button id="btn-generate">生成关卡</button>
+      <button id="btn-manual-edit" title="手动摆盒：车场里每格的车（颜色/载客量/空位/黑块）自己点着放。目标图仍用「导入TXT图」，也可以先「导入关卡包」把现成车场带进来再改。摆完可带入模拟器或导出关卡JSON/TXT">✏️ 手动摆盒</button>
+      <span class="sep">|</span>
+      <button id="btn-simulate" disabled>模拟游玩</button>
+      <button id="btn-exit-sim" class="hidden btn-warn">退出模拟</button>
+      <button id="btn-exit-edit" class="hidden btn-warn">退出摆盒</button>
+      <span class="sep">|</span>
+      <button id="btn-export" disabled>导出JSON</button>
+      <button id="btn-export-lib">导出关卡库</button>
+    </div>
+  </header>
+
+  <div id="view-simulator" class="view">
+  <div class="main-layout">
+    <!-- 【v158】左右两栏宽度分隔条：拖动改宽度（双击复位成默认 280 / 352）；宽度记 localStorage，刷新保留 -->
+    <div class="panel-resizer" id="resizer-left" title="拖动调整左侧「关卡信息」栏宽度（双击复位）"></div>
+    <div class="panel-resizer" id="resizer-right" title="拖动调整右侧栏宽度（双击复位）"></div>
+    <!-- 左侧状态面板 -->
+    <aside id="panel-left">
+      <div class="panel-head">
+        <h2 id="status-title">关卡信息</h2>
+        <button id="btn-collapse-left" title="收起左侧栏，把宽度让给棋盘（收起后点中间左上角的按钮可再展开）">◀ 收起</button>
+      </div>
+      <div id="status-content">
+        <p class="placeholder">请导入关卡或生成新关卡</p>
+      </div>
+
+      <!-- 关卡列表 -->
+      <div id="level-list-panel" class="hidden">
+        <h2>关卡列表 <span id="level-list-count"></span></h2>
+        <div id="level-list" style="max-height:200px;overflow-y:auto"></div>
+      </div>
+
+      <!-- 求解结果 -->
+      <div id="solve-result" class="hidden">
+        <h3>求解结果</h3>
+        <div id="solve-details"></div>
+      </div>
+    </aside>
+
+    <!-- 中间主区域：目标图(上) + 暂存区(中) + 队列棋盘(下) 竖直排列 -->
+    <main id="panel-center">
+      <!-- 目标图 -->
+      <section id="section-target">
+        <h3>目标图 <span id="target-info"></span>
+          <span style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">
+            <button id="btn-elim-order" class="zoom-btn" title="消除顺序可视化：按由外向内的颜色消除依赖，为每个像素在左下角标注全局消除序号(独立视图)">🔢序号</button>
+            <button id="btn-zoom-out" class="zoom-btn" title="缩小">🔍−</button>
+            <span id="zoom-val" style="font-size:11px;color:var(--muted);min-width:34px;text-align:center">100%</span>
+            <button id="btn-zoom-in" class="zoom-btn" title="放大">🔍＋</button>
+            <button id="btn-zoom-reset" class="zoom-btn" title="复位">⟳</button>
+          </span>
+        </h3>
+        <!-- 【v326·用户要求】生成结果条：直接压在目标图上方，不用翻日志。
+             每关跑完刷新一次；底色 = 合格(绿) / 不合格(橙) / 兜底(红)。 -->
+        <div id="gen-result-banner" class="gen-result-banner hidden"></div>
+        <div id="target-viewport">
+          <canvas id="target-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- 暂存区 -->
+      <section id="section-buffer" class="hidden">
+        <h3>暂存区 <span id="buffer-count">0/5</span></h3>
+        <div id="buffer-slots"></div>
+      </section>
+
+      <!-- 蚂蚁盒棋盘（元素区） -->
+      <section id="section-board">
+        <h3>蚂蚁盒棋盘 <span>顶部可取 · 障碍在棋盘上</span></h3>
+        <div id="board-row">
+          <div id="board-queues"></div>
+        </div>
+        <!-- 【v132·手动摆盒】编辑态专用棋盘（与模拟棋盘分开，互不覆盖） -->
+        <div id="edit-board-wrap" class="hidden">
+          <div id="edit-board-hint" class="edit-board-hint"></div>
+          <div id="edit-board-queues"></div>
+        </div>
+      </section>
+
+      <!-- 【v334·用户要求】生成过程：这关到底试了哪些候选、每个改成什么样、结果如何 -->
+      <section id="section-trace" class="hidden">
+        <h3>生成过程 <span id="trace-summary"></span>
+          <button id="btn-export-process" class="zoom-btn" style="margin-left:auto" title="把这关的制作过程导出成一个 HTML 文件：颜色统计 → 棋盘/障碍 → 每格车容量 → 压力曲线 → 判定">⬇ 导出制作过程</button>
+        </h3>
+        <div id="trace-list"></div>
+      </section>
+
+    </main>
+
+    <!-- 右侧栏：模拟控制 + 暂存压力图（点「模拟游玩」后才展开 = 页面整体呈「左信息 | 中棋盘 | 右控制」三列） -->
+    <!-- 【v144】右栏改为常驻：模拟模式放「模拟控制+压力图」，生成模式放「生成器」 -->
+    <aside id="panel-right">
+      <!-- ==================== 【v132】手动摆盒工具条 ====================
+           进入「✏️ 手动摆盒」时显示（此时模拟控制栏隐藏），与模拟游玩共用右侧这一栏。
+           校验口径 = 生产侧那条守恒：每色车的载客量之和 == 小人板上该色像素数。 -->
+      <section id="edit-controls" class="hidden">
+        <h3>手动摆盒</h3>
+        <div class="ctl-row">
+          <label>车场</label>
+          <input type="number" id="edit-rows" value="4" min="1" max="40" style="width:52px" title="车场行数">
+          <span class="edit-x">×</span>
+          <input type="number" id="edit-cols" value="7" min="1" max="40" style="width:52px" title="车场列数">
+          <button id="edit-resize" title="按上面的行列重设车场尺寸（左上角原有内容保留）">重设</button>
+        </div>
+        <div class="ctl-row edit-row-top">
+          <label>颜色</label>
+        </div>
+        <div id="edit-palette" class="edit-palette"></div>
+        <div class="ctl-row">
+          <label>载客量</label>
+          <input type="number" id="edit-count" value="3" min="1" max="99" style="width:56px" title="一辆车装几个小人（真机通常 3）">
+          <span style="font-size:11px;color:#8a7358">点棋盘空格放车</span>
+        </div>
+        <div class="ctl-row">
+          <label>工具</label>
+          <select id="edit-tool" title="放车=点空格放/点车改写；橡皮=清空该格；黑块=永久阻挡；数字冰/锁链/问号=给已放好的车加标记（单击切换）；管道=放管口并在下面编辑它的队列；吸管=把该格的颜色与载客量读进控件">
+            <option value="place" selected>🖐 放车 / 改写</option>
+            <option value="erase">🧽 橡皮（清空该格）</option>
+            <option value="black">⬛ 黑块（障碍）</option>
+            <option value="numice">🧊 数字冰（还剩几个球）</option>
+            <option value="chain">🔗 锁链（给车加链）</option>
+            <option value="question">❓ 问号（隐藏颜色）</option>
+            <option value="pipe">🪠 管道（放管口/改方向）</option>
+            <option value="pick">💧 吸管（取该格）</option>
+          </select>
+        </div>
+        <!-- 【v134】管道/锁链/数字冰 参数行 -->
+        <div class="ctl-row">
+          <label>管道方向</label>
+          <select id="edit-pipe-dir" title="管道的出口方向（11↑ 12→ 13↓ 14←）。出口格空着时，队首那辆车才会被吐到出口格上；出口被占就不吐">
+            <option value="11">↑ 向上</option>
+            <option value="12">→ 向右</option>
+            <option value="13" selected>↓ 向下</option>
+            <option value="14">← 向左</option>
+          </select>
+        </div>
+        <div class="ctl-row">
+          <label>锁链组</label>
+          <input type="number" id="edit-chain-group" value="1" min="1" max="99" style="width:48px" title="同组的车会被一起取走（一取就是整组进暂存）。至少要 2 个成员才成链">
+          <button id="edit-chain-new" title="组号 +1：接下来点的车都进新的一组">＋ 新组</button>
+          <label title="数字冰：覆盖在这辆车上的按球数倒计时。玩家每取走一个球减 1（锁链一步拿 2 个就减 2），减到 0 破碎、该车恢复可取。&#10;&#10;用法：先填数值 → 用「数字冰」工具点车（加/改）；数值没变再点同一格 = 去掉；吸管会把这个数读进框里。数值必须小于全场球数，否则永远减不到 0（配平面板会红字警告）。&#10;&#10;导出为官方 type 7，param 与实机逐字段一致（单独=标量；与锁链/问号叠加=同序数组）。老冰(type 4)已弃用，导入时自动转成数字冰。">数字冰·还剩几个球</label>
+          <input type="number" id="edit-numice-val" value="3" min="1" max="999" style="width:56px" title="数字冰：还剩几个球（每取走一个球减 1，减到 0 破碎）">
+        </div>
+        <!-- 管道队列：选中一个管道格后出现 -->
+        <div id="edit-pipe-panel" class="edit-pipe hidden">
+          <div class="edit-pipe-head">管道队列 <span id="edit-pipe-info"></span></div>
+          <div class="edit-pipe-hint">按出场顺序：上面的先出。队首一格空出来就吐一辆。</div>
+          <div id="edit-pipe-queue" class="edit-pipe-queue"></div>
+          <div class="ctl-row">
+            <button id="edit-pipe-add" title="把右栏当前选中的颜色+载客量加到队尾">＋ 加一辆（队尾）</button>
+            <button id="edit-pipe-clear" title="清空这条管道的队列（管道本体保留，只当障碍用）">清空队列</button>
+          </div>
+          <div id="edit-pipe-warn" class="edit-pipe-warn"></div>
+        </div>
+        <!-- 【v133】目标区微调画笔：开启后，点/拖上方目标图 = 改单个像素（不做改尺寸/整片填充）。
+             与目标图原本的「拖拽平移」互斥；需要平移就先把画笔关掉。 -->
+        <div class="ctl-row">
+          <button id="edit-paint-target" title="开启后在目标图上点或拖 = 改像素：放车工具=用当前颜色上色；橡皮=擦成空位；吸管=取该像素颜色。Ctrl/⌘+Z 撤回。只做微调，不改尺寸">✏️ 改目标图：关</button>
+          <button id="edit-paint-undo" title="撤回上一次目标区改动（Ctrl/⌘+Z 同效）" disabled>↩ 撤回</button>
+        </div>
+        <div id="edit-paint-tip" class="edit-tip"></div>
+        <div class="ctl-row">
+          <button id="edit-clear" title="清空整个车场（小人板不动，可「回到关卡原样」恢复）">🧹 清空车场</button>
+          <button id="edit-defaults" title="把车场恢复到进入摆盒时的原样（导入进来时是什么样就回到什么样）">↺ 回到关卡原样</button>
+        </div>
+        <div id="edit-validate" class="edit-validate"></div>
+        <div class="ctl-row">
+          <button id="edit-try-solve" title="用当前车场跑一遍全知求解，看能不能全清（不改任何数据）">🧪 试解一遍</button>
+          <button id="edit-apply" class="edit-primary" title="把当前车场装进模拟器，直接游玩/求解">▶ 带入模拟器</button>
+        </div>
+        <div class="ctl-row">
+          <button id="edit-export-json" title="导出官方 5 键关卡JSON（toprow/blocks/maprow/mapcol/spools），可直接给生产/审核用">⬇ 导出关卡JSON</button>
+          <button id="edit-export-txt" title="导出小人板 TXT（空格分隔数字，0 = 空）">⬇ 导出TXT</button>
+        </div>
+        <div class="edit-tip">
+          空格 = 空位（真实关卡的车场本来就不铺满，例如关卡1 的 4×7 里第 4 行只占第 3、4 列）。<br>
+          点空格放车 · 点车 = 按当前颜色/载客量改写 · 按住拖到别的格 = 换位 · 右键 = 清空该格。<br>🧊 数字冰 = 叠在车上的按球数倒计时（实机机制）：每取走 1 个球减 1，锁链一步拿 2 个就减 2，减到 0 破碎。数值在右上「数字冰·还剩几个球」里填；点车加/改，数值没变再点一次＝去掉。<b>老冰已弃用</b>：导入带老冰的关卡时会自动转成数字冰（数值取原耐久），导出的 JSON 里不会再出现 type 4。
+        </div>
+      </section>
+
+      <!-- 模拟控制栏 -->
+      <section id="sim-controls">
+        <h3>模拟控制</h3>
+        <!-- v99 消除模式：控制【手点模拟】的消除规则。三种玩法互斥，切换会重置本局（规则变了旧进度不再成立）。
+             求解路线下拉默认「跟随当前」，因此会自动与这里保持一致。 -->
+        <div class="ctl-row">
+          <label>消除模式</label>
+          <select id="sim-elim-mode" title="手点模拟按哪种规则消除。四边入口=现有默认玩法；仅底部入口=只能从底边向内消除；四方向瞬时连锁=每次取盒后一次性快照批量结算。切换会重置本局进度">
+            <option value="fourSide" selected>四边入口(默认)</option>
+            <option value="bottomOnly">仅底部入口</option>
+            <option value="instantChain">四方向瞬时连锁</option>
+          </select>
+        </div>
+        <div class="ctl-row">
+          <button id="btn-undo">↩ 撤销</button>
+          <button id="btn-reset">🔄 重置</button>
+          <button id="btn-auto-step">▶ 单步(全知)</button>
+        </div>
+        <!-- 【2026-10-14】「圈」多久重算一次 —— 用来对齐实机：现在这一盒中途才露出来的格子，
+             旧口径（整盒冻结）会把它们排到本盒最后，实机看起来是"每要一个人就重新看一遍谁露出来了"。
+             三档只在"层与层交界处、且额度快用完时"差两三个格子，正好是那种偶发偏差。 -->
+        <div class="ctl-row">
+          <label title="选取顺序里那个「最外层」多久重新算一次。整盒冻结=一次取盒算一遍（旧行为）；每层重算=取完一层重算一遍；每人重算=每取走一个小人就重算一遍（玩家版一直是这个口径）。三档大多数情况下一样，只在层交界、额度快满时差两三个格子">选取层级</label>
+          <select id="pick-layer-mode" title="【2026-10-14 已与实机对定】实机口径 = 每层重算：取完一层就重新看一遍谁露出来了，再从新的最外层继续。另两档只做对照用。改了会重置本局（规则变了旧进度不再成立）">
+            <option value="layer" selected>每层重算（实机口径）</option>
+            <option value="frozen">整盒冻结（旧行为）</option>
+            <option value="pixel">每人重算</option>
+          </select>
+        </div>
+        <div class="ctl-group">
+          <span class="ctl-title">自动求解</span>
+          <button id="btn-omni" title="全知求解器：瞬时最优、逐步回放(棋盘/暂存同步)">⏩ 全知版</button>
+          <button id="btn-omni-bottom" title="底部专用求解：只能从底部拿块(上/左/右封闭)，自底向上挖，逐步回放">⏩ 底部版</button>
+          <!-- v99 第三种玩法：四方向瞬时连锁消除。每次取盒后一次性快照批量结算，与上面两种是不同规则。 -->
+          <button id="btn-omni-chain" title="四方向瞬时连锁：每轮快照当前可达同色全集，按离订单起点距离近优先，一次消到订单容量为止，目标图整体刷新后再重扫；多订单严格先进先得">⏩ 瞬时连锁版</button>
+          <button id="btn-player-demo" title="玩家模拟：多球并发消除、起点最短距离、暂存流水线(会误判)">⏩ 玩家版</button>
+        </div>
+        <!-- 显示求解路线：把全知求解的取盒顺序叠加在棋盘上，只做可视化、不影响模拟 -->
+        <div class="ctl-row">
+          <button id="btn-show-route" title="显示求解路线：在棋盘上按取盒顺序标出序号（用下面下拉选定的消除模式求解）。再点=隐藏">🗺 求解路线</button>
+        </div>
+        <!-- 路线用哪种消除模式求解：三种玩法的最优取盒顺序不同，允许显式指定，便于对照 -->
+        <div class="ctl-row">
+          <label>路线</label>
+          <select id="route-mode" title="求解路线按哪种消除模式计算。三种玩法的最优取盒顺序本就不同，可切换对照；「跟随当前」= 用模拟器当前所处的模式。v121 新增玩家版与双路线：格子正中数字=全知版步号，右下角蓝色角标=玩家版盒号">
+            <option value="auto" selected>路线：全知·跟随当前</option>
+            <option value="player">路线：玩家版</option>
+            <option value="both">路线：全知+玩家双路线</option>
+            <option value="fourSide">路线：全知·四边入口</option>
+            <option value="bottomOnly">路线：全知·仅底部入口</option>
+            <option value="instantChain">路线：全知·四方向瞬时连锁</option>
+          </select>
+        </div>
+        <!-- v121 手点模拟的真机口径：每个盒都要出蚂蚁，约 1s 出 5~8 只（= 消 5~8 像素），
+             多个盒同时出蚂蚁 = 真正并行。该速率只影响【手点模拟】；演示按钮与回放走下面的「速度」滑块。 -->
+        <div class="ctl-row">
+          <label title="真机每个盒每秒出几只蚂蚁（=消几个像素）。多个盒同时出蚂蚁、并行消除。只影响手点模拟">出蚂蚁/秒</label>
+          <input type="number" id="sim-ant-rate" value="6.5" min="0.5" max="20" step="0.5"
+                 title="真机实测 5~8。调小 = 每个盒搬得更慢 = 暂存占用时间更长 = 压力更大">
+        </div>
+        <div class="ctl-row">
+          <label>速度</label>
+          <input type="range" id="anim-speed" min="1" max="999" value="999"
+                 title="仅影响【演示与回放】的播放速度。最右(999)=整批一起消失（真机观感）；往左拉 = 一个像素一个像素地消，方便看顺序">
+          <span id="anim-speed-val">整批一起</span>
+        </div>
+        <!-- 顺序闪白：小车进轨道后，即将被选走的小人按消除顺序依次闪白（白色+序号），闪完一起消失。
+             0 = 关闭闪白（直接整批消失）。手点模拟与「单步(全知)」都走这条路径。 -->
+        <div class="ctl-row">
+          <label title="小车进轨道后，即将被它选走的小人会按消除顺序依次闪白（白色格子+格子里的橙色数字=第几个被选）。闪完再一起消失。0=关闭">闪白</label>
+          <input type="range" id="flash-speed" min="0" max="200" value="40" step="5"
+                 title="顺序闪白速度：每个小人亮起的间隔(ms)。0=关闭闪白（直接整批消失）；往左拉=扫得更快，往右拉=一个一个人慢慢亮，便于核对选取顺序">
+          <span id="flash-speed-val">40ms/个</span>
+        </div>
+        <div id="sim-stats">
+          <span>步数: <b id="stat-steps">0</b></span>
+          <span>消除: <b id="stat-eliminated">0</b>/<b id="stat-total">0</b></span>
+          <span>进度: <b id="stat-progress">0%</b></span>
+          <span id="stat-revive" class="hidden" title="玩家版复活道具：卡死时自动触发，消除暂存/棋盘剩余订单最大的2个目标腾位，每关最多用2次">复活: <b id="stat-revive-count">0</b>/<b id="stat-revive-cap">2</b></span>
+        </div>
+      </section>
+
+      <!-- 暂存压力复合图（原在棋盘右侧，随控制栏一起移到右栏，给棋盘让出宽度） -->
+      <div id="board-charts" class="hidden">
+        <div style="margin-bottom:4px"><button id="btn-chart-mode" style="font-size:11px;padding:2px 8px;background:#6b4f34;color:#f3e9db;border:none;border-radius:3px;cursor:pointer">图形: 都显示</button></div>
+        <div class="chart-title">全知求解器 · 暂存压力</div>
+        <canvas id="chart-omni" width="300" height="180"></canvas>
+        <div id="chart-omni-cap" class="chart-cap"></div>
+        <div class="chart-title" style="margin-top:10px">玩家模拟 · 暂存压力</div>
+        <canvas id="chart-player" width="300" height="180"></canvas>
+        <div id="chart-player-cap" class="chart-cap"></div>
+
+        <!-- 【v147】逐次取盒序列：上面两张图是按【进度】的均值曲线，这张是按【第几次取盒】的原始序列。
+             柱子颜色 = 这一步暂存有没有降下来（红=取了一盒却没换出释放，绿=降了）。
+             用途：直接看出"是哪几次取盒把暂存顶上去的"、以及"空转比"有多高。 -->
+        <div class="chart-title" style="margin-top:10px">逐次取盒 × 暂存（原始序列）</div>
+        <canvas id="chart-steps" width="300" height="150"></canvas>
+        <div id="chart-steps-cap" class="chart-cap"></div>
+      </div>
+      <!-- ==================== 【v144】生成器（并入主界面右栏）====================
+           原来是独立的「生成器页面」（整页切换），现改为同一视图右栏里的一个面板：
+           点顶栏「🏭 生成器」右栏换成这一块，中间棋盘区保持可见 —— 生产出的关卡可直接
+           映射到棋盘上看，不用来回切页。参数手风琴 / 开始生成 / 进度 / 结果全在这里。 -->
+      <div id="gen-controls">
+  <!-- 左栏：导入 + 参数(手风琴分组) -->
+  <aside id="gen-panel-left">
+    <div class="gen-section">
+      <h2>1. 导入目标图</h2>
+      <div class="gen-row">
+        <button id="btn-gen-import-txt" class="gen-btn-wide">📂 导入TXT图（可多选）</button>
+      </div>
+      <div class="gen-row">
+        <label title="按此规则给导入的文件排序/分组">排序</label>
+        <select id="gen-file-sort" style="flex:1">
+          <option value="name">文件名</option>
+          <option value="colors">颜色数</option>
+          <option value="size">图尺寸</option>
+        </select>
+        <label style="width:auto;margin-left:6px"><input type="checkbox" id="gen-file-group" checked> 分组显示</label>
+      </div>
+      <div id="gen-file-list" class="gen-file-list"></div>
+      <div id="gen-file-empty" class="gen-file-empty">尚未导入任何目标图</div>
+      <!-- 【v154】色库提示行：用了官方色库读入多少张 / 多少张判据不足，由 app.js 的 renderColorlibHint 填 -->
+      <div id="gen-colorlib-hint" class="gen-hint"></div>
+    </div>
+
+    <div class="gen-section">
+      <h2>2. 开始生产</h2>
+      <div class="gen-hint" style="line-height:1.8">
+        按目标图尺寸自动选预设（小图 / 大图）· 难度标定 7 轮。<br>可调：卡点覆盖率门槛、球容量区间、每图搜索时间。
+      </div>
+      <!-- 【v310】覆盖率滑杆单独占一行、占满宽度，避免被挤到看不见 -->
+      <div style="margin-top:10px;padding:8px;border:1px solid var(--border2);border-radius:4px;background:var(--bg3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--text)">卡点覆盖率门槛</span>
+          <span id="gen-choke-cover-val" style="font-size:12px;color:var(--accent);font-weight:700">≥45%</span>
+        </div>
+        <input type="range" id="gen-choke-cover" min="40" max="95" step="5" value="45" style="width:100%;accent-color:var(--accent)">
+        <div class="gen-hint" style="margin-top:4px;line-height:1.6">
+          20%~80% 这段进度里，「暂存 ≥3」的采样点要占到多少才算合格。<br>调低 = 更容易过；调高 = 只收压力更持久的关。
+        </div>
+      </div>
+      <div class="gen-row" style="margin-top:4px">
+        <label title="勾上 = 只生成“有卡点”的难关；不勾 = 允许“简单关·趋势过平”占简单关名额。">
+          <input type="checkbox" id="gen-hard-only" checked> 只要难关（不生成简单合格）
+        </label>
+      </div>
+      <div class="gen-row" style="margin-top:8px" title="每辆车的容量区间（像素）。最多的颜色会用上限切出大车，小色整车一次装完。">
+        <label>球容量</label>
+        <input type="number" id="gen-boxmin" min="2" max="200" value="40" style="width:64px">
+        <span class="gen-hint">~</span>
+        <input type="number" id="gen-boxmax" min="2" max="200" value="60" style="width:64px">
+        <span class="gen-hint">（像素/辆）</span>
+      </div>
+      <!-- 【v320·用户裁决】把 candidateCount / portfolioK / timeBudgetMs 三个内部旋钮合成一个：
+           用户只需要回答"这张图值得花多久"，其余按时间自动分配。 -->
+      <!-- 【v336】主死因：只收"主要死在某一类障碍上"的关，用来把压力来源做成可控的 -->
+      <div class="gen-row" style="margin-top:8px" title="只收「玩家主要死在某一类障碍」的关。留空=不限。">
+        <label>希望主死因</label>
+        <select id="gen-death-cause" style="width:110px">
+          <option value="">不限</option>
+          <option value="链">锁链</option>
+          <option value="冰">数字冰</option>
+          <option value="管道">管道</option>
+          <option value="形状">形状/堵死</option>
+        </select>
+        <span class="gen-hint">占比 ≥</span>
+        <input type="number" id="gen-death-share" min="0" max="100" value="60" style="width:56px">
+        <span class="gen-hint">%</span>
+      </div>
+      <div class="gen-row" style="margin-top:8px" title="每张图允许搜索多久。时间越长，尝试的候选越多、覆盖率达标的机会越大；合格会提前停。">
+        <label>每图搜索时间</label>
+        <select id="gen-search-min" style="width:110px">
+          <option value="2">2 分钟</option>
+          <option value="3" selected>3 分钟</option>
+          <option value="5">5 分钟</option>
+          <option value="8">8 分钟</option>
+        </select>
+        <span class="gen-hint" id="gen-search-plan">≈ 4 轮 × 45 秒</span>
+      </div>
+      
+      </div>
+
+    <!-- 参数方案 -->
+    <div class="gen-section hidden" id="gen-sec-scheme">
+      <div class="gen-accordion-head" data-target="gen-acc-scheme">
+        <span class="gen-acc-arrow">▾</span><h2>参数方案</h2>
+      </div>
+      <div id="gen-acc-scheme" class="gen-accordion-body">
+        <div class="gen-row" style="flex-wrap:wrap;gap:4px">
+          <select id="gen-scheme-sel" style="flex:1;min-width:110px"><option value="">— 已保存方案 —</option></select>
+          <button id="gen-scheme-load" class="gen-btn-sm" title="读取所选方案参数">读取</button>
+          <button id="gen-scheme-del" class="gen-btn-sm gen-btn-danger" title="删除所选方案">✕</button>
+        </div>
+        <div class="gen-row" style="gap:4px">
+          <input type="text" id="gen-scheme-name" placeholder="方案名(留空=覆盖所选)" style="flex:1">
+          <button id="gen-scheme-save" class="gen-btn-sm" title="把当前参数保存为方案">保存</button>
+          <button id="gen-scheme-export" class="gen-btn-sm" title="导出方案参数JSON文件">导出</button>
+          <button id="gen-scheme-import" class="gen-btn-sm" title="导入方案JSON文件">导入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 基础参数 -->
+    <div class="gen-section hidden" id="gen-sec-basic">
+      <div class="gen-accordion-head" data-target="gen-acc-basic">
+        <span class="gen-acc-arrow">▾</span><h2>基础参数</h2>
+      </div>
+      <div id="gen-acc-basic" class="gen-accordion-body">
+        <!-- 目标图消除入口模式（ANT-GEN-BOTTOM-ONLY-20260729）：整批统一，默认四边入口＝v95 现有行为。
+             仅底部入口＝目标图上/左/右封闭，只能从底边向内消除；棋盘取盒方向不变。 -->
+        <div class="gen-row">
+          <label title="目标图从哪几条边开始消除。四边入口=现有默认玩法；仅底部入口=上/左/右封闭，只能从底边向内消除（棋盘取盒方向不变）。整批统一，生产前会先检查源图在该规则下是否全图可达。">目标图入口</label>
+          <select id="gen-bottom-only">
+            <option value="0" selected>四边入口(默认)</option>
+            <option value="1">仅底部入口</option>
+            <!-- v99 新增第三种玩法：四方向瞬时连锁消除。三态单选，与「仅底部入口」互斥。 -->
+            <option value="2">四方向瞬时连锁</option>
+          </select>
+        </div>
+        <div class="gen-row">
+          <label title="守恒下每盒容量的取值策略：随机=区间内随机(制造大小差距)；接近满/偏小">盒容量策略</label>
+          <select id="gen-boxmode">
+            <option value="random" selected>随机(区间内)</option>
+            <option value="max">接近满容量</option>
+            <option value="min">偏小(盒多)</option>
+            <!-- v99 新增：两极化采样，把容量推向区间两端，拉大同色盒容量差距 -->
+            <option value="polar">两极化(差距大)</option>
+          </select>
+        </div>
+        <div class="gen-row">
+          <label title="目标图怎么切成一辆辆车。&#10;&#10;趋势切(默认)=现有口径：按目标图【底→顶、行内左→右】的趋势流装箱，出来的车像从图的最下层一路剥上去。盒容量下限/上限/策略就是这一条的旋钮。&#10;&#10;锚点切盒(v137 新移植)=把图按【左下角 + 右下角】两个锚点测地切成 A 片(左) / B 片(右)，出场顺序【A 片整车先出、B 片后出】(进度错位)：同一种颜色前半场来一次、后半场又来一次，玩家手上会一直压着没放完的颜色 → 暂存压力被顶起来。这是目前唯一能自动做出『真卡点』的切法。&#10;&#10;⚠ 锚点切盒用【平均盒容量】切(均值取盒容量下限/上限的中值、单盒下限取下限值)，不吃『盒容量策略』那个下拉；车数也会和趋势切不同 —— 换到锚点切之后，先看它切出多少辆车，再按这个车数调棋盘行列范围（棋盘格数 ≈ 车数 ÷ 0.74）。&#10;&#10;锚点切盒拿不到盒时自动退回趋势切，不会把关卡生产卡死。不选它 = 生产口径与本次改动前逐字节一致。&#10;&#10;⚠ 选「仅底部入口」玩法时又选了锚点切盒：切盒仍按锚点走（它只按图形几何切、不看入口），底部专用那套切法就不生效了；要底部专用切法请选回趋势切。">切盒方式</label>
+          <select id="gen-box-cut">
+            <option value="trend" selected>趋势切(默认)</option>
+            <option value="anchor">锚点切盒·A片先出B片后出</option>
+          </select>
+        </div>
+        <div class="gen-row">
+          <label>暂存上限</label>
+          <input type="number" id="gen-buffer" min="3" max="7" value="5">
+        </div>
+              </div>
+    </div>
+
+    <!-- 障碍设置 -->
+    <div class="gen-section hidden" id="gen-sec-obstacle">
+      <div class="gen-accordion-head" data-target="gen-acc-obstacle">
+        <span class="gen-acc-arrow">▾</span><h2>障碍设置</h2>
+      </div>
+      <div id="gen-acc-obstacle" class="gen-accordion-body">
+        <div class="gen-row" style="border-bottom:1px solid #4d3627;padding-bottom:4px;margin-bottom:4px">
+          <label style="font-size:11px;color:#8a7358" title="v116 起障碍参数用【双端滑块】设区间：左钮=下限，右钮=上限，两端都能拖。&#10;两个滑钮重合 = 不启用区间，按该单值走（与 v114 及以前逐值一致）。&#10;拖动时会互相推挤，不会锁死。读数变橙色 = 该参数已启用区间。&#10;&#10;启用后【每个候选各随机采样一组】——同一关的 K 个候选拿到不同的障碍配比，&#10;解决「当前批次关卡都是同样的参数，输出的关卡结构会同质化」。&#10;&#10;⚠ 注意：候选后段仍有自动削减（黑块×0.85、冰×0.9、锁链×0.85，用于放宽产出），&#10;所以实际落地值可能低于你设的下限 —— 这是保留的既有机制。">障碍参数区间（双端拖动，两钮重合=单值） ↓</label>
+        </div>
+        <div class="gen-row">
+          <label title="【v139 新增】数字冰的数值规则：数值 = 该盒的「自然进度位次」+ 总盒数 × 本值%。&#10;&#10;自然进度位次 = 按正常打法它大概第几个被取走；延后量就是"再往后拖多少"。&#10;0 = 到点就化（冰形同虚设）；越大锁得越久、压力越足，也越可能把整关锁死。&#10;&#10;实测（真实产出关 76 盒 / 14 格冰）：延后 0~10 盒可通关，延后 15 盒即全知与玩家双双过不了。默认 10% ≈ 7~8 盒。&#10;生成器的求解器闸门会把被锁死的候选淘汰掉，所以调大不会产出死关，只会降低产能。">数字冰延后</label>
+          <input type="number" id="gen-numice-delay" value="10" min="0" max="60" step="1" style="width:64px">
+          <span style="font-size:11px;color:#888">% 总盒数</span>
+        </div>
+        <div class="gen-row">
+          <label>数字冰比例</label>
+          <div class="gen-dual" title="数字冰比例区间（%）。左钮=下限，右钮=上限；两钮重合=不启用区间。&#10;&#10;【v139】老冰已下线：这里的「冰」= 数字冰（type 7，按取走几个盒倒计时，减到 0 破碎）。">
+            <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+            <input type="range" class="gen-dual-lo" id="gen-ice" min="0" max="40" step="1" value="18" aria-label="数字冰比例下限">
+            <input type="range" class="gen-dual-hi" id="gen-ice-max" min="0" max="40" step="1" value="18" aria-label="数字冰比例上限">
+          </div>
+          <span class="gen-dual-val" id="gen-ice-val">18%</span>
+        </div>
+        <div class="gen-row">
+          <label>黑块比例</label>
+          <div class="gen-dual" title="黑块比例区间（%）。左钮=下限，右钮=上限；两钮重合=不启用区间。注意黑块另有 25% 硬上限">
+            <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+            <input type="range" class="gen-dual-lo" id="gen-black" min="0" max="25" step="1" value="13" aria-label="黑块比例下限">
+            <input type="range" class="gen-dual-hi" id="gen-black-max" min="0" max="25" step="1" value="13" aria-label="黑块比例上限">
+          </div>
+          <span class="gen-dual-val" id="gen-black-val">13%</span>
+        </div>
+        <div class="gen-row">
+          <label>锁链对数</label>
+          <div class="gen-dual" title="锁链对数区间。左钮=下限，右钮=上限；两钮重合=不启用区间">
+            <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+            <input type="range" class="gen-dual-lo" id="gen-chains" min="0" max="12" step="1" value="4" aria-label="锁链对数下限">
+            <input type="range" class="gen-dual-hi" id="gen-chains-max" min="0" max="12" step="1" value="4" aria-label="锁链对数上限">
+          </div>
+          <span class="gen-dual-val" id="gen-chains-val">4</span>
+        </div>
+        <div class="gen-row">
+          <label>问号比例</label>
+          <div class="gen-dual" title="问号比例区间（%）。左钮=下限，右钮=上限；两钮重合=不启用区间">
+            <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+            <input type="range" class="gen-dual-lo" id="gen-surprise" min="0" max="60" step="1" value="14" aria-label="问号比例下限">
+            <input type="range" class="gen-dual-hi" id="gen-surprise-max" min="0" max="60" step="1" value="14" aria-label="问号比例上限">
+          </div>
+          <span class="gen-dual-val" id="gen-surprise-val">14%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 棋盘尺寸 -->
+    <div class="gen-section hidden" id="gen-sec-board">
+      <div class="gen-accordion-head" data-target="gen-acc-board">
+        <span class="gen-acc-arrow">▾</span><h2>棋盘尺寸（管道自动装溢出盒）</h2>
+      </div>
+      <div id="gen-acc-board" class="gen-accordion-body">
+        <!-- 【v145】棋盘自适应：默认由车数反推行列，不再要用户先填 -->
+        <div class="gen-row">
+          <label title="【v145 新增·默认自适应】&#10;&#10;自适应 = 棋盘行列【由这张图切出多少辆车反推】：&#10;  棋盘格数 ≈ (车数 − 管道能带走的车数) ÷ 可用空间目标。&#10;  好处：不会再出现「棋盘范围跟车数不匹配」那种整关淘汰。&#10;&#10;手动 = 用下面那两行填的范围（从头到尾只从这一个范围里挑）。&#10;  ⚠ 手填范围从此只是【偏好】：装不下时不再淘汰整关，会自动换成反推出来的范围，&#10;    并在生产日志里标出「已自动换成 X×Y 起」。">棋盘尺寸</label>
+          <select id="gen-board-mode">
+            <option value="auto" selected>自适应（按车数反推）</option>
+            <option value="manual">手动指定范围</option>
+          </select>
+        </div>
+        <div class="gen-row">
+          <label title="仅「手动指定范围」时生效；列>行">行数范围</label>
+          <input type="number" id="gen-board-rows-min" min="3" max="20" value="8" style="width:48px">
+          <span style="width:12px">~</span>
+          <input type="number" id="gen-board-rows-max" min="3" max="20" value="9" style="width:48px">
+        </div>
+        <div class="gen-row">
+          <label title="仅「手动指定范围」时生效；列>行">列数范围</label>
+          <input type="number" id="gen-board-cols-min" min="3" max="30" value="11" style="width:48px">
+          <span style="width:12px">~</span>
+          <input type="number" id="gen-board-cols-max" min="3" max="30" value="16" style="width:48px">
+        </div>
+        <div class="gen-row">
+          <label title="不规律锯齿墙(斜向/边缘锚定)+缺口+缺口冰/锁链，制造唯一可达通道，需推理才可通过">窄路卡点</label>
+          <input type="checkbox" id="gen-narrow" checked>
+        </div>
+        <!-- ===== v99 新增：窄路出现概率 ===== -->
+                <!-- ===== 管道与可用空间（v115 起明确标注：三种入口模式通用）=====
+             修正：v99~v114 期间此处标为「瞬时连锁专用」，那是失准的 ——
+             引擎里这些参数从来没有 instantChain 门控，app.js 也无条件透传；
+             输出文件/底部消除 那批就是靠 minPipes=4 / usableSpaceTarget=0.74 跑出来的。
+             用户 2026-08-27 裁决「转为通用参数」，故改为如实标注并加区间。 -->
+        <div class="gen-row" style="border-top:1px dashed #d8cbb4;padding-top:6px;margin-top:4px">
+          <label style="font-size:11px;color:#8a7358" title="以下各项对【三种入口模式都生效】（四边入口 / 仅底部入口 / 四方向瞬时连锁）。&#10;&#10;修正说明：v99~v114 这里曾标为「瞬时连锁专用」，那是错的 —— 引擎里从无 instantChain 门控，&#10;已产出的「底部消除」批次正是靠 管道数下限=4 / 可用空间目标=0.74 生产的。&#10;&#10;用双端滑块的三项支持区间：左钮=下限、右钮=上限，两钮重合=不启用区间；&#10;启用后每个候选各随机采样一组，制造批次内结构多样性。">管道与可用空间（三种入口模式通用；双端滑块的支持区间） ↓</label>
+        </div>
+        <div class="gen-row">
+          <label title="每关至少要有几条管道。管道数由守恒反推(溢出盒 D ⇒ 下界 ⌈D/(深度上限−1)⌉)，开启后选棋盘尺寸时会保证「刚好够、不过量」。0=不约束。⚠ 与下面两项联立有硬约束：本值 × 单管最少 ≤ 溢出盒数，否则无解">管道数下限</label>
+          <div class="gen-dual" title="管道数区间。左钮=下限，右钮=上限；两钮重合=不启用区间">
+            <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+            <input type="range" class="gen-dual-lo" id="gen-min-pipes" min="0" max="16" step="1" value="4" aria-label="管道数下限">
+            <input type="range" class="gen-dual-hi" id="gen-min-pipes-max" min="0" max="16" step="1" value="4" aria-label="管道数上限">
+          </div>
+          <span class="gen-dual-val" id="gen-min-pipes-val">4</span>
+        </div>
+        <div class="gen-row">
+          <label title="单条管道队列最多排几个盒(原写死6)。官方格式与求解器都不限队列长度，此值只约束生成期容量。">管道队列深度</label>
+          <div class="gen-dual" title="管道队列深度区间。左钮=下限，右钮=上限；两钮重合=不启用区间（默认 6 = 参数化前的行为）">
+            <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+            <input type="range" class="gen-dual-lo" id="gen-pipe-depth" min="1" max="24" step="1" value="6" aria-label="管道队列深度下限">
+            <input type="range" class="gen-dual-hi" id="gen-pipe-depth-max" min="1" max="24" step="1" value="6" aria-label="管道队列深度上限">
+          </div>
+          <span class="gen-dual-val" id="gen-pipe-depth-val">6</span>
+          <span style="font-size:11px;color:#888">单管最少</span>
+          <input type="number" id="gen-pipe-minfill" min="1" max="20" value="4" style="width:38px" title="单管最少要排几个盒。它决定溢出盒最多摊给几条管道：P ≤ ⌊溢出/本值⌋。默认 4 = 参数化前的行为。调大会让管道更深但条数更少">
+        </div>
+                        <div class="gen-row">
+          <label title="可用棋盘空间 =(总棋盘格 − 墙 − 管道占位)/总棋盘格。设为 0=关闭。开启后各候选尺寸按该目标联立求解(管道数,黑块数)，只保留有解的尺寸并随机选，从而让同一批像素图产出不同大小的棋盘而密度一致。实测推荐 0.74">可用空间目标</label>
+          <div class="gen-dual" title="可用空间目标区间。左钮=下限，右钮=上限；两钮重合=不启用区间。0=关闭该能力">
+            <div class="gen-dual-track"><div class="gen-dual-fill"></div></div>
+            <input type="range" class="gen-dual-lo" id="gen-usable-target" min="0" max="0.95" step="0.01" value="0.74" aria-label="可用空间目标下限">
+            <input type="range" class="gen-dual-hi" id="gen-usable-target-max" min="0" max="0.95" step="0.01" value="0.74" aria-label="可用空间目标上限">
+          </div>
+          <span class="gen-dual-val" id="gen-usable-target-val">0.74</span>
+          <span style="font-size:11px;color:#888">±</span>
+          <input type="number" id="gen-usable-tol" min="1" max="15" value="5" style="width:38px" title="允许偏离目标多少个百分点，超出则淘汰该候选">
+          <span style="font-size:11px;color:#888">pp</span>
+        </div>
+        <div class="gen-row">
+          <label title="玩家暂存峰值触达上限时(死亡边界)，在原关卡上拆 1~2 格数字冰 + 解除 1 组锁链尝试救援。必须「全知仍通关 + 玩家仍通关 + 峰值降到上限以下」三者同时成立才采用，救不回则如实保留原关卡">死亡边界救援</label>
+          <input type="checkbox" id="gen-death-rescue" checked>
+        </div>
+      </div>
+    </div>
+
+    <!-- 批量生产参数 -->
+    <div class="gen-section hidden" id="gen-sec-batch">
+      <div class="gen-accordion-head" data-target="gen-acc-batch">
+        <span class="gen-acc-arrow">▾</span><h2>批量生产参数</h2>
+      </div>
+      <div id="gen-acc-batch" class="gen-accordion-body">
+        <div class="gen-row">
+          <label title="第一轮：每个源图生成几个候选(各过可解+结构)，筛最接近合格者进第二轮。1=不多候选">候选数</label>
+          <input type="number" id="gen-candidates" min="1" max="12" value="6" style="width:48px">
+        </div>
+        <div class="gen-row">
+          <label title="同一张图跑几关、只留最好的一关（按「好关v3」择优：先看六条过几条，再离带距离，再稳健通关率）。\n1 = 关闭。代价：单关时间 ×N（实测 K=5 时 20~50s/图）。">每图多产</label>
+          <input type="number" id="gen-portfolio" value="1" min="1" max="10" step="1" style="width:48px">
+          <span class="gen-hint">关（择优，1=关）</span>
+        </div>
+        <div class="gen-row">
+          <label title="单关生产最长搜索时间；到点仍不合格则立即停止，输出树内已评估过的最接近合格的候选(不再是完全无效关卡)。0=不限时">单关限时(分)</label>
+          <input type="number" id="gen-timebudget" min="0" max="30" value="5" style="width:48px">
+        </div>
+                <div class="gen-row">
+          <label title="最终选中关卡的难度分用多少轮玩家路线标定：跑 N 轮(不同 pickThreshold)取最稳的一条，去掉单轮抽样抖动(实测单轮极差均~18)。7=实测收敛拐点(耗时约单轮×1.4)；1=旧单轮口径。只影响难度分，不影响合格判定。">难度标定轮次</label>
+          <input type="number" id="gen-difficulty-rounds" min="1" max="25" value="7" style="width:48px">
+        </div>
+        <div class="gen-row">
+          <label title="逐关落库时的批次目录名，服务会自动加日期：输出文件/批次名-月-日/。留空则用「蚂蚁关卡生产」">批次名</label>
+          <input type="text" id="gen-batch-name" placeholder="如：55像素正式生产(可空)" style="flex:1">
+        </div>
+        <div class="gen-row">
+          <label title="仅在未连接本地生产服务的兜底模式下使用（此时才需要手动下载ZIP）">包名(兜底)</label>
+          <input type="text" id="batch-zip-name" placeholder="仅兜底模式用的ZIP包名(可空)" style="flex:1">
+        </div>
+        <div class="gen-row">
+          <label title="同时并行生产的后台线程数。每个线程各跑一关，单关时间预算不变（每关仍拿满自己的限时）。&#10;设 1 = 与旧版完全一样的串行行为。&#10;不要超过本机 CPU 核数：超订会让各关在同样的墙上限时内算得更少，反而增加超时兜底关。">并发线程</label>
+          <input type="number" id="gen-pool-size" value="6" min="1" max="16" step="1" style="width:70px">
+          <span class="gen-hint" id="gen-pool-hint">默认 6；设 1 = 旧串行行为</span>
+        </div>
+        <div class="gen-row">
+          <label title="目标图碎色率上限（百分比）。碎色 = 目标图上自己不够大、附近同色也凑不够的色块。&#10;超过该上限的源图在【生成候选之前】就被跳过，不消耗生产预算，生产日志与逐关记录会标明「碎色超限」。&#10;留空或 0 = 关闭闸门（与旧版行为一致）。&#10;【当前默认 22%】用户 2026-08-26 裁决（原 18%，2026-08-25 裁决）。⚠ 修图工具的碎色达标提示仍用 18%，两端已不同源——工具那边判达标的图这里一定不会被卡，但工具判不达标的图这里可能仍能过（22% 更宽）。&#10;&#10;⚠ 2026-08-25 小色块判定已放宽为「小于8像素」(原≤10)，同一张图的碎色率比之前低约4.3个百分点，阈值语义随之变化。&#10;新口径标定（同一批344关、同一份线上好差关标签）：&#10;  四等分 Q1≤11.47% 好关率32.6%(各档最高)/严重差关3.5%；Q2≤14.50% 29.1%/9.3%；Q3≤17.19% 24.4%/11.6%；Q4 22.1%/12.8%&#10;  全样本基础率：好关27.0% / 差关31.7%&#10;各阈值在新口径下的过闸率：15.16%→55.5%、18%→79.1%、20.47%→91.3%（旧口径同阈值分别是25.3%/43.0%/60.8%）&#10;⚠ 18% 过闸集的好关率28.7%已接近基础率27.0%，新口径下筛选力较弱（放过约八成图）。要恢复原设计强度请填 11.47。&#10;三批源图过闸率（新口径/旧口径）：200新图 18%→58.5%/13.0%；347修复批 18%→59.9%/28.8%">碎色上限%</label>
+          <input type="number" id="gen-frag-max" value="0" min="0" max="99" step="0.01" style="width:80px">
+          <span class="gen-hint">0=关闭（现在默认 0）；填了也只作提醒、不再跳过源图</span>
+        </div>
+                        <div class="gen-row" style="border-top:1px solid #4d3627;margin-top:6px;padding-top:6px">
+          <label title="【v115 新机制】卡点类型数量由「出现检查次数 × 出现概率」决定，替代原来的固定数量。&#10;&#10;怎么算：掷「检查次数」次骰子，每次以「出现概率」判定是否出现一个卡点类型；&#10;出现则从已勾选且未被抽中的类型里随机取一个（同一关内类型不重合）。&#10;类型池耗尽后，剩余检查次数不再产生新类型。&#10;&#10;例：勾了 4 种类型、检查次数 4、概率 0.5 → 数学期望 2 种。&#10;实测分布：0种 6.1% / 1种 25.0% / 2种 38.2% / 3种 24.8% / 4种 5.9%（2 万次抽样）。&#10;&#10;为什么换机制（用户原话）：「旧的机制无法用稳定的期望算出会出多少这样卡点类型，同时也无法制造波动」。&#10;&#10;检查次数填 0 = 退回旧的固定数量口径（读下面那行「固定数量·兼容」），此时概率视为 1。&#10;精确期望 E = E[min(B(次数,概率), 池大小)]，随每关的 chokePlan.expected 一起输出，可与批量实测均值对照。">卡点类型·检查次数</label>
+          <span class="gen-hint">普通</span>
+          <input type="number" id="gen-choke-rolls" value="0" min="0" max="20" step="1" style="width:56px">
+          <!-- v124：UI 文案「BOSS」→「难关」（用户 2026-08-28）。**控件 id 保持 *-boss 不变** ——
+               方案文件按 id 存取，改 id 会让所有历史方案读不出这两个值。 -->
+          <span class="gen-hint" title="难关（原称 BOSS 关）：按 难关间隔 每隔 N 关指定一个，用更多卡点类型生产。&#10;难关标记只在【排序分组】阶段用于决定它出现在第几关。">难关</span>
+          <input type="number" id="gen-choke-rolls-boss" value="0" min="0" max="20" step="1" style="width:56px">
+          <span class="gen-hint">概率P</span>
+          <input type="number" id="gen-choke-prob" value="0.5" min="0" max="1" step="0.05" style="width:56px">
+          <span class="gen-hint">0次=用下行兼容值</span>
+        </div>
+                <div class="gen-row" style="flex-wrap:wrap;gap:8px">
+          <label title="勾选参与抽取的卡点类型（等权）。不勾则该类型永不出现。&#10;&#10;【v120】窄路已进池：窄路墙缺口本身也是一个卡点类型，出现概率与其他类型一样由「检查次数×概率」抽取，&#10;不再是「默认开启的独立参数」。&#10;⚠ 抽中「窄路口叠冰」或「窄路口叠链」时会自动补建窄路（否则那两个名额会空转）。&#10;⚠ 一个类型都不勾（或检查次数与固定数量都为 0）= 不启用类型化，此时窄路回落到旧的「窄路卡点」开关 + 出现概率。">可用卡点类型</label>
+          <label class="gen-hint" title="窄路墙 + 缺口本身。缺口数由上面「窄路卡点」那行的活口数范围决定。"><input type="checkbox" id="gen-choke-narrowPath"> 窄路墙缺口</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-iceCluster"> 数字冰簇</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-chainCluster"> 锁链簇</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-questionCluster"> 问号簇</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-chainIce"> 冰叠锁链</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-pipeChain"> 管道口叠链</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-narrowGapIce"> 窄路口叠冰</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-narrowGapChain"> 窄路口叠链</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-bigBox"> 超大盒</label>
+          <label class="gen-hint" title="把稀有色（像素总量最少的颜色）换入窄路口/锁链端/管道口。在首次换球阶段执行。"><input type="checkbox" id="gen-choke-rareColorKey"> 稀有色占关键位</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-swap"> 换球/藏管道</label>
+          <label class="gen-hint"><input type="checkbox" id="gen-choke-inflate"> 增容</label>
+        </div>
+        <!-- ===== v120 逐类参数（用户 2026-08-27 q2 逐条口径）===== -->
+        <div class="gen-row" style="border-top:1px dashed #d8cbb4;padding-top:6px;margin-top:4px">
+          <label style="font-size:11px;color:#8a7358" title="每个卡点类型的具体形态参数。只有抽中该类型时对应参数才起作用。&#10;默认值由 _kiro临时/08.28-卡点类型参数化/_实验-默认值标定.js 定向标定，见文档 §8g。">卡点类型·逐类参数（抽中才生效） ↓</label>
+        </div>
+                                                        <div class="gen-row">
+          <label title="【卡点组合出现的进度位置】卡点手段只落在目标图消除进度的这个区间内。&#10;口径：棋盘盒格按填盘序（= 消除序）排成一条进度轴，取该区间内的格作为卡点候选位。&#10;&#10;⚠ 与合格门的卡点判定区（30%~100%）是两件事：这里是「卡点造在哪」，那里是「压力峰出现在哪」。&#10;障碍造在 15% 处，其压力后果可能到 40% 才显现。&#10;&#10;基础障碍（按比例铺的冰/问号/锁链）仍铺满全盘，本区间只约束**卡点类型手段**。">卡点进度位置</label>
+          <input type="number" id="gen-choke-pos-min" value="0.15" min="0" max="1" step="0.05" style="width:64px">
+          <span class="gen-hint">~</span>
+          <input type="number" id="gen-choke-pos-max" value="0.80" min="0" max="1" step="0.05" style="width:64px">
+          <span class="gen-hint">进度比例（默认 15%~80%）</span>
+        </div>
+              </div>
+    </div>
+  </aside>
+
+  <!-- 右栏：开始生成 + 进度可视化 + 结果表 -->
+  <main id="gen-panel-main">
+    <!-- 【v153】切球规划器：按供给时间线切球（矿脉表 → 车单 → 债务节拍） -->
+    <section id="cutplanner-card" class="gen-card hidden">
+      <h2>切球规划器 <span class="gen-hint">按「供给时间线」切球：先算矿脉表，再决定每条矿脉切几辆车、谁背债</span></h2>
+      <div class="gen-row">
+        <label title="这关多少辆车 = 多少步 = 关卡时长。平均车容量 = 彩色像素 ÷ 步数。&#10;0 = 自动（按平均容量 28 估）。">目标步数</label>
+        <input type="number" id="cutplan-steps" value="0" min="0" max="999" step="1" style="width:80px">
+        <span class="gen-hint">0=自动(≈像素÷28)</span>
+      </div>
+            <div class="gen-row">
+        <button id="btn-cutplan" class="gen-btn-primary">规划切球</button>
+        <label style="margin-left:12px"><input type="checkbox" id="cutplan-use" disabled> 生成时使用这份车单</label>
+      </div>
+      <div id="cutplan-body" style="white-space:pre-wrap;font-size:11px;color:#5a4632;line-height:1.5"></div>
+    </section>
+    <!-- 2. 开始生成 -->
+    <section class="gen-card">
+      <h2>3. 开始生产</h2>
+      <div class="gen-row">
+        <button id="btn-gen-start" class="gen-btn-primary">▶ 批量生产（每关自动落库）</button>
+        <button id="btn-gen-stop" class="gen-btn-danger hidden">■ 停止</button>
+        <button id="btn-gen-persist-retry" class="gen-btn-danger hidden" title="上一关写盘失败后，修好问题(如重启本地生产服务)再点此重试；服务端幂等，不会重复写">↻ 重试落库</button>
+        <button id="btn-analyze" class="gen-btn-sm">📊 批量模拟分析</button>
+        <!-- v121·任务AK④ 批量难度重标定：对已生产的关卡跑多轮玩家模拟，在通关轮里挑「最稳」那条
+             （复活少 → 峰值低 → 分数接近多轮中位）来标定难度，消除生产审核单跑 seed 7 的抽样扰动。
+             分析完可直接导出重标定报告 CSV（多 13 列：轮数/采用种子/通关率/分数与峰值的区间与极差）。 -->
+        <button id="btn-recalibrate" class="gen-btn-sm" title="多轮多路线重标定难度：每关跑 N 轮不同种子的玩家模拟，取最稳的一条通关路线标定难度，并输出多轮离散度。完成后可导出重标定报告CSV">🎯 批量难度重标定</button>
+        <!-- 【v156】关卡体检：卡点判据 v2 的只读报告（独木桥 / 预算判断点 / 无满解步数 / 高压位置）。
+             零参数：只对左侧列表里【已经有关卡】的条目体检；只有 TXT 图的条目跳过并计数。
+             只读：不生成、不写盘、不改关卡；门槛为"参考门"，未接进生产合格判定。 -->
+        <button id="btn-choke-audit" class="gen-btn-sm" title="关卡体检（只读）：按卡点判据 v2 量一关里的①独木桥处数（场上只有 1 个方块能点，一关最多 1 处）②预算判断点（可点≥2 但只有一个是对的）③无满解步数（必须硬垫的步数）④暂存≥4 的高压是否留在 70% 之后。全知线与玩家线都测、取最差。可导出 CSV。">🔬 关卡体检</button>
+        <label class="gen-hint" title="每关跑几轮玩家模拟（1~30）。轮数越多越稳、耗时线性增长">轮数
+          <input type="number" id="gen-analyze-rounds" value="5" min="1" max="30" style="width:52px">
+        </label>
+      </div>
+      <div class="gen-row" style="margin-top:6px">
+        <label class="gen-hint" title="每生产完一关，就把该关【直接装到中间的棋盘区】（不进模拟游玩），方便一边生产一边看棋盘。&#10;取消勾选则只记录、不动棋盘。想看详细局面时点结果行末尾的「🎮 带入棋盘」进模拟态。"><input type="checkbox" id="gen-auto-map" checked> 生成后自动映射到棋盘</label>
+      </div>
+      <div id="gen-persist-status" class="gen-persist-status">用 网页启动器/启动生产器(http).command 启动后，每生产完一关会立即写入 输出文件/&lt;批次名&gt;-月-日/，无需下载ZIP。</div>
+    </section>
+
+    <!-- 批量分析结果（快速难度分析，不落 ZIP） -->
+    <section id="analysis-result" class="gen-card hidden">
+      <h2>批量分析结果</h2>
+      <div id="analysis-body"></div>
+    </section>
+
+    <!-- 【v156】关卡体检结果（卡点判据 v2 · 只读报告） -->
+    <section id="choke-audit-card" class="gen-card hidden">
+      <h2>关卡体检（卡点判据 v2 · 只读）</h2>
+      <div id="choke-audit-body"></div>
+    </section>
+
+    <!-- 3. 生产进度可视化 -->
+    <section id="gen-progress-card" class="gen-card hidden">
+      <h2>4. 生产进度</h2>
+      <div id="gen-progress-bar-wrap">
+        <div id="gen-progress-bar"><div id="gen-progress-fill"></div></div>
+        <span id="gen-progress-pct">0%</span>
+      </div>
+      <div id="gen-progress-current" class="gen-progress-current">—</div>
+      <div id="gen-progress-stats" class="gen-stat-chips">
+        <span class="gen-chip gen-chip-hard" title="真实卡点合格">困难合格 <b id="gen-stat-hard">0</b></span>
+        <span class="gen-chip gen-chip-easy" title="趋势符合合格">简单合格 <b id="gen-stat-easy">0</b></span>
+        <span class="gen-chip gen-chip-fallback" title="搜索超时或穷尽仍无合格，选出的最接近候选">兜底 <b id="gen-stat-fallback">0</b></span>
+        <span class="gen-chip gen-chip-fail" title="不可解/异常">失败 <b id="gen-stat-fail">0</b></span>
+      </div>
+      <div id="gen-progress-time" class="gen-progress-time">已用时 0s · 预估剩余 —</div>
+      <div class="gen-log-head">
+        <span>实时日志</span>
+        <button id="btn-gen-log-clear" class="gen-btn-sm">清空</button>
+      </div>
+      <div id="gen-log" class="gen-log"></div>
+    </section>
+
+    <!-- 4. 结果 -->
+    <section id="gen-result-card" class="gen-card hidden">
+      <h2>5. 生产结果 <span id="gen-result-count"></span>
+        <button id="btn-gen-result-clear" class="gen-btn-sm" title="清空结果表里的历史（只清展示，不动已落库的输出文件）">🗑 清空表</button></h2>
+      <div class="gen-hint" style="margin:-4px 0 6px">每一行末尾的「🎮 带入棋盘」可把这关直接装进模拟器（连同入口模式、生成时的压力样本与卡点信息），不用先导出再导入。</div>
+      <div class="gen-row">
+        <button id="btn-gen-download" class="gen-btn-primary hidden">⬇ 下载关卡包 ZIP</button>
+        <span id="gen-download-hint" class="gen-download-hint"></span>
+      </div>
+      <div class="gen-row">
+        <label>排序</label>
+        <select id="gen-result-sort" style="width:120px">
+          <option value="order">生产顺序</option>
+          <option value="name">名称</option>
+          <option value="difficulty-desc">难度分↓</option>
+          <option value="difficulty-asc">难度分↑</option>
+        </select>
+        <label style="margin-left:8px">分组</label>
+        <select id="gen-result-group" style="width:120px">
+          <option value="none">不分组</option>
+          <option value="tier">按合格档</option>
+          <option value="grade">按难度等级</option>
+        </select>
+      </div>
+      <div id="gen-result-body"></div>
+    </section>
+  </main>
+      </div>
+
+    </aside>
+  </div>
+  </div><!-- /view-simulator -->
+
+
+  <!-- 消除顺序可视化（独立视图）：识别目标图强依赖消除顺序，为像素标注全局消除序号 -->
+  <div id="elim-order-view" class="hidden" style="position:fixed;inset:0;z-index:9999;background:#f4eee1;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:#ede3d2;border-bottom:1px solid #d7c8b0;color:#3c2e1f;flex:0 0 auto">
+      <b>🔢 消除顺序可视化</b>
+      <span id="elim-order-info" style="font-size:12px;color:#8a7358"></span>
+      <span style="margin-left:auto;display:inline-flex;gap:6px;align-items:center">
+        <label style="font-size:11px;color:#8a7358">格子</label>
+        <button id="elim-zoom-out" class="zoom-btn" title="缩小格子">−</button>
+        <span id="elim-zoom-val" style="font-size:11px;min-width:44px;text-align:center;color:#66513a">26px</span>
+        <button id="elim-zoom-in" class="zoom-btn" title="放大格子">＋</button>
+        <label style="font-size:11px;margin-left:8px;color:#8a7358"><input type="checkbox" id="elim-show-color" checked> 显示颜色</label>
+        <label style="font-size:11px;margin-left:6px;color:#8a7358"><input type="checkbox" id="elim-show-seg"> 显示分段(右上S)</label>
+        <button id="elim-order-close" class="btn-warn" style="margin-left:8px" title="关闭返回">✕ 关闭</button>
+      </span>
+    </div>
+    <div id="elim-order-body" style="flex:1 1 auto;display:flex;min-height:0;background:#e6dcc8">
+      <div id="elim-target-wrap" style="flex:1 1 auto;overflow:auto;padding:10px">
+        <canvas id="elim-order-canvas"></canvas>
+      </div>
+      <aside id="elim-board-panel" style="flex:0 0 400px;overflow:auto;padding:10px;border-left:1px solid #d7c8b0;background:#ece1cd">
+        <div style="display:flex;align-items:center;gap:8px;color:#3c2e1f;margin-bottom:8px">
+          <b style="font-size:13px">铺盒棋盘</b>
+          <label style="font-size:11px;color:#8a7358;margin-left:auto">盒容量≤</label>
+          <input type="number" id="elim-boxcap" value="35" min="2" max="200" style="width:56px;padding:3px 4px">
+          <button id="elim-rebuild" class="zoom-btn" title="用当前盒容量重新铺盒">重铺</button>
+        </div>
+        <div id="elim-board-info" style="font-size:11px;color:#8a7358;margin-bottom:6px"></div>
+        <canvas id="elim-board-canvas" style="cursor:pointer"></canvas>
+        <div style="margin-top:10px">
+          <button id="elim-sim" class="btn-warn" style="width:100%;padding:8px;font-weight:bold">▶ 就地模拟游玩（手点取盒）</button>
+          <div id="elim-sim-controls" class="hidden" style="margin-top:8px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <button id="elim-sim-omni" class="zoom-btn" title="全知求解器：求最优后逐步回放；再点=停">⏩ 全知版</button>
+              <button id="elim-sim-reset" class="zoom-btn" title="重置到初始">🔄 重置</button>
+              <button id="elim-sim-stop" class="btn-warn" title="退出就地模拟">■ 退出</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+              <label style="font-size:11px;color:#8a7358">慢放</label>
+              <input type="range" id="elim-sim-speed" min="0" max="600" value="15" step="5" style="flex:1;accent-color:#d2701f" title="全知版回放速度：0=瞬时(整批一起消失)，越往右越慢(逐格起底)">
+              <span id="elim-sim-speed-val" style="font-size:11px;color:#66513a;min-width:88px;text-align:right">15ms/格</span>
+            </div>
+            <div id="elim-sim-stats" style="font-size:11px;color:#66513a;margin-top:6px"></div>
+            <div id="elim-sim-buffer" style="font-size:11px;color:#66513a;margin-top:4px"></div>
+          </div>
+          <div style="font-size:11px;color:#8a7358;margin-top:6px;line-height:1.6">就地模拟：点右侧棋盘上【白框高亮】的盒=手动取；「⏩全知版」自动求解回放（可用「慢放」调速）。左侧目标图随消除同步溶解：黄色序号=下一槽位当前可消顺序，红色边缘=当前不可达范围（只描边、不覆盖原图、不是漏号）；基础棋盘无障碍，盒按目标图【底部→顶部】趋势、首行左→右铺入。</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" accept=".json" style="display:none">
+  <input type="file" id="txt-input" accept=".txt" style="display:none" multiple>
+  <input type="file" id="lib-input" accept=".json" style="display:none" multiple>
+  <input type="file" id="scheme-input" accept=".json" style="display:none">
+  <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+
+  <!-- ===== 【v154】新老色库转换面板 =====
+       两套色库：老色库 34 色（0 空位 / 1-34 颜色）、官方色库 0-21（-1 空位 / 0 黄）。
+       转换表来自 js/color-libs.js 的最小代价单射分配：官方 22 色 ↔ 老色库 22 个互不相同的色号，
+       所以「新→老→新」逐像素无损；老色库多出来的 12 色按最近色落到官方 22 色上。 -->
+  <div id="colorlib-panel" class="colorlib-panel hidden">
+    <div class="colorlib-head">
+      <b>🎨 新老色库转换</b>
+      <span class="colorlib-sub">老色库 34 色（0 = 空位） ↔ 官方色库 0-21（-1 = 空位，0 = 黄色）</span>
+      <button id="colorlib-close" title="关闭">✕</button>
+    </div>
+
+    <div class="colorlib-row">
+      <label>当前图色库</label>
+      <span id="colorlib-current-lib">—</span>
+      <label style="margin-left:14px">目标色库</label>
+      <select id="colorlib-direction">
+        <option value="older">转到 老色库 34 色（0 空位，给生成器/模拟器用）</option>
+        <option value="official">转到 官方色库 0-21（-1 空位，给实机/存档用）</option>
+      </select>
+    </div>
+
+    <div class="colorlib-row">
+      <label>范围</label>
+      <select id="colorlib-scope">
+        <option value="current">只转当前这一张</option>
+        <option value="all" selected>转本批全部（仅改预览，不写盘）</option>
+        <option value="download">转本批全部并下载 TXT</option>
+      </select>
+      <button id="colorlib-swap" title="只把「目标色库」和当前图色库对调，便于来回转">⇄ 换个方向</button>
+    </div>
+
+    <div class="colorlib-row">
+      <button id="colorlib-apply" class="colorlib-primary">🔁 转换</button>
+      <span id="colorlib-note" class="colorlib-note"></span>
+    </div>
+
+    <details class="colorlib-details">
+      <summary>色值对照表（官方 22 色 → 老色库 22 个色号，互不相同）</summary>
+      <div id="colorlib-map" class="colorlib-map"></div>
+    </details>
+
+    <div class="colorlib-hint">
+      转换只改颜色编号，不改尺寸；空位在两套格式里自动换成对应标记（老 <code>0</code> ↔ 官方 <code>-1</code>）。
+      「转本批全部」只改页面里的预览与后续生产用的数据，<b>不写盘</b>；要落盘请用「转本批全部并下载 TXT」，
+      把下载的 TXT 放进 <code>输出文件/</code> 或直接再导入。整批转换会清掉已生成的棋盘缓存，需要重新点「生成」。
+    </div>
+  </div>
+
+  <script src="js/zip.js?v=339"></script>
+  <script src="js/utils.js?v=339"></script>
+  <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+  <script src="js/color-libs.js?v=339"></script>
+  <script src="js/simulator.js?v=339"></script>
+  <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+  <script src="js/anchor-cut.js?v=339"></script>
+  <script src="js/solver-strategy.js?v=339"></script>
+  <script src="js/solver.js?v=339"></script>
+  <script src="js/playersim.js?v=339"></script>
+  <script src="js/generator.js?v=339"></script>
+  <script src="js/analysis.js?v=339"></script>
+  <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+  <script src="js/level-editor.js?v=339"></script>
+  <script src="js/app.js?v=339"></script>
+</body>
+</html>

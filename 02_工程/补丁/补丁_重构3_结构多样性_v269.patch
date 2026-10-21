@@ -1,0 +1,77 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4593,7 +4593,7 @@
+       // 【v262·用户裁决】"压力要持久"：不够持久就继续搜，而不是拿第一个高而不久的收工
+       earlyStopGe3: 20, earlyStopLongest: 5, earlyStopChokeWin: 2,
+       // 【v264·用户目标】30~80% 区间"基本都 ≥3、最高 4"
+-      earlyStopBand3: 60, earlyStopBandPeak: 4,   // 实测当前管线 30~80≥3 最高约 57%，先按 60 设（可调到 85 让搜索更久）
++      earlyStopBand3: 45, earlyStopBandPeak: 4,   // v269：结构多样性把中位从 14% 拉到 40%，门槛随之调到 45   // 实测当前管线 30~80≥3 最高约 57%，先按 60 设（可调到 85 让搜索更久）
+       // 【v260·实验】把最晚熟的几辆车借到"扇出最大"的格子上 → 想让全知线被逼出长债。
+       //   ⚠ 实测尚未生效（两个版本的闸门都返回 0 组），先默认关，别影响生产。
+       gateBorrow: 0,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -11265,6 +11265,15 @@
+           // 【v258·用户问"自己定尺寸会生成多少候选"】固定尺寸时棋盘不变，
+           //   原来 8 次尝试只是在同一尺寸上重摇随机数 —— 多样性很差。
+           //   现在每次换一组"容量 ±8% / 冰排程 2~3 块 / 延迟 3~5 步"，8 次尝试才有真正的结构差异。
++          // 【v269】每次尝试换一组"结构手段"：需求滞后 / 同色容量序列 / 按块切车。
++          //   单用任何一个都不稳（方差大于信号），但**让 8 次尝试各走一条路**，
++          //   再由 band3Pct 选优，等于把"运气"变成了池子里的多样性。
++          var _mix = [[0, 0, 0], [2, 2, 0], [0, 2, 2], [2, 0, 2]][_pi % 4];
++          if (config && config.mixStruct !== false) {
++            _cfg.fillLag = _mix[0];
++            _cfg.capSeqBoost = _mix[1];
++            _cfg.chunkCut = _mix[2];
++          }
+           var _vseq = [[1.00, 2, 3], [1.06, 2, 4], [0.94, 3, 3], [1.12, 2, 5]][_pi % 4];
+           var _bmin0 = parseInt(_cfg.boxSizeMin, 10) || 33;
+           var _bmax0 = parseInt(_cfg.boxSizeMax, 10) || 39;
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=268">
++  <link rel="stylesheet" href="css/style.css?v=269">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=268"></script>
+-  <script src="js/utils.js?v=268"></script>
++  <script src="js/zip.js?v=269"></script>
++  <script src="js/utils.js?v=269"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=268"></script>
+-  <script src="js/simulator.js?v=268"></script>
++  <script src="js/color-libs.js?v=269"></script>
++  <script src="js/simulator.js?v=269"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=268"></script>
+-  <script src="js/solver-strategy.js?v=268"></script>
+-  <script src="js/solver.js?v=268"></script>
+-  <script src="js/playersim.js?v=268"></script>
+-  <script src="js/generator.js?v=268"></script>
+-  <script src="js/analysis.js?v=268"></script>
++  <script src="js/anchor-cut.js?v=269"></script>
++  <script src="js/solver-strategy.js?v=269"></script>
++  <script src="js/solver.js?v=269"></script>
++  <script src="js/playersim.js?v=269"></script>
++  <script src="js/generator.js?v=269"></script>
++  <script src="js/analysis.js?v=269"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=268"></script>
+-  <script src="js/app.js?v=268"></script>
++  <script src="js/level-editor.js?v=269"></script>
++  <script src="js/app.js?v=269"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

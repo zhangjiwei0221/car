@@ -1,0 +1,167 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -668,15 +668,7 @@
+         document.querySelectorAll('[id^="gen-choke-"]').forEach(mark);
+         ['gen-pool-size', 'gen-frag-max'].forEach(function (id) { mark(document.getElementById(id)); });
+       })();
+-      // 【v153】高级参数临时开关：Ctrl+Shift+A（界面默认不显示，这条是留给调试/精调的后门）
+-      document.addEventListener('keydown', function (e) {
+-        if (e && e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+-          genAdvancedForce = !genAdvancedForce;
+-          if (adv) adv.checked = genAdvancedForce;
+-          applyAdvancedVisibility();
+-          genLog(genAdvancedForce ? '高级参数已临时显示（Ctrl+Shift+A 再按一次收起）' : '高级参数已收起', 'gen-log-warn');
+-        }
+-      });
++      // 【v197】参数已固定：高级参数入口关闭（Ctrl+Shift+A 后门也一并移除）
+       applyAdvancedVisibility();      // 默认收起高级段
+       updatePresetInfo();
+     })();
+@@ -4458,6 +4450,48 @@
+   }
+ 
+   /** 把自动参数并进 config（手动档原样返回）；tag 用于日志前缀 */
++  // 【v197】参数全部固定：界面不再暴露任何旋钮。按图尺寸选两套内置预设之一。
++  //   小图预设 = 方案_小图33-40四方向_v1 的实测值；大图预设 = 方案_v120四方向低管道去微棋盘 的实测值。
++  //   生产控制也固定：候选 6 · 每图多产 3 · 单关 5 分钟 · 难度标定 7 轮。
++  var FIXED_PRESETS = {
++    small: {
++      boxSizeMin: 24, boxSizeMax: 36,
++      boardRowsMin: 7, boardRowsMax: 9, boardColsMin: 8, boardColsMax: 10,
++      usableSpaceTarget: 0.86,
++      blackPercent: 5, blackPercentMin: 5, blackPercentMax: 8,
++      icePercent: 8, icePercentMin: 8, icePercentMax: 16,
++      chainCount: 1, chainCountMin: 0, chainCountMax: 3,
++      questionPercent: 6, questionPercentMin: 6, questionPercentMax: 6,
++      narrowPath: false, narrowPathProb: 0, minPipes: 0,
++      pipeFloorCount: 2, pipeFallbackCount: 2, pipeMaxDepth: 2, pipeMinFill: 2
++    },
++    large: {
++      boxSizeMin: 40, boxSizeMax: 60,
++      boardRowsMin: 8, boardRowsMax: 9, boardColsMin: 8, boardColsMax: 10,
++      usableSpaceTarget: 0.86,
++      blackPercent: 0, blackPercentMin: 0, blackPercentMax: 10,
++      icePercent: 10, icePercentMin: 10, icePercentMax: 25,
++      chainCount: 0, chainCountMin: 0, chainCountMax: 4,
++      questionPercent: 8, questionPercentMin: 8, questionPercentMax: 16,
++      narrowPath: true, narrowPathProb: 1, minPipes: 0,
++      pipeFloorCount: 2, pipeFallbackCount: 2, pipeMaxDepth: 6, pipeMinFill: 4
++    }
++  };
++  function genApplyFixed(cfg, blocks, tag) {
++    var R = blocks.length, C = blocks[0].length;
++    var big = Math.max(R, C) > 45;
++    var preset = big ? FIXED_PRESETS.large : FIXED_PRESETS.small;
++    var out = Object.assign({}, cfg, preset, {
++      candidateCount: 6, portfolioK: 3, timeBudgetMs: 300000, difficultyRounds: 7,
++      goodV3: true, requireHardPass: false, seed: null
++    });
++    try {
++      genLog('固定参数：' + (big ? '大图' : '小图') + '预设（' + R + '×' + C + '）· 每图多产 3 次 · 候选 6 · 单关 5 分钟',
++        'gen-log-ok');
++    } catch (e) {}
++    return out;
++  }
++
+   function genApplyAuto(cfg, blocks, tag) {
+     if (genParamMode() !== 'auto') return cfg;
+     var a = genAutoParams(blocks, genTargetSteps());
+@@ -4634,7 +4668,7 @@
+     // 如果当前有导入的TXT图，使用它
+     if (currentLevelIdx >= 0 && levelList[currentLevelIdx]) {
+       var entry = levelList[currentLevelIdx];
+-      config = genApplyAuto(config, entry.blocks, entry.name);   // 【v153】自动档：容量/障碍数量由规则推
++      config = genApplyFixed(config, entry.blocks, entry.name);   // 【v153】自动档：容量/障碍数量由规则推
+       config.mapSize = entry.blocks.length;
+ 
+       document.getElementById('solve-result').classList.remove('hidden');
+@@ -5604,7 +5638,7 @@
+     genPoolProgressText();
+     slot.w.postMessage({
+       cmd: 'produce', index: idx, blocks: entry.blocks,
+-      config: Object.assign({}, genApplyAuto(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
++      config: Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
+         mapSize: entry.blocks.length, requireHardPass: !isEasy,
+         isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
+         forcedBoxes: wantPlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,  // 【v153】逐图现算车单直通
+@@ -5712,7 +5746,7 @@
+           // 【v153】主线程路径也接进度钩子（同一套显示；跑完清掉，避免影响后面的求解/模拟）
+           if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: curIdx, no: 0 }, p); });
+           var usePlan = cutPlanParams && cutUseChecked;   // 【v153】主线程串行路径同样逐图现算车单直通
+-          var cfgAuto = genApplyAuto(b.config, entry.blocks, entry.name);   // 【v153】自动档
++          var cfgAuto = genApplyFixed(b.config, entry.blocks, entry.name);   // 【v153】自动档
+           var cfg = Object.assign({}, cfgAuto, {
+             mapSize: entry.blocks.length, requireHardPass: !isEasy,
+             isBossSlot: !!(b.bossSlot && b.bossSlot[curIdx]),
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=196">
++  <link rel="stylesheet" href="css/style.css?v=197">
+ </head>
+ <body>
+   <header>
+@@ -320,24 +320,9 @@
+     </div>
+ 
+     <div class="gen-section">
+-      <h2>2. 生成设置</h2>
+-      <!-- 【v153】自动档：只填「关卡时长」，盒容量与功能块数量全部由规则推（实测口径见工作日志第二十二节） -->
+-      <div class="gen-row">
+-        <label title="自动：按「像素数 ÷ 目标车数」推盒容量与障碍数量 —— 注意：**自动会覆盖参数方案里的对应数值**。&#10;手动：完全按「参数方案 / 高级参数」里的数值走。&#10;载入方案时会自动切到手动（否则方案不生效）。">参数来源</label>
+-        <select id="gen-param-mode" style="flex:1">
+-          <option value="auto" selected>自动（按图推，会覆盖方案）</option>
+-          <option value="manual">方案 / 手调（按下面数值走）</option>
+-        </select>
+-      </div>
+-      <div class="gen-row" id="gen-auto-row">
+-        <label title="关卡时长 = 这关要几辆车。平均车容量 = 彩色像素数 ÷ 步数。&#10;0 = 自动（按像素数推，约 40~55 步）。">关卡时长</label>
+-        <input type="number" id="gen-target-steps" value="0" min="0" max="999" step="1" style="width:80px">
+-        <span class="gen-hint">步数（车数）；0=自动</span>
+-      </div>
+-            <div class="gen-hint" id="gen-auto-info">自动档：盒容量 / 冰 / 锁链 / 问号 / 管道 数量都由规则推，日志里会写出每一个数是怎么来的。</div>
+-      <div class="gen-row">
+-        <label class="gen-hint" title="只展开【参数方案】和【批量生产参数】两段（方案读取/保存、每图多产、候选数、单关限时、难度轮次）。"> <input type="checkbox" id="gen-show-advanced"> 显示高级参数</label>
+-        <label class="gen-hint" id="gen-show-all-wrap" style="display:none;margin-left:10px" title="展开全部：基础参数 / 障碍设置 / 棋盘尺寸 / 卡点类型 / 切球规划器。一般不用动。"> <input type="checkbox" id="gen-show-all"> 显示全部参数（慎动）</label>
++      <h2>2. 开始生产</h2>
++      <div class="gen-hint" style="line-height:1.8">
++        参数已固定，不用调：按目标图尺寸自动选预设（小图 / 大图）· 每图多产 3 次择优 · 候选 6 · 单关 5 分钟 · 难度标定 7 轮。
+       </div>
+     </div>
+ 
+@@ -838,20 +823,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=196"></script>
+-  <script src="js/utils.js?v=196"></script>
++  <script src="js/zip.js?v=197"></script>
++  <script src="js/utils.js?v=197"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=196"></script>
+-  <script src="js/simulator.js?v=196"></script>
++  <script src="js/color-libs.js?v=197"></script>
++  <script src="js/simulator.js?v=197"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=196"></script>
+-  <script src="js/solver-strategy.js?v=196"></script>
+-  <script src="js/solver.js?v=196"></script>
+-  <script src="js/playersim.js?v=196"></script>
+-  <script src="js/generator.js?v=196"></script>
+-  <script src="js/analysis.js?v=196"></script>
++  <script src="js/anchor-cut.js?v=197"></script>
++  <script src="js/solver-strategy.js?v=197"></script>
++  <script src="js/solver.js?v=197"></script>
++  <script src="js/playersim.js?v=197"></script>
++  <script src="js/generator.js?v=197"></script>
++  <script src="js/analysis.js?v=197"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=196"></script>
+-  <script src="js/app.js?v=196"></script>
++  <script src="js/level-editor.js?v=197"></script>
++  <script src="js/app.js?v=197"></script>
+ </body>
+ </html>

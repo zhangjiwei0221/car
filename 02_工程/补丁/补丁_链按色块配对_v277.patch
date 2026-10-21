@@ -1,0 +1,242 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4667,7 +4667,12 @@
+       icePercent: 0, icePercentMin: 0, icePercentMax: 0, row0IceMax: 2,
+       // 【v253·用户裁决】冰当"顺序闸门"：只冻开局就能装满的车，冻 3 辆、各滞后 2 步。
+       //   随机撒冰停用（icePercent 仍留一点做背景障碍）。
+-      iceSchedule: true, iceScheduleCount: 2, iceScheduleDelay: 3
++      iceSchedule: true, iceScheduleCount: 2, iceScheduleDelay: 3,
++      // 【v276·用户设计】冰按"目标区在某一时刻的现状"落：在 35~70% 进度带里，
++      //   把那时"一点就满"的免费车冻住，逼玩家改走吃不饱的路线（实测中位 47%→63%）
++      iceBandMode: true, iceBandLo: 0.35, iceBandHi: 0.70,
++      // 【v277·用户设计】锁链按"大色块 × 小色块"配对（一头随手可吃、一头得等），最多 2 组
++      chainByDemand: 2, chainBandLo: 0.20, chainBandHi: 0.90
+     });
+     try {
+       genLog('模式：容量 ' + _capMin + '~' + _capMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3294,6 +3294,8 @@
+     // 【v253】冰排程：冻住"开局免费车"，把取车顺序逼回需求序（在顶部封顶之前做，
+     //   这样封顶仍会把前 2 行的过量障碍削掉，不会让排程把开局锁死）
+     try { bindStat.iceSchedule = applyIceSchedule(cells, rows, cols, config); } catch (e) { bindStat.iceSchedule = null; }
++    // 【v277】锁链按"大色块 × 小色块"配对（铺完之后才做，因为要看真实的颜色/容量）
++    try { bindStat.chainByDemand = pairChainsByDemand(cells, rows, cols, config); } catch (e) { bindStat.chainByDemand = null; }
+     enforceTopObstacleCap(cells, rows, cols, config);
+     var afterTop = { ice: 0, q: 0, chain: 0, black: 0 };
+     for (var tr2 = 0; tr2 < Math.min(2, rows); tr2++) for (var tc2 = 0; tc2 < cols; tc2++) {
+@@ -7780,30 +7782,69 @@
+     if (!config || !config.iceSchedule || !dc || !dc.startExposed) return { count:0, debug:'missing', hasCfg:!!(config&&config.iceSchedule), hasDc:!!dc, hasSE:!!(dc&&dc.startExposed) };
+     var N = Math.max(1, Math.min(8, parseInt(config.iceScheduleCount, 10) || 3));
+     var delay = Math.max(0, Math.min(10, parseInt(config.iceScheduleDelay, 10) || 2));
++    // 【v276·用户设计】冰不是随便落格，也不是只冻开局 ——
++    //   它要"针对目标区在某个时刻的现状，改掉玩家的路线"：
++    //   在那个时刻，玩家手里有几辆"一点就满"的免费车（按需求曲线已经能装满），
++    //   冰把它们冻住 → 玩家只能去拿"吃不饱"的车 → 路线被掰弯 → 那一段出现债务。
++    var bandLo = (config.iceBandLo != null) ? +config.iceBandLo : 0.35;
++    var bandHi = (config.iceBandHi != null) ? +config.iceBandHi : 0.70;
++    var bandMode = (config.iceBandMode !== false);
+     var cars = [];
+     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+       var b = cells[r][c];
+       if (!b || b.t !== 'box' || b.numice > 0) continue;
+-      var se = dc.startExposed[b.color];
+-      if (se == null || se < b.count) continue;      // 开局装不满 → 不是"免费车"，不用冻
+       cars.push({ r: r, c: c, color: b.color, count: b.count, seq: (b._seq != null ? b._seq : (r * cols + c)) });
+     }
+-    if (!cars.length) return { count:0, debug:'noCar', seKeys:Object.keys(dc.startExposed||{}).length };
++    if (!cars.length) return { count:0, debug:'noCar' };
+     cars.sort(function (a, b) { return a.seq - b.seq; });
+-    var frozen = [];
+-    for (var i = 0; i < cars.length && frozen.length < N; i++) {
+-      var t = cars[i], cell = cells[t.r][t.c];
+-      if (!cell || cell.numice > 0) continue;
+-      // 【关键】冰值用的是"冻几步"，不是摆位序！
+-      //   _seq 是需求序（0~车数），拿它当步数会把后段车冻到 40 步（玩家永远等不到）。
+-      //   这些车都是"开局就能装满"的，玩家本来第 1 步就会拿 —— 冻 delay 步就足以改变开局顺序。
+-      var v = Math.max(2, Math.min(12, delay + 1));
+-      cell.numice = v;
+-      frozen.push({ r: t.r, c: t.c, color: t.color, count: t.count, seq: t.seq, numice: v });
++    var total = cars.length;
++    function progOf(i) { return total > 1 ? (i / (total - 1)) : 0; }
++    function isFree(car, prog) {
++      var need = 1;
++      try { need = demandAt(dc, car.color, car.count); } catch (e) { need = -1; }
++      if (!(need >= 0)) return false;
++      return need <= prog + 0.02;          // 到这个进度时，该色已经够它装满 → 免费车
+     }
+-    return { frozen: frozen, count: frozen.length };
++    var frozen = [];
++    var probe = [];
++    if (bandMode) {
++      // 带内：按"第几步被点到"落在 [bandLo, bandHi]，且那时是免费车 → 冻它
++      for (var i = 0; i < total && frozen.length < N; i++) {
++        var p = progOf(i);
++        if (p < bandLo || p > bandHi) continue;
++        if (!isFree(cars[i], p)) continue;
++        probe.push({ i: i, p: +p.toFixed(2) });
++      }
++      // 相邻的免费车容易连成一片，隔一个取一个，让冻结更分散
++      var picked = [];
++      for (var k = 0; k < probe.length && picked.length < N; k++) {
++        if (k > 0 && probe[k].i - probe[k - 1].i <= 1 && picked.length) continue;
++        picked.push(probe[k]);
++      }
++      for (var q = 0; q < picked.length && frozen.length < N; q++) {
++        var t0 = cars[picked[q].i], cell0 = cells[t0.r][t0.c];
++        if (!cell0 || cell0.numice > 0) continue;
++        var v0 = Math.max(2, Math.min(12, delay + 1));
++        cell0.numice = v0;
++        frozen.push({ r: t0.r, c: t0.c, color: t0.color, count: t0.count, seq: t0.seq, numice: v0, at: picked[q].p, why: 'band' });
++      }
++    }
++    // 带内凑不够 → 退回"开局免费车"（老逻辑），但至少保证有冰
++    if (frozen.length < N) {
++      for (var j = 0; j < total && frozen.length < N; j++) {
++        var se = dc.startExposed[cars[j].color];
++        if (se == null || se < cars[j].count) continue;
++        var cell = cells[cars[j].r][cars[j].c];
++        if (!cell || cell.numice > 0) continue;
++        var v = Math.max(2, Math.min(12, delay + 1));
++        cell.numice = v;
++        frozen.push({ r: cars[j].r, c: cars[j].c, color: cars[j].color, count: cars[j].count, seq: cars[j].seq, numice: v, at: 0, why: 'start' });
++      }
++    }
++    return { frozen: frozen, count: frozen.length, band: [bandLo, bandHi] };
+   }
+ 
++
+   /**
+    * 【v260·修正版】闸门借车必须在**铺完盘之后**做。
+    *   铺盘前棋盘是空的，任何格子都不"挡路"，扇出恒为 0（上一版就卡在这）。
+@@ -7862,6 +7903,74 @@
+     return done.length ? { k: done.length, items: done } : null;
+   }
+ 
++  /**
++   * 【v277·用户设计】锁链按"色块大小配对"：一头锁大色块（随手可吃）、一头锁小色块（得等）。
++   *   原理：链把两格绑成一组，必须先消掉先出现的那格；如果另一格的颜色要很久才够，
++   *   玩家就被钉在"等它"上 —— 链路本身成了债务发生器，而不是单纯挡路。
++   *   判据：相邻两格的 demandAt(颜色,容量) 差距 ≥ 0.35，且一格 ≤0.35（大块）、一格 ≥0.55（小块）；
++   *        两格都要在 25%~85% 进度带内（避免开局/收尾），不与冰/问号/已有链重叠。
++   */
++  function pairChainsByDemand(cells, rows, cols, config) {
++    var K = Math.max(0, Math.min(6, parseInt(config && config.chainByDemand, 10) || 0));
++    if (K <= 0) return null;
++    var dc = config._demandCurve;
++    if (!dc || !dc.curve) return null;
++    var lo = (config.chainBandLo != null) ? +config.chainBandLo : 0.25;
++    var hi = (config.chainBandHi != null) ? +config.chainBandHi : 0.85;
++    var boxes = [];
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var b = cells[r][c];
++      if (!b || b.t !== 'box') continue;
++      if (b.chain > 0 || b.question) continue;
++      var need = -1;
++      try { need = demandAt(dc, b.color, b.count); } catch (e) { need = -1; }
++      if (!(need >= 0)) continue;
++      var seq = (b._seq != null) ? b._seq : (r * cols + c);
++      boxes.push({ r: r, c: c, cell: b, need: need, seq: seq });
++    }
++    if (boxes.length < 4) return null;
++    var total = boxes.length;
++    var byKey = {};
++    for (var i = 0; i < boxes.length; i++) byKey[boxes[i].r + ',' + boxes[i].c] = boxes[i];
++    function progOf(x) { return total > 1 ? (x.seq / total) : 0; }
++    var cands = [];
++    for (var j = 0; j < boxes.length; j++) {
++      var a = boxes[j];
++      var pa = progOf(a);
++      if (pa < lo || pa > hi) continue;
++      var nbs = [[a.r, a.c + 1], [a.r + 1, a.c]];
++      for (var d = 0; d < 2; d++) {
++        var nb = byKey[nbs[d][0] + ',' + nbs[d][1]];
++        if (!nb) continue;
++        var pb = progOf(nb);
++        if (pb < lo || pb > hi) continue;
++        var gap = Math.abs(a.need - nb.need);
++        if (gap < 0.25) continue;
++        var low = Math.min(a.need, nb.need), high = Math.max(a.need, nb.need);
++        if (!(low <= 0.45 && high >= 0.55)) continue;
++        cands.push({ a: a, b: nb, gap: gap, low: low, high: high });
++      }
++    }
++    if (!cands.length) return { groups: 0, why: 'noPair', boxes: boxes.length };
++    cands.sort(function (x, y) { return y.gap - x.gap; });
++    var used = {}, groups = [];
++    var gid = (config._chainGroupSeed || 1);
++    for (var q = 0; q < cands.length && groups.length < K; q++) {
++      var cd2 = cands[q];
++      var k1 = cd2.a.r + ',' + cd2.a.c, k2 = cd2.b.r + ',' + cd2.b.c;
++      if (used[k1] || used[k2]) continue;
++      var members = [{ r: cd2.a.r, c: cd2.a.c }, { r: cd2.b.r, c: cd2.b.c }];
++      if (typeof chainActivatable === 'function' && !chainActivatable(cells, rows, cols, members)) continue;
++      used[k1] = 1; used[k2] = 1;
++      var g = gid++;
++      cells[cd2.a.r][cd2.a.c].chain = g;
++      cells[cd2.b.r][cd2.b.c].chain = g;
++      groups.push({ group: g, low: +cd2.low.toFixed(2), high: +cd2.high.toFixed(2), gap: +cd2.gap.toFixed(2),
++                    members: members });
++    }
++    return { groups: groups.length, items: groups, cands: cands.length };
++  }
++
+   function gateBorrowAfterFill(cells, rows, cols, config) {
+     var K = Math.max(0, Math.min(6, parseInt(config && config.gateBorrow, 10) || 0));
+     if (K <= 0) return null;
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,13 +3,13 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车接小人 v274 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=275">
++  <title>车接小人 v277 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
++  <link rel="stylesheet" href="css/style.css?v=277">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v274</span></h1>
++    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v277</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -847,20 +847,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=275"></script>
+-  <script src="js/utils.js?v=275"></script>
++  <script src="js/zip.js?v=277"></script>
++  <script src="js/utils.js?v=277"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=275"></script>
+-  <script src="js/simulator.js?v=275"></script>
++  <script src="js/color-libs.js?v=277"></script>
++  <script src="js/simulator.js?v=277"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=275"></script>
+-  <script src="js/solver-strategy.js?v=275"></script>
+-  <script src="js/solver.js?v=275"></script>
+-  <script src="js/playersim.js?v=275"></script>
+-  <script src="js/generator.js?v=275"></script>
+-  <script src="js/analysis.js?v=275"></script>
++  <script src="js/anchor-cut.js?v=277"></script>
++  <script src="js/solver-strategy.js?v=277"></script>
++  <script src="js/solver.js?v=277"></script>
++  <script src="js/playersim.js?v=277"></script>
++  <script src="js/generator.js?v=277"></script>
++  <script src="js/analysis.js?v=277"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=275"></script>
+-  <script src="js/app.js?v=275"></script>
++  <script src="js/level-editor.js?v=277"></script>
++  <script src="js/app.js?v=277"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

@@ -1,0 +1,64 @@
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=218">
++  <link rel="stylesheet" href="css/style.css?v=219">
+ </head>
+ <body>
+   <header>
+@@ -356,6 +356,9 @@
+           <option value="high">高压（容错低）</option>
+         </select>
+         <span class="gen-hint">盖子 = 环上几乎全是深层车，最优解也得先扛（全知线峰 3~4）；高压 = 容错低但可解</span>
++        <label style="margin-left:16px" title="阀门：环上浅层车太多时，给多出来的挂数字冰（取 3 个盒后解冻），压住开局供给。"> 
++          <input type="checkbox" id="gen-valve" checked> 阀门
++        </label>
+         <label style="margin-left:16px" title="右栏宽度（也可以拖分隔条，双击复位）">右栏宽</label>
+         <input type="range" id="gen-right-width" min="240" max="760" step="10" value="352" style="width:120px">
+         <span class="gen-hint" id="gen-right-width-val">352</span>
+@@ -859,20 +862,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=218"></script>
+-  <script src="js/utils.js?v=218"></script>
++  <script src="js/zip.js?v=219"></script>
++  <script src="js/utils.js?v=219"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=218"></script>
+-  <script src="js/simulator.js?v=218"></script>
++  <script src="js/color-libs.js?v=219"></script>
++  <script src="js/simulator.js?v=219"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=218"></script>
+-  <script src="js/solver-strategy.js?v=218"></script>
+-  <script src="js/solver.js?v=218"></script>
+-  <script src="js/playersim.js?v=218"></script>
+-  <script src="js/generator.js?v=218"></script>
+-  <script src="js/analysis.js?v=218"></script>
++  <script src="js/anchor-cut.js?v=219"></script>
++  <script src="js/solver-strategy.js?v=219"></script>
++  <script src="js/solver.js?v=219"></script>
++  <script src="js/playersim.js?v=219"></script>
++  <script src="js/generator.js?v=219"></script>
++  <script src="js/analysis.js?v=219"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=218"></script>
+-  <script src="js/app.js?v=218"></script>
++  <script src="js/level-editor.js?v=219"></script>
++  <script src="js/app.js?v=219"></script>
+ </body>
+ </html>
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4566,6 +4566,7 @@
+       boardRowsMax: _norm.rowsMax,
+       boardColsMin: _norm.colsMin,
+       boardColsMax: _norm.colsMax,
++      valvePlan: !!(document.getElementById('gen-valve') || {}).checked,  // 【v219】阀门：冰冻环上多余的供给
+       cutMode: _cutMode                     // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
+     });
+     // 【v215】盖子模式：环上几乎全是深层车（结构性债），最优解也得扛；按全知线择优

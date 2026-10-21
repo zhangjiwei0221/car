@@ -1,0 +1,151 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -8097,6 +8097,40 @@
+     return out;
+   }
+ 
++  /**
++   * 【v207】按层切车（合球第一步）：同色**同一消除轮次**的像素单独成车。
++   *   浅轮次的车 = 开壳车（开局就能填满）；深轮次的车 = 被包车（要等外层开了才吃得满）。
++   *   总量守恒：每个像素恰好属于一辆车。config.cutMode === 'layerAware' 才用。
++   *   失败返回 null → 调用方落回默认切法。
++   */
++  function layerAwareBoxes(blocks, config) {
++    var R = blocks.length, C = blocks[0].length;
++    var eo = null;
++    try { eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly); } catch (e) { eo = null; }
++    if (!eo || !eo.round) return null;
++    var bmin = parseInt(config.boxSizeMin, 10) || 24;
++    var bmax = parseInt(config.boxSizeMax, 10) || 36;
++    if (bmax < bmin) bmax = bmin;
++    var groups = {};
++    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
++      var col = blocks[r][c];
++      if (col <= 0) continue;
++      var rd = eo.round[r][c] || 1;
++      var key = rd + '|' + col;
++      if (!groups[key]) groups[key] = { round: rd, color: col, px: 0 };
++      groups[key].px++;
++    }
++    var list = Object.keys(groups).map(function (k) { return groups[k]; });
++    list.sort(function (a, b) { return a.round - b.round || a.color - b.color; });
++    var out = [];
++    for (var i = 0; i < list.length; i++) {
++      var parts = splitIntoBoxes(list[i].px, bmin, bmax);
++      if (!parts || !parts.length) continue;
++      for (var j = 0; j < parts.length; j++) out.push({ color: list[i].color, count: parts[j] });
++    }
++    return out.length ? out : null;
++  }
++
+   function pickBoxSplit(blocks, config) {
+     var boxes = pickBoxSplitRaw(blocks, config);
+     return applyBoxPhase(boxes, config);
+@@ -8119,6 +8153,13 @@
+         if (anchorBoxes && anchorBoxes.length) return anchorBoxes;
+       } catch (e) { /* 落回默认切法 */ }
+     }
++    // 【v207】按层切车（合球第一步；默认关）
++    if (config.cutMode === 'layerAware') {
++      try {
++        var lb = layerAwareBoxes(blocks, config);
++        if (lb && lb.length) return lb;
++      } catch (e) { /* 落回默认切法 */ }
++    }
+     // 瞬时连锁模式固定四方向：绝不走底部依赖流分支（需求 §七.3：不得继承底部单入口结构限制）。
+     // 盒切分本身复用现有四方向口径，不新写第二套可达算法（需求 §十二）。
+     if (config.instantChain) {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=206">
++  <link rel="stylesheet" href="css/style.css?v=207">
+ </head>
+ <body>
+   <header>
+@@ -325,7 +325,7 @@
+         参数已固定，不用调：按目标图尺寸自动选预设（小图 / 大图）· 设计扫描（早车档 4~0 + 增容 1.5/2）· 候选 6 · 单关 5 分钟 · 难度标定 7 轮。
+       </div>
+       <div class="gen-row" style="margin-top:8px">
+-        <label title="棋盘行数范围（含端点）。生成器只在这个范围内选棋盘，不会缩到范围外。">棋盘行</label>
++        <label title="棋盘行数范围（含端点）。不开自适应时，生成器只在这个范围内选棋盘。">棋盘行</label>
+         <input type="number" id="gen-rows-min" value="7" min="4" max="20" style="width:52px">
+         <span class="gen-hint">~</span>
+         <input type="number" id="gen-rows-max" value="9" min="4" max="20" style="width:52px">
+@@ -333,6 +333,16 @@
+         <input type="number" id="gen-cols-min" value="8" min="4" max="30" style="width:52px">
+         <span class="gen-hint">~</span>
+         <input type="number" id="gen-cols-max" value="10" min="4" max="30" style="width:52px">
++        <label style="margin-left:16px" title="勾上 = 棋盘尺寸按车数自适应（上面四个数字被忽略）；不勾 = 严格用上面的范围。">
++          <input type="checkbox" id="gen-board-auto"> 自适应
++        </label>
++        <label style="margin-left:16px" title="切法：默认=按消除趋势平均切；按层=同色同层单独成车（浅层壳车/深层包车）。">
++          切法
++          <select id="gen-cutmode">
++            <option value="" selected>默认（按趋势）</option>
++            <option value="layerAware">按层切车</option>
++          </select>
++        </label>
+       </div>
+     </div>
+ 
+@@ -833,20 +843,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=206"></script>
+-  <script src="js/utils.js?v=206"></script>
++  <script src="js/zip.js?v=207"></script>
++  <script src="js/utils.js?v=207"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=206"></script>
+-  <script src="js/simulator.js?v=206"></script>
++  <script src="js/color-libs.js?v=207"></script>
++  <script src="js/simulator.js?v=207"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=206"></script>
+-  <script src="js/solver-strategy.js?v=206"></script>
+-  <script src="js/solver.js?v=206"></script>
+-  <script src="js/playersim.js?v=206"></script>
+-  <script src="js/generator.js?v=206"></script>
+-  <script src="js/analysis.js?v=206"></script>
++  <script src="js/anchor-cut.js?v=207"></script>
++  <script src="js/solver-strategy.js?v=207"></script>
++  <script src="js/solver.js?v=207"></script>
++  <script src="js/playersim.js?v=207"></script>
++  <script src="js/generator.js?v=207"></script>
++  <script src="js/analysis.js?v=207"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=206"></script>
+-  <script src="js/app.js?v=206"></script>
++  <script src="js/level-editor.js?v=207"></script>
++  <script src="js/app.js?v=207"></script>
+ </body>
+ </html>
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4479,14 +4479,19 @@
+   };
+   function genApplyFixed(cfg, blocks, tag) {
+     var R = blocks.length, C = blocks[0].length;
++    var _autoEl = document.getElementById('gen-board-auto');
++    var _boardAuto = !!(_autoEl && _autoEl.checked);
++    var _cutEl = document.getElementById('gen-cutmode');
++    var _cutMode = (_cutEl && _cutEl.value) ? _cutEl.value : '';
+     var big = Math.max(R, C) > 45;
+     var preset = big ? FIXED_PRESETS.large : FIXED_PRESETS.small;
+     var out = Object.assign({}, cfg, preset, {
+       candidateCount: 6, portfolioK: 1, timeBudgetMs: 300000, difficultyRounds: 7,
+       goodV3: true, requireHardPass: false, seed: null,
+       designSweep: true, designDebt: true,  // 【v201】饥荒强度扫描，按最终 goodV3 择优
+-      boardHardRange: true,                 // 【v206】棋盘尺寸严格落在下面的范围内（不许缩小、不许自动换范围）
+-      boardAuto: false,                     // 【v206】关掉"按车数自适应棋盘范围"，否则手填的行列会被它覆盖
++      boardHardRange: !_boardAuto,          // 【v207】不勾自适应 = 硬范围（不许缩小、不许自动换范围）
++      boardAuto: _boardAuto,                // 【v207】勾了自适应 = 按车数反推范围，忽略手填数字
++      cutMode: _cutMode,                    // 【v207】'' = 默认趋势切；'layerAware' = 按层切车
+       boardRowsMin: (parseInt((document.getElementById('gen-rows-min') || {}).value, 10) || 7),
+       boardRowsMax: (parseInt((document.getElementById('gen-rows-max') || {}).value, 10) || 9),
+       boardColsMin: (parseInt((document.getElementById('gen-cols-min') || {}).value, 10) || 8),

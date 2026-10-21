@@ -1,0 +1,117 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4587,7 +4587,9 @@
+     //   实测对照：批次 unnamed-10-19-109 是 6×6 合格关，31 辆、容量 28~60（均值 46.3）——
+     //   正是「容量跟着棋盘走」才成立的形态（工作日志 96）。棋盘不同，容量必须不同。
+     var out = Object.assign({}, cfg, preset, {
+-      candidateCount: 2, portfolioK: 8, timeBudgetMs: 25000, difficultyRounds: 2,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
++      // 【v257】候选 2→3；早停要求"峰窗≥3.5 且 稳健≤70"，不再拿第一个勉强及格的收工
++      candidateCount: 3, portfolioK: 8, timeBudgetMs: 25000, difficultyRounds: 2,
++      earlyStopPeak: 3.5, earlyStopSteady: 70,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
+       goodV3: true, requireHardPass: false, seed: null,
+       designSweep: false, designDebt: false, // 【v224】单套参数，取消扫描（之前每张图跑 11 变体 × 6 候选 × 7 轮，太慢）
+       boardHardRange: !_boardAuto,          // 【v207】不勾自适应 = 硬范围（不许缩小、不许自动换范围）
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -5289,7 +5289,7 @@
+       mergeFlowStats(flowStats, base.flowStats);
+       if (!base.valid) continue;
+       consider(base);
+-      if (candPass(base, requireHard, config)) return done(base);
++      if (candPass(base, requireHard, config) && meetsEarlyStopQuality(base, config)) return done(base);
+       // 【v157】旧门过了但 v2 没达标 → 不算"可以停"，再给它 v2Patience 个候选的机会
+       if (v2On && candPassLegacy(base, requireHard) && ++v2Extra > v2Patience) v2Stop = true;
+       if (v2Stop) break;
+@@ -6574,7 +6574,7 @@
+       var base = tagAudit(generateFromBlocks(blocks, config));
+       consider(base);
+       // 【v157】早停同样要求卡点判据 v2 达标；多搜 v2Patience 个候选为上限（与 produceFixed 同口径）
+-      if (candPass(base, requireHard, config)) return done(base);   // 初生成即合格（旧门 + v2）
++      if (candPass(base, requireHard, config) && meetsEarlyStopQuality(base, config)) return done(base);   // 【v257】初生成即合格且到带中段才收工
+       if (!(config.chokeV2 === false) && candPassLegacy(base, requireHard) &&
+           ++v2Extra > ((config.chokeV2Patience != null) ? config.chokeV2Patience : 1)) v2Stop = true;
+       if (v2Stop) break;
+@@ -6978,7 +6978,26 @@
+    * 【v157】早停条件 = 旧合格门 **且** 卡点判据 v2 达标（用户 R1~R9）。
+    *   · 可关掉：config.chokeV2 === false 时逐值回到旧行为（只认旧门）。
+    *   · v2 指标缺失（老关卡/异常）时**不拦**——宁可按旧门早停，也不因为量不出指标就把这一关无限搜下去。
++   */
++  /**
++   * 【v257·用户反馈"压力曲线不够"】早停的质量门槛。
++   *   原来的早停条件是 goodV3.pass，而 pass 的下界刚好是目标带下界 3.2 ——
++   *   峰窗 3.2 的关和 3.9 的关一样"合格"，搜索就停在第一个勉强及格的候选上，
++   *   实测最新批次一关只试了 **1 个基础候选、1.75 秒**就收工。
++   *   这里要求"真的到带中段"才允许早停：峰窗 ≥ earlyStopPeak（默认 3.5）、稳健 ≤ earlyStopSteady（默认 70）。
++   *   不达标就继续搜，最后仍取已评估里最好的那个（不会因此变差）。
+    */
++  function meetsEarlyStopQuality(cand, config) {
++    var g = cand && cand.goodV3;
++    if (!g || !g.pass) return false;
++    var p = g.midLateMax;
++    var pMin = (config && config.earlyStopPeak != null) ? +config.earlyStopPeak : 3.5;
++    var sMax = (config && config.earlyStopSteady != null) ? +config.earlyStopSteady : 70;
++    if (p == null || p < pMin) return false;
++    if (g.steadyWonPct != null && g.steadyWonPct > sMax) return false;
++    return true;
++  }
++
+   function candPass(c, requireHard, config) {
+     if (!candPassLegacy(c, requireHard)) return false;
+     if (config && config.chokeV2 === false) return true;
+@@ -10884,7 +10903,7 @@
+         var _t = portfolioTuple(_o);
+         if (_o && _o.goodV3 && _o.goodV3.pass) _passes++;
+         if (_o && (!_best || portfolioBetter(_t, _bestT))) { _best = _o; _bestT = _t; }
+-        if (_best && _best.goodV3 && _best.goodV3.pass) break;
++        if (_best && meetsEarlyStopQuality(_best, config)) break;   // 【v257】到带中段才早停
+       }
+       out = _best;
+       if (out) out.portfolio = { K: _pk, tried: _tried, passes: _passes, tuple: _bestT };
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=256">
++  <link rel="stylesheet" href="css/style.css?v=257">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=256"></script>
+-  <script src="js/utils.js?v=256"></script>
++  <script src="js/zip.js?v=257"></script>
++  <script src="js/utils.js?v=257"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=256"></script>
+-  <script src="js/simulator.js?v=256"></script>
++  <script src="js/color-libs.js?v=257"></script>
++  <script src="js/simulator.js?v=257"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=256"></script>
+-  <script src="js/solver-strategy.js?v=256"></script>
+-  <script src="js/solver.js?v=256"></script>
+-  <script src="js/playersim.js?v=256"></script>
+-  <script src="js/generator.js?v=256"></script>
+-  <script src="js/analysis.js?v=256"></script>
++  <script src="js/anchor-cut.js?v=257"></script>
++  <script src="js/solver-strategy.js?v=257"></script>
++  <script src="js/solver.js?v=257"></script>
++  <script src="js/playersim.js?v=257"></script>
++  <script src="js/generator.js?v=257"></script>
++  <script src="js/analysis.js?v=257"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=256"></script>
+-  <script src="js/app.js?v=256"></script>
++  <script src="js/level-editor.js?v=257"></script>
++  <script src="js/app.js?v=257"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

@@ -1,0 +1,468 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -47,6 +47,27 @@
+     //   为什么要它：趋势切永远挑"当前最好摸的颜色"，玩家手上不攒色 → 实测 14 组参数后期峰窗最高只到 2.0
+     //   （合格线 3.2 / 简单关线 2.5），压力调不出来；锚点切盒靠"同色前后各来一次"把暂存顶起来。
+     boxCutMode: 'trend',
++    // ===== 【v147】错位量：车在棋盘上的排位，相对"像素该露头的时刻"整体旋转多少% =====
++    //
++    // ⚠⚠ 实测结论：**这条路走不通，默认必须保持 0，也不进界面**（保留实现只为留证据，别再试一遍）。
++    //
++    // 当初的模型是"难度 = 「货的时间线」与「车的时间线」的相位差"：货的时间线 = 盒在盒队列里的位次
++    // （= 像素大概第几步露头），车的时间线 = 填盘顺序（由 elimSeq 决定）。默认两者锁死同序，
++    // 于是车可点时货刚好露头 → 顺畅、没压力。把排位整体旋转 k% 想让它们错开。
++    //
++    // 55×55 大图（2809 像素）每档 6 轮的实测：
++    //     错位  0% → 出关 6/6 ｜ 有卡点 3/6 ｜ 卡点区峰窗均 3.10 ｜ 前期均 1.19
++    //     错位 40% → 出关 5/6 ｜ 有卡点 2/5 ｜ 卡点区峰窗均 2.75 ｜ 前期均 1.05
++    // 即**整体错位既没把压力顶上来、也没把压力挪到后期**，反而略差；早先小样本看到的"40% 时 3/3 有卡点"
++    // 是噪声。小图（27×32）更明显，错位 0→40% 卡点区峰窗基本不动、有卡点始终 0。
++    //
++    // 机理：旋转让一半车"车晚于货"、另一半"车早于货"。而"车早于货"的那批一到手就没货可吃，
++    // 全堵在暂存区开头 → 压力被推到**前期**（恰恰是审核判不合格的形状），并没有沉淀成中后期的卡点。
++    //
++    // 修正后的认识：真正管用的杠杆是【一辆车的像素在时间轴上跨多宽】= **切盒的形状**，不是排位。
++    //   证据：同一张图把切盒方式从"趋势切"换成"锚点切盒"（把同一色拆到前后两半，车的跨度变大），
++    //   v137 实测 5 轮里 3 轮直接变成"有卡点合格"。要加压请走切盒形状族那条路。
++    boxPhaseShiftPct: 0,
+     // —— 锚点切盒专用参数（仅 boxCutMode:'anchor' 生效；沿用沙盒 anchor-cut.js 的原生字段名）——
+     // 双锚点 = 左下 + 右下；'single' = 只留底部中点（A/B 退化为单组，对照用）
+     anchorMode: 'double',
+@@ -5618,7 +5639,44 @@
+     };
+   }
+ 
++  /**
++   * 【v147】错位量：把「车在棋盘上的排位」相对「像素露头时刻」整体旋转 k%。
++   *
++   * 只动 `elimSeq` 这一串序位，**像素怎么切的一格不改**。下游所有读 `elimSeq` 的地方
++   * （填盘顺序 buildStructureCandidateFixed/fillStructureFixed、溢出盒进管道的分配、
++   * 窄路陷阱的"墙上/墙下"排序）都会自动跟着走 —— 这正是"排位"该有的传播范围。
++   *
++   * 契约：返回新数组（不改入参），且 elimSeq 仍是【唯一值集合】——只是把序位整体错开一格相位。
++   *   · k = 0 → 原样返回（零值短路，保证"不填这项 = 口径不变"）
++   *   · 第 i 个盒（按原 elimSeq 升序 = 货的时间线位次 i）拿到序位 seqs[(i+k) % n]
++   */
++  function applyBoxPhase(boxes, config) {
++    var pct = parseFloat(config && config.boxPhaseShiftPct);
++    if (!(pct > 0) || !boxes || boxes.length < 2) return boxes;
++    var n = boxes.length;
++    var k = Math.round(n * Math.min(90, pct) / 100);
++    if (k <= 0) return boxes;
++    var seqs = [];
++    for (var i = 0; i < n; i++) seqs.push(boxes[i].elimSeq != null ? boxes[i].elimSeq : i);
++    seqs.sort(function (a, b) { return a - b; });
++    var ranked = boxes.map(function (b, idx) { return { b: b, seq: (b.elimSeq != null ? b.elimSeq : idx) }; });
++    ranked.sort(function (a, b) { return a.seq - b.seq; });   // 按货的时间线排好 → 得到"第 i 个盒"
++    var out = boxes.slice();
++    for (var r = 0; r < n; r++) {
++      var dst = seqs[(r + k) % n];                            // 该盒在棋盘上拿到的序位
++      var nb = Object.assign({}, ranked[r].b);
++      nb.elimSeq = dst;
++      out[out.indexOf(ranked[r].b)] = nb;
++    }
++    return out;
++  }
++
+   function pickBoxSplit(blocks, config) {
++    var boxes = pickBoxSplitRaw(blocks, config);
++    return applyBoxPhase(boxes, config);
++  }
++
++  function pickBoxSplitRaw(blocks, config) {
+     // ===== v137 锚点切盒（可选；boxCutMode 默认 'trend'，不进这段）=====
+     //   失败（拿不到盒/抛错）就落回默认切法 —— 新模式不许把关卡生产整死。
+     if (config.boxCutMode === 'anchor' && AntSolver.AnchorCut && AntSolver.AnchorCut.cutBoxes) {
+@@ -6863,6 +6921,7 @@
+     sampleCarCount: sampleCarCount,
+     suggestBoardRange: suggestBoardRange,
+     applyAutoBoardRange: applyAutoBoardRange,
++    applyBoxPhase: applyBoxPhase,           // 【v147】错位量：旋转车在棋盘上的排位
+     withBoardRange: withBoardRange,
+     boardCellsExtent: boardCellsExtent,                     // 方案范围内合法棋盘的最小/最大格数
+     suggestBoardRange: suggestBoardRange,                   // 由车数反推建议行列范围
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -457,6 +457,19 @@
+     bindClick('btn-view-simulator', function () { switchView('simulator'); });
+     // 【v144】左栏收起/展开（收起后把宽度让给棋盘；中列左上角浮现「展开」按钮）
+     bindClick('btn-collapse-left', function () { setLeftPanelCollapsed(); });   // 不传 = 开关
++    // 【v147】难度档 / 压力来源 / 高级参数
++    (function () {
++      var presetSel = document.getElementById('gen-preset');
++      if (presetSel) presetSel.addEventListener('change', function () { applyGenPreset(presetSel.value); });
++      GEN_SRC_KEYS.forEach(function (k) {
++        var el = document.getElementById('gen-src-' + k);
++        if (el) el.addEventListener('change', applyStressSources);
++      });
++      var adv = document.getElementById('gen-show-advanced');
++      if (adv) adv.addEventListener('change', applyAdvancedVisibility);
++      applyAdvancedVisibility();      // 默认收起高级段
++      updatePresetInfo();
++    })();
+     bindClick('btn-view-generator', function () { switchView('generator'); });
+     bindClick('btn-gen-import-txt', importTXT);
+     bindClick('btn-gen-start', batchProduce);
+@@ -638,6 +651,93 @@
+     redraw();
+   }
+   /** 重画全部双端滑块（读方案后调用；applyScheme 直接改 value 不触发 input） */
++  // ==================== 【v147】难度档 + 压力来源（参数分层的第一层）====================
++  // 用户 2026-10-15：「我还是觉得这个参数太多了，很难调整」。做法：把 20 个难度旋钮打包成 4 档，
++  //   平时只动「难度档 + 压力来源」；档位会把具体数值【写进下面那些控件】，所以自动与手动微调
++  //   是同一套数字（不会出现"档位说 18% 实际跑 10%"这种两套口径）。
++  // 数值来源：方案文件夹里那几份实产方案 + v137 锚点切盒的实测（锚点切是唯一能自动做出真卡点的切法）。
++  var GEN_PRESETS = {
++    '简单': { ice: [0, 8],   black: [0, 0],   chain: [0, 1], q: [0, 6],   pipes: [2, 3], rolls: 0, prob: 0.4, easy: 60, cut: 'trend',
++              types: [] },
++    '标准': { ice: [10, 18], black: [0, 8],   chain: [2, 4], q: [6, 12],  pipes: [3, 4], rolls: 2, prob: 0.4, easy: 30, cut: 'trend',
++              types: ['iceCluster', 'chainCluster', 'questionCluster', 'bigBox'] },
++    '困难': { ice: [18, 28], black: [8, 14],  chain: [4, 6], q: [10, 18], pipes: [4, 5], rolls: 3, prob: 0.5, easy: 10, cut: 'trend',
++              types: ['narrowPath', 'iceCluster', 'chainCluster', 'questionCluster', 'chainIce', 'narrowGapIce', 'bigBox', 'rareColorKey'] },
++    '极难': { ice: [22, 32], black: [10, 16], chain: [5, 8], q: [12, 20], pipes: [4, 5], rolls: 4, prob: 0.6, easy: 0,  cut: 'anchor',
++              types: ['narrowPath', 'iceCluster', 'chainCluster', 'questionCluster', 'chainIce', 'pipeChain', 'narrowGapIce', 'narrowGapChain', 'bigBox', 'rareColorKey', 'swap', 'inflate'] }
++  };
++  var GEN_CHOKE_KEYS = ['narrowPath','iceCluster','chainCluster','questionCluster','chainIce','pipeChain',
++                        'narrowGapIce','narrowGapChain','bigBox','rareColorKey','swap','inflate'];
++  var GEN_SRC_KEYS = ['numice','chain','question','narrow','pipe'];
++  function genVal(id, v) { var e = document.getElementById(id); if (e) e.value = String(v); }
++  function genRange(loId, hiId, v) { genVal(loId, v[0]); genVal(hiId, v[1]); }
++  function genChk(id, v) { var e = document.getElementById(id); if (e) e.checked = !!v; }
++  function genChkVal(id) { var e = document.getElementById(id); return !!(e && e.checked); }
++  function genPresetName() { var e = document.getElementById('gen-preset'); return e ? e.value : '标准'; }
++
++  /** 把某一档的数值写进各控件（含双端滑块 → 写完统一重画）。 */
++  function applyGenPreset(name) {
++    var p = GEN_PRESETS[name];
++    if (!p) { updatePresetInfo(); return; }        // 自定义：不动任何数值
++    genRange('gen-ice', 'gen-ice-max', p.ice);
++    genRange('gen-black', 'gen-black-max', p.black);
++    genRange('gen-chains', 'gen-chains-max', p.chain);
++    genRange('gen-surprise', 'gen-surprise-max', p.q);
++    genRange('gen-min-pipes', 'gen-min-pipes-max', p.pipes);
++    genVal('gen-choke-rolls', p.rolls);
++    genVal('gen-choke-prob', p.prob);
++    genVal('gen-easy-ratio', p.easy);
++    genVal('gen-box-cut', p.cut);
++    GEN_CHOKE_KEYS.forEach(function (k) { genChk('gen-choke-' + k, p.types.indexOf(k) >= 0); });
++    GEN_SRC_KEYS.forEach(function (k) { genChk('gen-src-' + k, true); });   // 换档 = 恢复该档该有的全部压力来源
++    if (typeof refreshDualRanges === 'function') refreshDualRanges();
++    updatePresetInfo();
++  }
++
++  /** 压力来源：在难度档之上做减法 —— 取消勾选 = 把那一类障碍清零。 */
++  function applyStressSources() {
++    var p = GEN_PRESETS[genPresetName()] || GEN_PRESETS['标准'];
++    function v(k) { return genChkVal('gen-src-' + k); }
++    if (v('numice')) genRange('gen-ice', 'gen-ice-max', p.ice); else genRange('gen-ice', 'gen-ice-max', [0, 0]);
++    if (v('chain')) genRange('gen-chains', 'gen-chains-max', p.chain); else genRange('gen-chains', 'gen-chains-max', [0, 0]);
++    if (v('question')) genRange('gen-surprise', 'gen-surprise-max', p.q); else genRange('gen-surprise', 'gen-surprise-max', [0, 0]);
++    if (v('pipe')) genRange('gen-min-pipes', 'gen-min-pipes-max', p.pipes); else genRange('gen-min-pipes', 'gen-min-pipes-max', [0, 0]);
++    genChk('gen-narrow', v('narrow'));
++    genVal('gen-narrow-prob', v('narrow') ? 1 : 0);
++    if (!v('narrow')) genChk('gen-choke-narrowPath', false);
++    if (typeof refreshDualRanges === 'function') refreshDualRanges();
++    updatePresetInfo();
++  }
++
++  /** 难度档那一行下面的一行小字：把"当前实际生效的难度画像"摊开，免得藏在折叠里看不见。 */
++  function updatePresetInfo() {
++    var el = document.getElementById('gen-preset-info');
++    if (!el) return;
++    var name = genPresetName();
++    var p = GEN_PRESETS[name];
++    function num(id) { var e = document.getElementById(id); return e ? e.value : '-'; }
++    function num2(id) { var e = document.getElementById(id); return e ? e.value : '-'; }
++    var srcOff = GEN_SRC_KEYS.filter(function (k) { return !genChkVal('gen-src-' + k); });
++    if (p) {
++      el.textContent = '难度档「' + name + '」：数字冰 ' + num('gen-ice') + '~' + num2('gen-ice-max') + '%　黑块 ' +
++        num('gen-black') + '~' + num2('gen-black-max') + '%　锁链 ' + num('gen-chains') + '~' + num2('gen-chains-max') +
++        ' 对　问号 ' + num('gen-surprise') + '~' + num2('gen-surprise-max') + '%　管道下限 ' + num('gen-min-pipes') +
++        '　卡点类型 ' + num('gen-choke-rolls') + '×' + num('gen-choke-prob') + '　简单关 ' + num('gen-easy-ratio') + '%' +
++        (srcOff.length ? '　（已关：' + srcOff.join('、') + '）' : '');
++    } else {
++      el.textContent = '自定义：下面的数值由你直接控制。';
++    }
++  }
++
++  /** 高级参数开关：棋盘尺寸 / 批量与卡点细项平时收起。 */
++  function applyAdvancedVisibility() {
++    var on = genChkVal('gen-show-advanced');
++    ['gen-sec-board', 'gen-sec-batch'].forEach(function (id) {
++      var el = document.getElementById(id);
++      if (el) el.classList.toggle('hidden', !on);
++    });
++  }
++
+   function refreshDualRanges() {
+     DUAL_RANGES.forEach(function (d) {
+       var lo = document.getElementById(d[0]), hi = document.getElementById(d[1]);
+@@ -681,6 +781,7 @@
+ 
+   function captureScheme() {
+     var o = {};
++    var psel = document.getElementById('gen-preset'); if (psel) psel.value = '自定义';   // 【v147】读了方案 = 不再是某一档
+     SCHEME_INPUTS.forEach(function (id) {
+       var el = document.getElementById(id); if (!el) return;
+       o[id] = (el.type === 'checkbox') ? !!el.checked : el.value;
+@@ -2541,6 +2642,79 @@
+     redrawCharts(simulating ? simChartCursor('both') : null);
+   }
+ 
++  /**
++   * 【v147】逐次取盒序列 → 序列数据。
++   *   上面两张压力图是按【进度】的滑动窗口均值 —— 它回答"压力出现在哪个进度段"，
++   *   但看不出"是哪几次取盒把它顶上去的"。这张图补的就是这一层：一步一根柱子。
++   *   柱高 = 该步结算后的暂存占用；颜色 = 这一步暂存【降没降】：
++   *     绿 = 取这一盒换来了释放（暂存下降）；红 = 取了一盒却没换出释放（暂存不降反升）
++   *   「空转比」= 红柱占比。它高 = 玩家一直在往暂存里塞、很少兑现 = 压力就是这么攒出来的。
++   */
++  function buildStepSeries(stats, limit) {
++    if (!stats || !stats.length) return null;
++    var bars = [], rise = 0, peak = 0;
++    for (var i = 0; i < stats.length; i++) {
++      var st = stats[i];
++      var before = (st.bufBefore != null) ? st.bufBefore : 0;
++      var after = (st.bufAfter != null) ? st.bufAfter : 0;
++      var up = after > before;
++      if (up) rise++;
++      if (after > peak) peak = after;
++      bars.push({ i: i + 1, buf: after, up: up, boxes: st.boxes || 1, isChain: !!st.isChain });
++    }
++    return { bars: bars, rise: rise, total: stats.length, peak: peak,
++             limit: limit || 5,
++             idleRatio: stats.length ? (rise / stats.length) : 0 };
++  }
++
++  function drawStepChart(canvasId, capId, data) {
++    var cv = document.getElementById(canvasId);
++    var cap = document.getElementById(capId);
++    if (!cv) return;
++    var ctx = cv.getContext('2d'); var W = cv.width, H = cv.height;
++    ctx.clearRect(0, 0, W, H);
++    ctx.fillStyle = '#f0e8d8'; ctx.fillRect(0, 0, W, H);
++    if (!data || !data.bars.length) {
++      if (cap) cap.textContent = '本关没有逐次取盒记录（导入的关卡若无求解数据，跑一次求解即可）';
++      return;
++    }
++    var N = Math.max(1, data.limit);
++    var padL = 30, padB = 18, padT = 8, padR = 8;
++    var pw = W - padL - padR, ph = H - padT - padB;
++    function py(v) { return padT + ph - (Math.min(v, N) / N) * ph; }
++    // Y 刻度 + 上限红线
++    ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
++    for (var y = 0; y <= N; y++) {
++      var yy = py(y);
++      ctx.strokeStyle = (y === N) ? 'rgba(192,69,26,.65)' : 'rgba(60,46,31,.12)';
++      ctx.lineWidth = (y === N) ? 1.5 : 1;
++      ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.stroke();
++      ctx.fillStyle = (y === N) ? '#c0451a' : '#66513a'; ctx.font = 'bold 9px sans-serif';
++      ctx.fillText(String(y), padL - 4, yy);
++    }
++    // 柱子
++    var n = data.bars.length;
++    var bw = Math.max(1, pw / n - 0.6);
++    for (var i = 0; i < n; i++) {
++      var b = data.bars[i];
++      var x = padL + (i / n) * pw;
++      var top = py(b.buf);
++      ctx.fillStyle = b.up ? '#d9534f' : '#5a9e4a';        // 红=这一步没换出释放；绿=降了
++      ctx.fillRect(x, top, bw, padT + ph - top);
++    }
++    // X 轴底线
++    ctx.strokeStyle = 'rgba(60,46,31,.35)'; ctx.lineWidth = 1;
++    ctx.beginPath(); ctx.moveTo(padL, padT + ph); ctx.lineTo(W - padR, padT + ph); ctx.stroke();
++    ctx.fillStyle = '#66513a'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
++    ctx.fillText('第 1 次取盒', padL, padT + ph + 3);
++    ctx.textAlign = 'right'; ctx.fillText('第 ' + n + ' 次', W - padR, padT + ph + 3);
++    if (cap) {
++      cap.textContent = n + ' 次取盒 · 其中 ' + data.rise + ' 次暂存没降（空转 ' +
++        Math.round(data.idleRatio * 100) + '%）· 峰值 ' + data.peak + '/' + N +
++        '　（红=取了一盒却没换出释放，绿=降了）';
++    }
++  }
++
+   function drawPressureChart(canvasId, samples, limit, totalBoxes, capId, won, choke, itemUses, opts) {
+     opts = opts || {};
+     var cv = document.getElementById(canvasId); if (!cv) return;
+@@ -2696,6 +2870,7 @@
+       { audit: c.omni.audit, items: c.omni.items, preview: c.omni.preview, cursorProgress: co.p, cursorStep: co.step });
+     drawPressureChart('chart-player', c.player.samples, c.limit, c.totalBoxes, 'chart-player-cap', c.player.won, c.player.choke, c.player.itemUses,
+       { audit: c.player.audit, items: c.player.items, preview: c.player.preview, revives: c.player.reviveEvents || [], cursorProgress: cp.p, cursorStep: cp.step });
++    drawStepChart('chart-steps', 'chart-steps-cap', c.steps);   // 【v147】逐次取盒 × 暂存
+   }
+ 
+   // 由本关实际入口模式（currentEntryMode）推出 PlayerSim 的模式开关（需求 §6.1）。
+@@ -2716,15 +2891,17 @@
+         ? AntSolver.Analysis.dynamicPreviewMetrics(samples, totalBoxes)
+         : { sampleCount: 0, avgLockRatio: 0, maxLockRatio: 0, peakAt: null };
+     }
+-    chartCache = { limit: limit, totalBoxes: totalBoxes, omni: { samples: [], won: false, items: [], itemUses: 0 }, player: { samples: [], won: false, items: [], itemUses: 0, reviveEvents: [], trajectory: [] } };
++    chartCache = { limit: limit, totalBoxes: totalBoxes, omni: { samples: [], won: false, items: [], itemUses: 0 }, player: { samples: [], won: false, items: [], itemUses: 0, reviveEvents: [], trajectory: [] }, steps: null };
+     try {
+       // 旧导入审核数据仍可复用；现场新算时显式采集动态封锁快照，才显示封锁热度带。
+-      var oSamples, oWon, oItems = [], oItemUses = 0, reused = false;
++      var oSamples, oWon, oItems = [], oItemUses = 0, reused = false, oStepStats = null;   // 【v147】逐次取盒序列
+       if (currentGenerationEval && currentGenerationEval.omni && currentGenerationEval.omni.pressureSamples && currentGenerationEval.omni.pressureSamples.length) {
+         oSamples = currentGenerationEval.omni.pressureSamples;
+         oWon = !!currentGenerationEval.omni.won; reused = true;
++        oStepStats = currentGenerationEval.omni.stepStats || null;
+       } else if (currentImportedSolve && currentImportedSolve.pressureSamples && currentImportedSolve.pressureSamples.length) {
+         oSamples = currentImportedSolve.pressureSamples; oWon = !!currentImportedSolve.completed; reused = true;
++        oStepStats = currentImportedSolve.stepStats || null;
+       } else {
+         // 【v121·任务AK①】全知压力曲线也必须按本关玩法跑。
+         // 原实现写死 `bottomOnly=false` 且不传 instantChain → 底部/瞬时连锁关卡的全知压力图
+@@ -2733,7 +2910,15 @@
+         var omni = AntSolver.Solver.runSolver(currentLevel, 0, 1, true, pmo.bottomOnly,
+           { capturePreviewStats: true, instantChain: pmo.instantChain });
+         oSamples = omni.pressureSamples || []; oWon = omni.completed; oItems = omni.itemMarks || []; oItemUses = omni.itemUses || 0;
++        oStepStats = omni.stepStats || null;
++      }
++      // 【v147】generationEval.omni 只带压力样本、不带 stepStats（那是 solveResult 上的字段），
++      //   所以这里补一层兜底：三处来源取不到就回落到本关的求解记录，否则图会空着。
++      if (!oStepStats || !oStepStats.length) {
++        oStepStats = (currentImportedSolve && currentImportedSolve.stepStats) ||
++                     (currentGenerationEval && currentGenerationEval.omni && currentGenerationEval.omni.stepStats) || null;
+       }
++      chartCache.steps = buildStepSeries(oStepStats, limit);
+       chartCache.omni = {
+         samples: oSamples, won: oWon,
+         choke: AntSolver.Analysis.chokepointMetric(oSamples, totalBoxes, limit),
+@@ -4131,7 +4316,14 @@
+     genMaybeAutoMap(rec);
+     var dt = (rec._elapsedMs / 1000).toFixed(1);
+     var tierTxt = rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '合格' : '不可解'));
+-    genLog(entry.name + '  ' + dt + 's  ' + tierTxt + (rec.valid ? ('  难度' + rec.difficulty + '[' + rec.grade + ']') : ''),
++    // 【v147】空转比（取盒后暂存没降的步数占比）—— 批量时横向比较"压力是从哪来的"
++    var idleTxt = '';
++    if (rec.solve && rec.solve.stepStats && rec.solve.stepStats.length) {
++      var ss = rec.solve.stepStats, up = 0;
++      for (var si = 0; si < ss.length; si++) if ((ss[si].bufAfter || 0) > (ss[si].bufBefore || 0)) up++;
++      idleTxt = '　空转 ' + Math.round(up / ss.length * 100) + '%';
++    }
++    genLog(entry.name + '  ' + dt + 's  ' + tierTxt + (rec.valid ? ('  难度' + rec.difficulty + '[' + rec.grade + ']') : '') + idleTxt,
+       rec.fallback ? 'gen-log-warn' : (rec.audit && (rec.audit.tier === '合格' || rec.audit.tier === '困难合格') ? 'gen-log-ok' : ''));
+     // 【v137】棋盘范围偏大/偏小的提醒（没到"必然淘汰"那一档，所以照常跑，只是先让你看见）。
+     // 命中"必然淘汰"的那一档走上面 gateBlocked 分支，直接给可读原因 + 建议行列。
+@@ -4976,6 +5168,7 @@
+     currentImportedSolve = (rec.solve && rec.solve.pressureSamples && rec.solve.pressureSamples.length) ? {
+       completed: !!rec.solve.completed, steps: rec.solve.steps, maxBuffer: rec.solve.maxBuffer,
+       progress: rec.solve.progress, pressureSamples: rec.solve.pressureSamples,
++      stepStats: rec.solve.stepStats || [],           // 【v147】逐次取盒图要用
+       pickOrder: rec.solve.pickOrder || []
+     } : null;
+     // 卡点信息：口径与生成路径的 chokeInfoOf(result) 一致，只是数据来自落库前的 rec。
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,8 +3,8 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v146·修左栏收起</title>
+-  <link rel="stylesheet" href="css/style.css?v=146">
++  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v147·难度档与逐次取盒图</title>
++  <link rel="stylesheet" href="css/style.css?v=147">
+ </head>
+ <body>
+   <header>
+@@ -273,6 +273,13 @@
+         <div class="chart-title" style="margin-top:10px">玩家模拟 · 暂存压力</div>
+         <canvas id="chart-player" width="300" height="180"></canvas>
+         <div id="chart-player-cap" class="chart-cap"></div>
++
++        <!-- 【v147】逐次取盒序列：上面两张图是按【进度】的均值曲线，这张是按【第几次取盒】的原始序列。
++             柱子颜色 = 这一步暂存有没有降下来（红=取了一盒却没换出释放，绿=降了）。
++             用途：直接看出"是哪几次取盒把暂存顶上去的"、以及"空转比"有多高。 -->
++        <div class="chart-title" style="margin-top:10px">逐次取盒 × 暂存（原始序列）</div>
++        <canvas id="chart-steps" width="300" height="150"></canvas>
++        <div id="chart-steps-cap" class="chart-cap"></div>
+       </div>
+       <!-- 【v144】右栏空闲时的提示：面板常驻后，既没在模拟也没在生成时右栏会空一块 -->
+       <div id="panel-right-hint" class="gen-hint" style="padding:4px 2px">
+@@ -304,6 +311,37 @@
+       </div>
+       <div id="gen-file-list" class="gen-file-list"></div>
+       <div id="gen-file-empty" class="gen-file-empty">尚未导入任何目标图</div>
++    </div>
++
++    <!-- ==================== 【v147】难度档 + 压力来源 ====================
++         参数分层的第一层：平时只需要动这两处。
++         难度档 = 一整套难度旋钮的预设（障碍量 / 卡点类型 / 简单关比例 / 切盒方式），
++                  它会把具体数值写进下面那些控件里，所以"自动"与"手动微调"是同一套数字，不会打架。
++         压力来源 = 在难度档之上做减法：取消勾选就等于把那一类障碍清零。 -->
++    <div class="gen-section">
++      <h2>2. 难度</h2>
++      <div class="gen-row">
++        <label title="一整套难度旋钮的预设。选它之后下面「障碍设置 / 批量生产参数」里的具体数值会被写进去；&#10;你自己再动过任何一项，这里会自动变成「自定义」。&#10;&#10;极难档会顺带把「切盒方式」换成锚点切盒 —— 实测那是目前唯一能自动做出真卡点的切法。">难度档</label>
++        <select id="gen-preset" style="flex:1">
++          <option value="简单">简单（障碍少、六成是简单关）</option>
++          <option value="标准" selected>标准</option>
++          <option value="困难">困难（障碍多、卡点类型 3 种）</option>
++          <option value="极难">极难（障碍最多 + 锚点切盒）</option>
++          <option value="自定义">自定义</option>
++        </select>
++      </div>
++      <div class="gen-row" style="flex-wrap:wrap;gap:8px">
++        <label title="在难度档之上做减法：取消勾选就等于把那一类障碍清零（数字冰/锁链/问号/窄路/管道）。">压力来源</label>
++        <label class="gen-hint"><input type="checkbox" id="gen-src-numice" checked> 数字冰</label>
++        <label class="gen-hint"><input type="checkbox" id="gen-src-chain" checked> 锁链</label>
++        <label class="gen-hint"><input type="checkbox" id="gen-src-question" checked> 问号</label>
++        <label class="gen-hint"><input type="checkbox" id="gen-src-narrow" checked> 窄路</label>
++        <label class="gen-hint"><input type="checkbox" id="gen-src-pipe" checked> 管道</label>
++      </div>
++      <div class="gen-hint" id="gen-preset-info">—</div>
++      <div class="gen-row">
++        <label class="gen-hint" title="引擎内部兜底项（棋盘尺寸、管道三级兜底、填盘交错、候选数、时间预算、卡点逐类参数…）。&#10;平时不用看；要精细控制时再打开。"> <input type="checkbox" id="gen-show-advanced"> 显示高级参数</label>
++      </div>
+     </div>
+ 
+     <!-- 参数方案 -->
+@@ -436,7 +474,7 @@
+     </div>
+ 
+     <!-- 棋盘尺寸 -->
+-    <div class="gen-section">
++    <div class="gen-section" id="gen-sec-board">
+       <div class="gen-accordion-head" data-target="gen-acc-board">
+         <span class="gen-acc-arrow">▾</span><h2>棋盘尺寸（管道自动装溢出盒）</h2>
+       </div>
+@@ -536,7 +574,7 @@
+     </div>
+ 
+     <!-- 批量生产参数 -->
+-    <div class="gen-section">
++    <div class="gen-section" id="gen-sec-batch">
+       <div class="gen-accordion-head" data-target="gen-acc-batch">
+         <span class="gen-acc-arrow">▾</span><h2>批量生产参数</h2>
+       </div>
+@@ -835,18 +873,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=146"></script>
+-  <script src="js/utils.js?v=146"></script>
+-  <script src="js/simulator.js?v=146"></script>
++  <script src="js/zip.js?v=147"></script>
++  <script src="js/utils.js?v=147"></script>
++  <script src="js/simulator.js?v=147"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=146"></script>
+-  <script src="js/solver-strategy.js?v=146"></script>
+-  <script src="js/solver.js?v=146"></script>
+-  <script src="js/playersim.js?v=146"></script>
+-  <script src="js/generator.js?v=146"></script>
+-  <script src="js/analysis.js?v=146"></script>
++  <script src="js/anchor-cut.js?v=147"></script>
++  <script src="js/solver-strategy.js?v=147"></script>
++  <script src="js/solver.js?v=147"></script>
++  <script src="js/playersim.js?v=147"></script>
++  <script src="js/generator.js?v=147"></script>
++  <script src="js/analysis.js?v=147"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=146"></script>
+-  <script src="js/app.js?v=146"></script>
++  <script src="js/level-editor.js?v=147"></script>
++  <script src="js/app.js?v=147"></script>
+ </body>
+ </html>

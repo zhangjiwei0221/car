@@ -1,0 +1,62 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4608,6 +4608,11 @@
+       targetCarCount: _boardAuto ? 36 : _targetCars0,
+       valvePlan: true, valveMode: 'largest', valveIceSteps: 10,
+       maxPipes: 1, pipeFloorCount: 1, pipeFallbackCount: 1,   // 【v228】管道只留 1 条
++      // 【v248】管道深度 2 → 6：实测 35×35（1225 px）在 6×7 盘上切出 34~37 盒，
++      //   而 42 格 - 配额墙 5 格 = 37 个位置，经常差 3~5 盒装不下；管道深度只有 2 → pipeCapacity 10/10 全灭。
++      //   深度 6 后同样 5 个 seed：全灭 5/5 → 出关 5/5（3 个合格）。
++      //   代价：管道里最多藏 6 个盒（进度感偏移），但比"什么都产不出来"强。
++      pipeMaxDepth: 6, pipeMinFill: 2,
+       // 【v242】目标带下界 3 → 3.2：审核的卡点线是 5−1.8=3.2，原来写 3 会让"峰窗正好 3.0"的关
+       //   被搜索当成"进带收工"，却被审核判成"无卡点 → 简单关·趋势过平"。这正是"简单合格"的主要来源。
+       acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4, targetSteadyMin: 30, targetSteadyMax: 80,
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=247">
++  <link rel="stylesheet" href="css/style.css?v=248">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=247"></script>
+-  <script src="js/utils.js?v=247"></script>
++  <script src="js/zip.js?v=248"></script>
++  <script src="js/utils.js?v=248"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=247"></script>
+-  <script src="js/simulator.js?v=247"></script>
++  <script src="js/color-libs.js?v=248"></script>
++  <script src="js/simulator.js?v=248"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=247"></script>
+-  <script src="js/solver-strategy.js?v=247"></script>
+-  <script src="js/solver.js?v=247"></script>
+-  <script src="js/playersim.js?v=247"></script>
+-  <script src="js/generator.js?v=247"></script>
+-  <script src="js/analysis.js?v=247"></script>
++  <script src="js/anchor-cut.js?v=248"></script>
++  <script src="js/solver-strategy.js?v=248"></script>
++  <script src="js/solver.js?v=248"></script>
++  <script src="js/playersim.js?v=248"></script>
++  <script src="js/generator.js?v=248"></script>
++  <script src="js/analysis.js?v=248"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=247"></script>
+-  <script src="js/app.js?v=247"></script>
++  <script src="js/level-editor.js?v=248"></script>
++  <script src="js/app.js?v=248"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

@@ -1,0 +1,178 @@
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,16 +3,15 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>蚂蚁拿块求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v147·难度档与逐次取盒图</title>
+-  <link rel="stylesheet" href="css/style.css?v=147">
++  <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v150·右栏随模拟态切换</title>
++  <link rel="stylesheet" href="css/style.css?v=150">
+ </head>
+ <body>
+   <header>
+-    <h1>🐜 蚂蚁拿块求解器</h1>
+-    <div class="view-switch">
+-      <button id="btn-view-simulator" class="view-switch-btn active" title="单关调试/模拟游玩/求解回放">🎮 模拟器</button>
+-      <button id="btn-view-generator" class="view-switch-btn" title="批量生产关卡：导入TXT→设参数→批量生成→查看进度与结果">🏭 生成器</button>
+-    </div>
++    <h1>🐜 车间小人求解器</h1>
++    <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
++         右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
++         退出模拟就自动回到生成器的参数面板。 -->
+     <div class="header-actions" id="header-actions">
+       <button id="btn-import-txt">导入TXT图</button>
+       <button id="btn-import-pack" title="导入整个关卡包文件夹（关卡/ + 审核数据/），自动配对求解数据">导入关卡包📁</button>
+@@ -281,18 +280,11 @@
+         <canvas id="chart-steps" width="300" height="150"></canvas>
+         <div id="chart-steps-cap" class="chart-cap"></div>
+       </div>
+-      <!-- 【v144】右栏空闲时的提示：面板常驻后，既没在模拟也没在生成时右栏会空一块 -->
+-      <div id="panel-right-hint" class="gen-hint" style="padding:4px 2px">
+-        点顶栏「🏭 <b>生成器</b>」→ 这一栏变成生成器：导入目标图、调参数、批量生产；<br>
+-        生产出的关卡会直接映射到中间的棋盘区。<br>
+-        点「🎮 <b>模拟器</b>」→ 这一栏变回模拟控制与暂存压力图。
+-      </div>
+-
+       <!-- ==================== 【v144】生成器（并入主界面右栏）====================
+            原来是独立的「生成器页面」（整页切换），现改为同一视图右栏里的一个面板：
+            点顶栏「🏭 生成器」右栏换成这一块，中间棋盘区保持可见 —— 生产出的关卡可直接
+            映射到棋盘上看，不用来回切页。参数手风琴 / 开始生成 / 进度 / 结果全在这里。 -->
+-      <div id="gen-controls" class="hidden">
++      <div id="gen-controls">
+   <!-- 左栏：导入 + 参数(手风琴分组) -->
+   <aside id="gen-panel-left">
+     <div class="gen-section">
+@@ -873,18 +865,18 @@
+   <input type="file" id="scheme-input" accept=".json" style="display:none">
+   <input type="file" id="lib-dir-input" webkitdirectory directory multiple style="display:none">
+ 
+-  <script src="js/zip.js?v=147"></script>
+-  <script src="js/utils.js?v=147"></script>
+-  <script src="js/simulator.js?v=147"></script>
++  <script src="js/zip.js?v=150"></script>
++  <script src="js/utils.js?v=150"></script>
++  <script src="js/simulator.js?v=150"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=147"></script>
+-  <script src="js/solver-strategy.js?v=147"></script>
+-  <script src="js/solver.js?v=147"></script>
+-  <script src="js/playersim.js?v=147"></script>
+-  <script src="js/generator.js?v=147"></script>
+-  <script src="js/analysis.js?v=147"></script>
++  <script src="js/anchor-cut.js?v=150"></script>
++  <script src="js/solver-strategy.js?v=150"></script>
++  <script src="js/solver.js?v=150"></script>
++  <script src="js/playersim.js?v=150"></script>
++  <script src="js/generator.js?v=150"></script>
++  <script src="js/analysis.js?v=150"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=147"></script>
+-  <script src="js/app.js?v=147"></script>
++  <script src="js/level-editor.js?v=150"></script>
++  <script src="js/app.js?v=150"></script>
+ </body>
+ </html>
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -133,35 +133,37 @@
+    *   · 模拟器模式 → 右栏 = 模拟控制 + 暂存压力图（原行为）
+    *   · 生成器模式 → 右栏 = 导入/参数手风琴 + 开始生成 + 进度 + 结果表（原生成器页整块）
+    */
+-  var genMode = false;
+-  function switchView(view) {
+-    genMode = (view === 'generator');
+-    var btnSim = document.getElementById('btn-view-simulator');
+-    var btnGen = document.getElementById('btn-view-generator');
+-    if (btnSim) btnSim.classList.toggle('active', !genMode);
+-    if (btnGen) btnGen.classList.toggle('active', genMode);
+-    applyRightPanels();
+-    if (genMode) renderGenFileList();
++  /**
++   * 【v150·取代 v144 的顶栏按钮切换】右栏跟着【状态】走，不再需要用户切：
++   *   · 进「模拟游玩」→ 模拟控制 + 暂存压力图
++   *   · 退出模拟     → 自动回到生成器（导入 / 参数 / 开始生成 / 进度 / 结果）
++   *   · 手动摆盒     → 摆盒工具条
++   * 用户原话：「只需要在点击『模拟游玩』的时候，才显示模拟控制以及压力曲线的卡片；
++   *            退出模拟的时候，就又恢复成生成器的那些参数数据」。
++   */
++  function rightPanelMode() {
++    if (editMode) return 'edit';
++    if (simulating) return 'sim';
++    return 'gen';
+   }
+ 
+   /**
+-   * 【v144】按当前状态决定右栏显示哪一块。单一入口，避免 enter/exit 各处各写一遍导致显隐打架。
+-   *   优先级：生成模式 > 摆盒编辑 > 模拟游玩 > 都空闲（给一句提示）。
++   * 【v144 引入 / v150 改为随状态】右栏显示哪一块。单一入口，避免 enter/exit 各处各写一遍导致显隐打架。
++   *   优先级：摆盒编辑 > 模拟游玩 > 生成器（默认）。没有"空闲态"了 —— 平时就显示生成器。
+    */
+   function applyRightPanels() {
++    var mode = rightPanelMode();
+     var rail = document.getElementById('panel-right');
+     if (rail) rail.classList.remove('hidden');   // v144 起右栏常驻
+     var gen = document.getElementById('gen-controls');
+     var sim = document.getElementById('sim-controls');
+     var charts = document.getElementById('board-charts');
+     var edit = document.getElementById('edit-controls');
+-    var hint = document.getElementById('panel-right-hint');
+-    var showGen = genMode, showEdit = !genMode && editMode, showSim = !genMode && !editMode && simulating;
+-    if (gen) gen.classList.toggle('hidden', !showGen);
+-    if (edit) edit.classList.toggle('hidden', !showEdit);
+-    if (sim) sim.classList.toggle('hidden', !showSim);
+-    if (charts) charts.classList.toggle('hidden', !showSim);
+-    if (hint) hint.classList.toggle('hidden', showGen || showEdit || showSim);
++    if (gen) gen.classList.toggle('hidden', mode !== 'gen');
++    if (edit) edit.classList.toggle('hidden', mode !== 'edit');
++    if (sim) sim.classList.toggle('hidden', mode !== 'sim');
++    if (charts) charts.classList.toggle('hidden', mode !== 'sim');
++    if (mode === 'gen') { try { renderGenFileList(); } catch (e) {} }
+   }
+ 
+   /**
+@@ -454,7 +456,6 @@
+     renderSchemeSelect();
+ 
+     // ---- 生成器独立页面 ----
+-    bindClick('btn-view-simulator', function () { switchView('simulator'); });
+     // 【v144】左栏收起/展开（收起后把宽度让给棋盘；中列左上角浮现「展开」按钮）
+     bindClick('btn-collapse-left', function () { setLeftPanelCollapsed(); });   // 不传 = 开关
+     // 【v147】难度档 / 压力来源 / 高级参数
+@@ -470,7 +471,6 @@
+       applyAdvancedVisibility();      // 默认收起高级段
+       updatePresetInfo();
+     })();
+-    bindClick('btn-view-generator', function () { switchView('generator'); });
+     bindClick('btn-gen-import-txt', importTXT);
+     bindClick('btn-gen-start', batchProduce);
+     bindClick('btn-gen-stop', stopBatchProduce);
+@@ -498,6 +498,7 @@
+         genLoadToBoard(genResultRows[idx]);
+       });
+     })();
++    applyRightPanels();   // 【v150】初始即按状态摆右栏（没在模拟/摆盒 → 显示生成器）
+     // 参数分组手风琴：点标题展开/收起对应分组体
+     var accHeads = document.querySelectorAll('.gen-accordion-head');
+     for (var ai = 0; ai < accHeads.length; ai++) {
+@@ -4364,7 +4365,7 @@
+    *   不进模拟态 —— 要玩就点结果行末尾的「🎮 带入棋盘」。
+    */
+   function genMaybeAutoMap(rec) {
+-    if (!genMode || !rec || !rec.level) return;
++    if (simulating || editMode || !rec || !rec.level) return;   // 模拟/摆盒时不抢棋盘
+     var chk = document.getElementById('gen-auto-map');
+     if (chk && !chk.checked) return;
+     try {
+@@ -5189,10 +5190,7 @@
+       dropped: (rec.chokeFallback && rec.chokeFallback.dropped) || null
+     } : null;
+     renderLevelInfo();   // 重渲染一次，把上面三项（入口模式/卡点信息）带进「关卡信息」面板
+-    if (enterSim) {
+-      switchView('simulator');
+-      enterSimulation();
+-    }
++    if (enterSim) enterSimulation();   // 【v150】右栏会随 simulating 自动切成模拟控制
+     return true;
+   }
+ 

@@ -1,0 +1,122 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -1480,12 +1480,16 @@
+           if (d0) { d0.shrinkDist = 0; allDims.push(d0); }
+         }
+       }
+-      for (var sr = rMin - 1; sr >= shrinkFloor; sr--) {
+-        for (var dcol = 1; dcol <= 2; dcol++) {
+-          var sc = sr + dcol;
+-          if (sc < 3) continue;
+-          var ds = feasAt(sr, sc);
+-          if (ds) { ds.shrinkDist = rMin - sr; allDims.push(ds); }
++      // 【v205】棋盘硬范围：开了 boardHardRange 就不许"向下缩小"出范围，
++      //   也不许借缩小路径把棋盘做小（缩小会让周长/车数比例变差、暴露更多）。
++      if (!config.boardHardRange) {
++        for (var sr = rMin - 1; sr >= shrinkFloor; sr--) {
++          for (var dcol = 1; dcol <= 2; dcol++) {
++            var sc = sr + dcol;
++            if (sc < 3) continue;
++            var ds = feasAt(sr, sc);
++            if (ds) { ds.shrinkDist = rMin - sr; allDims.push(ds); }
++          }
+         }
+       }
+       if (allDims.length) {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=204">
++  <link rel="stylesheet" href="css/style.css?v=205">
+ </head>
+ <body>
+   <header>
+@@ -324,6 +324,16 @@
+       <div class="gen-hint" style="line-height:1.8">
+         参数已固定，不用调：按目标图尺寸自动选预设（小图 / 大图）· 设计扫描（早车档 4~0 + 增容 1.5/2）· 候选 6 · 单关 5 分钟 · 难度标定 7 轮。
+       </div>
++      <div class="gen-row" style="margin-top:8px">
++        <label title="棋盘行数范围（含端点）。生成器只在这个范围内选棋盘，不会缩到范围外。">棋盘行</label>
++        <input type="number" id="gen-rows-min" value="7" min="4" max="20" style="width:52px">
++        <span class="gen-hint">~</span>
++        <input type="number" id="gen-rows-max" value="9" min="4" max="20" style="width:52px">
++        <label style="margin-left:14px" title="棋盘列数范围（含端点）。列必须比行大 1~2 格。">列</label>
++        <input type="number" id="gen-cols-min" value="8" min="4" max="30" style="width:52px">
++        <span class="gen-hint">~</span>
++        <input type="number" id="gen-cols-max" value="10" min="4" max="30" style="width:52px">
++      </div>
+     </div>
+ 
+     <!-- 参数方案 -->
+@@ -464,15 +474,15 @@
+         </div>
+         <div class="gen-row">
+           <label title="仅「手动指定范围」时生效；列>行">行数范围</label>
+-          <input type="number" id="gen-rows-min" min="3" max="20" value="8" style="width:48px">
++          <input type="number" id="gen-board-rows-min" min="3" max="20" value="8" style="width:48px">
+           <span style="width:12px">~</span>
+-          <input type="number" id="gen-rows-max" min="3" max="20" value="9" style="width:48px">
++          <input type="number" id="gen-board-rows-max" min="3" max="20" value="9" style="width:48px">
+         </div>
+         <div class="gen-row">
+           <label title="仅「手动指定范围」时生效；列>行">列数范围</label>
+-          <input type="number" id="gen-cols-min" min="3" max="30" value="11" style="width:48px">
++          <input type="number" id="gen-board-cols-min" min="3" max="30" value="11" style="width:48px">
+           <span style="width:12px">~</span>
+-          <input type="number" id="gen-cols-max" min="3" max="30" value="16" style="width:48px">
++          <input type="number" id="gen-board-cols-max" min="3" max="30" value="16" style="width:48px">
+         </div>
+         <div class="gen-row">
+           <label title="不规律锯齿墙(斜向/边缘锚定)+缺口+缺口冰/锁链，制造唯一可达通道，需推理才可通过">窄路卡点</label>
+@@ -823,20 +833,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=204"></script>
+-  <script src="js/utils.js?v=204"></script>
++  <script src="js/zip.js?v=205"></script>
++  <script src="js/utils.js?v=205"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=204"></script>
+-  <script src="js/simulator.js?v=204"></script>
++  <script src="js/color-libs.js?v=205"></script>
++  <script src="js/simulator.js?v=205"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=204"></script>
+-  <script src="js/solver-strategy.js?v=204"></script>
+-  <script src="js/solver.js?v=204"></script>
+-  <script src="js/playersim.js?v=204"></script>
+-  <script src="js/generator.js?v=204"></script>
+-  <script src="js/analysis.js?v=204"></script>
++  <script src="js/anchor-cut.js?v=205"></script>
++  <script src="js/solver-strategy.js?v=205"></script>
++  <script src="js/solver.js?v=205"></script>
++  <script src="js/playersim.js?v=205"></script>
++  <script src="js/generator.js?v=205"></script>
++  <script src="js/analysis.js?v=205"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=204"></script>
+-  <script src="js/app.js?v=204"></script>
++  <script src="js/level-editor.js?v=205"></script>
++  <script src="js/app.js?v=205"></script>
+ </body>
+ </html>
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4484,7 +4484,12 @@
+     var out = Object.assign({}, cfg, preset, {
+       candidateCount: 6, portfolioK: 1, timeBudgetMs: 300000, difficultyRounds: 7,
+       goodV3: true, requireHardPass: false, seed: null,
+-      designSweep: true, designDebt: true   // 【v201】饥荒强度 3/2/1 扫描，按最终 goodV3 择优
++      designSweep: true, designDebt: true,  // 【v201】饥荒强度扫描，按最终 goodV3 择优
++      boardHardRange: true,                 // 【v205】棋盘尺寸严格落在下面的范围内（不许缩小出范围）
++      boardRowsMin: (parseInt((document.getElementById('gen-rows-min') || {}).value, 10) || 7),
++      boardRowsMax: (parseInt((document.getElementById('gen-rows-max') || {}).value, 10) || 9),
++      boardColsMin: (parseInt((document.getElementById('gen-cols-min') || {}).value, 10) || 8),
++      boardColsMax: (parseInt((document.getElementById('gen-cols-max') || {}).value, 10) || 10)
+     });
+     try {
+       genLog('固定参数：' + (big ? '大图' : '小图') + '预设（' + R + '×' + C + '）· 每图多产 3 次 · 候选 6 · 单关 5 分钟',

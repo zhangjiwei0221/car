@@ -1,0 +1,131 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -68,6 +68,29 @@
+     //   证据：同一张图把切盒方式从"趋势切"换成"锚点切盒"（把同一色拆到前后两半，车的跨度变大），
+     //   v137 实测 5 轮里 3 轮直接变成"有卡点合格"。要加压请走切盒形状族那条路。
+     boxPhaseShiftPct: 0,
++    // ===== 【v148】切盒"跨度"轴：像素流的排序键在「趋势序」与「等深线序」之间插值 =====
++    //
++    // ⚠⚠ 实测结论：**这条轴（无论往哪个方向）都没有可辨别的效果，默认必须保持 0、不进界面。**
++    //    保留实现只为留证据，别再试一遍。要加压请走【地理分片】（锚点切盒）那条路。
++    //
++    // 当初的假设：难度杠杆是"一辆车的像素在时间轴上跨多宽"（v147 由锚点切的效果反推），
++    //   于是把"跨度"做成本轴：0 = 趋势序（自下而上逐行）、1 = 等深线序（同层先装、跨度最小）。
++    //
++    // 实测（图 27×32 / 盒容量 40~60 / 每臂 12 轮 / **配对固定种子** / 管道下限 1）：
++    //     方案                出关     卡点区峰窗均   峰值暂存均   空转比
++    //     趋势切（0，现状）    12/12      0.67          0.67        5%
++    //     等深线（1）          12/12      0.92          0.92        7%
++    //     列优先（跨度最大）    12/12      0.67          0.67        5%
++    //     锚点切盒（对照组）    12/12      1.67          1.67       12%   ← 配对比较 10 胜 2 负
++    //   → 排序键这条轴的两端与中间都没有效果；**有效的是"地理分片"**（把图切成 A/B 两片、
++    //     片内照常切盒、片间串行出场）——那不是排序问题，是分区问题。
++    //
++    // 【评估方法（比结论更重要）】用小样本 + 二元统计量（"这关有没有卡点"）**分不出差异**：
++    //   同一份代码在 5 轮里能在 1/5 与 5/5 之间跳。要评估请用 /private/tmp/numice_gen/seeded_ab.js
++    //   那种【配对固定种子 + 连续量（卡点区峰窗 / 峰值暂存 / 空转比）】的做法。
++    boxCutSpan: 0,
++    // 【v148】'trend'(默认/现状) | 'column'（按列、列内由外向内 = 深度跨度最大）—— 同上，实测无效
++    boxCutOrder: 'trend',
+     // —— 锚点切盒专用参数（仅 boxCutMode:'anchor' 生效；沿用沙盒 anchor-cut.js 的原生字段名）——
+     // 双锚点 = 左下 + 右下；'single' = 只留底部中点（A/B 退化为单组，对照用）
+     anchorMode: 'double',
+@@ -5317,14 +5340,88 @@
+    * 盒最终按 trendStart(消除趋势先后)排序，其数组下标即【基础消除顺序 elimSeq】，供 buildBoard 顺序填入。
+    *
+    * 返回的盒序列真实可解性仍由外层 Solver.solve 判定/重试；此处只负责“趋势=消除顺序”的盒切分与排序。
++   */
++  /**
++   * 【v148】像素"到图外的测地深度"：0 = 直接贴盘外；数越大越靠芯。
++   *   用 0-1 BFS：穿过空格(0) 不花代价、穿过实心像素花 1 —— 也就是"要剥掉几层实心才够得着它"。
++   *   这正是"消解波纹"的几何形状（不区分颜色；颜色由装箱那一步负责）。
+    */
++  function pixelDepthMap(blocks, rows, cols) {
++    var INF = 1e9, dist = [];
++    for (var r = 0; r < rows; r++) { var row = []; for (var c = 0; c < cols; c++) row.push(INF); dist.push(row); }
++    var dq = [], head = 0;                       // 0-1 BFS 用双端队列（数组 + 头指针，够用且不依赖第三方）
++    function pushFront(x) { dq.unshift(x); }
++    function pushBack(x) { dq.push(x); }
++    for (var r2 = 0; r2 < rows; r2++) for (var c2 = 0; c2 < cols; c2++) {
++      if (!(r2 === 0 || r2 === rows - 1 || c2 === 0 || c2 === cols - 1)) continue;
++      var w = (blocks[r2][c2] > 0) ? 1 : 0;       // 贴边的实心像素深度 1（要剥它自己），空格 0
++      if (w < dist[r2][c2]) { dist[r2][c2] = w; if (w === 0) pushFront([r2, c2]); else pushBack([r2, c2]); }
++    }
++    var DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++    while (head < dq.length) {
++      var cur = dq[head++], cr = cur[0], cc = cur[1], cd = dist[cr][cc];
++      if (cd > dist[cr][cc]) continue;
++      for (var k = 0; k < 4; k++) {
++        var nr = cr + DIRS[k][0], nc = cc + DIRS[k][1];
++        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
++        var w2 = (blocks[nr][nc] > 0) ? 1 : 0, nd = cd + w2;
++        if (nd < dist[nr][nc]) {
++          dist[nr][nc] = nd;
++          if (w2 === 0) pushFront([nr, nc]); else pushBack([nr, nc]);
++        }
++      }
++    }
++    return dist;
++  }
++
++  /**
++   * 【v148】切盒跨度：把"像素流"的先后在【趋势序】与【等深线序】之间插值。
++   *   · span = 0 → 原样返回 bottomTrendPixels（**零值短路，口径逐字节不变**）
++   *   · span > 0 → 两条序各自归一成名次 [0,1]，按 key = span·深度名次 + (1−span)·趋势名次 升序重排
++   * 只改"像素先装谁"，装箱规则（同色累积到本盒容量即封箱）一格不动。
++   */
++  function cutSpanPixels(blocks, rows, cols, config) {
++    var pixels = AntSolver.bottomTrendPixels(blocks, rows, cols);
++    var span = parseFloat(config && config.boxCutSpan);
++    if (!(span > 0) || pixels.length < 2) return pixels;
++    span = Math.min(1, span);
++    var depth = pixelDepthMap(blocks, rows, cols);
++    // 【v148 探针】另一支排序：按【列】分组、列内按"到图外的深度"从外到内 ——
++    //   一辆车 = 同一列里同色的一段，从盘边一路贯到深处 → 深度跨度最大（与"等深线序"正好相反）。
++    //   用来检验"跨度大 → 压力大"这条理论是否只在一边成立。
++    if (config && config.boxCutOrder === 'column') {
++      var outC = pixels.slice();
++      outC.sort(function (a, b) {
++        return (a.c - b.c) || (depth[a.r][a.c] - depth[b.r][b.c]) || (a.trend - b.trend);
++      });
++      return outC;
++    }
++    var n = pixels.length;
++    // 深度名次：按深度值排序后的名次（同深度保持稳定的趋势序）
++    var byDepth = pixels.slice().sort(function (a, b) {
++      var da = depth[a.r][a.c], db = depth[b.r][b.c];
++      return (da - db) || (a.trend - b.trend);
++    });
++    var depthRank = {};
++    for (var i = 0; i < n; i++) depthRank[byDepth[i].r + ',' + byDepth[i].c] = i / (n - 1 || 1);
++    var out = pixels.slice();
++    var score = {};
++    for (var j = 0; j < n; j++) {
++      var p = pixels[j];
++      var tRank = (p.trend != null ? p.trend : j) / (n - 1 || 1);
++      score[p.r + ',' + p.c] = span * depthRank[p.r + ',' + p.c] + (1 - span) * tRank;
++    }
++    out.sort(function (a, b) { return score[a.r + ',' + a.c] - score[b.r + ',' + b.c]; });
++    return out;
++  }
++
+   function baseFillBoxes(blocks, config) {
+     var rows = blocks.length, cols = blocks[0].length;
+     var boxMin = config.boxSizeMin || 40, boxMax = config.boxSizeMax || 56;
+     if (boxMax < boxMin) { var t = boxMin; boxMin = boxMax; boxMax = t; }
+     var pickCap = makeCapPicker(config);   // 三处铺盒共用同一采样器（含 polar 两极化）
+ 
+-    var pixels = AntSolver.bottomTrendPixels(blocks, rows, cols);
++    var pixels = cutSpanPixels(blocks, rows, cols, config);   // 【v148】趋势序 ↔ 等深线序（span=0 时与原来完全一致）
+     var boxes = [], active = {}, perColor = {}, capOf = {};
+     for (var i = 0; i < pixels.length; i++) {
+       var p = pixels[i], box = active[p.color];
+@@ -6922,6 +7019,8 @@
+     suggestBoardRange: suggestBoardRange,
+     applyAutoBoardRange: applyAutoBoardRange,
+     applyBoxPhase: applyBoxPhase,           // 【v147】错位量：旋转车在棋盘上的排位
++    cutSpanPixels: cutSpanPixels,           // 【v148】切盒跨度：趋势序 ↔ 等深线序
++    pixelDepthMap: pixelDepthMap,
+     withBoardRange: withBoardRange,
+     boardCellsExtent: boardCellsExtent,                     // 方案范围内合法棋盘的最小/最大格数
+     suggestBoardRange: suggestBoardRange,                   // 由车数反推建议行列范围

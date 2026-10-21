@@ -1,0 +1,115 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -650,9 +650,24 @@
+       });
+       var adv = document.getElementById('gen-show-advanced');
+       if (adv) adv.addEventListener('change', function () {
+-        genAdvancedForce = !!adv.checked;   // 【v195】勾选要真的控制开关（原来只重画，不读勾选状态）
++        genAdvancedForce = !!adv.checked;   // 【v195】勾选要真的控制开关
++        if (!genAdvancedForce) genAllForce = false;
+         applyAdvancedVisibility();
+       });
++      var advAll = document.getElementById('gen-show-all');
++      if (advAll) advAll.addEventListener('change', function () {
++        genAllForce = !!advAll.checked;
++        applyAdvancedVisibility();
++      });
++      // 【v196】把"怪参数"行标成 adv-full：卡点类型相关、并发、碎色
++      (function markExoticRows() {
++        function mark(el) {
++          var row = el && el.closest ? el.closest('.gen-row') : null;
++          if (row) row.classList.add('adv-full');
++        }
++        document.querySelectorAll('[id^="gen-choke-"]').forEach(mark);
++        ['gen-pool-size', 'gen-frag-max'].forEach(function (id) { mark(document.getElementById(id)); });
++      })();
+       // 【v153】高级参数临时开关：Ctrl+Shift+A（界面默认不显示，这条是留给调试/精调的后门）
+       document.addEventListener('keydown', function (e) {
+         if (e && e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+@@ -940,12 +955,30 @@
+    *   所以"看不见" ≠ "配置变了"）。
+    */
+   var genAdvancedForce = false;
++  var genAllForce = false;
++  /**
++   * 【v196】两级可见性：
++   *   一级（显示高级参数）：只开【参数方案】+【批量生产参数】——日常真要动的；
++   *   二级（显示全部参数）：才开基础参数/障碍/棋盘/卡点类型/切球规划器；
++   *   批量段里的"怪参数"行（卡点类型 12 勾选、检查次数×概率、位置区间、并发、碎色）标 .adv-full，二级才显示。
++   */
+   function applyAdvancedVisibility() {
+-    var on = genAdvancedForce;
+-    ['gen-sec-scheme', 'gen-sec-basic', 'gen-sec-obstacle', 'gen-sec-board', 'gen-sec-batch', 'cutplanner-card'].forEach(function (id) {
++    var on = !!genAdvancedForce;
++    ['gen-sec-scheme', 'gen-sec-batch'].forEach(function (id) {
+       var el = document.getElementById(id);
+       if (el) el.classList.toggle('hidden', !on);
+     });
++    var all = on && !!genAllForce;
++    ['gen-sec-basic', 'gen-sec-obstacle', 'gen-sec-board', 'cutplanner-card'].forEach(function (id) {
++      var el = document.getElementById(id);
++      if (el) el.classList.toggle('hidden', !all);
++    });
++    var nodes = document.querySelectorAll('.adv-full');
++    for (var i = 0; i < nodes.length; i++) nodes[i].classList.toggle('hidden', !all);
++    var wrap = document.getElementById('gen-show-all-wrap');
++    if (wrap) wrap.style.display = on ? '' : 'none';
++    var allChk = document.getElementById('gen-show-all');
++    if (allChk) allChk.checked = !!genAllForce;
+   }
+ 
+   function refreshDualRanges() {
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=195">
++  <link rel="stylesheet" href="css/style.css?v=196">
+ </head>
+ <body>
+   <header>
+@@ -336,7 +336,8 @@
+       </div>
+             <div class="gen-hint" id="gen-auto-info">自动档：盒容量 / 冰 / 锁链 / 问号 / 管道 数量都由规则推，日志里会写出每一个数是怎么来的。</div>
+       <div class="gen-row">
+-        <label class="gen-hint" title="展开「参数方案 / 基础参数 / 障碍设置 / 棋盘尺寸 / 批量生产参数 / 切球规划器」。\n也可以按 Ctrl+Shift+A 临时开合。"> <input type="checkbox" id="gen-show-advanced"> 显示高级参数</label>
++        <label class="gen-hint" title="只展开【参数方案】和【批量生产参数】两段（方案读取/保存、每图多产、候选数、单关限时、难度轮次）。"> <input type="checkbox" id="gen-show-advanced"> 显示高级参数</label>
++        <label class="gen-hint" id="gen-show-all-wrap" style="display:none;margin-left:10px" title="展开全部：基础参数 / 障碍设置 / 棋盘尺寸 / 卡点类型 / 切球规划器。一般不用动。"> <input type="checkbox" id="gen-show-all"> 显示全部参数（慎动）</label>
+       </div>
+     </div>
+ 
+@@ -837,20 +838,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=195"></script>
+-  <script src="js/utils.js?v=195"></script>
++  <script src="js/zip.js?v=196"></script>
++  <script src="js/utils.js?v=196"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=195"></script>
+-  <script src="js/simulator.js?v=195"></script>
++  <script src="js/color-libs.js?v=196"></script>
++  <script src="js/simulator.js?v=196"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=195"></script>
+-  <script src="js/solver-strategy.js?v=195"></script>
+-  <script src="js/solver.js?v=195"></script>
+-  <script src="js/playersim.js?v=195"></script>
+-  <script src="js/generator.js?v=195"></script>
+-  <script src="js/analysis.js?v=195"></script>
++  <script src="js/anchor-cut.js?v=196"></script>
++  <script src="js/solver-strategy.js?v=196"></script>
++  <script src="js/solver.js?v=196"></script>
++  <script src="js/playersim.js?v=196"></script>
++  <script src="js/generator.js?v=196"></script>
++  <script src="js/analysis.js?v=196"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=195"></script>
+-  <script src="js/app.js?v=195"></script>
++  <script src="js/level-editor.js?v=196"></script>
++  <script src="js/app.js?v=196"></script>
+ </body>
+ </html>

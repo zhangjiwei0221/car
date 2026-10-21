@@ -1,0 +1,58 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4565,9 +4565,9 @@
+     // 【v223】单一模式：大容量 + 小盘 + 拆车补空（实测稳健 33~83%、峰窗 4）
+     preset = Object.assign({}, preset, { boxSizeMin: 34, boxSizeMax: 50 });
+     var out = Object.assign({}, cfg, preset, {
+-      candidateCount: 6, portfolioK: 1, timeBudgetMs: 300000, difficultyRounds: 7,
++      candidateCount: 4, portfolioK: 1, timeBudgetMs: 90000, difficultyRounds: 3,   // 【v224】提速：4 候选 × 3 轮 × 90s
+       goodV3: true, requireHardPass: false, seed: null,
+-      designSweep: true, designDebt: true,  // 【v201】饥荒强度扫描，按最终 goodV3 择优
++      designSweep: false, designDebt: false, // 【v224】单套参数，取消扫描（之前每张图跑 11 变体 × 6 候选 × 7 轮，太慢）
+       boardHardRange: !_boardAuto,          // 【v207】不勾自适应 = 硬范围（不许缩小、不许自动换范围）
+       boardAllowSquare: true,               // 【v211】允许正方形（列=行）
+       boardAuto: _boardAuto,                // 【v207】勾了自适应 = 按车数反推范围，忽略手填数字
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=223">
++  <link rel="stylesheet" href="css/style.css?v=224">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=223"></script>
+-  <script src="js/utils.js?v=223"></script>
++  <script src="js/zip.js?v=224"></script>
++  <script src="js/utils.js?v=224"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=223"></script>
+-  <script src="js/simulator.js?v=223"></script>
++  <script src="js/color-libs.js?v=224"></script>
++  <script src="js/simulator.js?v=224"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=223"></script>
+-  <script src="js/solver-strategy.js?v=223"></script>
+-  <script src="js/solver.js?v=223"></script>
+-  <script src="js/playersim.js?v=223"></script>
+-  <script src="js/generator.js?v=223"></script>
+-  <script src="js/analysis.js?v=223"></script>
++  <script src="js/anchor-cut.js?v=224"></script>
++  <script src="js/solver-strategy.js?v=224"></script>
++  <script src="js/solver.js?v=224"></script>
++  <script src="js/playersim.js?v=224"></script>
++  <script src="js/generator.js?v=224"></script>
++  <script src="js/analysis.js?v=224"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=223"></script>
+-  <script src="js/app.js?v=223"></script>
++  <script src="js/level-editor.js?v=224"></script>
++  <script src="js/app.js?v=224"></script>
+ </body>
+ </html>

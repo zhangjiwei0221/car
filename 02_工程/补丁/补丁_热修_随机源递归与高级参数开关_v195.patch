@@ -1,0 +1,84 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -37,7 +37,7 @@
+   //   ② 风险清单 R5「随机种子未固定」一直挂着；③ 所有 A/B 才可复现。
+   var _RNG = { on: false, s: 1 };
+   function rnd() {
+-    if (!_RNG.on) return rnd();
++    if (!_RNG.on) return Math.random();   // ← 这里必须是 Math.random：不能被批量替换成 rnd（会无限递归）
+     _RNG.s = (_RNG.s * 1664525 + 1013904223) >>> 0;
+     return _RNG.s / 4294967296;
+   }
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -649,11 +649,15 @@
+         if (el) el.addEventListener('change', applyStressSources);
+       });
+       var adv = document.getElementById('gen-show-advanced');
+-      if (adv) adv.addEventListener('change', applyAdvancedVisibility);
++      if (adv) adv.addEventListener('change', function () {
++        genAdvancedForce = !!adv.checked;   // 【v195】勾选要真的控制开关（原来只重画，不读勾选状态）
++        applyAdvancedVisibility();
++      });
+       // 【v153】高级参数临时开关：Ctrl+Shift+A（界面默认不显示，这条是留给调试/精调的后门）
+       document.addEventListener('keydown', function (e) {
+         if (e && e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+           genAdvancedForce = !genAdvancedForce;
++          if (adv) adv.checked = genAdvancedForce;
+           applyAdvancedVisibility();
+           genLog(genAdvancedForce ? '高级参数已临时显示（Ctrl+Shift+A 再按一次收起）' : '高级参数已收起', 'gen-log-warn');
+         }
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=194">
++  <link rel="stylesheet" href="css/style.css?v=195">
+ </head>
+ <body>
+   <header>
+@@ -335,6 +335,9 @@
+         <span class="gen-hint">步数（车数）；0=自动</span>
+       </div>
+             <div class="gen-hint" id="gen-auto-info">自动档：盒容量 / 冰 / 锁链 / 问号 / 管道 数量都由规则推，日志里会写出每一个数是怎么来的。</div>
++      <div class="gen-row">
++        <label class="gen-hint" title="展开「参数方案 / 基础参数 / 障碍设置 / 棋盘尺寸 / 批量生产参数 / 切球规划器」。\n也可以按 Ctrl+Shift+A 临时开合。"> <input type="checkbox" id="gen-show-advanced"> 显示高级参数</label>
++      </div>
+     </div>
+ 
+     <!-- 参数方案 -->
+@@ -834,20 +837,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=194"></script>
+-  <script src="js/utils.js?v=194"></script>
++  <script src="js/zip.js?v=195"></script>
++  <script src="js/utils.js?v=195"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=194"></script>
+-  <script src="js/simulator.js?v=194"></script>
++  <script src="js/color-libs.js?v=195"></script>
++  <script src="js/simulator.js?v=195"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=194"></script>
+-  <script src="js/solver-strategy.js?v=194"></script>
+-  <script src="js/solver.js?v=194"></script>
+-  <script src="js/playersim.js?v=194"></script>
+-  <script src="js/generator.js?v=194"></script>
+-  <script src="js/analysis.js?v=194"></script>
++  <script src="js/anchor-cut.js?v=195"></script>
++  <script src="js/solver-strategy.js?v=195"></script>
++  <script src="js/solver.js?v=195"></script>
++  <script src="js/playersim.js?v=195"></script>
++  <script src="js/generator.js?v=195"></script>
++  <script src="js/analysis.js?v=195"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=194"></script>
+-  <script src="js/app.js?v=194"></script>
++  <script src="js/level-editor.js?v=195"></script>
++  <script src="js/app.js?v=195"></script>
+ </body>
+ </html>

@@ -1,0 +1,264 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -6320,6 +6320,14 @@
+         (b.spreadPct != null && b.spreadPct >= 50 ? (' ⚠ 策略差 ' + b.spreadPct + ' 个点=稳健玩家被坑') : ''),
+         (b.steadyWonPct != null && b.steadyWonPct < 50) || (b.spreadPct != null && b.spreadPct >= 50)
+           ? 'gen-log-warn' : 'gen-log-ok');
++      // 【v179】可疑关（稳健被坑）再走一次机制归因：拿掉一种功能块重玩，看通关率回升多少
++      var at = attributeReport(AntSolver.parseLevel(level), b);
++      if (at) {
++        var detail = at.items.filter(function (x) { return x.kind !== 'all'; })
++          .map(function (x) { return x.cn + (x.deltaWon >= 0 ? '+' : '') + x.deltaWon; }).join('、');
++        genLog('　　归因　' + attrLineOf(at) + (detail ? ('　（单拿各：' + detail + '）') : ''),
++          (at.main && at.main.deltaWon > 0) ? 'gen-log-warn' : '');
++      }
+     } catch (ePB) { /* 度量失败不影响生产 */ }
+   }
+   /** 「稳健 5/6 · 冒险 3/6 · 乱点 4/6」——按玩家类型分开报，别把不同打法混成一个数。 */
+@@ -6330,6 +6338,38 @@
+       out.push((names[x.policy] || x.policy) + ' ' + x.won + '/' + x.n);
+     });
+     return out.join(' · ') || ('通关 ' + (b.finish ? b.finish.win : '?') + '/' + b.n);
++  }
++  /**
++   * 【v179】机制归因（只对"稳健被坑"的关跑，省时间）：拿掉一种功能块重玩，看通胜率回升多少。
++   *   缓存按关卡对象存，体检表格与 CSV 共用一份结果。
++   */
++  var attrCache = new Map();
++  function attributeReport(lv, pb) {
++    var G = AntSolver.Generator;
++    if (!G || !G.chokeV2Attribute || !lv) return null;
++    // 只在"可疑"时归因：稳健通关 <50%，或三种打法差距 ≥50 个点
++    var need = pb && ((pb.steadyWonPct != null && pb.steadyWonPct < 50) ||
++                      (pb.spreadPct != null && pb.spreadPct >= 50));
++    if (!need) return null;
++    var hit = attrCache.get(lv);
++    if (hit) return hit;
++    var a = null;
++    try { a = G.chokeV2Attribute(lv, { per: 6 }); } catch (e) { a = null; }
++    if (a) attrCache.set(lv, a);
++    return a;
++  }
++  /** 归因一句话：主因 / 叠加型 / 不是功能块（→ 在切球·容量·摆位）。 */
++  function attrLineOf(at) {
++    if (!at || !at.items || !at.items.length) return '';
++    if (at.baseline && at.baseline.wonPct >= 50) return '';
++    var all = null, singles = [];
++    at.items.forEach(function (x) { if (x.kind === 'all') all = x; else singles.push(x); });
++    singles.sort(function (a, b) { return b.deltaWon - a.deltaWon; });
++    var best = singles.length ? singles[0] : null;
++    var allD = all ? all.deltaWon : 0, bestD = best ? best.deltaWon : 0;
++    if (bestD <= 0 && allD <= 0) return '不是功能块（拿掉全部仍无回升）→ 在切球/容量/摆位';
++    if (allD > bestD) return '叠加型：全拿掉 +' + allD + '（单拿最多 +' + bestD + '）';
++    return '主因 ' + best.cn + ' +' + bestD + '（全拿掉 +' + allD + '）';
+   }
+   function auditV2OfLevel(lv, em) {
+     var omni = null, pl = null;
+@@ -6354,7 +6394,9 @@
+     try { gd = greedyLineReport(lv); } catch (e) { gd = null; }   // 【v176】第三条线（只报数）
+     var pb = null;
+     try { pb = playBatchReport(lv, 16); } catch (e) { pb = null; }   // 【v177】同一关玩 16 遍
+-    return { omni: mo, player: mp, greedy: gd, playBatch: pb, worst: worst };
++    var at = null;
++    try { at = attributeReport(lv, pb); } catch (e) { at = null; }     // 【v179】机制归因（只对可疑关跑）
++    return { omni: mo, player: mp, greedy: gd, playBatch: pb, attr: at, worst: worst };
+   }
+ 
+   /** 违反项（参考门；阈值集中在上面的 AUDIT_V2_GATES）。 */
+@@ -6428,12 +6470,13 @@
+     html += '<thead><tr style="background:#3a2c22;color:#f3e9db">' +
+       ['关卡', '玩法', '盒', '独木桥(全知/玩家)', '最长走廊', '最低可点', '无满解(全/玩)', '预算点(全/玩)',
+        '前期限压(全/玩)', '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4',
+-       '贪心线 峰窗/垫槽/赌管道', '16 遍波动', '参考门判定'].map(function (h) {
++       '贪心线 峰窗/垫槽/赌管道', '18 遍波动', '归因', '参考门判定'].map(function (h) {
+         return '<th style="padding:3px 6px;border:1px solid #5a4636">' + h + '</th>';
+       }).join('') + '</tr></thead><tbody>';
+     rows.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+       var pb = r.level.playBatch || null;                                                   // 【v177】16 遍波动
++      var at = r.level.attr || null;                                                        // 【v179】机制归因
+       var pbSpread = (pb && pb.lateMax.max != null && pb.lateMax.min != null) ? +(pb.lateMax.max - pb.lateMax.min).toFixed(1) : null;
+       var pbBad = !!(pb && ((pb.steadyWonPct != null && pb.steadyWonPct < 50) ||
+                             (pb.spreadPct != null && pb.spreadPct >= 50) ||
+@@ -6466,6 +6509,8 @@
+              (pbSpread != null && pbSpread >= 1.5 ? '<br><span style="color:#e0592c">波动 ' + pbSpread + ' 个点=看运气</span>' : '') +
+              (pb.spreadPct != null && pb.spreadPct >= 50 ? '<br><span style="color:#e0592c">策略差 ' + pb.spreadPct + ' 个点=稳健被坑</span>' : ''))
+              : '-', pbBad) +
++        td(at ? attrLineOf(at) : (pb ? '<span style="color:#8a7358">稳，不用归因</span>' : '-'),
++           !!(at && at.main && at.main.deltaWon > 0)) +
+         td(ok ? '✓ 通过' : '✗ ' + r.violations.join('、'), !ok) +
+         '</tr>';
+     });
+@@ -6485,7 +6530,7 @@
+ 
+   function exportChokeAuditCSV() {
+     if (!lastChokeAudit || !lastChokeAudit.length) return;
+-    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,波动局数,稳健通关%,最好通关%,最差通关%,策略差%,波动峰窗最小,波动峰窗最大,波动峰窗均值,波动峰窗中位,卡死中段,卡死前段,独木桥位置,参考门,违反项,难度分'];
++    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,波动局数,稳健通关%,最好通关%,最差通关%,策略差%,波动峰窗最小,波动峰窗最大,波动峰窗均值,波动峰窗中位,卡死中段,卡死前段,归因,归因主因Δ%,全拿掉Δ%,独木桥位置,参考门,违反项,难度分'];
+     var lines = head;
+     lastChokeAudit.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
+@@ -6506,6 +6551,9 @@
+         V(pb && pb.lateMax ? pb.lateMax.min : null), V(pb && pb.lateMax ? pb.lateMax.max : null),
+         V(pb && pb.lateMax ? pb.lateMax.mean : null), V(pb && pb.lateMax ? pb.lateMax.p50 : null),
+         V(pb ? pb.finish.mid : null), V(pb ? pb.finish.front : null),
++        '"' + (r.level.attr ? attrLineOf(r.level.attr) : '') + '"',
++        V(r.level.attr && r.level.attr.main ? r.level.attr.main.deltaWon : null),
++        V(r.level.attr ? (r.level.attr.items.filter(function (x) { return x.kind === 'all'; })[0] || {}).deltaWon : null),
+         '"' + ((o && o.bridgeAt.length) ? o.bridgeAt.join('/') + '%' : '') +
+           ((p && p.bridgeAt.length) ? (' 玩家:' + p.bridgeAt.join('/') + '%') : '') + '"',
+         (r.violations.length ? '不通过' : '通过'), '"' + r.violations.join('、') + '"', V(r.difficulty)
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4854,6 +4854,99 @@
+       lateMax: stat('lateMax'), peakBuf: stat('peakBuf'),
+       pads: stat('pads'), pipeBets: stat('pipeBets'),
+       finish: finish, runs: runs
++    };
++  }
++
++  /**
++   * 【v179】**机制归因**（用户 2026-10-17 选 2：把"稳健被坑"的关拆到机制上）。
++   *
++   * 做法 = **消融实验**（ablation），不是拍脑袋分类：
++   *   拿掉一种功能块（墙 / 管道 / 数字冰 / 锁链 / 问号）→ 重跑同一批稳健玩家 →
++   *   看"通关率回升多少"。回升越多，这个东西越是这关的凶手。
++   *
++   * 为什么只做这五类：它们都是**棋盘格子上的可移除字段**，消融后关卡仍然合法、可观测量；
++   *   而"切球 / 容量"属于关卡本体，拿掉就不是同一关了（留给矿脉债务 Δ 那一层去解释）。
++   *   ⚠ 拿掉管道会把它队列里的车一起拿走（totalBoxes 变小）——报告里已标注，读的时候要记得。
++   *
++   * opts.per：每种变体跑几局（默认 6，与 `chokeV2PlayBatch` 同口径：只跑**稳健**玩家，
++   *   因为"稳健被坑"才是我们要解释的现象）。
++   */
++  function chokeV2Attribute(parsed, opts) {
++    opts = opts || {};
++    var per = Math.max(1, Math.min(opts.per != null ? opts.per : 6, 20));
++    var seed = (opts.seed != null ? opts.seed : 20261017) >>> 0;
++    var A = AntSolver.Analysis;
++    // ⚠ 管道**不能**这样消融：拿掉 pipe 格子会把队列里的车一起带走 → 关卡变得不可解
++    //   （实测小鹿/第3关：拿掉管道后通关率 100% → 0%）。管道的"隐藏"对模拟器本来就不存在
++    //   （求解器/玩家都能看见队列首位），所以它只作为**结构信息**统计，不进消融表。
++    var KINDS = [
++      { k: 'black', cn: '墙' }, { k: 'numice', cn: '数字冰' },
++      { k: 'chain', cn: '锁链' }, { k: 'q', cn: '问号' },
++      { k: 'all', cn: '全部（墙+冰+链+问号）' }
++    ];
++    var raw = { blocks: parsed.blocks, bufferLimit: parsed.bufferLimit, board: parsed.board };
++    function runOn(lv, s0) {
++      var s = s0 || seed || 1, won = 0, lateSum = 0, lateN = 0, covSum = 0, k;
++      function rnd() { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }
++      for (k = 0; k < per; k++) {
++        var g = null;
++        try { g = simulatePlay(lv, { policy: 'steady', rnd: rnd }); } catch (e) { g = null; }
++        if (!g) continue;
++        if (g.won) won++;
++        covSum += g.coveragePct;
++        var a = null;
++        try { a = (A && A.chokepointAudit) ? A.chokepointAudit(g.samples || [], lv.totalBoxes || 0, lv.bufferLimit || 5) : null; } catch (e) { a = null; }
++        if (a && a.lateAt != null) { lateSum += a.lateMax; lateN++; }
++      }
++      return {
++        wonPct: Math.round(won / per * 100),
++        lateMaxMean: lateN ? +(lateSum / lateN).toFixed(2) : null,
++        coveragePct: Math.round(covSum / per)
++      };
++    }
++    var base = runOn(parsed);
++    var items = [];
++    for (var i = 0; i < KINDS.length; i++) {
++      var kind = KINDS[i].k, cn = KINDS[i].cn, removed = 0;
++      var clone;
++      try { clone = JSON.parse(JSON.stringify(raw)); } catch (e) { continue; }
++      var cells = (clone.board && clone.board.cells) || [];
++      for (var r = 0; r < cells.length; r++) {
++        var row = cells[r] || [];
++        for (var c = 0; c < row.length; c++) {
++          var cell = row[c];
++          if (!cell) continue;
++          if (kind === 'all') {
++            if (cell.t === 'black') { row[c] = { t: 'empty' }; removed++; }
++            else if (cell.numice > 0) { cell.numice = 0; removed++; }
++            else if (cell.chain > 0) { cell.chain = 0; removed++; }
++            else if (cell.q) { cell.q = false; removed++; }
++          }
++          else if (kind === 'black' && cell.t === 'black') { row[c] = { t: 'empty' }; removed++; }
++          else if (kind === 'pipe' && cell.t === 'pipe') { row[c] = { t: 'empty' }; removed++; }
++          else if (kind === 'numice' && cell.numice > 0) { cell.numice = 0; removed++; }
++          else if (kind === 'chain' && cell.chain > 0) { cell.chain = 0; removed++; }
++          else if (kind === 'q' && cell.q) { cell.q = false; removed++; }
++        }
++      }
++      if (!removed) continue;
++      var lv2 = null;
++      try { lv2 = AntSolver.parseLevel(clone); } catch (e) { lv2 = null; }
++      if (!lv2 || !lv2.board || !lv2.board.cells.length) continue;
++      var res = runOn(lv2);
++      items.push({
++        kind: kind, cn: cn, removed: removed,
++        wonPct: res.wonPct, deltaWon: res.wonPct - base.wonPct,
++        lateMaxMean: res.lateMaxMean,
++        deltaPeak: (res.lateMaxMean != null && base.lateMaxMean != null) ? +(res.lateMaxMean - base.lateMaxMean).toFixed(2) : null,
++        coveragePct: res.coveragePct
++      });
++    }
++    items.sort(function (a, b) { return (b.deltaWon - a.deltaWon) || ((a.deltaPeak || 0) - (b.deltaPeak || 0)); });
++    return {
++      per: per, baseline: base, items: items,
++      main: items.length ? items[0] : null,       // 主因 = 拿掉它通关率回升最多的那个
++      totalMechanisms: items.reduce(function (n, x) { return n + x.removed; }, 0)
+     };
+   }
+ 
+@@ -8658,6 +8751,7 @@
+     chokeV2GreedyLine: chokeV2GreedyLine, // 【v176】第三条线「贪心玩家」：垫槽/赌管道/峰窗（页面每关日志 + 体检用；不进候选循环）
+     simulatePlay: simulatePlay,           // 【v177】"玩一遍"模拟器（policy: steady/bold/random + 随机源）
+     chokeV2PlayBatch: chokeV2PlayBatch,   // 【v177】"同一关玩 N 遍"：通关率 / 峰窗区间 / 结束位置分布
++    chokeV2Attribute: chokeV2Attribute,   // 【v179】机制归因：拿掉墙/管道/冰/链/问号各跑一遍，看通关率回升多少
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+     setProgressHook: setProgressHook,     // 【v153】单关进度钩子（worker/界面显示跑到哪了）
+     solveSpaceQuota: solveSpaceQuota,                         // 可用空间配额联立解（含管道兜底），可独立调用体检参数是否自相矛盾
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=178">
++  <link rel="stylesheet" href="css/style.css?v=179">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=178"></script>
+-  <script src="js/utils.js?v=178"></script>
++  <script src="js/zip.js?v=179"></script>
++  <script src="js/utils.js?v=179"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=178"></script>
+-  <script src="js/simulator.js?v=178"></script>
++  <script src="js/color-libs.js?v=179"></script>
++  <script src="js/simulator.js?v=179"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=178"></script>
+-  <script src="js/solver-strategy.js?v=178"></script>
+-  <script src="js/solver.js?v=178"></script>
+-  <script src="js/playersim.js?v=178"></script>
+-  <script src="js/generator.js?v=178"></script>
+-  <script src="js/analysis.js?v=178"></script>
++  <script src="js/anchor-cut.js?v=179"></script>
++  <script src="js/solver-strategy.js?v=179"></script>
++  <script src="js/solver.js?v=179"></script>
++  <script src="js/playersim.js?v=179"></script>
++  <script src="js/generator.js?v=179"></script>
++  <script src="js/analysis.js?v=179"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=178"></script>
+-  <script src="js/app.js?v=178"></script>
++  <script src="js/level-editor.js?v=179"></script>
++  <script src="js/app.js?v=179"></script>
+ </body>
+ </html>

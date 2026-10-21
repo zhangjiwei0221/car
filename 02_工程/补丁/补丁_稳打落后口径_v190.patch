@@ -1,0 +1,27 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6144,7 +6144,10 @@
+     var buried = (b.buried != null) ? b.buried : null;
+     var steady = play ? play.steadyWonPct : null;
+     var spread = play ? play.spreadPct : null;
+-
++    // 【v190】口径修正：spread 大不一定不公平——"稳健 100% / 乱点 33%" 很正常。
++    //   真正要抓的是"稳打不如别的打法"：steadyGap = 最好打法 − 稳健。
++    var bestWon = play ? play.bestWonPct : null;
++    var steadyGap = (steady != null && bestWon != null) ? (bestWon - steady) : null;
+     var early = (a.earlyMax != null) ? a.earlyMax : null;
+     // 【口径】峰窗用【18 局中位】，不用审核那条单线（见工作日志 31.3「压力报区间、不报单点」）；
+     //   量不到 18 局时才退回 audit.midLateMax。两者都记下来，方便对账。
+@@ -6156,10 +6159,10 @@
+     if (buried == null || buried !== 0) fails.push('被埋>0');
+     if (early == null || early > 2.0) fails.push('前期峰窗>2');
+     if (midLate == null || midLate < 3.2 || midLate > 4.8) fails.push('峰窗不在3.2~4.8');
+-    if (spread == null || spread > 34) fails.push('策略差>34');
++    if (steadyGap == null || steadyGap > 17) fails.push('稳打落后>17');
+     return {
+       pass: fails.length === 0, fails: fails,
+-      steadyWonPct: steady, spreadPct: spread, buried: buried,
++      steadyWonPct: steady, spreadPct: spread, bestWonPct: bestWon, steadyGap: steadyGap, buried: buried,
+       earlyMax: early, midLateMax: midLate, midLateAudit: midLateAudit,
+       peakMin: play ? play.lateMax.min : null,
+       peakMax: play ? play.lateMax.max : null,

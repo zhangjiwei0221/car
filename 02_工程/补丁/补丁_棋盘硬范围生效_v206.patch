@@ -1,0 +1,76 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4746,6 +4746,17 @@
+       //   用户原话：「这个很扯淡。为什么不能让他的这个棋盘的范围自适应我的车子的数量呢？」
+       //   手填范围从此只是【偏好】：装得下就用手填的，装不下就自动换成能装下的，并在结果里如实标注。
+       //   原来的硬淘汰只在【连反推的范围都不可行】时保留（正常不会发生）。
++      // 【v206】硬范围：用户明确要求"盘只能在这几行几列里"，就不再自动改范围；
++      //   装不下就如实报错（以前会用反推范围兜底，于是填 6~8 却出了 10 列）。
++      if (config.boardHardRange) {
++        return {
++          level: null, valid: false, flow: 'new_fixed',
++          entryMode: (config.instantChain ? 'fourSideInstantChain' : (config.bottomOnly ? 'bottomOnly' : 'fourSide')),
++          boardFit: boardFit, timedOut: false, elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++          structural: { ok: false, reason: boardFit.detail + '（棋盘范围是硬限制：请调大行列，或关掉硬范围）' },
++          lastFailReason: 'boardRangeMismatch'
++        };
++      }
+       var badFit = boardFit;
+       var altRange = suggestBoardRange(badFit.carsMed || badFit.cars, config);
+       if (altRange) {
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4485,7 +4485,8 @@
+       candidateCount: 6, portfolioK: 1, timeBudgetMs: 300000, difficultyRounds: 7,
+       goodV3: true, requireHardPass: false, seed: null,
+       designSweep: true, designDebt: true,  // 【v201】饥荒强度扫描，按最终 goodV3 择优
+-      boardHardRange: true,                 // 【v205】棋盘尺寸严格落在下面的范围内（不许缩小出范围）
++      boardHardRange: true,                 // 【v206】棋盘尺寸严格落在下面的范围内（不许缩小、不许自动换范围）
++      boardAuto: false,                     // 【v206】关掉"按车数自适应棋盘范围"，否则手填的行列会被它覆盖
+       boardRowsMin: (parseInt((document.getElementById('gen-rows-min') || {}).value, 10) || 7),
+       boardRowsMax: (parseInt((document.getElementById('gen-rows-max') || {}).value, 10) || 9),
+       boardColsMin: (parseInt((document.getElementById('gen-cols-min') || {}).value, 10) || 8),
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=205">
++  <link rel="stylesheet" href="css/style.css?v=206">
+ </head>
+ <body>
+   <header>
+@@ -833,20 +833,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=205"></script>
+-  <script src="js/utils.js?v=205"></script>
++  <script src="js/zip.js?v=206"></script>
++  <script src="js/utils.js?v=206"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=205"></script>
+-  <script src="js/simulator.js?v=205"></script>
++  <script src="js/color-libs.js?v=206"></script>
++  <script src="js/simulator.js?v=206"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=205"></script>
+-  <script src="js/solver-strategy.js?v=205"></script>
+-  <script src="js/solver.js?v=205"></script>
+-  <script src="js/playersim.js?v=205"></script>
+-  <script src="js/generator.js?v=205"></script>
+-  <script src="js/analysis.js?v=205"></script>
++  <script src="js/anchor-cut.js?v=206"></script>
++  <script src="js/solver-strategy.js?v=206"></script>
++  <script src="js/solver.js?v=206"></script>
++  <script src="js/playersim.js?v=206"></script>
++  <script src="js/generator.js?v=206"></script>
++  <script src="js/analysis.js?v=206"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=205"></script>
+-  <script src="js/app.js?v=205"></script>
++  <script src="js/level-editor.js?v=206"></script>
++  <script src="js/app.js?v=206"></script>
+ </body>
+ </html>

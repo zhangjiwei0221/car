@@ -1,0 +1,88 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3976,6 +3976,40 @@
+     return { want: want, icedBefore: iced, added: added };
+   }
+ 
++  /**
++   * 【v192·实验】收尾调压一次：goodV3 量出峰窗越界时，按比例调冰重建一关，取更接近带的那一个。
++   *   >4.8 → 冰 ×0.7；<3.2 → 冰 ×1.3；各最多一次（retry 的 config.pressureLoop=false，不递归）。
++   *   判据：离带距离小者胜；距离相近时看六条谁过得更多。
++   */
++  function pressureLoopOnce(cand) {
++    var gv = cand.goodV3;
++    var p = gv && gv.midLateMax;
++    if (p == null) return null;
++    if (p >= 3.2 && p <= 4.8) return { meta: { skipped: true, why: 'in-band', p1: p } };
++    var cfg = cand.config || {};
++    var ice = (cfg.icePercent != null) ? cfg.icePercent : 10;
++    var ni = (p > 4.8) ? Math.max(0, Math.round(ice * 0.7)) : Math.min(40, Math.max(1, Math.round(ice * 1.3)));
++    if (ni === ice) return { meta: { skipped: true, why: 'no-room', p1: p, ice: ice } };
++    // 注意：cfg 里带着内部字段（_deadlineAt / _chokePlan 等）。_deadlineAt 是绝对时间戳，
++    //   直接透传会让"重建"一开场就超时 → 必须只保留非下划线开头的用户参数。
++    var retry = {};
++    for (var k in cfg) { if (k.charAt(0) !== '_') retry[k] = cfg[k]; }
++    retry.icePercent = ni; retry.icePercentMin = ni; retry.icePercentMax = ni;
++    retry.pressureLoop = false;
++    try { retry.mapSize = cand.level.blocks.length; } catch (e) {}
++    var res = null;
++    try { res = produce(cand.level.blocks, retry); } catch (e) { res = null; }
++    if (!res || !res.level || !res.goodV3) return { meta: { tried: true, ok: false, iceFrom: ice, iceTo: ni, p1: p } };
++    var p2 = res.goodV3.midLateMax;
++    var d1 = (p < 3.2) ? (3.2 - p) : (p - 4.8);
++    var d2 = (p2 == null) ? 1e9 : ((p2 < 3.2) ? (3.2 - p2) : (p2 > 4.8 ? (p2 - 4.8) : 0));
++    var better = (d2 < d1 - 0.05) || (Math.abs(d2 - d1) <= 0.05 && (res.goodV3.fails || []).length < (gv.fails || []).length);
++    return {
++      meta: { tried: true, iceFrom: ice, iceTo: ni, p1: p, p2: p2, d1: +d1.toFixed(2), d2: +d2.toFixed(2), picked: better ? 'retry' : 'orig' },
++      cand: better ? res : null
++    };
++  }
++
+   function buildOneCandidateAttempt(blocks, config, opts) {
+     opts = opts || {};
+     // 【v174】散点策略跟随卡点判据 v2 开关：关掉 v2 → 完全回到旧的"最大化最小距离"（口径不变/可回退）。
+@@ -4555,7 +4589,7 @@
+     function timeUp() { if (budget > 0 && (Date.now() - t0) >= budget) { timedOut = true; return true; } return false; }
+     var flowStats = newFlowStats();
+     var best = null, evaluated = 0;
+-    function consider(c) { if (c) { evaluated++; if (candBetter(c, best)) best = c; } return c; }
++    function consider(c) { if (c) { evaluated++; if (candBetter(c, best, config)) best = c; } return c; }
+     function done(c) {
+       if (c) { c.timedOut = timedOut; c.elapsedMs = Date.now() - t0; }
+       GENPERF.totalMs = Date.now() - t0;
+@@ -5863,7 +5897,7 @@
+     //   否则超时/全程无候选可解时会兜底成 null(等价于交付空关卡)，而不是"最接近标准的那个"。
+     // 兜底选择严格按【三档优先级】(candBetter 内 tierOf 分档，档内再用 candScore 排序)：
+     //   ①困难合格(真实卡点) > ②简单合格(趋势符合) > ③安全兜底(至少双方可通关，不触死亡边界=最差也要像"简单关")。
+-    function consider(c) { if (c) { evaluated++; if (candBetter(c, best)) best = c; } return c; }
++    function consider(c) { if (c) { evaluated++; if (candBetter(c, best, config)) best = c; } return c; }
+     // done()：收尾时补齐性能埋点快照(停止原因 + 总耗时 + 求解/玩家模拟计数)，挂到结果的 perf 字段。
+     //   纯记录，不影响 finalizeProduce 的档次判定与兜底选择。
+     function done(c) {
+@@ -6202,7 +6236,7 @@
+     var b = c && c.generationEval && c.generationEval.buried;
+     return (b && b.lateMax != null) ? b.lateMax : null;
+   }
+-  function candBetter(b, a) {
++  function candBetter(b, a, cfg) {
+     if (a == null) return true;
+     var tb = candTier(b), ta = candTier(a);
+     if (tb !== ta) return tb > ta;
+@@ -6877,6 +6911,17 @@
+           if (cand.generationEval) cand.generationEval.goodV3 = _gv3;
+         }
+       } catch (e) { cand.goodV3Error = String((e && e.message) || e); }
++    }
++
++    // 【v192·实验】收尾调压一次：峰窗越界时按比例调冰重建，取更接近带的那一个
++    if (cand && cand.goodV3 && cand.level && cand.config && cand.config.pressureLoop) {
++      try {
++        var _pl = pressureLoopOnce(cand);
++        if (_pl) {
++          cand.pressureLoop = _pl.meta;
++          if (_pl.cand) { _pl.cand.pressureLoop = _pl.meta; cand = _pl.cand; }
++        }
++      } catch (e) { cand.pressureLoop = { error: String((e && e.message) || e) }; }
+     }
+ 
+     return cand;

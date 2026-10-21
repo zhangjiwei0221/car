@@ -1,0 +1,21 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -6298,9 +6298,18 @@
+     if (early == null || early > 2.0) fails.push('前期峰窗>2');
+     if (midLate == null || midLate < 3.2 || midLate > 4.8) fails.push('峰窗不在3.2~4.8');
+     if (steadyGap == null || steadyGap > 17) fails.push('稳打落后>17');
++    // 【v199·用户裁决 2】以原版 choke v2 为准：无满解（硬垫）> 3 步判不合格。
++    //   理由：原版 CHOKE_V2_GATES.noGoodMax = 3；v198 的 seed 404 硬垫 5 步却被 goodV3 放过，两套判据打架。
++    var _v2 = null, _noGood = null;
++    try {
++      _v2 = (cand.generationEval && cand.generationEval.auditV2) ? cand.generationEval.auditV2 : chokeV2OfCand(cand);
++      _noGood = (_v2 && _v2.worst) ? _v2.worst.noGood : null;
++    } catch (e) { _noGood = null; }
++    if (_noGood == null || _noGood > 3) fails.push('硬垫>3');
+     return {
+       pass: fails.length === 0, fails: fails,
+       steadyWonPct: steady, spreadPct: spread, bestWonPct: bestWon, steadyGap: steadyGap, buried: buried,
++      noGood: _noGood,
+       earlyMax: early, midLateMax: midLate, midLateAudit: midLateAudit,
+       peakMin: play ? play.lateMax.min : null,
+       peakMax: play ? play.lateMax.max : null,

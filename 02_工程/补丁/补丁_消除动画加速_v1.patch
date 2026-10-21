@@ -1,0 +1,94 @@
+diff -u -r a/bin/index.html b/bin/index.html
+--- a/bin/index.html	2026-10-12 11:16:59
++++ b/bin/index.html	2026-10-12 11:16:55
+@@ -131,9 +131,9 @@
+         <input type="number" id="sim-ant-rate" value="6.5" min="0.5" max="20" step="0.5" style="width:56px"
+                title="真机实测 5~8。调小 = 每个盒搬得更慢 = 暂存占用时间更长 = 压力更大">
+         <label style="margin-left:8px">速度</label>
+-        <input type="range" id="anim-speed" min="1" max="12" value="2" style="width:90px"
++        <input type="range" id="anim-speed" min="1" max="60" value="8" style="width:90px"
+                title="仅影响【演示与回放】的播放速度；手点模拟按上面的「出蚂蚁/秒」走真机速率">
+-        <span id="anim-speed-val" style="font-size:11px;color:#888">2px/帧</span>
++        <span id="anim-speed-val" style="font-size:11px;color:#888">8px/帧</span>
+         <div id="sim-stats">
+           <span>步数: <b id="stat-steps">0</b></span>
+           <span>消除: <b id="stat-eliminated">0</b>/<b id="stat-total">0</b></span>
+@@ -651,8 +651,8 @@
+             </div>
+             <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+               <label style="font-size:11px;color:#8a7358">慢放</label>
+-              <input type="range" id="elim-sim-speed" min="20" max="600" value="60" step="10" style="flex:1;accent-color:#d2701f" title="全知版逐像素回放间隔(越大越慢)">
+-              <span id="elim-sim-speed-val" style="font-size:11px;color:#66513a;min-width:58px;text-align:right">60ms/格</span>
++              <input type="range" id="elim-sim-speed" min="0" max="600" value="15" step="5" style="flex:1;accent-color:#d2701f" title="全知版回放速度：0=瞬时(整批一起消失)，越往右越慢(逐格起底)">
++              <span id="elim-sim-speed-val" style="font-size:11px;color:#66513a;min-width:88px;text-align:right">15ms/格</span>
+             </div>
+             <div id="elim-sim-stats" style="font-size:11px;color:#66513a;margin-top:6px"></div>
+             <div id="elim-sim-buffer" style="font-size:11px;color:#66513a;margin-top:4px"></div>
+diff -u -r a/bin/js/app.js b/bin/js/app.js
+--- a/bin/js/app.js	2026-10-12 11:17:03
++++ b/bin/js/app.js	2026-10-12 11:16:55
+@@ -81,7 +81,7 @@
+     active: false, timer: null, visualElim: null, actualRank: null, nextRank: 0, token: 0, lastStart: null,
+     previewRank: null, previewLocked: null, previewStats: null, previewSlot: null, previewStart: null, previewRefreshes: 0
+   };  // 视图内【就地模拟】状态
+-  var elimSimSpeed = 60;                           // 全知版逐像素回放每格间隔(ms)，慢放参数
++  var elimSimSpeed = 15;                           // 全知版回放速度(ms/格起底面)：<=0=瞬时(整批一起消失)；数值越小每tick消得越快
+   // 生成器独立页面状态
+   var genFileFilter = { color: null };  // 文件列表当前筛选(点分组标题筛该组；null=不筛选)
+   var genBatchRunning = false, genBatchAborted = false;
+@@ -184,7 +184,7 @@
+   var animActiveEats = []; // 正在【并发】播放的 eat 列表: [{key, cells, idx}]（锁链组/多球同步消除）
+   var animPendingDones = [];// 本批并发消除播完后统一移除的 done 事件（锁链整组一起离场）
+   var animTimer = null;
+-  var animPxPerTick = 2;   // 每帧消除像素数（1=单像素逐个消除）
++  var animPxPerTick = 8;   // 每帧消除像素数（1=单像素逐个消除；越大越快）
+   var animFrameMs = 45;    // 帧间隔(ms)
+   var demoMode = 'off';    // off | auto | replay
+   var replayList = null, replayIdx = 0;
+@@ -264,12 +264,14 @@
+     if (elimBoardCanvas) elimBoardCanvas.addEventListener('click', elimBoardClick);
+     var elimSpeed = document.getElementById('elim-sim-speed');
+     if (elimSpeed) elimSpeed.addEventListener('input', function () {
+-      elimSimSpeed = parseInt(this.value, 10) || 60;
+-      var lbl = document.getElementById('elim-sim-speed-val'); if (lbl) lbl.textContent = elimSimSpeed + 'ms/格';
++      // 注意 0 是合法值（=瞬时整批一起消失），不能用 `|| 默认值`（0 会被吞成默认）
++      var ev = parseInt(this.value, 10); elimSimSpeed = isNaN(ev) ? 15 : ev;
++      var lbl = document.getElementById('elim-sim-speed-val');
++      if (lbl) lbl.textContent = elimSimSpeed <= 0 ? '瞬时·整批一起' : elimSimSpeed + 'ms/格';
+     });
+     var spd = document.getElementById('anim-speed');
+     if (spd) spd.addEventListener('input', function() {
+-      animPxPerTick = parseInt(this.value) || 2;
++      var sv = parseInt(this.value, 10); animPxPerTick = isNaN(sv) ? 8 : Math.max(1, sv);
+       var lbl = document.getElementById('anim-speed-val');
+       if (lbl) lbl.textContent = this.value + 'px/帧';
+     });
+@@ -1557,16 +1559,22 @@
+       for (var j = 0; j < ops[i].cells.length; j++) cells.push(ops[i].cells[j]);
+     }
+     var token = elimSim.token, idx = 0;
++    // 【加速】elimSimSpeed<=0 → 本批像素一次性全部消失（视觉上与真机"一批一起没"一致）；
++    //   否则每 tick 推进 per 格，per 随速度自动放大（0→整批，15ms→4格/次，60ms→1格/次逐格）。
++    function perTick() { return elimSimSpeed <= 0 ? cells.length : Math.max(1, Math.round(60 / elimSimSpeed)); }
+     function tick() {
+       if (!elimSim.active || token !== elimSim.token) return;
+-      if (idx >= cells.length) { elimSim.timer = null; elimSimRender(); if (done) done(); return; }
+-      var p = cells[idx++], r = p[0], c = p[1];
+-      if (elimSim.visualElim && !elimSim.visualElim[r][c]) {
+-        elimSim.visualElim[r][c] = true;
+-        if (elimSim.actualRank) elimSim.actualRank[r][c] = ++elimSim.nextRank;
++      var per = perTick();
++      for (var n = 0; n < per && idx < cells.length; n++) {
++        var p = cells[idx++], r = p[0], c = p[1];
++        if (elimSim.visualElim && !elimSim.visualElim[r][c]) {
++          elimSim.visualElim[r][c] = true;
++          if (elimSim.actualRank) elimSim.actualRank[r][c] = ++elimSim.nextRank;
++        }
+       }
+       elimSimRender();
+-      elimSim.timer = setTimeout(tick, elimSimSpeed); // 每一像素读取慢放参数，可实时调速
++      if (idx >= cells.length) { elimSim.timer = null; elimSimRender(); if (done) done(); return; }
++      elimSim.timer = setTimeout(tick, Math.max(16, elimSimSpeed)); // 每 tick 读取速度参数，可实时调速
+     }
+     tick();
+   }

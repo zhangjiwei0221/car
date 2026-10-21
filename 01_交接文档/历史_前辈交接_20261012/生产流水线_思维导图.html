@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>生成流水线（v206）</title>
+<style>
+  :root{--bg:#f5f6fa;--card:#fff;--ink:#1f2430;--sub:#5b6472;--line:#e3e6ee;
+        --ok:#16a34a;--okbg:#e8f7ee;--warn:#b45309;--warnbg:#fdf3e3;--bad:#dc2626;--badbg:#fdeaea;
+        --accent:#2f6fed;--accentbg:#eaf1ff;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:1100px;margin:0 auto;padding:26px 20px 64px}
+  h1{margin:0 0 4px;font-size:25px}
+  .meta{color:var(--sub);font-size:13px}
+  .tag{display:inline-block;background:var(--accentbg);color:var(--accent);border-radius:999px;
+       padding:2px 10px;font-size:12px;margin-left:8px}
+
+  .flow{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 8px}
+  .node{flex:1 1 92px;min-width:92px;background:var(--card);border:1px solid var(--line);
+        border-radius:10px;padding:8px 9px}
+  .node .no{font-size:11px;color:var(--accent);font-weight:700}
+  .node .nm{font-weight:600;font-size:13px;margin-top:1px}
+  .node.ok{border-color:#bfe6cd} .node.warn{border-color:#f2d9ae} .node.bad{border-color:#f5c2c2}
+
+  .stage{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:14px 0;overflow:hidden}
+  .stage > h2{margin:0;padding:12px 16px;font-size:16px;border-bottom:1px solid var(--line);
+              display:flex;align-items:center;gap:10px}
+  .stage > h2 .no{color:var(--accent);font-weight:700}
+  .stage > h2 .st{margin-left:auto;font-size:12px;padding:1px 9px;border-radius:999px;font-weight:500}
+  .st.ok{background:var(--okbg);color:var(--ok)}
+  .st.warn{background:var(--warnbg);color:var(--warn)}
+  .st.bad{background:var(--badbg);color:var(--bad)}
+
+  .blk{padding:11px 16px;border-left:4px solid transparent}
+  .blk + .blk{border-top:1px solid #f1f3f8}
+  .blk .lab{font-size:11.5px;font-weight:700;letter-spacing:.6px;margin-bottom:3px}
+  .blk.what{border-left-color:#94a3b8} .blk.what .lab{color:#64748b}
+  .blk.now{border-left-color:var(--accent)} .blk.now .lab{color:var(--accent)}
+  .blk.todo{border-left-color:var(--ok)} .blk.todo .lab{color:var(--ok)}
+  .blk p{margin:3px 0}
+  .blk ul{margin:4px 0 2px 18px;padding:0}
+  .blk li{margin:2px 0}
+
+  code{background:#f1f3f8;border-radius:4px;padding:1px 5px;font-size:12.5px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  pre{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:11px 13px;overflow:auto;
+      font-size:12px;line-height:1.55;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px;background:var(--card)}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+  th{background:#fafbfe;color:var(--sub);font-weight:600}
+  footer{margin-top:22px;color:var(--sub);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>生成流水线 <span class="tag">v206</span></h1>
+<div class="meta">拆图 → 合球 → 铺球 → 选棋盘 → 铺障碍 → 二次验证 → 复检 → 合成 → 检查/审核/评分 → 出炉</div>
+
+<div class="flow">
+  <div class="node ok"><div class="no">①</div><div class="nm">拆图</div></div>
+  <div class="node bad"><div class="no">②</div><div class="nm">合球</div></div>
+  <div class="node warn"><div class="no">③</div><div class="nm">铺球</div></div>
+  <div class="node warn"><div class="no">④</div><div class="nm">选棋盘</div></div>
+  <div class="node bad"><div class="no">⑤</div><div class="nm">铺障碍</div></div>
+  <div class="node warn"><div class="no">⑥</div><div class="nm">二次验证</div></div>
+  <div class="node ok"><div class="no">⑦</div><div class="nm">复检</div></div>
+  <div class="node ok"><div class="no">⑧</div><div class="nm">合成</div></div>
+  <div class="node ok"><div class="no">⑨</div><div class="nm">检查/评分</div></div>
+  <div class="node ok"><div class="no">⑩</div><div class="nm">出炉</div></div>
+</div>
+
+<!-- ① -->
+<section class="stage">
+  <h2><span class="no">①</span>拆图 <span class="st ok">✅ 有</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>把目标图拆成结构：同色连通块、谁盖着谁的依赖层、每个颜色埋在第几层、每层各有多少像素。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>消除轮次（<code>eliminationOrder</code>）：每色最早在第几轮被吃掉，1~2 视为早出、≥3 视为深埋；</li>
+      <li>层表报告：每层色块数/像素/颜色数、每色最浅层、色块位置表；</li>
+      <li>选图扫描：按深层色数量给图分级；开局体检：开局暴露了哪些颜色。</li>
+    </ul>
+    <p>生产里目前只用到"早出/深埋"这一档判定。</p></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>输出**每色每层的像素预算**：第几层多少像素、能切几辆、每辆多大；</li>
+      <li>输出依赖关系（哪个色开哪个色的壳），供合球直接消费；</li>
+      <li>成为切法的唯一依据，而不是只做一个观察报告。</li>
+    </ul></div>
+</section>
+
+<!-- ② -->
+<section class="stage">
+  <h2><span class="no">②</span>合球 <span class="st bad">❌ 缺</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>决定每个颜色切几辆车、每辆容量多大、每辆覆盖哪几个色块（哪几层）。这一步决定"债的形状"。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>仍然按"像素数 ÷ 平均容量"平均切，车与层没有关系；</li>
+      <li>唯一的设计动作：给一辆深埋色车增容（×1.5~2），同色其它车扣减保持总量。</li>
+    </ul>
+<pre>现在：某色 1225 px ÷ 平均容量 30 → 切 41 辆，大小均匀
+应为：该色第 1 层 40 px、第 3 层 260 px
+      → 浅层 1 辆 40（开壳车）
+      → 深层 7 辆 37（被包车，注定欠债）</pre></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>按层预算切：浅层切"开壳车"（容量≈该层可达量），深层切"被包车"（容量>当下可达量）；</li>
+      <li>每色总量守恒；车单输出「颜色 / 容量 / 起始层」；</li>
+      <li>能回答：这一关设计了几笔债、每笔多大、什么时候还。</li>
+    </ul></div>
+</section>
+
+<!-- ③ -->
+<section class="stage">
+  <h2><span class="no">③</span>铺球 <span class="st warn">🟡 有效</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>把车放到棋盘上：谁在可点位置、谁被压在里面、出场顺序如何，从而形成阻挡关系。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>车按消除趋势排序，逐行左→右填盘；</li>
+      <li>设计器：取开局"可点集合"，把可点且早出的车与不可点且深埋的车对调，直到可点早车 ≤ 目标档；</li>
+      <li>11 个变体（早车档 4/3/2/1/0 + 增容 1.5/2）各跑一关，按 goodV3 择优。</li>
+    </ul>
+    <table><tr><th>图</th><th>改前</th><th>现在</th></tr>
+      <tr><td>40×40_016</td><td>3/10 全过</td><td><b>10/10</b></td></tr>
+      <tr><td>35×35_010</td><td>1/10 全过</td><td><b>4/10</b></td></tr></table></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>以"可点集合 × 深度"为约束排布：可点环上只放深埋车，浅色车放内圈；</li>
+      <li>给出一条**目标压力曲线**（每 10% 进度应有多少辆吃不满的车），按曲线排车；</li>
+      <li>不依赖穷举变体，而是直接算出该放哪辆。</li>
+    </ul></div>
+</section>
+
+<!-- ④ -->
+<section class="stage">
+  <h2><span class="no">④</span>选棋盘 <span class="st warn">🟡 可用</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>定棋盘的行列、黑块与管道配额，保证车能放下、暴露面与设计匹配。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>行列范围可在界面填写，硬范围生效（超出范围直接报错，不再偷偷换尺寸）；</li>
+      <li>形态约束（列 − 行 ∈ {1,2}）、可用空间/黑块/管道配额联立。</li>
+    </ul>
+    <p>实测：只改棋盘范围、不开设计扫描，全过率不变（35×35 都是 0/5，40×40 都是 1/5）。</p></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>盘子大小由"车数 × 暴露面"反推：周长 ÷ 车数 ≤ 阈值（比如 0.45）；</li>
+      <li>范围只是护栏，真正决定尺寸的是这条比例约束。</li>
+    </ul></div>
+</section>
+
+<!-- ⑤ -->
+<section class="stage">
+  <h2><span class="no">⑤</span>铺障碍 <span class="st bad">❌ 缺</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>用冰、锁链、问号、管道、墙去控制节奏：压住某些车、藏起某段供给、堵住某条路。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>按比例撒：冰/链/问号按百分比落位，位置随机；</li>
+      <li>三次定向尝试全部失败（挂债车、挂解药车、拆解药车）；</li>
+      <li>已验证：障碍不是压力的主因，量也不是剂量（冰 0→20% 峰窗乱跳）。</li>
+    </ul></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>障碍挂在设计好的债上：冰压开壳车、管道藏一段供给、墙封关键路径；</li>
+      <li>位置由车单与层表决定，不是随机；</li>
+      <li>如果做不到，就把障碍降级为"美术/节奏装饰"，不指望它造压力。</li>
+    </ul></div>
+</section>
+
+<!-- ⑥ -->
+<section class="stage">
+  <h2><span class="no">⑥</span>二次验证 <span class="st warn">🟡 只验结构</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>铺完障碍后再验一遍：结构上有没有死锁、能不能全解、有没有被埋死的颜色。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>结构卡死检查 + 求解筛选；</li>
+      <li>被埋数（18 局里的死局颜色）作为 goodV3 的一条。</li>
+    </ul></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>除了结构，还要验**设计意图**：该欠的债有没有欠、硬垫步数是否落在设计区间、有没有多出来的死局；</li>
+      <li>不通过就回到③重排，而不是直接丢给候选排序。</li>
+    </ul></div>
+</section>
+
+<!-- ⑦ -->
+<section class="stage">
+  <h2><span class="no">⑦</span>复检 <span class="st ok">✅</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>求解 + 审核：能不能通关、压力曲线长什么样。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>全知求解器六遍编排 + 三步前瞻；</li>
+      <li>审核：卡点线 3.2、curveOK（中后期有卡点 + 前期不爆 + 不触死亡边界）；</li>
+      <li>18 局玩家线，取中位峰窗。</li>
+    </ul></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>加一步"设计对账"：实际压力曲线 vs 目标曲线，差在哪个区间；</li>
+      <li>差值反馈回去调③的排布。</li>
+    </ul></div>
+</section>
+
+<!-- ⑧ -->
+<section class="stage">
+  <h2><span class="no">⑧</span>合成 <span class="st ok">✅</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>把内部棋盘转成程序端关卡，连同 txt 与调试数据一起产出。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul><li>程序端干净 JSON + txt + 求解数据 + 关卡数据（含 board/solve/audit）。</li></ul></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul><li>关卡里带上设计元数据：车单、债点、目标曲线，方便复盘与二次编辑。</li></ul></div>
+</section>
+
+<!-- ⑨ -->
+<section class="stage">
+  <h2><span class="no">⑨</span>检查 / 审核 / 评分 <span class="st ok">✅</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>判断这关能不能用，以及有多难。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul>
+      <li>goodV3 六条：可解、稳健≥50%、被埋=0、前期≤2、峰窗 3.2~4.8、稳打落后≤17；</li>
+      <li>难度分 v3（只展示，不参与录用）；</li>
+      <li>口径修正过：原先"策略差"会惩罚好关，改成"稳打落后"。</li>
+    </ul></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul>
+      <li>阈值用真人玩后的一句话标签校准（现在样本量是 1）；</li>
+      <li>按难度分做档位（简单/普通/困难），对产出分档。</li>
+    </ul></div>
+</section>
+
+<!-- ⑩ -->
+<section class="stage">
+  <h2><span class="no">⑩</span>出炉 <span class="st ok">✅</span></h2>
+  <div class="blk what"><div class="lab">流程是什么</div>
+    <p>落库、打包、给程序端使用。</p></div>
+  <div class="blk now"><div class="lab">我们做了什么</div>
+    <ul><li>合格/不合格分目录、生产文档（配置/状态/逐关记录/报告/CSV）、ZIP 兜底。</li></ul></div>
+  <div class="blk todo"><div class="lab">应该做成什么样</div>
+    <ul><li>自动挑选 + 自动分档命名 + 一键导入实机。</li></ul></div>
+</section>
+
+<h2 style="font-size:17px;margin:26px 0 8px">一句话总结</h2>
+<table>
+  <tr><th>状态</th><th>环节</th></tr>
+  <tr><td><span class="st ok">✅ 有</span></td><td>拆图、复检、合成、检查/评分、出炉</td></tr>
+  <tr><td><span class="st warn">🟡 能用</span></td><td>铺球（设计器）、选棋盘（范围）、二次验证（只验结构）</td></tr>
+  <tr><td><span class="st bad">❌ 缺</span></td><td><b>合球</b>（切法模板）、<b>铺障碍</b>（随机撒）</td></tr>
+</table>
+<p style="color:var(--sub);font-size:13px">两个断点补上之前，压力只能靠"铺球"这一个手段凑。</p>
+
+<footer>版本 v206 · 2026-10-19 · <code>01_交接文档/生产流水线_思维导图.html</code></footer>
+
+</div>
+</body>
+</html>

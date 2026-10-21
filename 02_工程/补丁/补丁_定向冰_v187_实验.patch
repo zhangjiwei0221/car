@@ -1,0 +1,65 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -1948,7 +1948,9 @@
+     }
+ 
+     // ① 数字冰预定位置（全棋盘可出现，含第0行）
+-    var iceCount = Math.floor(boxTarget * (config.icePercent || 0) / 100);
++    // 【v187·实验】定向冰：结构层不放随机冰，改到"盒落位 + 债务节拍"之后按配额补（topUpIce）。
++    //   config.iceTargeted === true 才生效；默认关，口径与 v186 逐值一致。
++    var iceCount = config.iceTargeted ? 0 : Math.floor(boxTarget * (config.icePercent || 0) / 100);
+     var iceClusterStat = null;
+     if (iceCount > 0) {
+       // 卡点类型 iceCluster：同样数量的数字冰改为【聚集】铺设，在局部形成长时间锁死区。
+@@ -3840,6 +3842,38 @@
+       marks.push({ kind: p.kind, ok: false, why: '未实现的节拍道具种类' });
+     }
+     return { applied: applied, marks: marks, want: props.length };
++  }
++
++  /**
++   * 【v187·实验】定向冰的"补足"：结构层没放随机冰（iceTargeted），这里在【盒已落位、债务节拍已挂】之后
++   *   按冰配额补足剩余数量，优先不碰已经挂了冰的格子（= 债务节拍那几辆债车）。
++   *   只挂 numice，不动盒与容量；config.iceTargeted !== true 时直接返回 null。
++   */
++  function topUpIce(board, config) {
++    if (!config || !config.iceTargeted) return null;
++    var rows = board.rows, cols = board.cols;
++    var total = 0, iced = 0, pool = [];
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var x = board.cells[r][c];
++      if (!x) continue;
++      if (x.t === 'pipe') { total += (x.queue ? x.queue.length : 0); continue; }
++      if (x.t !== 'box') continue;
++      total++;
++      if (x.numice > 0) iced++;
++      else pool.push({ r: r, c: c });
++    }
++    var want = Math.floor(total * (config.icePercent || 0) / 100);
++    var need = Math.max(0, want - iced);
++    if (!need || !pool.length) return { want: want, icedBefore: iced, added: 0 };
++    var sel = pickDispersed(pool, need, 2);
++    var added = 0;
++    for (var i = 0; i < sel.length && added < need; i++) {
++      var cell = board.cells[sel[i].r][sel[i].c];
++      if (!cell || cell.t !== 'box' || cell.numice > 0) continue;
++      cell.numice = numIceValueFor(board.cells, rows, cols, sel[i].r, sel[i].c, config);
++      added++;
++    }
++    return { want: want, icedBefore: iced, added: added };
+   }
+ 
+   function buildOneCandidateAttempt(blocks, config, opts) {
+@@ -3914,6 +3948,12 @@
+       } catch (e) { board.earlyPressureStat = { applied: 0, error: String(e && e.message || e) }; }
+     }
+ 
++    // ③b2 【v187·实验】定向冰补足：结构层没撒的冰，在盒与债车都定下来之后按配额补
++    try {
++      var iceTop = topUpIce(board, config);
++      if (iceTop) board.iceTopStat = iceTop;
++    } catch (e) { board.iceTopStat = { error: String(e && e.message || e) }; }
++
+     // ③c2 【v162】定向"抉择投放"：中后段投放半满陷阱（让玩家做预算判断，而不是把选择挤掉）
+     //   ⚠ 实测结论（2026-10-16）：按"盒序中后段"投放**没有效果甚至更差** ——
+     //     同种子 A/B：预算判断点 平均 4.25 → 3.25，窄选择占比 56.8% → 54.0%（独木桥不变）。

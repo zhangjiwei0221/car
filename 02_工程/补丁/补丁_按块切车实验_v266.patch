@@ -1,0 +1,129 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -9408,6 +9408,10 @@
+     }
+     // 【v244】同色跨层拆两辆（用户裁决 2）：浅层一块、深层一块分开切，深层那辆必须等。
+     try {
++      if (config.chunkCut) {
++        var _cc2 = chunkAlignedCut(boxes, blocks, config._demandCurve, config);
++        if (_cc2 && _cc2.length) { if (_cc2._chunkCut) config._chunkCutStat = _cc2._chunkCut; boxes = _cc2; }
++      }
+       if (config.splitByLayer) {
+         var _lbs = splitBoxesByLayer(blocks, config, boxes);
+         if (_lbs && _lbs.length) {
+@@ -10190,6 +10194,65 @@
+    *   只在"浅层和深层都够一辆车"时才拆（sh≥boxMin 且 dp≥boxMin），否则该色原样保留。
+    *   守恒：两段各自 splitIntoBoxes 的和 = 该色总像素，逐位对上才替换，否则原样退回。
+    */
++  /**
++   * 【v266·用户裁决】按"露出块"切车（cut 层）。
++   *   现状：每色按总像素均分成等容量的车 → 颜色在时间轴上均匀供给 → 任意时刻总有车能吃
++   *        → 债务只能是尖峰（冲上去立刻归零），做不出"平台"。
++   *   本函数：用 demandCurve 的暴露增量（chunk）做切点，让每辆车覆盖 chunkSpan 个块。
++   *        块还没露出来，这辆车就吃不饱 → 它必须在暂存里等 → 平台。
++   *   chunkSpan=1 ≈ 现状（每块一辆）；2 表示每辆跨两块（会等一整个块周期）。
++   *   守恒：每色的车容量和强制等于该色总像素（最后一辆吸收误差）。
++   */
++  function chunkAlignedCut(boxes, blocks, dc, config) {
++    var span = parseInt(config && config.chunkCut, 10) || 0;
++    if (span <= 0 || !dc || !dc.curve) return boxes;
++    var bmin = parseInt(config.boxSizeMin, 10) || 24;
++    var bmax = parseInt(config.boxSizeMax, 10) || 36;
++    if (bmax < bmin) bmax = bmin;
++    var chunks = {};
++    for (var ck in dc.curve) {
++      var arr = dc.curve[ck], out = [], prev = 0;
++      for (var i = 0; i < arr.length; i++) { var e = arr[i][0]; if (e > prev) { out.push(e - prev); prev = e; } }
++      if (out.length) chunks[+ck] = out;
++    }
++    var byColor = {}, order = [];
++    for (var bi = 0; bi < boxes.length; bi++) {
++      var b = boxes[bi];
++      if (!byColor[b.color]) { byColor[b.color] = []; order.push(b.color); }
++      byColor[b.color].push(b);
++    }
++    var rebuilt = {}, changed = 0;
++    for (var oi = 0; oi < order.length; oi++) {
++      var color = order[oi], arr2 = byColor[color];
++      var P = 0; for (var ai = 0; ai < arr2.length; ai++) P += arr2[ai].count;
++      var ch = chunks[color];
++      if (!ch || ch.length < 2) { rebuilt[color] = arr2.map(function (x) { return x.count; }); continue; }
++      var avg = P / ch.length;
++      var target = Math.max(bmin, Math.min(bmax, Math.round(avg * span)));
++      var cars = [], acc = 0;
++      for (var ci2 = 0; ci2 < ch.length; ci2++) {
++        acc += ch[ci2];
++        while (acc >= target) { cars.push(target); acc -= target; }
++      }
++      if (acc > 0) {
++        if (cars.length && acc < bmin) cars[cars.length - 1] += acc;
++        else cars.push(Math.round(acc));
++      }
++      if (!cars.length) cars = [P];
++      var sum = 0; for (var si = 0; si < cars.length; si++) sum += cars[si];
++      if (sum !== P) cars[cars.length - 1] += (P - sum);
++      rebuilt[color] = cars;
++      if (cars.length !== arr2.length) changed++;
++    }
++    var out = [];
++    for (var oi2 = 0; oi2 < order.length; oi2++) {
++      var col = order[oi2], caps = rebuilt[col] || [];
++      for (var q = 0; q < caps.length; q++) out.push({ color: col, count: caps[q] });
++    }
++    out._chunkCut = { colors: order.length, changed: changed, span: span };
++    return out.length ? out : boxes;
++  }
++
+   function splitBoxesByLayer(blocks, config, boxes) {
+     if (!boxes || !boxes.length) return boxes;
+     var R = blocks.length, C = blocks[0].length;
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=265">
++  <link rel="stylesheet" href="css/style.css?v=266">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=265"></script>
+-  <script src="js/utils.js?v=265"></script>
++  <script src="js/zip.js?v=266"></script>
++  <script src="js/utils.js?v=266"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=265"></script>
+-  <script src="js/simulator.js?v=265"></script>
++  <script src="js/color-libs.js?v=266"></script>
++  <script src="js/simulator.js?v=266"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=265"></script>
+-  <script src="js/solver-strategy.js?v=265"></script>
+-  <script src="js/solver.js?v=265"></script>
+-  <script src="js/playersim.js?v=265"></script>
+-  <script src="js/generator.js?v=265"></script>
+-  <script src="js/analysis.js?v=265"></script>
++  <script src="js/anchor-cut.js?v=266"></script>
++  <script src="js/solver-strategy.js?v=266"></script>
++  <script src="js/solver.js?v=266"></script>
++  <script src="js/playersim.js?v=266"></script>
++  <script src="js/generator.js?v=266"></script>
++  <script src="js/analysis.js?v=266"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=265"></script>
+-  <script src="js/app.js?v=265"></script>
++  <script src="js/level-editor.js?v=266"></script>
++  <script src="js/app.js?v=266"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js

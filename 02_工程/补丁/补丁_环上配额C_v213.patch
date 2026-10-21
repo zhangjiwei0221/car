@@ -1,0 +1,29 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -8450,6 +8450,26 @@
+     }
+     // 层升序（浅层车先出场）
+     out.sort(function (x, y) { return x.layer - y.layer || x.color - y.color; });
++    // 【v213b·方案C】铺球前置：车单顺序决定出场（逐行填 → 队首的车落在可点环上）。
++    //   把队首重排成「浅层 2 辆（供给）+ 深层 2 辆（债点）」交替，其余车保持原顺序。
++    var _ringPlan = config.ringPlan || (config.cutMode === 'component' ? 'C' : '');
++    if (_ringPlan === 'C' || _ringPlan === 'B' || _ringPlan === 'A') {
++      var wantShallow = _ringPlan === 'A' ? 3 : 2;
++      var wantDeep = _ringPlan === 'C' ? 2 : 1;
++      var sh = [], dp = [], rest = [];
++      for (var ri = 0; ri < out.length; ri++) {
++        var rc = out[ri];
++        if (rc.layer <= 1 && sh.length < wantShallow) sh.push(rc);
++        else if (rc.layer >= 3 && dp.length < wantDeep) dp.push(rc);
++        else rest.push(rc);
++      }
++      var head = [];
++      for (var hi = 0; hi < Math.max(sh.length, dp.length); hi++) {
++        if (hi < sh.length) head.push(sh[hi]);
++        if (hi < dp.length) head.push(dp[hi]);
++      }
++      out = head.concat(rest);
++    }
+     // 【v213】序号设计：按"每 gap 辆浅层车插 1 辆深层车"重排车单，
+     //   让深层车在出场序列里**按计划**出现（而不是全堆在最后），
+     //   铺盒逐行填 → 车单顺序 ≈ 棋盘上的出场顺序。

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>车接小人 · 关卡生成流程框架图</title>
+<style>
+  :root{--ink:#222;--muted:#777;--line:#c9c9c9;--accent:#c96a2b;
+        --in:#e8f1fb;--build:#eef7ea;--eval:#fff6e6;--out:#f5eef8;}
+  *{box-sizing:border-box}
+  body{font:14px/1.65 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);
+       margin:0;padding:28px 24px 60px;background:#fbfbfb}
+  h1{font-size:21px;margin:0 0 4px}
+  .sub{color:var(--muted);margin-bottom:22px}
+  .wrap{max-width:1080px;margin:0 auto}
+  .stage{margin:0 0 6px;border-radius:10px;padding:12px 14px;border:1px solid var(--line)}
+  .stage h2{font-size:14px;margin:0 0 10px;letter-spacing:.5px}
+  .s-in{background:var(--in)} .s-build{background:var(--build)}
+  .s-eval{background:var(--eval)} .s-out{background:var(--out)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .box{flex:1 1 210px;min-width:190px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+  .box .t{font-weight:700;font-size:13.5px}
+  .box .d{color:#555;font-size:12.5px;margin-top:2px}
+  .box .f{color:#a06a3c;font-size:11.5px;margin-top:5px;font-family:ui-monospace,Menlo,monospace}
+  .arrow{text-align:center;color:var(--accent);font-size:18px;line-height:1;margin:2px 0 4px;font-weight:700}
+  .gate{border:2px dashed #d98b2b;background:#fffaf0}
+  .gate .t{color:#b5651d}
+  table{border-collapse:collapse;margin-top:6px;font-size:12.5px}
+  th,td{border:1px solid var(--line);padding:5px 9px;text-align:left}
+  th{background:#f3f3f3}
+  .legend{display:flex;gap:16px;color:var(--muted);font-size:12px;margin:10px 0 18px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle}
+  .note{background:#fff;border-left:4px solid var(--accent);padding:8px 12px;margin:14px 0;font-size:13px}
+  code{background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:12px}
+
+  /* ===== 详细流程图（v339） ===== */
+  .flowbox{display:flex;flex-direction:column;align-items:stretch;gap:0;margin:10px 0 6px}
+  .fs{border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px 12px;font-size:13px}
+  .fs b{font-size:13.5px}
+  .fs .fn{color:#a06a3c;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;margin-left:6px}
+  .fs.sub{margin-left:46px;border-left:3px solid #e6a25a}
+  .fd{border:2px dashed #d98b2b;background:#fffaf0;border-radius:10px;padding:8px 12px;font-size:13px;font-weight:700;color:#b5651d}
+  .fa{text-align:center;color:var(--accent);font-weight:700;font-size:13px;line-height:1.4;margin:2px 0}
+  .fbr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+  .fbr>div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff}
+  .fbr .h{font-weight:700;font-size:12.5px;margin-bottom:4px}
+  .hard .h{color:#c0392b}.easy .h{color:#2e7d32}
+  .fbr ul{margin:4px 0 0 16px;padding:0;font-size:12.5px;color:#444}
+  .fbr li{margin:2px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>车接小人 · 关卡生成流程框架</h1>
+  <div class="sub">从「导入一张像素图」到「输出一关」的完整链路。橙色 = 判定闸门；紫色 = 最终产物。</div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#e8f1fb"></i>输入</span>
+    <span><i class="dot" style="background:#eef7ea"></i>构造（造关）</span>
+    <span><i class="dot" style="background:#fff6e6"></i>评估（打难度分）</span>
+    <span><i class="dot" style="background:#f5eef8"></i>判定与输出</span>
+  </div>
+
+  <!-- 1 输入 -->
+  <div class="stage s-in">
+    <h2>① 输入</h2>
+    <div class="row">
+      <div class="box"><div class="t">导入目标图 TXT</div>
+        <div class="d">像素矩阵（每格一个颜色号，0 = 空）。一张图 = 一关。</div>
+        <div class="f">gen-file / levelList[]</div></div>
+      <div class="box"><div class="t">参数装配</div>
+        <div class="d">读界面：卡点覆盖率门槛、球容量区间、每图搜索时间；再套预设 → 得到本关的完整 config。</div>
+        <div class="f">genApplyFixed(cfg)</div></div>
+      <div class="box"><div class="t">搜索计划</div>
+        <div class="d">搜索时间 → 轮数 × 单轮预算（3 分钟 = 4 轮 × 45 秒）；候选数 = 单轮能精算几个。</div>
+        <div class="f">_searchPlan → portfolioK / timeBudgetMs</div></div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+
+  <!-- 2 构造 -->
+  <div class="stage s-build">
+    <h2>② 构造：一关是怎么"造"出来的（每轮换一套结构组合，跑 K 轮）</h2>
+    <div class="row">
+      <div class="box"><div class="t">2.1 分盒（切球）</div>
+        <div class="d">每个颜色单独切：该色总像素 ≥ 上限 → 按上限一辆辆切；余数不足下限 → 与前一辆平分。<br>切完整盘再按同色做一次归一化。</div>
+        <div class="f">pickBoxSplit → baseFillBoxes → normalizeCapacities</div></div>
+      <div class="box"><div class="t">2.2 选盘（行列）</div>
+        <div class="d">在范围里挑一个能装下全部车、可用率 ≈86%、列−行 ≤2 的尺寸；装不下才溢出到管道。</div>
+        <div class="f">chooseBoardDimsFixed</div></div>
+      <div class="box"><div class="t">2.3 摆障碍</div>
+        <div class="d">墙（黑块）、数字冰、锁链、管道：按比例撒 + 几何约束（可激活 / 不相邻 / 分散）。</div>
+        <div class="f">buildBoard</div></div>
+      <div class="box"><div class="t">2.4 放车</div>
+        <div class="d">把盒子按暴露顺序铺进格子：只有第 0 行开局可点，所以第 0 行的构成 = 开局的全部选择。</div>
+        <div class="f">fillBoard / ensureBoardFull（裁行、补黑）</div></div>
+      <div class="box"><div class="t">2.5 事后修正</div>
+        <div class="d">数字冰按时差锁车（冰值 = 需求时刻 − 可取时刻）；第 0 行颜色分散；免费车配额。</div>
+        <div class="f">applyIceSchedule / diversifyRow0 / limitRow0Free</div></div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+
+  <!-- 3 评估 -->
+  <div class="stage s-eval">
+    <h2>③ 评估：把"难度"量出来（每个候选都要跑一遍，这是最贵的一步）</h2>
+    <div class="row">
+      <div class="box"><div class="t">3.1 求解</div>
+        <div class="d">6 遍：贪心×2 → 三步树×2 → 噪声×2，任一遍通关即停。产出一条取盒序列 + 每步暂存。</div>
+        <div class="f">Solver.solve</div></div>
+      <div class="box"><div class="t">3.2 压力曲线</div>
+        <div class="d">沿求解路线算每步暂存；30~80% 区间里「暂存≥3」的占比 = 覆盖率；区间峰值 = 峰窗。</div>
+        <div class="f">pressureSamples → band3Pct / band4Pct / peak</div></div>
+      <div class="box"><div class="t">3.3 玩家线</div>
+        <div class="d">5 种"手痒程度"×2 种子 = 10 局，不给复活，看真实玩家能不能通。</div>
+        <div class="f">PlayerSim.run → playerPassPct</div></div>
+      <div class="box"><div class="t">3.4 好关判据</div>
+        <div class="d">可解 + 峰窗 3.2~4.8 + 稳健 + 覆盖率≥门槛 + 尖峰≥4（可选）+ 玩家通关率≥25%。</div>
+        <div class="f">goodV3Of → fails[]</div></div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+
+  <!-- 4 搜索策略 -->
+  <div class="stage s-eval" style="background:#fdf6ef">
+    <h2>④ 没达标怎么办：三层"再来一次"</h2>
+    <div class="row">
+      <div class="box"><div class="t">卡点树（候选内）</div>
+        <div class="d">在某个候选上只改车：换球（60%）/ 增容（40%），3 分支 × 2 轮，每改一次重新求解判定。</div>
+        <div class="f">applyOneChoke → chokeSwap / chokeInflate</div></div>
+      <div class="box"><div class="t">压力重建</div>
+        <div class="d">保留结构，只调障碍比例（冰/黑/链），整盘重铺。</div>
+        <div class="f">applyPressureAdjust</div></div>
+      <div class="box"><div class="t">带外纠偏</div>
+        <div class="d">峰窗跑出 3.2~4.8 时，冰 ±15% 再整轮产一次。</div>
+        <div class="f">bandFixOnce</div></div>
+      <div class="box"><div class="t">全灭兜底</div>
+        <div class="d">连可解都没有 → 宽松盘（填满率 0.80、允许 2 条管道、只要求可解）。</div>
+        <div class="f">safe fallback</div></div>
+    </div>
+  </div>
+  <div class="arrow">▼</div>
+
+  <!-- 5 判定/输出 -->
+  <div class="stage s-out">
+    <h2>⑤ 择优与输出</h2>
+    <div class="row">
+      <div class="box gate"><div class="t">择优顺序</div>
+        <div class="d">① 可解优先 ② 违规条数少 ③ 覆盖率高的 ④ 目标分近 ⑤ 压力更持久。</div>
+        <div class="f">portfolioBetter / candBetter</div></div>
+      <div class="box"><div class="t">落盘</div>
+        <div class="d">合格 → <code>合格关卡/</code>；不合格 → <code>不合格关卡/</code>（文件名带 __超时兜底 / __遍历兜底）。</div>
+        <div class="f">genOnResult → genPersistOne</div></div>
+      <div class="box"><div class="t">界面回显</div>
+        <div class="d">目标图上方结果条（覆盖/尖峰/玩家/峰窗/车/容量）+ 棋盘下方「生成过程」列表 + 可导出制作过程 HTML。</div>
+        <div class="f">genShowResultBanner / genRenderTrace / genExportProcess</div></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>一句话概括：</b>切球定"有多少辆车"，选盘定"盘多大"，障碍定"路怎么堵"，
+    求解 + 玩家模拟定"难度够不够"，六条门槛全过才算合格；不过就一直换结构、换车、换障碍再试，直到预算用完，
+    最后输出所有候选里最接近合格的那一关。
+  </div>
+
+  <h2 style="font-size:15px;margin-top:26px">附：六条判定门槛</h2>
+  <table>
+    <tr><th>#</th><th>门槛</th><th>含义</th><th>不过会怎样</th></tr>
+    <tr><td>1</td><td>可解</td><td>求解器能通关</td><td>直接淘汰该候选</td></tr>
+    <tr><td>2</td><td>峰窗 ∈ 3.2~4.8</td><td>中段最挤时手里几格</td><td>记一条违规</td></tr>
+    <tr><td>3</td><td>稳健</td><td>稳健打法通关率在带内</td><td>记一条违规</td></tr>
+    <tr><td>4</td><td>覆盖率 ≥ 滑杆</td><td>30~80% 里暂存≥3 的占比</td><td>记一条违规（最常见）</td></tr>
+    <tr><td>5</td><td>尖峰 ≥4 占比 ≥5%</td><td>曲线有没有冒尖（默认已关）</td><td>记一条违规</td></tr>
+    <tr><td>6</td><td>玩家通关率 ≥25%</td><td>10 局不给复活的真实通关率</td><td>记一条违规</td></tr>
+  </table>
+  <div class="sub" style="margin-top:8px">违规 0 条 = 合格。不全过时，按「违规条数 → 覆盖率 → 目标分」挑最接近的一关输出。</div>
+
+
+  <h2 style="font-size:15px;margin-top:30px">详细流程图（一关从造到出，含分支）</h2>
+  <div class="flowbox">
+
+    <div class="fs"><b>导入目标图 TXT</b><span class="fn">levelList[]</span>
+      <div class="sub-d" style="color:#666;font-size:12.5px">像素矩阵，一张图一关</div></div>
+    <div class="fa">↓</div>
+
+    <div class="fs"><b>参数装配</b><span class="fn">genApplyFixed</span>
+      <div style="color:#666;font-size:12.5px">容量区间 / 棋盘范围 / 覆盖门槛 / 主死因 / 搜索时间 → 轮数×预算</div></div>
+    <div class="fa">↓</div>
+
+    <div class="fd">◆ 拆成 K 轮（portfolioK＝搜索时间 ÷ 45 秒）</div>
+    <div class="fa">↓　每轮换一套结构组合（0/0/0、2/2/0、0/2/2 …）</div>
+
+    <div class="fs"><b>造一个候选</b><span class="fn">generateFromBlocks</span>（一轮最多 14 个）</div>
+    <div class="fs sub">① 切球　每色单独切：T ≥ 上限就按上限封箱，余数不足下限与最后一辆平分<span class="fn">pickBoxSplit</span></div>
+    <div class="fs sub">② 选盘　范围 + 形态（列−行 ≤2）+ 可用率 86% + 装得下优先 + 最贴合 + 再收紧<span class="fn">chooseBoardDimsFixed</span></div>
+    <div class="fs sub">③ 骨架　黑块配额 → 窄路墙 → 管道（由溢出量反推）<span class="fn">buildBoard 前半</span></div>
+    <div class="fs sub">④ 放车　按切球顺序铺进剩下的格子（<b>只有第 0 行开局可点</b>）<span class="fn">buildBoard 铺盒</span></div>
+    <div class="fs sub">⑤ 挂障碍　数字冰 / 锁链 / 问号（贴在车上）<span class="fn">placeBoardObstacles</span></div>
+    <div class="fs sub">⑥ 冰值　按"时差"重算（这色什么时候需要它）<span class="fn">applyIceSchedule</span></div>
+    <div class="fs sub">⑦ 第 0 行　同色 ≤2 辆、免费车 ≤2 辆（多的换深层色 + 加冰）<span class="fn">diversifyRow0 / limitRow0Free</span></div>
+    <div class="fa">↓</div>
+
+    <div class="fs"><b>首解 6 遍</b>（贪心×2 → 三步树×2 → 噪声×2，任一遍通关即停）<span class="fn">Solver.solve</span></div>
+    <div class="fa">↓</div>
+
+    <div class="fd">◆ 解得开吗？</div>
+    <div class="fbr">
+      <div class="hard"><div class="h">解不开</div>
+        <ul><li>减负重试（≤5 次）：黑 ×0.85、冰 ×0.9、链 ×0.85、窄路提前撤</li>
+            <li>仍解不开 → 淘汰这个候选，换下一个</li></ul></div>
+      <div class="easy"><div class="h">解得开</div>
+        <ul><li>进入评估：覆盖率 / 峰窗 / 尖峰 / 玩家 10 局</li>
+            <li>同时算死因分布（链/冰/管道/形状/断供）</li></ul></div>
+    </div>
+    <div class="fa">↓</div>
+
+    <div class="fd">◆ 六条门槛全过吗？（可解 / 峰窗 / 稳健 / 覆盖 / 尖峰 / 玩家）</div>
+    <div class="fa">↓</div>
+
+    <div class="fbr">
+      <div class="hard"><div class="h">不过：太 难</div>
+        <ul><li>症状：前期就顶满、玩家 10 局大多死、峰窗 &gt; 4.8</li>
+            <li>动作：<b>减压</b> —— 冰/黑/问号 ×0.95，链 −1</li>
+            <li>峰窗出带：<b>冰 −15%</b> 整轮重产（bandFixOnce）</li></ul></div>
+      <div class="easy"><div class="h">不过：太 简单</div>
+        <ul><li>症状：覆盖率低、峰窗 &lt; 3.2、中后期没有卡点</li>
+            <li>动作：<b>加压</b> —— 冰/黑/问号 ×1.05，链 +1</li>
+            <li>曲线被压平（没选择余地）：强制减压 ×0.7、链 −2</li></ul></div>
+    </div>
+    <div class="fa">↓　两种调整都会重新造盘、重新求解、重新评估</div>
+
+    <div class="fs"><b>卡点树</b>（在已有候选上只改车，不动障碍）<span class="fn">makeChokeVariant</span>
+      <div style="color:#666;font-size:12.5px">3 分支 × 2 轮：换球（约 60%）/ 增容（约 40%）/ 重生成（改障碍比例整盘重铺）</div></div>
+    <div class="fa">↓</div>
+
+    <div class="fs"><b>本轮收尾</b> → 下一轮 → 用 <span class="fn">portfolioBetter</span> 比较：
+      <span style="color:#666;font-size:12.5px">可解 &gt; 违规条数少 &gt; 覆盖率高 &gt; 目标分近 &gt; 压力更持久</span></div>
+    <div class="fa">↓</div>
+
+    <div class="fd">◆ K 轮全都不合格？</div>
+    <div class="fbr">
+      <div class="hard"><div class="h">兜底</div>
+        <ul><li>取"最接近合格"的那一关（先比违规条数，再比覆盖率）</li>
+            <li>连可解都没有 → 宽松盘（填满 0.80、允许 2 条管道、只要求可解）</li></ul></div>
+      <div class="easy"><div class="h">输出</div>
+        <ul><li>合格 → <code>合格关卡/</code></li>
+            <li>不合格 → <code>不合格关卡/</code>（文件名带 __超时兜底 / __遍历兜底）</li>
+            <li>界面：结果条 + 生成过程列表 + 可导出制作过程</li></ul></div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

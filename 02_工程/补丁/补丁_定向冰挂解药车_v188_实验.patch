@@ -1,0 +1,81 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3787,7 +3787,37 @@
+     return { applied: changed.length, wantBuf: wantBuf, dbg: dbg, marks: changed };
+   }
+ 
+-  function applyBeatProps(board, config) {
++  /**
++   * 【v188·实验】找出"债色 c 的开壳色"：c 的像素 4-邻里有谁、且那些邻居的贪心轮次更早。
++   *   返回按邻接次数降序的颜色数组（最多 4 个）。纯静态，只读 blocks + eliminationOrder。
++   *   用途：定向冰要挂在"会提前打开 c"的车上，而不是 c 自己车上（v187 的教训）。
++   */
++  function shellColorsOf(blocks, color, cache) {
++    if (cache && cache[color]) return cache[color];
++    var rows = blocks.length, cols = blocks[0].length;
++    var eo;
++    try { eo = AntSolver.eliminationOrder(blocks, rows, cols, false); } catch (e) { eo = null; }
++    var rd = eo ? eo.round : null;
++    var cnt = {};
++    var D4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      if (blocks[r][c] !== color) continue;
++      var myRound = rd ? (rd[r][c] || 0) : 0;
++      for (var d = 0; d < 4; d++) {
++        var nr = r + D4[d][0], nc = c + D4[d][1];
++        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
++        var v = blocks[nr][nc];
++        if (v <= 0 || v === color) continue;
++        if (rd && myRound && (rd[nr][nc] || 0) >= myRound) continue;   // 邻居不比我早 → 不是开壳
++        cnt[v] = (cnt[v] || 0) + 1;
++      }
++    }
++    var out = Object.keys(cnt).map(Number).sort(function (a, b) { return cnt[b] - cnt[a]; });
++    if (cache) cache[color] = out;
++    return out;
++  }
++
++  function applyBeatProps(board, config, blocks) {
+     var props = (config && config.beatProps) || null;
+     if (!props || !props.length) return null;
+     var rows = board.rows, cols = board.cols, marks = [], applied = 0;
+@@ -3816,9 +3846,27 @@
+       if (!mine.length) { marks.push({ kind: p.kind, ok: false, why: '棋盘上没有 ' + p.debtColor + ' 号色的盒子' }); continue; }
+       var debt = mine[i % Math.min(mine.length, 2)];       // 节拍分散到不同辆车
+       if (p.kind === 'ice') {
+-        if (debt.cell.numice > 0) { marks.push({ kind: 'ice', ok: false, why: '该格已有冰' }); continue; }
+-        debt.cell.numice = Math.max(2, parseInt(p.steps, 10) || 6);
+-        marks.push({ kind: 'ice', ok: true, at: [debt.r, debt.c], color: p.debtColor, steps: debt.cell.numice });
++        // 【v188·实验】iceTarget === 'cure'：冰挂到"开壳车"（会提前打开债色的那些车）上，而不是债车。
++        //   理由（v187 实测）：冰挂债车 → 车点不动 → 债根本不形成；要拖慢的是"解药"。
++        var targetCell = null, targetColor = p.debtColor, why = '';
++        if (config.iceTarget === 'cure' && blocks) {
++          var shells = shellColorsOf(blocks, p.debtColor, {});
++          for (var si = 0; si < shells.length && !targetCell; si++) {
++            var sb = boxesOf(shells[si]);
++            for (var sj = 0; sj < sb.length; sj++) {
++              if (sb[sj].cell.numice > 0) continue;
++              if (sb[sj].cell.chain) continue;
++              targetCell = sb[sj]; targetColor = shells[si]; break;
++            }
++          }
++          if (!targetCell) { marks.push({ kind: 'ice', ok: false, why: '债色 ' + p.debtColor + ' 没找到可挂冰的开壳车' }); continue; }
++          why = 'cure of ' + p.debtColor;
++        } else {
++          targetCell = debt;
++        }
++        if (targetCell.cell.numice > 0) { marks.push({ kind: 'ice', ok: false, why: '该格已有冰' }); continue; }
++        targetCell.cell.numice = Math.max(2, parseInt(p.steps, 10) || 6);
++        marks.push({ kind: 'ice', ok: true, at: [targetCell.r, targetCell.c], color: targetColor, steps: targetCell.cell.numice, why: why });
+         applied++;
+         continue;
+       }
+@@ -3933,7 +3981,7 @@
+     // ③b 【v153】债务节拍落位：把"债车"的可见性/时机用冰或链固定下来（只挂 numice/chain，不动盒与容量）
+     try {
+       // 只在真的落了位时才挂诊断字段 —— 不落位时保持关卡本体与改动前【逐字节一致】（v149 口径不变测试就吃这个）
+-      var beatStat = applyBeatProps(board, config);
++      var beatStat = applyBeatProps(board, config, blocks);
+       if (beatStat) board.beatStat = beatStat;
+     } catch (e) { board.beatStat = { applied: 0, error: String(e && e.message || e) }; }
+ 

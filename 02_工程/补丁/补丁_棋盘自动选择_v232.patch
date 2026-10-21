@@ -1,0 +1,71 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -10412,6 +10412,14 @@
+       var _best = null, _bestT = null, _tried = 0, _passes = 0;
+       for (var _pi = 0; _pi < _pk; _pi++) {
+         var _cfg = Object.assign({}, config, { portfolioK: 1 });
++        // 【v234】棋盘自动选择：每次尝试换一个棋盘尺寸（由 config.boardTryDims 给出）
++        if (config && config.boardTryDims && config.boardTryDims.length) {
++          var _bd = config.boardTryDims[_pi % config.boardTryDims.length];
++          _cfg.boardRowsMin = _bd[0]; _cfg.boardRowsMax = _bd[0];
++          _cfg.boardColsMin = _bd[1]; _cfg.boardColsMax = _bd[1];
++          _cfg.boardHardRange = true; _cfg.boardAuto = false; _cfg.boardAllowSquare = true;
++          _cfg.targetCarCount = Math.round(_bd[0] * _bd[1] * 0.86);
++        }
+         if (config && config.seed != null && !isNaN(+config.seed)) _cfg.seed = (+config.seed) + _pi;
+         var _o = flow === 'old' ? produce(blocks, _cfg) : produceFixed(blocks, _cfg, opts);
+         _tried++;
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4581,6 +4581,7 @@
+       valvePlan: true, valveMode: 'largest', valveIceSteps: 10,
+       maxPipes: 1, pipeFloorCount: 1, pipeFallbackCount: 1,   // 【v228】管道只留 1 条
+       acceptMode: 'target', targetPeakMin: 3, targetPeakMax: 4, targetSteadyMin: 30, targetSteadyMax: 80,  // 【v230】合格 = 落在困难区间
++      boardTryDims: [[6, 7], [7, 7], [6, 8], [7, 8]],   // 【v234】棋盘自动选择：每次尝试换一个尺寸
+       blackPercent: 3, blackPercentMin: 2, blackPercentMax: 4  // 【v228】黑块减半（底部不再被堵）
+     });
+     try { genLog('模式：容量 34~50 · 6×7 · 拆到 36 辆 · 冰锁最大色(10步) · 管道≤2', 'gen-log-warn'); } catch (e) {}
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=228">
++  <link rel="stylesheet" href="css/style.css?v=232">
+ </head>
+ <body>
+   <header>
+@@ -846,20 +846,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=228"></script>
+-  <script src="js/utils.js?v=228"></script>
++  <script src="js/zip.js?v=232"></script>
++  <script src="js/utils.js?v=232"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=228"></script>
+-  <script src="js/simulator.js?v=228"></script>
++  <script src="js/color-libs.js?v=232"></script>
++  <script src="js/simulator.js?v=232"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=228"></script>
+-  <script src="js/solver-strategy.js?v=228"></script>
+-  <script src="js/solver.js?v=228"></script>
+-  <script src="js/playersim.js?v=228"></script>
+-  <script src="js/generator.js?v=228"></script>
+-  <script src="js/analysis.js?v=228"></script>
++  <script src="js/anchor-cut.js?v=232"></script>
++  <script src="js/solver-strategy.js?v=232"></script>
++  <script src="js/solver.js?v=232"></script>
++  <script src="js/playersim.js?v=232"></script>
++  <script src="js/generator.js?v=232"></script>
++  <script src="js/analysis.js?v=232"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=228"></script>
+-  <script src="js/app.js?v=228"></script>
++  <script src="js/level-editor.js?v=232"></script>
++  <script src="js/app.js?v=232"></script>
+ </body>
+ </html>

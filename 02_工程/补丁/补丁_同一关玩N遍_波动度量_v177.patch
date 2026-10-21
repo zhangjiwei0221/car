@@ -1,0 +1,367 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4607,6 +4607,7 @@
+         } catch (e) {}
+         if (!result || !result.level) { alert('这一关没生成出来：' + ((result && result.lastFailReason) || '候选全灭')); return; }
+         genLogGreedyLine(result.level);   // 【v176】单关生成也报贪心线一行
++        genLogPlayBatch(result.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
+         loadLevel(result.level);
+         currentGenerationEval = result.generationEval || null;
+         currentEntryMode = result.entryMode || entryModeOf(config);
+@@ -5180,6 +5181,7 @@
+         v2vio.length ? 'gen-log-warn' : 'gen-log-ok');
+     }
+     genLogGreedyLine(rec.level);   // 【v176】第三条线「贪心玩家」一行
++    genLogPlayBatch(rec.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
+     if (curveTxt) {
+       var c3 = rec.choiceCurve;
+       genLog('　　' + c3.spark + curveTxt, (c3.lowPct >= 35 || c3.medFull <= 2) ? 'gen-log-warn' : 'gen-log-ok');
+@@ -6287,6 +6289,37 @@
+         (gRep.pipeBetWhileFull ? ('　⚠ 其中"只剩 1 个空位还得赌" ' + gRep.pipeBetWhileFull + ' 步') : ''),
+         gRep.pipeBetWhileFull ? 'gen-log-warn' : '');
+     } catch (eG) { /* 度量失败不影响生产 */ }
++  }
++  /**
++   * 【v177】"同一关玩 N 遍"的报告（用户 2026-10-17：「你看怎么做」→ 第 1 步"把玩 100 遍做出来"）。
++   *   换玩家性格 × 换随机种子跑 16 局，出**区间**：峰窗最小~最大、通关数、结束位置分布。
++   *   读法：区间窄 = 这关稳定（压力是设计出来的）；区间宽 = 看运气（压力来自抽样）。
++   */
++  var playBatchCache = new Map();
++  function playBatchReport(lv, n) {
++    var G = AntSolver.Generator;
++    if (!G || !G.chokeV2PlayBatch || !lv) return null;
++    var N = n || 16;
++    var hit = playBatchCache.get(lv);
++    if (hit && hit.n === N) return hit;
++    var b = null;
++    try { b = G.chokeV2PlayBatch(lv, { n: N }); } catch (e) { b = null; }
++    if (b) playBatchCache.set(lv, b);
++    return b;
++  }
++  function genLogPlayBatch(level) {
++    try {
++      if (!level) return;
++      var b = playBatchReport(AntSolver.parseLevel(level), 16);
++      if (!b) return;
++      var f = function (x) { return x == null ? '-' : x; };
++      var spread = (b.lateMax.max != null && b.lateMax.min != null) ? +(b.lateMax.max - b.lateMax.min).toFixed(1) : null;
++      genLog('　　玩16遍　峰窗 ' + f(b.lateMax.min) + '~' + f(b.lateMax.max) + '（均 ' + f(b.lateMax.mean) +
++        '）· 通关 ' + b.finish.win + '/' + b.n +
++        ' · 结束：收尾 ' + b.finish.tail + ' / 中段 ' + b.finish.mid + ' / 前段 ' + b.finish.front +
++        (spread != null && spread >= 1.5 ? ('　⚠ 波动 ' + spread + ' 个点 = 看运气') : ''),
++        (spread != null && spread >= 1.5) ? 'gen-log-warn' : 'gen-log-ok');
++    } catch (ePB) { /* 度量失败不影响生产 */ }
+   }
+   function auditV2OfLevel(lv, em) {
+     var omni = null, pl = null;
+@@ -6309,7 +6342,9 @@
+     if (worst.minPick >= 99) worst.minPick = 0;
+     var gd = null;
+     try { gd = greedyLineReport(lv); } catch (e) { gd = null; }   // 【v176】第三条线（只报数）
+-    return { omni: mo, player: mp, greedy: gd, worst: worst };
++    var pb = null;
++    try { pb = playBatchReport(lv, 16); } catch (e) { pb = null; }   // 【v177】同一关玩 16 遍
++    return { omni: mo, player: mp, greedy: gd, playBatch: pb, worst: worst };
+   }
+ 
+   /** 违反项（参考门；阈值集中在上面的 AUDIT_V2_GATES）。 */
+@@ -6383,11 +6418,13 @@
+     html += '<thead><tr style="background:#3a2c22;color:#f3e9db">' +
+       ['关卡', '玩法', '盒', '独木桥(全知/玩家)', '最长走廊', '最低可点', '无满解(全/玩)', '预算点(全/玩)',
+        '前期限压(全/玩)', '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4',
+-       '贪心线 峰窗/垫槽/赌管道', '参考门判定'].map(function (h) {
++       '贪心线 峰窗/垫槽/赌管道', '16 遍波动', '参考门判定'].map(function (h) {
+         return '<th style="padding:3px 6px;border:1px solid #5a4636">' + h + '</th>';
+       }).join('') + '</tr></thead><tbody>';
+     rows.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
++      var pb = r.level.playBatch || null;                                                   // 【v177】16 遍波动
++      var pbSpread = (pb && pb.lateMax.max != null && pb.lateMax.min != null) ? +(pb.lateMax.max - pb.lateMax.min).toFixed(1) : null;
+       var pair = function (a, b) { return (a == null ? '-' : a) + ' / ' + (b == null ? '-' : b); };
+       var td = function (txt, bad, extra) {
+         return '<td style="padding:3px 6px;border:1px solid #5a4636' +
+@@ -6409,6 +6446,12 @@
+              (gd.pipeBetWhileFull ? '<br><span style="color:#e0592c">满槽边缘还得赌 ' + gd.pipeBetWhileFull + ' 步</span>' : '') +
+              '<br><span style="color:#8a7358">覆盖 ' + gd.coveragePct + '% · ' + (gd.won ? '走通' : '收尾卡死') + '</span>')
+              : '（关掉v2时不测）', !!(gd && gd.pipeBetWhileFull)) +
++        td(pb ? ((pb.lateMax.min == null ? '-' : pb.lateMax.min) + '~' + (pb.lateMax.max == null ? '-' : pb.lateMax.max) +
++             '（均 ' + (pb.lateMax.mean == null ? '-' : pb.lateMax.mean) + '）' +
++             '<br><span style="color:#8a7358">通关 ' + pb.finish.win + '/' + pb.n +
++             ' · 收尾' + pb.finish.tail + ' 中段' + pb.finish.mid + ' 前段' + pb.finish.front + '</span>' +
++             (pbSpread != null && pbSpread >= 1.5 ? '<br><span style="color:#e0592c">波动 ' + pbSpread + ' 个点=看运气</span>' : ''))
++             : '-', !!(pbSpread != null && pbSpread >= 1.5)) +
+         td(ok ? '✓ 通过' : '✗ ' + r.violations.join('、'), !ok) +
+         '</tr>';
+     });
+@@ -6418,6 +6461,8 @@
+       '前期限压 = 0~30% 进度段里暂存落在 3~4 的步数占比（≥' + g.early34MinPct + '% 才算前期有预算压力）。' +
+       '贪心线 = 第三条线（像真人：能消就消、消不掉先垫、没得挑时照拿管道口）= 唯一会"垫槽/赌管道"的线；' +
+       '它的峰窗在"中途就卡死"的关上会被低估，所以<b>只报数、不进上面那套取最差判定</b>。' +
++      '<b>16 遍波动</b> = 同一关换玩家性格（稳健/冒险/乱点）× 换随机种子玩 16 局：峰窗区间窄=这关稳定，' +
++      '区间宽（≥1.5 个点）=压力来自运气；结束位置集中"收尾"=预算判断型，集中"中段"=路线被堵型。' +
+       '最低可点数 ≥2 与"独木桥 0 处"等价，故只作显示、不重复计违反。</div>';
+     body.innerHTML = html;
+     var csvBtn = document.getElementById('btn-choke-audit-csv');
+@@ -6426,10 +6471,11 @@
+ 
+   function exportChokeAuditCSV() {
+     if (!lastChokeAudit || !lastChokeAudit.length) return;
+-    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,独木桥位置,参考门,违反项,难度分'];
++    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,前期限压_全知%,前期限压_玩家%,前期限压_取最差%,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,贪心峰窗,贪心垫槽,贪心赌管道,贪心满槽边缘赌步数,贪心覆盖%,贪心结局,波动峰窗最小,波动峰窗最大,波动峰窗均值,波动峰窗中位,波动局数,波动通关数,波动收尾,波动中段,波动前段,独木桥位置,参考门,违反项,难度分'];
+     var lines = head;
+     lastChokeAudit.forEach(function (r) {
+       var w = r.level.worst, o = r.level.omni, p = r.level.player, gd = r.level.greedy;   // 【v176】第三条线
++      var pb = r.level.playBatch || null;                                                   // 【v177】16 遍波动
+       var V = function (x) { return x == null ? '' : x; };
+       lines.push(['"' + r.name + '"', '"' + entryModeLabel(r.em) + '"', r.boxes,
+         V(o ? o.bridges : null), V(p ? p.bridges : null), w.bridges, w.maxRun, w.minPick,
+@@ -6441,6 +6487,10 @@
+         V(gd ? gd.lateMax : null), V(gd ? gd.pads : null), V(gd ? gd.pipeBets : null),
+         V(gd ? gd.pipeBetWhileFull : null), V(gd ? gd.coveragePct : null),
+         '"' + (gd ? (gd.won ? '走通' : '收尾卡死') : '') + '"',
++        V(pb && pb.lateMax ? pb.lateMax.min : null), V(pb && pb.lateMax ? pb.lateMax.max : null),
++        V(pb && pb.lateMax ? pb.lateMax.mean : null), V(pb && pb.lateMax ? pb.lateMax.p50 : null),
++        V(pb ? pb.n : null), V(pb ? pb.finish.win : null),
++        V(pb ? pb.finish.tail : null), V(pb ? pb.finish.mid : null), V(pb ? pb.finish.front : null),
+         '"' + ((o && o.bridgeAt.length) ? o.bridgeAt.join('/') + '%' : '') +
+           ((p && p.bridgeAt.length) ? (' 玩家:' + p.bridgeAt.join('/') + '%') : '') + '"',
+         (r.violations.length ? '不通过' : '通过'), '"' + r.violations.join('、') + '"', V(r.difficulty)
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -4637,9 +4637,25 @@
+   //   批次61 3.5/3.5/**4.0**；批次62 3.5/3.0/**3.0**。
+   //   若把它并进 min()：用户亲口认可的小鹿会被判"中后期峰窗仅 3.0"不合格（假阴性）。
+   //   所以本函数默认只做 **R6 管道约束 + 报告/可视化**；要不要拿它改压力门，等用户拍板（日志第 30 节）。
+-  function chokeV2GreedyLine(parsed, opts) {
++  /**
++   * 【v177】"玩一遍"的可复用模拟器（一次完整对局）。v176 的贪心线就是它的一个特例。
++   *
++   *   opts.policy：玩家的"性格"
++   *     · 'steady' 稳健（= v176 贪心线）：能消就消，优先救暂存区里的车；实在消不掉才垫，垫最容易凑满的
++   *     · 'bold'   冒险：能消的里面优先拿"管道口的车"（赌里面是好色）；只能垫时也优先赌管道
++   *     · 'random' 乱点：在所有能点的里均匀随机（真人开场不看牌瞎点的情形）
++   *   opts.rnd：0~1 随机源。**传 `rnd = () => 0` 时逐值等于 v176 的贪心线**（同分取第一个）——
++   *     这条保证是 `v176` 那套实测数字（垫槽 3/5/8/9、赌管道 10/16/6/10、峰窗 3/4/4/3）仍然可复现。
++   *
++   * 为什么要"性格"：真人的差异不在规则，而在**几个选项看着都行时挑了哪一个**。
++   *   "玩 N 遍"必须有这个随机源，否则跑 100 遍也只是同一局重复 100 次。
++   */
++  function simulatePlay(parsed, opts) {
++    opts = opts || {};
+     var S = AntSolver.Simulator;
+     if (!S || !S.enter || !S.listMoves || !S.applyPick || !parsed) return null;
++    var policy = opts.policy || 'steady';
++    var rnd = opts.rnd || function () { return 0; };
+     var st;
+     try { st = S.enter(parsed, { useSlotStart: true }); } catch (e) { return null; }
+     var order = [], samples = [], lastDone = st.completedBoxes || 0;
+@@ -4655,6 +4671,20 @@
+         if (cc && cc.t === 'pipe') return true;
+       }
+       return false;
++    }
++    /** 从候选里挑：score 越大越优先；**同分随机**（rnd 恒 0 → 取候选顺序里的第一个）。 */
++    function pickAmong(arr, score) {
++      var ties = [], bestV = -Infinity, t;
++      for (t = 0; t < arr.length; t++) {
++        var v = score ? score(arr[t]) : 0;
++        if (v > bestV + 1e-9) { bestV = v; ties = [arr[t]]; }
++        else if (Math.abs(v - bestV) <= 1e-9) ties.push(arr[t]);
++      }
++      if (!ties.length) return null;
++      var k = Math.floor(rnd() * ties.length);
++      if (k >= ties.length) k = ties.length - 1;
++      if (k < 0) k = 0;
++      return ties[k];
+     }
+     try {
+       while (!st.gameOver && guard++ < maxSteps) {
+@@ -4665,18 +4695,39 @@
+         for (i = 0; i < st.buffer.length; i++) bufColors[st.buffer[i].color] = 1;
+         var can = [], pad = [];
+         for (i = 0; i < open.length; i++) (open[i].canConsume ? can : pad).push(open[i]);
+-        var pick = null;
+-        for (i = 0; i < can.length; i++) if (bufColors[can[i].antBox.color]) { pick = can[i]; break; }   // ① 救车
+-        if (!pick && can.length) {                                                                        // ② 最能清场
+-          var cnt = {};
+-          for (i = 0; i < open.length; i++) { var cc2 = open[i].antBox.color; cnt[cc2] = (cnt[cc2] || 0) + 1; }
+-          pick = can.slice().sort(function (a, b) { return (cnt[b.antBox.color] || 0) - (cnt[a.antBox.color] || 0); })[0];
++        var cnt = {};
++        for (i = 0; i < open.length; i++) { var cc2 = open[i].antBox.color; cnt[cc2] = (cnt[cc2] || 0) + 1; }
++        var cntScore = function (m) { return cnt[m.antBox.color] || 0; };          // 该色场上露头越多越优先
++        var smallFirst = function (m) { return -(m.antBox.count || 0); };           // 容量越小越容易凑满
++        var isPm = function (m) { return isPipeMouth(m.r, m.c); };
++        var rescue = [], pick = null;
++        for (i = 0; i < can.length; i++) if (bufColors[can[i].antBox.color]) rescue.push(can[i]);
++        if (policy === 'random') {
++          pick = pickAmong(open, null);                                            // 乱点：随便挑一个
++        } else if (policy === 'bold') {
++          if (rescue.length) pick = pickAmong(rescue, null);                        // ① 救车
++          if (!pick) {                                                             // ② 有能消的：先赌管道口
++            var pmCan = can.filter(isPm);
++            if (pmCan.length) pick = pickAmong(pmCan, cntScore);
++          }
++          if (!pick && can.length) pick = pickAmong(can, cntScore);                 // ③ 最能清场
++          if (!pick) {                                                             // ④ 只能垫：先赌管道口
++            var pmPad = pad.filter(isPm);
++            var same = pad.filter(function (m) { return bufColors[m.antBox.color]; });
++            pick = (pmPad.length ? pickAmong(pmPad, smallFirst) : null)
++                || (same.length ? pickAmong(same, smallFirst) : null)
++                || pickAmong(pad, smallFirst);
++          }
++        } else {                                                                   // 'steady' = v176 贪心线
++          if (rescue.length) pick = pickAmong(rescue, null);                        // ① 救车
++          if (!pick && can.length) pick = pickAmong(can, cntScore);                 // ② 最能清场
++          if (!pick) {                                                             // ③ 先垫
++            var same2 = pad.filter(function (m) { return bufColors[m.antBox.color]; });
++            pick = (same2.length ? pickAmong(same2, smallFirst) : null) || pickAmong(pad, smallFirst);
++          }
+         }
+-        if (!pick) {                                                                                      // ③ 先垫
+-          pads++;
+-          for (i = 0; i < pad.length; i++) if (bufColors[pad[i].antBox.color]) { pick = pad[i]; break; }
+-          if (!pick) pick = pad.slice().sort(function (a, b) { return (a.antBox.count || 0) - (b.antBox.count || 0); })[0];
+-        }
++        if (!pick) break;
++        if (!pick.canConsume) pads++;                                             // 垫槽：拿的是"一口填不满"的车
+         // ④ 赌管道：拿的是"管道口的车"（里面是什么看不见）= 真人行为。两种情形都记：
+         //    垫出来的（一个都消不掉、只好赌）与顺手消的；并单独记"已经在满槽边缘（空位≤1）还得赌"的步数
+         //    —— 后者就是用户 R6 要约束的情形（「必须赌管道时暂存最好 ≤3」）。
+@@ -4698,10 +4749,83 @@
+       pickOrder: order, samples: samples, won: !!st.gameWon, gameOver: !!st.gameOver,
+       steps: order.length, completedBoxes: st.completedBoxes || 0,
+       coveragePct: total ? Math.round((st.completedBoxes || 0) / total * 100) : 0,
+-      pads: pads, pipeBets: pipeBets, pipeBetBufMax: pipeBetBufMax, pipeBetWhileFull: pipeBetWhileFull
++      pads: pads, pipeBets: pipeBets, pipeBetBufMax: pipeBetBufMax, pipeBetWhileFull: pipeBetWhileFull,
++      policy: policy
+     };
+   }
+ 
++  /** 兼容 v176：贪心线 = "稳健玩家"跑一局、同分取第一个（确定性）。 */
++  function chokeV2GreedyLine(parsed, opts) {
++    var o = Object.assign({}, opts || {});
++    o.policy = 'steady';
++    o.rnd = function () { return 0; };
++    return simulatePlay(parsed, o);
++  }
++
++  /**
++   * 【v177】"同一关玩 N 遍"（用户 2026-10-17 / 前辈口述的"幽灵员工玩 100 遍"）。
++   *
++   * 产出**区间**而不是一个点：同一关换玩家性格 × 换随机种子跑 N 次，统计
++   *   通关率 / 中后期峰窗（最小·最大·均值·中位）/ 暂存峰值 / 垫槽 / 赌管道 / 结束位置分布。
++   * 读数方式：
++   *   · 峰窗区间窄（如 3.5~4.0，均 3.7）→ 这关**稳定**，压力是设计出来的；
++   *   · 峰窗区间宽（如 2.0~4.5）→ 这关**看运气**，说明压力来自"抽样"而不是结构；
++   *   · 结束位置集中在「收尾」→ 预算判断型（玩家把好用的车用早了）；
++   *     集中在「中段」→ 路线/包裹型（路被堵死）。
++   * 默认 16 遍（单关 ~0.5~1.1s）；确定性：同 seed 同结果。
++   */
++  function chokeV2PlayBatch(parsed, opts) {
++    opts = opts || {};
++    var n = Math.max(1, Math.min(opts.n || 16, 200));
++    var seed = (opts.seed != null ? opts.seed : 20261017) >>> 0;
++    var policies = opts.policies || ['steady', 'steady', 'bold', 'random'];
++    var s = seed || 1;
++    function rnd() { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }
++    var A = AntSolver.Analysis;
++    var total = parsed.totalBoxes || 0, lim = parsed.bufferLimit || 5;
++    var runs = [], i;
++    for (i = 0; i < n; i++) {
++      var pol = policies[i % policies.length];
++      var g = null;
++      try { g = simulatePlay(parsed, { policy: pol, rnd: rnd }); } catch (e) { g = null; }
++      if (!g) continue;
++      var a = null;
++      try { a = (A && A.chokepointAudit) ? A.chokepointAudit(g.samples || [], total, lim) : null; } catch (e) { a = null; }
++      runs.push({
++        policy: pol, won: !!g.won, coveragePct: g.coveragePct, steps: g.steps,
++        pads: g.pads, pipeBets: g.pipeBets, pipeBetWhileFull: g.pipeBetWhileFull,
++        peakBuf: a ? a.peakBuf : 0,
++        // 覆盖 <30% 就跑死的局，卡点区根本没有样本 → 记 null（不当 0 混进 min/mean，否则"波动"里全是假的 0）
++        lateMax: (a && g.coveragePct >= 30) ? a.lateMax : null
++      });
++    }
++    if (!runs.length) return null;
++    function stat(key) {
++      var v = [], k;
++      for (k = 0; k < runs.length; k++) if (runs[k][key] != null) v.push(runs[k][key]);
++      if (!v.length) return { min: null, max: null, mean: null, p50: null };
++      v.sort(function (a2, b2) { return a2 - b2; });
++      var sum = 0;
++      for (k = 0; k < v.length; k++) sum += v[k];
++      return { min: v[0], max: v[v.length - 1], mean: +(sum / v.length).toFixed(2), p50: v[Math.floor(v.length / 2)] };
++    }
++    var finish = { win: 0, tail: 0, mid: 0, front: 0 };
++    for (i = 0; i < runs.length; i++) {
++      var r = runs[i];
++      if (r.won) finish.win++;
++      else if (r.coveragePct >= 95) finish.tail++;
++      else if (r.coveragePct >= 30) finish.mid++;
++      else finish.front++;
++    }
++    return {
++      n: runs.length, seed: seed, policies: policies,
++      wonRatePct: Math.round(finish.win / runs.length * 100),
++      lateMax: stat('lateMax'), peakBuf: stat('peakBuf'),
++      pads: stat('pads'), pipeBets: stat('pipeBets'),
++      finish: finish, runs: runs
++    };
++  }
++
+   /** 一关的 v2 指标：全知线 + 玩家线（+ 贪心线）各量一遍，再"取最差"合成一组判据值。 */
+   function chokeV2Of(parsed, solveResult, playerResult, greedyOn) {
+     var mo = (solveResult && solveResult.pickOrder) ? chokeV2MeasureLine(parsed, solveResult.pickOrder) : null;
+@@ -8501,6 +8625,8 @@
+     chokeV2Of: chokeV2Of,                 // 【v157】卡点判据 v2（R1~R9）：全知线/玩家线各量一遍再取最差
+     chokeV2Violations: chokeV2Violations, // 【v157】违反项（空数组=达标）——页面每关日志与报告用
+     chokeV2GreedyLine: chokeV2GreedyLine, // 【v176】第三条线「贪心玩家」：垫槽/赌管道/峰窗（页面每关日志 + 体检用；不进候选循环）
++    simulatePlay: simulatePlay,           // 【v177】"玩一遍"模拟器（policy: steady/bold/random + 随机源）
++    chokeV2PlayBatch: chokeV2PlayBatch,   // 【v177】"同一关玩 N 遍"：通关率 / 峰窗区间 / 结束位置分布
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+     setProgressHook: setProgressHook,     // 【v153】单关进度钩子（worker/界面显示跑到哪了）
+     solveSpaceQuota: solveSpaceQuota,                         // 可用空间配额联立解（含管道兜底），可独立调用体检参数是否自相矛盾
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=176">
++  <link rel="stylesheet" href="css/style.css?v=177">
+ </head>
+ <body>
+   <header>
+@@ -975,20 +975,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=176"></script>
+-  <script src="js/utils.js?v=176"></script>
++  <script src="js/zip.js?v=177"></script>
++  <script src="js/utils.js?v=177"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=176"></script>
+-  <script src="js/simulator.js?v=176"></script>
++  <script src="js/color-libs.js?v=177"></script>
++  <script src="js/simulator.js?v=177"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=176"></script>
+-  <script src="js/solver-strategy.js?v=176"></script>
+-  <script src="js/solver.js?v=176"></script>
+-  <script src="js/playersim.js?v=176"></script>
+-  <script src="js/generator.js?v=176"></script>
+-  <script src="js/analysis.js?v=176"></script>
++  <script src="js/anchor-cut.js?v=177"></script>
++  <script src="js/solver-strategy.js?v=177"></script>
++  <script src="js/solver.js?v=177"></script>
++  <script src="js/playersim.js?v=177"></script>
++  <script src="js/generator.js?v=177"></script>
++  <script src="js/analysis.js?v=177"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=176"></script>
+-  <script src="js/app.js?v=176"></script>
++  <script src="js/level-editor.js?v=177"></script>
++  <script src="js/app.js?v=177"></script>
+ </body>
+ </html>

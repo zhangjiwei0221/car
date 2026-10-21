@@ -1,0 +1,102 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -259,11 +259,25 @@
+       var h = document.getElementById(id);
+       if (!h || !h.addEventListener) return;
+       var dragging = false, startX = 0, startW = 0;
+-      function end() {
++      // 【v217·修】原来 pointermove/up 绑在分隔条自己身上：指针一离开就收不到事件，
++      //   于是拖动变成"选文字"。改成：按下后把 move/up 挂到 window（捕获阶段），松手再摘掉。
++      function onMove(e) {
++        if (!dragging) return;
++        if (e.cancelable && e.preventDefault) e.preventDefault();
++        var d = (e.clientX || 0) - startX;
++        var next = { left: layoutW.left, right: layoutW.right };
++        next[side] = startW + (side === 'left' ? d : -d);
++        layoutW = layoutClamp(next);
++        layoutApply();
++      }
++      function onUp() {
+         if (!dragging) return;
+         dragging = false;
+         if (h.classList && h.classList.remove) h.classList.remove('active');
+         if (document.body && document.body.classList) document.body.classList.remove('resizing');
++        window.removeEventListener('pointermove', onMove, true);
++        window.removeEventListener('pointerup', onUp, true);
++        window.removeEventListener('pointercancel', onUp, true);
+         layoutSave();
+         afterResize();
+       }
+@@ -271,21 +285,15 @@
+         dragging = true;
+         startX = e.clientX; startW = layoutW[side];
+         if (h.classList && h.classList.add) h.classList.add('active');
+-        try { if (h.setPointerCapture) h.setPointerCapture(e.pointerId); } catch (x) { }
+         if (document.body && document.body.classList) document.body.classList.add('resizing');
+-        if (e.preventDefault) e.preventDefault();   // 别触发文本选择
+-      });
+-      h.addEventListener('pointermove', function (e) {
+-        if (!dragging) return;
+-        var d = e.clientX - startX;
+-        var next = { left: layoutW.left, right: layoutW.right };
+-        next[side] = startW + (side === 'left' ? d : -d);
+-        layoutW = layoutClamp(next);
+-        layoutApply();
++        try { if (h.setPointerCapture) h.setPointerCapture(e.pointerId); } catch (x) { }
++        if (e.preventDefault) e.preventDefault();
++        if (e.stopPropagation) e.stopPropagation();
++        window.addEventListener('pointermove', onMove, true);
++        window.addEventListener('pointerup', onUp, true);
++        window.addEventListener('pointercancel', onUp, true);
+       });
+-      h.addEventListener('pointerup', end);
+-      h.addEventListener('pointercancel', end);
+-      h.addEventListener('dblclick', function () {    // 双击复位
++      h.addEventListener('dblclick', function () {
+         layoutW = layoutClamp({ left: LAYOUT_DEF.left, right: LAYOUT_DEF.right });
+         layoutApply(); layoutSave(); afterResize();
+       });
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=216">
++  <link rel="stylesheet" href="css/style.css?v=217">
+ </head>
+ <body>
+   <header>
+@@ -859,20 +859,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=216"></script>
+-  <script src="js/utils.js?v=216"></script>
++  <script src="js/zip.js?v=217"></script>
++  <script src="js/utils.js?v=217"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=216"></script>
+-  <script src="js/simulator.js?v=216"></script>
++  <script src="js/color-libs.js?v=217"></script>
++  <script src="js/simulator.js?v=217"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=216"></script>
+-  <script src="js/solver-strategy.js?v=216"></script>
+-  <script src="js/solver.js?v=216"></script>
+-  <script src="js/playersim.js?v=216"></script>
+-  <script src="js/generator.js?v=216"></script>
+-  <script src="js/analysis.js?v=216"></script>
++  <script src="js/anchor-cut.js?v=217"></script>
++  <script src="js/solver-strategy.js?v=217"></script>
++  <script src="js/solver.js?v=217"></script>
++  <script src="js/playersim.js?v=217"></script>
++  <script src="js/generator.js?v=217"></script>
++  <script src="js/analysis.js?v=217"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=216"></script>
+-  <script src="js/app.js?v=216"></script>
++  <script src="js/level-editor.js?v=217"></script>
++  <script src="js/app.js?v=217"></script>
+ </body>
+ </html>

@@ -1,0 +1,136 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -9229,10 +9229,45 @@
+    *   纠偏版额外带 flow / flowStats 字段，调用方无需改动。
+    */
+   var DEFAULT_FLOW = 'new_fixed';
++  /** 【v194】一图多产的比较元组：先比六条过几条，再比离带距离，再比稳健通关率。 */
++  function portfolioTuple(out) {
++    var g = out && out.goodV3;
++    if (!g || !g.fails) return { f: 99, d: 1e9, s: -1 };
++    var p = g.midLateMax;
++    var d = (p == null) ? 1e9 : (p < 3.2 ? (3.2 - p) : (p > 4.8 ? (p - 4.8) : 0));
++    return { f: g.fails.length, d: d, s: (g.steadyWonPct || 0) };
++  }
++  function portfolioBetter(x, y) {
++    if (!y) return true;
++    if (x.f !== y.f) return x.f < y.f;
++    if (Math.abs(x.d - y.d) > 0.05) return x.d < y.d;
++    return x.s > y.s;
++  }
++
+   function produceDispatch(blocks, config, opts) {
+     var flow = (config && config.generatorFlow) ||
+       (AntSolver.Generator && AntSolver.Generator.FLOW) || DEFAULT_FLOW;
+-    var out = flow === 'old' ? produce(blocks, config) : produceFixed(blocks, config, opts);
++    // 【v194】一图多产：同图跑 K 次（seed + i），按最终 goodV3 择优；已全过就早停。
++    //   config.portfolioK === 1（默认）时逐值等于改动前。
++    var _pk = Math.max(1, Math.min(10, parseInt(config && config.portfolioK, 10) || 1));
++    var out = null;
++    if (_pk <= 1) {
++      out = flow === 'old' ? produce(blocks, config) : produceFixed(blocks, config, opts);
++    } else {
++      var _best = null, _bestT = null, _tried = 0, _passes = 0;
++      for (var _pi = 0; _pi < _pk; _pi++) {
++        var _cfg = Object.assign({}, config, { portfolioK: 1 });
++        if (config && config.seed != null && !isNaN(+config.seed)) _cfg.seed = (+config.seed) + _pi;
++        var _o = flow === 'old' ? produce(blocks, _cfg) : produceFixed(blocks, _cfg, opts);
++        _tried++;
++        var _t = portfolioTuple(_o);
++        if (_o && _o.goodV3 && _o.goodV3.pass) _passes++;
++        if (_o && (!_best || portfolioBetter(_t, _bestT))) { _best = _o; _bestT = _t; }
++        if (_best && _best.goodV3 && _best.goodV3.pass) break;
++      }
++      out = _best;
++      if (out) out.portfolio = { K: _pk, tried: _tried, passes: _passes, tuple: _bestT };
++    }
+     // 唯一出口处统一标记本关的【目标图入口模式】，供批次记录 / CSV / 生产报告识别。
+     // 只写在生产侧结果对象上，【不写入关卡本体】——关卡 JSON 协议保持不变(用户决定 D1)。
+     // 三种模式互斥，出口只打一个标记（需求 §九：至少能区分原四方向 / 底部消除 / 四方向瞬时连锁）。
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -1835,6 +1835,12 @@
+         if (!el) return 1;
+         var v = parseFloat(el.value);
+         return (isNaN(v) || v < 0) ? 1 : v;
++      })(),
++      // 【v194】一图多产：同图跑 N 关按 goodV3 择优（1=关）
++      portfolioK: (function () {
++        var el = document.getElementById('gen-portfolio');
++        var v = parseInt(el && el.value, 10);
++        return (isNaN(v) || v < 1) ? 1 : Math.min(10, v);
+       })(),
+       boxSizeMin: parseInt(document.getElementById('gen-boxmin').value) || 40,
+       boxSizeMax: parseInt(document.getElementById('gen-boxmax').value) || 56,
+@@ -4618,6 +4624,7 @@
+         genLogGreedyLine(result.level);   // 【v176】单关生成也报贪心线一行
+         genLogPlayBatch(result.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
+         genLogGoodV3(result);             // 【v184】好关判据 v3（六条全过？）
++        if (result.portfolio) genLog('　　一图多产　试了 ' + result.portfolio.tried + ' 次（全过 ' + result.portfolio.passes + ' 次，取最优）', 'gen-log-ok');
+         loadLevel(result.level);
+         currentGenerationEval = result.generationEval || null;
+         currentEntryMode = result.entryMode || entryModeOf(config);
+@@ -5193,6 +5200,7 @@
+     genLogGreedyLine(rec.level);   // 【v176】第三条线「贪心玩家」一行
+     genLogPlayBatch(rec.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
+     genLogGoodV3(result);          // 【v184】好关判据 v3（六条全过？）
++    if (result.portfolio) genLog('　　一图多产　试了 ' + result.portfolio.tried + ' 次（全过 ' + result.portfolio.passes + ' 次，取最优）', 'gen-log-ok');
+     if (curveTxt) {
+       var c3 = rec.choiceCurve;
+       genLog('　　' + c3.spark + curveTxt, (c3.lowPct >= 35 || c3.medFull <= 2) ? 'gen-log-warn' : 'gen-log-ok');
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=186">
++  <link rel="stylesheet" href="css/style.css?v=194">
+ </head>
+ <body>
+   <header>
+@@ -548,6 +548,11 @@
+           <input type="number" id="gen-candidates" min="1" max="12" value="6" style="width:48px">
+         </div>
+         <div class="gen-row">
++          <label title="同一张图跑几关、只留最好的一关（按「好关v3」择优：先看六条过几条，再离带距离，再稳健通关率）。\n1 = 关闭。代价：单关时间 ×N（实测 K=5 时 20~50s/图）。">每图多产</label>
++          <input type="number" id="gen-portfolio" value="1" min="1" max="10" step="1" style="width:48px">
++          <span class="gen-hint">关（择优，1=关）</span>
++        </div>
++        <div class="gen-row">
+           <label title="单关生产最长搜索时间；到点仍不合格则立即停止，输出树内已评估过的最接近合格的候选(不再是完全无效关卡)。0=不限时">单关限时(分)</label>
+           <input type="number" id="gen-timebudget" min="0" max="30" value="5" style="width:48px">
+         </div>
+@@ -829,20 +834,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=186"></script>
+-  <script src="js/utils.js?v=186"></script>
++  <script src="js/zip.js?v=194"></script>
++  <script src="js/utils.js?v=194"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=186"></script>
+-  <script src="js/simulator.js?v=186"></script>
++  <script src="js/color-libs.js?v=194"></script>
++  <script src="js/simulator.js?v=194"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=186"></script>
+-  <script src="js/solver-strategy.js?v=186"></script>
+-  <script src="js/solver.js?v=186"></script>
+-  <script src="js/playersim.js?v=186"></script>
+-  <script src="js/generator.js?v=186"></script>
+-  <script src="js/analysis.js?v=186"></script>
++  <script src="js/anchor-cut.js?v=194"></script>
++  <script src="js/solver-strategy.js?v=194"></script>
++  <script src="js/solver.js?v=194"></script>
++  <script src="js/playersim.js?v=194"></script>
++  <script src="js/generator.js?v=194"></script>
++  <script src="js/analysis.js?v=194"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=186"></script>
+-  <script src="js/app.js?v=186"></script>
++  <script src="js/level-editor.js?v=194"></script>
++  <script src="js/app.js?v=194"></script>
+ </body>
+ </html>

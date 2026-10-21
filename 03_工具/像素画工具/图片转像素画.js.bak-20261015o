@@ -1,0 +1,303 @@
+#!/usr/bin/env node
+/**
+ * 图片 → 像素画目标图（TXT） / 现有 TXT → 新尺寸
+ *
+ * 用法：
+ *   node 图片转像素画.js <图片或TXT> <列数> <行数> [选项]
+ * 选项：
+ *   --colors N      最多用几种颜色（默认 12）
+ *   --despeckle N   去碎色：4-连通块小于 N 像素的并到邻色（默认 8；0=不处理）
+ *   --sample mode|avg  取色方式：mode=主色聚类投票（默认，同一条线的抗锯齿像素会合成一个颜色）；
+ *                      avg=旧的整格平均色口径
+ *   --protect N     细线保护阈值（默认 0=关；0.3=中；0.2=强）：格内占比≥N 的「对比色」在连续两格以上时保留
+ *   --outdir 目录   输出目录（默认当前目录）
+ *   --name 名字     输出文件名前缀（默认用输入文件名）
+ *   --bin 目录      工程 bin/js 目录（默认取交接包里的快照，用于色表 + 碎色闸门判定）
+ *
+ * 产出：
+ *   <名字>_<列>x<行>.txt          目标图 TXT（首行"像素矩阵"，空格分隔，0=空）
+ *   <名字>_<列>x<行>_预览.png      像素画预览（放大的方格图）
+ *   屏幕报告：尺寸 / 色数 / 每色格数 / 碎色率（与生成器同一口径）/ 是否过闸
+ */
+const fs = require('fs'), os = require('os'), path = require('path'), zlib = require('zlib'), vm = require('vm');
+const { execFileSync } = require('child_process');
+
+// ---------- 参数 ----------
+const argv = process.argv.slice(2);
+if (argv.length < 3) { console.log('用法: node 图片转像素画.js <图片或TXT> <列数> <行数> [--colors N] [--despeckle N] [--outdir 目录] [--name 名字] [--bin bin/js目录]'); process.exit(1); }
+const SRC = argv[0], COLS = +argv[1], ROWS = +argv[2];
+function opt(name, dflt) { const i = argv.indexOf('--' + name); return i >= 0 ? argv[i + 1] : dflt; }
+const MAX_COLORS = +opt('colors', 12);
+const DESPECKLE = +opt('despeckle', 8);
+const SAMPLE = (opt('sample', 'mode') === 'avg') ? 'avg' : 'mode';   // 【2026-10-14】默认改成主色聚类投票
+const PROTECT = +opt('protect', 0);                                  // 细线保护（0=关）
+const OUTDIR = opt('outdir', '.');
+// 找工程里的 bin/js（色表 + 碎色闸门用）：--bin 优先；否则从本文件往上找，
+// 这样整个包随便挪目录都不用改脚本。
+function findBin() {
+  const explicit = opt('bin', null);
+  if (explicit) return explicit;
+  let dir = __dirname;
+  for (let up = 0; up < 5; up++) {
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch (e) { names = []; }
+    for (const n of names) {
+      const cands = [path.join(dir, n, 'bin', 'js'), path.join(dir, n, '完整主bin快照_20261012', 'bin', 'js')];
+      for (const cd of cands) if (fs.existsSync(path.join(cd, 'utils.js'))) return cd;
+    }
+    const direct = path.join(dir, 'bin', 'js');
+    if (fs.existsSync(path.join(direct, 'utils.js'))) return direct;
+    dir = path.dirname(dir);
+  }
+  return null;
+}
+const BIN = findBin();
+if (!BIN) { console.error('✗ 找不到工程 bin/js（用 --bin <目录> 手动指定）'); process.exit(1); }
+console.log('色表/闸门取自：' + BIN);
+const NAME = opt('name', path.basename(SRC).replace(/\.[^.]+$/, ''));
+const BG = opt('bg', 'auto');   // auto=把贴边的背景色整片转成 0（空位）；none=不处理
+
+// ---------- 极简 PNG 解码（8bit 灰/RGB/调色板/RGBA，非隔行）----------
+function decodePNG(file) {
+  const buf = fs.readFileSync(file);
+  let off = 8, w = 0, h = 0, ct = 0, idat = [], pal = null;
+  while (off < buf.length) {
+    const len = buf.readUInt32BE(off), type = buf.toString('ascii', off + 4, off + 8);
+    const data = buf.slice(off + 8, off + 8 + len);
+    if (type === 'IHDR') { w = data.readUInt32BE(0); h = data.readUInt32BE(4); ct = data[9]; }
+    else if (type === 'IDAT') idat.push(data);
+    else if (type === 'PLTE') pal = data;
+    else if (type === 'IEND') break;
+    off += 12 + len;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const ch = ct === 2 ? 3 : (ct === 6 ? 4 : (ct === 0 ? 1 : (ct === 3 ? 1 : 2)));
+  const stride = w * ch, out = Buffer.alloc(h * stride);
+  let p = 0;
+  for (let y = 0; y < h; y++) {
+    const ft = raw[p++], line = raw.slice(p, p + stride); p += stride;
+    const cur = out.slice(y * stride, (y + 1) * stride), prev = y > 0 ? out.slice((y - 1) * stride, y * stride) : Buffer.alloc(stride);
+    for (let i = 0; i < stride; i++) {
+      const a = i >= ch ? cur[i - ch] : 0, b = prev[i], c = i >= ch ? prev[i - ch] : 0;
+      let v = line[i];
+      if (ft === 1) v += a; else if (ft === 2) v += b; else if (ft === 3) v += ((a + b) >> 1);
+      else if (ft === 4) { const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c); v += (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
+      cur[i] = v & 255;
+    }
+  }
+  function px(x, y) {
+    const i = y * stride + x * ch;
+    if (ct === 3 && pal) { const k = out[i] * 3; return [pal[k], pal[k + 1], pal[k + 2]]; }
+    if (ch === 1) return [out[i], out[i], out[i]];
+    return [out[i], out[i + 1], out[i + 2]];
+  }
+  return { w, h, px };
+}
+function writePNG(file, w, h, rgb) {
+  function crc32(b) { let c, t = []; for (let n = 0; n < 256; n++) { c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+    let cr = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) cr = t[(cr ^ b[i]) & 255] ^ (cr >>> 8); return (cr ^ 0xFFFFFFFF) >>> 0; }
+  function chunk(type, data) { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const t = Buffer.from(type, 'ascii');
+    const cr = Buffer.alloc(4); cr.writeUInt32BE(crc32(Buffer.concat([t, data]))); return Buffer.concat([len, t, data, cr]); }
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const rows = []; for (let y = 0; y < h; y++) { rows.push(Buffer.from([0])); rows.push(Buffer.from(rgb.slice(y * w * 3, (y + 1) * w * 3))); }
+  fs.writeFileSync(file, Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(Buffer.concat(rows))), chunk('IEND', Buffer.alloc(0))]));
+}
+function writeTXT(file, grid) { fs.writeFileSync(file, '像素矩阵\n' + grid.map(r => r.join(' ')).join('\n') + '\n'); }
+
+// ---------- 读工程色表 + 碎色闸门 ----------
+const sb = { console, Math, Date, JSON, Int32Array, Uint8Array, Float64Array, Object, Array, String, Number, Boolean, parseInt, parseFloat, isNaN };
+sb.window = sb; sb.globalThis = sb;
+const ctx = vm.createContext(sb);
+['utils.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'generator.js'].forEach(f => {
+  const p = path.join(BIN, f); if (fs.existsSync(p)) vm.runInContext(fs.readFileSync(p, 'utf8'), ctx, { filename: f });
+});
+const A = ctx.AntSolver;
+const PAL = A.COLORS.map((c, i) => c && ({ id: i, hex: c.hex, name: c.name })).filter(Boolean);
+const rgbOf = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const cssOf = id => A.getColorCSS(id);
+
+// ---------- 1. 取源像素（图片或 TXT）----------
+let sw, sh, srcPx;
+const lower = SRC.toLowerCase();
+if (lower.endsWith('.txt')) {
+  const lines = fs.readFileSync(SRC, 'utf8').trim().split('\n').filter(l => /^\s*\d/.test(l));
+  const g = lines.map(l => l.trim().split(/\s+/).map(Number));
+  sw = g[0].length; sh = g.length;
+  srcPx = (x, y) => {
+    const v = g[Math.min(y, sh - 1)][Math.min(x, sw - 1)];
+    if (!v) return [255, 255, 255];
+    return PAL.find(p => p.id === v) ? rgbOf(PAL.find(p => p.id === v).hex) : [255, 255, 255];
+  };
+  console.log('源：TXT 像素画 ' + sw + '×' + sh);
+} else {
+  let png = SRC;
+  if (!/\.png$/i.test(SRC)) {           // jpg/webp/heic… → sips 转 PNG（macOS 自带，无需 PIL）
+    png = path.join(os.tmpdir(), 'img2px_' + Date.now() + '.png');
+    execFileSync('sips', ['-s', 'format', 'png', SRC, '--out', png], { stdio: 'ignore' });
+  }
+  const im = decodePNG(png); sw = im.w; sh = im.h; srcPx = im.px;
+  console.log('源：图片 ' + sw + '×' + sh);
+}
+
+// ---------- 2. 分格取色：主色聚类投票（默认）/ 整格平均（旧口径）----------
+//   为什么默认改了：一条单色直线的抗锯齿像素会散落吸附到好几个相近的暗色上，整格平均后每格混到的比例又不同，
+//   同一条线会被识别成一节一节的不同色（用户实测）。聚类投票把相近色并成一簇再取最大簇，线就合成一个颜色。
+function nearest(colorArr, ids) {
+  let best = null, bd = Infinity;
+  for (const id of ids) { const q = rgbOf(PAL.find(p => p.id === id).hex);
+    const d = (q[0] - colorArr[0]) ** 2 + (q[1] - colorArr[1]) ** 2 + (q[2] - colorArr[2]) ** 2;
+    if (d < bd) { bd = d; best = id; } }
+  return best;
+}
+const ALL_IDS = PAL.map(p => p.id);
+const MERGE2 = 9000;            // 聚簇阈值（本文件用的是平方欧氏距离；≈ HTML 版 redmean 阈值 150²的等价量级）
+const PROTECT_CONTRAST = 0.25;
+const lumOf = (id) => { const c = rgbOf(PAL.find(p => p.id === id).hex); return (0.299*c[0]+0.587*c[1]+0.114*c[2])/255; };
+function cellToId(pix) {
+  if (!pix.length) return 31;
+  if (SAMPLE === 'avg') {
+    let R = 0, G = 0, B = 0;
+    for (const p of pix) { R += p[0]; G += p[1]; B += p[2]; }
+    return nearest([Math.round(R/pix.length), Math.round(G/pix.length), Math.round(B/pix.length)], ALL_IDS);
+  }
+  const byId = new Map();
+  for (const p of pix) { const id = nearest(p, ALL_IDS); byId.set(id, (byId.get(id) || 0) + 1); }
+  const cl = [];
+  [...byId.entries()].sort((a, b) => b[1] - a[1]).forEach(([id, n2]) => {
+    const pc = rgbOf(PAL.find(p => p.id === id).hex);      // ★簇心用"色表色"，不是像素均值（否则相近色并不到一起）
+    let hit = cl.find(x => ((x.rgb[0]-pc[0])**2 + (x.rgb[1]-pc[1])**2 + (x.rgb[2]-pc[2])**2) <= MERGE2);
+    if (hit) { const t = hit.n + n2;
+      hit.rgb = [(hit.rgb[0]*hit.n + pc[0]*n2)/t, (hit.rgb[1]*hit.n + pc[1]*n2)/t, (hit.rgb[2]*hit.n + pc[2]*n2)/t];
+      hit.n = t;
+    } else cl.push({ rgb: pc.slice(), n: n2 });
+  });
+  cl.forEach(x => { x.share = x.n / pix.length; x.rep = nearest([Math.round(x.rgb[0]), Math.round(x.rgb[1]), Math.round(x.rgb[2])], ALL_IDS); });
+  cl.sort((a, b) => b.n - a.n);
+  let main = cl[0].rep, cand = null, bestDiff = 0;
+  if (PROTECT > 0) {
+    for (let i = 1; i < cl.length; i++) {
+      if (cl[i].share < PROTECT) continue;
+      const diff = Math.abs(lumOf(cl[0].rep) - lumOf(cl[i].rep));
+      if (diff > bestDiff) { bestDiff = diff; cand = cl[i].rep; }
+    }
+    if (bestDiff < PROTECT_CONTRAST) cand = null;
+  }
+  return { main, cand };
+}
+const info = [];
+for (let r = 0; r < ROWS; r++) { const row = [];
+  for (let c = 0; c < COLS; c++) {
+    const x0 = Math.floor(c * sw / COLS), x1 = Math.max(x0 + 1, Math.floor((c + 1) * sw / COLS));
+    const y0 = Math.floor(r * sh / ROWS), y1 = Math.max(y0 + 1, Math.floor((r + 1) * sh / ROWS));
+    const pix = [];
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) pix.push(srcPx(x, y));
+    row.push(cellToId(pix));
+  }
+  info.push(row);
+}
+
+// ---------- 3. 吸附色表 + 限制色数（细线保护要求"相邻格也选中相近的候选色"，连续两格以上才认）----------
+const cell = info.map((row, r) => row.map((cellv, c) => {
+  if (typeof cellv === 'number') return cellv;                 // avg 口径：已是 id
+  if (!cellv.cand) return cellv.main;
+  const nb = [[r-1,c],[r+1,c],[r,c-1],[r,c+1]];
+  for (const [nr, nc] of nb) {
+    const nrow = info[nr]; if (!nrow) continue;
+    const nCell = nrow[nc]; if (!nCell || typeof nCell === 'number' || !nCell.cand) continue;
+    const a = rgbOf(PAL.find(p => p.id === nCell.cand).hex), b = rgbOf(PAL.find(p => p.id === cellv.cand).hex);
+    if (nCell.cand === cellv.cand || ((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2) <= MERGE2) return cellv.cand;
+  }
+  return cellv.main;
+}));
+const used = new Map();
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const id = cell[r][c]; used.set(id, (used.get(id) || 0) + 1); }   // 上面取色已直接给出 id
+let keep = [...used.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_COLORS).map(e => e[0]);
+let grid = cell.map(row => row.map(id => keep.includes(id) ? id : nearest(rgbOf(PAL.find(p => p.id === id).hex), keep)));
+if (used.size > keep.length) console.log('色数限制：把 ' + used.size + ' 色压到 ' + keep.length + ' 色（用最多的那些）');
+
+// ---------- 4. 去碎色（4-连通小块并到边界最长的邻色）----------
+function despeckle(grid, minPx) {
+  if (!(minPx > 0)) return grid;
+  let changed = true, rounds = 0;
+  while (changed && rounds++ < 12) {
+    changed = false;
+    const lab = grid.map(r => r.map(() => -1));
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (lab[r][c] >= 0 || !grid[r][c]) continue;
+      const v = grid[r][c], st = [[r, c]], cells = []; lab[r][c] = 1;
+      while (st.length) { const [y, x] = st.pop(); cells.push([y, x]);
+        for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ny = y + dy, nx = x + dx;
+          if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS) continue;
+          if (lab[ny][nx] < 0 && grid[ny][nx] === v) { lab[ny][nx] = 1; st.push([ny, nx]); } } }
+      if (cells.length < minPx) {
+        const border = {};
+        for (const [y, x] of cells) for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ny = y + dy, nx = x + dx;
+          if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS) continue;
+          const nv = grid[ny][nx]; if (nv && nv !== v) border[nv] = (border[nv] || 0) + 1;
+        }
+        const best = Object.keys(border).sort((a, b) => border[b] - border[a])[0];
+        if (best) { for (const [y, x] of cells) grid[y][x] = +best; changed = true; }
+      }
+    }
+  }
+  return grid;
+}
+if (DESPECKLE > 0) grid = despeckle(grid, DESPECKLE);
+
+// ---------- 4.5 背景 → 空位(0)：贴边那一色整片挖空 ----------
+if (BG !== 'none') {
+  // 取四边出现最多的颜色当背景色（含四角）
+  const tally = {};
+  const bump = id => tally[id] = (tally[id] || 0) + 1;
+  for (let c = 0; c < COLS; c++) { bump(grid[0][c]); bump(grid[ROWS - 1][c]); }
+  for (let r = 0; r < ROWS; r++) { bump(grid[r][0]); bump(grid[r][COLS - 1]); }
+  const bgId = +Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
+  // 从四边 flood-fill：同为 bgId 的连通片 → 0
+  const seen = grid.map(r => r.map(() => false));
+  const stack = [];
+  for (let c = 0; c < COLS; c++) { stack.push([0, c], [ROWS - 1, c]); }
+  for (let r = 0; r < ROWS; r++) { stack.push([r, 0], [r, COLS - 1]); }
+  let cleared = 0;
+  while (stack.length) {
+    const [y, x] = stack.pop();
+    if (y < 0 || y >= ROWS || x < 0 || x >= COLS) continue;
+    if (seen[y][x] || grid[y][x] !== bgId) continue;
+    seen[y][x] = true; grid[y][x] = 0; cleared++;
+    stack.push([y + 1, x], [y - 1, x], [y, x + 1], [y, x - 1]);
+  }
+  if (cleared) console.log('背景识别：贴边那色（' + bgId + ' ' + PAL.find(p => p.id === bgId).name + '）连通片挖成空位，共 ' + cleared + ' 格');
+}
+
+// ---------- 5. 出文件 + 报告 ----------
+fs.mkdirSync(OUTDIR, { recursive: true });
+const base = NAME + '_' + COLS + 'x' + ROWS;
+writeTXT(path.join(OUTDIR, base + '.txt'), grid);
+const S = Math.max(6, Math.min(40, Math.floor(900 / Math.max(COLS, ROWS))));
+const W = COLS * S, H = ROWS * S, buf = Buffer.alloc(W * H * 3, 245);
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+  const id = grid[r][c];
+  const col = id ? rgbOf(PAL.find(p => p.id === id).hex) : [235, 235, 235];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const px = (r * S + y) * W + (c * S + x);
+    const edge = (x === 0 || y === 0);
+    const k = edge ? 0.72 : 1;                       // 只压暗格线，便于数格子
+    buf[px * 3] = Math.round(col[0] * k); buf[px * 3 + 1] = Math.round(col[1] * k); buf[px * 3 + 2] = Math.round(col[2] * k);
+  }
+}
+writePNG(path.join(OUTDIR, base + '_预览.png'), W, H, buf);
+
+const cnt = {}; grid.forEach(row => row.forEach(v => cnt[v] = (cnt[v] || 0) + 1));
+console.log('\n产出：' + path.join(OUTDIR, base + '.txt') + '（' + COLS + ' 列 × ' + ROWS + ' 行）');
+console.log('       ' + path.join(OUTDIR, base + '_预览.png'));
+console.log('每色格数：');
+Object.keys(cnt).map(Number).sort((a, b) => b - a).forEach(id => {
+  const p = PAL.find(x => x.id === id);
+  console.log('   ' + (id === 0 ? '  0 空位' : String(id).padStart(3) + ' ' + p.name.padEnd(4) + ' ' + p.hex) + '  ×' + cnt[id]);
+});
+if (A.Generator && A.Generator.checkFragmentGate) {
+  const g = A.Generator.checkFragmentGate(grid, { fragmentMaxRate: 0.22 });
+  console.log('\n碎色闸门（与生成器同一口径，上限 22%）：' + (g.ok ? '✅ 过闸' : '❌ 不过闸') + ' —— ' + g.detail);
+  if (!g.ok) console.log('   建议：把 --colors 调小、或 --despeckle 调大（例如 12~20），再跑一次');
+}

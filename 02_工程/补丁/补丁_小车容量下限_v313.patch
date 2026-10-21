@@ -1,0 +1,79 @@
+补丁 v313 —— 旧流程不再把车拆成 12~25 的小车（用户：满盘 19）
+基线：v312（?v=312）
+应用：在 02_工程/完整主bin快照_20261012 下 `patch -p1 < 本文件`
+
+改动四件事，全是为了"我设的 30~50，出来的车就得在这个区间里"：
+ 1. app.js  旧流程 targetCarCount 置 0（旧流程的棋盘由盒数反推，不需要目标车数）
+ 2. generator.js  splitCarsToTarget 的下限从写死 12 改成 boxSizeMin
+ 3. generator.js  同色尾盒"平分后两半都不够下限"→ 合成一辆整块（55 = 50+5 不再变 27/28）
+ 4. generator.js  候选变体的 0.94 档不再把下限压低（30 不会被改成 28）
+
+--- a/bin/js/generator.js	2026-10-20 20:07:29
++++ b/bin/js/generator.js	2026-10-20 20:07:29
+@@ -9911,8 +9911,12 @@
+       var tail = group[group.length - 1], prev = group[group.length - 2];
+       if (tail.count >= boxMin) continue;
+       var total = prev.count + tail.count;
++      // 【v313·用户裁决】平分后两半仍低于下限（如 55 = 50+5 → 28/27 < 30）时，
++      //   只要整块不超过 max(上限×1.1, 下限×1.9)，就合成一辆整块 —— 宁可一辆 55，也不要两辆 27。
++      if (Math.floor(total / 2) < boxMin && total <= Math.max(boxMax * 1.1, boxMin * 1.9)) { prev.count = total; tail.__drop = true; continue; }
+       prev.count = Math.ceil(total / 2); tail.count = Math.floor(total / 2);
+     }
++    if (boxes.some(function (b) { return b.__drop; })) boxes = boxes.filter(function (b) { return !b.__drop; });
+     boxes.sort(function (a, b) { return a.trendStart - b.trendStart; });
+     for (var bi = 0; bi < boxes.length; bi++) { boxes[bi].elimSeq = bi; delete boxes[bi].trendStart; }
+     return boxes;
+@@ -9973,8 +9977,12 @@
+       var tail = group[group.length - 1], prev = group[group.length - 2];
+       if (tail.count >= boxMin) continue;
+       var total = prev.count + tail.count;
++      // 【v313·用户裁决】平分后两半仍低于下限（如 55 = 50+5 → 28/27 < 30）时，
++      //   只要整块不超过 max(上限×1.1, 下限×1.9)，就合成一辆整块 —— 宁可一辆 55，也不要两辆 27。
++      if (Math.floor(total / 2) < boxMin && total <= Math.max(boxMax * 1.1, boxMin * 1.9)) { prev.count = total; tail.__drop = true; continue; }
+       prev.count = Math.ceil(total / 2); tail.count = Math.floor(total / 2);
+     }
++    if (boxes.some(function (b) { return b.__drop; })) boxes = boxes.filter(function (b) { return !b.__drop; });
+     boxes.sort(function (a, b) { return a.trendStart - b.trendStart; });
+     for (var bi = 0; bi < boxes.length; bi++) { boxes[bi].elimSeq = bi; delete boxes[bi].trendStart; }
+     return boxes;
+@@ -10872,8 +10880,15 @@
+     // 【v218】收尾清理微型车（<3px），避免出现容量 1 的车
+     try { boxes = fixTinyBoxes(boxes, Math.max(3, parseInt(config.boxSizeMin, 10) > 0 ? 3 : 3)); } catch (e) { }
+     // 【v228】车数不够目标 → 拆大车（填满棋盘、让"大容量+小棋盘"成立）
++    // 【v313·用户裁决】拆出来的两半都不得低于用户设的容量下限。
++    //   之前 minHalf 写死 12：35×35 图 targetCarCount=77 时，50 的车被对半拆成
++    //   12/13/16/19 一堆小车，棋盘上满眼"19"（用户当场指出「还是不对」）。
++    //   现在下限 = boxSizeMin；拆不动就不拆（宁可车少，不要车小）。
+     try {
+-      if (config.targetCarCount) boxes = splitCarsToTarget(boxes, parseInt(config.targetCarCount, 10), 12);
++      if (config.targetCarCount) {
++        var _minHalf = Math.max(12, parseInt(config.boxSizeMin, 10) || 12);
++        boxes = splitCarsToTarget(boxes, parseInt(config.targetCarCount, 10), _minHalf);
++      }
+     } catch (e) { }
+     // 【v230】定向埋深：每色最大的一辆推到队尾 + 容量压到该色总量的一半以内
+     try {
+@@ -12927,7 +12942,9 @@
+           var _vseq = [[1.00, 2, 3], [1.06, 2, 4], [0.94, 3, 3], [1.12, 2, 5]][_pi % 4];
+           var _bmin0 = parseInt(_cfg.boxSizeMin, 10) || 33;
+           var _bmax0 = parseInt(_cfg.boxSizeMax, 10) || 39;
+-          _cfg.boxSizeMin = Math.max(14, Math.round(_bmin0 * _vseq[0]));
++          // 【v313·用户裁决】变体只允许把下限放大，绝不允许压低：
++          //   0.94 档会把用户设的 30 变成 28，候选里就冒出 27/28 的车（用户："不希望出现小容量车"）。
++          _cfg.boxSizeMin = Math.max(_bmin0, Math.round(_bmin0 * _vseq[0]));
+           _cfg.boxSizeMax = Math.max(_cfg.boxSizeMin + 4, Math.round(_bmax0 * _vseq[0]));
+           // v284：冰的块数与时长取"配置值与变体值的较大者"，否则每次尝试的变体会把 app 的加强覆盖回去
+           _cfg.iceScheduleCount = Math.max(parseInt(config.iceScheduleCount,10)||3, _vseq[1]);
+--- a/bin/js/app.js	2026-10-20 20:07:29
++++ b/bin/js/app.js	2026-10-20 20:07:29
+@@ -4684,7 +4684,9 @@
+       // 【v305·用户裁决】棋盘尺寸由球数决定后，不允许正方形（保持 列−行 ∈ {1,2}）
+       boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: !_legacyFlow,
+       // 【v238】目标车数也随棋盘走
+-      targetCarCount: _legacyFlow ? _targetCars0 : (_boardAuto ? 36 : _targetCars0),
++      // 【v313·用户裁决】旧流程不按"目标车数"拆车：它的棋盘是由盒数反推的（chooseBoardDimsFixed），
++      //   再把车拆到 _targetCars0（= 行列上限 9×10×0.86 = 77 辆）只会把 30~50 的车对半劈成 12~25。
++      targetCarCount: _legacyFlow ? 0 : (_boardAuto ? 36 : _targetCars0),
+       // 【v254】阀门补冰关掉：它是"没有绑定能力时硬凑压力"的老补丁，会在排程之外
+       //   再往第 0 行塞 1~2 块冰（实测 6 个格子 4 块冰就是这么来的）。排程已能定点施压。
+       valvePlan: false, valveMode: 'largest', valveIceSteps: 10,

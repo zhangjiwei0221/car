@@ -1,0 +1,75 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3918,7 +3918,59 @@
+    *   让那些车更早到位（= 把选择还给玩家）。改动前先做快照，修完更差就整体回滚。
+    *   config.strangleRepair === true 才生效；默认关。
+    *   成本：触发时 2 次稳健模拟（~0.1~0.2s）。
++   */
++  /**
++   * 【v198】设计器·摆位：把"埋得最深的颜色"的车，换到第 0 行（恒可取）——
++   *   玩家开局就能点它，而它的像素还被别的颜色盖着 → 这笔债是**设计出来的**，不是撒出来的。
++   * 依据：原始工程 `interiorColorRank`（埋深排名，ratio 越小越深）。
++   * 只换**普通盒**（无锁链、无数字冰），双方都在 box 格上；donor 选"在场数量最多"的浅色，
++   *   这样它被挪到深处也只是少一辆早车，不会把某个颜色掐死。
++   * config.designDebt === true 才生效；默认关。
+    */
++  function designDebtPlacement(board, blocks, config) {
++    if (!config || !config.designDebt) return null;
++    var rank = interiorColorRank(blocks, config.bottomOnly);
++    if (!rank || !rank.length) return { ok: false, why: 'no-rank' };
++    var want = Math.max(1, Math.min(4, parseInt(config.designDebtCount, 10) || 2));
++    var cells = board.cells, rows = board.rows, cols = board.cols;
++    // 在场每色盒数（选 donor 用）
++    var perColor = {};
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var b = cells[r][c];
++      if (b && b.t === 'box') perColor[b.color] = (perColor[b.color] || 0) + 1;
++    }
++    var moved = [];
++    for (var i = 0; i < rank.length && moved.length < want; i++) {
++      var col = rank[i].color;
++      if (!perColor[col]) continue;
++      // 该色最靠后的普通盒
++      var src = null;
++      for (var rr = rows - 1; rr >= 0 && !src; rr--) {
++        for (var cc = 0; cc < cols && !src; cc++) {
++          var x = cells[rr][cc];
++          if (x && x.t === 'box' && x.color === col && !(x.chain > 0) && !(x.numice > 0)) src = { r: rr, c: cc };
++        }
++      }
++      if (!src) continue;
++      // 第 0 行里"最可牺牲"的普通盒：不同色、该色在场盒数最多
++      var dst = null, dstCnt = -1;
++      for (var c2 = 0; c2 < cols; c2++) {
++        var y = cells[0][c2];
++        if (!y || y.t !== 'box' || y.color === col || (y.chain > 0) || (y.numice > 0)) continue;
++        var cnt = perColor[y.color] || 0;
++        if (cnt >= 3 && cnt > dstCnt) { dst = { r: 0, c: c2 }; dstCnt = cnt; }
++      }
++      if (!dst) continue;
++      var tmp = cells[src.r][src.c];
++      cells[src.r][src.c] = cells[dst.r][dst.c];
++      cells[dst.r][dst.c] = tmp;
++      // 换位后更新计数
++      perColor[col] = (perColor[col] || 1);
++      moved.push({ color: col, ratio: +rank[i].ratio.toFixed(3), from: [src.r, src.c], to: [dst.r, dst.c], donor: cells[src.r][src.c].color });
++    }
++    return moved.length ? { ok: true, moved: moved } : { ok: false, why: 'no-move' };
++  }
++
+   function repairStrangle(board, blocks, config) {
+     if (!config || !config.strangleRepair) return null;
+     function parsedOf() { return AntSolver.parseLevel({ blocks: blocks, bufferLimit: config.bufferLimit, board: board }); }
+@@ -4180,6 +4232,12 @@
+     }
+ 
+     // ⑤ 解析
++    // ③b2 【v198·实验】设计器·摆位：把埋得最深的车换到第 0 行，制造"设计好的债"（默认关）
++    try {
++      var dStat = designDebtPlacement(board, blocks, config);
++      if (dStat) board.designStat = dStat;
++    } catch (e) { board.designStat = { ok: false, error: String((e && e.message) || e) }; }
++
+     // ③b3 【v189·实验】"别掐死"修复：被埋色 → 拆掉开壳车上的障碍，让选择回来（默认关）
+     try {
+       var strStat = repairStrangle(board, blocks, config);

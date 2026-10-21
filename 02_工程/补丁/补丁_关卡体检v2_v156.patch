@@ -1,0 +1,303 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -520,6 +520,8 @@
+     // 直接 bindClick('btn-analyze', batchAnalyze) 会让 opts 变成 MouseEvent（当前恰好等价于单轮，但属隐患）。
+     bindClick('btn-analyze', function () { batchAnalyze({ recalibrate: false }); });
+     bindClick('btn-recalibrate', function () { batchAnalyze({ recalibrate: true }); });
++    // 【v156】关卡体检：卡点判据 v2 的只读报告（零参数）。见 runChokeAudit 上方说明。
++    bindClick('btn-choke-audit', runChokeAudit);
+ 
+     // 参数区间双端滑块（v116）：七项区间参数的下限/上限都用滑钮拖。
+     //   用户裁决「把上下限做成左右端可拖动的，而不是左端可拖动，右端变成填入」。
+@@ -5972,8 +5974,223 @@
+     renderLevelInfo();   // 重渲染一次，把上面三项（入口模式/卡点信息）带进「关卡信息」面板
+     if (enterSim) enterSimulation();   // 【v150】右栏会随 simulating 自动切成模拟控制
+     return true;
++  }
++
++  // ==================== 【v156】关卡体检（卡点判据 v2 · 只读报告） ====================
++  // 需求来源（用户 2026-10-16 口述，见 01_交接文档/工作日志_20261012.md 第二十五节）：
++  //   · 独木桥：场上**只有 1 个方块能点**（其余被数字冰锁/链锁/不可达挡住）→ 一关最多 1 处；
++  //     **按"步"计**（点 A 解锁 B、再解锁 C 那种走廊算多处）；末段豁免。
++  //   · 预算判断点（R9）：可点 ≥2，但"取了立刻能消掉（不占暂存）"的选项**恰 1 个**，
++  //     且至少有 1 个"取了会占暂存位"的陷阱项 —— 这是用户要刻意做的核心体验。
++  //   · 无满解步数：这一步一个都消不掉、必须硬垫 → 要少（好关 1~3 步）。
++  //   · 暂存 ≥4 的高压尽量留在 70% 之后。
++  //   · 两条线（全知线 / 玩家线）都测，判据**取较差的那条**（用户 2026-10-16 定：「取最差吧」）。
++  //
++  // ⚠ 本功能【只读】：不生成、不写盘、不改关卡；门槛一律是"参考门"（阈值由用户认可的好关反推），
++  //   等用户确认阈值后才接进生产合格判定。**没有任何新参数入口**（用户明确不想再调参数）。
++  var AUDIT_V2_TAIL_PCT = 0.90;    // 末段豁免：进度 ≥90%
++  var AUDIT_V2_TAIL_BOXES = 3;     // 末段豁免：棋盘剩余盒总数 ≤3
++  // 参考门（从"小鹿"这一关反推的初值；样本少，待用户再多给几关好关后校准）
++  var AUDIT_V2_GATES = { bridgeMax: 1, r9Min: 12, noGoodMax: 3, hiBefore70PctMax: 10 };
++  var lastChokeAudit = null;
++
++  /** 沿一条既定路线（pickOrder）逐步回放，量出这条线上的指标。 */
++  function auditV2MeasureLine(lv, order) {
++    var S = AntSolver.Simulator;
++    if (!S || !S.enter || !S.listMoves || !S.applyPick || !order || !order.length) return null;
++    var st;
++    try { st = S.enter(lv, { useSlotStart: true }); } catch (e) { return null; }
++    var n = 0, bridges = 0, bridgeAt = [], run = 0, maxRun = 0, soft = 0, r9 = [];
++    var minPick = 99, buf34 = 0, buf4 = 0, hiBefore70 = 0, stepsBefore70 = 0, noGood = 0;
++    try {
++      for (var i = 0; i < order.length; i++) {
++        var p = order[i];
++        if (!p || p.r == null) continue;
++        var moves = S.listMoves(st);
++        var pickable = moves.length, safe = 0, good = 0, traps = 0;
++        for (var j = 0; j < moves.length; j++) {
++          var m = moves[j];
++          if (m.blocked) continue;
++          safe++;
++          if (m.canConsume) good++; else traps++;
++        }
++        var prog = st.totalBoxes ? (st.completedBoxes / st.totalBoxes) : 0;
++        var leftBoxes = 0;
++        for (var r = 0; r < st.boardRows; r++) for (var c = 0; c < st.boardCols; c++) {
++          var cc = st.cells[r][c]; if (cc && cc.t === 'box') leftBoxes++;
++        }
++        var tail = (prog >= AUDIT_V2_TAIL_PCT) || (leftBoxes <= AUDIT_V2_TAIL_BOXES);
++        var buf = st.buffer.length, pc = Math.round(prog * 100);
++        n++;
++        if (buf >= 3 && buf <= 4) buf34++;
++        if (buf >= 4) buf4++;
++        if (prog < 0.70) { stepsBefore70++; if (buf >= 4) hiBefore70++; }
++        if (pickable < minPick) minPick = pickable;
++        if (pickable === 1) {                    // 独木桥：按步计（末段豁免）
++          if (!tail) { bridges++; bridgeAt.push(pc); }
++          run++; if (run > maxRun) maxRun = run;
++        } else run = 0;
++        if (pickable >= 2 && safe === 1) soft++;               // 软独木桥（只记录，不设门）
++        if (pickable >= 2 && good === 1 && traps >= 1) r9.push(pc);   // 预算判断点 R9
++        if (good === 0) noGood++;                              // 一个都消不掉 → 必须硬垫
++        S.applyPick(st, p.r, p.c);                             // 锁链组已整组拿走的情形会返回 false，忽略即可
++        if (st.gameOver) break;
++      }
++    } catch (e) { /* 回放中断：用已采到的部分，不伪造 */ }
++    if (!n) return null;
++    return {
++      steps: n, bridges: bridges, bridgeAt: bridgeAt, maxRun: maxRun, soft: soft,
++      r9: r9.length, r9At: r9, minPick: minPick === 99 ? 0 : minPick,
++      buf34Pct: Math.round(buf34 / n * 100), buf4Pct: Math.round(buf4 / n * 100),
++      hiBefore70Pct: stepsBefore70 ? Math.round(hiBefore70 / stepsBefore70 * 100) : 0,
++      noGood: noGood
++    };
+   }
+ 
++  /** 一关体检：全知线 + 玩家线各量一遍，再按"取最差"合成一组判据值。 */
++  function auditV2OfLevel(lv, em) {
++    var omni = null, pl = null;
++    try { omni = solveByEntryMode(lv, em); } catch (e) { omni = null; }
++    try { if (AntSolver.PlayerSim) pl = AntSolver.PlayerSim.run(lv, Object.assign({ seed: 7 }, playerOptsOfEntry(em))); } catch (e) { pl = null; }
++    var mo = omni ? auditV2MeasureLine(lv, omni.pickOrder || []) : null;
++    var mp = pl ? auditV2MeasureLine(lv, pl.pickOrder || []) : null;
++    if (!mo && !mp) return null;
++    var worst = {   // 取最差：坏的取大、好的取小
++      bridges: Math.max(mo ? mo.bridges : -1, mp ? mp.bridges : -1),
++      maxRun: Math.max(mo ? mo.maxRun : -1, mp ? mp.maxRun : -1),
++      noGood: Math.max(mo ? mo.noGood : -1, mp ? mp.noGood : -1),
++      hiBefore70Pct: Math.max(mo ? mo.hiBefore70Pct : -1, mp ? mp.hiBefore70Pct : -1),
++      r9: Math.min(mo ? mo.r9 : 1e9, mp ? mp.r9 : 1e9),
++      minPick: Math.min(mo ? mo.minPick : 99, mp ? mp.minPick : 99)
++    };
++    if (worst.r9 >= 1e9) worst.r9 = 0;
++    if (worst.minPick >= 99) worst.minPick = 0;
++    return { omni: mo, player: mp, worst: worst };
++  }
++
++  /** 违反项（参考门；阈值集中在上面的 AUDIT_V2_GATES）。 */
++  function auditV2Violations(w) {
++    var v = [];
++    if (w.bridges > AUDIT_V2_GATES.bridgeMax) v.push('独木桥×' + w.bridges + '处');
++    if (w.r9 < AUDIT_V2_GATES.r9Min) v.push('预算判断点仅' + w.r9 + '处');
++    if (w.noGood > AUDIT_V2_GATES.noGoodMax) v.push('无满解' + w.noGood + '步');
++    if (w.hiBefore70Pct > AUDIT_V2_GATES.hiBefore70PctMax) v.push('70%前≥4占' + w.hiBefore70Pct + '%');
++    return v;
++  }
++
++  /**
++   * 关卡体检：把左侧关卡列表里【有关卡的条目】逐关体检，出表格 + CSV。
++   * 只有 TXT 图（还没生产出关卡）的条目【跳过并计数】—— 现场生成一关再体检既慢又误导
++   * （那条路径用的是最老的生成流程，跟你「批量生产」得到的不是同一关）。
++   */
++  function runChokeAudit() {
++    if (!AntSolver.Simulator || !AntSolver.Solver) { alert('模拟/求解模块未加载'); return; }
++    if (!levelList.length) { alert('请先导入目标图（TXT）或导入关卡包'); return; }
++    var card = document.getElementById('choke-audit-card');
++    var body = document.getElementById('choke-audit-body');
++    if (card) card.classList.remove('hidden');
++    if (body) body.innerHTML = '<p style="color:#888">体检中…</p>';
++    var rows = [], skipped = 0, idx = 0, t0 = Date.now();
++    function next() {
++      if (idx >= levelList.length) { renderChokeAudit(rows, skipped, Date.now() - t0); return; }
++      var en = levelList[idx];
++      if (body) body.innerHTML = '<p style="color:#888">体检 ' + (idx + 1) + '/' + levelList.length + '：' + en.name + '</p>';
++      setTimeout(function () {
++        try {
++          if (en.level) {
++            var lv = AntSolver.parseLevel(en.level);
++            var em = en.entryMode || 'fourSide';
++            var m = auditV2OfLevel(lv, em);
++            if (m) rows.push({ name: en.name, em: em, boxes: lv.totalBoxes, level: m,
++                               difficulty: (en.difficulty && en.difficulty.score != null) ? en.difficulty.score : null });
++          } else skipped++;
++        } catch (e) { skipped++; }
++        idx++; next();
++      }, 0);
++    }
++    next();
++  }
++
++  function renderChokeAudit(rows, skipped, ms) {
++    var body = document.getElementById('choke-audit-body');
++    if (!body) return;
++    lastChokeAudit = rows;
++    if (!rows.length) {
++      body.innerHTML = '<p class="fail">没有可体检的关卡（关卡列表里全是只有 TXT 图、还没生产出关卡的条目）' +
++        (skipped ? '（跳过 ' + skipped + ' 张）' : '') + '</p>';
++      return;
++    }
++    var passN = 0;
++    rows.forEach(function (r) {
++      r.violations = auditV2Violations(r.level.worst);
++      if (!r.violations.length) passN++;
++    });
++    var g = AUDIT_V2_GATES;
++    var html = '<div style="font-size:11px;color:#aaa;margin-bottom:6px">';
++    html += '🔬 卡点判据 v2 · 两条线（全知/玩家）都测、判据<b>取最差</b> · 共 ' + rows.length + ' 关';
++    if (skipped) html += ' · 跳过 ' + skipped + ' 张只有 TXT 的图（没关卡可体检）';
++    html += ' · 参考门通过 <b style="color:' + (passN === rows.length ? '#8bc34a' : '#e0592c') + '">' + passN + '/' + rows.length + '</b>';
++    html += ' · 用时 ' + Math.round(ms / 1000) + 's';
++    html += ' <button id="btn-choke-audit-csv" style="margin-left:6px;padding:2px 8px;background:#6b4f34;color:#f3e9db;border:none;border-radius:3px;cursor:pointer">⬇ 体检报告CSV</button>';
++    html += '<br>参考门（阈值从"小鹿"反推，待你确认）：非末段独木桥 ≤' + g.bridgeMax + ' 处 · 预算判断点 ≥' + g.r9Min +
++      ' 处 · 无满解 ≤' + g.noGoodMax + ' 步 · 70% 之前 ≥4 占比 ≤' + g.hiBefore70PctMax + '%</div>';
++    html += '<div style="overflow:auto"><table style="border-collapse:collapse;font-size:11px;width:100%">';
++    html += '<thead><tr style="background:#3a2c22;color:#f3e9db">' +
++      ['关卡', '玩法', '盒', '独木桥(全知/玩家)', '最长走廊', '最低可点', '无满解(全/玩)', '预算点(全/玩)',
++       '暂存3~4(全/玩)', '暂存≥4(全/玩)', '70%前≥4', '参考门判定'].map(function (h) {
++        return '<th style="padding:3px 6px;border:1px solid #5a4636">' + h + '</th>';
++      }).join('') + '</tr></thead><tbody>';
++    rows.forEach(function (r) {
++      var w = r.level.worst, o = r.level.omni, p = r.level.player;
++      var pair = function (a, b) { return (a == null ? '-' : a) + ' / ' + (b == null ? '-' : b); };
++      var td = function (txt, bad, extra) {
++        return '<td style="padding:3px 6px;border:1px solid #5a4636' +
++          (bad ? ';color:#e0592c' : '') + (extra || '') + '">' + txt + '</td>';
++      };
++      var ok = !r.violations.length;
++      html += '<tr>' +
++        td(r.name + (r.difficulty != null ? ('<br><span style="color:#8a7358">难度 ' + r.difficulty + '</span>') : '')) +
++        td(entryModeLabel(r.em)) + td(r.boxes) +
++        td(pair(o ? o.bridges : null, p ? p.bridges : null), w.bridges > g.bridgeMax) +
++        td(w.maxRun) + td(w.minPick) +
++        td(pair(o ? o.noGood : null, p ? p.noGood : null), w.noGood > g.noGoodMax) +
++        td(pair(o ? o.r9 : null, p ? p.r9 : null), w.r9 < g.r9Min) +
++        td(pair(o ? o.buf34Pct + '%' : null, p ? p.buf34Pct + '%' : null)) +
++        td(pair(o ? o.buf4Pct + '%' : null, p ? p.buf4Pct + '%' : null)) +
++        td(w.hiBefore70Pct + '%', w.hiBefore70Pct > g.hiBefore70PctMax) +
++        td(ok ? '✓ 通过' : '✗ ' + r.violations.join('、'), !ok) +
++        '</tr>';
++    });
++    html += '</tbody></table></div>';
++    html += '<div style="font-size:11px;color:#8a7358;margin-top:6px">独木桥 = 场上只有 1 个方块能点（按"步"计，点 A 解锁 B 那种走廊算多处）；末段（进度 ≥90% 或剩余盒 ≤3）豁免。' +
++      '预算判断点 = 可点 ≥2，但"取了立刻能消掉"的选项恰 1 个、其余是"取了会占暂存位"的陷阱项。' +
++      '最低可点数 ≥2 与"独木桥 0 处"等价，故只作显示、不重复计违反。</div>';
++    body.innerHTML = html;
++    var csvBtn = document.getElementById('btn-choke-audit-csv');
++    if (csvBtn) csvBtn.addEventListener('click', exportChokeAuditCSV);
++  }
++
++  function exportChokeAuditCSV() {
++    if (!lastChokeAudit || !lastChokeAudit.length) return;
++    var head = ['关卡,玩法,盒数,独木桥_全知,独木桥_玩家,独木桥_取最差,最长走廊,最低可点,无满解_全知,无满解_玩家,无满解_取最差,预算点_全知,预算点_玩家,预算点_取最差,暂存3to4_全知%,暂存3to4_玩家%,暂存4plus_全知%,暂存4plus_玩家%,70%前4plus占比%,独木桥位置,参考门,违反项,难度分'];
++    var lines = head;
++    lastChokeAudit.forEach(function (r) {
++      var w = r.level.worst, o = r.level.omni, p = r.level.player;
++      var V = function (x) { return x == null ? '' : x; };
++      lines.push(['"' + r.name + '"', '"' + entryModeLabel(r.em) + '"', r.boxes,
++        V(o ? o.bridges : null), V(p ? p.bridges : null), w.bridges, w.maxRun, w.minPick,
++        V(o ? o.noGood : null), V(p ? p.noGood : null), w.noGood,
++        V(o ? o.r9 : null), V(p ? p.r9 : null), w.r9,
++        V(o ? o.buf34Pct : null), V(p ? p.buf34Pct : null), V(o ? o.buf4Pct : null), V(p ? p.buf4Pct : null),
++        w.hiBefore70Pct,
++        '"' + ((o && o.bridgeAt.length) ? o.bridgeAt.join('/') + '%' : '') +
++          ((p && p.bridgeAt.length) ? (' 玩家:' + p.bridgeAt.join('/') + '%') : '') + '"',
++        (r.violations.length ? '不通过' : '通过'), '"' + r.violations.join('、') + '"', V(r.difficulty)
++      ].join(','));
++    });
++    downloadText('蚂蚁关卡体检v2_' + lastChokeAudit.length + '关_' + Date.now() + '.csv', lines.join('\n') + '\n');
++  }
++
+   // ==================== 关卡库 导入/导出 ====================
+   /**
+    * 导入关卡库（JSON）：支持三种格式
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=155">
++  <link rel="stylesheet" href="css/style.css?v=156">
+ </head>
+ <body>
+   <header>
+@@ -785,6 +785,10 @@
+              （复活少 → 峰值低 → 分数接近多轮中位）来标定难度，消除生产审核单跑 seed 7 的抽样扰动。
+              分析完可直接导出重标定报告 CSV（多 13 列：轮数/采用种子/通关率/分数与峰值的区间与极差）。 -->
+         <button id="btn-recalibrate" class="gen-btn-sm" title="多轮多路线重标定难度：每关跑 N 轮不同种子的玩家模拟，取最稳的一条通关路线标定难度，并输出多轮离散度。完成后可导出重标定报告CSV">🎯 批量难度重标定</button>
++        <!-- 【v156】关卡体检：卡点判据 v2 的只读报告（独木桥 / 预算判断点 / 无满解步数 / 高压位置）。
++             零参数：只对左侧列表里【已经有关卡】的条目体检；只有 TXT 图的条目跳过并计数。
++             只读：不生成、不写盘、不改关卡；门槛为"参考门"，未接进生产合格判定。 -->
++        <button id="btn-choke-audit" class="gen-btn-sm" title="关卡体检（只读）：按卡点判据 v2 量一关里的①独木桥处数（场上只有 1 个方块能点，一关最多 1 处）②预算判断点（可点≥2 但只有一个是对的）③无满解步数（必须硬垫的步数）④暂存≥4 的高压是否留在 70% 之后。全知线与玩家线都测、取最差。可导出 CSV。">🔬 关卡体检</button>
+         <label class="gen-hint" title="每关跑几轮玩家模拟（1~30）。轮数越多越稳、耗时线性增长">轮数
+           <input type="number" id="gen-analyze-rounds" value="5" min="1" max="30" style="width:52px">
+         </label>
+@@ -801,6 +805,12 @@
+       <div id="analysis-body"></div>
+     </section>
+ 
++    <!-- 【v156】关卡体检结果（卡点判据 v2 · 只读报告） -->
++    <section id="choke-audit-card" class="gen-card hidden">
++      <h2>关卡体检（卡点判据 v2 · 只读）</h2>
++      <div id="choke-audit-body"></div>
++    </section>
++
+     <!-- 3. 生产进度可视化 -->
+     <section id="gen-progress-card" class="gen-card hidden">
+       <h2>4. 生产进度</h2>
+@@ -961,20 +971,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=155"></script>
+-  <script src="js/utils.js?v=155"></script>
++  <script src="js/zip.js?v=156"></script>
++  <script src="js/utils.js?v=156"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=155"></script>
+-  <script src="js/simulator.js?v=155"></script>
++  <script src="js/color-libs.js?v=156"></script>
++  <script src="js/simulator.js?v=156"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=155"></script>
+-  <script src="js/solver-strategy.js?v=155"></script>
+-  <script src="js/solver.js?v=155"></script>
+-  <script src="js/playersim.js?v=155"></script>
+-  <script src="js/generator.js?v=155"></script>
+-  <script src="js/analysis.js?v=155"></script>
++  <script src="js/anchor-cut.js?v=156"></script>
++  <script src="js/solver-strategy.js?v=156"></script>
++  <script src="js/solver.js?v=156"></script>
++  <script src="js/playersim.js?v=156"></script>
++  <script src="js/generator.js?v=156"></script>
++  <script src="js/analysis.js?v=156"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=155"></script>
+-  <script src="js/app.js?v=155"></script>
++  <script src="js/level-editor.js?v=156"></script>
++  <script src="js/app.js?v=156"></script>
+ </body>
+ </html>

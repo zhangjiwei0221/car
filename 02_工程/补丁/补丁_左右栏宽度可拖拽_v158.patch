@@ -1,0 +1,220 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -191,6 +191,102 @@
+     if (typeof lastTargetElim !== 'undefined' && currentLevel) renderTarget(lastTargetElim);
+   }
+ 
++  // ==================== 【v158】左右两栏宽度可拖拽 ====================
++  // 用户 2026-10-16：「左侧右侧的框，宽度要可调整」。
++  // 宽度由 `.main-layout` 上的 CSS 变量 --left-w / --right-w 驱动（网格轨道也跟着它们走），
++  // 分隔条（#resizer-left / #resizer-right）绝对定位贴在边界上，所以拖动时条和面板始终对齐。
++  // 夹取规则：两栏各自 min/max，且**中列至少留 360px**（不够就先削右栏、再削左栏）——
++  //   避免把目标图/棋盘挤成一条缝（v146 那次"收起左栏把中间也塌了"是同源教训）。
++  // 宽度记进 localStorage，刷新保留；双击分隔条复位成默认 280 / 352。
++  var LAYOUT_W_KEY = 'antLayoutWidths';
++  var LAYOUT_DEF = { left: 280, right: 352 };
++  var LAYOUT_LIM = { leftMin: 180, leftMax: 620, rightMin: 240, rightMax: 720, centerMin: 360 };
++  var layoutW = { left: LAYOUT_DEF.left, right: LAYOUT_DEF.right };
++
++  function layoutMainEl() { return document.querySelector('.main-layout'); }
++  function layoutApply() {
++    var ml = layoutMainEl();
++    if (!ml || !ml.style || !ml.style.setProperty) return;
++    ml.style.setProperty('--left-w', layoutW.left + 'px');
++    ml.style.setProperty('--right-w', layoutW.right + 'px');
++  }
++  function layoutLoadSaved() {
++    try {
++      var s = JSON.parse(localStorage.getItem(LAYOUT_W_KEY) || 'null');
++      if (s && s.left && s.right) { layoutW.left = +s.left || LAYOUT_DEF.left; layoutW.right = +s.right || LAYOUT_DEF.right; }
++    } catch (e) { /* 存坏了就用默认值，不打扰用户 */ }
++  }
++  function layoutSave() {
++    try { localStorage.setItem(LAYOUT_W_KEY, JSON.stringify({ left: Math.round(layoutW.left), right: Math.round(layoutW.right) })); } catch (e) { }
++  }
++  /** 夹取：先保左栏下限、再保右栏下限、最后保证中列 ≥ centerMin（不够先削右栏） */
++  function layoutClamp(w) {
++    var ml = layoutMainEl();
++    var total = (ml && ml.clientWidth) ? ml.clientWidth : (window.innerWidth || 1440);
++    w.left = Math.max(LAYOUT_LIM.leftMin, Math.min(w.left, LAYOUT_LIM.leftMax));
++    w.right = Math.max(LAYOUT_LIM.rightMin, Math.min(w.right, LAYOUT_LIM.rightMax));
++    var over = (w.left + w.right + LAYOUT_LIM.centerMin) - total;
++    if (over > 0) {
++      var cutR = Math.min(over, Math.max(0, w.right - LAYOUT_LIM.rightMin));
++      w.right -= cutR; over -= cutR;
++      if (over > 0) w.left -= Math.min(over, Math.max(0, w.left - LAYOUT_LIM.leftMin));
++    }
++    return w;
++  }
++  function initPanelResizers() {
++    var ml = layoutMainEl();
++    if (!ml) return;
++    layoutLoadSaved();
++    layoutW = layoutClamp(layoutW);
++    layoutApply();
++    function afterResize() {          // 中列宽度变了 → 目标图框体/画布跟着重算（拖动过程中不做，避免每帧重绘卡顿）
++      applyTargetViewportSize();
++      if (typeof lastTargetElim !== 'undefined' && currentLevel) renderTarget(lastTargetElim);
++    }
++    function bindResizer(id, side) {
++      var h = document.getElementById(id);
++      if (!h || !h.addEventListener) return;
++      var dragging = false, startX = 0, startW = 0;
++      function end() {
++        if (!dragging) return;
++        dragging = false;
++        if (h.classList && h.classList.remove) h.classList.remove('active');
++        if (document.body && document.body.classList) document.body.classList.remove('resizing');
++        layoutSave();
++        afterResize();
++      }
++      h.addEventListener('pointerdown', function (e) {
++        dragging = true;
++        startX = e.clientX; startW = layoutW[side];
++        if (h.classList && h.classList.add) h.classList.add('active');
++        try { if (h.setPointerCapture) h.setPointerCapture(e.pointerId); } catch (x) { }
++        if (document.body && document.body.classList) document.body.classList.add('resizing');
++        if (e.preventDefault) e.preventDefault();   // 别触发文本选择
++      });
++      h.addEventListener('pointermove', function (e) {
++        if (!dragging) return;
++        var d = e.clientX - startX;
++        var next = { left: layoutW.left, right: layoutW.right };
++        next[side] = startW + (side === 'left' ? d : -d);
++        layoutW = layoutClamp(next);
++        layoutApply();
++      });
++      h.addEventListener('pointerup', end);
++      h.addEventListener('pointercancel', end);
++      h.addEventListener('dblclick', function () {    // 双击复位
++        layoutW = layoutClamp({ left: LAYOUT_DEF.left, right: LAYOUT_DEF.right });
++        layoutApply(); layoutSave(); afterResize();
++      });
++    }
++    bindResizer('resizer-left', 'left');
++    bindResizer('resizer-right', 'right');
++    // 窗口变小：夹一遍，避免中列被挤没（比如从外接屏拔回笔记本屏）
++    window.addEventListener('resize', function () {
++      var n = layoutClamp({ left: layoutW.left, right: layoutW.right });
++      if (n.left !== layoutW.left || n.right !== layoutW.right) { layoutW = n; layoutApply(); }
++    });
++  }
++
+   function applyTargetTransform() {
+     var canvas = document.getElementById('target-canvas');
+     if (canvas) canvas.style.transform = 'translate(' + targetPan.x + 'px,' + targetPan.y + 'px)';
+@@ -543,6 +639,7 @@
+     // ---- 生成器独立页面 ----
+     // 【v144】左栏收起/展开（收起后把宽度让给棋盘；中列左上角浮现「展开」按钮）
+     bindClick('btn-collapse-left', function () { setLeftPanelCollapsed(); });   // 不传 = 开关
++    initPanelResizers();   // 【v158】左右两栏宽度可拖拽（分隔条 + 双击复位 + 记 localStorage）
+     // 【v147】难度档 / 压力来源 / 高级参数
+     (function () {
+       var presetSel = document.getElementById('gen-preset');
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=157">
++  <link rel="stylesheet" href="css/style.css?v=158">
+ </head>
+ <body>
+   <header>
+@@ -38,6 +38,9 @@
+ 
+   <div id="view-simulator" class="view">
+   <div class="main-layout">
++    <!-- 【v158】左右两栏宽度分隔条：拖动改宽度（双击复位成默认 280 / 352）；宽度记 localStorage，刷新保留 -->
++    <div class="panel-resizer" id="resizer-left" title="拖动调整左侧「关卡信息」栏宽度（双击复位）"></div>
++    <div class="panel-resizer" id="resizer-right" title="拖动调整右侧栏宽度（双击复位）"></div>
+     <!-- 左侧状态面板 -->
+     <aside id="panel-left">
+       <div class="panel-head">
+@@ -971,20 +974,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=157"></script>
+-  <script src="js/utils.js?v=157"></script>
++  <script src="js/zip.js?v=158"></script>
++  <script src="js/utils.js?v=158"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=157"></script>
+-  <script src="js/simulator.js?v=157"></script>
++  <script src="js/color-libs.js?v=158"></script>
++  <script src="js/simulator.js?v=158"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=157"></script>
+-  <script src="js/solver-strategy.js?v=157"></script>
+-  <script src="js/solver.js?v=157"></script>
+-  <script src="js/playersim.js?v=157"></script>
+-  <script src="js/generator.js?v=157"></script>
+-  <script src="js/analysis.js?v=157"></script>
++  <script src="js/anchor-cut.js?v=158"></script>
++  <script src="js/solver-strategy.js?v=158"></script>
++  <script src="js/solver.js?v=158"></script>
++  <script src="js/playersim.js?v=158"></script>
++  <script src="js/generator.js?v=158"></script>
++  <script src="js/analysis.js?v=158"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=157"></script>
+-  <script src="js/app.js?v=157"></script>
++  <script src="js/level-editor.js?v=158"></script>
++  <script src="js/app.js?v=158"></script>
+ </body>
+ </html>
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+@@ -60,17 +60,19 @@
+    左(关卡信息，可收起) | 中(目标图/暂存/棋盘) | 右(模拟控制+压力图 或 生成器) */
+ .main-layout {
+   display: grid;
+-  grid-template-columns: 280px minmax(0, 1fr) 352px;
++  /* 【v158】左右两栏宽度改成 CSS 变量驱动（拖动分隔条时由 JS 改写），默认值与旧版一致 */
++  grid-template-columns: var(--left-w, 280px) minmax(0, 1fr) var(--right-w, 352px);
+   height: calc(100vh - 48px);
++  position: relative;   /* 【v158】分隔条用绝对定位贴在两栏边界上 */
+ }
+ /* 兼容旧类名（进入模拟游玩时曾用它展开第三列）；现在已经常驻，保留以免旧调用点报错 */
+-.main-layout.with-right { grid-template-columns: 280px minmax(0, 1fr) 352px; }
++.main-layout.with-right { grid-template-columns: var(--left-w, 280px) minmax(0, 1fr) var(--right-w, 352px); }
+ /* 【v146 修 v144 的 bug】左栏收起：**不能**把它 display:none ——
+    那会把它从网格里摘掉，中列与右栏会自动前移一格，中列于是掉进那个 0 宽的第一列，
+    表现就是「收起左栏，连中间的目标区和棋盘一起塌了」。
+    改成把它压成一条窄条（仍是网格项、仍占第 1 列），只留折叠按钮；
+    按钮就地翻转方向当"展开"用，不再另放一个浮动按钮（那个也会被塌掉的中列带走）。 */
+-.main-layout.left-collapsed { grid-template-columns: 34px minmax(0, 1fr) 352px; }
++.main-layout.left-collapsed { grid-template-columns: 34px minmax(0, 1fr) var(--right-w, 352px); }
+ .main-layout.left-collapsed aside#panel-left { padding: 8px 2px; overflow: hidden; }
+ .main-layout.left-collapsed aside#panel-left > *:not(.panel-head) { display: none; }
+ .main-layout.left-collapsed .panel-head { flex-direction: column; }
+@@ -91,6 +93,27 @@
+ }
+ #btn-collapse-left:hover { background: var(--amber); border-color: var(--amber); color: #fff; }
+ 
++/* 【v158】左右两栏宽度可拖拽（用户 2026-10-16：「左侧右侧的框，宽度要可调整」）。
++   分隔条绝对定位贴在两栏边界上（边界位置 = 对应的 CSS 变量），宽 7px、只有中间 3px 视觉可见。
++   左栏处于收起态（34px 窄条）时左分隔条隐藏 —— 收起是"临时让位给棋盘"，不该还能拖。 */
++.panel-resizer {
++  position: absolute; top: 0; bottom: 0; width: 7px;
++  cursor: col-resize; z-index: 40; background: transparent;
++  touch-action: none;
++}
++.panel-resizer::after {
++  content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent;
++}
++.panel-resizer:hover { background: rgba(210, 112, 31, .18); }
++.panel-resizer.active { background: rgba(210, 112, 31, .32); }
++.panel-resizer:hover::after, .panel-resizer.active::after { background: var(--amber); }
++#resizer-left { left: calc(var(--left-w, 280px) - 3px); }
++#resizer-right { right: calc(var(--right-w, 352px) - 3px); }
++.main-layout.left-collapsed #resizer-left { display: none; }
++/* 拖动过程中：全局锁光标与选中，避免拖出文字选择/文本光标闪 */
++body.resizing { cursor: col-resize; }
++body.resizing * { user-select: none !important; }
++
+ /* 右侧栏：模拟控制 + 暂存压力图 */
+ aside#panel-right {
+   background: var(--panel);

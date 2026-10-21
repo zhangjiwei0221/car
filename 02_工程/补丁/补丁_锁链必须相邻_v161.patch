@@ -1,0 +1,172 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3307,12 +3307,25 @@
+     if (config.earlyChain !== false) {
+       var maxGid = 0;
+       for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) { var y = cells[r3][c3]; if (y && y.chain > maxGid) maxGid = y.chain; }
++      // 【v161】开局链必须**相邻**（用户 2026-10-16：不能跨过中间的车）：
++      //   改成"从靠前的车出发，找它 4-邻接的另一辆"，而不是随便挑两辆靠前的。
+       var pick2 = [];
++      var D4c = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+       for (var m = 0; m < early.length && pick2.length < 2; m++) {
+         var f = early[m], fc = f.cell;
+         if (fc.q || fc.chain) continue;
+-        if (pick2.length && pick2[0].cell.color === fc.color) continue;   // 两辆必须不同色
+-        pick2.push(f);
++        // 候选伙伴：4-邻接、是盒、未上链、非问号、且**不同色**（同色绑一起没有"双占用"的意义）
++        var nb = shuffle(D4c.slice());
++        for (var nd = 0; nd < nb.length; nd++) {
++          var nr = f.r + nb[nd][0], nc = f.c + nb[nd][1];
++          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
++          var ncell = cells[nr][nc];
++          if (!ncell || ncell.t !== 'box' || ncell.chain || ncell.q) continue;
++          if (ncell.color === fc.color) continue;
++          pick2.push({ r: f.r, c: f.c, cell: fc });
++          pick2.push({ r: nr, c: nc, cell: ncell });
++          break;
++        }
+       }
+       if (pick2.length === 2) {
+         var gid = maxGid + 1;
+@@ -3326,6 +3339,75 @@
+     out.applied = out.inflate.length + (out.chain ? 1 : 0) + out.ice.length;
+     out.earlyCells = nEarly;
+     return out;
++  }
++
++  /**
++   * 【v161】锁链相邻性硬保证（用户 2026-10-16：「现在锁链锁的那些车必须是相邻的，不能跨过中间的车」）。
++   *
++   * 现状核查（实测扫过全部产出）：结构阶段预定的链组本来就是**正交相邻**的 2/3 连，
++   *   最近 19 关产出里 0 个不连通；但**没有一道统一兜底**——后处理（区域换色 / 扩容 / 换球）
++   *   与 v159 新加的开局链都可能把成员挪开或不查相邻性（开局链当时只是"碰巧"相邻）。
++   *   所以这里在**候选定稿前**统一修：逐组取 4-邻接的最大连通子集，落单成员取消链；子集 <2 则整组取消。
++   *
++   * 只改 chain 字段（0/组号），不动盒、不动容量、不动颜色 → 守恒与可解性不受影响。
++   */
++  function enforceChainAdjacency(board) {
++    var rows = board.rows, cols = board.cols, cells = board.cells;
++    var groups = {}, gid;
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var x = cells[r][c];
++      if (x && x.t === 'box' && x.chain > 0) { gid = 'g' + x.chain; (groups[gid] = groups[gid] || []).push({ r: r, c: c }); }
++    }
++    var D4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
++    var fixed = 0, cleared = 0, groupsIn = 0, groupsOut = 0, detail = [];
++    for (var g in groups) {
++      var mem = groups[g];
++      groupsIn++;
++      var set = {}, i;
++      for (i = 0; i < mem.length; i++) set[mem[i].r + ',' + mem[i].c] = mem[i];
++      // 从每个成员出发做 4-邻接 BFS，取最大的连通子集
++      var best = [];
++      for (i = 0; i < mem.length; i++) {
++        var startKey = mem[i].r + ',' + mem[i].c;
++        if (set[startKey] === undefined) continue;
++        var seen = {}, q = [mem[i]], comp = [];
++        seen[startKey] = 1;
++        while (q.length) {
++          var cur = q.pop();
++          comp.push(cur);
++          for (var d = 0; d < 4; d++) {
++            var k = (cur.r + D4[d][0]) + ',' + (cur.c + D4[d][1]);
++            if (set[k] !== undefined && !seen[k]) { seen[k] = 1; q.push(set[k]); }
++          }
++        }
++        if (comp.length > best.length) best = comp;
++        for (var kk in seen) delete set[kk];   // 该连通块已访问过，别重复计算
++      }
++      if (best.length === mem.length) { groupsOut++; continue; }   // 已连通 → 不动
++      // 不连通：保留最大连通子集，其余取消
++      var keep = {};
++      for (i = 0; i < best.length; i++) keep[best[i].r + ',' + best[i].c] = 1;
++      var before = mem.length;
++      for (i = 0; i < mem.length; i++) {
++        if (!keep[mem[i].r + ',' + mem[i].c]) {
++          var cell = cells[mem[i].r][mem[i].c];
++          if (cell && cell.chain > 0) { cell.chain = 0; cleared++; }
++        }
++      }
++      if (best.length >= 2) {
++        groupsOut++; fixed++;
++        detail.push('组' + g.slice(1) + '：' + before + ' 格 → 保留相邻的 ' + best.length + ' 格，清掉 ' + (before - best.length) + ' 格');
++      } else {
++        // 剩下的 <2 格没有互锁语义 → 整组取消（避免求解器收到孤立成员）
++        for (i = 0; i < best.length; i++) {
++          var c2 = cells[best[i].r][best[i].c];
++          if (c2 && c2.chain > 0) { c2.chain = 0; cleared++; }
++        }
++        detail.push('组' + g.slice(1) + '：全部不连通 → 整组取消（' + before + ' 格）');
++      }
++    }
++    if (!fixed && !cleared) return null;                 // 没动过 → 不挂字段（保持"未改动时本体一致"）
++    return { groupsIn: groupsIn, groupsOut: groupsOut, repaired: fixed, clearedCells: cleared, detail: detail };
+   }
+ 
+   function applyBeatProps(board, config) {
+@@ -3454,6 +3536,13 @@
+         if (epStat) board.earlyPressureStat = epStat;   // 只在真落地时挂诊断字段（不落地时保持本体一致）
+       } catch (e) { board.earlyPressureStat = { applied: 0, error: String(e && e.message || e) }; }
+     }
++
++    // ③d 【v161】锁链相邻性兜底：同组的两/三辆车必须 4-邻接连通（用户：「不能跨过中间的车」）。
++    //   放在结构阶段末尾（求解/审计之前）——清链会改变局面，必须在评价之前做完，否则审计结论是脏的。
++    try {
++      var laStat = enforceChainAdjacency(board);
++      if (laStat) board.linkAdjStat = laStat;   // 只真修过才挂字段（未改动时不挂，保持"不动则本体一致"）
++    } catch (e) { board.linkAdjStat = { error: String(e && e.message || e) }; }
+ 
+     // ④ 结构性卡死检验（带球后的完整检查）
+     var tSdc = Date.now();
+@@ -7800,6 +7889,7 @@
+     pipeMinFillOf: pipeMinFillOf,                             // 生效的单管最少装盒数
+     applyBeatProps: applyBeatProps,       // 【v153】债务节拍→道具落位（冰/链）
+     midChokeOf: midChokeOf,               // 【v153】30~80% 区间内的卡点数（同档候选首选键）
++    enforceChainAdjacency: enforceChainAdjacency,   // 【v161】锁链相邻性修复（同组必须 4-邻接连通）；供体检/单测直接调用
+     chokeV2Of: chokeV2Of,                 // 【v157】卡点判据 v2（R1~R9）：全知线/玩家线各量一遍再取最差
+     chokeV2Violations: chokeV2Violations, // 【v157】违反项（空数组=达标）——页面每关日志与报告用
+     CHOKE_V2_GATES: CHOKE_V2_GATES,       // 【v157】参考门阈值（暂定：独木桥≤1 / 预算点≥12 / 无满解≤3 / 70%前≥4≤10%）
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=159">
++  <link rel="stylesheet" href="css/style.css?v=161">
+ </head>
+ <body>
+   <header>
+@@ -974,20 +974,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=159"></script>
+-  <script src="js/utils.js?v=159"></script>
++  <script src="js/zip.js?v=161"></script>
++  <script src="js/utils.js?v=161"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=159"></script>
+-  <script src="js/simulator.js?v=159"></script>
++  <script src="js/color-libs.js?v=161"></script>
++  <script src="js/simulator.js?v=161"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=159"></script>
+-  <script src="js/solver-strategy.js?v=159"></script>
+-  <script src="js/solver.js?v=159"></script>
+-  <script src="js/playersim.js?v=159"></script>
+-  <script src="js/generator.js?v=159"></script>
+-  <script src="js/analysis.js?v=159"></script>
++  <script src="js/anchor-cut.js?v=161"></script>
++  <script src="js/solver-strategy.js?v=161"></script>
++  <script src="js/solver.js?v=161"></script>
++  <script src="js/playersim.js?v=161"></script>
++  <script src="js/generator.js?v=161"></script>
++  <script src="js/analysis.js?v=161"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=159"></script>
+-  <script src="js/app.js?v=159"></script>
++  <script src="js/level-editor.js?v=161"></script>
++  <script src="js/app.js?v=161"></script>
+ </body>
+ </html>

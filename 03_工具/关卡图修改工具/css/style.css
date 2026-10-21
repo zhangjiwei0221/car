@@ -1,0 +1,612 @@
+/* 蚂蚁拿块关卡图修改工具 · 样式（本轮：暖色调 + 左右两栏布局） */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: #241a12; color: #f0e2d3;
+  font: 13px/1.55 -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+.topbar {
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 10px 16px; background: #34241a; border-bottom: 1px solid #4d3627;
+}
+.topbar .brand { font-size: 16px; font-weight: 600; color: #ffb066; }
+.topbar .stage { color: #ffd27a; font-size: 12px; }
+.topbar .meta { margin-left: auto; color: #c9a98a; font-size: 12px; }
+.topbar .helpLink { text-decoration: none; }
+
+.layout { display: flex; align-items: flex-start; gap: 14px; padding: 14px; }
+/* 左右两栏布局：sideLeft(导入/求解/定位/多路线/显示导出) 在最左，main(目标图，主区) 居中，
+   sideRight(演示/美术编辑/重构) 在最右。三栏各自纵向滚动，减少单栏堆叠过长的滑动。
+   DOM 顺序（HTML 里 sideLeft → main → sideRight）与视觉顺序一致，不使用 CSS order，
+   避免 tab 键盘导航顺序与视觉顺序不符。 */
+.main { flex: 1 1 auto; min-width: 0; }
+.side { width: 320px; flex: 0 0 320px; max-height: calc(100vh - 90px); overflow-y: auto; }
+
+.card {
+  background: #34241a; border: 1px solid #4d3627; border-radius: 6px;
+  padding: 10px 12px; margin-bottom: 12px;
+}
+.card h3 { margin: 0 0 8px; font-size: 13px; color: #ffb066; font-weight: 600; }
+.hint { margin: 4px 0 8px; color: #c9a98a; font-size: 12px; }
+.hint code, .kv code { background: #402c1e; padding: 0 3px; border-radius: 3px; color: #ffb066; }
+.muted { color: #b09378; }
+
+.row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.row.wrap { flex-wrap: wrap; }
+label { color: #e6d2ba; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+input[type=number] { width: 66px; }
+input[type=number], select {
+  background: #402c1e; border: 1px solid #5c4130; color: #f5e9db;
+  border-radius: 4px; padding: 3px 5px; font-size: 12px;
+}
+input[type=file] { display: none; }
+input[type=text] {
+  background: #402c1e; border: 1px solid #5c4130; color: #f5e9db;
+  border-radius: 4px; padding: 4px 6px; font-size: 12px;
+}
+input[type=range] { width: 150px; }
+
+/* 文件/文件夹选择按钮（原生 input[type=file] 已隐藏，用 label 包裹以统一外观） */
+.fileBtn {
+  background: #4d3627; border: 1px solid #6b4c34; color: #f0e2d3;
+  border-radius: 4px; padding: 5px 11px; font-size: 12px; cursor: pointer; display: inline-block;
+}
+.fileBtn:hover { background: #5c4130; }
+
+.btn {
+  background: #4d3627; border: 1px solid #6b4c34; color: #f0e2d3;
+  border-radius: 4px; padding: 5px 11px; font-size: 12px; cursor: pointer;
+}
+.btn:hover { background: #5c4130; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: #c1601f; border-color: #e37a2e; color: #fff7ec; font-weight: 600; }
+.btn.primary:hover { background: #d9701f; }
+.btn.ghost { background: transparent; }
+.btn.tiny { padding: 3px 7px; font-size: 11px; }
+
+/* 破坏性操作的「待确认」态：首次点击后按钮进入此态，再点一次才真正执行。
+   刻意做得比 primary 更扎眼（红橙 + 呼吸边框），让人一眼看出这一下是要动真格的。
+   .ghost 上的 background:transparent 会盖掉本规则，故此处显式提权。 */
+.btn.confirming,
+.btn.ghost.confirming {
+  background: #8f2f22; border-color: #d4553c; color: #ffe6de;
+  font-weight: 600; animation: btnConfirmPulse 1s ease-in-out infinite;
+}
+.btn.confirming:hover,
+.btn.ghost.confirming:hover { background: #a53727; }
+@keyframes btnConfirmPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 85, 60, .55); }
+  50%      { box-shadow: 0 0 0 3px rgba(212, 85, 60, 0); }
+}
+/* 尊重系统「减少动态效果」设置：关掉呼吸动画，保留配色区分 */
+@media (prefers-reduced-motion: reduce) {
+  .btn.confirming, .btn.ghost.confirming { animation: none; }
+}
+
+.list { max-height: 240px; overflow: auto; margin-top: 8px; border-top: 1px solid #4d3627; }
+.list .item {
+  padding: 5px 6px; border-bottom: 1px solid #402c1e; cursor: pointer;
+  display: flex; gap: 6px; align-items: center; font-size: 12px;
+}
+.list .item:hover { background: #3e2b1d; }
+.list .item.active { background: #4a3320; }
+.list .item .nm { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid #6b4c34; color: #d9b899; }
+.tag.ok { border-color: #4a8f3a; color: #9fdb84; }
+.tag.warn { border-color: #b8801f; color: #ffcf7a; }
+.tag.bad { border-color: #a5402a; color: #ff9d7a; }
+
+.kv { font-size: 12px; }
+.kv table { border-collapse: collapse; width: 100%; }
+.kv td { padding: 2px 4px; border-bottom: 1px solid #402c1e; vertical-align: top; }
+.kv td.k { color: #b09378; width: 40%; white-space: nowrap; }
+.kv td.v { color: #f5e9db; }
+.kv .big { color: #ffb066; font-weight: 600; }
+
+/* 需求 08.03 §三：目标图始终水平居中，缩放或切换后都不贴左。
+   做法只动布局，不动画布尺寸与绘制坐标：容器改成块级铺满可用宽度，内部用 flex 居中放画布。
+   图比容器大时 overflow:auto 仍然可以横向滚动查看，flex-start 保证左边缘不被裁掉、内容都能访问到。
+   画布本身的 width/height 与像素→格子的换算完全没变，编辑点击坐标不受影响。 */
+.canvasWrap {
+  position: relative; display: flex; justify-content: flex-start; align-items: flex-start;
+  background: #1c130c; border: 1px solid #4d3627; border-radius: 6px; padding: 8px;
+  width: 100%; box-sizing: border-box; max-width: 100%; overflow: auto;
+}
+/* 用 margin:0 auto 而不是 justify-content:center 来居中：图比容器宽时，居中会把左边缘顶到
+   滚动区之外、导致最左边那几列永远滚不到（flex 溢出的已知问题）；margin auto 在有余量时居中，
+   没余量时自动退回左对齐，两种情况都不会有内容访问不到。 */
+.canvasWrap > canvas { flex: 0 0 auto; margin: 0 auto; }
+canvas { display: block; image-rendering: pixelated; }
+#cv.editing { cursor: crosshair; }
+
+.overlay {
+  position: absolute; inset: 0; background: rgba(28,19,12,.85);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; color: #ffb066; font-size: 13px; text-align: center; padding: 20px;
+}
+.overlay.hidden { display: none; }
+.spin {
+  width: 26px; height: 26px; border: 3px solid #e37a2e; border-top-color: transparent;
+  border-radius: 50%; animation: sp 0.9s linear infinite;
+}
+@keyframes sp { to { transform: rotate(360deg); } }
+
+.legend { margin: 10px 0 4px; display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #e6d2ba; }
+.legend .sw { display: inline-block; width: 16px; height: 0; border-top-width: 3px; border-top-style: solid; vertical-align: middle; margin-right: 5px; }
+
+.readout {
+  margin: 6px 0 10px; font-size: 12px; color: #d9b899;
+  background: #34241a; border: 1px solid #4d3627; border-radius: 4px; padding: 6px 8px; min-height: 30px;
+}
+
+.logbox { background: #34241a; border: 1px solid #4d3627; border-radius: 6px; }
+.logHead { padding: 6px 10px; border-bottom: 1px solid #4d3627; color: #b09378; font-size: 12px; }
+#log {
+  margin: 0; padding: 8px 10px; max-height: 190px; overflow: auto;
+  font: 11px/1.5 Menlo, Consolas, monospace; color: #d9b899; white-space: pre-wrap;
+}
+
+/* ===== 棋盘区 + 暂存对比标题行 ===== */
+.boardSectionHead {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 14px 0 8px; padding-top: 10px; border-top: 1px solid #4d3627;
+  font-size: 13px; color: #ffb066; font-weight: 600;
+}
+.boardSectionHead label { font-weight: 400; }
+
+/* ===== 棋盘区 + 暂存对比（状态A/B 并排） ===== */
+.boardCompareWrap { display: flex; gap: 14px; margin: 10px 0; flex-wrap: wrap; min-height: 40px; }
+.boardCompareWrap.hidden { display: none; }
+.boardCompareWrap .muted { padding: 10px; }
+.boardCol {
+  background: #1c130c; border: 1px solid #4d3627; border-radius: 6px; padding: 8px;
+  flex: 1 1 320px; min-width: 280px;
+}
+.boardColHead { font-size: 12px; color: #ffb066; margin-bottom: 6px; font-weight: 600; }
+.boardCol canvas { display: block; image-rendering: pixelated; margin: 0 auto; }
+
+/* 暂存槛位一排色块，凹陷/凸起区分空/占用 */
+.bufferRow { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.bufSlot {
+  flex: 1 1 0; min-width: 34px; height: 30px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; color: #fff;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.bufSlot.empty { background: #34241a; color: #7a6248; border-style: dashed; }
+.bufSlot.linked { outline: 2px solid #ffd400; outline-offset: -2px; }
+.bufSlot.done { opacity: .55; }
+
+/* ===== 自动演示：进度条 & 信息 ===== */
+#demoScrub { display: block; }
+
+/* ===== 目标图右侧的统计位 + 可悬浮面板 ===== */
+/* 目标图放到最大也还有右边空间，编辑改动统计固定放这里；点「悬浮」可脱离原位、拖到任意位置。 */
+.mainCanvasRow { display: flex; align-items: flex-start; gap: 10px; }
+.mainCanvasRow .canvasWrap { flex: 1 1 auto; min-width: 0; }
+/* 目标图右侧那一列：编辑改动统计在上、显示与导出在下，共用这块空位 */
+.mainSideCol { flex: 0 0 248px; width: 248px; display: flex; flex-direction: column; gap: 10px; }
+.mainSideCol > .floatPanel { width: 100%; }
+/* 面板悬浮出去后，它在列里的占位就没了，剩下的面板自然上移，不留空洞 */
+.mainSideCol > .floatPanel.floating { width: 260px; }
+
+.floatPanel {
+  position: relative;
+  background: #34241a; border: 1px solid #4d3627; border-radius: 6px; padding: 8px 10px;
+}
+.floatHead {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.floatTitle { flex: 1 1 auto; font-size: 13px; color: #ffb066; font-weight: 600; margin: 0; }
+.btn.tiny { font-size: 10px; padding: 2px 6px; }
+/* 悬浮态：脱离文档流，拖动标题栏移动。宽高不设死，跟内容走，避免把统计挤成一条。 */
+.floating {
+  position: fixed; z-index: 60; width: 260px; max-height: 70vh; overflow: auto;
+  box-shadow: 0 6px 22px rgba(0,0,0,.55); border-color: #ffb066;
+}
+.floating > .floatHead { cursor: move; user-select: none; }
+.floating.wide { width: 360px; }
+
+/* 悬浮框的边缘拉伸手柄：右边缘、下边缘、右下角。只在悬浮态出现，贴在框边上。
+   非悬浮态（在目标图右侧那一列里）不显示，避免把列宽拉乱。 */
+.rzHandle { display: none; position: absolute; z-index: 2; }
+.floating > .rzHandle { display: block; }
+.floating > .rzR { top: 0; right: -3px; width: 8px; height: 100%; cursor: ew-resize; }
+.floating > .rzB { left: 0; bottom: -3px; height: 8px; width: 100%; cursor: ns-resize; }
+.floating > .rzBR {
+  right: -3px; bottom: -3px; width: 14px; height: 14px; cursor: nwse-resize;
+  border-right: 2px solid #ffb066; border-bottom: 2px solid #ffb066;
+  border-bottom-right-radius: 5px;
+}
+
+/* ===== 美术编辑：待替换状态条（误触后能直接取消，不必靠撤销回退） ===== */
+.replaceStatus {
+  margin: 6px 0; padding: 6px 8px; border-radius: 4px; font-size: 11px;
+  background: #4a3320; border: 1px solid #ffb066; color: #ffd8a8;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.replaceStatus .sw2 { width: 12px; height: 12px; }
+
+/* ===== 美术编辑：调色板（1-34完整色库，已有颜色用外框整体分组） ===== */
+/* 需求 08.03 §二：同一套色库内部分两段——已有颜色集中排列并由一个共同外框框住，未使用颜色排在框外。
+   不复制第二套色库，也不再另做一块「当前目标图颜色」面板。 */
+#editPalette { max-height: 260px; overflow-y: auto; }
+.paletteUsedBox {
+  border: 2px solid #ffb066; border-radius: 6px; padding: 6px 8px 8px;
+  background: rgba(255,176,102,0.06); margin-bottom: 8px;
+}
+.paletteGroupTitle { font-size: 11px; color: #c9a98a; margin: 2px 0 5px; }
+.paletteRow { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+/* 加宽到 56px：每个色块下面要放中文色名 + 像素数与占比（颜色数必须带颜色名） */
+.swatchCell { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 56px; }
+.swatchName { font-size: 9px; line-height: 1.15; color: #c9a98a; text-align: center; word-break: break-all; }
+.swatchCell.replacing { outline: 1px dashed #ffb066; outline-offset: 2px; border-radius: 4px; }
+.swatchStat { font-size: 9px; line-height: 1.15; color: #9c8168; text-align: center; }
+.swatchReplace {
+  font-size: 9px; line-height: 1; padding: 2px 3px; cursor: pointer;
+  color: #ffcf7a; background: #3a2718; border: 1px solid #6b4a2e; border-radius: 3px;
+}
+.swatchReplace:hover { background: #4a3320; }
+.editSwatch {
+  width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+  border: 2px solid transparent; opacity: .45;
+}
+.editSwatch.used { opacity: 1; }
+.editSwatch.active { border-color: #fff; box-shadow: 0 0 0 2px #c1601f; opacity: 1; }
+
+/* ===== 美术编辑：当前目标图颜色分组 / 选区颜色统计 ===== */
+.editSubhead { margin: 10px 0 4px; font-size: 11px; color: #b09378; border-top: 1px solid #4d3627; padding-top: 8px; }
+.usedColorItem {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px;
+  border: 1px solid #4d3627; border-radius: 4px; cursor: pointer; font-size: 11px; color: #d9b899;
+}
+.usedColorItem:hover { background: #402c1e; }
+.usedColorItem.active { border-color: #ffb066; background: #4a3320; }
+.sw2 { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+
+/* ===== 美术编辑：靠色检查命中提示 ===== */
+.closeHit { font-size: 11px; color: #ffcf7a; padding: 2px 0; }
+
+/* ===== 重构关卡（阶段6）===== */
+#reconInfo .tag.ok { font-weight: 600; }
+
+/* 碎色率检查（任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825）
+   三档配色对应 js/fragment.js 的 GRADES.cls：很整/偏整=绿，中等=黄，偏碎/很碎=红。
+   只给「等级」两个字上色，不改动既有 .tag/.kv 的任何规则。 */
+.fragOK { color: #9fdb84; }
+.fragMid { color: #ffcf7a; }
+.fragBad { color: #ff9d7a; }
+
+/* ==================== 12. 主体提取（任务 ANT-ARTTOOL-SUBJECT-EXTRACT-20260902） ====================
+   配色沿用本工具的暖棕底 + 橙色强调，不引入新色系。
+   选区高亮用青色系，与「碎色高亮」的红色、「区间描边」的白色区分开，三种叠加时能分辨。 */
+
+/* 剔除后的空位（值为 0）：斜纹底，一眼看出主体边界在哪。
+   用 repeating-linear-gradient 而不是纯色，是为了和「颜色 id 恰好画成深色」的格子区分开。 */
+.cell-void-legend {
+  display: inline-block; width: 14px; height: 12px; border-radius: 2px;
+  border: 1px solid #6b4c34; vertical-align: -2px;
+  background: repeating-linear-gradient(45deg, #2b1e15, #2b1e15 3px, #3c2a1d 3px, #3c2a1d 6px);
+}
+
+/* 主体提取面板里的数字摘要：把「剔掉多少 / 剩多少」做成一眼可读的两列 */
+#extractInfo table td.k { width: 46%; }
+#extractInfo .num { color: #ffb066; font-weight: 600; }
+#extractInfo .warnText { color: #ffcf7a; }
+#extractInfo .badText { color: #ff9d7a; }
+
+/* 图纸库列表：比关卡列表更密，因为条目会多很多 */
+#pieceLibList { max-height: 300px; }
+#pieceLibList .item { padding: 3px 6px; gap: 5px; }
+#pieceLibList .item .nm { font-size: 12px; }
+#pieceLibList .item .px { color: #b09378; font-size: 11px; white-space: nowrap; }
+#pieceLibList .item .bb { color: #8f7963; font-size: 10px; white-space: nowrap; }
+/* 缩略图：用 canvas 画，固定高度，宽度按图的长宽比走 */
+#pieceLibList .item canvas {
+  border: 1px solid #4d3627; border-radius: 2px; background: #241a12;
+  image-rendering: pixelated; flex: 0 0 auto;
+}
+
+/* 选区工具当前生效时给画布一个提示边框，避免用户以为没开编辑模式 */
+#cv.selecting { outline: 2px solid #3fb6c4; outline-offset: 1px; }
+#cv.lassoing { outline: 2px dashed #3fb6c4; outline-offset: 1px; }
+
+/* 图纸库为空时的引导文字 */
+#pieceLibList .item.muted { color: #8f7963; justify-content: center; }
+
+/* ===== 13. 区域内同色选取与去毛边（任务 ANT-ARTTOOL-EDGE-TRIM-20260915）=====
+   沿用既有暖棕底 + 橙强调，不引入新色系。
+   选区相关的强调色继续用上一轮定的青 #3fb6c4（与碎色红、区间白区分）。 */
+
+/* 「叠加方式」单选行：交集是本轮的重点，给它一点视觉重量，避免又被忽略掉 */
+.selCombineRow { align-items: center; }
+.rowLabel {
+  font-size: 12px; color: #c9a98a; padding: 1px 6px; margin-right: 2px;
+  border: 1px solid #4d3627; border-radius: 4px; background: #3a2718;
+}
+.selCombineRow label { font-size: 12px; }
+.selCombineRow input[value="intersect"] + b,
+.selCombineRow label:hover b { color: #6fd4e0; }
+
+/* 「选区内颜色」条目里的小按钮：主体点击区仍是原来的替换流程，
+   「只选」是新增的第二动作，所以做成明显独立的小按钮而不是整条改语义 */
+.miniBtn {
+  font-size: 10px; line-height: 1.4; padding: 0 5px; margin-left: 4px;
+  border: 1px solid #3fb6c4; border-radius: 3px;
+  background: #24333a; color: #7fd9e4; cursor: pointer; flex: 0 0 auto;
+}
+.miniBtn:hover { background: #2f4650; color: #b6ecf2; }
+.miniBtn:active { background: #3fb6c4; color: #10242a; }
+
+/* 操作指引块：比 .hint 更成段，用于「去毛边怎么做」这类多步流程 */
+.hintBlock {
+  margin: 6px 0 8px; padding: 7px 9px; font-size: 12px; line-height: 1.7;
+  color: #d9b899; background: #3a2718; border: 1px solid #4d3627;
+  border-left: 3px solid #3fb6c4; border-radius: 4px;
+}
+.hintBlock b { color: #ffb066; }
+.hintBlock .muted { display: block; margin-top: 3px; font-size: 11px; }
+
+/* 行内数字输入（清零碎的阈值）：跟 .rowLabel 同一套边框语言，别让它看起来像独立控件区 */
+.inlineNum { font-size: 12px; color: #c9a98a; display: inline-flex; align-items: center; gap: 4px; }
+.inlineNum input[type="number"] {
+  width: 58px; padding: 2px 4px; font-size: 12px;
+  background: #2b1d12; color: #f0d9bf; border: 1px solid #4d3627; border-radius: 3px;
+}
+
+/* ===== 14. 纯美术编辑模式与卡片折叠（任务 ANT-ARTTOOL-EDGE-TRIM-20260915 需求④）===== */
+
+/* 顶栏的模式开关 */
+.topToggle {
+  font-size: 12px; color: #f0d9bf; display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; margin-left: 8px; cursor: pointer;
+  background: #4a3320; border: 1px solid #6b4a2e; border-radius: 5px; white-space: nowrap;
+}
+.topToggle:hover { background: #5a3f28; border-color: #ffb066; }
+.topToggle input { cursor: pointer; }
+/* 开着的时候必须一眼看出来，否则用户会以为功能丢了 */
+body.artOnly .topToggle { background: #7a4a18; border-color: #ffb066; color: #fff3e2; }
+
+/* ---- 卡片折叠 ---- */
+/* 标题可点。折叠时隐藏标题行以外的一切（普通卡片是 h3，美术编辑那张是 .floatHead） */
+.card > h3, .card > .floatHead > .floatTitle { cursor: pointer; user-select: none; }
+.card > h3::before, .card > .floatHead > .floatTitle::before {
+  content: '▾'; display: inline-block; width: 12px; margin-right: 2px;
+  font-size: 10px; color: #c9a98a; transition: transform .12s;
+}
+.card.collapsed > h3::before, .card.collapsed > .floatHead > .floatTitle::before {
+  transform: rotate(-90deg);
+}
+.card.collapsed > :not(h3):not(.floatHead) { display: none !important; }
+.card.collapsed { padding-bottom: 6px; }
+.card.collapsed > h3, .card.collapsed > .floatHead { margin-bottom: 0; opacity: .78; }
+.card > h3:hover, .card > .floatHead > .floatTitle:hover { color: #ffd9a8; }
+
+/* ---- 纯美术编辑模式：藏掉与生产/求解有关的部分 ---- */
+/* 用 body class 控制，而不是逐个 element.style.display —— 这样切回来时不会残留 inline 样式，
+   也不会和「折叠」状态互相覆盖（两者是独立维度：折叠记的是用户意图，模式记的是可见范围）。 */
+body.artOnly #cardSolve,
+body.artOnly #cardInterval,
+body.artOnly #cardMulti,
+body.artOnly #cardDemo,
+body.artOnly #cardPressure,
+body.artOnly #cardRecon,
+body.artOnly #cardExportLib,
+body.artOnly .boardSectionHead,
+body.artOnly #boardCompareWrap { display: none !important; }
+/* 纯美术模式下给「主体提取」一点强调，因为它现在紧跟在美术编辑后面，是主要工作区 */
+body.artOnly #extractCard { border-color: #6b4a2e; }
+
+/* ===== 15. 图纸拼接工作台（任务 ANT-ARTTOOL-PIECE-COMPOSE-20260915）=====
+   独立视图，默认隐藏；body.composeMode 时显示，并把常规目标图那一套让位。
+   历史版本沿用暖棕底 + 橙强调；拼接 2.1 在文件末尾覆盖为浅色工作台。
+   覆盖提示用硬边红框，不再作为导出错误态。 */
+
+.composeView { display: none; }
+body.composeMode .composeView { display: block; }
+/* 进拼接时让常规目标图区域整体让位 —— 它们和拼接无关，留着只会挤空间又容易误操作 */
+body.composeMode .mainCanvasRow,
+body.composeMode #legend,
+body.composeMode .main > .readout,
+body.composeMode .boardSectionHead,
+body.composeMode #boardCompareWrap { display: none !important; }
+/* 拼接时右栏只留拼接卡片，左栏保留导入（要用它拿 txt） */
+body.composeMode #cardSolve,
+body.composeMode #cardInterval,
+body.composeMode #cardMulti,
+body.composeMode #cardDemo,
+body.composeMode #editCard,
+body.composeMode #cardPressure,
+body.composeMode #cardRecon,
+body.composeMode #cardExportLib,
+body.composeMode #extractCard { display: none !important; }
+/* 反过来：不在拼接模式时，拼接卡片藏起来，免得和主体提取抢注意力 */
+#composeCard { display: none; }
+body.composeMode #composeCard { display: block; }
+body.composeMode #btnComposeMode { background: #6b4a9e; border-color: #a98bd8; color: #f3e9ff; }
+
+.composeBar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 10px; margin-bottom: 8px;
+  background: #3a2718; border: 1px solid #4d3627; border-left: 3px solid #a98bd8; border-radius: 5px;
+  font-size: 12px; color: #d9b899;
+}
+.composeTitle { font-weight: 600; color: #c9a3ff; }
+.composeCanvasInfo { color: #f0d9bf; }
+.composeBar label { display: inline-flex; align-items: center; gap: 4px; }
+
+.composeCanvasWrap {
+  overflow: auto; max-width: 100%; padding: 8px;
+  background: #17100a; border: 1px solid #4d3627; border-radius: 5px;
+}
+/* 画布水平居中。
+   注意**不能只写 text-align:center** —— 本文件第 120 行有全局 `canvas { display: block }`，
+   text-align 对 block 元素不起作用（2026-09-15 用户报「画布没居中」就是这个原因）。
+   这里沿用既有目标图的口径：`margin: 0 auto`。
+   也不用 flex + justify-content:center —— 图比容器宽时那样会把左边缘顶到滚不到的地方，
+   既有 .canvasWrap 的注释里已经记过这个坑。 */
+#composeCv { image-rendering: pixelated; cursor: crosshair; display: block; margin: 0 auto; }
+#composeCv.dragging { cursor: grabbing; }
+
+/* 部件列表 / 图层列表：比关卡列表密，条目里带缩略图 */
+#composeSourceList, #composeLayerList { max-height: 260px; overflow-y: auto; }
+#composeSourceList .item, #composeLayerList .item {
+  display: flex; align-items: center; gap: 6px; padding: 3px 5px; font-size: 11px;
+}
+#composeSourceList canvas, #composeLayerList canvas {
+  image-rendering: pixelated; border: 1px solid #4d3627; background: #17100a; flex: 0 0 auto;
+}
+#composeLayerList .item.selected { background: #3d2f52; border-color: #a98bd8; }
+#composeLayerList .item.conflict { border-left: 3px solid #ff5a5a; }
+#composeLayerList .item .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.layerBadge {
+  font-size: 10px; padding: 0 4px; border-radius: 3px; flex: 0 0 auto;
+  background: #4a3320; color: #c9a98a; border: 1px solid #5d4230;
+}
+.layerBadge.type { background: #2f2539; color: #d8c1ff; border-color: #6b4a9e; }
+.layerBadge.bad { background: #4a1f1f; color: #ff9a9a; border-color: #7a3030; }
+.layerBadge.locked { background: #2f3a4a; color: #9ac0e0; border-color: #3f5570; }
+
+/* ===== 16. 拼接 2.1 浅色工作台与最终效果预览（2026-09-18）===== */
+body {
+  background: #f5f6f8; color: #252a31;
+}
+.topbar {
+  background: #ffffff; border-bottom-color: #d8dde4; box-shadow: 0 1px 3px rgba(28,35,45,.06);
+}
+.topbar .brand { color: #1f5f9e; }
+.topbar .stage { color: #637083; }
+.topbar .meta { color: #758195; }
+.card, .floatPanel, .logbox, .readout {
+  background: #ffffff; border-color: #d8dde4; color: #252a31;
+}
+.card h3, .floatTitle, .boardSectionHead { color: #1f5f9e; }
+.hint, .muted, .logHead, .kv td.k, .paletteGroupTitle { color: #6f7b8d; }
+.kv td { border-bottom-color: #e8ebf0; }
+.kv td.v, label, .legend, .readout, #log { color: #252a31; }
+.hint code, .kv code {
+  background: #eef3f8; color: #1f5f9e;
+}
+input[type=number], input[type=text], select, .inlineNum input[type="number"] {
+  background: #ffffff; color: #252a31; border-color: #cbd3dd;
+}
+.fileBtn, .btn {
+  background: #f1f4f8; border-color: #cbd3dd; color: #27313d;
+}
+.fileBtn:hover, .btn:hover { background: #e7edf5; }
+.btn.primary {
+  background: #2f6fae; border-color: #255f98; color: #ffffff;
+}
+.btn.primary:hover { background: #255f98; }
+.btn.ghost { background: #ffffff; }
+.list { border-top-color: #e3e7ed; }
+.list .item { border-bottom-color: #e8ebf0; color: #27313d; }
+.list .item:hover { background: #f2f6fb; }
+.list .item.active { background: #e7f1ff; }
+.tag { border-color: #cbd3dd; color: #5d6878; }
+.canvasWrap, .boardCol {
+  background: #bfc3c7; border-color: #cbd3dd;
+}
+.overlay {
+  background: rgba(245,246,248,.88); color: #1f5f9e;
+}
+.spin { border-color: #2f6fae; border-top-color: transparent; }
+.topToggle {
+  background: #eef3f8; border-color: #cbd3dd; color: #27313d;
+}
+.topToggle:hover { background: #e3ebf4; border-color: #7fa6ce; }
+body.artOnly .topToggle {
+  background: #dbeafe; border-color: #2f6fae; color: #174a7a;
+}
+.composeBar {
+  background: #ffffff; border-color: #d8dde4; border-left-color: #5b6fe5; color: #27313d;
+}
+.composeTitle { color: #3746b3; }
+.composeCanvasInfo { color: #637083; }
+.composeCanvasWrap {
+  background: #bfc3c7; border-color: #aeb6bf;
+}
+#composeSourceList canvas, #composeLayerList canvas {
+  border-color: #cbd3dd; background: #c4c7cb;
+}
+#composeLayerList .item.selected { background: #e8eaff; border-color: #5b6fe5; }
+#composeLayerList .item.conflict { border-left: 3px solid #d83b32; }
+#composeLayerList .item.childLayer { padding-left: 18px; background-image: linear-gradient(90deg, #d8dde4 0 1px, transparent 1px); background-size: 18px 100%; background-repeat: no-repeat; }
+.layerBadge {
+  background: #eef3f8; color: #5d6878; border-color: #cbd3dd;
+}
+.layerBadge.type { background: #e8eaff; color: #3746b3; border-color: #a9b1ff; }
+.layerBadge.child { background: #e8f5ee; color: #2f8652; border-color: #a8d8bb; }
+.layerBadge.warn { background: #fff4df; color: #9a5b00; border-color: #e5b45f; }
+.layerBadge.bad { background: #fdecea; color: #b3261e; border-color: #f3b8b3; }
+.layerBadge.locked { background: #eaf2fb; color: #2f6fae; border-color: #b7cce0; }
+.inlineNum { color: #5d6878; }
+.rowLabel {
+  color: #5d6878; border-color: #cbd3dd; background: #f1f4f8;
+}
+.hintBlock {
+  color: #4d5968; background: #f8fafc; border-color: #d8dde4;
+}
+.miniBtn {
+  border-color: #cbd3dd; background: #ffffff; color: #2f6fae;
+}
+.miniBtn:hover { background: #eaf2fb; color: #1f5f9e; }
+.miniBtn:active { background: #dbeafe; color: #174a7a; }
+.composeColorChip {
+  width: 20px; height: 20px; padding: 0; border-radius: 4px;
+  border: 1px solid #9fa8b4; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.55);
+}
+.composeColorName { color: #5d6878; min-width: 60px; font-size: 11px; }
+.composeColorPicker {
+  margin: 6px 0 8px; padding: 8px; background: #f8fafc;
+  border: 1px solid #cbd3dd; border-radius: 6px;
+}
+.composeColorPicker.hidden { display: none; }
+.colorPickerHead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #27313d; }
+.colorPickerHead span { color: #6f7b8d; font-size: 11px; }
+.composeColorGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 5px; }
+.composeColorChoice {
+  display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 4px;
+  padding: 4px; border: 1px solid #d8dde4; border-radius: 5px; background: #ffffff;
+  color: #27313d; font-size: 11px; cursor: pointer; min-width: 0;
+}
+.composeColorChoice:hover, .composeColorChoice.active { border-color: #2f6fae; background: #eaf2fb; }
+.composeColorChoice i { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
+.composeColorChoice span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composeColorChoice b { color: #6f7b8d; font-weight: 600; }
+.composeFloatPanel {
+  margin: 8px 0; padding: 8px 10px;
+}
+.composeFloatPanel.floating {
+  width: 380px; max-height: 78vh;
+}
+.composeFloatPanel .floatBody { min-width: 0; }
+.composeFloatPanel .list { max-height: 310px; }
+.finalPreviewBox {
+  margin-top: 8px; padding: 8px; background: #f8fafc;
+  border: 1px solid #d8dde4; border-radius: 6px;
+}
+.finalPreviewHead { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.finalPreviewHead b { color: #1f5f9e; }
+.finalPreviewHead span { color: #6f7b8d; font-size: 11px; flex: 1; }
+.finalPreviewCanvas {
+  image-rendering: pixelated; max-width: 100%; height: auto; border: 1px solid #aeb6bf; margin: 0 auto 8px;
+}
+.colorStatList { display: grid; gap: 3px; margin-top: 6px; max-height: 190px; overflow: auto; }
+.colorStatRow {
+  display: grid; grid-template-columns: 18px 1fr auto 52px; gap: 6px; align-items: center;
+  font-size: 11px; color: #27313d; padding: 2px 4px; border-bottom: 1px solid #e8ebf0;
+}
+.colorStatRow em { color: #6f7b8d; font-style: normal; text-align: right; }
+.sparseColorRow { align-items: flex-start; cursor: default; }
+.sparseColorRow.active { background: #e7f1ff; border-left: 3px solid #2f6fae; }
+.sparseColorRow .sw2 { width: 14px; height: 14px; margin-top: 2px; border: 1px solid rgba(0,0,0,.2); }
+.sw2.emptySw {
+  background:
+    linear-gradient(45deg, #c4c7cb 25%, transparent 25%),
+    linear-gradient(-45deg, #c4c7cb 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #c4c7cb 75%),
+    linear-gradient(-45deg, transparent 75%, #c4c7cb 75%);
+  background-color: #dde0e3; background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+}

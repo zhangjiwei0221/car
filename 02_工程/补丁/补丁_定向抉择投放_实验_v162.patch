@@ -1,0 +1,90 @@
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3408,6 +3408,65 @@
+     }
+     if (!fixed && !cleared) return null;                 // 没动过 → 不挂字段（保持"未改动时本体一致"）
+     return { groupsIn: groupsIn, groupsOut: groupsOut, repaired: fixed, clearedCells: cleared, detail: detail };
++  }
++
++  /**
++   * 【v162】定向"抉择投放"（用户 2026-10-16 选的方案②：「利用不同的功能块，让玩家多一些抉择」）。
++   *
++   * 想法：卡点应该让玩家**做判断**（多个选择里只有一个"划算"），而不是把选择**挤掉**（墙/冰把可点数压到 1）。
++   *   所以这里在**中后段（盒序 40%~80%，对应 30~80% 进度带）**主动投放"半满陷阱"：
++   *   把某辆车的容量扩到接近上限（一口吃不满）→ 玩家如果贪它，就得先占一个暂存位，
++   *   而旁边还有"能装满/能救车"的正确选项 → 形成"预算判断点"（v2 的 r9 指标）。
++   *
++   * 手段选择（用户 #2 的原话）：
++   *   · **数字冰**：时间锁 —— 引导玩家先走别的路再回来（可随进度破开，打开新路径）；
++   *   · **锁链**：空间锁 —— 逼一次占两个暂存位（"要救 A 必须先带 B"）；
++   *   · **扩容（半满车）**：把"取它值不值"变成判断（本函数做的事）；
++   *   · **墙**：唯一"永久且无信息"的工具 —— 因此本函数**不加墙**，只在已有结构上做选择层的压力。
++   *
++   * 守恒：容量只在同色车之间搬（总量不变）；不动盒数、不动颜色 → 可解性由下游同一套求解/审核把关。
++   * config.choiceTrap === false 可关掉。
++   */
++  function choiceTrap(board, blocks, config) {
++    var rows = board.rows, cols = board.cols, cells = board.cells;
++    var minCap = Math.max(2, config.boxSizeMin || 2), maxCap = Math.max(minCap, config.boxSizeMax || 52);
++    var all = [];
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var x = cells[r][c];
++      if (x && x.t === 'box') all.push({ r: r, c: c, cell: x, seq: (x._seq != null ? x._seq : (r * cols + c)) });
++    }
++    if (all.length < 8) return null;
++    all.sort(function (a, b) { return a.seq - b.seq; });
++    var lo = Math.floor(all.length * 0.40), hi = Math.max(lo + 1, Math.floor(all.length * 0.80));
++    var mid = all.slice(lo, hi);                       // 中后段的车 = 玩家的"中盘判断区"
++    if (!mid.length) return null;
++    // 目标容量：接近上限（一口吃不满），但别超过上限
++    var targetCap = Math.max(minCap, Math.round(maxCap * (config.choiceTrapScale != null ? config.choiceTrapScale : 0.85)));
++    var out = { traps: [] };
++    for (var i = 0; i < mid.length && out.traps.length < 2; i++) {
++      var e0 = mid[i], cell = e0.cell;
++      if (cell.q || cell.chain || cell.numice > 0) continue;      // 已经在别的功能块上 → 不叠
++      if (cell.count >= targetCap) continue;                       // 本来就够大 → 不需要
++      if (cell.count >= maxCap) continue;
++      var donors = [];
++      for (var j = 0; j < all.length; j++) {
++        var d = all[j];
++        if (d.cell === cell || d.cell.color !== cell.color) continue;
++        if (d.cell.chain || d.cell.q) continue;
++        if (d.seq <= e0.seq) continue;                             // 只从更晚的同色车搬
++        donors.push(d.cell);
++      }
++      donors.sort(function (a, b) { return b.count - a.count; });
++      var moved = 0;
++      for (var k = 0; k < donors.length && cell.count < targetCap; k++) {
++        var take = Math.min(donors[k].count - minCap, targetCap - cell.count);
++        if (take > 0) { donors[k].count -= take; cell.count += take; moved += take; }
++      }
++      if (moved > 0) out.traps.push({ r: e0.r, c: e0.c, color: cell.color, to: cell.count, moved: moved, at: Math.round(e0.seq / all.length * 100) + '%' });
++    }
++    if (!out.traps.length) return null;
++    out.applied = out.traps.length;
++    return out;
+   }
+ 
+   function applyBeatProps(board, config) {
+@@ -3537,6 +3596,21 @@
+       } catch (e) { board.earlyPressureStat = { applied: 0, error: String(e && e.message || e) }; }
+     }
+ 
++    // ③c2 【v162】定向"抉择投放"：中后段投放半满陷阱（让玩家做预算判断，而不是把选择挤掉）
++    //   ⚠ 实测结论（2026-10-16）：按"盒序中后段"投放**没有效果甚至更差** ——
++    //     同种子 A/B：预算判断点 平均 4.25 → 3.25，窄选择占比 56.8% → 54.0%（独木桥不变）。
++    //     原因：扩容会**消灭**一个"能装满"的选项，如果把该步本来只有 1~2 个满解选项的情况打掉，
++    //     就变成"无满解"（硬垫）而不是"只剩一个对的选择"。正确的放法需要**先求解**、
++    //     只在"该步有 ≥2 个能装满的选项"处投放，才能把"多选项"变成"预算判断点"。
++    //   → 因此本招**默认关闭**，等改成"按 pickOrder 定向 + ≥2 满解约束"（在变体阶段、有再评价）再开。
++    //   config.choiceTrap === true 可开（实验用）。
++    if (config.choiceTrap === true && config.chokeV2 !== false) {
++      try {
++        var ctStat = choiceTrap(board, blocks, config);
++        if (ctStat) board.choiceTrapStat = ctStat;   // 只在真落地时挂诊断字段
++      } catch (e) { board.choiceTrapStat = { applied: 0, error: String(e && e.message || e) }; }
++    }
++
+     // ③d 【v161】锁链相邻性兜底：同组的两/三辆车必须 4-邻接连通（用户：「不能跨过中间的车」）。
+     //   放在结构阶段末尾（求解/审计之前）——清链会改变局面，必须在评价之前做完，否则审计结论是脏的。
+     try {

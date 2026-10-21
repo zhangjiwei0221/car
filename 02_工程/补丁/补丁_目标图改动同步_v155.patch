@@ -1,0 +1,143 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -353,7 +353,7 @@
+         var en = levelList[currentLevelIdx];
+         try {
+           var cv = convertEntryBlocks(en, toLib);
+-          en.blocks = cv.outBlocks;
++          setEntryBlocks(en, cv.outBlocks);   // 【v155】两份 blocks 一起换（见 setEntryBlocks）
+           en.usedLib = toLib;
+           en._colorCount = null;
+           reloadCurrentEntry();
+@@ -1158,7 +1158,7 @@
+       var pick = pickReadLib(en.rawBlocks);
+       var conv = { blocks: en.rawBlocks, stats: null };
+       try { conv = toSolverBlocks(en.rawBlocks, pick.lib); } catch (err) { continue; }
+-      en.blocks = conv.blocks;
++      setEntryBlocks(en, conv.blocks);   // 【v155】两份 blocks 必须同一份，否则改目标图会丢（见 setEntryBlocks）
+       en.convStats = conv.stats;
+       en.detectedLib = pick.detected;
+       en.confident = pick.confident;
+@@ -1310,7 +1310,7 @@
+         var cv = convertEntryBlocks(en, toLib);
+         outs.push({ name: en.name, txt: COLORS.renderTXT(cv.outBlocks, '像素矩阵') });
+         if (cv.fromLib === toLib) nSame++;
+-        en.blocks = cv.outBlocks;         // 预览与后续生产都用转换后的编号
++        setEntryBlocks(en, cv.outBlocks);  // 预览与后续生产都用转换后的编号（【v155】两份引用一起换）
+         en.usedLib = toLib;
+         en._colorCount = null;
+       } catch (err) {
+@@ -3518,6 +3518,28 @@
+     currentLevel.totalPixels = total;
+   }
+ 
++  /**
++   * 【v155】写进条目：`entry.blocks`（生成 / 批量生产派发用的那份）
++   * 与 `entry.level.blocks`（中间棋盘、目标图渲染、手动摆盒用的那份）**必须是同一份数组**。
++   *
++   * 为什么不写会出事：这两份只要不是同一个数组，用户在手动摆盒里改的目标图就只改了一边 ——
++   *   · 导入关卡包（`合格关卡/x.json` 本体 + `生产文档/关卡数据/x.json` 无损 同名同批）时，
++   *     第 3b 步会把 entry.level 整体换成无损的，旧写法只换 level、entry.blocks 还指着本体那份；
++   *   · 色库互转（`reinterpretAll` / 🎨色库转换）会给 entry.blocks 换一个新数组，level.blocks 不动。
++   * 症状（用户 2026-10-16 报）：「手动摆盒改完目标图 → 点批量生产 → 映射到中间，目标图还是原来的 txt」。
++   * 收口办法：所有对条目 blocks 的写入都走这里，两边永远同一份引用。
++   */
++  function setEntryBlocks(en, blocks) {
++    if (!en || !blocks) return;
++    en.blocks = blocks;
++    if (en.level) en.level.blocks = blocks;
++  }
++  /** 【v155】当前关的 blocks 变了 → 写回当前条目（画笔/撤回/手改目标图都会调它）。 */
++  function syncEntryBlocks(blocks) {
++    if (!blocks || currentLevelIdx < 0 || currentLevelIdx >= levelList.length) return;
++    setEntryBlocks(levelList[currentLevelIdx], blocks);
++  }
++
+   /** 把（改过的）目标图装回当前关卡。注意：车场不动，所以改完目标区后「每色人数核对」会立刻不等。 */
+   function editInstallBlocks(blocks) {
+     if (!currentLevel || !blocks || !blocks.length) return;
+@@ -3525,6 +3547,7 @@
+     currentLevel.rows = blocks.length;
+     currentLevel.cols = blocks[0] ? blocks[0].length : 0;
+     editRecomputeCounts();
++    syncEntryBlocks(blocks);   // 【v155】手改/回退目标图后立刻同步到条目，批量生产才不会用旧图
+     renderTarget(lastTargetElim);
+     renderLevelInfo();
+     if (AntSolver.LevelEditor && AntSolver.LevelEditor.onLevelChanged) AntSolver.LevelEditor.onLevelChanged();
+@@ -3576,6 +3599,7 @@
+     tgtPaintStack.push({ r: pos.r, c: pos.c, from: from, to: col });
+     if (tgtPaintStack.length > TGT_PAINT_STACK_MAX) tgtPaintStack.shift();
+     currentLevel.blocks[pos.r][pos.c] = col;
++    syncEntryBlocks(currentLevel.blocks);   // 【v155】改一格就同步到条目（批量生产派发的是条目里的 blocks）
+     editRecomputeCounts();
+     renderTarget(lastTargetElim);
+     renderLevelInfo();
+@@ -3587,6 +3611,7 @@
+     if (!tgtPaintStack.length || !currentLevel) return;
+     var op = tgtPaintStack.pop();
+     currentLevel.blocks[op.r][op.c] = op.from;
++    syncEntryBlocks(currentLevel.blocks);   // 【v155】撤回同样同步
+     editRecomputeCounts();
+     renderTarget(lastTargetElim);
+     renderLevelInfo();
+@@ -6115,7 +6140,15 @@
+       // 已有本体 → 用无损数据把它补全。level 用无损的覆盖：本体是官方格式经 fromGameFormat 还原，
+       // 冰耐久等字段是按默认值补的（有损）；无损数据的 board 是生成期原样，优先级更高。
+       var lossless = parseLibrary(pj);
+-      if (lossless.length && lossless[0].level) tgt0.level = lossless[0].level;
++      // 【v155】★ 换 level 时必须**把 entry.blocks 一起换成同一份数组**。
++      //   原来只换 level → 同一关存在两份 blocks：中间棋盘/目标图画的是 entry.level.blocks（改目标图改的是它），
++      //   而批量生产派发的是 entry.blocks（本体那份旧数组）→ 用户在手动摆盒里改的目标图，
++      //   一点「批量生产」就被原 TXT 顶掉（用户 2026-10-16 报："映射到中间的时候目标图还是原来的 txt"）。
++      //   判据：`合格关卡/x.json`（本体）与 `生产文档/关卡数据/x.json`（无损）同名同时导入时才走到这里。
++      if (lossless.length && lossless[0].level) {
++        tgt0.level = lossless[0].level;
++        setEntryBlocks(tgt0, tgt0.level.blocks);
++      }
+       tgt0.solve = tgt0.solve || pj.solve || null;
+       tgt0.audit = tgt0.audit || pj.audit || null;
+       tgt0.generationEval = tgt0.generationEval || pj.generationEval || null;
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -4,7 +4,7 @@
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>车间小人求解器 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=153">
++  <link rel="stylesheet" href="css/style.css?v=155">
+ </head>
+ <body>
+   <header>
+@@ -961,20 +961,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=153"></script>
+-  <script src="js/utils.js?v=153"></script>
++  <script src="js/zip.js?v=155"></script>
++  <script src="js/utils.js?v=155"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=154"></script>
+-  <script src="js/simulator.js?v=153"></script>
++  <script src="js/color-libs.js?v=155"></script>
++  <script src="js/simulator.js?v=155"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=153"></script>
+-  <script src="js/solver-strategy.js?v=153"></script>
+-  <script src="js/solver.js?v=153"></script>
+-  <script src="js/playersim.js?v=153"></script>
+-  <script src="js/generator.js?v=153"></script>
+-  <script src="js/analysis.js?v=153"></script>
++  <script src="js/anchor-cut.js?v=155"></script>
++  <script src="js/solver-strategy.js?v=155"></script>
++  <script src="js/solver.js?v=155"></script>
++  <script src="js/playersim.js?v=155"></script>
++  <script src="js/generator.js?v=155"></script>
++  <script src="js/analysis.js?v=155"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=153"></script>
+-  <script src="js/app.js?v=153"></script>
++  <script src="js/level-editor.js?v=155"></script>
++  <script src="js/app.js?v=155"></script>
+ </body>
+ </html>

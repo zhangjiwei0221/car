@@ -1,0 +1,273 @@
+--- a/bin/js/app.js
++++ b/bin/js/app.js
+@@ -4661,6 +4661,9 @@
+       // row0IceMax 必须 >= 排程数量：排程冻的就是「需求最早」的车，而它们在 v239 之后正好排在第 0 行。
+       // 【v256·用户裁决】墙全部压到最底层：中间不再被切出窄走廊
+       wallBottomFirst: true,
++      // 【v275·用户设计】容量跟"开局暴露量"挂钩：每色容量 ≥ 开局暴露量 ÷ 2，
++      //   让开局最多只能装满 2 辆车（实测从 17~19 辆降到 5 辆，覆盖率中位 37%→58%）
++      capTie: true, capPerColor: 2, capCeil: 160,
+       icePercent: 0, icePercentMin: 0, icePercentMax: 0, row0IceMax: 2,
+       // 【v253·用户裁决】冰当"顺序闸门"：只冻开局就能装满的车，冻 3 辆、各滞后 2 步。
+       //   随机撒冰停用（icePercent 仍留一点做背景障碍）。
+--- a/bin/js/generator.js
++++ b/bin/js/generator.js
+@@ -3069,9 +3069,65 @@
+           if (borrow > 0) timing.gateBorrow = { k: borrow, fans: gates.slice(0, borrow).map(function (g) { return g.fan; }) };
+         }
+       } catch (e) { /* 借车失败不影响铺盘 */ }
++      // ===== 【v275·用户设计】联动铺盘：不是"按需求序一辆辆摆"，而是每摆一格都问一句
++      //   "这辆车进入暂存区时，目标区离能给它喂满还有多远？"
++      //   口径：给第 i 格（大约第 i 步被点到）挑一辆车，使
++      //        wait = 该车被装满所需的目标进度 − 该格被点到的进度
++      //   尽量接近 coupledLag（默认 2 步）。
++      //     wait ≈ 0  → 一点就满、目标立刻前移 → 造不出压力（这就是"外层颜色全放第一排"的毛病）
++      //     wait ≫ 0  → 等到天荒地老 → 玩家只能弃车，属于不可玩
++      //   同时保留"不可与左/上邻同色"的硬约束（同色成片会被埋）。
++      var coupledAssign = null;
++      if (config.coupledFill && _dc && _dc.curve && list.length) {
++        try {
++          var _LAG = (config.coupledLag != null) ? +config.coupledLag : 2.0;
++          var _W = (config.coupledWindow != null) ? Math.max(2, parseInt(config.coupledWindow, 10)) : 8;
++          var _nc = Math.min(order.length, list.length);
++          var pool = list.slice(0, _nc), assign = [];
++          for (var oi2 = 0; oi2 < _nc; oi2++) {
++            var prog = _nc > 1 ? (oi2 / (_nc - 1)) : 0;
++            var tr0 = order[oi2][0], tc0 = order[oi2][1];
++            var lcO = (tc0 > 0) ? cells[tr0][tc0 - 1] : null;
++            var ucO = (tr0 > 0) ? cells[tr0 - 1][tc0] : null;
++            var bad0 = {}, bad1 = {};
++            if (lcO && lcO.t === 'box') bad0[lcO.color] = 1;
++            if (ucO && ucO.t === 'box') bad1[ucO.color] = 1;
++            var bestK = -1, bestScore = 1e9;
++            for (var k2 = 0; k2 < Math.min(_W, pool.length); k2++) {
++              var cd = pool[k2];
++              if (bad0[cd.color] || bad1[cd.color]) continue;      // 硬约束：不贴同色
++              var need = 1;
++              try { need = demandAt(_dc, cd.color, cd.count); } catch (e2) { need = -1; }
++              if (!(need >= 0)) continue;
++              var wait = need - prog;
++              // 目标：wait ≈ LAG；立刻能满（wait<=0）重罚，太远（wait>0.5）也罚
++              var score = Math.abs(wait - _LAG);
++              if (wait <= 0.02) score += 3;
++              if (wait > 0.5) score += (wait - 0.5) * 10;
++              if (score < bestScore) { bestScore = score; bestK = k2; }
++            }
++            if (bestK < 0) bestK = 0;                              // 全被硬约束挡掉 → 退回队首
++            assign.push(pool.splice(bestK, 1)[0]);
++          }
++          // 剩下的车按原顺序接在后面（格子多于车时不会走到这里）
++          for (var rz = 0; rz < pool.length; rz++) assign.push(pool[rz]);
++          coupledAssign = assign;
++          timing.coupledFill = { n: _nc, lag: _LAG, window: _W };
++        } catch (e3) { coupledAssign = null; }
++      }
+       var exW = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
+       for (var oi = 0; oi < order.length && fi < list.length; oi++) {
+         var tr2 = order[oi][0], tc2 = order[oi][1];
++        // 联动模式下这一格的车已经由 coupledAssign 指定，不再走交错（否则会破坏依赖关系）
++        if (coupledAssign && oi < coupledAssign.length) {
++          var _car = coupledAssign[oi];
++          var _b0 = cells[tr2][tc2];
++          if (_b0 == null) {
++            cells[tr2][tc2] = { t: 'box', color: _car.color, count: _car.count, _seq: fi, _dm: _car._dm };
++            fi++;
++            continue;
++          }
++        }
+         // 在暴露序里也做颜色交错：窗口内挑一个与"已放的四邻"都不同色的车，避免同色成片（被埋）
+         var pickIdx = fi;
+         if (exW > 0) {
+@@ -9414,6 +9470,11 @@
+     }
+     // 【v244】同色跨层拆两辆（用户裁决 2）：浅层一块、深层一块分开切，深层那辆必须等。
+     try {
++      // 【v275】容量跟开局暴露量挂钩（先跑，后面的切法在它基础上再调）
++      if (config.capTie) {
++        var _ct = retuneCapacities(boxes, blocks, config._demandCurve, config);
++        if (_ct && _ct.length) { if (_ct._capTie) config._capTieStat = _ct._capTie; boxes = _ct; }
++      }
+       if (config.chunkCut) {
+         var _cc2 = chunkAlignedCut(boxes, blocks, config._demandCurve, config);
+         if (_cc2 && _cc2.length) { if (_cc2._chunkCut) config._chunkCutStat = _cc2._chunkCut; boxes = _cc2; }
+@@ -10208,7 +10269,75 @@
+    *        块还没露出来，这辆车就吃不饱 → 它必须在暂存里等 → 平台。
+    *   chunkSpan=1 ≈ 现状（每块一辆）；2 表示每辆跨两块（会等一整个块周期）。
+    *   守恒：每色的车容量和强制等于该色总像素（最后一辆吸收误差）。
++   */
++  /**
++   * 【v275·用户设计·第一步】让容量跟着"开局暴露量"走。
++   *   病根（工作日志 195）：色 32 开局就露出 327px，而一辆车只有 40px → 这一色有 8 辆车"一点就满"，
++   *   远超暂存 5 格，压力根本起不来。铺盘怎么排都没用，因为车本来就太小吃得太快。
++   *   做法：每色的目标容量 = max(该色平均块大小, 开局暴露量 ÷ capPerColor 辆)
++   *        capPerColor 默认 2 → 开局最多只能装满 2 辆，剩下的必须等后面露出的像素。
++   *   守恒：每色车容量之和强制等于该色总像素。
++   *   车数会变少 → 由 wantCars（棋盘格×0.9）反向调容量，保证棋盘装得下。
+    */
++  function retuneCapacities(boxes, blocks, dc, config) {
++    if (!config || !config.capTie || !dc || !dc.curve) return boxes;
++    var ceil = (config.capCeil != null) ? +config.capCeil : 160;
++    var floorC = (config.capFloor != null) ? +config.capFloor : 12;
++    var perColor = (config.capPerColor != null) ? +config.capPerColor : 2;
++    if (!(perColor >= 1)) perColor = 2;
++    // 每色：总像素 P、开局暴露 S、块序列
++    var info = {};
++    for (var ck in dc.curve) {
++      var arr = dc.curve[ck], out = [], prev = 0;
++      for (var i = 0; i < arr.length; i++) { var e = arr[i][0]; if (e > prev) { out.push(e - prev); prev = e; } }
++      if (!out.length) continue;
++      var P = out.reduce(function (a, b) { return a + b; }, 0);
++      var S = (dc.startExposed && dc.startExposed[ck] != null) ? dc.startExposed[ck] : 0;
++      var meanChunk = P / out.length;
++      info[+ck] = { P: P, S: S, meanChunk: meanChunk, chunks: out };
++    }
++    var byColor = {}, order = [];
++    for (var bi = 0; bi < boxes.length; bi++) {
++      var b = boxes[bi];
++      if (!byColor[b.color]) { byColor[b.color] = []; order.push(b.color); }
++      byColor[b.color].push(b);
++    }
++    function buildCaps(color, scale) {
++      var inf = info[color];
++      var P = inf.P;
++      var capBase = Math.max(inf.meanChunk, inf.S / perColor);
++      var cap = Math.max(floorC, Math.min(ceil, Math.min(P, capBase * scale)));
++      var n = Math.max(1, Math.round(P / cap));
++      var caps = [];
++      var per = Math.floor(P / n), rest = P - per * n;
++      for (var q = 0; q < n; q++) caps.push(per + (q === n - 1 ? rest : 0));
++      return caps;
++    }
++    var cells = (parseInt(config.boardRowsMax, 10) || 7) * (parseInt(config.boardColsMax, 10) || 8);
++    var wantCars = Math.max(6, Math.round(cells * 0.90));
++    var scale = 1.0, best = null, bestDiff = 1e9;
++    for (var t = 0; t < 5; t++) {
++      var rebuilt = {}, total = 0;
++      for (var oi = 0; oi < order.length; oi++) {
++        var col = order[oi];
++        if (!info[col]) { rebuilt[col] = byColor[col].map(function (x) { return x.count; }); total += rebuilt[col].length; continue; }
++        rebuilt[col] = buildCaps(col, scale);
++        total += rebuilt[col].length;
++      }
++      var diff = Math.abs(total - wantCars);
++      if (diff < bestDiff) { bestDiff = diff; best = rebuilt; }
++      if (diff <= Math.max(2, wantCars * 0.08)) break;
++      scale *= (total > wantCars) ? 1.18 : 0.85;     // 车太多→车变大；太少→车变小
++    }
++    var out2 = [];
++    for (var oi2 = 0; oi2 < order.length; oi2++) {
++      var col2 = order[oi2], caps2 = best[col2] || [];
++      for (var q2 = 0; q2 < caps2.length; q2++) out2.push({ color: col2, count: caps2[q2] });
++    }
++    out2._capTie = { cars: out2.length, want: wantCars, perColor: perColor };
++    return out2.length ? out2 : boxes;
++  }
++
+   function chunkAlignedCut(boxes, blocks, dc, config) {
+     var span0 = parseInt(config && config.chunkCut, 10) || 0;
+     if (span0 <= 0 || !dc || !dc.curve) return boxes;
+@@ -11266,8 +11395,17 @@
+           if (config && config.mixStruct !== false) {
+             var _MIX2 = [[0,0,0],[2,2,0],[0,2,2],[2,0,2],[1,0,0],[0,1,0],[3,2,0],[0,3,0]];
+             var _mx = _MIX2[_pi % _MIX2.length];
+-            _cfg.fillLag = _mx[0]; _cfg.capSeqBoost = _mx[1]; _cfg.chunkCut = _mx[2];
+-            _cfg._mixTag = _mx.join('/');
++            if (config.capTie) {
++              // 【v275】capTie 已解决"车太小"根因；再叠 lag/capSeq 反而更差（58%→26%）。
++              //   capTie 模式下组合改成只变"每色开局能装满几辆"。
++              var _PERC2 = [2.0, 1.8, 2.2, 2.5, 1.6, 2.4, 2.0, 1.9];
++              _cfg.fillLag = 0; _cfg.capSeqBoost = 0; _cfg.chunkCut = 0;
++              _cfg.capPerColor = _PERC2[_pi % _PERC2.length];
++              _cfg._mixTag = 'capTie/' + _cfg.capPerColor;
++            } else {
++              _cfg.fillLag = _mx[0]; _cfg.capSeqBoost = _mx[1]; _cfg.chunkCut = _mx[2];
++              _cfg._mixTag = _mx.join('/');
++            }
+           }
+           // 【v238】容量也随这次选的棋盘反推（原先只有 app 侧算一次，换尺寸后容量不跟着变）：
+           //   每辆容量 ≈ 彩色像素 ÷ 目标车数，区间 ±12%。这样 6×7/7×7/6×8/7×8 各自有各自的容量，
+@@ -11301,9 +11439,16 @@
+           ];
+           var _mix = _MIXES[_pi % _MIXES.length];
+           if (config && config.mixStruct !== false) {
+-            _cfg.fillLag = _mix[0];
+-            _cfg.capSeqBoost = _mix[1];
+-            _cfg.chunkCut = _mix[2];
++            if (config.capTie) {
++              // 【v275】capTie 已解决"车太小"根因；再叠 lag/capSeq 反而更差（58%→26%）
++              var _PERC3 = [2.0, 1.8, 2.2, 2.5, 1.6, 2.4, 2.0, 1.9];
++              _cfg.fillLag = 0; _cfg.capSeqBoost = 0; _cfg.chunkCut = 0;
++              _cfg.capPerColor = _PERC3[_pi % _PERC3.length];
++            } else {
++              _cfg.fillLag = _mix[0];
++              _cfg.capSeqBoost = _mix[1];
++              _cfg.chunkCut = _mix[2];
++            }
+           }
+           var _vseq = [[1.00, 2, 3], [1.06, 2, 4], [0.94, 3, 3], [1.12, 2, 5]][_pi % 4];
+           var _bmin0 = parseInt(_cfg.boxSizeMin, 10) || 33;
+@@ -11313,7 +11458,7 @@
+           _cfg.iceScheduleCount = _vseq[1];
+           _cfg.iceScheduleDelay = _vseq[2];
+           _cfg._attemptVariant = { capScale: _vseq[0], iceCount: _vseq[1], iceDelay: _vseq[2] };
+-          _cfg._mixTag = _mix.join('/');
++          _cfg._mixTag = config && config.capTie ? ('capTie/' + _cfg.capPerColor) : _mix.join('/');
+         }
+         if (config && config.seed != null && !isNaN(+config.seed)) _cfg.seed = (+config.seed) + _pi;
+         var _o = flow === 'old' ? produce(blocks, _cfg) : produceFixed(blocks, _cfg, opts);
+--- a/bin/css/style.css
++++ b/bin/css/style.css
+--- a/bin/index.html
++++ b/bin/index.html
+@@ -3,13 +3,13 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车间小人 v273 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=273">
++  <title>车接小人 v274 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
++  <link rel="stylesheet" href="css/style.css?v=275">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车间小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v273</span></h1>
++    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v274</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -847,20 +847,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=273"></script>
+-  <script src="js/utils.js?v=273"></script>
++  <script src="js/zip.js?v=275"></script>
++  <script src="js/utils.js?v=275"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=273"></script>
+-  <script src="js/simulator.js?v=273"></script>
++  <script src="js/color-libs.js?v=275"></script>
++  <script src="js/simulator.js?v=275"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=273"></script>
+-  <script src="js/solver-strategy.js?v=273"></script>
+-  <script src="js/solver.js?v=273"></script>
+-  <script src="js/playersim.js?v=273"></script>
+-  <script src="js/generator.js?v=273"></script>
+-  <script src="js/analysis.js?v=273"></script>
++  <script src="js/anchor-cut.js?v=275"></script>
++  <script src="js/solver-strategy.js?v=275"></script>
++  <script src="js/solver.js?v=275"></script>
++  <script src="js/playersim.js?v=275"></script>
++  <script src="js/generator.js?v=275"></script>
++  <script src="js/analysis.js?v=275"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=273"></script>
+-  <script src="js/app.js?v=273"></script>
++  <script src="js/level-editor.js?v=275"></script>
++  <script src="js/app.js?v=275"></script>
+ </body>
+ </html>
+--- a/网页启动器/生产服务.js
++++ b/网页启动器/生产服务.js
