@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>切球动画 · 有多少球 → 切几辆 · 35x35_006</title>
+<style>
+  :root{ --bg:#14171c; --panel:#1c2027; --line:#2c333d; --txt:#d8dee9; --dim:#7d8896; --acc:#e8b04a; --grn:#5fb87a; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.6 -apple-system,"PingFang SC",sans-serif}
+  .wrap{display:flex;gap:18px;padding:18px;min-height:100vh}
+  .left{flex:0 0 auto;display:flex;flex-direction:column;gap:9px}
+  canvas{background:#0b0d10;border:1px solid var(--line);border-radius:6px}
+  .bar{display:flex;align-items:center;gap:8px;width:455px}
+  input[type=range]{flex:1;accent-color:var(--acc);cursor:pointer;height:18px}
+  #barTxt{color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
+  .btns{display:flex;gap:6px}
+  button{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:5px;padding:4px 12px;cursor:pointer;font-size:12px}
+  button:hover{border-color:var(--acc);color:var(--acc)}
+  #stage{color:var(--acc);font-weight:600;min-height:22px}
+  #calc{font-size:15px;min-height:26px;font-variant-numeric:tabular-nums}
+  #calc b{color:#fff}
+  #sub{color:var(--dim);font-size:12px;min-height:18px}
+  .right{flex:1;min-width:340px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  h2{font-size:14px;margin:0;color:var(--acc);font-weight:600}
+  #list{flex:1;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;padding-right:4px;max-height:calc(100vh - 200px)}
+  .car{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:12px;white-space:nowrap}
+  .car.cur{border-color:var(--acc);box-shadow:0 0 0 1px rgba(232,176,74,.35)}
+  .car .n{color:#fff;font-weight:700}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  #stat{color:var(--dim);font-size:12px;border-top:1px solid var(--line);padding-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="left">
+    <canvas id="cv"></canvas>
+    <div class="bar">
+      <input type="range" id="seek" min="0" max="23" value="0">
+      <span id="barTxt">0 / 23</span>
+    </div>
+    <div class="btns">
+      <button id="play">▶ 播放</button>
+      <button id="pause">❚❚ 暂停</button>
+      <button id="replay">↺ 重播</button>
+    </div>
+    <div id="stage">准备中…</div>
+    <div id="calc"></div>
+    <div id="sub"></div>
+  </div>
+  <div class="right">
+    <h2>切出的车（按到期排序）</h2>
+    <div id="list"></div>
+    <div id="stat"></div>
+  </div>
+</div>
+<script>
+const DATA = {"R":35,"C":35,"blocks":[[31,30,30,30,30,30,31,31,31,31,31,31,31,31,31,30,30,30,30,30,31,31,31,31,31,31,31,31,31,30,30,30,30,30,31],[5,31,31,31,15,15,15,15,15,15,15,15,15,15,5,31,31,31,31,31,5,15,5,5,5,5,5,15,5,31,31,31,31,31,5],[5,31,31,15,31,31,31,31,31,31,31,31,15,21,15,31,31,31,31,31,15,22,15,5,5,5,15,22,15,31,31,31,31,31,5],[5,31,31,15,14,31,14,14,14,15,14,14,15,21,21,15,31,31,31,31,5,15,22,15,5,15,22,15,5,31,31,31,31,31,5],[5,31,31,15,31,14,14,14,15,22,15,14,15,21,21,15,31,31,31,31,5,5,15,22,15,22,15,5,5,31,31,31,31,31,5],[5,31,31,15,14,14,14,14,15,22,15,14,15,21,21,15,31,31,31,33,33,33,33,33,22,33,33,33,33,33,33,31,31,31,5],[31,30,30,15,14,21,14,14,14,15,14,14,15,21,21,15,30,30,33,28,28,28,28,28,28,28,28,28,28,28,28,33,30,30,31],[31,30,30,15,14,21,14,14,14,14,14,14,15,21,21,15,30,33,28,15,15,15,15,15,15,15,15,15,28,22,22,28,33,30,31],[31,30,30,15,15,15,15,15,15,15,15,15,15,21,21,15,30,33,28,15,31,14,31,14,31,14,14,15,28,22,22,28,33,30,31],[31,30,30,15,14,14,14,14,14,14,14,14,15,21,21,15,30,33,28,15,31,31,14,31,14,14,14,15,28,28,28,28,33,30,31],[31,30,30,15,14,21,14,14,14,14,31,14,15,21,21,15,30,33,28,15,31,14,31,14,14,14,22,15,28,14,14,28,33,30,31],[31,30,30,15,14,21,14,14,14,31,14,31,15,21,21,15,30,33,28,15,14,31,14,14,14,22,14,15,28,14,14,28,33,30,31],[31,30,30,15,14,14,14,14,14,14,31,14,15,21,21,15,30,33,28,15,31,14,14,14,22,14,22,15,28,14,14,28,33,30,31],[31,30,30,15,14,21,14,21,14,21,14,21,15,21,21,15,30,33,28,15,15,15,15,15,15,15,15,15,28,28,28,28,33,30,31],[31,30,30,15,21,14,21,14,21,14,21,14,15,21,15,30,30,30,33,28,28,28,28,28,28,28,28,28,28,28,28,33,30,30,31],[5,31,31,31,15,15,15,15,15,15,15,15,15,15,5,31,31,31,31,33,33,33,33,33,33,33,33,33,33,33,33,31,31,31,5],[5,31,31,31,15,15,5,5,5,5,15,15,5,5,5,31,31,31,31,31,5,5,5,5,5,5,5,5,5,31,31,31,31,31,5],[5,31,31,31,31,31,5,34,34,34,34,34,34,5,5,31,31,31,31,31,5,17,17,17,17,17,17,17,17,17,17,31,31,31,5],[5,31,31,31,31,31,34,5,5,5,5,5,5,34,5,31,31,31,31,31,17,13,13,13,13,13,13,13,13,13,13,17,31,31,5],[5,31,31,31,31,34,5,4,4,4,4,4,4,5,34,31,31,31,31,17,13,13,13,13,13,13,13,13,13,13,13,13,17,31,5],[31,30,30,30,34,5,4,4,4,4,4,4,4,4,5,34,30,30,30,17,31,31,31,31,31,22,31,30,31,31,30,31,17,30,31],[31,30,30,30,34,5,4,30,30,4,30,30,4,30,5,34,30,30,30,17,31,13,13,31,22,22,31,30,31,30,30,31,17,30,31],[31,30,30,30,34,5,4,4,4,4,4,4,4,4,5,34,30,30,30,17,15,15,15,15,15,15,15,15,15,15,15,15,17,30,31],[31,30,30,30,34,5,4,4,4,4,4,30,30,30,30,34,30,30,30,17,31,31,31,31,17,17,17,17,31,31,31,31,17,30,31],[31,30,30,34,5,15,4,4,4,4,4,30,30,30,15,5,34,30,30,17,31,31,31,17,13,13,13,13,17,31,31,31,17,30,31],[31,30,34,5,4,4,15,4,4,4,30,30,30,28,15,4,5,34,30,17,31,31,17,13,15,15,15,15,13,17,31,31,17,30,31],[31,34,5,4,4,4,15,15,15,15,28,28,28,28,15,4,5,5,34,17,31,17,13,15,31,15,31,15,15,13,17,31,17,30,31],[31,34,5,4,4,15,22,22,22,22,15,15,15,15,4,4,5,5,34,17,31,17,13,15,15,31,15,15,4,13,17,31,17,30,31],[31,30,34,4,15,22,22,22,22,22,22,22,22,22,15,4,34,34,30,17,31,17,13,22,22,30,31,4,4,13,17,31,17,30,31],[5,31,34,4,15,13,13,13,13,13,13,13,13,13,15,4,34,31,31,17,31,17,13,15,31,30,30,4,4,13,17,31,17,31,5],[5,31,34,4,4,15,15,15,15,15,15,15,15,15,15,4,34,31,31,17,31,31,17,13,13,31,31,13,13,17,31,31,17,31,5],[5,31,34,28,28,28,28,28,28,28,28,28,28,28,28,28,34,31,31,17,31,31,31,17,13,13,13,13,17,31,31,31,17,31,5],[5,31,31,34,28,34,34,34,34,34,34,34,34,34,28,34,31,31,31,17,31,31,31,31,17,17,17,17,31,31,31,31,17,31,5],[5,31,31,34,34,31,5,5,5,5,5,5,5,5,34,34,31,31,31,31,17,17,17,17,17,17,17,17,17,17,17,17,31,31,5],[31,30,30,30,30,30,31,31,31,31,31,31,31,31,31,30,30,30,30,30,31,31,31,31,31,31,31,31,31,30,30,30,30,30,31]],"layerOf":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],[0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],[0,1,1,1,2,2,2,2,2,2,2,2,1,2,2,1,1,1,1,1,2,2,2,1,1,1,2,2,2,1,1,1,1,1,0],[0,1,1,1,2,2,2,2,2,3,2,2,1,2,2,2,1,1,1,1,2,3,3,2,1,2,3,3,2,1,1,1,1,1,0],[0,1,1,1,2,2,2,2,3,4,3,2,1,2,2,2,1,1,1,1,2,2,3,3,2,3,3,2,2,1,1,1,1,1,0],[0,1,1,1,2,2,2,2,3,4,3,2,1,2,2,2,1,1,1,2,2,2,2,2,3,2,2,2,2,2,2,1,1,1,0],[0,1,1,1,2,2,2,2,2,3,2,2,1,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,2,1,1,0],[0,1,1,1,2,2,2,2,2,2,2,2,1,2,2,2,2,3,3,4,4,4,4,4,4,4,4,4,3,4,4,3,2,1,0],[0,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,3,3,4,5,5,5,5,5,5,5,4,3,4,4,3,2,1,0],[0,1,1,1,2,2,2,2,2,2,2,2,1,2,2,2,2,3,3,4,5,5,6,6,5,5,5,4,3,3,3,3,2,1,0],[0,1,1,1,2,3,2,2,2,2,3,2,1,2,2,2,2,3,3,4,5,6,6,5,5,5,5,4,3,4,4,3,2,1,0],[0,1,1,1,2,3,2,2,2,3,3,2,1,2,2,2,2,3,3,4,5,6,5,5,5,6,5,4,3,4,4,3,2,1,0],[0,1,1,1,2,2,2,2,2,2,3,2,1,2,2,2,2,3,3,4,5,5,5,5,5,5,5,4,3,4,4,3,2,1,0],[0,1,1,1,2,3,2,3,2,3,3,2,1,2,2,2,2,3,3,4,4,4,4,4,4,4,4,4,3,3,3,3,2,1,0],[0,1,1,1,2,2,2,2,2,2,2,2,1,2,3,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,2,1,1,0],[0,1,1,1,1,1,1,1,1,1,1,1,1,1,2,3,3,3,3,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,0],[0,1,1,1,1,1,2,2,2,2,1,1,2,2,2,3,3,3,3,3,2,2,2,2,2,2,2,2,2,1,1,1,1,1,0],[0,1,1,1,1,1,2,2,2,2,2,2,2,2,2,3,3,3,3,3,2,2,2,2,2,2,2,2,2,2,2,1,1,1,0],[0,1,1,1,1,1,2,3,3,3,3,3,3,3,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,1,1,0],[0,1,1,1,1,2,3,4,4,4,4,4,4,4,3,3,3,3,3,2,3,3,3,3,3,3,3,3,3,3,3,3,2,1,0],[0,1,1,1,2,3,4,4,4,4,4,4,4,4,4,4,3,3,3,2,3,3,3,3,3,4,4,4,4,4,4,3,2,1,0],[0,1,1,1,2,3,4,5,5,4,5,5,4,5,4,4,3,3,3,2,3,4,4,3,4,4,4,4,4,4,4,3,2,1,0],[0,1,1,1,2,3,4,4,4,4,4,4,4,4,4,4,3,3,3,2,3,3,3,3,3,3,3,3,3,3,3,3,2,1,0],[0,1,1,1,2,3,4,4,4,4,4,5,5,5,5,4,3,3,3,2,2,2,2,2,3,3,3,3,2,2,2,2,2,1,0],[0,1,1,2,3,4,4,4,4,4,4,5,5,5,4,4,4,3,3,2,2,2,2,3,4,4,4,4,3,2,2,2,2,1,0],[0,1,2,3,3,3,4,4,4,4,5,5,5,5,4,3,3,4,3,2,2,2,3,4,4,4,4,4,4,3,2,2,2,1,0],[0,1,2,3,3,3,4,4,4,4,5,5,5,5,4,3,3,3,3,2,2,3,4,5,5,4,5,4,4,4,3,2,2,1,0],[0,1,2,3,3,4,4,4,4,4,4,4,4,4,3,3,3,3,3,2,2,3,4,5,5,5,4,4,3,4,3,2,2,1,0],[0,1,2,3,4,4,4,4,4,4,4,4,4,4,3,3,2,2,2,2,2,3,4,4,4,4,4,3,3,4,3,2,2,1,0],[0,1,2,3,4,4,4,4,4,4,4,4,4,4,3,3,2,1,1,2,2,3,4,3,3,4,4,3,3,4,3,2,2,1,0],[0,1,2,3,3,3,3,3,3,3,3,3,3,3,3,3,2,1,1,2,2,2,3,2,2,3,3,2,2,3,2,2,2,1,0],[0,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,2,2,2,2,3,2,2,2,2,3,2,2,2,2,1,0],[0,1,1,1,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,2,2,2,2,2,1,1,1,1,2,2,2,2,2,1,0],[0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]],"layerPx":[179,426,347,69,204,0,0],"total":1225,"units":[{"layer":0,"color":5,"px":103,"n":2,"counts":[52,51],"due":0.0},{"layer":0,"color":31,"px":76,"n":2,"counts":[38,38],"due":0.0},{"layer":1,"color":31,"px":173,"n":3,"counts":[58,58,57],"due":0.146},{"layer":1,"color":30,"px":135,"n":3,"counts":[45,45,45],"due":0.146},{"layer":1,"color":15,"px":118,"n":2,"counts":[59,59],"due":0.146},{"layer":2,"color":14,"px":89,"n":2,"counts":[45,44],"due":0.494},{"layer":2,"color":17,"px":76,"n":2,"counts":[38,38],"due":0.494},{"layer":2,"color":31,"px":55,"n":1,"counts":[55],"due":0.494},{"layer":2,"color":34,"px":50,"n":1,"counts":[50],"due":0.494},{"layer":2,"color":33,"px":41,"n":1,"counts":[41],"due":0.494},{"layer":2,"color":21,"px":36,"n":1,"counts":[36],"due":0.494},{"layer":3,"color":28,"px":69,"n":2,"counts":[35,34],"due":0.777},{"layer":4,"color":4,"px":61,"n":2,"counts":[31,30],"due":0.833},{"layer":4,"color":13,"px":55,"n":1,"counts":[55],"due":0.833},{"layer":4,"color":15,"px":53,"n":1,"counts":[53],"due":0.833},{"layer":4,"color":22,"px":35,"n":1,"counts":[35],"due":0.833}],"merged":[{"color":31,"from":3,"to":1,"px":38},{"color":31,"from":4,"to":1,"px":6},{"color":31,"from":5,"to":1,"px":10},{"color":31,"from":6,"to":1,"px":3},{"color":30,"from":0,"to":1,"px":30},{"color":30,"from":2,"to":1,"px":13},{"color":30,"from":3,"to":1,"px":15},{"color":30,"from":4,"to":1,"px":8},{"color":30,"from":5,"to":1,"px":15},{"color":5,"from":[0,1,2,3,4],"to":0,"px":103},{"color":15,"from":2,"to":1,"px":19},{"color":15,"from":3,"to":1,"px":36},{"color":15,"from":5,"to":1,"px":3},{"color":34,"from":[1,2,3,4],"to":2,"px":50},{"color":17,"from":[1,2,3],"to":2,"px":76},{"color":21,"from":[2,3],"to":2,"px":36},{"color":22,"from":[2,3,4,5,6],"to":4,"px":35},{"color":14,"from":3,"to":2,"px":2},{"color":14,"from":4,"to":2,"px":6},{"color":14,"from":5,"to":2,"px":19},{"color":14,"from":6,"to":2,"px":2},{"color":33,"from":[2,3],"to":2,"px":41},{"color":28,"from":2,"to":3,"px":15},{"color":28,"from":5,"to":3,"px":5},{"color":13,"from":[2,3,4],"to":4,"px":55},{"color":4,"from":[3,4],"to":4,"px":61}],"HI":60,"LO":40};
+const CELL = 13, L = DATA.layerPx.length, U = DATA.units.length, TOTAL = L + U;
+const HI = DATA.HI;
+const cv = document.getElementById('cv');
+cv.width = DATA.C * CELL; cv.height = DATA.R * CELL;
+const ctx = cv.getContext('2d');
+const listEl = document.getElementById('list'), stageEl = document.getElementById('stage');
+const calcEl = document.getElementById('calc'), subEl = document.getElementById('sub'), statEl = document.getElementById('stat');
+const seek = document.getElementById('seek'), barTxt = document.getElementById('barTxt');
+const colorOf = c => 'hsl(' + ((c * 137.5) % 360) + ',68%,55%)';
+let step = 0, timer = null;
+
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const u = step > L ? DATA.units[step - L - 1] : null;
+  for (let r = 0; r < DATA.R; r++) for (let c = 0; c < DATA.C; c++) {
+    const col = DATA.blocks[r][c];
+    if (!col) continue;
+    const ly = DATA.layerOf[r][c];
+    let alpha = 1, stroke = false;
+    if (step > 0 && step <= L) {
+      if (ly < step) alpha = 0.10;
+      else if (ly === step) { alpha = 1; stroke = true; }
+    } else if (u) {
+      if (ly === u.layer && col === u.color) { alpha = 1; stroke = true; }
+      else alpha = 0.12;
+    }
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = colorOf(col);
+    ctx.fillRect(c * CELL, r * CELL, CELL - 1, CELL - 1);
+    if (stroke) { ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(c * CELL + 0.7, r * CELL + 0.7, CELL - 2.4, CELL - 2.4); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function addCarCard(u, k) {
+  const d = document.createElement('div');
+  d.className = 'car cur';
+  d.innerHTML = '<span class="sw" style="background:' + colorOf(u.color) + '"></span>' +
+    '层' + u.layer + '·色' + u.color + ' · 第' + (k + 1) + '/' + u.n + ' 辆 · <span class="n">' + u.counts[k] + '</span> 球';
+  listEl.appendChild(d);
+  d.scrollIntoView({ block: 'nearest' });
+}
+
+function showStat() {
+  const all = DATA.units.reduce((a, u) => a.concat(u.counts), []);
+  const n = all.length;
+  const caps = all.slice().sort((a, b) => a - b);
+  const over = all.filter(x => x > HI).length, under = all.filter(x => x < DATA.LO).length;
+  statEl.innerHTML = '共 <b>' + n + '</b> 辆车（' + DATA.units.length + ' 个「层×色」单元）· 容量 ' +
+    caps[0] + '~' + caps[n - 1] + ' · 中位 ' + caps[Math.floor(n / 2)] +
+    '<br>超上限 ' + HI + '：' + over + ' 辆　低于下限 ' + DATA.LO + '：' + under + ' 辆';
+}
+
+function render(n) {
+  step = Math.max(0, Math.min(TOTAL, n));
+  listEl.innerHTML = ''; calcEl.innerHTML = ''; statEl.innerHTML = '';
+  if (step === 0) {
+    stageEl.textContent = '第 0 步：目标图（35×35，1225 个球，13 色）';
+    subEl.textContent = '';
+  } else if (step <= L) {
+    stageEl.textContent = '第 1 步：洋葱剥层（白框 = 当前层）';
+    subEl.textContent = '层 ' + (step - 1) + '：' + DATA.layerPx[step - 1] + ' 个球';
+  } else {
+    const idx = step - L - 1, u = DATA.units[idx];
+    stageEl.textContent = '第 2 步：切球（层 ' + u.layer + ' · 色 ' + u.color + '）';
+    calcEl.innerHTML = '<b>' + u.px + '</b> 个球 ÷ 上限 ' + HI + ' → <b>' + u.n + '</b> 辆（' + u.counts.join(' / ') + '）';
+    subEl.textContent = '到期 ' + u.due.toFixed(2) + '　色块颜色见画布白框';
+    // 重建列表：前面所有单元的车 + 当前单元的车
+    for (let i = 0; i <= idx; i++) {
+      const uu = DATA.units[i];
+      for (let k = 0; k < uu.counts.length; k++) addCarCard(uu, k);
+    }
+    if (idx >= U - 1) {
+      stageEl.textContent = '完成：' + DATA.units.length + ' 个单元 → ' + DATA.units.reduce((a, u) => a + u.counts.length, 0) + ' 辆车';
+      calcEl.innerHTML = ''; subEl.textContent = '';
+      showStat();
+    }
+  }
+  seek.value = step;
+  const pct = TOTAL ? Math.round(step / TOTAL * 100) : 0;
+  barTxt.textContent = step + ' / ' + TOTAL + ' · ' + pct + '%';
+  draw();
+}
+
+function stop() { if (timer) { clearInterval(timer); timer = null; } }
+function play() {
+  stop();
+  if (step >= TOTAL) render(0);
+  timer = setInterval(function () {
+    if (step >= TOTAL) { stop(); return; }
+    render(step + 1);
+  }, 520);
+}
+document.getElementById('play').onclick = play;
+document.getElementById('pause').onclick = stop;
+document.getElementById('replay').onclick = function () { stop(); render(0); play(); };
+seek.oninput = function () { stop(); render(parseInt(seek.value, 10) || 0); };
+seek.onmousedown = stop; seek.ontouchstart = stop;
+render(0);
+</script>
+</body>
+</html>

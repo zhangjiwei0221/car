@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>车接小人 v347 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
-  <link rel="stylesheet" href="css/style.css?v=347">
+  <title>车接小人 v348 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+  <link rel="stylesheet" href="css/style.css?v=348">
 </head>
 <body>
   <header>
     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v347</span></h1>
+    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v348</span></h1>
     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
          退出模拟就自动回到生成器的参数面板。 -->
@@ -386,14 +386,18 @@
         </select>
         <span class="gen-hint" id="gen-search-plan">≈ 4 轮 × 45 秒</span>
       </div>
-      <!-- 【v347·实验】通道模式：第 0 行只留一个入口，第 1 行封 k 格，用来把中段压力做成可控的 -->
+      <!-- 【v348·实验】通道模式：第 0 行只留一个入口，第 1 行封 k 格，用来把中段压力做成可控的 -->
       <div class="gen-row" style="margin-top:8px" title="【实验项·配对验证无效】通道模式：第 0 行只留一个入口（其余封黑块），第 1 行封 k 格。10 个 seed 配对对比仅 +0.7 点（4胜4负），5×7 盘黑块预算不足封不到单入口。默认关。">
         <label><input type="checkbox" id="gen-channel"> 通道模式</label>
         <span class="gen-hint">入口列</span>
         <input type="number" id="gen-channel-col" min="0" max="9" value="0" style="width:48px">
         <span class="gen-hint">封堵</span>
         <input type="number" id="gen-channel-k" min="0" max="6" value="0" style="width:48px">
-        <label style="margin-left:8px" title="按目标图的依赖层切车：浅层车小、深层车大，按到期排序填盘。实验项，默认关。"><input type="checkbox" id="gen-layercut" checked> 层切</label>
+        <select id="gen-cutmode" style="width:112px" title="切球方式。债务球=按同色连通块切，并选择性把「浅层小块+深层小块」合成一个球（制造攒票）；层切=按依赖层×颜色切；默认=按颜色总量切。">
+          <option value="debtBlock" selected>债务球</option>
+          <option value="layerCut2">层切</option>
+          <option value="">默认按色</option>
+        </select>
       </div>
       
       </div>
@@ -887,20 +891,20 @@
     </div>
   </div>
 
-  <script src="js/zip.js?v=347"></script>
-  <script src="js/utils.js?v=347"></script>
+  <script src="js/zip.js?v=348"></script>
+  <script src="js/utils.js?v=348"></script>
   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
-  <script src="js/color-libs.js?v=347"></script>
-  <script src="js/simulator.js?v=347"></script>
+  <script src="js/color-libs.js?v=348"></script>
+  <script src="js/simulator.js?v=348"></script>
   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
-  <script src="js/anchor-cut.js?v=347"></script>
-  <script src="js/solver-strategy.js?v=347"></script>
-  <script src="js/solver.js?v=347"></script>
-  <script src="js/playersim.js?v=347"></script>
-  <script src="js/generator.js?v=347"></script>
-  <script src="js/analysis.js?v=347"></script>
+  <script src="js/anchor-cut.js?v=348"></script>
+  <script src="js/solver-strategy.js?v=348"></script>
+  <script src="js/solver.js?v=348"></script>
+  <script src="js/playersim.js?v=348"></script>
+  <script src="js/generator.js?v=348"></script>
+  <script src="js/analysis.js?v=348"></script>
   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
-  <script src="js/level-editor.js?v=347"></script>
-  <script src="js/app.js?v=347"></script>
+  <script src="js/level-editor.js?v=348"></script>
+  <script src="js/app.js?v=348"></script>
 </body>
 </html>

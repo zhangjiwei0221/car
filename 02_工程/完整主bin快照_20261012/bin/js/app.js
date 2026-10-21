@@ -1989,7 +1989,7 @@ AntSolver.App = (function() {
       channelEntryCol: parseInt((document.getElementById('gen-channel-col') || {}).value, 10) || 0,
       channelK: parseInt((document.getElementById('gen-channel-k') || {}).value, 10) || 0,
       // 【v342·实验】层切：按依赖层 × 颜色切车，并按「到期」排序
-      cutMode: (document.getElementById('gen-layercut') || {}).checked ? 'layerCut2' : undefined
+      cutMode: (document.getElementById('gen-cutmode') || {}).value || undefined
       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
     };
   }

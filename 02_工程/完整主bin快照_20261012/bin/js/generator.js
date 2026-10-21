@@ -52,6 +52,7 @@ AntSolver.Generator = (function() {
     _RNG.s = s;
   }
 
+  var DIRS4 = [[1,0],[-1,0],[0,1],[0,-1]];   // 【v348】四方向常量
   var DEFAULT_CONFIG = {
     // 【默认参数基线：v95四方向消除统一默认参数】2026-07-31 起，以下标注「统一默认」的字段
     // 取自 方案文件夹/方案_v95四方向消除统一默认参数.json 的 config，作为四方向消除的统一默认口径。
@@ -11307,6 +11308,246 @@ AntSolver.Generator = (function() {
     return { layerOf: layerOf, pxByLayer: pxByLayer, total: total, rows: rows, cols: cols };
   }
 
+  /* 【v348·用户思路】按层不切：一层一色一辆，容量 = 该层该色全部像素。
+   * 与 layerCut2 的区别：layerCut2 按上限 60 把一段切成几辆；这里不切，一段就是一辆。
+   * 理由：一辆车的像素正好是「该段已暴露的」，玩家在该段点到它就能吃满；
+   *       均分切开反而让每辆只覆盖一段的一部分，更容易攒票。 */
+  function layerUnitCut(blocks, config) {
+    var info = onionLayersOf(blocks);
+    var layers = info.layers, total = info.total;
+    if (!total) return null;
+    var boxes = [], cum = 0;
+    for (var li = 0; li < layers.length; li++) {
+      var L = layers[li], layerSum = 0;
+      for (var k in L) layerSum += L[k];
+      for (var c in L) {
+        boxes.push({ color: +c, count: L[c], layer: li, due: cum / total });
+      }
+      cum += layerSum;
+    }
+    var sum = 0;
+    for (var i = 0; i < boxes.length; i++) sum += boxes[i].count;
+    if (sum !== total) return null;
+    boxes.sort(function (a, b) { return a.due - b.due || a.color - b.color; });
+    for (var j = 0; j < boxes.length; j++) boxes[j].elimSeq = j;
+    return boxes;
+  }
+
+  /* 【v348】自适应切车：不做「固定上限」，改成「按车数区间」——
+   *   单元数 < 24 → 反复切当前最大的单元（大色块被切开，但不是按固定 60）
+   *   单元数 > 40 → 反复合并「同色 + 到期最近」的相邻单元（碎块被并掉）
+   *   24~40 之间不动（自然大小）。
+   * 容量是切/并的结果，不是参数。 */
+  function layerAdaptiveCut(blocks, config) {
+    var info = onionLayersOf(blocks);
+    var layers = info.layers, total = info.total;
+    if (!total) return null;
+    var units = [], cum = 0;
+    for (var li = 0; li < layers.length; li++) {
+      var L = layers[li], ls = 0;
+      for (var k in L) ls += L[k];
+      for (var c in L) units.push({ color: +c, count: L[c], due: cum / total, layer: li, split: false, merged: false });
+      cum += ls;
+    }
+    var LO = 24, HI = 40;
+    var guard = 0;
+    while (units.length < LO && guard++ < 200) {
+      var mi = 0;
+      for (var i = 1; i < units.length; i++) if (units[i].count > units[mi].count) mi = i;
+      if (units[mi].count < 20) break;
+      var u = units[mi], a = Math.floor(u.count / 2), b = u.count - a;
+      units.splice(mi, 1,
+        { color: u.color, count: a, due: u.due, layer: u.layer, split: true, merged: false },
+        { color: u.color, count: b, due: u.due, layer: u.layer, split: true, merged: false });
+    }
+    guard = 0;
+    while (units.length > HI && guard++ < 200) {
+      var bi = -1, bj = -1, bd = Infinity;
+      for (var ii = 0; ii < units.length - 1; ii++) {
+        for (var jj = ii + 1; jj < units.length; jj++) {
+          if (units[ii].color !== units[jj].color) continue;
+          var dd = Math.abs(units[ii].due - units[jj].due);
+          if (dd < bd) { bd = dd; bi = ii; bj = jj; }
+        }
+      }
+      if (bi < 0) break;
+      units[bi].count += units[bj].count;
+      units[bi].merged = true;
+      units.splice(bj, 1);
+    }
+    var sum = 0;
+    for (var si = 0; si < units.length; si++) sum += units[si].count;
+    if (sum !== total) return null;
+    units.sort(function (a, b) { return a.due - b.due || a.color - b.color; });
+    for (var ei = 0; ei < units.length; ei++) units[ei].elimSeq = ei;
+    return units;
+  }
+
+  /* 【v348】按目标车数反推：车数固定 target，每色分几辆 = 目标 × 该色像素占比；
+   * 色内按「层序累积」切成 n 段（跨层连续），容量 = 段内像素和。
+   * 上限不存在：切分点是「该色的第 k 段」而不是「够不够 60」。 */
+  function colorSegmentCut(blocks, config) {
+    var info = onionLayersOf(blocks);
+    var layers = info.layers, total = info.total;
+    if (!total) return null;
+    var target = Math.max(8, parseInt(config.carCountTarget, 10) || 24);
+    // 每色每层像素
+    var per = {};   // color -> { layer: px }
+    var layerPx = [];
+    for (var li = 0; li < layers.length; li++) {
+      var sum = 0;
+      for (var k in layers[li]) {
+        var c = +k, px = layers[li][k];
+        (per[c] = per[c] || {})[li] = px;
+        sum += px;
+      }
+      layerPx.push(sum);
+    }
+    var cum = [0];
+    for (var lp = 0; lp < layerPx.length; lp++) cum.push(cum[cum.length - 1] + layerPx[lp]);
+    var boxes = [];
+    for (var col in per) {
+      var d = per[col], pxSum = 0;
+      for (var l in d) pxSum += d[l];
+      var n = Math.max(1, Math.round(target * pxSum / total));
+      var perCar = pxSum / n;
+      var acc = 0, accLayer = 0, made = 0, seg = [];
+      for (var l2 = 0; l2 < layers.length; l2++) {
+        var p = d[l2] || 0;
+        if (p <= 0) continue;
+        var remaining = p;
+        while (remaining > 0) {
+          if (made >= n - 1) { acc += remaining; remaining = 0; break; }   // 已切够 → 剩余并入末段
+          var need = Math.max(0, perCar - acc);
+          var take = need > 0 ? Math.min(need, remaining) : remaining;
+          acc += take; remaining -= take; accLayer = l2;
+          if (acc >= perCar - 1e-6) {
+            seg.push({ count: acc, layer: accLayer });
+            made++; acc = 0;
+          }
+        }
+      }
+      if (acc > 0) {
+        if (seg.length && made >= n - 1) seg[seg.length - 1].count += acc;
+        else seg.push({ count: acc, layer: accLayer });
+      }
+      for (var si = 0; si < seg.length; si++) {
+        boxes.push({ color: +col, count: Math.max(1, Math.round(seg[si].count)), layer: seg[si].layer,
+                     due: cum[seg[si].layer] / total });
+      }
+    }
+    // 整数化后做守恒修正（差额全加到最后一辆）
+    var sum2 = 0;
+    for (var bi = 0; bi < boxes.length; bi++) sum2 += boxes[bi].count;
+    if (sum2 !== total) {
+      boxes.sort(function (a, b) { return a.due - b.due || a.color - b.color; });
+      boxes[boxes.length - 1].count += (total - sum2);
+      if (boxes[boxes.length - 1].count <= 0) { blocks._csStat = { fail: 'neg' }; return null; }
+      sum2 = total;
+    }
+    if (sum2 !== total) { blocks._csStat = { fail: 'sum', sum: sum2 }; return null; }
+    boxes.sort(function (a, b) { return a.due - b.due || a.color - b.color; });
+    for (var bj = 0; bj < boxes.length; bj++) boxes[bj].elimSeq = bj;
+    blocks._csStat = { n: boxes.length, target: target };
+    return boxes;
+  }
+
+  /* 【v348·用户设计】选择性合球做债务：
+   *   · 以「同色连通块」为基本单元
+   *   · 对每个色，找「最早层的块」和「最晚层的块」；若 浅 ≤ maxLight、深 ≤ maxDeep、层差 ≥ minGap
+   *     → 合成一个「债务球」（浅层部分开局能吃，深层部分要等）
+   *   · 其余小块（< minBlock）并入同色最大块
+   *   · 不设容量上限；容量 = 块像素之和
+   * 参数：debtMaxLight(默认60) / debtMaxDeep(默认10) / debtMinGap(默认2) / debtMinBlock(默认10) */
+  function debtBlockCut(blocks, config) {
+    var info = onionLayerMap(blocks);
+    var rows = info.rows, cols = info.cols, total = info.total;
+    if (!total) return null;
+    var layerOf = info.layerOf;
+    var maxLight = parseInt(config.debtMaxLight, 10) || 45;
+    var maxDeep = parseInt(config.debtMaxDeep, 10) || 8;
+    var minGap = parseInt(config.debtMinGap, 10) || 2;
+    var minBlock = parseInt(config.debtMinBlock, 10) || 25;
+    // 连通块（同色 4-连通），记录最浅层
+    var seen = [], R = rows, C = cols;
+    for (var r0 = 0; r0 < R; r0++) { var a = []; for (var c0 = 0; c0 < C; c0++) a.push(false); seen.push(a); }
+    var comps = [];
+    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
+      if (blocks[r][c] <= 0 || seen[r][c]) continue;
+      var col = blocks[r][c], stack = [[r, c]], px = 0, minL = 999;
+      seen[r][c] = true;
+      while (stack.length) {
+        var cur = stack.pop(), x = cur[0], y = cur[1];
+        px++; if (layerOf[x][y] < minL) minL = layerOf[x][y];
+        for (var d = 0; d < 4; d++) {
+          var nx = x + DIRS4[d][0], ny = y + DIRS4[d][1];
+          if (nx >= 0 && nx < R && ny >= 0 && ny < C && !seen[nx][ny] && blocks[nx][ny] === col) {
+            seen[nx][ny] = true; stack.push([nx, ny]);
+          }
+        }
+      }
+      comps.push({ color: col, px: px, layer: minL });
+    }
+    // 按色分组
+    var byColor = {};
+    for (var ci = 0; ci < comps.length; ci++) {
+      var cc = comps[ci];
+      (byColor[cc.color] = byColor[cc.color] || []).push(cc);
+    }
+    var boxes = [], debtN = 0;
+    for (var ck in byColor) {
+      var arr = byColor[ck].slice();
+      // 每色最多做一对债务球
+      var usedLight = -1, usedDeep = -1;
+      if (arr.length >= 2) {
+        var sortedL = arr.slice().sort(function (a, b) { return a.layer - b.layer || b.px - a.px; });
+        for (var li = 0; li < sortedL.length && usedLight < 0; li++) {
+          if (sortedL[li].px <= maxLight) usedLight = li;
+        }
+        var sortedD = arr.slice().sort(function (a, b) { return b.layer - a.layer || a.px - b.px; });
+        for (var di = 0; di < sortedD.length && usedDeep < 0; di++) {
+          if (sortedD[di].px <= maxDeep && sortedD[di].layer - sortedL[usedLight >= 0 ? usedLight : 0].layer >= minGap) usedDeep = di;
+        }
+        if (usedLight >= 0 && usedDeep >= 0) {
+          var a1 = sortedL[usedLight], a2 = sortedD[usedDeep];
+          var maxBall = parseInt(config.debtMaxBall, 10) || 150;
+          if (a1 !== a2 && (a1.px + a2.px) <= maxBall) {
+            boxes.push({ color: +ck, count: a1.px + a2.px, layer: a1.layer, debt: a2.px, due: 0, _debt: true });
+            debtN++;
+            arr = arr.filter(function (x) { return x !== a1 && x !== a2; });
+          }
+        }
+      }
+      // 剩余块：小块并入同色最大块
+      var big = arr.filter(function (x) { return x.px >= minBlock; });
+      var smallSum = 0;
+      for (var si = 0; si < arr.length; si++) if (arr[si].px < minBlock) smallSum += arr[si].px;
+      if (!big.length) {
+        var sum0 = 0; for (var q0 = 0; q0 < arr.length; q0++) sum0 += arr[q0].px;
+        if (sum0 > 0) boxes.push({ color: +ck, count: sum0, layer: arr[0].layer, debt: 0, due: 0 });
+        continue;
+      }
+      big.sort(function (a, b) { return a.layer - b.layer || b.px - a.px; });
+      if (smallSum > 0) big[big.length - 1].px += smallSum;
+      for (var bi = 0; bi < big.length; bi++) {
+        boxes.push({ color: +ck, count: big[bi].px, layer: big[bi].layer, debt: 0, due: 0 });
+      }
+    }
+    var sum = 0;
+    for (var z = 0; z < boxes.length; z++) sum += boxes[z].count;
+    if (sum !== total) { blocks._dbStat = { fail: 'sum', sum: sum, total: total, n: boxes.length }; return null; }
+    // 层累计 → 到期
+    var layerPx = [];
+    for (var l2 = 0; l2 < info.pxByLayer.length; l2++) layerPx.push(info.pxByLayer[l2]);
+    var cum = [0];
+    for (var l3 = 0; l3 < layerPx.length; l3++) cum.push(cum[cum.length - 1] + layerPx[l3]);
+    for (var b2 = 0; b2 < boxes.length; b2++) boxes[b2].due = cum[Math.min(boxes[b2].layer, cum.length - 1)] / total;
+    boxes.sort(function (a, b) { return a.due - b.due || a.color - b.color; });
+    for (var b3 = 0; b3 < boxes.length; b3++) boxes[b3].elimSeq = b3;
+    blocks._dbStat = { n: boxes.length, debts: debtN };
+    return boxes;
+  }
+
   function layerBlockCut(blocks, config) {
     var map = onionLayerMap(blocks);
     var rows = map.rows, cols = map.cols, total = map.total;
@@ -11377,6 +11618,22 @@ AntSolver.Generator = (function() {
 
   function pickBoxSplit(blocks, config) {
     // 【v347·用户裁决】按「依赖层 × 色块」切车：先有自然块，再合并到目标车数
+    if (config && config.cutMode === 'debtBlock') {
+      try { var _db = debtBlockCut(blocks, config); if (_db && _db.length) return _db; } catch (e) { blocks._dbErr = String(e && e.message); }
+    }
+    if (config && config.cutMode === 'colorSegment') {
+      try { var _cs = colorSegmentCut(blocks, config); if (_cs && _cs.length) return _cs; } catch (e) { blocks._csErr = String(e && e.message); }
+    }
+    if (config && config.cutMode === 'layerAdaptive') {
+      try {
+        var _la = layerAdaptiveCut(blocks, config);
+        blocks._laStat = _la ? { n: _la.length } : null;
+        if (_la && _la.length) return _la;
+      } catch (e) { blocks._laErr = String(e && e.message); }
+    }
+    if (config && config.cutMode === 'layerUnit') {
+      try { var _lu = layerUnitCut(blocks, config); if (_lu && _lu.length) return _lu; } catch (e) { }
+    }
     if (config && config.cutMode === 'layerBlock') {
       try {
         var _lb = layerBlockCut(blocks, config);
