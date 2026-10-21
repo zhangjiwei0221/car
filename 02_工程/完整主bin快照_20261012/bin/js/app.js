@@ -1987,7 +1987,9 @@ AntSolver.App = (function() {
       // 【v341·实验】通道模式：第 0 行只留一个入口，第 1 行从入口右侧封 k 格
       channelMode: !!(document.getElementById('gen-channel') || {}).checked,
       channelEntryCol: parseInt((document.getElementById('gen-channel-col') || {}).value, 10) || 0,
-      channelK: parseInt((document.getElementById('gen-channel-k') || {}).value, 10) || 0
+      channelK: parseInt((document.getElementById('gen-channel-k') || {}).value, 10) || 0,
+      // 【v342·实验】层切：按依赖层 × 颜色切车，并按「到期」排序
+      cutMode: (document.getElementById('gen-layercut') || {}).checked ? 'layerCut2' : undefined
       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
     };
   }

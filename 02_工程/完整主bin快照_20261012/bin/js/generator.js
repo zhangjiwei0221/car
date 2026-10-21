@@ -11146,7 +11146,119 @@ AntSolver.Generator = (function() {
     return keep.concat(deep);
   }
 
+  /* ==================== 【v342·实验】按依赖层切车（layerCut2） ====================
+   * 与 layerCut(v297) 的区别：那版只切不摆（第 0 行全同色，失败）。
+   * 本版：按（洋葱依赖层 × 颜色）切车，小层并入同色最大层；每辆车带「到期」= 该层累计像素/总像素，
+   *       切完按到期升序设 elimSeq —— buildBoard 的「按 elimSeq 行优先填」会自动把浅层车放前面。
+   * 守恒校验：Σ车容量 = 彩色像素，不守恒直接返回 null 落回默认切法。
+   * 默认关（config.cutMode !== 'layerCut2'）。 */
+  function onionLayersOf(blocks) {
+    var rows = blocks.length, cols = blocks[0].length;
+    var removed = [];
+    for (var r = 0; r < rows; r++) { var rr = []; for (var c = 0; c < cols; c++) rr.push(false); removed.push(rr); }
+    var total = 0;
+    for (var r0 = 0; r0 < rows; r0++) for (var c0 = 0; c0 < cols; c0++) if (blocks[r0][c0] > 0) total++;
+    var done = 0, layers = [], DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+    while (done < total && layers.length < 200) {
+      var exp = [];
+      for (var r1 = 0; r1 < rows; r1++) for (var c1 = 0; c1 < cols; c1++) {
+        if (blocks[r1][c1] <= 0 || removed[r1][c1]) continue;
+        if (r1 === 0 || r1 === rows-1 || c1 === 0 || c1 === cols-1) { exp.push([r1, c1]); continue; }
+        for (var d0 = 0; d0 < 4; d0++) {
+          var nr0 = r1 + DIRS[d0][0], nc0 = c1 + DIRS[d0][1];
+          if (nr0 >= 0 && nr0 < rows && nc0 >= 0 && nc0 < cols && removed[nr0][nc0]) { exp.push([r1, c1]); break; }
+        }
+      }
+      if (!exp.length) break;
+      var cnt = {};
+      for (var e0 = 0; e0 < exp.length; e0++) {
+        var er = exp[e0][0], ec = exp[e0][1];
+        if (removed[er][ec]) continue;
+        var col = blocks[er][ec], n = 0, stack = [[er, ec]];
+        removed[er][ec] = true;
+        while (stack.length) {
+          var cur = stack.pop(), x = cur[0], y = cur[1]; n++;
+          for (var d1 = 0; d1 < 4; d1++) {
+            var nx = x + DIRS[d1][0], ny = y + DIRS[d1][1];
+            if (nx >= 0 && nx < rows && ny >= 0 && ny < cols && !removed[nx][ny] && blocks[nx][ny] === col) {
+              removed[nx][ny] = true; stack.push([nx, ny]);
+            }
+          }
+        }
+        cnt[col] = (cnt[col] || 0) + n; done += n;
+      }
+      layers.push(cnt);
+    }
+    return { layers: layers, total: total };
+  }
+
+  function layerCutBoxes2(blocks, config) {
+    var rows = blocks.length, cols = blocks[0].length;
+    var boxMin = parseInt(config.boxSizeMin, 10) || 25;
+    var boxMax = parseInt(config.boxSizeMax, 10) || 70;
+    if (boxMax < boxMin) { var t = boxMin; boxMin = boxMax; boxMax = t; }
+    var info = onionLayersOf(blocks);
+    if (!info || !info.layers.length) return null;
+    var layers = info.layers, total = info.total;
+    if (!total) return null;
+    // 小层并入同色最大层
+    var perColor = {}, c, l;
+    for (var li = 0; li < layers.length; li++) for (c in layers[li]) { (perColor[c] = perColor[c] || {})[li] = layers[li][c]; }
+    var final = [];
+    for (var fi = 0; fi < layers.length; fi++) final.push({});
+    for (c in perColor) {
+      var d = perColor[c], big = {}, small = {}, tgt = -1, best = -1;
+      for (l in d) { if (d[l] >= boxMin) { big[l] = d[l]; if (d[l] > best) { best = d[l]; tgt = +l; } } else small[l] = d[l]; }
+      if (tgt < 0) {
+        var mx = -1, ml = 0;
+        for (l in d) if (d[l] > mx) { mx = d[l]; ml = +l; }
+        var ssum = 0; for (l in d) ssum += d[l];
+        final[ml][c] = (final[ml][c] || 0) + ssum;
+        continue;
+      }
+      for (l in big) final[+l][c] = (final[+l][c] || 0) + big[l];
+      for (l in small) final[tgt][c] = (final[tgt][c] || 0) + small[l];
+    }
+    // 层累计
+    var layerPx = [], cumBefore = [0];
+    for (var lp = 0; lp < final.length; lp++) {
+      var sp = 0; for (var k0 in final[lp]) sp += final[lp][k0];
+      layerPx.push(sp); cumBefore.push(cumBefore[cumBefore.length-1] + sp);
+    }
+    // 切车
+    var boxes = [];
+    for (var fl = 0; fl < final.length; fl++) {
+      var L = final[fl], cs = Object.keys(L).sort(function (a, b) { return L[b] - L[a]; });
+      for (var ci = 0; ci < cs.length; ci++) {
+        var cc = cs[ci], px = L[cc];
+        var n = Math.max(1, Math.ceil(px / boxMax));
+        while (n > 1 && px / n < boxMin) n--;
+        var base = Math.floor(px / n), rest = px - base * n, off = 0;
+        for (var kk = 0; kk < n; kk++) {
+          var cnt = base + (kk < rest ? 1 : 0);
+          off += cnt;
+          boxes.push({ color: +cc, count: cnt, _due: (cumBefore[fl] + off) / total });
+        }
+      }
+    }
+    // 守恒校验
+    var sum = 0;
+    for (var bi = 0; bi < boxes.length; bi++) sum += boxes[bi].count;
+    if (sum !== total) return null;
+    // 按到期排序 → elimSeq
+    boxes.sort(function (a, b) { return a._due - b._due; });
+    for (var bj = 0; bj < boxes.length; bj++) { boxes[bj].elimSeq = bj; delete boxes[bj]._due; }
+    return boxes;
+  }
+
   function pickBoxSplit(blocks, config) {
+    // 【v342·实验】层切：按依赖层切车 + 按到期排序（失败自动落回默认切法）
+    if (config && config.cutMode === 'layerCut2') {
+      try {
+        var _lc = layerCutBoxes2(blocks, config);
+        if (_lc && _lc.length) return _lc;
+      } catch (e) { }
+    }
     var boxes = pickBoxSplitRaw(blocks, config);
     boxes = applyBoxPhase(boxes, config);
     // 【v284】先做容量归一化（同色内拆分/合并），再走后面的容量策略

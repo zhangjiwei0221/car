@@ -25,7 +25,7 @@ function band3(res){
   return {band3: tot?Math.round(ge/tot*100):null, peak:pk};
 }
 function run(cfg, i){
-  const c = Object.assign({}, cfg0, cfg);
+  const c = Object.assign({}, cfg0, cfg, { seed: 1000 + i });
   let out=null;
   try { out = G.generateFromBlocks(blocks, c); } catch(e){ return {err:String(e&&e.message)}; }
   if(!out || !out.solveResult) return {err:'no solve'};
@@ -52,5 +52,18 @@ console.log('');
 const off = group('通道 off', {});
 const on1 = group('通道 on (入口0,k0)', {channelMode:true, channelEntryCol:0, channelK:0});
 const on3 = group('通道 on (入口0,k3)', {channelMode:true, channelEntryCol:0, channelK:3});
+const lc = group('层切 on', {cutMode:'layerCut2'});
+const lcCh = group('层切+通道', {cutMode:'layerCut2', channelMode:true, channelEntryCol:0, channelK:0});
+function paired(name, a, b){
+  const d=[];
+  for(let i=0;i<Math.min(a.b3.length,b.b3.length);i++) if(a.b3[i]!=null&&b.b3[i]!=null) d.push(b.b3[i]-a.b3[i]);
+  if(!d.length){ console.log('  '+name+' 无配对'); return; }
+  const mean=d.reduce((x,y)=>x+y,0)/d.length;
+  const win=d.filter(x=>x>0).length, lose=d.filter(x=>x<0).length, tie=d.filter(x=>x===0).length;
+  console.log('  '+name.padEnd(20)+' 配对差均值 '+mean.toFixed(1)+'  胜/负/平 '+win+'/'+lose+'/'+tie+'  ('+d.join(',')+')');
+}
 console.log('');
-console.log('off→on(k3) 均值差：'+(off.mean!=null&&on3.mean!=null?(on3.mean-off.mean).toFixed(1):'-'));
+console.log('配对对比（同一 seed 下，正值=变好）：');
+paired('层切 − off', off, lc);
+paired('通道 − off', off, on1);
+paired('层切+通道 − off', off, lcCh);
