@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>主体框选 · 分层 · 车单</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#16181d;color:#d8dde5;font:13px/1.6 -apple-system,"PingFang SC",sans-serif}
+.wrap{display:flex;gap:16px;padding:16px;align-items:flex-start}
+.left{flex:0 0 auto}
+.right{flex:1;min-width:360px;max-height:calc(100vh - 32px);overflow:auto}
+h2{font-size:14px;margin:0 0 8px;color:#fff;font-weight:600}
+canvas{background:#0d0f13;border-radius:6px;cursor:crosshair;display:block}
+.panel{background:#1d2027;border:1px solid #2b3038;border-radius:6px;padding:10px 12px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #23272f}
+.row:last-child{border:0}
+.k{color:#8b95a5}
+.v{color:#fff;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:3px 6px;text-align:left;border-bottom:1px solid #23272f}
+th{color:#8b95a5;font-weight:500;font-size:12px}
+td{font-size:12px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(255,255,255,.2)}
+button{background:#2b64d8;border:0;color:#fff;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;margin-right:6px}
+button.ghost{background:#2b3038}
+button:hover{filter:brightness(1.15)}
+.hint{color:#7a8494;font-size:12px;line-height:1.7}
+.tag{display:inline-block;background:#2b3038;border-radius:3px;padding:1px 6px;margin:2px 3px 2px 0;font-size:11px}
+.layerbar{height:6px;border-radius:3px;background:#2b3038;overflow:hidden;display:flex;margin:4px 0}
+.layerbar i{display:block;height:100%}
+pre{background:#0d0f13;padding:8px 10px;border-radius:5px;overflow:auto;font-size:11px;line-height:1.5;color:#9fb3c8;max-height:180px;margin:6px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="left">
+    <h2 id="title">目标图 · 拖拽框选主体</h2>
+    <canvas id="cv"></canvas>
+  </div>
+  <div class="right">
+    <div class="panel">
+      <h2>框选</h2>
+      <div id="selInfo" class="hint">在图上一块区域拖拽鼠标来框选主体。</div>
+      <div style="margin-top:8px">
+        <button id="btnClear" class="ghost">清除框选</button>
+        <button id="btnOnly" class="ghost">只看框内</button>
+        <button id="btnNums" class="ghost">显示层号</button>
+      </div>
+    </div>
+    <div class="panel" id="pStat" style="display:none">
+      <h2>分层结果</h2>
+      <div id="layersBox"></div>
+    </div>
+    <div class="panel" id="pCar" style="display:none">
+      <h2>车单（按层 · 由外到内）</h2>
+      <div id="carBox"></div>
+    </div>
+    <div class="panel">
+      <h2>说明</h2>
+      <div class="hint">
+        分层算法：框内贴边框的格子 = 第 1 层，逐层向内 BFS。<br>
+        层号即消除顺序，先外后内。<br>
+        车单按「层 → 颜色」切，单车上限 <span id="capTxt">60</span> px。
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const RAW = `31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31
+5 31 31 31 15 15 15 15 15 15 15 15 15 15 5 31 31 31 31 31 5 15 5 5 5 5 5 15 5 31 31 31 31 31 5
+5 31 31 15 31 31 31 31 31 31 31 31 15 21 15 31 31 31 31 31 15 22 15 5 5 5 15 22 15 31 31 31 31 31 5
+5 31 31 15 14 31 14 14 14 15 14 14 15 21 21 15 31 31 31 31 5 15 22 15 5 15 22 15 5 31 31 31 31 31 5
+5 31 31 15 31 14 14 14 15 22 15 14 15 21 21 15 31 31 31 31 5 5 15 22 15 22 15 5 5 31 31 31 31 31 5
+5 31 31 15 14 14 14 14 15 22 15 14 15 21 21 15 31 31 31 33 33 33 33 33 22 33 33 33 33 33 33 31 31 31 5
+31 30 30 15 14 21 14 14 14 15 14 14 15 21 21 15 30 30 33 28 28 28 28 28 28 28 28 28 28 28 28 33 30 30 31
+31 30 30 15 14 21 14 14 14 14 14 14 15 21 21 15 30 33 28 15 15 15 15 15 15 15 15 15 28 22 22 28 33 30 31
+31 30 30 15 15 15 15 15 15 15 15 15 15 21 21 15 30 33 28 15 31 14 31 14 31 14 14 15 28 22 22 28 33 30 31
+31 30 30 15 14 14 14 14 14 14 14 14 15 21 21 15 30 33 28 15 31 31 14 31 14 14 14 15 28 28 28 28 33 30 31
+31 30 30 15 14 21 14 14 14 14 31 14 15 21 21 15 30 33 28 15 31 14 31 14 14 14 22 15 28 14 14 28 33 30 31
+31 30 30 15 14 21 14 14 14 31 14 31 15 21 21 15 30 33 28 15 14 31 14 14 14 22 14 15 28 14 14 28 33 30 31
+31 30 30 15 14 14 14 14 14 14 31 14 15 21 21 15 30 33 28 15 31 14 14 14 22 14 22 15 28 14 14 28 33 30 31
+31 30 30 15 14 21 14 21 14 21 14 21 15 21 21 15 30 33 28 15 15 15 15 15 15 15 15 15 28 28 28 28 33 30 31
+31 30 30 15 21 14 21 14 21 14 21 14 15 21 15 30 30 30 33 28 28 28 28 28 28 28 28 28 28 28 28 33 30 30 31
+5 31 31 31 15 15 15 15 15 15 15 15 15 15 5 31 31 31 31 33 33 33 33 33 33 33 33 33 33 33 33 31 31 31 5
+5 31 31 31 15 15 5 5 5 5 15 15 5 5 5 31 31 31 31 31 5 5 5 5 5 5 5 5 5 31 31 31 31 31 5
+5 31 31 31 31 31 5 34 34 34 34 34 34 5 5 31 31 31 31 31 5 17 17 17 17 17 17 17 17 17 17 31 31 31 5
+5 31 31 31 31 31 34 5 5 5 5 5 5 34 5 31 31 31 31 31 17 13 13 13 13 13 13 13 13 13 13 17 31 31 5
+5 31 31 31 31 34 5 4 4 4 4 4 4 5 34 31 31 31 31 17 13 13 13 13 13 13 13 13 13 13 13 13 17 31 5
+31 30 30 30 34 5 4 4 4 4 4 4 4 4 5 34 30 30 30 17 31 31 31 31 31 22 31 30 31 31 30 31 17 30 31
+31 30 30 30 34 5 4 30 30 4 30 30 4 30 5 34 30 30 30 17 31 13 13 31 22 22 31 30 31 30 30 31 17 30 31
+31 30 30 30 34 5 4 4 4 4 4 4 4 4 5 34 30 30 30 17 15 15 15 15 15 15 15 15 15 15 15 15 17 30 31
+31 30 30 30 34 5 4 4 4 4 4 30 30 30 30 34 30 30 30 17 31 31 31 31 17 17 17 17 31 31 31 31 17 30 31
+31 30 30 34 5 15 4 4 4 4 4 30 30 30 15 5 34 30 30 17 31 31 31 17 13 13 13 13 17 31 31 31 17 30 31
+31 30 34 5 4 4 15 4 4 4 30 30 30 28 15 4 5 34 30 17 31 31 17 13 15 15 15 15 13 17 31 31 17 30 31
+31 34 5 4 4 4 15 15 15 15 28 28 28 28 15 4 5 5 34 17 31 17 13 15 31 15 31 15 15 13 17 31 17 30 31
+31 34 5 4 4 15 22 22 22 22 15 15 15 15 4 4 5 5 34 17 31 17 13 15 15 31 15 15 4 13 17 31 17 30 31
+31 30 34 4 15 22 22 22 22 22 22 22 22 22 15 4 34 34 30 17 31 17 13 22 22 30 31 4 4 13 17 31 17 30 31
+5 31 34 4 15 13 13 13 13 13 13 13 13 13 15 4 34 31 31 17 31 17 13 15 31 30 30 4 4 13 17 31 17 31 5
+5 31 34 4 4 15 15 15 15 15 15 15 15 15 15 4 34 31 31 17 31 31 17 13 13 31 31 13 13 17 31 31 17 31 5
+5 31 34 28 28 28 28 28 28 28 28 28 28 28 28 28 34 31 31 17 31 31 31 17 13 13 13 13 17 31 31 31 17 31 5
+5 31 31 34 28 34 34 34 34 34 34 34 34 34 28 34 31 31 31 17 31 31 31 31 17 17 17 17 31 31 31 31 17 31 5
+5 31 31 34 34 31 5 5 5 5 5 5 5 5 34 34 31 31 31 31 17 17 17 17 17 17 17 17 17 17 17 17 31 31 5
+31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31`;
+const PALETTE = [null,
+'#FF3240','#FF269F','#FF5294','#DF2455','#FF98A3','#F63C3F','#A073E7','#E749B6','#AD00AC','#C538C3',
+'#A032DC','#C60174','#00ACF6','#00E1EF','#256A85','#7074B6','#6F67DC','#6B5BBA','#95E502','#01CC64',
+'#00AEAD','#04DB01','#02CBA9','#018441','#FFB900','#C15701','#FF9F6A','#FF8002','#F69602','#F9DA00',
+'#FDE8D6','#FFEAB2','#010101','#BBB6B7'];
+const NAME = [null,
+'红色','浅红','粉红','暗粉','浅粉','深红','紫色','浅紫粉','玫红','灰紫','深紫','紫红',
+'天蓝','浅蓝','深棕','深蓝','灰蓝','蓝色','浅黄','绿色','橄榄绿','青蓝','浅绿','深绿',
+'黄色','砖红','浅橙','橙色','深棕2','棕色','浅灰','灰色','深灰','中灰'];
+
+const blocks = RAW.trim().split('\n').map(l=>l.trim().split(/\s+/).map(Number));
+const R = blocks.length, C = blocks[0].length;
+const CELL = 17, PAD_L = 26, PAD_T = 20, CAP = 60;
+
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+cv.width = PAD_L + C*CELL + 4; cv.height = PAD_T + R*CELL + 4;
+document.getElementById('capTxt').textContent = CAP;
+
+let sel = null, showNums = false, onlySel = false;
+
+function cellColor(v){ return v>0 && PALETTE[v] ? PALETTE[v] : '#000'; }
+function isDark(hex){
+  const n = parseInt(hex.slice(1),16);
+  const r=(n>>16)&255,g=(n>>8)&255,b=n&255;
+  return (r*299+g*587+b*114)/1000 < 120;
+}
+
+function draw(){
+  ctx.fillStyle = '#0d0f13'; ctx.fillRect(0,0,cv.width,cv.height);
+  // 行列号
+  ctx.font = '9px ui-monospace,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#5a6472';
+  for(let c=0;c<C;c++) if(c%5===0) ctx.fillText(c, PAD_L+c*CELL+CELL/2, PAD_T/2);
+  ctx.textAlign='right';
+  for(let r=0;r<R;r++) if(r%5===0) ctx.fillText(r, PAD_L-6, PAD_T+r*CELL+CELL/2);
+  ctx.textAlign='center';
+
+  const dist = sel ? bfs(sel) : null;
+  let maxL = 0;
+  if(dist) for(const k in dist) maxL = Math.max(maxL, dist[k]);
+
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const v = blocks[r][c];
+    const x = PAD_L + c*CELL, y = PAD_T + r*CELL;
+    const inSel = sel && r>=sel.r0 && r<=sel.r1 && c>=sel.c0 && c<=sel.c1;
+    if(onlySel && !inSel){ ctx.fillStyle='#1a1d23'; ctx.fillRect(x,y,CELL-1,CELL-1); continue; }
+    ctx.fillStyle = cellColor(v);
+    ctx.fillRect(x,y,CELL-1,CELL-1);
+    // 框内：按层叠加深色遮罩（外亮内暗）
+    if(inSel && dist){
+      const L = dist[r+','+c] || 1;
+      const a = 0.06 + 0.62 * ((L-1) / Math.max(1,maxL-1));
+      ctx.fillStyle = 'rgba(0,0,0,'+a.toFixed(3)+')';
+      ctx.fillRect(x,y,CELL-1,CELL-1);
+      if(showNums){
+        ctx.fillStyle = a>0.4 ? 'rgba(255,255,255,.95)' : 'rgba(0,0,0,.85)';
+        ctx.font = 'bold 9px ui-monospace,monospace';
+        ctx.fillText(String(L), x+CELL/2-0.5, y+CELL/2);
+      }
+    }
+  }
+  if(sel){
+    ctx.strokeStyle='#4d9eff'; ctx.lineWidth=2;
+    const x=PAD_L+sel.c0*CELL, y=PAD_T+sel.r0*CELL;
+    const w=(sel.c1-sel.c0+1)*CELL-1, h=(sel.r1-sel.r0+1)*CELL-1;
+    ctx.strokeRect(x-1,y-1,w+2,h+2);
+  }
+}
+
+// 框内 BFS：贴边框 = 第 1 层
+function bfs(s){
+  const H = s.r1-s.r0+1, W = s.c1-s.c0+1;
+  const dist = {}, q = [];
+  for(let r=s.r0;r<=s.r1;r++)for(let c=s.c0;c<=s.c1;c++){
+    if(r===s.r0||r===s.r1||c===s.c0||c===s.c1){ dist[r+','+c]=1; q.push([r,c,1]); }
+  }
+  let head = 0;
+  while(head < q.length){
+    const [r,c,d] = q[head++];
+    for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      const nr=r+dr, nc=c+dc;
+      if(nr<s.r0||nr>s.r1||nc<s.c0||nc>s.c1) continue;
+      const k = nr+','+nc;
+      if(dist[k] != null) continue;
+      dist[k] = d+1; q.push([nr,nc,d+1]);
+    }
+  }
+  return dist;
+}
+
+function analyze(){
+  const dist = bfs(sel);
+  const layers = {};
+  let total = 0;
+  for(let r=sel.r0;r<=sel.r1;r++)for(let c=sel.c0;c<=sel.c1;c++){
+    const L = dist[r+','+c], v = blocks[r][c];
+    if(!layers[L]) layers[L] = {px:0, colors:{}};
+    layers[L].px++; layers[L].colors[v] = (layers[L].colors[v]||0)+1;
+    total++;
+  }
+  const maxL = Math.max(...Object.keys(layers).map(Number));
+
+  // 面板：框选信息
+  const h = sel.r1-sel.r0+1, w = sel.c1-sel.c0+1;
+  const colorTot = {};
+  for(let r=sel.r0;r<=sel.r1;r++)for(let c=sel.c0;c<=sel.c1;c++){
+    const v=blocks[r][c]; colorTot[v]=(colorTot[v]||0)+1;
+  }
+  const top = Object.entries(colorTot).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('selInfo').innerHTML =
+    `<div class="row"><span class="k">范围</span><span class="v">行 ${sel.r0}–${sel.r1} × 列 ${sel.c0}–${sel.c1}</span></div>`+
+    `<div class="row"><span class="k">尺寸</span><span class="v">${h} × ${w} = ${total} px</span></div>`+
+    `<div class="row"><span class="k">层数</span><span class="v">${maxL}</span></div>`+
+    `<div class="row"><span class="k">颜色数</span><span class="v">${top.length}</span></div>`+
+    `<div style="margin-top:8px">`+top.map(([k,v])=>
+      `<span class="tag"><i class="sw" style="background:${cellColor(+k)}"></i>色${k} ${NAME[k]||''} · ${v}px · ${(v/total*100).toFixed(1)}%</span>`
+    ).join('')+`</div>`;
+
+  // 层条
+  let bar = '<div class="layerbar">';
+  const maxPx = Math.max(...Object.values(layers).map(x=>x.px));
+  for(let L=1;L<=maxL;L++){
+    const p = layers[L] ? layers[L].px : 0;
+    const t = p/maxPx;
+    bar += `<i style="width:${(100/maxL).toFixed(2)}%;background:rgba(77,158,255,${(0.25+0.75*t).toFixed(2)})" title="层${L}: ${p}px"></i>`;
+  }
+  bar += '</div>';
+
+  let tbl = '<table><tr><th>层</th><th>像素</th><th>颜色构成</th></tr>';
+  for(let L=1;L<=maxL;L++){
+    const it = layers[L]; if(!it) continue;
+    const cs = Object.entries(it.colors).sort((a,b)=>b[1]-a[1])
+      .map(([k,v])=>`<span class="tag"><i class="sw" style="background:${cellColor(+k)}"></i>${k}:${v}</span>`).join('');
+    tbl += `<tr><td>${L}</td><td>${it.px}</td><td>${cs}</td></tr>`;
+  }
+  tbl += '</table>';
+  document.getElementById('layersBox').innerHTML = bar + tbl;
+  document.getElementById('pStat').style.display = 'block';
+
+  // 车单
+  let cars = [], cum = 0;
+  for(let L=1;L<=maxL;L++){
+    const it = layers[L]; if(!it) continue;
+    const cs = Object.entries(it.colors).sort((a,b)=>b[1]-a[1]);
+    for(const [col,px] of cs){
+      let rest = px;
+      while(rest > 0){
+        let n = rest >= CAP ? CAP : rest;
+        // 尾部太小则并入当前（不低于 20）
+        if(rest - n > 0 && rest - n < 20){ n = Math.ceil(rest/2); }
+        cars.push({layer:L, color:+col, count:n, cum});
+        rest -= n;
+      }
+    }
+    cum += it.px;
+  }
+  const sum = cars.reduce((s,x)=>s+x.count,0);
+  let ct = '<table><tr><th>#</th><th>层</th><th>颜色</th><th>容量</th><th>到期</th></tr>';
+  cars.forEach((x,i)=>{
+    ct += `<tr><td>${i+1}</td><td>${x.layer}</td><td><i class="sw" style="background:${cellColor(x.color)}"></i>${x.color}</td><td>${x.count}</td><td>${(x.cum/total*100).toFixed(1)}%</td></tr>`;
+  });
+  ct += '</table>';
+  ct += `<div class="row" style="margin-top:6px"><span class="k">合计</span><span class="v">${cars.length} 辆 · ${sum} px</span></div>`;
+  if(sum !== total) ct += `<div style="color:#ff7b72">容量合计与框内像素不一致：${sum} vs ${total}</div>`;
+  ct += `<pre>${JSON.stringify({sel,carCount:cars.length,total,cars},null,0)}</pre>`;
+  document.getElementById('carBox').innerHTML = ct;
+  document.getElementById('pCar').style.display = 'block';
+  window.__RESULT__ = {sel, total, maxL, layers, cars};
+}
+
+// 鼠标框选
+let drag = null;
+function pos(e){
+  const rc = cv.getBoundingClientRect();
+  const x = e.clientX - rc.left - PAD_L, y = e.clientY - rc.top - PAD_T;
+  const c = Math.floor(x/CELL), r = Math.floor(y/CELL);
+  if(r<0||c<0||r>=R||c>=C) return null;
+  return {r,c};
+}
+cv.addEventListener('mousedown', e=>{ const p=pos(e); if(!p)return; drag={r:p.r,c:p.c}; });
+cv.addEventListener('mousemove', e=>{
+  if(!drag) return;
+  const p = pos(e); if(!p) return;
+  sel = {r0:Math.min(drag.r,p.r), r1:Math.max(drag.r,p.r), c0:Math.min(drag.c,p.c), c1:Math.max(drag.c,p.c)};
+  draw();
+});
+window.addEventListener('mouseup', ()=>{
+  if(drag && sel){ drag=null; analyze(); draw(); }
+  drag = null;
+});
+document.getElementById('btnClear').onclick = ()=>{
+  sel=null; draw();
+  document.getElementById('pStat').style.display='none';
+  document.getElementById('pCar').style.display='none';
+  document.getElementById('selInfo').textContent='在图上一块区域拖拽鼠标来框选主体。';
+};
+document.getElementById('btnOnly').onclick = ()=>{ onlySel=!onlySel; draw(); };
+document.getElementById('btnNums').onclick = ()=>{ showNums=!showNums; draw(); };
+
+document.getElementById('title').textContent = `目标图 ${R}×${C} · 拖拽框选主体`;
+draw();
+</script>
+</body>
+</html>

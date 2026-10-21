@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>出发点箭头 · 颜色出场顺序</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#16181d;color:#d8dde5;font:13px/1.6 -apple-system,"PingFang SC",sans-serif}
+.wrap{display:flex;gap:16px;padding:16px;align-items:flex-start}
+.left{flex:0 0 auto}
+.right{flex:1;min-width:380px;max-height:calc(100vh - 32px);overflow:auto}
+h2{font-size:14px;margin:0 0 8px;color:#fff;font-weight:600}
+canvas{background:#0d0f13;border-radius:6px;cursor:crosshair;display:block}
+.panel{background:#1d2027;border:1px solid #2b3038;border-radius:6px;padding:10px 12px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #23272f}
+.row:last-child{border:0}
+.k{color:#8b95a5}.v{color:#fff;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:4px 6px;text-align:left;border-bottom:1px solid #23272f}
+th{color:#8b95a5;font-weight:500;font-size:12px}
+td{font-size:12px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(255,255,255,.2)}
+button{background:#2b64d8;border:0;color:#fff;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;margin-right:6px}
+button.ghost{background:#2b3038}
+button:hover{filter:brightness(1.15)}
+.hint{color:#7a8494;font-size:12px;line-height:1.7}
+.ord{display:inline-block;background:#2b64d8;color:#fff;border-radius:3px;padding:0 6px;font-size:11px;margin-right:6px}
+pre{background:#0d0f13;padding:8px 10px;border-radius:5px;overflow:auto;font-size:11px;line-height:1.5;color:#9fb3c8;max-height:200px;margin:6px 0 0}
+.big{font-size:15px;color:#fff;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="left">
+    <h2 id="title">目标图 · 拖一个箭头，箭尾 = 出发点</h2>
+    <canvas id="cv"></canvas>
+  </div>
+  <div class="right">
+    <div class="panel">
+      <h2>箭头</h2>
+      <div id="arrowInfo" class="hint">在图上按住鼠标，从「想开始的地方」拖出一个箭头。箭尾是出发点，箭头指向推进方向。</div>
+      <div style="margin-top:8px">
+        <button id="btnClear" class="ghost">清除</button>
+        <button id="btnWave" class="ghost">显示波纹</button>
+      </div>
+    </div>
+    <div class="panel" id="pOrder" style="display:none">
+      <h2>颜色出场顺序</h2>
+      <div id="orderBox"></div>
+    </div>
+    <div class="panel" id="pCar" style="display:none">
+      <h2>全图车单（按出场顺序）</h2>
+      <div id="carBox"></div>
+    </div>
+  </div>
+</div>
+<script>
+const RAW = `31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31
+5 31 31 31 15 15 15 15 15 15 15 15 15 15 5 31 31 31 31 31 5 15 5 5 5 5 5 15 5 31 31 31 31 31 5
+5 31 31 15 31 31 31 31 31 31 31 31 15 21 15 31 31 31 31 31 15 22 15 5 5 5 15 22 15 31 31 31 31 31 5
+5 31 31 15 14 31 14 14 14 15 14 14 15 21 21 15 31 31 31 31 5 15 22 15 5 15 22 15 5 31 31 31 31 31 5
+5 31 31 15 31 14 14 14 15 22 15 14 15 21 21 15 31 31 31 31 5 5 15 22 15 22 15 5 5 31 31 31 31 31 5
+5 31 31 15 14 14 14 14 15 22 15 14 15 21 21 15 31 31 31 33 33 33 33 33 22 33 33 33 33 33 33 31 31 31 5
+31 30 30 15 14 21 14 14 14 15 14 14 15 21 21 15 30 30 33 28 28 28 28 28 28 28 28 28 28 28 28 33 30 30 31
+31 30 30 15 14 21 14 14 14 14 14 14 15 21 21 15 30 33 28 15 15 15 15 15 15 15 15 15 28 22 22 28 33 30 31
+31 30 30 15 15 15 15 15 15 15 15 15 15 21 21 15 30 33 28 15 31 14 31 14 31 14 14 15 28 22 22 28 33 30 31
+31 30 30 15 14 14 14 14 14 14 14 14 15 21 21 15 30 33 28 15 31 31 14 31 14 14 14 15 28 28 28 28 33 30 31
+31 30 30 15 14 21 14 14 14 14 31 14 15 21 21 15 30 33 28 15 31 14 31 14 14 14 22 15 28 14 14 28 33 30 31
+31 30 30 15 14 21 14 14 14 31 14 31 15 21 21 15 30 33 28 15 14 31 14 14 14 22 14 15 28 14 14 28 33 30 31
+31 30 30 15 14 14 14 14 14 14 31 14 15 21 21 15 30 33 28 15 31 14 14 14 22 14 22 15 28 14 14 28 33 30 31
+31 30 30 15 14 21 14 21 14 21 14 21 15 21 21 15 30 33 28 15 15 15 15 15 15 15 15 15 28 28 28 28 33 30 31
+31 30 30 15 21 14 21 14 21 14 21 14 15 21 15 30 30 30 33 28 28 28 28 28 28 28 28 28 28 28 28 33 30 30 31
+5 31 31 31 15 15 15 15 15 15 15 15 15 15 5 31 31 31 31 33 33 33 33 33 33 33 33 33 33 33 33 31 31 31 5
+5 31 31 31 15 15 5 5 5 5 15 15 5 5 5 31 31 31 31 31 5 5 5 5 5 5 5 5 5 31 31 31 31 31 5
+5 31 31 31 31 31 5 34 34 34 34 34 34 5 5 31 31 31 31 31 5 17 17 17 17 17 17 17 17 17 17 31 31 31 5
+5 31 31 31 31 31 34 5 5 5 5 5 5 34 5 31 31 31 31 31 17 13 13 13 13 13 13 13 13 13 13 17 31 31 5
+5 31 31 31 31 34 5 4 4 4 4 4 4 5 34 31 31 31 31 17 13 13 13 13 13 13 13 13 13 13 13 13 17 31 5
+31 30 30 30 34 5 4 4 4 4 4 4 4 4 5 34 30 30 30 17 31 31 31 31 31 22 31 30 31 31 30 31 17 30 31
+31 30 30 30 34 5 4 30 30 4 30 30 4 30 5 34 30 30 30 17 31 13 13 31 22 22 31 30 31 30 30 31 17 30 31
+31 30 30 30 34 5 4 4 4 4 4 4 4 4 5 34 30 30 30 17 15 15 15 15 15 15 15 15 15 15 15 15 17 30 31
+31 30 30 30 34 5 4 4 4 4 4 30 30 30 30 34 30 30 30 17 31 31 31 31 17 17 17 17 31 31 31 31 17 30 31
+31 30 30 34 5 15 4 4 4 4 4 30 30 30 15 5 34 30 30 17 31 31 31 17 13 13 13 13 17 31 31 31 17 30 31
+31 30 34 5 4 4 15 4 4 4 30 30 30 28 15 4 5 34 30 17 31 31 17 13 15 15 15 15 13 17 31 31 17 30 31
+31 34 5 4 4 4 15 15 15 15 28 28 28 28 15 4 5 5 34 17 31 17 13 15 31 15 31 15 15 13 17 31 17 30 31
+31 34 5 4 4 15 22 22 22 22 15 15 15 15 4 4 5 5 34 17 31 17 13 15 15 31 15 15 4 13 17 31 17 30 31
+31 30 34 4 15 22 22 22 22 22 22 22 22 22 15 4 34 34 30 17 31 17 13 22 22 30 31 4 4 13 17 31 17 30 31
+5 31 34 4 15 13 13 13 13 13 13 13 13 13 15 4 34 31 31 17 31 17 13 15 31 30 30 4 4 13 17 31 17 31 5
+5 31 34 4 4 15 15 15 15 15 15 15 15 15 15 4 34 31 31 17 31 31 17 13 13 31 31 13 13 17 31 31 17 31 5
+5 31 34 28 28 28 28 28 28 28 28 28 28 28 28 28 34 31 31 17 31 31 31 17 13 13 13 13 17 31 31 31 17 31 5
+5 31 31 34 28 34 34 34 34 34 34 34 34 34 28 34 31 31 31 17 31 31 31 31 17 17 17 17 31 31 31 31 17 31 5
+5 31 31 34 34 31 5 5 5 5 5 5 5 5 34 34 31 31 31 31 17 17 17 17 17 17 17 17 17 17 17 17 31 31 5
+31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31`;
+const PALETTE = [null,
+'#FF3240','#FF269F','#FF5294','#DF2455','#FF98A3','#F63C3F','#A073E7','#E749B6','#AD00AC','#C538C3',
+'#A032DC','#C60174','#00ACF6','#00E1EF','#256A85','#7074B6','#6F67DC','#6B5BBA','#95E502','#01CC64',
+'#00AEAD','#04DB01','#02CBA9','#018441','#FFB900','#C15701','#FF9F6A','#FF8002','#F69602','#F9DA00',
+'#FDE8D6','#FFEAB2','#010101','#BBB6B7'];
+const NAME = [null,
+'红色','浅红','粉红','暗粉','浅粉','深红','紫色','浅紫粉','玫红','灰紫','深紫','紫红',
+'天蓝','浅蓝','深棕','深蓝','灰蓝','蓝色','浅黄','绿色','橄榄绿','青蓝','浅绿','深绿',
+'黄色','砖红','浅橙','橙色','深棕2','棕色','浅灰','灰色','深灰','中灰'];
+
+const blocks = RAW.trim().split('\n').map(l=>l.trim().split(/\s+/).map(Number));
+const R = blocks.length, C = blocks[0].length;
+const CELL = 17, PAD_L = 26, PAD_T = 20, CAP = 60;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+cv.width = PAD_L + C*CELL + 4; cv.height = PAD_T + R*CELL + 4;
+
+let arrow = null, showWave = false;
+const DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
+
+function cellColor(v){ return v>0 && PALETTE[v] ? PALETTE[v] : '#000'; }
+
+// 从出发点做波纹扩散，返回每格步数
+function waveFrom(P){
+  const d = {}; d[P.r+','+P.c] = 0;
+  const q = [[P.r,P.c]]; let head = 0;
+  while(head < q.length){
+    const [r,c] = q[head++], dd = d[r+','+c];
+    for(const [dr,dc] of DIRS){
+      const nr=r+dr, nc=c+dc;
+      if(nr<0||nc<0||nr>=R||nc>=C) continue;
+      const k = nr+','+nc;
+      if(d[k] != null) continue;
+      d[k] = dd+1; q.push([nr,nc]);
+    }
+  }
+  return d;
+}
+
+function draw(){
+  ctx.fillStyle='#0d0f13'; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.font='9px ui-monospace,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#5a6472';
+  for(let c=0;c<C;c++) if(c%5===0) ctx.fillText(c, PAD_L+c*CELL+CELL/2, PAD_T/2);
+  ctx.textAlign='right';
+  for(let r=0;r<R;r++) if(r%5===0) ctx.fillText(r, PAD_L-6, PAD_T+r*CELL+CELL/2);
+  ctx.textAlign='center';
+
+  let dist = null, maxD = 1;
+  if(arrow && showWave){
+    dist = waveFrom({r:arrow.r0,c:arrow.c0});
+    for(const k in dist) maxD = Math.max(maxD, dist[k]);
+  }
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const x=PAD_L+c*CELL, y=PAD_T+r*CELL;
+    ctx.fillStyle = cellColor(blocks[r][c]);
+    ctx.fillRect(x,y,CELL-1,CELL-1);
+    if(dist){
+      const t = (dist[r+','+c]||0)/maxD;
+      ctx.fillStyle = 'rgba(0,0,0,'+(t*0.78).toFixed(3)+')';
+      ctx.fillRect(x,y,CELL-1,CELL-1);
+    }
+  }
+  // 画箭头
+  if(arrow){
+    const x0=PAD_L+arrow.c0*CELL+CELL/2, y0=PAD_T+arrow.r0*CELL+CELL/2;
+    const x1=PAD_L+arrow.c1*CELL+CELL/2, y1=PAD_T+arrow.r1*CELL+CELL/2;
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    const a = Math.atan2(y1-y0, x1-x0), L = 11;
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-L*Math.cos(a-0.42), y1-L*Math.sin(a-0.42));
+    ctx.lineTo(x1-L*Math.cos(a+0.42), y1-L*Math.sin(a+0.42));
+    ctx.closePath(); ctx.fillStyle='#ffffff'; ctx.fill();
+    // 箭尾标记
+    ctx.beginPath(); ctx.arc(x0,y0,5,0,Math.PI*2);
+    ctx.fillStyle='#2b64d8'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+  }
+}
+
+function analyze(){
+  const d = waveFrom({r:arrow.r0, c:arrow.c0});
+  const totalAll = {};
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){ const v=blocks[r][c]; totalAll[v]=(totalAll[v]||0)+1; }
+  // 每色首现步数 + 首现位置
+  const first = {};
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const v=blocks[r][c], dd=d[r+','+c];
+    if(!first[v] || dd < first[v].d) first[v] = {d:dd, r, c};
+  }
+  const order = Object.keys(first).map(Number).sort((a,b)=>first[a].d-first[b].d);
+
+  document.getElementById('arrowInfo').innerHTML =
+    `<div class="row"><span class="k">箭尾(出发点)</span><span class="v">行 ${arrow.r0}, 列 ${arrow.c0}</span></div>`+
+    `<div class="row"><span class="k">箭头指向</span><span class="v">行 ${arrow.r1}, 列 ${arrow.c1}</span></div>`+
+    `<div class="row"><span class="k">箭尾颜色</span><span class="v"><i class="sw" style="background:${cellColor(blocks[arrow.r0][arrow.c0])}"></i>色 ${blocks[arrow.r0][arrow.c0]} ${NAME[blocks[arrow.r0][arrow.c0]]||''}</span></div>`+
+    `<div class="row"><span class="k">颜色数</span><span class="v">${order.length}</span></div>`;
+
+  // 顺序表
+  let t = '<table><tr><th>顺序</th><th>颜色</th><th>首现步</th><th>首现位置</th><th>全图像素</th><th>占比</th></tr>';
+  order.forEach((col,i)=>{
+    const px = totalAll[col]||0;
+    t += `<tr><td><span class="ord">${i+1}</span></td>`+
+      `<td><i class="sw" style="background:${cellColor(col)}"></i>${col} ${NAME[col]||''}</td>`+
+      `<td>${first[col].d}</td><td>r${first[col].r} c${first[col].c}</td>`+
+      `<td>${px}</td><td>${(px/1225*100).toFixed(1)}%</td></tr>`;
+  });
+  t += '</table>';
+  document.getElementById('orderBox').innerHTML = t;
+  document.getElementById('pOrder').style.display='block';
+
+  // 车单
+  const cars = []; let cum = 0;
+  for(const col of order){
+    const px = totalAll[col]||0;
+    let rest = px, made = [];
+    while(rest > 0){
+      let n = rest >= CAP ? CAP : rest;
+      if(rest - n > 0 && rest - n < 20) n = Math.ceil(rest/2);
+      made.push(n); rest -= n;
+    }
+    made.forEach(n=>{ cars.push({color:col, count:n, firstStep:first[col].d, cum}); cum += n; });
+  }
+  const sum = cars.reduce((a,b)=>a+b.count,0);
+  let ct = '<table><tr><th>#</th><th>颜色</th><th>容量</th><th>首现步</th><th>累计</th></tr>';
+  cars.forEach((x,i)=>{
+    ct += `<tr><td>${i+1}</td><td><i class="sw" style="background:${cellColor(x.color)}"></i>${x.color} ${NAME[x.color]||''}</td>`+
+      `<td>${x.count}</td><td>${x.firstStep}</td><td>${x.cum}</td></tr>`;
+  });
+  ct += '</table>';
+  ct += `<div class="row" style="margin-top:6px"><span class="k">合计</span><span class="v">${cars.length} 辆 · ${sum} px</span></div>`;
+  ct += `<pre>${JSON.stringify({arrow, order:order.map(c=>({color:c,name:NAME[c],step:first[c].d,px:totalAll[c]})), cars},null,0)}</pre>`;
+  document.getElementById('carBox').innerHTML = ct;
+  document.getElementById('pCar').style.display='block';
+}
+
+let drag = null;
+function pos(e){
+  const rc = cv.getBoundingClientRect();
+  const c = Math.floor((e.clientX-rc.left-PAD_L)/CELL), r = Math.floor((e.clientY-rc.top-PAD_T)/CELL);
+  if(r<0||c<0||r>=R||c>=C) return null;
+  return {r,c};
+}
+cv.addEventListener('mousedown', e=>{ const p=pos(e); if(p){ drag=p; arrow={r0:p.r,c0:p.c,r1:p.r,c1:p.c}; draw(); } });
+cv.addEventListener('mousemove', e=>{
+  if(!drag) return; const p=pos(e); if(!p) return;
+  arrow.r1=p.r; arrow.c1=p.c; draw();
+});
+window.addEventListener('mouseup', ()=>{
+  if(drag && arrow){
+    if(arrow.r0===arrow.r1 && arrow.c0===arrow.c1){ arrow=null; draw(); }
+    else { analyze(); draw(); }
+  }
+  drag=null;
+});
+document.getElementById('btnClear').onclick=()=>{
+  arrow=null; draw();
+  document.getElementById('pOrder').style.display='none';
+  document.getElementById('pCar').style.display='none';
+  document.getElementById('arrowInfo').textContent='在图上按住鼠标，从「想开始的地方」拖出一个箭头。箭尾是出发点，箭头指向推进方向。';
+};
+document.getElementById('btnWave').onclick=()=>{ showWave=!showWave; draw(); };
+document.getElementById('title').textContent = `目标图 ${R}×${C} · 拖一个箭头，箭尾 = 出发点`;
+draw();
+</script>
+</body>
+</html>

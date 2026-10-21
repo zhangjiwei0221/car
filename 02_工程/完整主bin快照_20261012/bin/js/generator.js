@@ -665,7 +665,11 @@ AntSolver.Generator = (function() {
       var sdc = structuralDeadlockCheck(board);   // 结构性卡死检验(锁链可激活/盒可达)
       // 【v317·用户裁决】贪心粗筛：前 10 步随手玩都压不出暂存 → 太松，40ms 判掉，不花 25s 精算。
       //   注意方向：只淘汰"太容易"，**不**因为贪心解不完而淘汰（难度以全知峰窗为准）。
-      var _pre = greedyPrefilter(parsed, curCfg);
+      // 【v350·用户裁决】exposeCut（暴露顺序模式）**跳过**这道筛：
+      //   该模式的设计目标就是让玩家顺着目标图吐料节奏走，前期必然压不出暂存（实测玩家 8/8 通关），
+      //   被"太容易"判掉等于永远产不出关。难度压力留给后续加障碍那一版解决。
+      var _pre = (curCfg.cutMode === 'exposeCut' || curCfg.skipGreedyPrefilter)
+        ? null : greedyPrefilter(parsed, curCfg);
       if (_pre) {
         GENPERF.prefilterRejects = (GENPERF.prefilterRejects || 0) + 1;
         return {
@@ -882,7 +886,58 @@ AntSolver.Generator = (function() {
     return true;
   }
 
+  /**
+   * 【v350·用户裁决】行优先摆盘：车单第 1 辆放 (0,0)、第 2 辆放 (0,1)……
+   *
+   * 为什么需要：棋盘只有第 0 行是入口，其余靠"邻接已消格"向下传导，
+   *   所以【车的行号就是它大致的可点顺序】。配合 exposeCut 把车单排成目标图暴露序，
+   *   就得到"越早暴露的颜色越靠上，玩家从上往下点，正好跟着目标图吐料的节奏走"。
+   *
+   * 实测反例（旧摆位，打散）：17 在目标图第 7 轮才露出，却被摆在 r0 开局就能点；
+   *   15 在第 4 轮就露出，却压在 r3。暴露轮次与车行号相关系数只有 0.44 → 玩家 14% 就卡死。
+   *
+   * 本模式不铺管道/冰/锁链/问号（纯车 + 黑块），先把"顺序"这条主干立住。
+   */
+  function buildRowMajorBoard(boxes, config) {
+    var n = boxes.length;
+    if (!n) return null;
+    var minR = Math.max(3, parseInt(config.boardRowsMin, 10) || 3);
+    var maxR = Math.max(minR, parseInt(config.boardRowsMax, 10) || 14);
+    var best = null;
+    for (var r = minR; r <= maxR; r++) {
+      for (var c = r + 1; c <= r + 2; c++) {
+        if (r * c < n) continue;
+        if (!best || r * c < best.rows * best.cols) best = { rows: r, cols: c };
+      }
+    }
+    if (!best) {
+      var s = Math.max(1, Math.ceil(Math.sqrt(n)));
+      best = { rows: s, cols: Math.ceil(n / s) };
+    }
+    var rows = best.rows, cols = best.cols, cells = [];
+    for (var rr = 0; rr < rows; rr++) cells.push(new Array(cols));
+    var i = 0;
+    for (var r2 = 0; r2 < rows; r2++) {
+      for (var c2 = 0; c2 < cols; c2++) {
+        if (i < n) {
+          var b = boxes[i];
+          cells[r2][c2] = { t: 'box', color: b.color, count: b.count, chain: 0, q: false, numice: 0 };
+          i++;
+        } else {
+          cells[r2][c2] = { t: 'black' };
+        }
+      }
+    }
+    var board = { rows: rows, cols: cols, cells: cells };
+    board.rowMajorStat = { boxes: n, rows: rows, cols: cols, blanks: rows * cols - n };
+    return board;
+  }
+
   function buildBoard(boxes, config) {
+    // 【v350·用户裁决】行优先摆盘（配合 cutMode='exposeCut'）：车单顺序 = 自上而下。
+    if (config && config.boardLayout === 'rowMajor') {
+      try { var _rmb = buildRowMajorBoard(boxes, config); if (_rmb) return _rmb; } catch (e) { }
+    }
     var n = boxes.length;
     // 【v301·修】旧流程原来用 chooseBoardDims（范围内**纯随机**选行列），
     //   结果常选出与盒数不匹配的大盘 → 填不满 → 事后裁行 → 出现 4×10 这种违反形态约束的盘。
@@ -11656,7 +11711,83 @@ AntSolver.Generator = (function() {
     return boxes;
   }
 
+  /**
+   * 【v350·用户裁决】按「目标图暴露顺序」切车单。
+   *
+   * 现场（006 图实测，buffer 5，玩家模拟 8 局）：
+   *   D 组 颜色按手画路径排 + 固定上限 60 → 0/8 通关，全部 33% 死
+   *   B 组 颜色按目标图暴露序 + 固定上限 60 → 8/8 通关，顺序匹配 77%
+   *   A 组 颜色按目标图暴露序 + 总量 2.5%±1% 浮动上限 → 8/8 通关，顺序匹配 100%
+   *
+   * 旧规则「该色总量 ≥ 上限就用上限」完全不看目标图什么时候吐料：
+   *   一辆车可能远大于它出场那一轮能提供的像素数 → 车压在暂存区等料 → 暂存满 → 卡死。
+   *
+   * 规则：
+   *   1) 颜色先后 = eliminationOrder 里每色的【首现轮次】
+   *   2) 同色内按轮次分组；不足 mergeBelow 的小轮并入前一组（避免一辆车只装 3 个像素）
+   *   3) 每组按【总像素 × pct】切车，pct 在 [lo, hi] 随机浮动（默认 1.5%~3.5%，即 2.5%±1%）
+   */
+  function exposeCut(blocks, config) {
+    var rows = blocks.length, cols = blocks[0].length;
+    var total = 0, r, c;
+    for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) if (blocks[r][c] > 0) total++;
+    if (!total) return null;
+
+    var eo;
+    try { eo = AntSolver.eliminationOrder(blocks, rows, cols, !!config.bottomOnly); }
+    catch (e) { return null; }
+    if (!eo || !eo.order || !eo.order.length) return null;
+
+    var firstRound = {}, byRound = {};
+    for (var i = 0; i < eo.order.length; i++) {
+      var p = eo.order[i];
+      if (firstRound[p.color] == null || p.round < firstRound[p.color]) firstRound[p.color] = p.round;
+      if (!byRound[p.color]) byRound[p.color] = {};
+      byRound[p.color][p.round] = (byRound[p.color][p.round] || 0) + 1;
+    }
+    var colors = Object.keys(firstRound).map(Number).sort(function (a, b) { return firstRound[a] - firstRound[b]; });
+
+    var pctLo = (config.exposeCapPctLo != null) ? +config.exposeCapPctLo : 1.5;
+    var pctHi = (config.exposeCapPctHi != null) ? +config.exposeCapPctHi : 3.5;
+    if (!(pctHi > pctLo)) pctHi = pctLo;
+    var minCap = Math.max(1, parseInt(config.exposeCapMin, 10) || 8);
+    var mergeBelow = Math.max(1, parseInt(config.exposeMergeBelow, 10) || 12);
+
+    function pickCap() {
+      var pct = pctLo + rnd() * (pctHi - pctLo);
+      return Math.max(minCap, Math.round(total * pct / 100));
+    }
+
+    var groups = [];
+    for (var ci = 0; ci < colors.length; ci++) {
+      var col = colors[ci], g = byRound[col] || {};
+      var rounds = Object.keys(g).map(Number).sort(function (a, b) { return a - b; });
+      var cur = null;
+      for (var ri = 0; ri < rounds.length; ri++) {
+        var rd = rounds[ri], px = g[rd];
+        if (cur && px < mergeBelow) { cur.px += px; cur.rounds.push(rd); }
+        else { cur = { color: col, px: px, rounds: [rd] }; groups.push(cur); }
+      }
+    }
+
+    var boxes = [];
+    for (var gi = 0; gi < groups.length; gi++) {
+      var gr = groups[gi], rest = gr.px;
+      while (rest > 0) {
+        var cap = pickCap();
+        var take = Math.min(cap, rest);
+        boxes.push({ color: gr.color, count: take, exposeRound: gr.rounds[0] });
+        rest -= take;
+      }
+    }
+    return boxes;
+  }
+
   function pickBoxSplit(blocks, config) {
+    // 【v350·用户裁决】按目标图暴露顺序切车单（配合 boardLayout='rowMajor' 使用）。
+    if (config && config.cutMode === 'exposeCut') {
+      try { var _ec = exposeCut(blocks, config); if (_ec && _ec.length) return _ec; } catch (e) { }
+    }
     // 【v347·用户裁决】按「依赖层 × 色块」切车：先有自然块，再合并到目标车数
     if (config && config.cutMode === 'roundCut') {
       try { var _rc = roundCut(blocks, config); if (_rc && _rc.length) return _rc; } catch (e) { blocks._rcErr = String(e && e.message); }

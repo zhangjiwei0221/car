@@ -1993,7 +1993,10 @@ AntSolver.App = (function() {
       //   缺控件时不写(=undefined)，由 generator DEFAULT_CONFIG 填默认 7；填 1 = 回到旧单轮。
       difficultyRounds: (function () { var v = parseInt((document.getElementById('gen-difficulty-rounds') || {}).value, 10); return isNaN(v) ? undefined : Math.max(1, Math.min(25, v)); })(),
       // 【v342·实验】层切：按依赖层 × 颜色切车，并按「到期」排序
-      cutMode: (document.getElementById('gen-cutmode') || {}).value || undefined
+      cutMode: (document.getElementById('gen-cutmode') || {}).value || undefined,
+      // 【v350·用户裁决】暴露顺序模式：车单按目标图暴露顺序排 + 行优先摆盘（越早暴露的越靠上）。
+      //   实测 006：路径序+固定容量 0/8 通关 → 暴露序+2.5%±1%浮动容量 8/8 通关、顺序匹配 100%。
+      boardLayout: ((document.getElementById('gen-cutmode') || {}).value === 'exposeCut') ? 'rowMajor' : undefined
       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
     };
   }
@@ -4694,7 +4697,9 @@ AntSolver.App = (function() {
       splitByLayer: false, layerSplitShallow: 2,
       fillOrder: 'exposure',                // 【v220】铺球：按暴露距离（第 k 辆 ≈ 第 k 步出现）
       debtCarCap: _debtCap,                 // 【v221】债车目标容量（由自适应均值推出）
-      cutMode: _cutMode                     // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
+      cutMode: _cutMode,                    // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
+      // 【v350·用户裁决】选 exposeCut 时同步打开行优先摆盘（车单顺序 = 棋盘自上而下）。
+      boardLayout: (_cutMode === 'exposeCut') ? 'rowMajor' : undefined
     });
     try {
       genLog('棋盘：行 ' + _norm.rowsMin + '~' + _norm.rowsMax + ' · 列 ' + _norm.colsMin + '~' + _norm.colsMax +

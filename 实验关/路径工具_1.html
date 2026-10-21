@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>消除路线 · 手绘路径</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#16181d;color:#d8dde5;font:13px/1.6 -apple-system,"PingFang SC",sans-serif}
+.wrap{display:flex;gap:16px;padding:16px;align-items:flex-start}
+.left{flex:0 0 auto}
+.right{flex:1;min-width:380px;max-height:calc(100vh - 32px);overflow:auto}
+h2{font-size:14px;margin:0 0 8px;color:#fff;font-weight:600}
+canvas{background:#0d0f13;border-radius:6px;cursor:crosshair;display:block}
+.panel{background:#1d2027;border:1px solid #2b3038;border-radius:6px;padding:10px 12px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #23272f}
+.row:last-child{border:0}
+.k{color:#8b95a5}.v{color:#fff;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:4px 6px;text-align:left;border-bottom:1px solid #23272f}
+th{color:#8b95a5;font-weight:500;font-size:12px}
+td{font-size:12px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(255,255,255,.2)}
+button{background:#2b64d8;border:0;color:#fff;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:12px;margin-right:6px}
+button.ghost{background:#2b3038}
+button:hover{filter:brightness(1.15)}
+.hint{color:#7a8494;font-size:12px;line-height:1.7}
+.ord{display:inline-block;background:#2b64d8;color:#fff;border-radius:3px;padding:0 6px;font-size:11px;margin-right:6px}
+pre{background:#0d0f13;padding:8px 10px;border-radius:5px;overflow:auto;font-size:11px;line-height:1.5;color:#9fb3c8;max-height:200px;margin:6px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="left">
+    <h2 id="title">目标图 · 按住鼠标画一条消除路线</h2>
+    <canvas id="cv"></canvas>
+  </div>
+  <div class="right">
+    <div class="panel">
+      <h2>路线</h2>
+      <div id="pathInfo" class="hint">按住鼠标画。起点 = 第一次按下的格子，想怎么拐就怎么拐。</div>
+      <div style="margin-top:8px">
+        <button id="btnClear" class="ghost">清除</button>
+        <button id="btnSweep" class="ghost">显示推进过程</button>
+        <button id="btnExport">导出 JSON</button>
+        <button id="btnCopy" class="ghost">复制到剪贴板</button>
+        <span id="saveTip" style="color:#00d26a;font-size:12px;margin-left:4px"></span>
+      </div>
+    </div>
+    <div class="panel" id="pOrder" style="display:none">
+      <h2>颜色出场顺序</h2>
+      <div id="orderBox"></div>
+    </div>
+    <div class="panel" id="pCar" style="display:none">
+      <h2>全图车单（按出场顺序）</h2>
+      <div id="carBox"></div>
+    </div>
+  </div>
+</div>
+<script>
+const RAW = `31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31
+5 31 31 31 15 15 15 15 15 15 15 15 15 15 5 31 31 31 31 31 5 15 5 5 5 5 5 15 5 31 31 31 31 31 5
+5 31 31 15 31 31 31 31 31 31 31 31 15 21 15 31 31 31 31 31 15 22 15 5 5 5 15 22 15 31 31 31 31 31 5
+5 31 31 15 14 31 14 14 14 15 14 14 15 21 21 15 31 31 31 31 5 15 22 15 5 15 22 15 5 31 31 31 31 31 5
+5 31 31 15 31 14 14 14 15 22 15 14 15 21 21 15 31 31 31 31 5 5 15 22 15 22 15 5 5 31 31 31 31 31 5
+5 31 31 15 14 14 14 14 15 22 15 14 15 21 21 15 31 31 31 33 33 33 33 33 22 33 33 33 33 33 33 31 31 31 5
+31 30 30 15 14 21 14 14 14 15 14 14 15 21 21 15 30 30 33 28 28 28 28 28 28 28 28 28 28 28 28 33 30 30 31
+31 30 30 15 14 21 14 14 14 14 14 14 15 21 21 15 30 33 28 15 15 15 15 15 15 15 15 15 28 22 22 28 33 30 31
+31 30 30 15 15 15 15 15 15 15 15 15 15 21 21 15 30 33 28 15 31 14 31 14 31 14 14 15 28 22 22 28 33 30 31
+31 30 30 15 14 14 14 14 14 14 14 14 15 21 21 15 30 33 28 15 31 31 14 31 14 14 14 15 28 28 28 28 33 30 31
+31 30 30 15 14 21 14 14 14 14 31 14 15 21 21 15 30 33 28 15 31 14 31 14 14 14 22 15 28 14 14 28 33 30 31
+31 30 30 15 14 21 14 14 14 31 14 31 15 21 21 15 30 33 28 15 14 31 14 14 14 22 14 15 28 14 14 28 33 30 31
+31 30 30 15 14 14 14 14 14 14 31 14 15 21 21 15 30 33 28 15 31 14 14 14 22 14 22 15 28 14 14 28 33 30 31
+31 30 30 15 14 21 14 21 14 21 14 21 15 21 21 15 30 33 28 15 15 15 15 15 15 15 15 15 28 28 28 28 33 30 31
+31 30 30 15 21 14 21 14 21 14 21 14 15 21 15 30 30 30 33 28 28 28 28 28 28 28 28 28 28 28 28 33 30 30 31
+5 31 31 31 15 15 15 15 15 15 15 15 15 15 5 31 31 31 31 33 33 33 33 33 33 33 33 33 33 33 33 31 31 31 5
+5 31 31 31 15 15 5 5 5 5 15 15 5 5 5 31 31 31 31 31 5 5 5 5 5 5 5 5 5 31 31 31 31 31 5
+5 31 31 31 31 31 5 34 34 34 34 34 34 5 5 31 31 31 31 31 5 17 17 17 17 17 17 17 17 17 17 31 31 31 5
+5 31 31 31 31 31 34 5 5 5 5 5 5 34 5 31 31 31 31 31 17 13 13 13 13 13 13 13 13 13 13 17 31 31 5
+5 31 31 31 31 34 5 4 4 4 4 4 4 5 34 31 31 31 31 17 13 13 13 13 13 13 13 13 13 13 13 13 17 31 5
+31 30 30 30 34 5 4 4 4 4 4 4 4 4 5 34 30 30 30 17 31 31 31 31 31 22 31 30 31 31 30 31 17 30 31
+31 30 30 30 34 5 4 30 30 4 30 30 4 30 5 34 30 30 30 17 31 13 13 31 22 22 31 30 31 30 30 31 17 30 31
+31 30 30 30 34 5 4 4 4 4 4 4 4 4 5 34 30 30 30 17 15 15 15 15 15 15 15 15 15 15 15 15 17 30 31
+31 30 30 30 34 5 4 4 4 4 4 30 30 30 30 34 30 30 30 17 31 31 31 31 17 17 17 17 31 31 31 31 17 30 31
+31 30 30 34 5 15 4 4 4 4 4 30 30 30 15 5 34 30 30 17 31 31 31 17 13 13 13 13 17 31 31 31 17 30 31
+31 30 34 5 4 4 15 4 4 4 30 30 30 28 15 4 5 34 30 17 31 31 17 13 15 15 15 15 13 17 31 31 17 30 31
+31 34 5 4 4 4 15 15 15 15 28 28 28 28 15 4 5 5 34 17 31 17 13 15 31 15 31 15 15 13 17 31 17 30 31
+31 34 5 4 4 15 22 22 22 22 15 15 15 15 4 4 5 5 34 17 31 17 13 15 15 31 15 15 4 13 17 31 17 30 31
+31 30 34 4 15 22 22 22 22 22 22 22 22 22 15 4 34 34 30 17 31 17 13 22 22 30 31 4 4 13 17 31 17 30 31
+5 31 34 4 15 13 13 13 13 13 13 13 13 13 15 4 34 31 31 17 31 17 13 15 31 30 30 4 4 13 17 31 17 31 5
+5 31 34 4 4 15 15 15 15 15 15 15 15 15 15 4 34 31 31 17 31 31 17 13 13 31 31 13 13 17 31 31 17 31 5
+5 31 34 28 28 28 28 28 28 28 28 28 28 28 28 28 34 31 31 17 31 31 31 17 13 13 13 13 17 31 31 31 17 31 5
+5 31 31 34 28 34 34 34 34 34 34 34 34 34 28 34 31 31 31 17 31 31 31 31 17 17 17 17 31 31 31 31 17 31 5
+5 31 31 34 34 31 5 5 5 5 5 5 5 5 34 34 31 31 31 31 17 17 17 17 17 17 17 17 17 17 17 17 31 31 5
+31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31 31 31 31 31 31 31 31 31 30 30 30 30 30 31`;
+const PALETTE = [null,
+'#FF3240','#FF269F','#FF5294','#DF2455','#FF98A3','#F63C3F','#A073E7','#E749B6','#AD00AC','#C538C3',
+'#A032DC','#C60174','#00ACF6','#00E1EF','#256A85','#7074B6','#6F67DC','#6B5BBA','#95E502','#01CC64',
+'#00AEAD','#04DB01','#02CBA9','#018441','#FFB900','#C15701','#FF9F6A','#FF8002','#F69602','#F9DA00',
+'#FDE8D6','#FFEAB2','#010101','#BBB6B7'];
+const NAME = [null,
+'红色','浅红','粉红','暗粉','浅粉','深红','紫色','浅紫粉','玫红','灰紫','深紫','紫红',
+'天蓝','浅蓝','深棕','深蓝','灰蓝','蓝色','浅黄','绿色','橄榄绿','青蓝','浅绿','深绿',
+'黄色','砖红','浅橙','橙色','深棕2','棕色','浅灰','灰色','深灰','中灰'];
+
+const blocks = RAW.trim().split('\n').map(l=>l.trim().split(/\s+/).map(Number));
+const R = blocks.length, C = blocks[0].length;
+const CELL = 17, PAD_L = 26, PAD_T = 20, CAP = 60;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+cv.width = PAD_L + C*CELL + 4; cv.height = PAD_T + R*CELL + 4;
+
+let path = [], drawing = false, showSweep = false, orderData = null;
+const DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
+function cellColor(v){ return v>0 && PALETTE[v] ? PALETTE[v] : '#000'; }
+
+// 每格 → 路径上最近点的序号
+// 到达时间 = 沿路径的进度 + 0.3 × 到路径的横向距离
+//   k=0 会让所有颜色在起点并列、排序退化成按颜色号排，所以必须有横向权重
+const K_SIDE = 0.3;
+function sweep(){
+  const tm = {};
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    let best = 1e9;
+    for(let i=0;i<path.length;i++){
+      const d = Math.abs(r-path[i].r) + Math.abs(c-path[i].c);
+      const val = i + K_SIDE*d;
+      if(val < best) best = val;
+    }
+    tm[r+','+c] = best;
+  }
+  return tm;
+}
+
+function draw(){
+  ctx.fillStyle='#0d0f13'; ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.font='9px ui-monospace,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#5a6472';
+  for(let c=0;c<C;c++) if(c%5===0) ctx.fillText(c, PAD_L+c*CELL+CELL/2, PAD_T/2);
+  ctx.textAlign='right';
+  for(let r=0;r<R;r++) if(r%5===0) ctx.fillText(r, PAD_L-6, PAD_T+r*CELL+CELL/2);
+  ctx.textAlign='center';
+
+  let idx = null, maxI = 1;
+  if(path.length>1 && showSweep){ idx = sweep(); maxI = Math.max(1e-6, ...Object.values(idx)); }
+
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const x=PAD_L+c*CELL, y=PAD_T+r*CELL;
+    ctx.fillStyle = cellColor(blocks[r][c]);
+    ctx.fillRect(x,y,CELL-1,CELL-1);
+    if(idx){
+      const t = idx[r+','+c]/maxI;
+      ctx.fillStyle = 'rgba(0,0,0,'+(t*0.8).toFixed(3)+')';
+      ctx.fillRect(x,y,CELL-1,CELL-1);
+    }
+  }
+  // 画路径
+  if(path.length){
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath();
+    path.forEach((p,i)=>{
+      const x=PAD_L+p.c*CELL+CELL/2, y=PAD_T+p.r*CELL+CELL/2;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+    // 起点
+    const s=path[0];
+    ctx.beginPath(); ctx.arc(PAD_L+s.c*CELL+CELL/2, PAD_T+s.r*CELL+CELL/2, 5, 0, Math.PI*2);
+    ctx.fillStyle='#2b64d8'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    // 终点
+    const e=path[path.length-1];
+    ctx.beginPath(); ctx.arc(PAD_L+e.c*CELL+CELL/2, PAD_T+e.r*CELL+CELL/2, 4, 0, Math.PI*2);
+    ctx.fillStyle='#00d26a'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+}
+
+function analyze(){
+  const idx = sweep();
+  const tot = {}, first = {};
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++){
+    const v=blocks[r][c], i=idx[r+','+c];
+    tot[v]=(tot[v]||0)+1;
+    if(!first[v] || i < first[v].i) first[v]={i, r, c};
+  }
+  const order = Object.keys(first).map(Number).sort((a,b)=>first[a].i-first[b].i);
+  const maxI = Math.max(1e-6, ...Object.values(idx));
+
+  document.getElementById('pathInfo').innerHTML =
+    `<div class="row"><span class="k">起点</span><span class="v">行 ${path[0].r}, 列 ${path[0].c} · <i class="sw" style="background:${cellColor(blocks[path[0].r][path[0].c])}"></i>色 ${blocks[path[0].r][path[0].c]}</span></div>`+
+    `<div class="row"><span class="k">终点</span><span class="v">行 ${path[path.length-1].r}, 列 ${path[path.length-1].c}</span></div>`+
+    `<div class="row"><span class="k">路径长度</span><span class="v">${path.length} 格</span></div>`+
+    `<div class="row"><span class="k">颜色数</span><span class="v">${order.length}</span></div>`;
+
+  let t = '<table><tr><th>顺序</th><th>颜色</th><th>出场位置</th><th>路径进度</th><th>全图像素</th></tr>';
+  order.forEach((col,n)=>{
+    const f = first[col];
+    t += `<tr><td><span class="ord">${n+1}</span></td>`+
+      `<td><i class="sw" style="background:${cellColor(col)}"></i>${col} ${NAME[col]||''}</td>`+
+      `<td>r${f.r} c${f.c}</td>`+
+      `<td>${path.length>1?(f.i/maxI*100).toFixed(0):'0'}%</td>`+
+      `<td>${tot[col]}</td></tr>`;
+  });
+  t += '</table>';
+  document.getElementById('orderBox').innerHTML = t;
+  document.getElementById('pOrder').style.display='block';
+
+  const cars = [];
+  for(const col of order){
+    let rest = tot[col];
+    while(rest > 0){
+      let n = rest >= CAP ? CAP : rest;
+      if(rest-n>0 && rest-n<20) n = Math.ceil(rest/2);
+      cars.push({color:col, count:n, at:first[col].i});
+      rest -= n;
+    }
+  }
+  let ct = '<table><tr><th>#</th><th>颜色</th><th>容量</th><th>出场位置</th></tr>';
+  cars.forEach((x,i)=>{
+    ct += `<tr><td>${i+1}</td><td><i class="sw" style="background:${cellColor(x.color)}"></i>${x.color} ${NAME[x.color]||''}</td><td>${x.count}</td><td>${path.length>1?(x.at/maxI*100).toFixed(0):'0'}%</td></tr>`;
+  });
+  ct += '</table>';
+  ct += `<div class="row" style="margin-top:6px"><span class="k">合计</span><span class="v">${cars.length} 辆 · ${cars.reduce((a,b)=>a+b.count,0)} px</span></div>`;
+  ct += `<pre>${JSON.stringify({path:path.map(p=>[p.r,p.c]), order:order.map(c=>({color:c,name:NAME[c],px:tot[c]})), cars},null,0)}</pre>`;
+  document.getElementById('carBox').innerHTML = ct;
+  document.getElementById('pCar').style.display='block';
+  orderData = {order, first, tot, cars, maxI};
+}
+
+function pos(e){
+  const rc = cv.getBoundingClientRect();
+  const c = Math.floor((e.clientX-rc.left-PAD_L)/CELL), r = Math.floor((e.clientY-rc.top-PAD_T)/CELL);
+  if(r<0||c<0||r>=R||c>=C) return null;
+  return {r,c};
+}
+cv.addEventListener('mousedown', e=>{
+  const p=pos(e); if(!p) return;
+  drawing=true; path=[p]; draw();
+});
+cv.addEventListener('mousemove', e=>{
+  if(!drawing) return;
+  const p=pos(e); if(!p) return;
+  const last = path[path.length-1];
+  if(p.r===last.r && p.c===last.c) return;
+  const steps = Math.max(Math.abs(p.r-last.r), Math.abs(p.c-last.c));
+  for(let i=1;i<=steps;i++){
+    const rr = Math.round(last.r + (p.r-last.r)*i/steps);
+    const cc = Math.round(last.c + (p.c-last.c)*i/steps);
+    const q = path[path.length-1];
+    if(q.r!==rr || q.c!==cc) path.push({r:rr,c:cc});
+  }
+  draw();
+});
+window.addEventListener('mouseup', ()=>{
+  if(drawing && path.length>1){ analyze(); draw(); }
+  drawing=false;
+});
+document.getElementById('btnClear').onclick=()=>{
+  path=[]; draw();
+  document.getElementById('pOrder').style.display='none';
+  document.getElementById('pCar').style.display='none';
+  document.getElementById('pathInfo').textContent='按住鼠标画。起点 = 第一次按下的格子，想怎么拐就怎么拐。';
+};
+document.getElementById('btnSweep').onclick=()=>{ showSweep=!showSweep; draw(); };
+
+// ---------- 导出 ----------
+function buildExport(){
+  if(!orderData){ alert('先画一条路径再导出'); return null; }
+  return {
+    tool: '路径工具_1',
+    source: '35x35拼接图纸_006.txt',
+    size: {rows:R, cols:C},
+    kSide: K_SIDE,
+    path: path.map(p=>[p.r,p.c]),
+    pathLen: path.length,
+    order: orderData.order.map(c=>({
+      color: c,
+      name: NAME[c]||'',
+      px: orderData.tot[c],
+      at: +orderData.first[c].i.toFixed(2),
+      pct: +(orderData.first[c].i/orderData.maxI*100).toFixed(1),
+      from: [orderData.first[c].r, orderData.first[c].c]
+    })),
+    cars: orderData.cars,
+    totalPx: Object.values(orderData.tot).reduce((a,b)=>a+b,0)
+  };
+}
+document.getElementById('btnExport').onclick = ()=>{
+  const d = buildExport(); if(!d) return;
+  const txt = JSON.stringify(d, null, 2);
+  const blob = new Blob([txt], {type:'application/json'});
+  const a = document.createElement('a');
+  const ts = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  a.download = '路径_'+ts.getFullYear()+pad(ts.getMonth()+1)+pad(ts.getDate())+'_'+pad(ts.getHours())+pad(ts.getMinutes())+pad(ts.getSeconds())+'.json';
+  a.href = URL.createObjectURL(blob);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  const tip=document.getElementById('saveTip'); tip.textContent='已导出到下载文件夹';
+  setTimeout(()=>tip.textContent='', 4000);
+};
+document.getElementById('btnCopy').onclick = async ()=>{
+  const d = buildExport(); if(!d) return;
+  const txt = JSON.stringify(d, null, 2);
+  const tip=document.getElementById('saveTip');
+  try{
+    await navigator.clipboard.writeText(txt);
+    tip.textContent='已复制'; setTimeout(()=>tip.textContent='',3000);
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); tip.textContent='已复制'; }
+    catch(e2){ tip.textContent='复制失败，请用「导出 JSON」'; }
+    ta.remove(); setTimeout(()=>tip.textContent='',3000);
+  }
+};
+document.getElementById('title').textContent = `目标图 ${R}×${C} · 按住鼠标画一条消除路线`;
+draw();
+</script>
+</body>
+</html>
