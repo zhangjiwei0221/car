@@ -1,0 +1,43 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index fd69521..52d5d14 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -55,6 +55,9 @@ AntSolver.Generator = (function() {
+   var DEFAULT_CONFIG = {
+     // 【默认参数基线：v95四方向消除统一默认参数】2026-07-31 起，以下标注「统一默认」的字段
+     // 取自 方案文件夹/方案_v95四方向消除统一默认参数.json 的 config，作为四方向消除的统一默认口径。
++    channelMode: false,     // 【v340·实验】通道模式：第 0 行只留 channelEntryCol 一个入口，其余封黑
++    channelEntryCol: 0,     // 通道入口列（channelMode 时生效）
++    channelK: 0,            // 第 1 行封堵格数（从入口右侧循环封）
+     boxSizeMin: 35,     // 【统一默认】蚂蚁盒容量下限（原 25）
+     boxSizeMax: 80,     // 【统一默认】蚂蚁盒容量上限（原 52）
+     boxSizeMode: 'random', // 盒容量策略：random(区间内随机,默认)/max(接近满容量)/min(偏小)/polar(两极化,见 makeCapPicker)
+@@ -945,6 +948,28 @@ AntSolver.Generator = (function() {
+     if (pipeCount > maxPipes) pipeCount = maxPipes; // 超上限则 clamp（此时个别管道会略超深度上限，由兜底/P1b 精调）
+     if (overflow > 0 && pipeCount < 1) pipeCount = 1; // 有溢出必须至少1个管道兜底，避免丢盒
+ 
++    // ===== 【v340·实验】通道模式：第 0 行留单一入口，第 1 行封 k 格 =====
++    // 用"分散黑块"的预算来放，不改变总黑块数；放完若破坏空格可达则整体回滚。
++    if (config.channelMode) {
++      var _ec = clampInt(config.channelEntryCol, 0, 0, cols - 1);
++      var _budget0 = extraBlack, _budget = extraBlack, _placed = [];
++      for (var _c0 = 0; _c0 < cols && _budget > 0; _c0++) {
++        if (_c0 === _ec || cells[0][_c0] != null) continue;
++        cells[0][_c0] = { t: 'black' }; _placed.push([0, _c0]); _budget--;
++      }
++      var _k = Math.max(0, parseInt(config.channelK, 10) || 0);
++      for (var _ci = 0; _ci < _k && _budget > 0; _ci++) {
++        var _cc = (_ec + 1 + _ci) % cols;
++        if (_cc === _ec || cells[1][_cc] != null) continue;
++        cells[1][_cc] = { t: 'black' }; _placed.push([1, _cc]); _budget--;
++      }
++      if (!nullCellsReachable(cells, rows, cols)) {
++        for (var _pi = 0; _pi < _placed.length; _pi++) cells[_placed[_pi][0]][_placed[_pi][1]] = null;
++        _budget = _budget0;
++      }
++      extraBlack = _budget;
++    }
++
+     // 管道：分散在棋盘各处（非第0行、避开墙行），四方向随机(11上/12右/13下/14左)，出口须在盘内且为盒格。
+     // 管道视作黑块永久占格（吐完球也不消失）。
+     var pipeList = []; // [{r,c,dir}]
