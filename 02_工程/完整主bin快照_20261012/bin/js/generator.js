@@ -11235,8 +11235,9 @@ AntSolver.Generator = (function() {
       var L = final[fl], cs = Object.keys(L).sort(function (a, b) { return L[b] - L[a]; });
       for (var ci = 0; ci < cs.length; ci++) {
         var cc = cs[ci], px = L[cc];
+        // 【v346·用户裁决】不再为守下限减车数：容量由切法自然分配，只守上限。
+        //   78px 切成 39/39（低于下限）而不是硬留一辆 78（突破上限）。
         var n = Math.max(1, Math.ceil(px / boxMax));
-        while (n > 1 && px / n < boxMin) n--;
         var base = Math.floor(px / n), rest = px - base * n, off = 0;
         for (var kk = 0; kk < n; kk++) {
           var cnt = base + (kk < rest ? 1 : 0);
@@ -12159,7 +12160,8 @@ AntSolver.Generator = (function() {
         var stack = [v];
         while (stack.length && guard++ < 200) {
           var x = stack.pop();
-          if (maxC > 0 && x > maxC && x >= 2 * minC) { stack.push(Math.floor(x / 2)); stack.push(x - Math.floor(x / 2)); }
+          // 【v346·用户裁决】只守上限：x > maxC 就拆，不再要求 x >= 2*minC
+          if (maxC > 0 && x > maxC) { stack.push(Math.floor(x / 2)); stack.push(x - Math.floor(x / 2)); }
           else split.push(x);
         }
       }
