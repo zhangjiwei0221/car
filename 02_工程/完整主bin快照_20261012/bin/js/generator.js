@@ -11390,7 +11390,11 @@ AntSolver.Generator = (function() {
     var info = onionLayersOf(blocks);
     var layers = info.layers, total = info.total;
     if (!total) return null;
-    var target = Math.max(8, parseInt(config.carCountTarget, 10) || 24);
+    // 【v349·用户裁决】目标车数由棋盘反推：盘格中值 × 0.86
+    var _rMid = (parseInt(config.boardRowsMin, 10) || 4) + (parseInt(config.boardRowsMax, 10) || 8);
+    var _cMid = (parseInt(config.boardColsMin, 10) || 6) + (parseInt(config.boardColsMax, 10) || 10);
+    var _autoCars = Math.round((_rMid / 2) * (_cMid / 2) * 0.86);
+    var target = Math.max(8, parseInt(config.carCountTarget, 10) || _autoCars);
     // 每色每层像素
     var per = {};   // color -> { layer: px }
     var layerPx = [];
@@ -11459,6 +11463,38 @@ AntSolver.Generator = (function() {
    *   · 其余小块（< minBlock）并入同色最大块
    *   · 不设容量上限；容量 = 块像素之和
    * 参数：debtMaxLight(默认60) / debtMaxDeep(默认10) / debtMinGap(默认2) / debtMinBlock(默认10) */
+  /* 【v349·用户思路】按「遮挡关系」切：用真实消除序（eliminationOrder）把像素分轮，
+   *   每一轮 × 每一色 = 一辆车，容量 = 该轮该色完全可达的像素数。
+   * 为什么大车也安全：同一轮的像素在那一轮全都可达，玩家点它就能吃满。
+   * 不设容量上限。 */
+  function roundCut(blocks, config) {
+    var R = blocks.length, C = blocks[0].length;
+    var eo = null;
+    try { eo = AntSolver.eliminationOrder(blocks, R, C, false); } catch (e) { return null; }
+    if (!eo || !eo.round || !eo.rounds) return null;
+    var rd = eo.round, rounds = eo.rounds;
+    var groups = {}, total = 0;
+    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
+      var v = blocks[r][c];
+      if (v <= 0) continue;
+      total++;
+      var k = rd[r][c], key = k + ':' + v;
+      groups[key] = (groups[key] || 0) + 1;
+    }
+    var boxes = [];
+    for (var g in groups) {
+      var parts = g.split(':');
+      boxes.push({ color: +parts[1], count: groups[g], round: +parts[0], due: (+parts[0]) / rounds });
+    }
+    var sum = 0;
+    for (var i = 0; i < boxes.length; i++) sum += boxes[i].count;
+    if (sum !== total) { blocks._rcStat = { fail: 'sum', sum: sum, total: total }; return null; }
+    boxes.sort(function (a, b) { return a.due - b.due || a.color - b.color; });
+    for (var j = 0; j < boxes.length; j++) boxes[j].elimSeq = j;
+    blocks._rcStat = { n: boxes.length, rounds: rounds };
+    return boxes;
+  }
+
   function debtBlockCut(blocks, config) {
     var info = onionLayerMap(blocks);
     var rows = info.rows, cols = info.cols, total = info.total;
@@ -11518,19 +11554,23 @@ AntSolver.Generator = (function() {
           }
         }
       }
-      // 剩余块：小块并入同色最大块
+      // 【v348·修】剩余块：小块两两合并（不堆给最大块），避免出现 300 的超大球
       var big = arr.filter(function (x) { return x.px >= minBlock; });
-      var smallSum = 0;
-      for (var si = 0; si < arr.length; si++) if (arr[si].px < minBlock) smallSum += arr[si].px;
-      if (!big.length) {
-        var sum0 = 0; for (var q0 = 0; q0 < arr.length; q0++) sum0 += arr[q0].px;
-        if (sum0 > 0) boxes.push({ color: +ck, count: sum0, layer: arr[0].layer, debt: 0, due: 0 });
-        continue;
+      var small = arr.filter(function (x) { return x.px < minBlock; });
+      var guardM = 0;
+      while (small.length > 1 && guardM++ < 200) {
+        small.sort(function (a, b) { return a.px - b.px || a.layer - b.layer; });
+        var sa = small.shift(), sb2 = small.shift();
+        small.push({ color: sa.color, px: sa.px + sb2.px, layer: Math.min(sa.layer, sb2.layer) });
+        if (small.length === 1) break;
+        var allBig = true;
+        for (var sm = 0; sm < small.length; sm++) if (small[sm].px < minBlock) { allBig = false; break; }
+        if (allBig) break;
       }
-      big.sort(function (a, b) { return a.layer - b.layer || b.px - a.px; });
-      if (smallSum > 0) big[big.length - 1].px += smallSum;
-      for (var bi = 0; bi < big.length; bi++) {
-        boxes.push({ color: +ck, count: big[bi].px, layer: big[bi].layer, debt: 0, due: 0 });
+      var rest = big.concat(small);
+      if (!rest.length) continue;
+      for (var bi = 0; bi < rest.length; bi++) {
+        boxes.push({ color: +ck, count: rest[bi].px, layer: rest[bi].layer, debt: 0, due: 0 });
       }
     }
     var sum = 0;
@@ -11618,6 +11658,9 @@ AntSolver.Generator = (function() {
 
   function pickBoxSplit(blocks, config) {
     // 【v347·用户裁决】按「依赖层 × 色块」切车：先有自然块，再合并到目标车数
+    if (config && config.cutMode === 'roundCut') {
+      try { var _rc = roundCut(blocks, config); if (_rc && _rc.length) return _rc; } catch (e) { blocks._rcErr = String(e && e.message); }
+    }
     if (config && config.cutMode === 'debtBlock') {
       try { var _db = debtBlockCut(blocks, config); if (_db && _db.length) return _db; } catch (e) { blocks._dbErr = String(e && e.message); }
     }

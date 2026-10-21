@@ -800,7 +800,7 @@ AntSolver.App = (function() {
   // ==================== 参数方案（保存/读取/导出/导入）====================
   // 左侧生成器参数整套保存为"方案"，存 localStorage；可读取、导出JSON文件、再导入。
   var SCHEME_KEY = 'antGenSchemes_v1';
-  var SCHEME_INPUTS = ['gen-boxmin','gen-boxmax','gen-boxmode','gen-buffer',
+  var SCHEME_INPUTS = ['gen-boxmax','gen-boxmode','gen-buffer',
     'gen-swap-min','gen-swap-max','gen-ice','gen-black','gen-chains','gen-surprise',
     'gen-rows-min','gen-rows-max','gen-cols-min','gen-cols-max',
     'gen-narrow','gen-narrow-gap-min','gen-narrow-gap-max','gen-candidates',
@@ -1952,8 +1952,16 @@ AntSolver.App = (function() {
         var v = parseInt(el && el.value, 10);
         return (isNaN(v) || v < 1) ? 1 : Math.min(10, v);
       })(),
-      boxSizeMin: parseInt(document.getElementById('gen-boxmin').value) || 40,
-      boxSizeMax: parseInt(document.getElementById('gen-boxmax').value) || 56,
+      // 【v349】只留上限：下限自动取上限的 2/3（v346 起下限本来就不强制）
+      boxSizeMin: (function () {
+        var v = parseInt((document.getElementById('gen-boxmax') || {}).value, 10);
+        if (isNaN(v) || v <= 0) v = 60;
+        return Math.max(20, Math.round(v * 0.66));
+      })(),
+      boxSizeMax: (function () {
+        var v = parseInt((document.getElementById('gen-boxmax') || {}).value, 10);
+        return (isNaN(v) || v <= 0) ? 60 : v;
+      })(),
       boxSizeMode: (document.getElementById('gen-boxmode') || {}).value || 'random',
       bufferLimit: parseInt(document.getElementById('gen-buffer').value) || 5,
       shuffleIntensity: 0,   // 已弃用洗牌
@@ -1984,10 +1992,6 @@ AntSolver.App = (function() {
       // 多轮难度标定轮次(任务 ANT-DIFF-MULTIROUND-PROD-20260901)：最终选中关卡按 N 轮玩家路线取最稳标定难度。
       //   缺控件时不写(=undefined)，由 generator DEFAULT_CONFIG 填默认 7；填 1 = 回到旧单轮。
       difficultyRounds: (function () { var v = parseInt((document.getElementById('gen-difficulty-rounds') || {}).value, 10); return isNaN(v) ? undefined : Math.max(1, Math.min(25, v)); })(),
-      // 【v341·实验】通道模式：第 0 行只留一个入口，第 1 行从入口右侧封 k 格
-      channelMode: !!(document.getElementById('gen-channel') || {}).checked,
-      channelEntryCol: parseInt((document.getElementById('gen-channel-col') || {}).value, 10) || 0,
-      channelK: parseInt((document.getElementById('gen-channel-k') || {}).value, 10) || 0,
       // 【v342·实验】层切：按依赖层 × 颜色切车，并按「到期」排序
       cutMode: (document.getElementById('gen-cutmode') || {}).value || undefined
       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
