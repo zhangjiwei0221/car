@@ -1042,14 +1042,14 @@ AntSolver.Generator = (function() {
     // ===== 铺盒到棋盘骨架（此时尺寸/黑块/墙/管道骨架已就绪）=====
     // list：盒序列，_seq = 基础消除顺序(baseFillBoxes 的 elimSeq 优先，否则数组下标)。
     var list = [];
-    for (var bi = 0; bi < boxes.length; bi++) list.push({ color: boxes[bi].color, count: boxes[bi].count, _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi) });
+    for (var bi = 0; bi < boxes.length; bi++) list.push({ color: boxes[bi].color, count: boxes[bi].count, _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi), due: boxes[bi].due });
 
     var singlePct = (typeof config.singleColorExtractPercent === 'number') ? config.singleColorExtractPercent : 5;
     var firstMult = (typeof config.firstRowRangeMultiplier === 'number') ? config.firstRowRangeMultiplier : 1;
     var nextMult = (typeof config.nextRowRangeMultiplier === 'number') ? config.nextRowRangeMultiplier : 1.1;
 
     function isEmptyPlaceable(r, c) { return cells[r][c] == null; }
-    function placeBox(r, c, b) { cells[r][c] = { t: 'box', color: b.color, count: b.count, chain: 0, q: false, numice: 0, _seq: b._seq }; }
+    function placeBox(r, c, b) { cells[r][c] = { t: 'box', color: b.color, count: b.count, chain: 0, q: false, numice: 0, _seq: b._seq, _due: b.due }; }
 
     if (config.baseFillByElimOrder !== false) {
       // ===== 基础填球：按消除顺序(_seq)逐行左→右【单扫】填入；每格只扫一遍 =====
@@ -1098,6 +1098,16 @@ AntSolver.Generator = (function() {
         }
       }
       list = list.slice(fi);   // 空位+管道各首遍1个后仍剩的盒 → 第二遍均匀填管道(下方)
+      // 【v343·G1】按「到期」加冰：越晚到期的车冰越久，让它到该点的时候才化开
+      var _ibd = (typeof config.iceByDue === 'number') ? config.iceByDue : 0;
+      if (_ibd > 0) {
+        for (var _ir = 0; _ir < rows; _ir++) for (var _ic = 0; _ic < cols; _ic++) {
+          var _icell = cells[_ir][_ic];
+          if (!_icell || _icell.t !== 'box' || _icell._due == null) continue;
+          var _in = Math.round(Math.max(0, _icell._due - 0.25) * 12 * _ibd);
+          if (_in > 0) _icell.numice = Math.max(1, Math.min(12, _in));
+        }
+      }
       // 注：基础阶段不做任何换球/换位扰动(v86 起)——保持纯粹的消除顺序铺盒；换球只在【卡点B支】(chokeSwap)定向执行。
     } else {
       // ===== 旧：交错随机铺盒（对齐 bin 毛线 generateBaseElements）=====
@@ -11247,7 +11257,7 @@ AntSolver.Generator = (function() {
     if (sum !== total) return null;
     // 按到期排序 → elimSeq
     boxes.sort(function (a, b) { return a._due - b._due; });
-    for (var bj = 0; bj < boxes.length; bj++) { boxes[bj].elimSeq = bj; delete boxes[bj]._due; }
+    for (var bj = 0; bj < boxes.length; bj++) { boxes[bj].elimSeq = bj; boxes[bj].due = boxes[bj]._due; delete boxes[bj]._due; }
     return boxes;
   }
 
