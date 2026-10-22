@@ -9,6 +9,8 @@ var AntSolver = AntSolver || {};
 
 AntSolver.App = (function() {
   var currentLevel = null;
+  // 【v352·用户裁决】路线（指针）：路径工具导出的颜色顺序，导入后替代自动暴露序（null = 不启用）
+  var currentRouteOrder = null, currentRouteName = '';
   var currentImportedSolve = null;  // 从关卡包导入的【求解数据】(审核那一轮)：有则复用、免网页重算；无则重新求解
   var currentGenerationEval = null; // 当前生成/导入关卡的统一全知+玩家压力/封锁诊断，压力图优先复用同一口径
   // 【v120】当前关卡的卡点类型信息与位置（仅本次在页面上生成的关卡才有；导入的关卡本体不含这些）。
@@ -678,6 +680,42 @@ AntSolver.App = (function() {
     if (libInput) libInput.addEventListener('change', handleLibSelect);
     // 导入整个关卡包(文件夹)：webkitdirectory 递归取全部文件，复用同一配对逻辑
     bindClick('btn-import-pack', function () { var d = document.getElementById('lib-dir-input'); if (d) d.click(); });
+    // 【v352·用户裁决】路线（指针）导入
+    bindClick('btn-import-route', function () { var d = document.getElementById('route-input'); if (d) d.click(); });
+    bindClick('btn-clear-route', function () {
+      currentRouteOrder = null; currentRouteName = '';
+      var el = document.getElementById('gen-route-name');
+      if (el) el.textContent = '未导入（不导入 = 按目标图自动顺序）';
+    });
+    (function () {
+      var ri = document.getElementById('route-input');
+      if (!ri) return;
+      ri.addEventListener('change', function (e) {
+        var f = e.target.files && e.target.files[0];
+        if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function (ev) {
+          try {
+            var j = JSON.parse(ev.target.result);
+            var arr = [];
+            if (j && j.order && j.order.length) {
+              for (var i = 0; i < j.order.length; i++) {
+                var o = j.order[i];
+                arr.push(typeof o === 'number' ? o : o.color);
+              }
+            } else if (j && j.routeOrder) arr = j.routeOrder.slice();
+            arr = arr.map(Number).filter(function (x) { return !isNaN(x); });
+            if (!arr.length) { alert('这个 JSON 里没有颜色顺序（需要 order 或 routeOrder 字段）'); return; }
+            currentRouteOrder = arr;
+            currentRouteName = f.name;
+            var el = document.getElementById('gen-route-name');
+            if (el) el.textContent = f.name + ' → ' + arr.join(' → ');
+          } catch (err) { alert('JSON 解析失败: ' + err.message); }
+        };
+        rd.readAsText(f);
+        e.target.value = '';
+      });
+    })();
     var libDir = document.getElementById('lib-dir-input');
     if (libDir) libDir.addEventListener('change', handleLibSelect);
     bindClick('btn-export-lib', exportLibrary);
@@ -2001,7 +2039,9 @@ AntSolver.App = (function() {
       capJitter: (function () {
         var v = parseInt((document.getElementById('gen-capjitter') || {}).value, 10);
         return isNaN(v) ? 5 : Math.max(0, Math.min(30, v));
-      })()
+      })(),
+      // 【v352·用户裁决】路线（指针）给出的颜色先后；null/空 = 用目标图自动暴露序
+      routeOrder: (currentRouteOrder && currentRouteOrder.length) ? currentRouteOrder.slice() : undefined
       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
     };
   }
@@ -4709,7 +4749,9 @@ AntSolver.App = (function() {
       capJitter: (function () {
         var v = parseInt((document.getElementById('gen-capjitter') || {}).value, 10);
         return isNaN(v) ? 5 : Math.max(0, Math.min(30, v));
-      })()
+      })(),
+      // 【v352】路线（指针）颜色先后
+      routeOrder: (currentRouteOrder && currentRouteOrder.length) ? currentRouteOrder.slice() : undefined
     });
     try {
       genLog('棋盘：行 ' + _norm.rowsMin + '~' + _norm.rowsMax + ' · 列 ' + _norm.colsMin + '~' + _norm.colsMax +

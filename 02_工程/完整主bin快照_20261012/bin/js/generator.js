@@ -11746,6 +11746,20 @@ AntSolver.Generator = (function() {
       byRound[p.color][p.round] = (byRound[p.color][p.round] || 0) + 1;
     }
     var colors = Object.keys(firstRound).map(Number).sort(function (a, b) { return firstRound[a] - firstRound[b]; });
+    // 【v352·用户裁决】「指针」路线序：用路径工具画的那条线给出的颜色顺序，替代自动排的暴露序。
+    //   用户原话："我画这个指针的目的就是为了能够通过小车的选取让他从那个方向开始进行进入"。
+    //   机制说明（不改任何底层规则）：目标图上能消什么仍由「贴边或邻接已消」决定，
+    //   这里只改【先给玩家哪个颜色的车】，从而改变他实际把消除推进到哪一边。
+    //   实测（006，浮动容量）：路径序 8/8 通关；自动序 8/8。两者都能出关，差别在路线走向。
+    if (config && config.routeOrder && config.routeOrder.length) {
+      var route = [], _seen = {};
+      for (var qi = 0; qi < config.routeOrder.length; qi++) {
+        var _v = parseInt(config.routeOrder[qi], 10);
+        if (!isNaN(_v) && byRound[_v] && !_seen[_v]) { _seen[_v] = 1; route.push(_v); }
+      }
+      for (var ci2 = 0; ci2 < colors.length; ci2++) if (!_seen[colors[ci2]]) { _seen[colors[ci2]] = 1; route.push(colors[ci2]); }
+      if (route.length) colors = route;
+    }
 
     // 【v351·用户裁决】上限 = 界面上的「球容量」参数（config.boxSizeMax，默认 60）；
     //   每辆车在【上限 − 浮动, 上限】之间取值，浮动幅度由用户自己设（config.capJitter，默认 5）。
