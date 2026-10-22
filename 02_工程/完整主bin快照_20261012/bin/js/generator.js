@@ -946,17 +946,26 @@ AntSolver.Generator = (function() {
     //   绑小车 → 拿进来就能吃满、立刻空出，锁链只增加"一次多拿"的节奏压力。
     // 默认【不铺】——实测同一布局换个绑法就在 8/8 与 0/8 之间跳，固定规则摆不稳。
     //   要试的话显式传 rowMajorChainCount（1 或 2），别用全局 chainCount（它是老流程的，默认 3）。
+    // 【v354·负结果】默认【不铺】。6 种子实测：
+    //   开 1 组 → 达标 4/6、峰均值 4.5、34档 15%
+    //   关 0 组 → 达标 5/6、峰均值 4.0、34档 15%
+    //   锁链只把峰均值抬了 0.5，却让达标率掉了 1/6 —— 不划算，默认关。
+    //   要用显式传 rowMajorChainCount:1。
     var chainN = Math.max(0, parseInt(config.rowMajorChainCount, 10) || 0);
     var placedChains = 0, avgCap = 0;
     if (chainN > 0) {
-      chainN = Math.min(chainN, 2);   // buffer 只有 5 槽且行优先盘的车偏大，实测超过 2 组必死
+      chainN = Math.min(chainN, 1);   // 【v354】多方案筛选：2 组直接让求解失败，故硬限 1 组
       var caps = [];
       for (var ar = 0; ar < rows; ar++) for (var ac = 0; ac < cols; ac++) {
         var _cx = cells[ar][ac];
         if (_cx && _cx.t === 'box') caps.push(_cx.count);
       }
       avgCap = caps.length ? (caps.reduce(function (a, b) { return a + b; }, 0) / caps.length) : 0;
-      var cLo = Math.floor(rows * 0.30), cHi = Math.ceil(rows * 0.75);
+      // 【v354】多方案筛选：固定放在 20%~50% 行区间、从上往下取第一处可用位置。
+      //   试过用 rnd() 打乱行顺序，结果更差（006 六种子达标 2/6，固定顺序是 3/4）——已回退。
+      //   ⚠ 这个位置仍有约 1/4 的种子会翻车（峰3、玩家0/8），根因是锁链位置对 5 槽盘太敏感。
+      //   彻底解决要做【运行时筛选】：摆 N 套 → 各跑玩家模拟 → 只留 8/8 且峰≥4 的那套。
+      var cLo = Math.floor(rows * 0.20), cHi = Math.ceil(rows * 0.50);
       var chainId = 0;
       for (var cr = cLo; cr <= cHi && placedChains < chainN; cr++) {
         if (cr >= rows) break;
