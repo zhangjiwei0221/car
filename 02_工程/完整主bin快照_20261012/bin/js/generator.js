@@ -616,7 +616,7 @@ AntSolver.Generator = (function() {
     var rows = blocks.length, cols = blocks[0].length;
     var deadlineAt = config._deadlineAt || 0;
 
-    var lastLevel = null, lastResult = null, lastParsed = null, curCfg = config;
+    var lastLevel = null, lastResult = null, lastParsed = null, curCfg = config, lastVariant = null;
     for (var retry = 0; retry < config.maxRetries; retry++) {
       if (retry > 0 && deadlineAt && Date.now() >= deadlineAt) break;   // 超时：停止再开新一轮重试(已完成的轮次仍返回)
       // 1) 生成盒序列：默认按【目标图底→顶趋势=消除顺序】切分(baseFillBoxes)，
@@ -626,7 +626,14 @@ AntSolver.Generator = (function() {
       // 2) 确定棋盘骨架(尺寸+障碍/墙/管道) → 基础填球按消除顺序顺序填入 → 再执行后续铺盒扰动
       GENPERF.boardBuilds++;                       // 埋点：建盘次数(含每次重试)
       var _tb = Date.now();
-      var board = buildBoard(boxes, curCfg);
+      var board = null;
+      // 【v355·用户裁决】行优先盘走【运行时筛选】：摆几套锁链位置 → 各跑求解+玩家模拟 → 留能过的那套。
+      //   锁链对 5 槽盘太敏感，一次成型算不稳（v354 实测 6 种子达标率 4/6）。
+      if (curCfg && curCfg.boardLayout === 'rowMajor' && curCfg.rowMajorAutoFilter !== false) {
+        var _var = pickRowMajorVariant(blocks, curCfg, boxes);
+        if (_var && _var.board) { board = _var.board; lastVariant = _var; }
+      }
+      if (!board) board = buildBoard(boxes, curCfg);
       GENPERF.boardMs += Date.now() - _tb;
       // 【v301·用户裁决】把"数字冰 + 第0行同色限量"接进**旧流程**（原工程路径）。
       //   旧流程只有随机冰（icePercent），没有时间锁；这里补上：
@@ -966,6 +973,14 @@ AntSolver.Generator = (function() {
       //   ⚠ 这个位置仍有约 1/4 的种子会翻车（峰3、玩家0/8），根因是锁链位置对 5 槽盘太敏感。
       //   彻底解决要做【运行时筛选】：摆 N 套 → 各跑玩家模拟 → 只留 8/8 且峰≥4 的那套。
       var cLo = Math.floor(rows * 0.20), cHi = Math.ceil(rows * 0.50);
+      // 【v355】_chainSeed 让不同方案从不同行开始找（运行时筛选需要产出多套候选）
+      var _cs = parseInt(config._chainSeed, 10);
+      if (!isNaN(_cs) && cHi >= cLo) {
+        var _span = cHi - cLo + 1;
+        cLo = cLo + (_cs % _span);
+        cHi = cLo + _span - 1;
+        if (cHi >= rows) { cHi = rows - 1; cLo = Math.max(0, cHi - _span + 1); }
+      }
       var chainId = 0;
       for (var cr = cLo; cr <= cHi && placedChains < chainN; cr++) {
         if (cr >= rows) break;
@@ -1000,6 +1015,59 @@ AntSolver.Generator = (function() {
     board.rowMajorStat = { boxes: n, rows: rows, cols: cols, blanks: rows * cols - n,
       chains: placedChains, avgCap: Math.round(avgCap) };
     return board;
+  }
+
+  /**
+   * 【v355·用户裁决】行优先盘的【运行时筛选】。
+   *
+   * 为什么需要：锁链对 5 槽的盘太敏感 —— 同一张盘换一组位置就能在 8/8 与 0/8 之间跳
+   *   （v354 实测：12 套摆法里 4 套达标、2 组直接求解失败；换成 6 个种子达标率只有 4/6）。
+   *   一次成型算不出稳定解，只能"摆几套、各跑一遍、留能过的"。
+   *
+   * 成本：每套 = 建盘(0.3s) + 贪心求解(0.1s) + 3 局玩家模拟(~1s)，默认 3 套约 3~4 秒。
+   * 判定：玩家 3 局全过 **且** 全知峰 >= minPeak(默认 4) 就提前收工；否则取分数最高的一套。
+   */
+  function pickRowMajorVariant(blocks, config, boxes) {
+    var N = Math.max(1, Math.min(6, parseInt(config.rowMajorPlans, 10) || 3));
+    var minPeak = Math.max(0, parseInt(config.rowMajorMinPeak, 10) || 4);
+    // 【v355】探针局数默认 8 —— 用 3 局筛过、结果正式跑 8 局时第 8 局翻车（实测 seed77），必须同口径
+    var probeRuns = Math.max(1, Math.min(12, parseInt(config.rowMajorProbeRuns, 10) || 8));
+    var chainWant = Math.max(0, parseInt(config.rowMajorChainCount, 10));
+    if (isNaN(chainWant)) chainWant = 1;
+    var best = null;
+    for (var i = 0; i < N; i++) {
+      // 第 0 套无链（保底），其余带 1 组锁链、从不同行开始
+      var chainN = (i === 0) ? 0 : Math.min(1, chainWant);
+      var cfg = Object.assign({}, config, { rowMajorChainCount: chainN, _chainSeed: i });
+      var board = null;
+      try { board = buildRowMajorBoard(boxes, cfg); } catch (e) { board = null; }
+      if (!board) continue;
+      var level = { blocks: blocks, bufferLimit: config.bufferLimit || 5, board: board };
+      var parsed = null, sr = null;
+      try {
+        parsed = AntSolver.parseLevel(level);
+        sr = AntSolver.Solver.solve(parsed, { greedyOnly: true, bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain });
+      } catch (e) { continue; }
+      if (!sr || !sr.completed) continue;
+      var wins = 0;
+      for (var k = 0; k < probeRuns; k++) {
+        try {
+          var rr = AntSolver.PlayerSim.run(parsed, { seed: 7 + k * 37, useItems: false, reviveCap: 0 });
+          if (rr && (rr.won || rr.success)) wins++;
+        } catch (e) { }
+      }
+      var score = wins * 1000 + (sr.maxBuffer || 0);
+      if (!best || score > best.score) best = { level: level, board: board, solveResult: sr, score: score, wins: wins, peak: sr.maxBuffer, plan: i, chainN: chainN };
+      if (wins >= probeRuns && (sr.maxBuffer || 0) >= minPeak) break;   // 全过且压力够 → 提前收工
+    }
+    if (best) {
+      try {
+        best.board.rowMajorStat.plan = best.plan;
+        best.board.rowMajorStat.probeWins = best.wins + '/' + probeRuns;
+        best.board.rowMajorStat.probePeak = best.peak;
+      } catch (e) { }
+    }
+    return best;
   }
 
   function buildBoard(boxes, config) {
