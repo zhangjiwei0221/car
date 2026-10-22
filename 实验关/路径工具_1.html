@@ -44,6 +44,11 @@ pre{background:#0d0f13;padding:8px 10px;border-radius:5px;overflow:auto;font-siz
         <button id="btnExport">导出 JSON</button>
         <button id="btnCopy" class="ghost">复制到剪贴板</button>
         <span id="saveTip" style="color:#00d26a;font-size:12px;margin-left:4px"></span>
+        <div style="margin-top:8px">
+          <button id="btn-loadtxt" class="ghost">导入 TXT 图</button>
+          <span id="cur-file" class="hint" style="margin-left:6px"></span>
+        </div>
+        <input type="file" id="txt-input" accept=".txt" style="display:none">
       </div>
     </div>
     <div class="panel" id="pOrder" style="display:none">
@@ -102,11 +107,35 @@ const NAME = [null,
 '天蓝','浅蓝','深棕','深蓝','灰蓝','蓝色','浅黄','绿色','橄榄绿','青蓝','浅绿','深绿',
 '黄色','砖红','浅橙','橙色','深棕2','棕色','浅灰','灰色','深灰','中灰'];
 
-const blocks = RAW.trim().split('\n').map(l=>l.trim().split(/\s+/).map(Number));
-const R = blocks.length, C = blocks[0].length;
+let blocks = RAW.trim().split('\n').map(l=>l.trim().split(/\s+/).map(Number));
+let R = blocks.length, C = blocks[0].length;
 const CELL = 17, PAD_L = 26, PAD_T = 20, CAP = 60;
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
-cv.width = PAD_L + C*CELL + 4; cv.height = PAD_T + R*CELL + 4;
+function fitCanvas(){ cv.width = PAD_L + C*CELL + 4; cv.height = PAD_T + R*CELL + 4; }
+fitCanvas();
+
+// 【v356】导入外部 TXT：跳过非数字行（如"像素矩阵"表头），只收数字矩阵
+function loadTxt(text){
+  const lines = String(text).replace(/\r/g,'').trim().split('\n');
+  const rows = [];
+  for (const line of lines){
+    const t = line.trim(); if(!t) continue;
+    const nums = t.split(/\s+/).map(Number);
+    if (nums.length > 1 && nums.every(n => !isNaN(n))) rows.push(nums);
+  }
+  if (!rows.length){ alert('没在文件里找到数字矩阵'); return; }
+  // 各行列数对齐（少数文件尾部有空格缺失）
+  const w = Math.max(...rows.map(r=>r.length));
+  for (const r of rows){ while(r.length < w) r.push(0); }
+  blocks = rows; R = rows.length; C = w;
+  path = []; orderData = null;
+  fitCanvas(); draw();
+  document.getElementById('pOrder').style.display='none';
+  document.getElementById('pCar').style.display='none';
+  document.getElementById('pathInfo').textContent = `已载入 ${R}×${C}，按住鼠标画一条消除路线。`;
+  document.getElementById('title').textContent = `目标图 ${R}×${C} · 按住鼠标画一条消除路线`;
+  const el=document.getElementById('cur-file'); if(el) el.textContent = `当前：${R}×${C}`;
+}
 
 let path = [], drawing = false, showSweep = false, orderData = null;
 const DIRS = [[-1,0],[1,0],[0,-1],[0,1]];
@@ -295,6 +324,14 @@ document.getElementById('btnExport').onclick = ()=>{
   setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   const tip=document.getElementById('saveTip'); tip.textContent='已导出到下载文件夹';
   setTimeout(()=>tip.textContent='', 4000);
+};
+document.getElementById('btn-loadtxt').onclick = ()=>{ document.getElementById('txt-input').click(); };
+document.getElementById('txt-input').onchange = (e)=>{
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ev => { try { loadTxt(ev.target.result); } catch(err){ alert('解析失败: '+err.message); } };
+  rd.readAsText(f);
+  e.target.value = '';
 };
 document.getElementById('btnCopy').onclick = async ()=>{
   const d = buildExport(); if(!d) return;

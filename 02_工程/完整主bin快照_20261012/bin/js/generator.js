@@ -905,6 +905,52 @@ AntSolver.Generator = (function() {
    *
    * 本模式不铺管道/冰/锁链/问号（纯车 + 黑块），先把"顺序"这条主干立住。
    */
+  /**
+   * 【v356·用户裁决】混色预处理：让行优先盘看起来像正常关卡，而不是"一色一行"。
+   *
+   * 用户原话："你把这些球，按颜色顺序规规整整的从第1行往下摆，这完全不是一个正常的关卡，
+   *           我想要的是这个棋盘上的车去引导玩家实现我想要的路径"
+   *
+   * 做法：车单顺序不变（仍按路线），但把【后面行】的一部分车提前掺进本行，等量换走本行的车。
+   *   效果：每行主色仍占多数（60~70%），但混入少量"下一段才该出"的颜色当诱饵。
+   *   玩家点诱饵会发现吃不满、卡槽，从而学会"先别碰它"——这就是靠供给引导，而不是靠排队强制。
+   *
+   * mixRate：每行被换掉的比例（默认 0.35）；0 = 退回原来的一色一行。
+   * donorSpan：从后面第几行以内借车（默认 1，只看紧邻的下一行，避免掺进太远的颜色）。
+   */
+  function mixRowsOf(boxes, rows, config) {
+    var mixRate = (config && config.mixRate != null) ? +config.mixRate : 0.4;
+    if (!(mixRate > 0) || rows < 2) return boxes;
+    if (mixRate > 0.8) mixRate = 0.8;
+    var N = boxes.length;
+    var span = Math.max(1, parseInt(config.donorSpan, 10) || 1);
+    var out = boxes.slice();
+    for (var r = 0; r < rows - 1; r++) {
+      var start = Math.floor(r * N / rows), end = Math.floor((r + 1) * N / rows);
+      var len = end - start;
+      if (len <= 1) continue;
+      var nMix = Math.floor(len * mixRate);
+      // 【v356b】第 0 行强制至少混 1 个异色 —— 那是玩家第一眼看到的一行，
+      //   全一色会让"这是正常关卡"的第一印象直接崩掉。其余行按 mixRate 来。
+      if (r === 0) nMix = Math.max(nMix, 1);
+      for (var k = 0; k < nMix; k++) {
+        var dEnd = Math.floor((r + 1 + span) * N / rows);
+        if (dEnd > N) dEnd = N;
+        if (end >= dEnd) break;
+        // 同色就重抽，最多试 12 次（否则原来一遇到同色就整行没混成）
+        for (var attempt = 0; attempt < 12; attempt++) {
+          var i = start + Math.floor(rnd() * len);
+          var j = end + Math.floor(rnd() * (dEnd - end));
+          if (i >= N || j >= N || i === j) continue;
+          if (out[i].color === out[j].color) continue;
+          var t = out[i]; out[i] = out[j]; out[j] = t;
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
   function buildRowMajorBoard(boxes, config) {
     var n = boxes.length;
     if (!n) return null;
@@ -926,6 +972,8 @@ AntSolver.Generator = (function() {
     }
     var rows = best.rows, cols = best.cols, cells = [];
     for (var rr = 0; rr < rows; rr++) cells.push(new Array(cols));
+    // 【v356】混色：把后面行的车提前掺进本行，避免"一色一行"的排队感
+    boxes = mixRowsOf(boxes, rows, config);
     var i = 0;
     for (var r2 = 0; r2 < rows; r2++) {
       for (var c2 = 0; c2 < cols; c2++) {
