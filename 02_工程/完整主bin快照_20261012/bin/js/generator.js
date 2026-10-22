@@ -918,35 +918,75 @@ AntSolver.Generator = (function() {
    * mixRate：每行被换掉的比例（默认 0.35）；0 = 退回原来的一色一行。
    * donorSpan：从后面第几行以内借车（默认 1，只看紧邻的下一行，避免掺进太远的颜色）。
    */
-  function mixRowsOf(boxes, rows, config) {
-    var mixRate = (config && config.mixRate != null) ? +config.mixRate : 0.4;
+  function mixRowsOf(boxes, rows, cols, config) {
+    var mixRate = (config && config.mixRate != null) ? +config.mixRate : 0.6;
     if (!(mixRate > 0) || rows < 2) return boxes;
     if (mixRate > 0.8) mixRate = 0.8;
     var N = boxes.length;
     var span = Math.max(1, parseInt(config.donorSpan, 10) || 1);
+    // deepShare：诱饵取自车单末尾这一段的占比（默认 0.35 → 从后 35% 里挑"深层色"）
+    var deepShare = (config && config.deepShare != null) ? +config.deepShare : 0.35;
+    if (!(deepShare > 0) || deepShare > 0.8) deepShare = 0.35;
     var out = boxes.slice();
+    // 【v357·用户裁决】分类：过渡色 = 车单最前面那几个颜色（公共外壳）；深层色 = 车单末尾一段。
+    //   首行只放这两类 —— 过渡色让玩家有得点，深层色是"目标图上还消不掉"的诱饵。
+    //   突破口色（路线里真正想引导的那个，位于车单中段）一律不在首行，等过渡色消掉后从下一层露出来。
+    var transColors = {}, nTrans = 0;
+    for (var ti = 0; ti < out.length && nTrans < 2; ti++) {
+      if (!transColors[out[ti].color]) { transColors[out[ti].color] = 1; nTrans++; }
+    }
+    var deepFrom0 = Math.floor(out.length * (1 - deepShare));
+    if (deepFrom0 >= out.length) deepFrom0 = out.length - 1;
+    var deepColors = {};
+    for (var di = deepFrom0; di < out.length; di++) deepColors[out[di].color] = 1;
+
+    // 【v357·修】行区间必须按【每行格子数 cols】切，不能按 N/rows 平均分。
+    //   原来 6×7 盘 27 辆车被算成"每行 4.5 辆"，导致"首行"实际是索引 0~3，
+    //   而真正首行是 0~6 —— 索引 6 那个突破口色（17）就漏在首行没被清走。
     for (var r = 0; r < rows - 1; r++) {
-      var start = Math.floor(r * N / rows), end = Math.floor((r + 1) * N / rows);
+      var start = r * cols, end = Math.min((r + 1) * cols, N);
       var len = end - start;
       if (len <= 1) continue;
       var nMix = Math.floor(len * mixRate);
       // 【v356b】第 0 行强制至少混 1 个异色 —— 那是玩家第一眼看到的一行，
       //   全一色会让"这是正常关卡"的第一印象直接崩掉。其余行按 mixRate 来。
       if (r === 0) nMix = Math.max(nMix, 1);
+      // 【v357·用户裁决】诱饵只从【车单深处的颜色】里挑，不从紧邻的下一行借。
+      //   用户原话："第一行也可能有突破口颜色，也可能有背景的过渡色，
+      //              也可能有目标图深层无法消除的颜色"
+      //   含义：首行应该是「过渡色 + 深层诱饵」，突破口色要等过渡色消掉后才从下一层露出来
+      //         —— 那个"露出"本身就是引导。把突破口提前塞进首行，等于把答案先给了。
+      var deepFrom = Math.floor(N * (1 - deepShare));
+      if (deepFrom < end) deepFrom = end;
+      if (deepFrom >= N) deepFrom = N - 1;
+      // 【v357】优先换掉【本行占比最高的颜色】的位置 —— 只靠随机抽的话，
+      //   6/7 都是同一个颜色时几乎抽不到同色位置，行看着还是"一色一行"。
+      var rowCnt = {}, order2 = [];
+      for (var ci2 = start; ci2 < end; ci2++) {
+        var _cc = out[ci2].color;
+        if (rowCnt[_cc] == null) { rowCnt[_cc] = 0; order2.push(_cc); }
+        rowCnt[_cc]++;
+      }
+      order2.sort(function (a, b) { return rowCnt[b] - rowCnt[a]; });
+      var slotPool = [];
+      for (var oi = 0; oi < order2.length; oi++) {
+        for (var ci3 = start; ci3 < end; ci3++) {
+          if (out[ci3].color === order2[oi]) slotPool.push(ci3);
+        }
+      }
       for (var k = 0; k < nMix; k++) {
-        var dEnd = Math.floor((r + 1 + span) * N / rows);
-        if (dEnd > N) dEnd = N;
-        if (end >= dEnd) break;
-        // 同色就重抽，最多试 12 次（否则原来一遇到同色就整行没混成）
+        if (deepFrom >= N) break;
         for (var attempt = 0; attempt < 12; attempt++) {
-          var i = start + Math.floor(rnd() * len);
-          var j = end + Math.floor(rnd() * (dEnd - end));
+          var i = slotPool.length ? slotPool[(k + Math.floor(rnd() * slotPool.length)) % slotPool.length]
+                                  : (start + Math.floor(rnd() * len));
+          var j = deepFrom + Math.floor(rnd() * (N - deepFrom));
           if (i >= N || j >= N || i === j) continue;
           if (out[i].color === out[j].color) continue;
           var t = out[i]; out[i] = out[j]; out[j] = t;
           break;
         }
       }
+      // 首行特别处理：把既不是过渡色、也不是深层色的（= 突破口 / 中段色）统统换到深层去
     }
     return out;
   }
@@ -973,7 +1013,7 @@ AntSolver.Generator = (function() {
     var rows = best.rows, cols = best.cols, cells = [];
     for (var rr = 0; rr < rows; rr++) cells.push(new Array(cols));
     // 【v356】混色：把后面行的车提前掺进本行，避免"一色一行"的排队感
-    boxes = mixRowsOf(boxes, rows, config);
+    boxes = mixRowsOf(boxes, rows, cols, config);
     var i = 0;
     for (var r2 = 0; r2 < rows; r2++) {
       for (var c2 = 0; c2 < cols; c2++) {
