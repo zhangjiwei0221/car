@@ -334,6 +334,9 @@ AntSolver.App = (function() {
   function applyTargetTransform() {
     var canvas = document.getElementById('target-canvas');
     if (canvas) canvas.style.transform = 'translate(' + targetPan.x + 'px,' + targetPan.y + 'px)';
+    // 【v358】形状预览层与目标图同一位移，否则放大平移后预览会错位
+    var shapeOv = document.getElementById('target-shape-overlay');
+    if (shapeOv) shapeOv.style.transform = 'translate(' + targetPan.x + 'px,' + targetPan.y + 'px)';
   }
   function clampTargetPan() {
     var vp = document.getElementById('target-viewport'), canvas = document.getElementById('target-canvas');
@@ -387,16 +390,36 @@ AntSolver.App = (function() {
     var dragging = false, sx = 0, sy = 0;
     canvas.addEventListener('pointerdown', function (e) {
       // 【v133】目标区画笔开启时，在目标图上按下 = 上色（或擦除/吸管），此时不平移。
-      if (tgtPaint) { tgtPainting = true; tgtPaintAt(e); try { canvas.setPointerCapture(e.pointerId); } catch (x) { } return; }
+      // 【v358】当前工具是「矩形/圆形」时改成"按住拖出一块区域"：起点只记锚点，
+      //   拖动过程只画预览，松手才一次性写入（整块一次撤回）。
+      if (tgtPaint) {
+        var shapePos = tgtCellFromEvent(e);
+        if (shapePos && tgtShapeSpec()) {
+          e.preventDefault();
+          tgtShapeBegin(e, shapePos);
+          try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
+          return;
+        }
+        tgtPainting = true; tgtPaintAt(e); try { canvas.setPointerCapture(e.pointerId); } catch (x) { } return;
+      }
       dragging = true; canvas.classList.add('grabbing'); sx = e.clientX - targetPan.x; sy = e.clientY - targetPan.y; try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
     });
     canvas.addEventListener('pointermove', function (e) {
-      if (tgtPaint) { if (tgtPainting) tgtPaintAt(e); return; }   // 按住拖动 = 连续刷
+      if (tgtPaint) {
+        if (tgtShape) { tgtShapeMove(e); return; }                  // 【v358】形状：只更新预览
+        if (tgtPainting) tgtPaintAt(e); return;                     // 按住拖动 = 连续刷
+        return;
+      }
       if (!dragging) return; targetPan.x = e.clientX - sx; targetPan.y = e.clientY - sy; clampTargetPan();
     });
-    function endDrag() { dragging = false; tgtPainting = false; canvas.classList.remove('grabbing'); }
+    function endDrag() {
+      if (tgtShape) tgtShapeCommit();     // 【v358】松手提交整块形状
+      dragging = false; tgtPainting = false; canvas.classList.remove('grabbing');
+    }
     canvas.addEventListener('pointerup', endDrag);
     canvas.addEventListener('pointercancel', endDrag);
+    // 形状模式下右键拖动 = 擦成空位，所以不能弹系统菜单
+    canvas.addEventListener('contextmenu', function (e) { if (tgtPaint && tgtShapeSpec()) e.preventDefault(); });
     // 滚轮缩放（以视口为中心）
     canvas.addEventListener('wheel', function (e) { e.preventDefault(); zoomTarget(e.deltaY < 0 ? 1.2 : 1 / 1.2); }, { passive: false });
   }
@@ -3846,11 +3869,15 @@ AntSolver.App = (function() {
   //   改前目标图只能整张导入；现在在「手动摆盒」里可以直接点/拖改单个像素
   //   （画笔 = 当前颜色；橡皮工具 = 擦成空位；吸管工具 = 把该像素的颜色读给画笔），带撤回。
   //   只做微调：不提供改尺寸/整片填充（要那些用 参考/目标图TXT编辑器_可手动框选版）。
+  //   【v358】用户要求「手动摆盘里面，增加矩形，圆形等」→ 工具下拉里加了「▭ 矩形 / ◯ 圆形」：
+  //     在目标图上按住拖出一块区域，松手一次性填成当前颜色（或右键拖 = 擦成空位），
+  //     实心/只画边框由「形状」下拉切换，Shift = 正方形/正圆。整块一次撤销。
   //   与目标图原有的「拖拽平移」互斥：画笔开启时按下 = 上色，不再平移；滚轮缩放照旧，方便放大到单格细调。
   var tgtPaint = false;         // 画笔开关
   var tgtPainting = false;      // 本次按下是否正在连续刷
-  var tgtPaintStack = [];       // 撤回栈 [{r,c,from,to}]
+  var tgtPaintStack = [];       // 撤回栈：单格 {r,c,from,to}；形状 {cells:[{r,c,from,to}]}（整块一次撤回）
   var TGT_PAINT_STACK_MAX = 500;
+  var tgtShape = null;          // 【v358】拖形状时的状态 {anchor,cur,spec,erase}
 
   function tgtCellFromEvent(e) {
     var canvas = document.getElementById('target-canvas');
@@ -3866,8 +3893,155 @@ AntSolver.App = (function() {
     return { r: r, c: c };
   }
 
+  // ==================== 【v358】目标区形状填充（矩形 / 圆形） ====================
+  //   拖拽只是"框范围"，中途不写数据；松手才一次性提交，撤销也是一次撤掉整块。
+  function tgtShapeSpec() {
+    var L = AntSolver.LevelEditor;
+    return (L && L.shapeSpec) ? L.shapeSpec() : null;   // {shape:'rect'|'circle', fill:bool} 或 null
+  }
+
+  /** 把「拖出来的范围」展开成格子清单。矩形 = 外接框；圆形 = 外接框内切椭圆（格子中心落在椭圆内）。 */
+  function tgtShapeCells(spec, anchor, cur) {
+    var rmin = Math.min(anchor.r, cur.r), rmax = Math.max(anchor.r, cur.r);
+    var cmin = Math.min(anchor.c, cur.c), cmax = Math.max(anchor.c, cur.c);
+    var out = [], r, c;
+    if (spec.shape === 'rect') {
+      for (r = rmin; r <= rmax; r++) {
+        for (c = cmin; c <= cmax; c++) {
+          if (!spec.fill && r > rmin && r < rmax && c > cmin && c < cmax) continue;   // 空心 = 只留一圈边框
+          out.push({ r: r, c: c });
+        }
+      }
+      return out;
+    }
+    var cx = (cmin + cmax + 1) / 2, cy = (rmin + rmax + 1) / 2;
+    var rx = (cmax - cmin + 1) / 2, ry = (rmax - rmin + 1) / 2;
+    var irx = rx - 1, iry = ry - 1;                   // 空心：内圈半径缩 1 格（缩没了就把整圆当实心画）
+    for (r = rmin; r <= rmax; r++) {
+      for (c = cmin; c <= cmax; c++) {
+        var dx = (c + 0.5 - cx) / rx, dy = (r + 0.5 - cy) / ry;
+        if (dx * dx + dy * dy > 1.0001) continue;
+        if (!spec.fill && irx >= 0.5 && iry >= 0.5) {
+          var ix = (c + 0.5 - cx) / irx, iy = (r + 0.5 - cy) / iry;
+          if (ix * ix + iy * iy <= 1.0001) continue;
+        }
+        out.push({ r: r, c: c });
+      }
+    }
+    return out;
+  }
+
+  function tgtShapeRgba(hex, a) {
+    var rgb = hexToRgb(hex || '');
+    if (!rgb) return 'rgba(210,112,31,' + a + ')';
+    return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + a + ')';
+  }
+
+  /** 预览层：与目标图同尺寸、同平移的透明 canvas（不写进关卡数据）。 */
+  function tgtShapeOverlay() {
+    var cv = document.getElementById('target-canvas');
+    var ov = document.getElementById('target-shape-overlay');
+    if (!cv || !ov) return null;
+    if (ov.width !== cv.width || ov.height !== cv.height) {
+      ov.width = cv.width; ov.height = cv.height;
+      ov.style.width = cv.width + 'px'; ov.style.height = cv.height + 'px';
+    }
+    ov.style.transform = 'translate(' + targetPan.x + 'px,' + targetPan.y + 'px)';
+    ov.classList.remove('hidden');
+    return ov;
+  }
+
+  function tgtShapeDrawPreview() {
+    if (!tgtShape || !currentLevel) return;
+    var ov = tgtShapeOverlay();
+    if (!ov) return;
+    var ctx = ov.getContext('2d');
+    ctx.clearRect(0, 0, ov.width, ov.height);
+    var step = ov.width / currentLevel.cols;
+    var gap = step > 7 ? 1 : 0;
+    var cell = Math.max(1, step - gap);
+    var L = AntSolver.LevelEditor;
+    var col = tgtShape.erase ? 0 : ((L && L.currentColor) ? L.currentColor() : 1);
+    ctx.fillStyle = tgtShape.erase ? 'rgba(224,60,60,.55)' : tgtShapeRgba(AntSolver.getColorCSS(col), .55);
+    var cells = tgtShapeCells(tgtShape.spec, tgtShape.anchor, tgtShape.cur);
+    for (var i = 0; i < cells.length; i++) {
+      ctx.fillRect(cells[i].c * step, cells[i].r * step, cell, cell);
+    }
+    // 虚线外框：空心时也能一眼看出拖了多大范围
+    var rmin = Math.min(tgtShape.anchor.r, tgtShape.cur.r), rmax = Math.max(tgtShape.anchor.r, tgtShape.cur.r);
+    var cmin = Math.min(tgtShape.anchor.c, tgtShape.cur.c), cmax = Math.max(tgtShape.anchor.c, tgtShape.cur.c);
+    ctx.strokeStyle = 'rgba(60,46,31,.75)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(cmin * step + 0.5, rmin * step + 0.5, (cmax - cmin + 1) * step - 1, (rmax - rmin + 1) * step - 1);
+    ctx.setLineDash([]);
+  }
+
+  function tgtShapeClearPreview() {
+    var ov = document.getElementById('target-shape-overlay');
+    if (!ov) return;
+    var ctx = ov.getContext('2d');
+    ctx.clearRect(0, 0, ov.width, ov.height);
+    ov.classList.add('hidden');
+  }
+
+  function tgtShapeBegin(e, pos) {
+    var spec = tgtShapeSpec();
+    if (!spec) return;
+    // 右键拖 = 擦成空位；左键拖 = 用当前颜色填
+    tgtShape = { anchor: { r: pos.r, c: pos.c }, cur: { r: pos.r, c: pos.c }, spec: spec, erase: (e.button === 2) };
+    tgtPainting = false;
+    tgtShapeDrawPreview();
+  }
+
+  function tgtShapeMove(e) {
+    if (!tgtShape) return;
+    var pos = tgtCellFromEvent(e);
+    if (!pos) return;
+    var r = pos.r, c = pos.c;
+    if (e.shiftKey) {
+      // Shift：锁正方形 / 正圆（取拖得更远的那条边，方向跟随指针）
+      var dr = r - tgtShape.anchor.r, dc = c - tgtShape.anchor.c;
+      var s = Math.max(Math.abs(dr), Math.abs(dc));
+      r = tgtShape.anchor.r + (dr < 0 ? -s : s);
+      c = tgtShape.anchor.c + (dc < 0 ? -s : s);
+      r = Math.max(0, Math.min(currentLevel.rows - 1, r));
+      c = Math.max(0, Math.min(currentLevel.cols - 1, c));
+    }
+    if (r === tgtShape.cur.r && c === tgtShape.cur.c) return;
+    tgtShape.cur = { r: r, c: c };
+    tgtShapeDrawPreview();
+  }
+
+  function tgtShapeCommit() {
+    var st = tgtShape; tgtShape = null;
+    tgtShapeClearPreview();
+    if (!st || !currentLevel) return;
+    var L = AntSolver.LevelEditor;
+    var col = st.erase ? 0 : ((L && L.currentColor) ? L.currentColor() : 1);
+    var cells = tgtShapeCells(st.spec, st.anchor, st.cur);
+    var ops = [];
+    for (var i = 0; i < cells.length; i++) {
+      var from = currentLevel.blocks[cells[i].r][cells[i].c];
+      if (from === col) continue;
+      ops.push({ r: cells[i].r, c: cells[i].c, from: from, to: col });
+      currentLevel.blocks[cells[i].r][cells[i].c] = col;
+    }
+    if (!ops.length) return;
+    tgtPaintStack.push({ cells: ops });     // 整块一条记录 → 一次 Ctrl+Z 撤回整个形状
+    if (tgtPaintStack.length > TGT_PAINT_STACK_MAX) tgtPaintStack.shift();
+    syncEntryBlocks(currentLevel.blocks);   // 【v155】改完同样同步到条目
+    editRecomputeCounts();
+    renderTarget(lastTargetElim);
+    renderLevelInfo();
+    editCheckDirty();
+    if (L && L.onLevelChanged) L.onLevelChanged();
+    if (L && L.onPaintChanged) L.onPaintChanged(tgtPaintStack.length);
+  }
+
   function tgtPaintAt(e) {
     if (!tgtPaint) return;
+    if (tgtShapeSpec()) return;            // 【v358】形状工具时不做逐格刷（拖动交给 tgtShapeMove）
     var pos = tgtCellFromEvent(e);
     if (!pos) return;
     var L = AntSolver.LevelEditor;
@@ -3897,7 +4071,13 @@ AntSolver.App = (function() {
   function tgtPaintUndo() {
     if (!tgtPaintStack.length || !currentLevel) return;
     var op = tgtPaintStack.pop();
-    currentLevel.blocks[op.r][op.c] = op.from;
+    if (op.cells) {                       // 【v358】形状填充：一条记录 = 一整块，逐格还原
+      for (var i = op.cells.length - 1; i >= 0; i--) {
+        currentLevel.blocks[op.cells[i].r][op.cells[i].c] = op.cells[i].from;
+      }
+    } else {
+      currentLevel.blocks[op.r][op.c] = op.from;
+    }
     syncEntryBlocks(currentLevel.blocks);   // 【v155】撤回同样同步
     editRecomputeCounts();
     renderTarget(lastTargetElim);
@@ -3909,7 +4089,7 @@ AntSolver.App = (function() {
   /** 开关目标区画笔（由摆盒面板的按钮调用）。on 省略 = 取反。 */
   function tgtPaintToggle(on) {
     tgtPaint = (on == null) ? !tgtPaint : !!on;
-    if (!tgtPaint) tgtPainting = false;
+    if (!tgtPaint) { tgtPainting = false; tgtShape = null; tgtShapeClearPreview(); }
     var vp = document.getElementById('target-viewport');
     if (vp) vp.classList.toggle('painting', tgtPaint);
     if (AntSolver.LevelEditor && AntSolver.LevelEditor.onPaintChanged) AntSolver.LevelEditor.onPaintChanged(tgtPaintStack.length);

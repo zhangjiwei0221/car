@@ -202,6 +202,14 @@ section h3 span { color: var(--muted); font-weight: normal; }
   touch-action: none;
 }
 #target-canvas.grabbing { cursor: grabbing; }
+/* 【v358】形状填充（矩形/圆形）预览层：盖在目标图上、跟着同一位移，不吃鼠标事件 */
+#target-shape-overlay {
+  position: absolute;
+  left: 0; top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 2;
+}
 .zoom-btn {
   font-size: 11px;
   padding: 1px 7px;

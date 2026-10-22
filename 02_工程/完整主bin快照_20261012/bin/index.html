@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>车接小人 v357 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
-  <link rel="stylesheet" href="css/style.css?v=357">
+  <title>车接小人 v358 · 圈序v8·每层重算·顺序闪白·摆盒v6·形状填充·压力图现算·锚点切盒·数字冰v151</title>
+  <link rel="stylesheet" href="css/style.css?v=358">
 </head>
 <body>
   <header>
     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v357</span></h1>
+    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v6·形状填充·压力图现算·锚点切盒·数字冰v151">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v358</span></h1>
     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
          退出模拟就自动回到生成器的参数面板。 -->
@@ -83,6 +83,8 @@
         <div id="gen-result-banner" class="gen-result-banner hidden"></div>
         <div id="target-viewport">
           <canvas id="target-canvas"></canvas>
+          <!-- 【v358】形状填充（矩形/圆形）的拖拽预览层：不写进关卡数据，松手才提交 -->
+          <canvas id="target-shape-overlay" class="hidden"></canvas>
         </div>
       </section>
 
@@ -141,7 +143,7 @@
         </div>
         <div class="ctl-row">
           <label>工具</label>
-          <select id="edit-tool" title="放车=点空格放/点车改写；橡皮=清空该格；黑块=永久阻挡；数字冰/锁链/问号=给已放好的车加标记（单击切换）；管道=放管口并在下面编辑它的队列；吸管=把该格的颜色与载客量读进控件">
+          <select id="edit-tool" title="放车=点空格放/点车改写；橡皮=清空该格；黑块=永久阻挡；数字冰/锁链/问号=给已放好的车加标记（单击切换）；管道=放管口并在下面编辑它的队列；吸管=把该格的颜色与载客量读进控件；矩形/圆形=在目标图上拖一块区域批量上色（要先开「✏️ 改目标图」）">
             <option value="place" selected>🖐 放车 / 改写</option>
             <option value="erase">🧽 橡皮（清空该格）</option>
             <option value="black">⬛ 黑块（障碍）</option>
@@ -150,7 +152,18 @@
             <option value="question">❓ 问号（隐藏颜色）</option>
             <option value="pipe">🪠 管道（放管口/改方向）</option>
             <option value="pick">💧 吸管（取该格）</option>
+            <option value="rect">▭ 矩形（目标图·拖动）</option>
+            <option value="circle">◯ 圆形（目标图·拖动）</option>
           </select>
+        </div>
+        <!-- 【v358】形状填充方式：只对「矩形/圆形」工具生效 -->
+        <div class="ctl-row">
+          <label>形状</label>
+          <select id="edit-shape-fill" title="矩形/圆形怎么填：实心 = 区域内全铺满；只画边框 = 只留最外一圈。拖动时按住 Shift 锁正方形/正圆；右键拖 = 擦成空位">
+            <option value="fill" selected>实心（铺满）</option>
+            <option value="outline">只画边框</option>
+          </select>
+          <span style="font-size:11px;color:#8a7358">Shift=正方/正圆</span>
         </div>
         <!-- 【v134】管道/锁链/数字冰 参数行 -->
         <div class="ctl-row">
@@ -898,20 +911,20 @@
     </div>
   </div>
 
-  <script src="js/zip.js?v=357"></script>
-  <script src="js/utils.js?v=357"></script>
+  <script src="js/zip.js?v=358"></script>
+  <script src="js/utils.js?v=358"></script>
   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
-  <script src="js/color-libs.js?v=357"></script>
-  <script src="js/simulator.js?v=357"></script>
+  <script src="js/color-libs.js?v=358"></script>
+  <script src="js/simulator.js?v=358"></script>
   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
-  <script src="js/anchor-cut.js?v=357"></script>
-  <script src="js/solver-strategy.js?v=357"></script>
-  <script src="js/solver.js?v=357"></script>
-  <script src="js/playersim.js?v=357"></script>
-  <script src="js/generator.js?v=357"></script>
-  <script src="js/analysis.js?v=357"></script>
+  <script src="js/anchor-cut.js?v=358"></script>
+  <script src="js/solver-strategy.js?v=358"></script>
+  <script src="js/solver.js?v=358"></script>
+  <script src="js/playersim.js?v=358"></script>
+  <script src="js/generator.js?v=358"></script>
+  <script src="js/analysis.js?v=358"></script>
   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
-  <script src="js/level-editor.js?v=357"></script>
-  <script src="js/app.js?v=357"></script>
+  <script src="js/level-editor.js?v=358"></script>
+  <script src="js/app.js?v=358"></script>
 </body>
 </html>

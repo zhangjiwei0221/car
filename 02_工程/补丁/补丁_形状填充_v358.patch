@@ -1,0 +1,461 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css"
+index 05dd183..889df9d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css"
+@@ -202,6 +202,14 @@ section h3 span { color: var(--muted); font-weight: normal; }
+   touch-action: none;
+ }
+ #target-canvas.grabbing { cursor: grabbing; }
++/* 【v358】形状填充（矩形/圆形）预览层：盖在目标图上、跟着同一位移，不吃鼠标事件 */
++#target-shape-overlay {
++  position: absolute;
++  left: 0; top: 0;
++  transform-origin: 0 0;
++  pointer-events: none;
++  z-index: 2;
++}
+ .zoom-btn {
+   font-size: 11px;
+   padding: 1px 7px;
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index cb2a605..de70fda 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -3,13 +3,13 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车接小人 v357 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=357">
++  <title>车接小人 v358 · 圈序v8·每层重算·顺序闪白·摆盒v6·形状填充·压力图现算·锚点切盒·数字冰v151</title>
++  <link rel="stylesheet" href="css/style.css?v=358">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v357</span></h1>
++    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v6·形状填充·压力图现算·锚点切盒·数字冰v151">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v358</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -83,6 +83,8 @@
+         <div id="gen-result-banner" class="gen-result-banner hidden"></div>
+         <div id="target-viewport">
+           <canvas id="target-canvas"></canvas>
++          <!-- 【v358】形状填充（矩形/圆形）的拖拽预览层：不写进关卡数据，松手才提交 -->
++          <canvas id="target-shape-overlay" class="hidden"></canvas>
+         </div>
+       </section>
+ 
+@@ -141,7 +143,7 @@
+         </div>
+         <div class="ctl-row">
+           <label>工具</label>
+-          <select id="edit-tool" title="放车=点空格放/点车改写；橡皮=清空该格；黑块=永久阻挡；数字冰/锁链/问号=给已放好的车加标记（单击切换）；管道=放管口并在下面编辑它的队列；吸管=把该格的颜色与载客量读进控件">
++          <select id="edit-tool" title="放车=点空格放/点车改写；橡皮=清空该格；黑块=永久阻挡；数字冰/锁链/问号=给已放好的车加标记（单击切换）；管道=放管口并在下面编辑它的队列；吸管=把该格的颜色与载客量读进控件；矩形/圆形=在目标图上拖一块区域批量上色（要先开「✏️ 改目标图」）">
+             <option value="place" selected>🖐 放车 / 改写</option>
+             <option value="erase">🧽 橡皮（清空该格）</option>
+             <option value="black">⬛ 黑块（障碍）</option>
+@@ -150,8 +152,19 @@
+             <option value="question">❓ 问号（隐藏颜色）</option>
+             <option value="pipe">🪠 管道（放管口/改方向）</option>
+             <option value="pick">💧 吸管（取该格）</option>
++            <option value="rect">▭ 矩形（目标图·拖动）</option>
++            <option value="circle">◯ 圆形（目标图·拖动）</option>
+           </select>
+         </div>
++        <!-- 【v358】形状填充方式：只对「矩形/圆形」工具生效 -->
++        <div class="ctl-row">
++          <label>形状</label>
++          <select id="edit-shape-fill" title="矩形/圆形怎么填：实心 = 区域内全铺满；只画边框 = 只留最外一圈。拖动时按住 Shift 锁正方形/正圆；右键拖 = 擦成空位">
++            <option value="fill" selected>实心（铺满）</option>
++            <option value="outline">只画边框</option>
++          </select>
++          <span style="font-size:11px;color:#8a7358">Shift=正方/正圆</span>
++        </div>
+         <!-- 【v134】管道/锁链/数字冰 参数行 -->
+         <div class="ctl-row">
+           <label>管道方向</label>
+@@ -898,20 +911,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=357"></script>
+-  <script src="js/utils.js?v=357"></script>
++  <script src="js/zip.js?v=358"></script>
++  <script src="js/utils.js?v=358"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=357"></script>
+-  <script src="js/simulator.js?v=357"></script>
++  <script src="js/color-libs.js?v=358"></script>
++  <script src="js/simulator.js?v=358"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=357"></script>
+-  <script src="js/solver-strategy.js?v=357"></script>
+-  <script src="js/solver.js?v=357"></script>
+-  <script src="js/playersim.js?v=357"></script>
+-  <script src="js/generator.js?v=357"></script>
+-  <script src="js/analysis.js?v=357"></script>
++  <script src="js/anchor-cut.js?v=358"></script>
++  <script src="js/solver-strategy.js?v=358"></script>
++  <script src="js/solver.js?v=358"></script>
++  <script src="js/playersim.js?v=358"></script>
++  <script src="js/generator.js?v=358"></script>
++  <script src="js/analysis.js?v=358"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=357"></script>
+-  <script src="js/app.js?v=357"></script>
++  <script src="js/level-editor.js?v=358"></script>
++  <script src="js/app.js?v=358"></script>
+ </body>
+ </html>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 3910bfe..356cb8d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -334,6 +334,9 @@ AntSolver.App = (function() {
+   function applyTargetTransform() {
+     var canvas = document.getElementById('target-canvas');
+     if (canvas) canvas.style.transform = 'translate(' + targetPan.x + 'px,' + targetPan.y + 'px)';
++    // 【v358】形状预览层与目标图同一位移，否则放大平移后预览会错位
++    var shapeOv = document.getElementById('target-shape-overlay');
++    if (shapeOv) shapeOv.style.transform = 'translate(' + targetPan.x + 'px,' + targetPan.y + 'px)';
+   }
+   function clampTargetPan() {
+     var vp = document.getElementById('target-viewport'), canvas = document.getElementById('target-canvas');
+@@ -387,16 +390,36 @@ AntSolver.App = (function() {
+     var dragging = false, sx = 0, sy = 0;
+     canvas.addEventListener('pointerdown', function (e) {
+       // 【v133】目标区画笔开启时，在目标图上按下 = 上色（或擦除/吸管），此时不平移。
+-      if (tgtPaint) { tgtPainting = true; tgtPaintAt(e); try { canvas.setPointerCapture(e.pointerId); } catch (x) { } return; }
++      // 【v358】当前工具是「矩形/圆形」时改成"按住拖出一块区域"：起点只记锚点，
++      //   拖动过程只画预览，松手才一次性写入（整块一次撤回）。
++      if (tgtPaint) {
++        var shapePos = tgtCellFromEvent(e);
++        if (shapePos && tgtShapeSpec()) {
++          e.preventDefault();
++          tgtShapeBegin(e, shapePos);
++          try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
++          return;
++        }
++        tgtPainting = true; tgtPaintAt(e); try { canvas.setPointerCapture(e.pointerId); } catch (x) { } return;
++      }
+       dragging = true; canvas.classList.add('grabbing'); sx = e.clientX - targetPan.x; sy = e.clientY - targetPan.y; try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
+     });
+     canvas.addEventListener('pointermove', function (e) {
+-      if (tgtPaint) { if (tgtPainting) tgtPaintAt(e); return; }   // 按住拖动 = 连续刷
++      if (tgtPaint) {
++        if (tgtShape) { tgtShapeMove(e); return; }                  // 【v358】形状：只更新预览
++        if (tgtPainting) tgtPaintAt(e); return;                     // 按住拖动 = 连续刷
++        return;
++      }
+       if (!dragging) return; targetPan.x = e.clientX - sx; targetPan.y = e.clientY - sy; clampTargetPan();
+     });
+-    function endDrag() { dragging = false; tgtPainting = false; canvas.classList.remove('grabbing'); }
++    function endDrag() {
++      if (tgtShape) tgtShapeCommit();     // 【v358】松手提交整块形状
++      dragging = false; tgtPainting = false; canvas.classList.remove('grabbing');
++    }
+     canvas.addEventListener('pointerup', endDrag);
+     canvas.addEventListener('pointercancel', endDrag);
++    // 形状模式下右键拖动 = 擦成空位，所以不能弹系统菜单
++    canvas.addEventListener('contextmenu', function (e) { if (tgtPaint && tgtShapeSpec()) e.preventDefault(); });
+     // 滚轮缩放（以视口为中心）
+     canvas.addEventListener('wheel', function (e) { e.preventDefault(); zoomTarget(e.deltaY < 0 ? 1.2 : 1 / 1.2); }, { passive: false });
+   }
+@@ -3846,11 +3869,15 @@ AntSolver.App = (function() {
+   //   改前目标图只能整张导入；现在在「手动摆盒」里可以直接点/拖改单个像素
+   //   （画笔 = 当前颜色；橡皮工具 = 擦成空位；吸管工具 = 把该像素的颜色读给画笔），带撤回。
+   //   只做微调：不提供改尺寸/整片填充（要那些用 参考/目标图TXT编辑器_可手动框选版）。
++  //   【v358】用户要求「手动摆盘里面，增加矩形，圆形等」→ 工具下拉里加了「▭ 矩形 / ◯ 圆形」：
++  //     在目标图上按住拖出一块区域，松手一次性填成当前颜色（或右键拖 = 擦成空位），
++  //     实心/只画边框由「形状」下拉切换，Shift = 正方形/正圆。整块一次撤销。
+   //   与目标图原有的「拖拽平移」互斥：画笔开启时按下 = 上色，不再平移；滚轮缩放照旧，方便放大到单格细调。
+   var tgtPaint = false;         // 画笔开关
+   var tgtPainting = false;      // 本次按下是否正在连续刷
+-  var tgtPaintStack = [];       // 撤回栈 [{r,c,from,to}]
++  var tgtPaintStack = [];       // 撤回栈：单格 {r,c,from,to}；形状 {cells:[{r,c,from,to}]}（整块一次撤回）
+   var TGT_PAINT_STACK_MAX = 500;
++  var tgtShape = null;          // 【v358】拖形状时的状态 {anchor,cur,spec,erase}
+ 
+   function tgtCellFromEvent(e) {
+     var canvas = document.getElementById('target-canvas');
+@@ -3866,8 +3893,155 @@ AntSolver.App = (function() {
+     return { r: r, c: c };
+   }
+ 
++  // ==================== 【v358】目标区形状填充（矩形 / 圆形） ====================
++  //   拖拽只是"框范围"，中途不写数据；松手才一次性提交，撤销也是一次撤掉整块。
++  function tgtShapeSpec() {
++    var L = AntSolver.LevelEditor;
++    return (L && L.shapeSpec) ? L.shapeSpec() : null;   // {shape:'rect'|'circle', fill:bool} 或 null
++  }
++
++  /** 把「拖出来的范围」展开成格子清单。矩形 = 外接框；圆形 = 外接框内切椭圆（格子中心落在椭圆内）。 */
++  function tgtShapeCells(spec, anchor, cur) {
++    var rmin = Math.min(anchor.r, cur.r), rmax = Math.max(anchor.r, cur.r);
++    var cmin = Math.min(anchor.c, cur.c), cmax = Math.max(anchor.c, cur.c);
++    var out = [], r, c;
++    if (spec.shape === 'rect') {
++      for (r = rmin; r <= rmax; r++) {
++        for (c = cmin; c <= cmax; c++) {
++          if (!spec.fill && r > rmin && r < rmax && c > cmin && c < cmax) continue;   // 空心 = 只留一圈边框
++          out.push({ r: r, c: c });
++        }
++      }
++      return out;
++    }
++    var cx = (cmin + cmax + 1) / 2, cy = (rmin + rmax + 1) / 2;
++    var rx = (cmax - cmin + 1) / 2, ry = (rmax - rmin + 1) / 2;
++    var irx = rx - 1, iry = ry - 1;                   // 空心：内圈半径缩 1 格（缩没了就把整圆当实心画）
++    for (r = rmin; r <= rmax; r++) {
++      for (c = cmin; c <= cmax; c++) {
++        var dx = (c + 0.5 - cx) / rx, dy = (r + 0.5 - cy) / ry;
++        if (dx * dx + dy * dy > 1.0001) continue;
++        if (!spec.fill && irx >= 0.5 && iry >= 0.5) {
++          var ix = (c + 0.5 - cx) / irx, iy = (r + 0.5 - cy) / iry;
++          if (ix * ix + iy * iy <= 1.0001) continue;
++        }
++        out.push({ r: r, c: c });
++      }
++    }
++    return out;
++  }
++
++  function tgtShapeRgba(hex, a) {
++    var rgb = hexToRgb(hex || '');
++    if (!rgb) return 'rgba(210,112,31,' + a + ')';
++    return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + a + ')';
++  }
++
++  /** 预览层：与目标图同尺寸、同平移的透明 canvas（不写进关卡数据）。 */
++  function tgtShapeOverlay() {
++    var cv = document.getElementById('target-canvas');
++    var ov = document.getElementById('target-shape-overlay');
++    if (!cv || !ov) return null;
++    if (ov.width !== cv.width || ov.height !== cv.height) {
++      ov.width = cv.width; ov.height = cv.height;
++      ov.style.width = cv.width + 'px'; ov.style.height = cv.height + 'px';
++    }
++    ov.style.transform = 'translate(' + targetPan.x + 'px,' + targetPan.y + 'px)';
++    ov.classList.remove('hidden');
++    return ov;
++  }
++
++  function tgtShapeDrawPreview() {
++    if (!tgtShape || !currentLevel) return;
++    var ov = tgtShapeOverlay();
++    if (!ov) return;
++    var ctx = ov.getContext('2d');
++    ctx.clearRect(0, 0, ov.width, ov.height);
++    var step = ov.width / currentLevel.cols;
++    var gap = step > 7 ? 1 : 0;
++    var cell = Math.max(1, step - gap);
++    var L = AntSolver.LevelEditor;
++    var col = tgtShape.erase ? 0 : ((L && L.currentColor) ? L.currentColor() : 1);
++    ctx.fillStyle = tgtShape.erase ? 'rgba(224,60,60,.55)' : tgtShapeRgba(AntSolver.getColorCSS(col), .55);
++    var cells = tgtShapeCells(tgtShape.spec, tgtShape.anchor, tgtShape.cur);
++    for (var i = 0; i < cells.length; i++) {
++      ctx.fillRect(cells[i].c * step, cells[i].r * step, cell, cell);
++    }
++    // 虚线外框：空心时也能一眼看出拖了多大范围
++    var rmin = Math.min(tgtShape.anchor.r, tgtShape.cur.r), rmax = Math.max(tgtShape.anchor.r, tgtShape.cur.r);
++    var cmin = Math.min(tgtShape.anchor.c, tgtShape.cur.c), cmax = Math.max(tgtShape.anchor.c, tgtShape.cur.c);
++    ctx.strokeStyle = 'rgba(60,46,31,.75)';
++    ctx.lineWidth = 1;
++    ctx.setLineDash([4, 3]);
++    ctx.strokeRect(cmin * step + 0.5, rmin * step + 0.5, (cmax - cmin + 1) * step - 1, (rmax - rmin + 1) * step - 1);
++    ctx.setLineDash([]);
++  }
++
++  function tgtShapeClearPreview() {
++    var ov = document.getElementById('target-shape-overlay');
++    if (!ov) return;
++    var ctx = ov.getContext('2d');
++    ctx.clearRect(0, 0, ov.width, ov.height);
++    ov.classList.add('hidden');
++  }
++
++  function tgtShapeBegin(e, pos) {
++    var spec = tgtShapeSpec();
++    if (!spec) return;
++    // 右键拖 = 擦成空位；左键拖 = 用当前颜色填
++    tgtShape = { anchor: { r: pos.r, c: pos.c }, cur: { r: pos.r, c: pos.c }, spec: spec, erase: (e.button === 2) };
++    tgtPainting = false;
++    tgtShapeDrawPreview();
++  }
++
++  function tgtShapeMove(e) {
++    if (!tgtShape) return;
++    var pos = tgtCellFromEvent(e);
++    if (!pos) return;
++    var r = pos.r, c = pos.c;
++    if (e.shiftKey) {
++      // Shift：锁正方形 / 正圆（取拖得更远的那条边，方向跟随指针）
++      var dr = r - tgtShape.anchor.r, dc = c - tgtShape.anchor.c;
++      var s = Math.max(Math.abs(dr), Math.abs(dc));
++      r = tgtShape.anchor.r + (dr < 0 ? -s : s);
++      c = tgtShape.anchor.c + (dc < 0 ? -s : s);
++      r = Math.max(0, Math.min(currentLevel.rows - 1, r));
++      c = Math.max(0, Math.min(currentLevel.cols - 1, c));
++    }
++    if (r === tgtShape.cur.r && c === tgtShape.cur.c) return;
++    tgtShape.cur = { r: r, c: c };
++    tgtShapeDrawPreview();
++  }
++
++  function tgtShapeCommit() {
++    var st = tgtShape; tgtShape = null;
++    tgtShapeClearPreview();
++    if (!st || !currentLevel) return;
++    var L = AntSolver.LevelEditor;
++    var col = st.erase ? 0 : ((L && L.currentColor) ? L.currentColor() : 1);
++    var cells = tgtShapeCells(st.spec, st.anchor, st.cur);
++    var ops = [];
++    for (var i = 0; i < cells.length; i++) {
++      var from = currentLevel.blocks[cells[i].r][cells[i].c];
++      if (from === col) continue;
++      ops.push({ r: cells[i].r, c: cells[i].c, from: from, to: col });
++      currentLevel.blocks[cells[i].r][cells[i].c] = col;
++    }
++    if (!ops.length) return;
++    tgtPaintStack.push({ cells: ops });     // 整块一条记录 → 一次 Ctrl+Z 撤回整个形状
++    if (tgtPaintStack.length > TGT_PAINT_STACK_MAX) tgtPaintStack.shift();
++    syncEntryBlocks(currentLevel.blocks);   // 【v155】改完同样同步到条目
++    editRecomputeCounts();
++    renderTarget(lastTargetElim);
++    renderLevelInfo();
++    editCheckDirty();
++    if (L && L.onLevelChanged) L.onLevelChanged();
++    if (L && L.onPaintChanged) L.onPaintChanged(tgtPaintStack.length);
++  }
++
+   function tgtPaintAt(e) {
+     if (!tgtPaint) return;
++    if (tgtShapeSpec()) return;            // 【v358】形状工具时不做逐格刷（拖动交给 tgtShapeMove）
+     var pos = tgtCellFromEvent(e);
+     if (!pos) return;
+     var L = AntSolver.LevelEditor;
+@@ -3897,7 +4071,13 @@ AntSolver.App = (function() {
+   function tgtPaintUndo() {
+     if (!tgtPaintStack.length || !currentLevel) return;
+     var op = tgtPaintStack.pop();
+-    currentLevel.blocks[op.r][op.c] = op.from;
++    if (op.cells) {                       // 【v358】形状填充：一条记录 = 一整块，逐格还原
++      for (var i = op.cells.length - 1; i >= 0; i--) {
++        currentLevel.blocks[op.cells[i].r][op.cells[i].c] = op.cells[i].from;
++      }
++    } else {
++      currentLevel.blocks[op.r][op.c] = op.from;
++    }
+     syncEntryBlocks(currentLevel.blocks);   // 【v155】撤回同样同步
+     editRecomputeCounts();
+     renderTarget(lastTargetElim);
+@@ -3909,7 +4089,7 @@ AntSolver.App = (function() {
+   /** 开关目标区画笔（由摆盒面板的按钮调用）。on 省略 = 取反。 */
+   function tgtPaintToggle(on) {
+     tgtPaint = (on == null) ? !tgtPaint : !!on;
+-    if (!tgtPaint) tgtPainting = false;
++    if (!tgtPaint) { tgtPainting = false; tgtShape = null; tgtShapeClearPreview(); }
+     var vp = document.getElementById('target-viewport');
+     if (vp) vp.classList.toggle('painting', tgtPaint);
+     if (AntSolver.LevelEditor && AntSolver.LevelEditor.onPaintChanged) AntSolver.LevelEditor.onPaintChanged(tgtPaintStack.length);
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/level-editor.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/level-editor.js"
+index f9971b6..cbde621 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/level-editor.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/level-editor.js"
+@@ -30,7 +30,10 @@
+   var curColor = 1;
+   var curCount = 3;
+   // 【v138】'ice' → 'numice'：手动摆盘只出【数字冰】(type 7)，老冰(type 4)已弃用（用户 2026-10-14）。
+-  var tool = 'place';      // place | erase | black | numice | chain | question | pipe | pick
++  var tool = 'place';      // place | erase | black | numice | chain | question | pipe | pick | rect | circle
++  // 【v358】目标区形状工具：rect=矩形 / circle=圆形（只在「改目标图」开启后生效，见 app.js 的 tgtPaint）。
++  //   fill=true 实心铺满；false = 只画一圈边框。形状拖动时按住 Shift = 正方形/正圆。
++  var shapeFill = true;
+   var curDir = 13;         // 【v134】管道方向：11↑ 12→ 13↓ 14←（与官方 type 一致）
+   var curChain = 1;        // 当前锁链组号（同号成一组）
+   // 【v138】数字冰：数值 = 还剩几个球。与实机一致：每取走一个球减 1，锁链一步拿 2 个就减 2，减到 0 破碎。
+@@ -377,6 +380,7 @@
+   //   这三个标记只作用在【车】上（空格先放车再加），这样口径简单：标记是车的属性。
+   function applyTool(r, c) {
+     var cell = working.cells[r][c];
++    if (tool === 'rect' || tool === 'circle') return '形状工具不作用在车场：它只给「目标图」上色';   // 【v358】
+     if (tool === 'erase') { working.cells[r][c] = null; return null; }
+     if (tool === 'black') { working.cells[r][c] = { t: 'black' }; return null; }
+     // 【v138】数字冰（取代老冰）：点车加/去；数值可调 —— 输入框改个数再点同一格＝改数值，
+@@ -417,6 +421,11 @@
+     var pos = cellAt(e.target);
+     if (!pos) return;
+     e.preventDefault();
++    // 【v358】形状工具只在目标图上用（车场那边是逐格摆，不做形状）
++    if (tool === 'rect' || tool === 'circle') {
++      status('矩形 / 圆形只用在「目标图」上：先点「✏️ 改目标图：开」，再在目标图上按住拖动');
++      return;
++    }
+     var r = pos.r, c = pos.c;
+     var cell = working.cells[r][c];
+ 
+@@ -516,8 +525,13 @@
+     var btn = e.target && e.target.closest ? e.target.closest('.edit-swatch') : null;
+     if (!btn) return;
+     curColor = parseInt(btn.getAttribute('data-color'), 10) || 1;
+-    tool = ($('edit-tool') || {}).value || tool;
+-    var sel = $('edit-tool'); if (sel && sel.value !== 'place') { sel.value = 'place'; tool = 'place'; }
++    var sel = $('edit-tool');
++    if (sel && (sel.value === 'rect' || sel.value === 'circle')) {
++      tool = sel.value;                     // 【v358】选颜色不打断形状工具（否则在目标图上一拖又变回逐格刷）
++    } else {
++      tool = (sel || {}).value || tool;
++      if (sel && sel.value !== 'place') { sel.value = 'place'; tool = 'place'; }
++    }
+     renderPalette();
+     renderBoard();
+     renderValidate();
+@@ -650,9 +664,19 @@
+     if (tool === 'erase') return '擦成空位（0）';
+     if (tool === 'pick') return '吸管：点一下就取该像素的颜色当画笔';
+     if (tool === 'black') return '目标图没有黑块 → 按「擦掉」处理';
++    if (tool === 'rect' || tool === 'circle') {
++      return (tool === 'rect' ? '矩形' : '圆形') + (shapeFill ? '（实心）' : '（只画边框）') +
++        '：在目标图上<b>按住拖</b>出一块区域，松手一次性填成当前颜色；<b>Shift</b> = 正方形/正圆；<b>右键拖</b> = 擦成空位';
++    }
+     return '用 ' + A.getColorName(curColor) + '（编号 ' + curColor + '）上色';
+   }
+ 
++  /** 【v358】当前是不是形状工具（供 app.js 的目标区画笔判断走「拖形状」还是「逐格刷」）。 */
++  function shapeSpec() {
++    if (tool !== 'rect' && tool !== 'circle') return null;
++    return { shape: tool, fill: !!shapeFill };
++  }
++
+   function onPaintChanged() {
+     var on = !!(host && host.paint && host.paint.isOn && host.paint.isOn());
+     var btn = $('edit-paint-target');
+@@ -800,6 +824,18 @@
+     if (val) val.addEventListener('click', onValidateClick);
+     var tsel = $('edit-tool');
+     if (tsel) tsel.addEventListener('change', function () { tool = this.value; renderBoard(); onPaintChanged(); });
++    // 【v358】形状工具（矩形/圆形）的填充方式：实心 / 只画边框
++    var sfSel = $('edit-shape-fill');
++    if (sfSel) {
++      sfSel.value = shapeFill ? 'fill' : 'outline';
++      sfSel.addEventListener('change', function () {
++        shapeFill = (this.value !== 'outline');
++        status((tool === 'rect' || tool === 'circle')
++          ? ('形状填充方式 → ' + (shapeFill ? '实心' : '只画边框'))
++          : '形状填充方式 → ' + (shapeFill ? '实心' : '只画边框') + '（选「矩形/圆形」工具后在目标图上拖动）');
++        onPaintChanged();
++      });
++    }
+     // 【v134】管道/锁链/数字冰的参数控件
+     var dirSel = $('edit-pipe-dir');
+     if (dirSel) {
+@@ -892,6 +928,7 @@
+     currentColor: currentColor,
+     setColor: setColor,
+     toolMode: toolMode,
++    shapeSpec: shapeSpec,      // 【v358】{shape:'rect'|'circle', fill:bool} 或 null；app.js 的目标区画笔据此走「拖形状」
+     onLevelChanged: onLevelChanged,
+     onPaintChanged: onPaintChanged
+   };

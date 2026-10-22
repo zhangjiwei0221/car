@@ -30,7 +30,10 @@
   var curColor = 1;
   var curCount = 3;
   // 【v138】'ice' → 'numice'：手动摆盘只出【数字冰】(type 7)，老冰(type 4)已弃用（用户 2026-10-14）。
-  var tool = 'place';      // place | erase | black | numice | chain | question | pipe | pick
+  var tool = 'place';      // place | erase | black | numice | chain | question | pipe | pick | rect | circle
+  // 【v358】目标区形状工具：rect=矩形 / circle=圆形（只在「改目标图」开启后生效，见 app.js 的 tgtPaint）。
+  //   fill=true 实心铺满；false = 只画一圈边框。形状拖动时按住 Shift = 正方形/正圆。
+  var shapeFill = true;
   var curDir = 13;         // 【v134】管道方向：11↑ 12→ 13↓ 14←（与官方 type 一致）
   var curChain = 1;        // 当前锁链组号（同号成一组）
   // 【v138】数字冰：数值 = 还剩几个球。与实机一致：每取走一个球减 1，锁链一步拿 2 个就减 2，减到 0 破碎。
@@ -377,6 +380,7 @@
   //   这三个标记只作用在【车】上（空格先放车再加），这样口径简单：标记是车的属性。
   function applyTool(r, c) {
     var cell = working.cells[r][c];
+    if (tool === 'rect' || tool === 'circle') return '形状工具不作用在车场：它只给「目标图」上色';   // 【v358】
     if (tool === 'erase') { working.cells[r][c] = null; return null; }
     if (tool === 'black') { working.cells[r][c] = { t: 'black' }; return null; }
     // 【v138】数字冰（取代老冰）：点车加/去；数值可调 —— 输入框改个数再点同一格＝改数值，
@@ -417,6 +421,11 @@
     var pos = cellAt(e.target);
     if (!pos) return;
     e.preventDefault();
+    // 【v358】形状工具只在目标图上用（车场那边是逐格摆，不做形状）
+    if (tool === 'rect' || tool === 'circle') {
+      status('矩形 / 圆形只用在「目标图」上：先点「✏️ 改目标图：开」，再在目标图上按住拖动');
+      return;
+    }
     var r = pos.r, c = pos.c;
     var cell = working.cells[r][c];
 
@@ -516,8 +525,13 @@
     var btn = e.target && e.target.closest ? e.target.closest('.edit-swatch') : null;
     if (!btn) return;
     curColor = parseInt(btn.getAttribute('data-color'), 10) || 1;
-    tool = ($('edit-tool') || {}).value || tool;
-    var sel = $('edit-tool'); if (sel && sel.value !== 'place') { sel.value = 'place'; tool = 'place'; }
+    var sel = $('edit-tool');
+    if (sel && (sel.value === 'rect' || sel.value === 'circle')) {
+      tool = sel.value;                     // 【v358】选颜色不打断形状工具（否则在目标图上一拖又变回逐格刷）
+    } else {
+      tool = (sel || {}).value || tool;
+      if (sel && sel.value !== 'place') { sel.value = 'place'; tool = 'place'; }
+    }
     renderPalette();
     renderBoard();
     renderValidate();
@@ -650,7 +664,17 @@
     if (tool === 'erase') return '擦成空位（0）';
     if (tool === 'pick') return '吸管：点一下就取该像素的颜色当画笔';
     if (tool === 'black') return '目标图没有黑块 → 按「擦掉」处理';
+    if (tool === 'rect' || tool === 'circle') {
+      return (tool === 'rect' ? '矩形' : '圆形') + (shapeFill ? '（实心）' : '（只画边框）') +
+        '：在目标图上<b>按住拖</b>出一块区域，松手一次性填成当前颜色；<b>Shift</b> = 正方形/正圆；<b>右键拖</b> = 擦成空位';
+    }
     return '用 ' + A.getColorName(curColor) + '（编号 ' + curColor + '）上色';
+  }
+
+  /** 【v358】当前是不是形状工具（供 app.js 的目标区画笔判断走「拖形状」还是「逐格刷」）。 */
+  function shapeSpec() {
+    if (tool !== 'rect' && tool !== 'circle') return null;
+    return { shape: tool, fill: !!shapeFill };
   }
 
   function onPaintChanged() {
@@ -800,6 +824,18 @@
     if (val) val.addEventListener('click', onValidateClick);
     var tsel = $('edit-tool');
     if (tsel) tsel.addEventListener('change', function () { tool = this.value; renderBoard(); onPaintChanged(); });
+    // 【v358】形状工具（矩形/圆形）的填充方式：实心 / 只画边框
+    var sfSel = $('edit-shape-fill');
+    if (sfSel) {
+      sfSel.value = shapeFill ? 'fill' : 'outline';
+      sfSel.addEventListener('change', function () {
+        shapeFill = (this.value !== 'outline');
+        status((tool === 'rect' || tool === 'circle')
+          ? ('形状填充方式 → ' + (shapeFill ? '实心' : '只画边框'))
+          : '形状填充方式 → ' + (shapeFill ? '实心' : '只画边框') + '（选「矩形/圆形」工具后在目标图上拖动）');
+        onPaintChanged();
+      });
+    }
     // 【v134】管道/锁链/数字冰的参数控件
     var dirSel = $('edit-pipe-dir');
     if (dirSel) {
@@ -892,6 +928,7 @@
     currentColor: currentColor,
     setColor: setColor,
     toolMode: toolMode,
+    shapeSpec: shapeSpec,      // 【v358】{shape:'rect'|'circle', fill:bool} 或 null；app.js 的目标区画笔据此走「拖形状」
     onLevelChanged: onLevelChanged,
     onPaintChanged: onPaintChanged
   };
