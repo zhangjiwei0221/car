@@ -1,0 +1,182 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index d0897f3..558b5b1 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -3,13 +3,13 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车接小人 v351 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
+-  <link rel="stylesheet" href="css/style.css?v=351">
++  <title>车接小人 v352 · 圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线</title>
++  <link rel="stylesheet" href="css/style.css?v=352">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v351</span></h1>
++    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v5·压力图现算·锚点切盒·数字冰v151·选择余地曲线">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v352</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -389,7 +389,7 @@
+         </select>
+         <span class="gen-hint" id="gen-search-plan">≈ 4 轮 × 45 秒</span>
+       </div>
+-      <div class="gen-row" style="margin-top:8px" title="切球方式。按暴露顺序=车单跟着目标图吐料的先后排，并把早露的颜色摆在棋盘上方（越早暴露越靠上），容量取总像素 2.5%±1% 浮动；按依赖层=先洋葱剥层，再按「层×色」切；按颜色总量=旧切法。">
++      <div class="gen-row" style="margin-top:8px" title="切球方式。按暴露顺序=车单跟着目标图吐料的先后排，并把早露的颜色摆在棋盘上方（越早暴露越靠上）；按依赖层=先洋葱剥层，再按「层×色」切；按颜色总量=旧切法。">
+         <label>切球方式</label>
+         <select id="gen-cutmode" style="width:200px">
+           <option value="layerCut2" selected>按依赖层切（推荐）</option>
+@@ -397,6 +397,15 @@
+           <option value="">按颜色总量切</option>
+         </select>
+       </div>
++      <!-- 【v352·用户裁决】指针/路线：用路径工具画一条消除路线，导出 JSON 后从这里导入，
++           生成器按该路线的【颜色先后】切车单 —— 目标图能消什么仍由几何决定，这里只改「先给哪个颜色的车」。 -->
++      <div class="gen-row" style="margin-top:8px" title="导入路径工具导出的 JSON。生成器按该路线给出的颜色先后切球，让玩家从你指定的方向突破。只在「按暴露顺序切」模式下生效。">
++        <label>路线（指针）</label>
++        <button id="btn-import-route" style="padding:3px 10px">导入路线 JSON</button>
++        <button id="btn-clear-route" style="padding:3px 10px">清除</button>
++        <span class="gen-hint" id="gen-route-name">未导入（不导入 = 按目标图自动顺序）</span>
++      </div>
++      <input type="file" id="route-input" accept=".json" style="display:none">
+       
+       </div>
+ 
+@@ -889,20 +898,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=351"></script>
+-  <script src="js/utils.js?v=351"></script>
++  <script src="js/zip.js?v=352"></script>
++  <script src="js/utils.js?v=352"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=351"></script>
+-  <script src="js/simulator.js?v=351"></script>
++  <script src="js/color-libs.js?v=352"></script>
++  <script src="js/simulator.js?v=352"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=351"></script>
+-  <script src="js/solver-strategy.js?v=351"></script>
+-  <script src="js/solver.js?v=351"></script>
+-  <script src="js/playersim.js?v=351"></script>
+-  <script src="js/generator.js?v=351"></script>
+-  <script src="js/analysis.js?v=351"></script>
++  <script src="js/anchor-cut.js?v=352"></script>
++  <script src="js/solver-strategy.js?v=352"></script>
++  <script src="js/solver.js?v=352"></script>
++  <script src="js/playersim.js?v=352"></script>
++  <script src="js/generator.js?v=352"></script>
++  <script src="js/analysis.js?v=352"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=351"></script>
+-  <script src="js/app.js?v=351"></script>
++  <script src="js/level-editor.js?v=352"></script>
++  <script src="js/app.js?v=352"></script>
+ </body>
+ </html>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 05950f2..3910bfe 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -9,6 +9,8 @@ var AntSolver = AntSolver || {};
+ 
+ AntSolver.App = (function() {
+   var currentLevel = null;
++  // 【v352·用户裁决】路线（指针）：路径工具导出的颜色顺序，导入后替代自动暴露序（null = 不启用）
++  var currentRouteOrder = null, currentRouteName = '';
+   var currentImportedSolve = null;  // 从关卡包导入的【求解数据】(审核那一轮)：有则复用、免网页重算；无则重新求解
+   var currentGenerationEval = null; // 当前生成/导入关卡的统一全知+玩家压力/封锁诊断，压力图优先复用同一口径
+   // 【v120】当前关卡的卡点类型信息与位置（仅本次在页面上生成的关卡才有；导入的关卡本体不含这些）。
+@@ -678,6 +680,42 @@ AntSolver.App = (function() {
+     if (libInput) libInput.addEventListener('change', handleLibSelect);
+     // 导入整个关卡包(文件夹)：webkitdirectory 递归取全部文件，复用同一配对逻辑
+     bindClick('btn-import-pack', function () { var d = document.getElementById('lib-dir-input'); if (d) d.click(); });
++    // 【v352·用户裁决】路线（指针）导入
++    bindClick('btn-import-route', function () { var d = document.getElementById('route-input'); if (d) d.click(); });
++    bindClick('btn-clear-route', function () {
++      currentRouteOrder = null; currentRouteName = '';
++      var el = document.getElementById('gen-route-name');
++      if (el) el.textContent = '未导入（不导入 = 按目标图自动顺序）';
++    });
++    (function () {
++      var ri = document.getElementById('route-input');
++      if (!ri) return;
++      ri.addEventListener('change', function (e) {
++        var f = e.target.files && e.target.files[0];
++        if (!f) return;
++        var rd = new FileReader();
++        rd.onload = function (ev) {
++          try {
++            var j = JSON.parse(ev.target.result);
++            var arr = [];
++            if (j && j.order && j.order.length) {
++              for (var i = 0; i < j.order.length; i++) {
++                var o = j.order[i];
++                arr.push(typeof o === 'number' ? o : o.color);
++              }
++            } else if (j && j.routeOrder) arr = j.routeOrder.slice();
++            arr = arr.map(Number).filter(function (x) { return !isNaN(x); });
++            if (!arr.length) { alert('这个 JSON 里没有颜色顺序（需要 order 或 routeOrder 字段）'); return; }
++            currentRouteOrder = arr;
++            currentRouteName = f.name;
++            var el = document.getElementById('gen-route-name');
++            if (el) el.textContent = f.name + ' → ' + arr.join(' → ');
++          } catch (err) { alert('JSON 解析失败: ' + err.message); }
++        };
++        rd.readAsText(f);
++        e.target.value = '';
++      });
++    })();
+     var libDir = document.getElementById('lib-dir-input');
+     if (libDir) libDir.addEventListener('change', handleLibSelect);
+     bindClick('btn-export-lib', exportLibrary);
+@@ -2001,7 +2039,9 @@ AntSolver.App = (function() {
+       capJitter: (function () {
+         var v = parseInt((document.getElementById('gen-capjitter') || {}).value, 10);
+         return isNaN(v) ? 5 : Math.max(0, Math.min(30, v));
+-      })()
++      })(),
++      // 【v352·用户裁决】路线（指针）给出的颜色先后；null/空 = 用目标图自动暴露序
++      routeOrder: (currentRouteOrder && currentRouteOrder.length) ? currentRouteOrder.slice() : undefined
+       // 难度参数已删除：难度由生产合格后的求解器反推(Analysis.difficulty)计算；diffLevel 用内部默认(2)
+     };
+   }
+@@ -4709,7 +4749,9 @@ AntSolver.App = (function() {
+       capJitter: (function () {
+         var v = parseInt((document.getElementById('gen-capjitter') || {}).value, 10);
+         return isNaN(v) ? 5 : Math.max(0, Math.min(30, v));
+-      })()
++      })(),
++      // 【v352】路线（指针）颜色先后
++      routeOrder: (currentRouteOrder && currentRouteOrder.length) ? currentRouteOrder.slice() : undefined
+     });
+     try {
+       genLog('棋盘：行 ' + _norm.rowsMin + '~' + _norm.rowsMax + ' · 列 ' + _norm.colsMin + '~' + _norm.colsMax +
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 0f7c791..b237fba 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -11746,6 +11746,20 @@ AntSolver.Generator = (function() {
+       byRound[p.color][p.round] = (byRound[p.color][p.round] || 0) + 1;
+     }
+     var colors = Object.keys(firstRound).map(Number).sort(function (a, b) { return firstRound[a] - firstRound[b]; });
++    // 【v352·用户裁决】「指针」路线序：用路径工具画的那条线给出的颜色顺序，替代自动排的暴露序。
++    //   用户原话："我画这个指针的目的就是为了能够通过小车的选取让他从那个方向开始进行进入"。
++    //   机制说明（不改任何底层规则）：目标图上能消什么仍由「贴边或邻接已消」决定，
++    //   这里只改【先给玩家哪个颜色的车】，从而改变他实际把消除推进到哪一边。
++    //   实测（006，浮动容量）：路径序 8/8 通关；自动序 8/8。两者都能出关，差别在路线走向。
++    if (config && config.routeOrder && config.routeOrder.length) {
++      var route = [], _seen = {};
++      for (var qi = 0; qi < config.routeOrder.length; qi++) {
++        var _v = parseInt(config.routeOrder[qi], 10);
++        if (!isNaN(_v) && byRound[_v] && !_seen[_v]) { _seen[_v] = 1; route.push(_v); }
++      }
++      for (var ci2 = 0; ci2 < colors.length; ci2++) if (!_seen[colors[ci2]]) { _seen[colors[ci2]] = 1; route.push(colors[ci2]); }
++      if (route.length) colors = route;
++    }
+ 
+     // 【v351·用户裁决】上限 = 界面上的「球容量」参数（config.boxSizeMax，默认 60）；
+     //   每辆车在【上限 − 浮动, 上限】之间取值，浮动幅度由用户自己设（config.capJitter，默认 5）。
