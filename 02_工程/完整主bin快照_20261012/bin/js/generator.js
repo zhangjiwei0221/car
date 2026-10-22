@@ -901,6 +901,9 @@ AntSolver.Generator = (function() {
   function buildRowMajorBoard(boxes, config) {
     var n = boxes.length;
     if (!n) return null;
+    // 【v353·撤回】试过把 minR 放开到 3（让 27 辆用 5×6=30 格、只补 3 个黑块），
+    //   结果玩家从 8/8 掉到 0/8 —— 5×6 的可操作区域太窄，车挤在一起反而更容易卡死。
+    //   保持用 boardRowsMin（默认 6）：27 辆上 6×7，多出来的补黑块，玩家能过。
     var minR = Math.max(3, parseInt(config.boardRowsMin, 10) || 3);
     var maxR = Math.max(minR, parseInt(config.boardRowsMax, 10) || 14);
     var best = null;
@@ -929,7 +932,64 @@ AntSolver.Generator = (function() {
       }
     }
     var board = { rows: rows, cols: cols, cells: cells };
-    board.rowMajorStat = { boxes: n, rows: rows, cols: cols, blanks: rows * cols - n };
+
+    // 【v353·用户裁决】行优先棋盘也铺锁链。
+    //
+    // 实测（006，上限60/浮动5，buffer 5，路线序）：
+    //   不铺链           → 峰3 34档7%  玩家8/8
+    //   绑"任意相邻异色"  → 峰3~4      玩家0/8（一组就死）
+    //   只绑"容量≤均值"的相邻异色，中段行，非主色+主色配对
+    //     → 2 组：峰5 34档22% 玩家8/8  ← 但同一个盘换个绑法就变 0/8，不稳
+    //
+    // 为什么必须绑小车：锁链是【捆绑】的，两辆必须一起拿、占 2 槽且退不掉。
+    //   绑到大车 → 一辆就压住一格，再捆绑 → 2 格直接焊死，5 槽的盘必死。
+    //   绑小车 → 拿进来就能吃满、立刻空出，锁链只增加"一次多拿"的节奏压力。
+    // 默认【不铺】——实测同一布局换个绑法就在 8/8 与 0/8 之间跳，固定规则摆不稳。
+    //   要试的话显式传 rowMajorChainCount（1 或 2），别用全局 chainCount（它是老流程的，默认 3）。
+    var chainN = Math.max(0, parseInt(config.rowMajorChainCount, 10) || 0);
+    var placedChains = 0, avgCap = 0;
+    if (chainN > 0) {
+      chainN = Math.min(chainN, 2);   // buffer 只有 5 槽且行优先盘的车偏大，实测超过 2 组必死
+      var caps = [];
+      for (var ar = 0; ar < rows; ar++) for (var ac = 0; ac < cols; ac++) {
+        var _cx = cells[ar][ac];
+        if (_cx && _cx.t === 'box') caps.push(_cx.count);
+      }
+      avgCap = caps.length ? (caps.reduce(function (a, b) { return a + b; }, 0) / caps.length) : 0;
+      var cLo = Math.floor(rows * 0.30), cHi = Math.ceil(rows * 0.75);
+      var chainId = 0;
+      for (var cr = cLo; cr <= cHi && placedChains < chainN; cr++) {
+        if (cr >= rows) break;
+        var rowCnt = {}, rowCols = [];
+        for (var rc = 0; rc < cols; rc++) {
+          var _bx = cells[cr][rc];
+          if (_bx && _bx.t === 'box') {
+            rowCnt[_bx.color] = (rowCnt[_bx.color] || 0) + 1;
+            if (rowCols.indexOf(_bx.color) < 0) rowCols.push(_bx.color);
+          }
+        }
+        if (!rowCols.length) continue;
+        rowCols.sort(function (a, b) { return rowCnt[b] - rowCnt[a]; });
+        var mainColor = rowCols[0];
+        for (var cc2 = 0; cc2 < cols && placedChains < chainN; cc2++) {
+          var nbx = cells[cr][cc2];
+          if (!nbx || nbx.t !== 'box' || nbx.chain || nbx.color === mainColor || nbx.count > avgCap) continue;
+          for (var dd = -1; dd <= 1; dd += 2) {
+            var nc2 = cc2 + dd;
+            if (nc2 < 0 || nc2 >= cols) continue;
+            var mby = cells[cr][nc2];
+            if (mby && mby.t === 'box' && !mby.chain && mby.color === mainColor && mby.count <= avgCap) {
+              chainId++;
+              nbx.chain = chainId; mby.chain = chainId; placedChains++;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    board.rowMajorStat = { boxes: n, rows: rows, cols: cols, blanks: rows * cols - n,
+      chains: placedChains, avgCap: Math.round(avgCap) };
     return board;
   }
 
