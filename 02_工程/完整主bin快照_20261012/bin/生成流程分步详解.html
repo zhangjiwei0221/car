@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>关卡生成流程 · 分步详解</title>
+<style>
+  :root{
+    --bg:#070b14; --panel:#0c1526; --panel2:#101d33; --line:rgba(120,170,255,.16);
+    --text:#dce9ff; --dim:#8fa9c9; --blue:#4d96ff; --cyan:#2ec4b6; --yellow:#ffd93d;
+    --red:#ff6b6b; --purple:#c77dff; --orange:#ff9f1c; --green:#6bcb77;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(1200px 800px at 50% -10%,#0d1a31,#070b14 55%,#05070c);
+    color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{display:grid;grid-template-columns:260px minmax(0,1fr);gap:34px;max-width:1480px;margin:0 auto;padding:34px 28px 100px}
+  aside{position:sticky;top:26px;align-self:start;height:calc(100vh - 52px);overflow:auto}
+  .brand{font-size:13px;letter-spacing:.16em;color:var(--dim);margin-bottom:6px}
+  .brand b{color:#fff;letter-spacing:.06em}
+  h1{font-size:25px;line-height:1.25;margin:0 0 8px}
+  .sub{color:var(--dim);font-size:12.5px;margin-bottom:22px}
+  nav{display:flex;flex-direction:column;gap:4px;border-left:1px solid var(--line);padding-left:12px}
+  nav a{display:flex;gap:9px;align-items:baseline;text-decoration:none;color:var(--dim);font-size:12.5px;padding:6px 8px;border-radius:8px}
+  nav a b{color:#5f7ea8;font-size:11px;min-width:18px}
+  nav a:hover{background:rgba(77,150,255,.08);color:#cfe3ff}
+  nav a.on{background:rgba(77,150,255,.13);color:#fff}
+  nav a.on b{color:var(--yellow)}
+  .meta{margin-top:22px;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(16,29,51,.55);font-size:11.5px;color:var(--dim)}
+  main{min-width:0}
+  .hero{border:1px solid var(--line);background:linear-gradient(180deg,rgba(16,29,51,.8),rgba(9,17,31,.6));
+    border-radius:18px;padding:26px 28px;margin-bottom:24px}
+  .hero h2{margin:0 0 10px;font-size:20px}
+  .hero p{margin:0;color:var(--dim);font-size:13.5px}
+  .hero .tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+  .tag{font-size:11px;border:1px solid var(--line);color:#a9c6e8;background:rgba(77,150,255,.06);border-radius:999px;padding:4px 9px}
+  section.step{border:1px solid var(--line);background:rgba(12,21,38,.72);border-radius:18px;padding:24px 26px;margin:0 0 20px;scroll-margin-top:24px}
+  .step-head{display:flex;gap:15px;align-items:flex-start;margin-bottom:18px}
+  .num{flex:0 0 auto;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-weight:800;
+    background:linear-gradient(145deg,rgba(77,150,255,.22),rgba(46,196,182,.10));border:1px solid rgba(77,150,255,.3);color:#cfe7ff}
+  .step-head h3{margin:0 0 3px;font-size:17.5px}
+  .step-head p{margin:0;color:var(--dim);font-size:12.5px}
+  .split{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:22px;align-items:start}
+  .visual{border:1px solid var(--line);border-radius:14px;background:
+    linear-gradient(rgba(77,150,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(77,150,255,.035) 1px,transparent 1px),rgba(8,15,28,.8);
+    background-size:24px 24px,24px 24px,auto;padding:18px;min-height:210px;position:relative;overflow:hidden}
+  .detail h4{margin:0 0 7px;font-size:13px;color:#e8f2ff}
+  .detail p{margin:0 0 9px;color:#b8cde6;font-size:12.8px}
+  .detail ul{margin:6px 0 10px;padding-left:18px;color:#b8cde6;font-size:12.8px}
+  .detail li{margin:3px 0}
+  .detail code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#a8d8ff;background:rgba(77,150,255,.1);padding:1px 5px;border-radius:5px}
+  table{width:100%;border-collapse:collapse;font-size:12px;color:#c4d6ec;margin:8px 0 12px}
+  th,td{text-align:left;border-bottom:1px solid rgba(120,170,255,.12);padding:6px 7px;vertical-align:top}
+  th{color:#86a6c9;font-weight:600;font-size:11px}
+  .status{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 7px;margin-left:5px;border:1px solid}
+  .ok{color:#9ff0dd;border-color:rgba(46,196,182,.4);background:rgba(46,196,182,.08)}
+  .wip{color:#ffe58a;border-color:rgba(255,217,61,.4);background:rgba(255,217,61,.08)}
+  .no{color:#ffb3b3;border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.08)}
+  .note{font-size:11.5px;color:var(--dim);border-left:2px solid rgba(77,150,255,.4);padding-left:9px;margin-top:10px}
+
+  /* --- 视觉组件 --- */
+  .pixel{display:grid;grid-template-columns:repeat(11,1fr);gap:2px;width:210px;margin:4px auto 8px}
+  .pixel i{aspect-ratio:1;border-radius:2px;display:block;opacity:.9}
+  .pixel i.dim{opacity:.15}
+  .scan{position:absolute;left:0;right:0;height:2px;background:#7fd0ff;box-shadow:0 0 14px #4d96ff;top:58%}
+  .target-label,.tiny{font-size:10.5px;color:#7f9ec1;text-align:center;letter-spacing:.05em}
+  .cars{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+  .car{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:10px;font-weight:800;color:rgba(0,0,0,.55);box-shadow:0 0 14px rgba(77,150,255,.14)}
+  .arrow{color:#5f7ea8;font-size:18px;text-align:center;margin:6px 0}
+  .board{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;width:232px;margin:0 auto}
+  .board i{aspect-ratio:1;border:1px solid rgba(120,170,255,.16);border-radius:4px;background:rgba(77,150,255,.045)}
+  .board i.full{border-color:rgba(255,255,255,.12)}
+  .board i.extra{border-style:dashed;border-color:rgba(120,220,255,.65);background:rgba(46,196,182,.07)}
+  .pipebox{display:flex;gap:10px;justify-content:center;margin-top:12px}
+  .pipe{width:58px;border:1px solid rgba(120,170,255,.35);border-radius:22px;padding:6px 5px;background:rgba(7,16,30,.85)}
+  .pipe b{display:block;text-align:center;font-size:9.5px;color:#7f9ec1;font-weight:600;margin-bottom:4px}
+  .pipe .dot{width:18px;height:18px;border-radius:5px;margin:3px auto;box-shadow:0 0 10px rgba(0,0,0,.3)}
+  .pipe .cap{text-align:center;font-size:9px;color:#6f8db1;margin-top:4px}
+  .lanes{display:flex;flex-direction:column;gap:9px}
+  .lane{display:grid;grid-template-columns:48px 1fr;gap:9px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:7px;background:rgba(77,150,255,.04)}
+  .lane b{font-size:16px;text-align:center;color:#cfe7ff}
+  .lane span{font-size:10px;color:#7f9ec1;display:block;text-align:center}
+  .nodes{display:flex;align-items:center;gap:5px;min-width:0}
+  .node{width:38px;height:38px;border-radius:50%;border:1px solid rgba(120,170,255,.28);display:grid;place-items:center;
+    font-size:10px;color:#a9c6e8;background:rgba(12,21,38,.9);flex:0 0 auto}
+  .node.hot{border-color:rgba(120,220,255,.85);background:rgba(30,60,110,.95);color:#fff;box-shadow:0 0 16px rgba(77,150,255,.35)}
+  .dash{height:1px;flex:1;background:repeating-linear-gradient(90deg,rgba(120,170,255,.4) 0 4px,transparent 4px 8px)}
+  .cards4{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .op{border:1px solid var(--line);border-radius:10px;padding:9px;background:rgba(77,150,255,.045)}
+  .op b{display:block;font-size:12px;color:#e8f2ff;margin-bottom:3px}
+  .op em{font-style:normal;font-size:10.5px;color:#8fa9c9}
+  .flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;font-size:11px;color:#9db8dd}
+  .pill{border:1px solid var(--line);border-radius:999px;padding:5px 9px;background:rgba(12,21,38,.9)}
+  .pill.hot{border-color:rgba(255,217,61,.55);color:#ffe58a}
+  .meter{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+  .meter .row{display:grid;grid-template-columns:45px 1fr 38px;gap:7px;align-items:center;font-size:10.5px;color:#9db8dd}
+  .meter .track{height:6px;border-radius:5px;background:rgba(120,170,255,.13);overflow:hidden}
+  .meter .track i{display:block;height:100%;border-radius:5px}
+  .stamp{position:absolute;right:18px;bottom:16px;border:2px solid rgba(46,196,182,.8);color:#9ff0dd;border-radius:8px;
+    padding:5px 10px;font-weight:800;font-size:13px;transform:rotate(-8deg);background:rgba(46,196,182,.06)}
+  .statusline{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .badge{font-size:10.5px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;color:#9db8dd}
+  .badge.good{border-color:rgba(46,196,182,.4);color:#9ff0dd}
+  .badge.warn{border-color:rgba(255,217,61,.4);color:#ffe58a}
+  .badge.bad{border-color:rgba(255,107,107,.4);color:#ffb3b3}
+
+  @media (max-width:1080px){.wrap{grid-template-columns:1fr}aside{position:static;height:auto}nav{flex-direction:row;flex-wrap:wrap;border-left:0;padding-left:0}.split{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <div class="brand"><b>车接小人</b> · 生成流程</div>
+    <h1>关卡生成<br>分步详解</h1>
+    <div class="sub">当前实现 v407 · 不是动画，按步骤拆开</div>
+    <nav id="nav">
+      <a href="#s0"><b>00</b>奶奶版</a>
+      <a href="#s1"><b>01</b>切车</a>
+      <a href="#s2"><b>02</b>选盘</a>
+      <a href="#s3"><b>03</b>障碍与管道</a>
+      <a href="#s4"><b>04</b>候选生成</a>
+      <a href="#s5"><b>05</b>求解与四玩家</a>
+      <a href="#s6"><b>06</b>诊断主因</a>
+      <a href="#s7"><b>07</b>ABC 三基底</a>
+      <a href="#s8"><b>08</b>A1–A4 修复</a>
+      <a href="#s9"><b>09</b>接受/回滚</a>
+      <a href="#s10"><b>10</b>qPass 与输出</a>
+    </nav>
+    <div class="meta">
+      红线：容量区间不缩放 · 可解+守恒是硬门 · 单管 ≤4 辆<br>
+      当前：ABC 仍是顺序跑前 3 个基底。
+    </div>
+  </aside>
+
+  <main>
+    <div class="hero">
+      <h2>先把“生成”拆成 10 个可检查的步骤</h2>
+      <p>每一步只回答一个问题：这一步输入什么、改了什么、输出什么、失败会怎样。下面不是自动播放，而是静态分步说明。</p>
+      <div class="tags">
+        <span class="tag">硬门 2 条</span><span class="tag">四玩家</span><span class="tag">T / R / free / J</span>
+        <span class="tag">A1–A4 修复</span><span class="tag">qPass 带上限</span>
+      </div>
+    </div>
+
+    <section class="step" id="s0">
+      <div class="step-head"><div class="num">00</div><div><h3>先看这个：奶奶版</h3><p>不讲代码，只讲这件事像什么。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="flow" style="flex-direction:column;align-items:stretch;gap:9px">
+            <div class="lane"><b style="font-size:20px">🧩</b><div><span>一张彩色拼图</span><div class="tiny" style="text-align:left">目标图：很多彩色小方块拼成一个人/一个图案</div></div></div>
+            <div class="lane"><b style="font-size:20px">🚚</b><div><span>拆成一辆辆小推车</span><div class="tiny" style="text-align:left">每辆车只装一种颜色，装 31~35 块</div></div></div>
+            <div class="lane"><b style="font-size:20px">🅿️</b><div><span>停进停车场</span><div class="tiny" style="text-align:left">棋盘 6×7 个车位；车要停得下</div></div></div>
+            <div class="lane"><b style="font-size:20px">✋</b><div><span>玩家手里只有 5 个手位</span><div class="tiny" style="text-align:left">同色凑齐才能消；手满了就输</div></div></div>
+            <div class="lane"><b style="font-size:20px">🧊</b><div><span>路上有冰、锁链、传送带</span><div class="tiny" style="text-align:left">冰要等；链要占两个手位；管道里看不见</div></div></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>一句话</h4>
+          <p><b>把一张彩色拼图拆成小推车，停进停车场，让玩家一辆辆拉走；工厂做很多遍，挑一版“能过、又有点难”的。</b></p>
+          <h4>七个动作</h4>
+          <ol style="padding-left:18px;color:#b8cde6;font-size:12.8px">
+            <li><b>拆图</b>：把图案按颜色装车；</li>
+            <li><b>找停车场</b>：选一个装得下的棋盘；</li>
+            <li><b>设路障</b>：摆冰、锁链、传送带；</li>
+            <li><b>试玩</b>：四个不同水平的试玩员；</li>
+            <li><b>体检</b>：qPass 看各项指标；</li>
+            <li><b>修理</b>：A1~A4 按毛病修；</li>
+            <li><b>交付</b>：合格的叫“合格”，不合格也给你看，标“偏松”。</li>
+          </ol>
+          <div class="note">你玩到的一关，就是这七步里“试玩 + 体检”之后的结果。</div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px" class="split">
+        <div class="visual">
+          <h4 style="margin:0 0 8px;color:#e8f2ff">四个试玩员</h4>
+          <div class="cards4">
+            <div class="op"><b>🐣 首通</b><em>新手，10 次过几次</em></div>
+            <div class="op"><b>🙂 学会后</b><em>死几次后，能不能过</em></div>
+            <div class="op"><b>🧠 前瞻</b><em>能往前想两步的人</em></div>
+            <div class="op"><b>👁 全知</b><em>开天眼的电脑，必须能过</em></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>体检为什么不是“越高越好”</h4>
+          <table>
+            <tr><th>指标</th><th>奶奶版</th></tr>
+            <tr><td>首通</td><td>新手过太多 → 太简单；过太少 → 太难；要 20~50%</td></tr>
+            <tr><td>学会后</td><td>死几次就会 → 100% 说明“一学就会”，后面没压力；要 55~85%</td></tr>
+            <tr><td>T</td><td>真正需要做选择的步数；太低 = 一条路走到黑</td></tr>
+            <tr><td>R</td><td>高手和普通人差多少；太低 = 大家都走同一条路</td></tr>
+            <tr><td>free</td><td>手里空着、随便拿的免费步；太多 = 没压力</td></tr>
+            <tr><td>J</td><td>死在“看不见”的管道上的比例；太高 = 不公平</td></tr>
+          </table>
+          <div class="note">你说的“没压力”，翻译成体检就是：首通太高、学会后 100%、free 太高、T 太低。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s1">
+      <div class="step-head"><div class="num">01</div><div><h3>切车：目标图 → 车单</h3><p>把像素剪影切成一辆辆“车”，容量由像素分布决定。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="pixel">
+            <i style="background:#ff6b6b"></i><i style="background:#ff6b6b"></i><i class="dim"></i><i class="dim"></i><i style="background:#ffd93d"></i><i style="background:#ffd93d"></i><i style="background:#ffd93d"></i><i class="dim"></i><i style="background:#4d96ff"></i><i style="background:#4d96ff"></i><i class="dim"></i>
+            <i style="background:#ff6b6b"></i><i style="background:#ff6b6b"></i><i style="background:#ff6b6b"></i><i class="dim"></i><i style="background:#ffd93d"></i><i style="background:#ffd93d"></i><i style="background:#ffd93d"></i><i class="dim"></i><i style="background:#4d96ff"></i><i style="background:#4d96ff"></i><i style="background:#4d96ff"></i>
+            <i class="dim"></i><i style="background:#ff6b6b"></i><i style="background:#ff6b6b"></i><i style="background:#6bcb77"></i><i style="background:#6bcb77"></i><i class="dim"></i><i style="background:#6bcb77"></i><i style="background:#6bcb77"></i><i class="dim"></i><i style="background:#4d96ff"></i><i class="dim"></i>
+            <i class="dim"></i><i class="dim"></i><i style="background:#ff6b6b"></i><i style="background:#6bcb77"></i><i style="background:#6bcb77"></i><i style="background:#6bcb77"></i><i style="background:#6bcb77"></i><i style="background:#6bcb77"></i><i style="background:#4d96ff"></i><i class="dim"></i><i class="dim"></i>
+            <i class="dim"></i><i style="background:#c77dff"></i><i style="background:#c77dff"></i><i class="dim"></i><i style="background:#ff9f1c"></i><i style="background:#ff9f1c"></i><i class="dim"></i><i style="background:#4d96ff"></i><i style="background:#4d96ff"></i><i class="dim"></i><i class="dim"></i>
+            <i style="background:#c77dff"></i><i style="background:#c77dff"></i><i class="dim"></i><i class="dim"></i><i style="background:#ff9f1c"></i><i class="dim"></i><i class="dim"></i><i style="background:#2ec4b6"></i><i style="background:#2ec4b6"></i><i class="dim"></i><i class="dim"></i>
+          </div>
+          <div class="scan"></div>
+          <div class="target-label">扫描线 · 按暴露顺序切</div>
+          <div class="cars">
+            <span class="car" style="background:#ff6b6b">31</span>
+            <span class="car" style="background:#ffd93d">30</span>
+            <span class="car" style="background:#4d96ff">34</span>
+            <span class="car" style="background:#6bcb77">31</span>
+            <span class="car" style="background:#c77dff">35</span>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>输入 / 输出</h4>
+          <ul>
+            <li>输入：目标图 TXT（像素颜色 + 剪影）</li>
+            <li>输出：车单 <code>{color, count, due}</code>，总和必须等于像素总数</li>
+          </ul>
+          <h4>两种切法</h4>
+          <table><tr><th>切法</th><th>特点</th></tr>
+            <tr><td><code>exposeCut</code></td><td>按目标图暴露顺序；前沿平均 2~4 时用</td></tr>
+            <tr><td><code>layerCut2</code></td><td>按层切；前沿过大时用</td></tr>
+          </table>
+          <h4>硬约束</h4>
+          <ul>
+            <li>容量区间是用户输入，<b>不缩放、不对半拆</b>；</li>
+            <li>所有车 count 之和 = 目标图像素数（守恒）；</li>
+            <li>切不出车 → 直接跳过这张图。</li>
+          </ul>
+          <div class="note">当前 35×35 图：约 37~39 辆，容量 31~35，棋盘 6×7。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s2">
+      <div class="step-head"><div class="num">02</div><div><h3>选盘：先 board，后 pipe</h3><p>先让盘装下车，再决定哪些车进管道；不再先给管道留空间。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="board">
+            <i class="full" style="background:#ff6b6b"></i><i class="full" style="background:#ffd93d"></i><i class="full" style="background:#4d96ff"></i><i class="full" style="background:#6bcb77"></i><i class="full" style="background:#c77dff"></i><i class="full" style="background:#ff9f1c"></i><i class="full" style="background:#2ec4b6"></i>
+            <i class="full" style="background:#ff6b6b"></i><i class="full" style="background:#ffd93d"></i><i class="full" style="background:#4d96ff"></i><i class="full" style="background:#6bcb77"></i><i class="full" style="background:#c77dff"></i><i class="full" style="background:#ff9f1c"></i><i class="full" style="background:#2ec4b6"></i>
+            <i class="full" style="background:#ff6b6b"></i><i class="full" style="background:#ffd93d"></i><i class="full" style="background:#4d96ff"></i><i class="full" style="background:#6bcb77"></i><i class="full" style="background:#c77dff"></i><i class="full" style="background:#ff9f1c"></i><i class="full" style="background:#2ec4b6"></i>
+            <i class="full" style="background:#ff6b6b"></i><i class="full" style="background:#ffd93d"></i><i class="full" style="background:#4d96ff"></i><i class="full" style="background:#6bcb77"></i><i class="full" style="background:#c77dff"></i><i class="full" style="background:#ff9f1c"></i><i class="full" style="background:#2ec4b6"></i>
+            <i class="full" style="background:#ff6b6b"></i><i class="full" style="background:#ffd93d"></i><i class="full" style="background:#4d96ff"></i><i class="full" style="background:#6bcb77"></i><i class="full" style="background:#c77dff"></i><i class="full" style="background:#ff9f1c"></i><i class="full" style="background:#2ec4b6"></i>
+            <i class="full" style="background:#ff6b6b"></i><i class="full" style="background:#ffd93d"></i><i class="full" style="background:#4d96ff"></i><i class="full" style="background:#6bcb77"></i><i class="full" style="background:#c77dff"></i><i class="full" style="background:#ff9f1c"></i><i class="full" style="background:#2ec4b6"></i>
+            <i class="extra"></i><i class="extra"></i><i class="extra"></i><i class="extra"></i><i class="extra"></i><i class="extra"></i><i class="extra"></i>
+          </div>
+          <div class="tiny" style="margin-top:8px">虚线 = 装不下时优先 +1 行/列</div>
+          <div class="pipebox">
+            <div class="pipe"><b>pipe</b><div class="dot" style="background:#ff6b6b"></div><div class="dot" style="background:#ffd93d"></div><div class="dot" style="background:#4d96ff"></div><div class="dot" style="background:#6bcb77"></div><div class="cap">≤4</div></div>
+            <div class="pipe"><b>pipe</b><div class="dot" style="background:#c77dff"></div><div class="dot" style="background:#ff9f1c"></div><div class="cap">≤4</div></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>选盘顺序</h4>
+          <ul>
+            <li>按车数反推“能装下”的合法尺寸；</li>
+            <li>范围不够先 <code>+1 行</code> / <code>+1 列</code>；</li>
+            <li>盘装得下（<code>overflow≤0</code>）优先于“带管道盘”。</li>
+          </ul>
+          <table><tr><th>项</th><th>当前</th></tr>
+            <tr><td>形状</td><td>列−行 ∈ {1,2}</td></tr>
+            <tr><td>填充</td><td>0.86~0.94 可用空间</td></tr>
+            <tr><td>单管</td><td>最多 4 辆</td></tr>
+            <tr><td>管道数</td><td>maxPipes=2</td></tr>
+          </table>
+          <h4>失败会怎样</h4>
+          <ul><li>加行/列后仍装不下 → 才进管道；</li><li>管道也装不下 → 淘汰该尺寸。</li></ul>
+          <div class="note">006 窄范围实测：5×7 + 管道[4,4] → 6×7 + 管道[]。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s3">
+      <div class="step-head"><div class="num">03</div><div><h3>障碍与管道：三种债</h3><p>冰 = 等待，链 = 同组占 2 槽，管道 = 隐藏信息。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="cards4">
+            <div class="op"><b>❄ 数字冰</b><em>点一次不消，要等/多次</em><div class="tiny" style="text-align:left;margin-top:6px">numice=1/2</div></div>
+            <div class="op"><b>⛓ 锁链</b><em>整组入场，占 2 槽</em><div class="tiny" style="text-align:left;margin-top:6px">chain 同组</div></div>
+            <div class="op"><b>▯ 管道</b><em>藏着未知车，单管≤4</em><div class="tiny" style="text-align:left;margin-top:6px">queue</div></div>
+            <div class="op"><b>▨ 黑格</b><em>永久占格，不用</em><div class="tiny" style="text-align:left;margin-top:6px">black</div></div>
+          </div>
+          <div class="meter">
+            <div class="row"><span>冰</span><div class="track"><i style="width:38%;background:#4d96ff"></i></div><span>中</span></div>
+            <div class="row"><span>链</span><div class="track"><i style="width:58%;background:#c77dff"></i></div><span>多</span></div>
+            <div class="row"><span>管道</span><div class="track"><i style="width:22%;background:#ff9f1c"></i></div><span>少</span></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>管道为什么不是垃圾桶</h4>
+          <ul>
+            <li>溢出才进管道；每管最多 4 辆；</li>
+            <li>管道同时是“未知信息”，死亡会算 J；</li>
+            <li>J &gt; 20% → A1 修；不是继续塞。</li>
+          </ul>
+          <h4>管道死亡为什么可怕</h4>
+          <p>玩家看不到队列里的颜色/数量，第一次死亡无法归因。J 高时优先修公平性，不是加难度。</p>
+          <div class="note">当前：maxPipes=2 · pipeMaxDepth 硬夹 4 · 单管≤4。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s4">
+      <div class="step-head"><div class="num">04</div><div><h3>候选生成：K 轮重新开一关</h3><p>每轮都是从切车/选盘重新来，不是改上一关。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="flow" style="margin:8px 0 14px">
+            <span class="pill">轮1 A</span><span class="pill">轮2 B</span><span class="pill">轮3 C</span><span class="pill">…</span><span class="pill">轮10</span>
+          </div>
+          <div class="flow" style="flex-direction:column;align-items:stretch">
+            <div class="lane"><b style="font-size:12px">切</b><div class="nodes"><span class="node hot">切</span><span class="dash"></span><span class="node">盘</span><span class="dash"></span><span class="node">障</span><span class="dash"></span><span class="node">解</span></div></div>
+            <div class="lane"><b style="font-size:12px">筛</b><div class="nodes"><span class="node">解</span><span class="dash"></span><span class="node hot">玩</span><span class="dash"></span><span class="node">留</span><span class="dash"></span><span class="node">弃</span></div></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>每轮做什么</h4>
+          <ul>
+            <li>换 seed / 切法 / 棋盘 / 结构组合 / 冰排程；</li>
+            <li>求解 + 结构检查 + 玩家粗筛；</li>
+            <li>通过 → 进候选；不通过 → <b>丢弃</b>，不修改；</li>
+            <li>只保留当前最好，qPass 或早停就停。</li>
+          </ul>
+          <h4>时间</h4>
+          <table><tr><th>档</th><th>实际</th></tr>
+            <tr><td>3 分钟</td><td>约 120~160s（10 轮）</td></tr>
+            <tr><td>15 分钟</td><td>约 640s（封顶 40 轮）</td></tr>
+          </table>
+          <div class="note">当前“ABC”还不是真正并行分支；是 K 轮顺序跑，前 3 轮各修一次。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s5">
+      <div class="step-head"><div class="num">05</div><div><h3>求解与四玩家：先能过，再分人</h3><p>全知通关是硬门；四玩家是质量证据。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="flow"><span class="pill hot">全知通关</span><span class="pill">首通</span><span class="pill">学会后</span><span class="pill">前瞻</span></div>
+          <div class="meter">
+            <div class="row"><span>首通</span><div class="track"><i style="width:40%;background:#ffd93d"></i></div><span>40%</span></div>
+            <div class="row"><span>学会</span><div class="track"><i style="width:80%;background:#6bcb77"></i></div><span>80%</span></div>
+            <div class="row"><span>前瞻</span><div class="track"><i style="width:100%;background:#4d96ff"></i></div><span>100%</span></div>
+          </div>
+          <div class="tiny" style="margin-top:10px">四玩家是证据，不是四个独立关卡</div>
+        </div>
+        <div class="detail">
+          <h4>四玩家</h4>
+          <ul>
+            <li><b>首通</b>：贪心/手痒，10 局；</li>
+            <li><b>学会后</b>：≤3 次重试 + 避开上局死色；</li>
+            <li><b>前瞻</b>：2 步、前 6 决策点、3 局采样；</li>
+            <li><b>全知</b>：求解器通关。</li>
+          </ul>
+          <h4>六指标</h4>
+          <table><tr><th>指标</th><th>含义</th></tr>
+            <tr><td>F/W</td><td>前沿宽度 / 选择宽度</td></tr>
+            <tr><td>T/R</td><td>陷阱密度 / 后悔率</td></tr>
+            <tr><td>U/J</td><td>废牌率 / 公平度</td></tr>
+          </table>
+          <div class="note">首通 100% / 学会后 100% 不是“好”，是“没压力”；qPass 有上限。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s6">
+      <div class="step-head"><div class="num">06</div><div><h3>诊断主因：先判，再修</h3><p>每轮只修一个主因，不随机换关。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="cards4">
+            <div class="op"><b>J &gt; 20</b><em>管道/问号死亡</em><div class="badge bad" style="margin-top:6px">A1 公平</div></div>
+            <div class="op"><b>T &lt; 10 / R &lt; 15</b><em>没岔路</em><div class="badge bad" style="margin-top:6px">A2 岔路</div></div>
+            <div class="op"><b>freePct &gt; 50</b><em>开局白给</em><div class="badge bad" style="margin-top:6px">A3 收紧</div></div>
+            <div class="op"><b>learned &lt; 55</b><em>太黑</em><div class="badge warn" style="margin-top:6px">A4 减负</div></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>诊断顺序</h4>
+          <ol style="padding-left:18px;color:#b8cde6;font-size:12.8px">
+            <li>公平性 J；</li>
+            <li>岔路 T/R；</li>
+            <li>开局 free；</li>
+            <li>太黑 learned/look。</li>
+          </ol>
+          <p>顺序不能反：J 不公平时，先修 T 只会更黑；free 太松时，先修 T 会被免费步稀释。</p>
+          <div class="note">诊断是“当前主因”，不是“所有问题一起修”。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s7">
+      <div class="step-head"><div class="num">07</div><div><h3>ABC 三基底：三种结构假设</h3><p>不是三个随机 seed，是三套配方。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="lanes">
+            <div class="lane"><b>A</b><div><span>公平</span><div class="nodes"><span class="node hot">A1</span><span class="dash"></span><span class="node">A2</span><span class="dash"></span><span class="node">A3</span><span class="dash"></span><span class="node">A4</span></div></div></div>
+            <div class="lane"><b>B</b><div><span>密度</span><div class="nodes"><span class="node hot">B1</span><span class="dash"></span><span class="node">B2</span><span class="dash"></span><span class="node">B3</span><span class="dash"></span><span class="node">B4</span></div></div></div>
+            <div class="lane"><b>C</b><div><span>债务</span><div class="nodes"><span class="node hot">C1</span><span class="dash"></span><span class="node">C2</span><span class="dash"></span><span class="node">C3</span><span class="dash"></span><span class="node">C4</span></div></div></div>
+          </div>
+        </div>
+        <div class="detail">
+          <table><tr><th></th><th>A 公平</th><th>B 密度</th><th>C 债务</th></tr>
+            <tr><td>切法</td><td>exposeCut</td><td>layerCut2</td><td>capTie</td></tr>
+            <tr><td>管道</td><td>0</td><td>1 条</td><td>0~1</td></tr>
+            <tr><td>冰</td><td>少</td><td>中</td><td>少</td></tr>
+            <tr><td>链/债</td><td>少</td><td>中</td><td>多</td></tr>
+          </table>
+          <p><b>当前实际：</b>前 3 轮各修一次，仍顺序执行；不是真正三 worker 并行。</p>
+          <div class="statusline"><span class="badge good">配方已定</span><span class="badge warn">并行未接</span><span class="badge warn">各修一遍已接</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s8">
+      <div class="step-head"><div class="num">08</div><div><h3>A1–A4：每步具体改什么</h3><p>不是“修一下”，每一步都有明确的格子级动作。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="cards4">
+            <div class="op"><b>A1 管道公平</b><em>J&gt;20</em><ul style="margin:5px 0 0;padding-left:15px"><li>合并同色上盘</li><li>换位暴露</li><li>移管道/降隐藏</li></ul></div>
+            <div class="op"><b>A2 压力点岔路</b><em>T&lt;10 / R&lt;15</em><ul style="margin:5px 0 0;padding-left:15px"><li>35~70% + free≤1 + full≥2</li><li>加链/冰</li><li>锁安全替代</li></ul></div>
+            <div class="op"><b>A3 收紧开局</b><em>freePct&gt;50</em><ul style="margin:5px 0 0;padding-left:15px"><li>早熟车加冰/链</li><li>换深</li><li>换切法</li></ul></div>
+            <div class="op"><b>A4 太黑减负</b><em>learned&lt;55</em><ul style="margin:5px 0 0;padding-left:15px"><li>拆一组链</li><li>拆一块冰</li><li>加安全替代</li></ul></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h4>A1 具体改动</h4>
+          <pre style="white-space:pre-wrap;color:#a8d8ff;font-size:11px;background:rgba(77,150,255,.06);border:1px solid var(--line);border-radius:8px;padding:8px">pipe.queue.splice(qi,1)
+同色 board.count += car.count
+空管道 → black</pre>
+          <h4>A2 具体改动</h4>
+          <pre style="white-space:pre-wrap;color:#a8d8ff;font-size:11px;background:rgba(77,150,255,.06);border:1px solid var(--line);border-radius:8px;padding:8px">cell(r,c).chain = newGroup
+相邻盒.chain = newGroup
+或 cell.numice = 2</pre>
+          <h4>A3 具体改动</h4>
+          <pre style="white-space:pre-wrap;color:#a8d8ff;font-size:11px;background:rgba(77,150,255,.06);border:1px solid var(--line);border-radius:8px;padding:8px">早熟车 numice=1/2
+或 与相邻盒成链
+或 与 40~65% 债务车交换</pre>
+          <div class="note">A2/A3 都有 T/R/free 守卫：修坏就回滚。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s9">
+      <div class="step-head"><div class="num">09</div><div><h3>接受 / 回滚：每轮都要验证</h3><p>主因改善 ≥5，守卫指标不能恶化。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="flow" style="flex-direction:column;align-items:stretch;gap:8px">
+            <div class="flow"><span class="pill">诊断</span><span class="pill">改一个主因</span><span class="pill hot">重算</span></div>
+            <div class="flow"><span class="pill">主因 ↓≥5</span><span class="pill">T/R 不崩</span><span class="pill">free 不涨</span></div>
+            <div class="flow"><span class="pill" style="border-color:rgba(46,196,182,.5);color:#9ff0dd">接受</span><span class="pill" style="border-color:rgba(255,107,107,.5);color:#ffb3b3">回滚</span></div>
+          </div>
+          <div class="tiny" style="margin-top:10px">不改善 → 试下一个算子；全失败 → 基底 dead</div>
+        </div>
+        <div class="detail">
+          <h4>守卫</h4>
+          <table><tr><th>指标</th><th>限制</th></tr>
+            <tr><td>T / R</td><td>掉 &gt;5 拒绝</td></tr>
+            <tr><td>freePct</td><td>涨 &gt;5 拒绝</td></tr>
+            <tr><td>freeRunMax</td><td>涨 &gt;2 拒绝</td></tr>
+            <tr><td>J</td><td>涨 &gt;5 拒绝</td></tr>
+          </table>
+          <p>最多 3~5 轮；每轮只修一个主因，修不动就换基底，不在一关上死磕。</p>
+          <div class="note">这是“局部搜索”，不是随机重开。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s10">
+      <div class="step-head"><div class="num">10</div><div><h3>qPass 与输出：合格是带，不是越高越好</h3><p>旧 goodV3 只参考；qPass 决定质量标签。</p></div></div>
+      <div class="split">
+        <div class="visual">
+          <div class="stamp">qPass</div>
+          <table style="margin-top:4px"><tr><th>项</th><th>要求</th></tr>
+            <tr><td>首通</td><td>20~50%</td></tr>
+            <tr><td>学会后</td><td>55~85%</td></tr>
+            <tr><td>前瞻</td><td>40~85%</td></tr>
+            <tr><td>T</td><td>≥10%</td></tr>
+            <tr><td>R</td><td>≥15pp</td></tr>
+            <tr><td>freePct</td><td>≤50%</td></tr>
+            <tr><td>freeRunMax</td><td>≤6</td></tr>
+          </table>
+        </div>
+        <div class="detail">
+          <h4>输出语义</h4>
+          <ul>
+            <li><b>qPass=true</b>：质量合格；</li>
+            <li><b>qPass=false</b>：仍输出，标“可玩·偏松/没压力”；</li>
+            <li>ZIP/落库都保留，方便你看原因；</li>
+            <li>“简单合格”是旧 audit，不是 qPass。</li>
+          </ul>
+          <div class="note">你贴的 6×7/38：首通40、学会80、J0，但 T6/free76/run29/look100 → qPass=false。</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="hero" style="margin-top:6px">
+      <h2>当前实现状态（v407）</h2>
+      <p>硬门与 qPass 已有；A1 只做了合并同色上盘，A2/A3/A4 已接但接受率低；ABC 仍顺序跑前 3 个基底。下一步不是继续加时间，而是让 A2/A3 的“找到点 → 改动 → 接受”链路真正跑通。</p>
+      <div class="tags">
+        <span class="tag">可解+守恒 ✅</span><span class="tag">A1 🟡</span><span class="tag">A2 🟡</span>
+        <span class="tag">A3 🟡</span><span class="tag">A4 🟡</span><span class="tag">ABC 并行 ❌</span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // 只做目录高亮，不是动画
+  const links = [...document.querySelectorAll('#nav a')];
+  const secs = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const obs = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id));
+    }
+  }, { rootMargin: '-20% 0px -65% 0px', threshold: 0 });
+  secs.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

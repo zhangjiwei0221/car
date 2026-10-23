@@ -7,6 +7,9 @@
 
 var AntSolver = AntSolver || {};
 
+var APP_BUILD = "459";
+try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+
 AntSolver.App = (function() {
   var currentLevel = null;
   // 【v352·用户裁决】路线（指针）：路径工具导出的颜色顺序，导入后替代自动暴露序（null = 不启用）
@@ -112,6 +115,7 @@ AntSolver.App = (function() {
   //   · 落库仍是「每关写盘确认」，只是由【全局串行门】改为【按关独立】——服务端 persistResult 全同步，
   //     Node 事件循环天然把并发写序列化，因此不存在 CSV/JSONL/计数竞态（已核对 生产服务.js:185）。
   var genPool = [];                     // 线程池槽位：[{ no, w, epoch, ready, busy, idx, watchdog }]
+  var genBranchState = null;            // 【v440】单图目标模式：A/B/C 三个 branch worker
   var genPoolSize = 1;                  // 本批并发线程数（UI 可配；1 = 与改动前的串行行为完全等价）
   var genPoolReadyCount = 0;            // 已握手就绪的槽位数：为 0 时才判定「这个环境用不了 Worker」并整批回退主线程
   var genPoolFellBack = false;          // 是否已回退主线程（只允许发生一次）
@@ -445,9 +449,28 @@ AntSolver.App = (function() {
   var reviveHighlight = null; // { until: 时间戳, slots:[slot...], cells:[{r,c}...] }
   var REVIVE_FLASH_MS = 650;
 
+  // 【v418·用户裁决】左右两栏合并到左侧，右侧只留关卡棋盘，整体 50/50。
+  function mergeSidePanels() {
+    var ml = document.querySelector('.main-layout');
+    if (!ml || document.getElementById('left-stack')) return;
+    var left = document.getElementById('panel-left');
+    var right = document.getElementById('panel-right');
+    if (!left || !right) return;
+    var stack = document.createElement('div');
+    stack.id = 'left-stack';
+    ml.insertBefore(stack, left);
+    stack.appendChild(left);
+    stack.appendChild(right);
+    var btn = document.getElementById('btn-collapse-left');
+    if (btn) btn.style.display = 'none';
+    var rl = document.getElementById('resizer-left'), rr = document.getElementById('resizer-right');
+    if (rl) rl.style.display = 'none';
+    if (rr) rr.style.display = 'none';
+  }
+
   function init() {
+    mergeSidePanels();
     document.getElementById('btn-import-txt').addEventListener('click', importTXT);
-    document.getElementById('btn-generate').addEventListener('click', runGenerate);
     // 【v335】导出"制作过程"HTML（用最近一次生成的结果）
     var _expBtn = document.getElementById('btn-export-process');
     if (_expBtn) _expBtn.addEventListener('click', function () { genExportProcess(window.__lastGenRec); });
@@ -477,6 +500,16 @@ AntSolver.App = (function() {
       if (_smPlan) _smPlan.textContent = '≈ ' + pk + ' 轮 × ' + per + ' 秒（合格早停）';
     };
     if (_smEl) { _smEl.addEventListener('change', syncSearchPlan); syncSearchPlan(); }
+    // 【2026-10-22·用户裁决】生成模式：时间模式用到「每图搜索时间」；目标模式不用（每轮 20s 自动重试）。
+    var _mdEl = document.getElementById('gen-mode');
+    var _mdHint = document.getElementById('gen-mode-hint');
+    var syncGenMode = function () {
+      var goal = !!(_mdEl && _mdEl.value === 'goal');
+      if (_mdHint) _mdHint.textContent = goal ? '不达标一直做；点「结束」输出当前最好' : '到点输出最好';
+      if (_smEl) _smEl.disabled = goal;
+      if (_smPlan) _smPlan.style.opacity = goal ? '0.4' : '1';
+    };
+    if (_mdEl) { _mdEl.addEventListener('change', syncGenMode); syncGenMode(); }
     // 【v153】自动档：切到手动档时把「关卡时长」那行收起来（避免误以为它还有效）
     // 【v153】生产档位：一次设定候选数 / 难度轮数 / 单关时间预算（三个数决定一批多久）
     var _stEl = document.getElementById('gen-speed-tier');
@@ -744,10 +777,7 @@ AntSolver.App = (function() {
     bindClick('btn-export-lib', exportLibrary);
     // v121：显式包一层再传参 —— bindClick 会把 Event 当第一个实参传进去，
     // 直接 bindClick('btn-analyze', batchAnalyze) 会让 opts 变成 MouseEvent（当前恰好等价于单轮，但属隐患）。
-    bindClick('btn-analyze', function () { batchAnalyze({ recalibrate: false }); });
-    bindClick('btn-recalibrate', function () { batchAnalyze({ recalibrate: true }); });
     // 【v156】关卡体检：卡点判据 v2 的只读报告（零参数）。见 runChokeAudit 上方说明。
-    bindClick('btn-choke-audit', runChokeAudit);
 
     // 参数区间双端滑块（v116）：七项区间参数的下限/上限都用滑钮拖。
     //   用户裁决「把上下限做成左右端可拖动的，而不是左端可拖动，右端变成填入」。
@@ -950,16 +980,10 @@ AntSolver.App = (function() {
   //   语义自洽且少一个控件；采样时 lo===hi 也不会掷随机（sampleRangedConfig 内 lo===hi 直接返回）。
   //
   // 每项：[下限控件ID, 上限控件ID, 读数span ID, 单位后缀]
-  var DUAL_RANGES = [
-    ['gen-ice', 'gen-ice-max', 'gen-ice-val', '%'],
-    ['gen-black', 'gen-black-max', 'gen-black-val', '%'],
-    ['gen-chains', 'gen-chains-max', 'gen-chains-val', ''],
-    ['gen-surprise', 'gen-surprise-max', 'gen-surprise-val', '%'],
-    ['gen-min-pipes', 'gen-min-pipes-max', 'gen-min-pipes-val', ''],
-    ['gen-pipe-depth', 'gen-pipe-depth-max', 'gen-pipe-depth-val', ''],
-    ['gen-usable-target', 'gen-usable-target-max', 'gen-usable-target-val', '']
-  ];
-  // 上限ID → 下限ID（applyScheme 兼容旧方案空值时要用）
+  // 【v360】双端滑块的 7 组控件（冰/黑块/锁链/问号/管道下限/管道深度/可用空间）已随
+  //   “障碍设置 / 棋盘尺寸”两段一起从界面删除；绑定函数保留（guard 已处理缺失），数组清空。
+  var DUAL_RANGES = [];
+  // 上限ID → 下限ID（applyScheme 兼容旧方案空值时要用；v360 已无控件，留空对象）
   var DUAL_HI_TO_LO = {};
   DUAL_RANGES.forEach(function (d) { DUAL_HI_TO_LO[d[1]] = d[0]; });
 
@@ -2029,9 +2053,9 @@ AntSolver.App = (function() {
       // 换球区域：仅供【卡点B支】chokeSwap 划分早/后期用；基础阶段不换球(v86起)
       swapRegionMin: parseInt((document.getElementById('gen-swap-min') || {}).value) || 0,
       swapRegionMax: (function () { var v = (document.getElementById('gen-swap-max') || {}).value; return (v === '' || v == null) ? 100 : parseInt(v); })(),
-      icePercent: parseInt(document.getElementById('gen-ice').value) || 0,
-      blackPercent: parseInt(document.getElementById('gen-black').value) || 0,
-      chainCount: parseInt(document.getElementById('gen-chains').value) || 0,
+      icePercent: parseInt((document.getElementById('gen-ice') || {}).value) || 0,
+      blackPercent: parseInt((document.getElementById('gen-black') || {}).value) || 0,
+      chainCount: parseInt((document.getElementById('gen-chains') || {}).value) || 0,
       questionPercent: parseInt((document.getElementById('gen-surprise') || {}).value) || 0,
       // 【v145】棋盘自适应：默认 true —— 行列范围由车数反推，手填范围降级为"偏好"（装不下会自动兜底）。
       // 【v151】按「选择余地」曲线挑关卡（实验，默认关）
@@ -4801,22 +4825,28 @@ AntSolver.App = (function() {
       chainCount: 0, chainCountMin: 0, chainCountMax: 4,
       questionPercent: 8, questionPercentMin: 8, questionPercentMax: 16,
       narrowPath: true, narrowPathProb: 1, minPipes: 0,
-      pipeFloorCount: 2, pipeFallbackCount: 2, pipeMaxDepth: 6, pipeMinFill: 4
+      pipeFloorCount: 2, pipeFallbackCount: 2, pipeMaxDepth: 4, pipeMinFill: 4
     }
   };
   function genApplyFixed(cfg, blocks, tag) {
     var R = blocks.length, C = blocks[0].length;
-    var _autoEl = document.getElementById('gen-board-auto');
-    var _boardAuto = !!(_autoEl && _autoEl.checked);
-    // 【v304】「容量自适应」勾选框：勾上 = 程序按棋盘反推容量；勾掉 = 用界面填的球容量区间
-    var _autoboxEl = document.getElementById('gen-autobox');
-    var _autobox = !!(_autoboxEl && _autoboxEl.checked);
-    var _cutEl = document.getElementById('gen-cutmode');
-    var _cutMode = (_cutEl && _cutEl.value) ? _cutEl.value : '';
-    // 【v295·用户裁决】中段压力覆盖率门槛 + 只要难关开关（界面读取，缺元素时回退默认值）
-    var _coverEl = document.getElementById('gen-choke-cover');
-    var _coverMin = _coverEl ? (parseInt(_coverEl.value, 10) || 70) : 70;
-    // 【v320】每图搜索时间 → 单次预算 / 轮数 / 候选数
+    var _boardAuto = false;           // 棋盘自适应已固定为“按车数反推”
+    // 【2026-10-22·用户裁决】容量/切法都自动：
+    //   容量 = deriveCapacityBand(blocks)（需求块 → [1.5m,4.5m] → 白给车≤2）
+    //   切法 = 有路线 → 暴露序；前沿 2~4 → 暴露序+行优先；否则按依赖层
+    var _autoCap = null;
+    try { _autoCap = AntSolver.Generator.deriveCapacityBand(blocks); } catch (e) {}
+    var _frontAvg = (_autoCap && _autoCap.frontier) ? _autoCap.frontier.avg : null;
+    var _hasRoute = !!(currentRouteOrder && currentRouteOrder.length);
+    var _cutMode = _hasRoute ? 'exposeCut'
+      : ((_frontAvg != null && _frontAvg >= 2 && _frontAvg <= 4.5) ? 'exposeCut' : 'layerCut2');
+    // 覆盖率 / 主死因 / 只要难关：用户已裁决
+    //   · 覆盖率只报告，不再当门槛（targetBand3Min = 0）
+    //   · 主死因整行删除，代码路径留待“关卡类型”
+    //   · 所有关都按难关做（hardOnly = true）
+    var _coverMin = 0;
+    var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
+    var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
     var _searchPlan = (function () {
       var el = document.getElementById('gen-search-min');
       var m = parseInt(el && el.value, 10);
@@ -4826,13 +4856,6 @@ AntSolver.App = (function() {
       var cand = Math.max(8, Math.min(14, Math.round(perMs / 4300) + 4));
       return { min: m, perMs: perMs, pk: pk, cand: cand };
     })();
-    // 【v336】主死因：要求"玩家主要死在某一类障碍上"（空 = 不限）
-    var _dcEl = document.getElementById('gen-death-cause');
-    var _wantDeath = _dcEl ? (_dcEl.value || null) : null;
-    var _dsEl = document.getElementById('gen-death-share');
-    var _wantDeathMin = _dsEl ? (parseInt(_dsEl.value, 10) || 60) : 60;
-    var _hardEl = document.getElementById('gen-hard-only');
-    var _hardOnly = _hardEl ? !!_hardEl.checked : true;
 
     // 【v215】行列范围规范化：保证范围内至少有一对 (行,列) 满足 列=行+1 或 行+2
     var _norm = (function () {
@@ -4890,7 +4913,10 @@ AntSolver.App = (function() {
       // 【v320·用户裁决】候选数/轮数/预算由界面的「每图搜索时间」一个旋钮推导：
       //   3 分钟 → 4 轮 × 45 秒；5 分钟 → 7 轮；8 分钟 → 11 轮（上限 12 轮）。
       //   单轮 45 秒 ≈ 精算 10 个候选（单个候选 ≈4.3 秒），所以候选上限给 14。
-      candidateCount: _searchPlan.cand, portfolioK: _searchPlan.pk, timeBudgetMs: _searchPlan.perMs, difficultyRounds: 7,
+      candidateCount: _searchPlan.cand,
+      portfolioK: _fullTime ? Math.min(40, Math.max(_searchPlan.pk, _searchPlan.min * 3 + 1)) : _searchPlan.pk,
+      fullTime: _fullTime, trapPost: _trapPost,
+      timeBudgetMs: _searchPlan.perMs, difficultyRounds: 7,
       earlyStopPeak: 3.5, earlyStopSteady: 70,
       // 【v262·用户裁决】"压力要持久"：不够持久就继续搜，而不是拿第一个高而不久的收工
       earlyStopGe3: 20, earlyStopLongest: 5, earlyStopChokeWin: 2,
@@ -4898,7 +4924,7 @@ AntSolver.App = (function() {
       // 【v295】早停与目标门都跟滑杆走（原来写死 45，与界面上调的门槛打架）
       earlyStopBand3: _coverMin, earlyStopBandPeak: 4.8,
       // 【v273·用户选 A】合格口径：30~80% 区间暂存≥3 的覆盖率 ≥45%
-      targetBand3Min: _coverMin,   // v295：跟界面滑杆走（原 45）// v269：结构多样性把中位从 14% 拉到 40%，门槛随之调到 45   // 实测当前管线 30~80≥3 最高约 57%，先按 60 设（可调到 85 让搜索更久）
+      targetBand3Min: 0,   // 【2026-10-22·用户裁决】覆盖率只报告，不再当合格门槛
       // 【v260·实验】把最晚熟的几辆车借到"扇出最大"的格子上 → 想让全知线被逼出长债。
       //   ⚠ 实测尚未生效（两个版本的闸门都返回 0 组），先默认关，别影响生产。
       gateBorrow: 0,   // 【v231】一图最多产 8 关，命中目标即停（命中不了就取最接近的）
@@ -4925,11 +4951,13 @@ AntSolver.App = (function() {
       cutMode: _cutMode,                    // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
       // 【v350·用户裁决】选 exposeCut 时同步打开行优先摆盘（车单顺序 = 棋盘自上而下）。
       boardLayout: (_cutMode === 'exposeCut') ? 'rowMajor' : undefined,
-      // 【v351·用户裁决】容量浮动幅度（界面自己设）
-      capJitter: (function () {
-        var v = parseInt((document.getElementById('gen-capjitter') || {}).value, 10);
-        return isNaN(v) ? 5 : Math.max(0, Math.min(30, v));
-      })(),
+      // 【2026-10-22·用户裁决】自动切法/自动容量的依据，随记录走（结果条显示）
+      _cutAuto: {
+        mode: _cutMode, frontier: _frontAvg, route: _hasRoute,
+        capacity: _autoCap ? { m: _autoCap.m, band: _autoCap.band, chosen: _autoCap.chosen, free: _autoCap.free, feasible: _autoCap.feasible } : null
+      },
+      // 【2026-10-22·用户裁决】容量浮动固定 2：默认层切不读它；只有暴露序切法会用到。
+      capJitter: 2,
       // 【v352】路线（指针）颜色先后
       routeOrder: (currentRouteOrder && currentRouteOrder.length) ? currentRouteOrder.slice() : undefined
     });
@@ -4976,6 +5004,16 @@ AntSolver.App = (function() {
       boardColsMax: _legacyFlow ? out.boardColsMax : (_boardAuto ? 8 : _norm.colsMax),
       // 【v305·用户裁决】棋盘尺寸由球数决定后，不允许正方形（保持 列−行 ∈ {1,2}）
       boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: !_legacyFlow,
+      boardExpandOnOverflow: true, boardFirst: true,
+      p7Repair: true, p7BaseCount: 3,
+      semanticObstacles: (function () {
+        var el = document.getElementById('gen-semantic-obstacles');
+        return el ? !!el.checked : true;   // 【v459】UI 开关；缺控件时默认开
+      })(),
+      semanticRouteLock: false,  // 【v458】前期白给允许；RouteLock 前提不成立，先关
+      semanticEarly: false,      // 【v458】不再强求前期无白给
+      costlyAlt: true,   // 【v425】生成时预留一个代价替代
+      row0FreeMax: 1, row0FreeIce: 1,
       // 【v238】目标车数也随棋盘走
       // 【v313·用户裁决】旧流程不按"目标车数"拆车：它的棋盘是由盒数反推的（chooseBoardDimsFixed），
       //   再把车拆到 _targetCars0（= 行列上限 9×10×0.86 = 77 辆）只会把 30~50 的车对半劈成 12~25。
@@ -4995,7 +5033,7 @@ AntSolver.App = (function() {
       //   而 42 格 - 配额墙 5 格 = 37 个位置，经常差 3~5 盒装不下；管道深度只有 2 → pipeCapacity 10/10 全灭。
       //   深度 6 后同样 5 个 seed：全灭 5/5 → 出关 5/5（3 个合格）。
       //   代价：管道里最多藏 6 个盒（进度感偏移），但比"什么都产不出来"强。
-      pipeMaxDepth: 6, pipeMinFill: 2,
+      pipeMaxDepth: 4, pipeMinFill: 2,
       // 【v242】目标带下界 3 → 3.2：审核的卡点线是 5−1.8=3.2，原来写 3 会让"峰窗正好 3.0"的关
       //   被搜索当成"进带收工"，却被审核判成"无卡点 → 简单关·趋势过平"。这正是"简单合格"的主要来源。
       // 【v295·用户裁决】「难点没事，目前只要有解」——
@@ -5012,8 +5050,12 @@ AntSolver.App = (function() {
       // 【v324·用户裁决】容错门槛：玩家线（不给复活，5 种手痒度 × 2 种子）通关率至少 25%。
       //   0 = 关掉。用户那关 16/16 死于三锁链，就是这条没拦住。
       targetPlayerPassMin: 0.25,
+      // 【v366·用户裁决】质量线（不是硬门）：首通 >80% 偏松；W 中位 <2 / ≤1 占 >35% 偏窄；
+      //   隐藏信息死亡 >20% 偏黑。任一不过 → goal 模式继续搜，报告标质量未过项。
+      targetPlayerPassMax: 80, targetWMin: 2, targetWLowMax: 35, targetHiddenDeathMax: 20,
       // 【v336】只收"玩家主要死在某一类障碍"的关（空 = 不限）
-      targetDeathCause: _wantDeath, targetDeathCauseMin: _wantDeathMin,
+      // 【2026-10-22·用户裁决】主死因整行删除；代码路径保留，等“关卡类型”再做。
+      targetDeathCause: null, targetDeathCauseMin: 0,
 
       // 【v239·用户裁决】「尽量用数字冰代替黑块」：黑块全撤（v228 的 2~4% 也不留），
       //   障碍改用数字冰承担（冰是可消的锁，黑块是永久死格，且配额会把墙堆到 14%）。
@@ -5052,13 +5094,13 @@ AntSolver.App = (function() {
       generatorFlow: 'old',
       // 【v303·用户要求】球容量改成"用户预设"，界面上 gen-boxmin / gen-boxmax 就是它；
       //   只有没填时才回落到原工程的 40~60。
-      boxSizeMin: _autobox ? _capMin : (cfg.boxSizeMin || 40),
-      boxSizeMax: _autobox ? _capMax : (cfg.boxSizeMax || 60),
+      boxSizeMin: _autoCap ? _autoCap.band[0] : (cfg.boxSizeMin || 40),
+      boxSizeMax: _autoCap ? _autoCap.band[1] : (cfg.boxSizeMax || 60),
       blackPercent: 5, blackPercentMin: 5, blackPercentMax: 8,
       icePercent: 0, chainCount: 2, chainCountMin: 1, chainCountMax: 3,
       questionPercent: 8, questionPercentMin: 6, questionPercentMax: 10,
       narrowPath: true, narrowPathProb: 0.5,
-      pipeFloorCount: 2, pipeFallbackCount: 2, pipeMaxDepth: 6, pipeMinFill: 4,
+      pipeFloorCount: 2, pipeFallbackCount: 2, pipeMaxDepth: 4, pipeMinFill: 4,
       // 盘型：原工程的 7~9×8~10 会把盒子填不满 → 裁行 → 出现 4×10 怪盘，实测改成 5~6×7~8 才对
       capTie: false, capPerColor: 2, capCeil: 84, row0ColorMax: 2,
       // 【v328·用户裁决】第 0 行最多留 2 辆"点了就能吃满"的车。开局只有第 0 行能点，
@@ -5086,7 +5128,7 @@ AntSolver.App = (function() {
       // 【v295·用户裁决】暂时不要简单合格：「现在只生成难的关卡，理解后再生成简单的」。
       //   打开时 flatTrend 不再算合格（详见 candTier / evaluateGeneration 里的 hardOnly 分支）。
       //   想恢复简单关，把这个改成 false 即可。
-      hardOnly: _hardOnly,
+      hardOnly: true,   // 【2026-10-22·用户裁决】所有关都按难关做
       // 小盘上 usableSpaceTarget 必须放大：0.86 是按 6×7 调的，小盘溢出装不下时
       //   "可用空间偏离"与"管道容量"会互相锁死（35×35 + 5×6 实测 20/20 全灭）。
       usableSpaceTarget: (_norm.rowsMax * _norm.colsMax <= 35) ? 0.94 : 0.86,
@@ -5096,8 +5138,8 @@ AntSolver.App = (function() {
       //   原来写死 [_capAvg×0.6, _capAvg×1.6]：35×35 图 _capAvg = px÷77 = 16 →
       //   [16, 26]，于是不管界面填 30~50 还是 40~60，最后一步 normalize 会把每辆车
       //   重新切成 16~26（58 辆小车、管道塞满）。用户三次说「还是不对」都是它。
-      capNormMin: _autobox ? Math.max(16, Math.round(_capAvg * 0.60)) : (cfg.boxSizeMin || 40),
-      capNormMax: _autobox ? Math.round(_capAvg * 1.60) : (cfg.boxSizeMax || 60),
+      capNormMin: _autoCap ? _autoCap.band[0] : (cfg.boxSizeMin || 40),
+      capNormMax: _autoCap ? _autoCap.band[1] : (cfg.boxSizeMax || 60),
       icePercent: 0, icePercentMin: 0, icePercentMax: 0, row0IceMax: 2,
       // 【v253·用户裁决】冰当"顺序闸门"：只冻开局就能装满的车，冻 3 辆、各滞后 2 步。
       //   随机撒冰停用（icePercent 仍留一点做背景障碍）。
@@ -5136,8 +5178,15 @@ AntSolver.App = (function() {
       //   覆盖率 63%→32%，所以默认关；只保留"自然配对"（相邻两格本来就一大一小时才上链）
       chainCompose: false
     });
+    // 【2026-10-22·用户裁决】把“自动选了什么”写进日志，结果条也会显示。
     try {
-      genLog('模式：容量 ' + _capMin + '~' + _capMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
+      genLog('自动：切法 ' + (_cutMode === 'exposeCut' ? '暴露序+行优先' : '按依赖层') +
+        '（前沿 ' + (_frontAvg == null ? '?' : _frontAvg) + '）· 容量 ' + out.boxSizeMin + '~' + out.boxSizeMax +
+        (_autoCap ? '（需求块 ' + _autoCap.m + ' · 白给车 ' + _autoCap.free + ' · ' +
+          (_autoCap.feasible ? '可压到≤2' : '压不下来，建议冰/改图') + '）' : ''), 'gen-log-ok');
+    } catch (e) {}
+    try {
+      genLog('本关：容量 ' + out.boxSizeMin + '~' + out.boxSizeMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
         ' 辆 · 冰锁最大色(10步) · 管道≤2', 'gen-log-warn');
     } catch (e) {}
     try {
@@ -5440,6 +5489,12 @@ AntSolver.App = (function() {
     }
     if (result.retries > 0) html += '<p>重试: ' + result.retries + '次</p>';
     html += '<p>耗时: ' + (result.solveResult.time || 0) + 'ms</p>';
+    // 【v362】单关生成也出体检报告（原来只有批量路径会刷新结果条）
+    try {
+      if (typeof currentLevelIdx !== 'undefined' && currentLevelIdx >= 0 && levelList[currentLevelIdx]) {
+        genRenderReport(genBuildRec(levelList[currentLevelIdx], result));
+      }
+    } catch (e) {}
     document.getElementById('solve-result').classList.remove('hidden');
     document.getElementById('solve-details').innerHTML = html;
   }
@@ -5553,7 +5608,7 @@ AntSolver.App = (function() {
       svg = '<svg width="' + W + '" height="' + Hh + '" style="background:#fff;border:1px solid #ddd">' +
         '<polyline fill="none" stroke="#e08a2b" stroke-width="2" points="' + pts.join(' ') + '"/></svg>';
     }
-    var verdict = rec.fallback ? ('兜底·' + (rec.fallbackType || '')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '合格' : '不可解'));
+    var verdict = rec.qLabel || (rec.fallback ? ('兜底·' + (rec.fallbackType || '')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '可玩' : '不可解')));
     var html = '<!doctype html><meta charset="utf-8"><title>制作过程 ' + esc(rec.name) + '</title>' +
       '<style>body{font:14px/1.7 -apple-system,"PingFang SC",sans-serif;margin:24px;color:#222}h1{font-size:20px}h2{font-size:16px;margin-top:26px;border-left:4px solid #e08a2b;padding-left:8px}' +
       'table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:4px 8px;font-size:13px}th{background:#f6f6f6}' +
@@ -5584,9 +5639,9 @@ AntSolver.App = (function() {
     var el = document.getElementById('gen-result-banner');
     if (!el || !rec) return;
     var t = rec.audit && rec.audit.tier;
-    var pass = !!(rec.valid && !rec.fallback && (t === '合格' || t === '困难合格'));
-    var cls = !rec.valid ? 'fallback' : (rec.fallback ? 'fallback' : (pass ? 'ok' : 'bad'));
-    var verdict = !rec.valid ? '无关卡' : (rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : (pass ? (t || '合格') : '不合格'));
+    var pass = !!rec.qPass;
+    var cls = !rec.valid ? 'fallback' : (pass ? 'ok' : (rec.fallback ? 'fallback' : 'bad'));
+    var verdict = rec.qLabel || (!rec.valid ? '无关卡' : (rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : (pass ? (t || '合格') : '可玩')));
     var ps = rec.persist || {};
     var bs = rec.boardStat || {};
     var cov = ps.band3Pct, spk = ps.band4Pct, ply = ps.playerPassPct;
@@ -5594,6 +5649,17 @@ AntSolver.App = (function() {
     function chip(label, val, warn) {
       return '<span class="grb-chip' + (warn ? ' warn' : '') + '">' + label + ' <b>' + val + '</b></span>';
     }
+    // 【2026-10-22】开局白给车（近似）：用开局暴露的每色像素 ÷ 本关容量上限。
+    //   精确值（按每色实际容量）看工具 `03_工具/难度关系/容量推导.js`。
+    var freeTxt = '-';
+    try {
+      var oe = rec.openingExposure, capMax = rec.appliedParams && rec.appliedParams.capMax;
+      if (oe && oe.detail && capMax > 0) {
+        var nf = 0;
+        for (var oi = 0; oi < oe.detail.length; oi++) nf += Math.floor(oe.detail[oi].px / capMax);
+        freeTxt = nf;
+      }
+    } catch (e) {}
     var html = '<span class="grb-verdict">' + verdict + '</span>' +
       chip('覆盖', cov == null ? '-' : cov + '%', cov != null && cov < 45) +
       chip('尖峰≥4', spk == null ? '-' : spk + '%', false) +
@@ -5603,12 +5669,216 @@ AntSolver.App = (function() {
       chip('棋盘', bs.rows ? (bs.rows + '×' + bs.cols) : '-', false) +
       chip('车', bs.boardBoxes == null ? '-' : bs.boardBoxes, false) +
       chip('容量', rec.appliedParams ? (rec.appliedParams.capMin + '~' + rec.appliedParams.capMax) : '-', false) +
+      chip('切球', rec.cutInfo ? ((rec.cutInfo.mode === 'exposeCut' ? '暴露序' : '层切') + (rec.cutInfo.frontier != null ? '·前沿' + rec.cutInfo.frontier : '')) : '-', false) +
+      chip('白给车≈', freeTxt, freeTxt !== '-' && freeTxt > 2) +
+      chip('类型', rec.type || '-', false) +
+      (rec.goalMode ? chip('目标轮', rec.goalRounds || 1, false) : '') +
       chip('难度', rec.difficulty || '-', false) +
       chip('用时', ((rec._elapsedMs || 0) / 1000).toFixed(0) + 's', false);
     var fails = (rec.goodV3Fails || []).join('、');
     if (fails) html += '<span class="grb-note">' + fails + '</span>';
+    if (rec.goalMode) html += '<span class="grb-note">' + (rec.goalPreview ? '目标预览（未达标，继续跑）' : ('目标模式：' + (rec.goalStopped ? '点结束时输出当前最好' : '已达标'))) + '（第 ' + (rec.goalRounds || 1) + ' 轮）</span>';
     el.className = 'gen-result-banner ' + cls;
     el.innerHTML = html;
+  }
+
+  /**
+   * 【2026-10-22·v362】体检报告：把“这关长什么样”摊成一页，生成完自动显示。
+   *   数据来自 rec（genBuildRec）；首通/学会后/认真玩三项还没有对应模拟，先标“待接入”。
+   */
+  function genRenderReport(rec) {
+    var card = document.getElementById('gen-report-card');
+    var body = document.getElementById('gen-report-body');
+    var title = document.getElementById('gen-report-title');
+    if (!card || !body || !rec) return;
+    var ps = rec.persist || {}, bs = rec.boardStat || {}, ap = rec.appliedParams || {}, ci = rec.cutInfo || null;
+    var qm = ps.quality || null;
+    var cov = ps.band3Pct, intervalPeak = ps.bandPeak, ply = ps.playerPassPct;
+    var gv = rec.goodV3Summary || {};
+    var qualityFails = [];
+    var rawFails = (gv.fails && gv.fails.length) ? gv.fails : (rec.goodV3Fails || []);
+    var oldPeak = (gv.midLateMax != null) ? gv.midLateMax : ((rec.audit && rec.audit.midLateMax != null) ? rec.audit.midLateMax : null);
+    var oldSteady = (gv.steadyWonPct != null) ? gv.steadyWonPct : null;
+
+    // ===== 白给车（近似：开局每色暴露 ÷ 容量上限）=====
+    var free = '-';
+    try {
+      var oe = rec.openingExposure, capMax = ap.capMax;
+      if (!oe && rec.level && rec.level.blocks && AntSolver.Generator.openingExposure) {
+        var _b = rec.level.blocks;
+        oe = AntSolver.Generator.openingExposure(_b, _b.length, _b[0].length, false);
+      }
+      if (oe && oe.detail && capMax > 0) {
+        var nf = 0;
+        for (var oi = 0; oi < oe.detail.length; oi++) nf += Math.floor(oe.detail[oi].px / capMax);
+        free = nf;
+      }
+    } catch (e) {}
+
+    // ===== 六指标（能算的先算）=====
+    var frontier = (ci && ci.frontier != null) ? ci.frontier : null;
+    var _gfc = gv.fillCurve || null;
+    var wMed = (_gfc && _gfc.medFull != null) ? _gfc.medFull : (rec.choiceCurve ? rec.choiceCurve.medFull : null);
+    var wLow = (_gfc && _gfc.lowPct != null) ? _gfc.lowPct : (rec.choiceCurve ? rec.choiceCurve.lowPct : null);
+    var wTxt = (wMed == null) ? '未测（choiceCurve 缺失）' :
+      ('中位 ' + wMed + ' 辆可吃满 · ≤1 占 ' + (wLow == null ? '?' : wLow + '%'));
+    var dc = ps.deathCauses || {}, dTot = 0, hiddenD = 0;
+    for (var dk in dc) { dTot += dc[dk]; if (dk === '管道' || dk === '问号') hiddenD += dc[dk]; }
+    var jTxt;
+    if (dTot > 0) jTxt = '管道/问号死亡 ' + Math.round(hiddenD / dTot * 100) + '%（越低越公平）';
+    else if (ply == null) jTxt = '未测（首通未返回）';
+    else jTxt = '无死亡（首通 ' + ply + '%）';
+
+    // 【v367】质量未过项：不只读生成时写的 qualityFails（旧关卡没有），
+    //   也按**当前**首通/W/隐藏死亡现算一遍 → 旧关卡的报告也能显示真实质量。
+    var computedQF = [];
+    if (ply != null && ply > 80) computedQF.push('首通' + ply + '%>80%');
+    if (dTot > 0 && hiddenD / dTot > 0.2) computedQF.push('隐藏信息死亡' + Math.round(hiddenD / dTot * 100) + '%>20%');
+    // 【v373】生成侧有 qualityFails 就以它为准；只有旧关卡没有时才现算，避免同一指标出现两个不同的数。
+    qualityFails = (rec.qReasons && rec.qReasons.length) ? rec.qReasons.slice() : (gv.qualityFails || []).slice();
+    if (!qualityFails.length) {
+      for (var qi2 = 0; qi2 < computedQF.length; qi2++) qualityFails.push(computedQF[qi2]);
+    }
+    var oldFails = [];
+    for (var fi = 0; fi < rawFails.length; fi++) {
+      var _f = rawFails[fi];
+      if (qualityFails.indexOf(_f) >= 0) continue;
+      if (/偏松|偏窄|W中位|W≤1|隐藏信息死亡/.test(_f)) continue;
+      oldFails.push(_f);
+    }
+
+    // ===== 硬门（2 条）=====
+    var solvable = !!rec.valid;
+    var hardPass = solvable && !!rec.level;
+
+    // ===== 质量结论（六指标没齐 → 不判“合格”）=====
+    var qFlags = [], verdict = '—';
+    if (!rec.level) verdict = '无关卡';
+    else if (!solvable) verdict = '不可解';
+    else {
+      if (ply == null) qFlags.push('首通未测');
+      else if (ply > 80) qFlags.push('首通 ' + ply + '%（偏松）');
+      else if (ply < 30) qFlags.push('首通 ' + ply + '%（偏难）');
+      else qFlags.push('首通 ' + ply + '%（有压力）');
+      if (cov != null && cov < 30) qFlags.push('覆盖 ' + cov + '%（偏低）');
+      if (dTot > 0 && hiddenD / dTot > 0.2) qFlags.push('隐藏信息死亡 ' + Math.round(hiddenD / dTot * 100) + '%（偏黑）');
+      if (ply == null) verdict = '可玩 · 待评（首通未测）';
+      else if (ply < 30) verdict = '可玩 · 偏难';
+      else if (ply > 80) verdict = '可玩 · 偏松';
+
+      else if (cov != null && cov < 30) verdict = '可玩 · 偏松';
+      else verdict = '可玩 · 待评（T/R/U 未测）';
+    }
+    if (rec.qLabel) verdict = rec.qLabel;
+
+    var death = ps.deathTop ? (ps.deathTop + (ps.deathTopPct != null ? (' ' + ps.deathTopPct + '%') : ''))
+      : (dTot > 0 ? '未标记'
+        : (ply == null ? '未测（首通未返回）' : ('无死亡（首通 ' + ply + '%）')));
+    var cutTxt = ci ? ((ci.mode === 'exposeCut' ? '暴露序' : '层切') +
+      (ci.frontier != null ? (' · 前沿 ' + ci.frontier) : '') + (ci.route ? ' · 路线' : '')) : '-';
+    var intent = (ply == null) ? '首通未测（10 局模拟未返回）'
+      : ((ply > 80) ? ('首通 ' + ply + '%，没有真正的卡点')
+        : (((wMed != null && wMed < 2) || (wLow != null && wLow > 35)) ? ('W 中位 ' + wMed + ' 辆 · ≤1 占 ' + (wLow == null ? '?' : wLow + '%') + '，选择偏窄')
+          : ((cov != null && cov < 30) ? ('覆盖率 ' + cov + '%，压力偏短')
+            : (oldFails.length ? ('旧判据：' + oldFails.join('；')) : '—'))));
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function row(k, v) {
+      return '<tr><td style="color:#8a7358;padding:2px 8px 2px 0;white-space:nowrap">' + k + '</td><td style="color:#3c2e1f;padding:2px 0">' + esc(v) + '</td></tr>';
+    }
+    function sec(t) {
+      return '<div style="margin-top:8px;font-size:12px;color:#8a7358;border-top:1px dashed #d8c8b0;padding-top:4px">' + t + '</div>';
+    }
+
+    body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v459 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      sec('硬门（2 条）') +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+      row('守恒', rec.level ? '✅ 生成器已校验' : '—') +
+      '</table>' +
+      sec('四玩家') +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      row('首通（贪心/手痒）', ply == null ? '未测（10 局模拟未返回）' : (ply + '%' + (ps.playerRuns != null ? ('（' + (ps.playerWins || 0) + '/' + ps.playerRuns + '）') : ''))) +
+      row('学会后（带记忆）', ps.learnedPassPct == null ? '未测（待接入）' : (ps.learnedPassPct + '%（' + (ps.learnedWins || 0) + '/' + (ps.learnedRuns || 0) + '，' + (ps.learnedAttempts || 0) + ' 次尝试）')) +
+      row('有限信息前瞻（2 步）', ps.lookaheadPassPct == null ? '未测（待接入）' : (ps.lookaheadPassPct + '%（' + (ps.lookaheadWins || 0) + '/' + (ps.lookaheadRuns || 0) + ' 局，前6决策点）')) +
+      row('全知', solvable ? '通关' : '未通关') +
+      '</table>' +
+      sec('六指标') +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      row('F 前沿宽度', frontier == null ? '未测' : String(frontier)) +
+      row('W 选择宽度', wTxt) +
+      row('T 陷阱密度', (qm && qm.T != null) ? (qm.decisions > 0 ? (qm.T + '%（' + qm.trapCount + '/' + qm.decisions + ' 决策点）') : '0%（无≥2决策点）') : '未测（无通关局）') +
+      row('R 后悔率', (qm && qm.R != null) ? (qm.R + 'pp（最优−10局平均进度）') : '未测') +
+      row('U 废牌率', (qm && qm.U != null) ? (qm.U + '%（10局没碰过的盒）') : '未测') +
+      row('J 公平度', jTxt) +
+      row('结构门', rec.qGatePass === false ? ('未过：' + ((rec.qGateReasons || []).join('；') || '未知')) : '通过') +
+      row('质量未过项', qualityFails.length ? qualityFails.join('；') : '无') +
+      '</table>' +
+      sec('旧判据（goodV3，仅供参考）') +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      row('18局中位峰窗', oldPeak == null ? '-' : oldPeak) +
+      row('稳健通关', oldSteady == null ? '-' : oldSteady + '%') +
+      row('goodV3.pass', gv.pass ? 'true' : 'false') +
+      row('生成质量项', (gv.qualityFails && gv.qualityFails.length) ? gv.qualityFails.join('；') : '无') +
+      row('未过项', oldFails.length ? oldFails.join('；') : '无') +
+      '</table>' +
+      sec('其他') +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      row('覆盖率', cov == null ? '-' : cov + '%') +
+      row('区间峰值', intervalPeak == null ? '-' : intervalPeak) +
+      row('白给车≈', free) +
+      row('ready稳定', rec.readyStats ? (rec.readyStats.stablePct + '% · 均spread ' + rec.readyStats.avgSpread) : '未测') +
+      row('决策宽度', (rec.selectMed == null ? '-' : ('可选中位 ' + rec.selectMed)) +
+        (rec.fullMed2 == null ? '' : ('　吃满中位 ' + rec.fullMed2)) +
+        (rec.forcedPct == null ? '' : ('　被迫步 ' + rec.forcedPct + '%'))) +
+      row('前10步', (rec.earlyFree10 == null ? '-' : ('免费 ' + rec.earlyFree10 + ' 步')) +
+        (rec.earlyPeak10 == null ? '' : ('　峰值 ' + rec.earlyPeak10))) +
+      row('白给位置', (rec.freeLowPct == null ? '-' : ('低缓冲免费步 ' + rec.freeLowPct + '%')) +
+        (rec.pressurePct3 == null ? '' : ('　压力步 ' + rec.pressurePct3 + '%')) +
+        (rec.pressurePeak == null ? '' : ('　峰值 ' + rec.pressurePeak)) +
+        (rec.misplacedFreePct == null ? '' : ('　错位白给 ' + rec.misplacedFreePct + '%'))) +
+      row('主要死法', death) +
+      row('切球', cutTxt) +
+      row('容量', ap.capMin != null ? (ap.capMin + '~' + ap.capMax) : '-') +
+      row('棋盘 / 车', (bs.rows ? bs.rows + '×' + bs.cols : '-') + ' / ' + (bs.boardBoxes == null ? '-' : bs.boardBoxes)) +
+      row('目标轮', rec.goalMode ? (rec.goalRounds || 1) : '按时间') +
+      row('跑满时间', rec.fullTime ? '开（不早停）' : '关') +
+      row('陷阱后处理', rec.trapPost ? (rec.trapPost.applied ? ('命中 / +' + Math.round((rec.trapPost.ms || 0) / 1000) + 's') : ('未命中（' + (rec.trapPost.reason || rec.trapPost.error || '无') + '）')) : '未开') +
+      row('P7修复', rec.p7 ? ('试' + (rec.p7.tried || 0) + ' / 收' + (rec.p7.accepted || 0) +
+        '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
+        '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
+        '　freeLow ' + (rec.p7.fromFreeLowPct == null ? '-' : rec.p7.fromFreeLowPct) + '→' + (rec.p7.toFreeLowPct == null ? '-' : rec.p7.toFreeLowPct) +
+        '　压力 ' + (rec.p7.fromPressurePct3 == null ? '-' : rec.p7.fromPressurePct3) + '→' + (rec.p7.toPressurePct3 == null ? '-' : rec.p7.toPressurePct3) +
+        (rec.p7.path && rec.p7.path.length ? ('　路径 ' + rec.p7.path.map(function (x) { return x.step; }).join('→')) : '') +
+        (rec.p7.notes && rec.p7.notes.length ? ('　注 ' + rec.p7.notes.slice(0, 2).join('；')) : '')) : '未跑') +
+      row('搜索停止', (rec.perfStop && rec.perfStop.reason ? rec.perfStop.reason : '-') +
+        ' / ' + ((rec._elapsedMs || 0) / 1000).toFixed(0) + 's') +
+      row('worker build', rec.workerBuild || '未标记') +
+      row('一图多产', rec.portfolio ? (rec.portfolio.tried + '/' + rec.portfolio.K + ' 试，过 ' + rec.portfolio.passes) : '-') +
+      row('这关难在', intent) +
+      '</table>';
+    if (title) title.textContent = rec.name || '';
+    try { console.log('[gen-report] v459', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    card.classList.remove('hidden');
+    try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+    // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+    try {
+      var _toast = document.getElementById('gen-report-toast');
+      if (_toast) _toast.classList.remove('hidden');
+      var _tb = document.getElementById('gen-report-toast-btn');
+      if (_tb && !_tb._bound) {
+        _tb._bound = true;
+        _tb.addEventListener('click', function () { try { card.scrollIntoView({ block: 'center' }); } catch (e) {} });
+      }
+      var _tc = document.getElementById('gen-report-toast-close');
+      if (_tc && !_tc._bound) {
+        _tc._bound = true;
+        _tc.addEventListener('click', function () { try { _toast.classList.add('hidden'); } catch (e) {} });
+      }
+    } catch (e) {}
   }
 
   /**
@@ -5651,9 +5921,8 @@ AntSolver.App = (function() {
       if (!r.valid) { fail++; return; }
       if (r.fallback) { fallback++; return; }
       // v104：档次字样改为「合格 / 简单关·趋势过平」；旧字样一并认，历史批次口径不变
-      var _t = r.audit && r.audit.tier;
-      if (_t === '合格' || _t === '困难合格') hard++;
-      else if (_t === '简单关·趋势过平' || _t === '简单合格') easy++;
+      if (r.qPass) hard++;
+      else if (r.qLabel && r.qLabel.indexOf('可玩') === 0) easy++;
     });
     var setTxt = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
     setTxt('gen-stat-hard', hard); setTxt('gen-stat-easy', easy);
@@ -5683,9 +5952,10 @@ AntSolver.App = (function() {
   }
   // 读取页面 app.js 脚本标签的 ?v= 版本，透传给 worker(及其 importScripts)保证缓存版本一致
   function genScriptVersion() {
-    var s = document.querySelector('script[src*="app.js"]');
-    var m = s && s.src.match(/[?&]v=([^&]+)/);
-    return m ? ('?v=' + m[1]) : '';
+    // 【v369】不再依赖页面 URL / script 标签：统一用 APP_BUILD 当 worker 的加载版本。
+    //   之前页面以 ?v=xxx 打开时 worker 才带版本；不带 ?v= 时会去拉未版本化的
+    //   generator.js，可能命中旧缓存 → 报告是新界面、生成却还是旧质量线。
+    return '?v=' + APP_BUILD + '&b=' + APP_BUILD;
   }
 
   // 停止批量生产：
@@ -5699,7 +5969,31 @@ AntSolver.App = (function() {
     if (pendingN) {
       genLog('注意：有 ' + pendingN + ' 关已生成但尚未落库成功，停止后仍可点「重试落库」把它们写盘。', 'gen-log-warn');
     }
+    if (genBranchState && !genBranchState.finished) {
+      genBranchState.stopped = true;
+      genBranchState.ws.forEach(function (w) { try { w.postMessage({ cmd: 'stop' }); } catch (e) {} });
+      genLog('已请求结束：正在收 A/B/C 三支的当前最好…', 'gen-log-warn');
+      if (genBranchState.timer) clearTimeout(genBranchState.timer);
+      genBranchState.timer = setTimeout(function () { genFinishGoalBranches('手动结束收尾超时'); }, 25000);
+      return;
+    }
     if (genPool.length) {
+      // 【2026-10-22·用户裁决】目标模式：不立刻 terminate，先让每关把"当前最好"交回来。
+      //   目标模式的 produceGoal 在两轮之间检查 stopFlag；一轮默认 20s，所以最多等 ~25s。
+      if (genBatch && genBatch.mode === 'goal') {
+        genPool.forEach(function (s) {
+          try { if (s && s.w) s.w.postMessage({ cmd: 'stop' }); } catch (e) {}
+        });
+        var _per = (genBatch.config && genBatch.config.goalPerRoundMs) || 20000;
+        var _wait = Math.max(10000, Math.min(90000, _per + 15000));   // 一轮 20s + 15s 余量
+        genLog('已请求结束：正在收尾，最多等 ' + Math.round(_wait / 1000) + ' 秒输出当前最好的一关…', 'gen-log-warn');
+        if (genBatch._stopTimer) clearTimeout(genBatch._stopTimer);
+        genBatch._stopTimer = setTimeout(function () {
+          if (genBatchRunning) genFinalizeBatch('已停止（收尾超时；已落库的关卡全部保留）');
+        }, _wait);
+        genMaybeFinalize();   // 若此刻没有在飞的关，立即收尾；有则等它们把最好交回来
+        return;
+      }
       genFinalizeBatch('已停止（已落库 ' + (genBatch ? genBatch.doneCount : 0) + '/' + (genBatch ? genBatch.total : 0) + ' 关；已落库的关卡全部保留）');
     } else {
       genLog('已请求停止，将在当前关处理完后生效（主线程模式无法中途打断当前关）...', 'gen-log-warn');
@@ -5784,6 +6078,61 @@ AntSolver.App = (function() {
     };
   }
 
+  /**
+   * 【v375·P4】统一质量判定：表头 / CSV / 报告都用这一份，不再各自读旧 audit。
+   *   合格 = 硬门(可解/守恒) + 首通30~80 + 学会后≥85 + W中位≥2 + W≤1≤35 + T≥1 + 隐藏死亡≤20。
+   *   缺任何一项数据 → 待评，不冒充合格。
+   */
+  function genQualityVerdict(o) {
+    var r = [];
+    if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
+    if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
+    // 【v397】qPass 改成“带上下限”的带，不再奖励学会后100/首通60。
+    if (o.ply == null) r.push('首通未测');
+    else if (o.ply < 20) r.push('首通' + o.ply + '%<20%（偏难）');
+    else if (o.ply > 50) r.push('首通' + o.ply + '%>50%（偏松）');
+    if (o.learned == null) r.push('学会后未测');
+    else if (o.learned < 55) r.push('学会后' + o.learned + '%<55%（学不会）');
+    else if (o.learned > 85) r.push('学会后' + o.learned + '%>85%（一学就会）');
+    if (o.look == null) r.push('前瞻未测');
+    else if (o.look < 40) r.push('前瞻' + o.look + '%<40%（偏黑）');
+    else if (o.look > 85) r.push('前瞻' + o.look + '%>85%（一眼看穿）');
+    if (o.wMed == null) r.push('W未测');
+    // 【v429】W≤1 不再判窄：一个正确 + 多个 partial 是解谜，不是窄
+    if (o.selectMed == null) r.push('可选项中位未测');
+    else if (o.selectMed < 2) r.push('可选中位' + o.selectMed + '<2（被迫单线）');
+    if (o.forcedPct != null && o.forcedPct > 25) r.push('被迫步' + o.forcedPct + '%>25%');
+    if (o.fullMed2 != null && o.fullMed2 > 2) r.push('吃满中位' + o.fullMed2 + '>2（太白给）');
+    if (o.t == null) r.push('T未测');
+    else if (o.t < 10) r.push('T陷阱' + o.t + '%<10%（没压力）');
+    if (o.r == null) r.push('R未测');
+    else if (o.r < 15) r.push('R后悔' + o.r + 'pp<15（没岔路）');
+    if (o.hidden != null && o.hidden > 20) r.push('隐藏信息死亡' + o.hidden + '%>20%');
+    if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
+    if (o.freeRunMax != null && o.freeRunMax > 6) r.push('最长免费连' + o.freeRunMax + '步>6');
+    var pass = r.length === 0;
+    // 【v411·用户裁决】qPass-lite 结构硬门：可解/守恒之外，只看 J/W/freeLow/首通
+    var g = [];
+    if (o.ply == null) g.push('首通未测');
+    else if (o.ply > 50) g.push('首通' + o.ply + '%>50%');
+    if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
+    if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
+    if (o.forcedPct != null && o.forcedPct > 25) g.push('被迫步 ' + o.forcedPct + '%>25%');
+    if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
+    var gatePass = g.length === 0;
+    var label = pass ? '合格' :
+      (o.ply != null && o.ply > 50) ? '可玩·偏松' :
+      (o.ply != null && o.ply < 20) ? '可玩·偏难' :
+      (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
+      (o.look != null && o.look > 85) ? '可玩·偏透' :
+      (o.t != null && o.t < 10) ? '可玩·没压力' :
+      (o.r != null && o.r < 15) ? '可玩·没岔路' :
+      (o.selectMed != null && o.selectMed < 2) ? '可玩·被迫单线' :
+      (o.hidden != null && o.hidden > 20) ? '可玩·偏黑' :
+      '可玩·待评';
+    return { pass: pass, gatePass: gatePass, gateReasons: g, label: label, reasons: r };
+  }
+
   function genBuildRec(entry, result) {
     if (!result || !result.level) {
       var why = (result && result.lastFailReason) || 'noCandidate';
@@ -5799,6 +6148,7 @@ AntSolver.App = (function() {
         bottomEntryFeasibility: (result && result.bottomEntryFeasibility) || null,
         entryMode: (result && result.entryMode) || 'fourSide',
         audit: null, difficulty: 0, grade: '-', fallback: false,
+        goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped),
         perf: (result && result.perf) || null
       };
     }
@@ -5807,9 +6157,43 @@ AntSolver.App = (function() {
     var samples = sr.pressureSamples || [];
     var pm = pmFromSamples(samples, parsed.totalBoxes, !!sr.completed);
     var audit = result.audit || (AntSolver.Analysis ? AntSolver.Analysis.chokepointAudit(samples, parsed.totalBoxes, result.level.bufferLimit) : null);
+    // 【v362】开局暴露：有些生成路径不挂 boardFit.openingExposure → 这里按关卡目标图现算一遍，
+    //   否则报告里的「开局白给车」永远是 “-”。
+    var _oe = (result.boardFit && result.boardFit.openingExposure) || null;
+    if (!_oe && result.level && result.level.blocks && AntSolver.Generator && AntSolver.Generator.openingExposure) {
+      try {
+        var _b = result.level.blocks;
+        _oe = AntSolver.Generator.openingExposure(_b, _b.length, _b[0].length, false);
+      } catch (e) { _oe = null; }
+    }
     // 卡点类型：本关实际抽中了哪几种（ANT-GEN-CHOKE-TYPES-20260824）。
     //   只进生产侧记录，不入关卡本体。用于度量多样性——改动前只能靠结构指纹反推用了什么手段。
     var cp = result.chokePlan || null;
+    // 【v375·P4】统一质量字段：表头/CSV/报告同一来源
+    var _ps = (result.goodV3 && result.goodV3.persist) || {};
+    var _fc = (result.goodV3 && result.goodV3.fillCurve) || null;
+    var _q = _ps.quality || {};
+    var _dc0 = _ps.deathCauses || {}, _dt0 = 0, _dh0 = 0;
+    for (var _dk0 in _dc0) { _dt0 += _dc0[_dk0]; if (_dk0 === '管道' || _dk0 === '问号') _dh0 += _dc0[_dk0]; }
+    var _hidden0 = _dt0 ? Math.round(_dh0 / _dt0 * 100) : null;
+    var _wMed0 = _fc ? _fc.medFull : null, _wLow0 = _fc ? _fc.lowPct : null;
+    // 白给车（近似，同报告口径）
+    var _white0 = null;
+    try {
+      var _capMax0 = (result.config && result.config.boxSizeMax) || (result.appliedParams && result.appliedParams.capMax);
+      if (_oe && _oe.detail && _capMax0 > 0) {
+        var _nf0 = 0;
+        for (var _oi0 = 0; _oi0 < _oe.detail.length; _oi0++) _nf0 += Math.floor(_oe.detail[_oi0].px / _capMax0);
+        _white0 = _nf0;
+      }
+    } catch (e) {}
+    var _qv = genQualityVerdict({
+      valid: !!result.valid, level: result.level, ply: _ps.playerPassPct,
+      learned: _ps.learnedPassPct, look: _ps.lookaheadPassPct,
+      wMed: _wMed0, wLow: _wLow0, t: (_q.T != null ? _q.T : null), r: (_q.R != null ? _q.R : null), hidden: _hidden0,
+      white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null),
+      earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null)
+    });
     return {
       name: entry.name, txt: entry.txt || null, level: result.level, valid: result.valid,
       chokeTypes: cp ? cp.types : null, chokeTypesCN: cp ? cp.cn : null,
@@ -5842,7 +6226,32 @@ AntSolver.App = (function() {
         cols: result.config.boardColsMin + '~' + result.config.boardColsMax,
         flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs
       } : null,
+      // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
+      cutInfo: (result.config && result.config._cutAuto) || null,
       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
+      qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+      qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
+      fullTime: !!(result.config && result.config.fullTime),
+      trapPost: result.trapPost || null,
+      p7: result.p7 || null, a3d: result.a3d || null, readyStats: result.readyStats || null,
+      playerPassPct: (_ps.playerPassPct != null ? _ps.playerPassPct : null),
+      learnedPassPct: (_ps.learnedPassPct != null ? _ps.learnedPassPct : null),
+      lookaheadPassPct: (_ps.lookaheadPassPct != null ? _ps.lookaheadPassPct : null),
+      wMed: _wMed0, wLow: _wLow0, tPct: (_q.T != null ? _q.T : null),
+      freeLowPct: _fc ? _fc.freeLowPct : null, misplacedFreePct: _fc ? _fc.misplacedFreePct : null,
+      selectMed: _fc ? _fc.selectMedian : null, fullMed2: _fc ? _fc.fullMedian2 : null, forcedPct: _fc ? _fc.forcedPct : null,
+      earlyFree10: _fc ? _fc.earlyFree10 : null, earlyPeak10: _fc ? _fc.earlyPeak10 : null,
+      pressurePct3: _fc ? _fc.pressurePct3 : null, pressurePeak: _fc ? _fc.pressurePeak : null,
+      rPct: (_q.R != null ? _q.R : null), uPct: (_q.U != null ? _q.U : null),
+      hiddenDeathPct: _hidden0,
+      // 【v364】旧判据摘要（报告里单独标“旧判据，仅供参考”，不再当合格门）
+      goodV3Summary: result.goodV3 ? {
+        pass: !!result.goodV3.pass, fails: result.goodV3.fails || [],
+        qualityFails: result.goodV3.qualityFails || [],
+        fillCurve: result.goodV3.fillCurve || null,
+        midLateMax: result.goodV3.midLateMax, steadyWonPct: result.goodV3.steadyWonPct,
+        earlyMax: result.goodV3.earlyMax, spreadPct: result.goodV3.spreadPct
+      } : null,
       // 【v115】卡点类型改「检查次数 × 概率」后，数量本身是随机量，只记 chokeCount 无法判断
       //   「这关只出 1 种」是参数设小了还是抽样波动。这里把设定值(rolls/prob)、实测命中(hits)、
       //   理论期望(expected，含池截断的精确式)与池大小一并记下，供批量实测均值与期望对照。
@@ -5890,6 +6299,13 @@ AntSolver.App = (function() {
       fallbackTier: result.fallbackTier != null ? result.fallbackTier : null,
       fallbackType: result.fallbackType || null,
       fallbackReason: result.fallbackReason || null,
+      // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
+      goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped,
+      // 【v368】搜索为什么停：pass_early_stop / budget_timeout / exhausted / no_candidate
+      perfStop: result.perf ? { reason: result.perf.stopReason || null, totalMs: result.perf.totalMs || null } : null,
+      workerBuild: result._workerBuild || null,   // 【v369】生成线程的 build（确认跑的是新 generator）
+      portfolio: result.portfolio || null,          // 【v369】一图多产：试了几轮/过几次
+      openingExposure: _oe,
       generationEval: result.generationEval || null,
       solve: {
         completed: !!sr.completed, retryRound: sr.retryRound || 0, steps: sr.steps,
@@ -6080,11 +6496,41 @@ AntSolver.App = (function() {
     rec._idx = inputIndex;             // 并发下必须带下标：落库回调要靠它精确定位本关记录（原先按「最后一个 _full」找会错行）
     // 耗时按【本关自己的派发时刻】算。原先用全局 genBatch.itemT0，并发下会被后派发的关覆写 → 所有关耗时全错。
     rec._elapsedMs = Date.now() - (genInFlightT0[inputIndex] || Date.now());
+    // 【v411】qPass-lite 结构硬门：J/W/freeLow/首通 不过 → 不交付，但结果表/报告可见
+    if (rec.qGatePass === false) {
+      rec.rejected = true;
+      rec._full = true;
+      var _gw = (rec.qGateReasons && rec.qGateReasons.length) ? rec.qGateReasons.join('；') : '结构门未过';
+      genBatchResults.push(rec); genResultHistory.push(rec);
+      genRenderResultsLive();
+      try { genShowResultBanner(rec); } catch (e) {}
+      try { genRenderReport(rec); } catch (e) {}
+      // 【v414】未达标也要把“最接近的一关”映射到棋盘，方便直接试玩/看盘
+      try { genMaybeAutoMap(rec); } catch (e) {}
+      genLog(entry.name + '  结构门未过，不交付（结果可见，已映射棋盘）：' + _gw, 'gen-log-warn');
+      if (typeof next === 'function') next();
+      return;
+    }
+    // 【v395·用户裁决】qPass 改为软门：未达标也输出/落库，只标“未达标”。
+    //   qPass 后续可能还要改，不能因为它暂时为 false 就把关丢掉（时间到了没结果更糟）。
+    if (rec.qPass === false) {
+      rec.qualityFallback = true;
+      var _why = (rec.qReasons && rec.qReasons.length) ? rec.qReasons.join('；') : 'qPass=false';
+      genLog(entry.name + '  未达 qPass，作为未达标结果输出：' + _why, 'gen-log-warn');
+      // 不 return：继续走正常的结果表/报告/落库/ZIP 路径。
+    }
     genBatchResults.push(rec); genResultHistory.push(rec);   // 【v153】同记录进跨批次历史
     genRenderResultsLive();
     genMaybeAutoMap(rec);
     var dt = (rec._elapsedMs / 1000).toFixed(1);
-    var tierTxt = rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '合格' : '不可解'));
+    if (rec.p7) {
+      genLog(entry.name + '  P7 试' + (rec.p7.tried || 0) + ' 收' + (rec.p7.accepted || 0) +
+        '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
+        '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
+        (rec.p7.path && rec.p7.path.length ? ('　' + rec.p7.path.map(function (x) { return x.step; }).join('→')) : '') +
+        (rec.p7.notes && rec.p7.notes.length ? ('　注 ' + rec.p7.notes.slice(0, 2).join('；')) : ''), 'gen-log-warn');
+    }
+    var tierTxt = rec.qLabel || (rec.fallback ? ('兜底·' + (rec.fallbackType === 'timeout' ? '超时' : '穷尽')) : ((rec.audit && rec.audit.tier) || (rec.valid ? '可玩' : '不可解')));
     // 【v151】"选择余地"曲线（用户 2026-10-15 定的核心指标）：每步有几个"能吃满"的选项。
     //   ≥3 有得选 / ≤1 只能按既定路线走。这是判断"有没有灵气"的唯一判据，黑块/冰/链都只是工具。
     var curveTxt = '';
@@ -6105,7 +6551,7 @@ AntSolver.App = (function() {
       idleTxt = '　空转 ' + Math.round(up / ss.length * 100) + '%';
     }
     genLog(entry.name + '  ' + dt + 's  ' + tierTxt + (rec.valid ? ('  难度' + rec.difficulty + '[' + rec.grade + ']') : '') + idleTxt,
-      rec.fallback ? 'gen-log-warn' : (rec.audit && (rec.audit.tier === '合格' || rec.audit.tier === '困难合格') ? 'gen-log-ok' : ''));
+      rec.qPass ? 'gen-log-ok' : (rec.fallback ? 'gen-log-warn' : ''));
     // 【v157】卡点判据 v2 一行（用户 R1~R9）：独木桥 / 预算判断点 / 无满解 / 70%前≥4，全知线与玩家线都报，
     //   判定按"取最差"。用户要"边生产边看数据是否符合预期"，所以这里直接打在日志里，不用另外导表。
     if (rec.chokeV2) {
@@ -6123,6 +6569,7 @@ AntSolver.App = (function() {
     genLogPlayBatch(rec.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
     window.__lastGenRec = rec;     // 【v335】给"导出制作过程"按钮用
     genShowResultBanner(rec);      // 【v326】把结果直接显示到目标图上方
+    genRenderReport(rec);          // 【v362】体检报告面板（右栏“5. 体检报告”）
     genRenderTrace(rec);           // 【v334】生成过程列表
     genLogGoodV3(result);          // 【v184】好关判据 v3（六条全过？）
     if (result.portfolio) genLog('　　一图多产　试了 ' + result.portfolio.tried + ' 次（全过 ' + result.portfolio.passes + ' 次，取最优）', 'gen-log-ok');
@@ -6240,6 +6687,11 @@ AntSolver.App = (function() {
     if (genBatchRunning) return;
 
     var config = getGenConfig();
+    // 【2026-10-22·用户裁决】两种出关模式：
+    //   time = 按时间（到点输出最好）；goal = 按目标（没达标一直重试，点结束输出当前最好）。
+    var modeEl = document.getElementById('gen-mode');
+    var genMode = (modeEl && modeEl.value === 'goal') ? 'goal' : 'time';
+    config.genMode = genMode;   // 写进批次配置，便于回看“这批是按时间还是按目标跑的”
     // 【v153】切球规划器：哪几张图勾了「使用这份车单」，就把规划车单作为该关的切法（forcedBoxes 直通），
     //   并临时关闭碎色闸门——规划内的碎色是「背债车」的压力素材，不是缺陷（用户 2026-10-15 模型）。
     var cutUseChecked = !!(document.getElementById('cutplan-use') || {}).checked;
@@ -6315,13 +6767,15 @@ AntSolver.App = (function() {
     genInFlightT0 = {};
     genBatch = {
       config: config, easySlot: easySlot, bossSlot: bossSlot, bossInterval: bossInterval,
+      mode: genMode,         // 【2026-10-22】time=按时间 / goal=按目标
       nextIdx: 0,            // 下一个待派发的输入下标（取代原来的单游标 idx）
       doneCount: 0,          // 已结算（落库完成/失败跳过）的关数——并发下进度只能按这个算
       retryQueue: [],        // 因线程死亡而需要另一个槽重跑的下标，优先于 nextIdx
       total: levelList.length
     };
     genLog('开始批量生产，共 ' + levelList.length + ' 张源图，并发 ' + genPoolSize + ' 线程' +
-      (genPoolSize < (isNaN(poolInput) ? 6 : poolInput) ? '（已按本机 ' + hw + ' 核上限收窄）' : '') + '。');
+      (genPoolSize < (isNaN(poolInput) ? 6 : poolInput) ? '（已按本机 ' + hw + ' 核上限收窄）' : '') +
+      ' · 模式：' + (genMode === 'goal' ? '按目标（没达标自动重试；点「结束」输出当前最好）' : '按时间（到点输出最好）') + '。');
 
     // 先探测本地生产服务：可用 → 开批次(逐关落库，正式路径)；不可用 → 回退旧内存+ZIP模式并明确告知
     genPersist = { enabled: false, batchId: null, batchToken: null, relDir: '', dirName: '', persistedCount: 0, pendingPayloads: {}, failed: false };
@@ -6355,7 +6809,9 @@ AntSolver.App = (function() {
     }).then(function () {
       if (!genBatchRunning) return;   // 期间被停止
       // 优先用后台线程(主线程不阻塞、停止即时生效)；创建失败(如 file:// 被拦截)则回退主线程模式。
-      if (!genSpawnPool(genPoolSize)) { genLog('无法创建后台线程，改用主线程模式(停止将在当前关处理完后生效)', 'gen-log-warn'); genRunSync(); }
+      if (genBatch.mode === 'goal' && levelList.length === 1) {
+        genStartGoalBranches();
+      } else if (!genSpawnPool(genPoolSize)) { genLog('无法创建后台线程，改用主线程模式(停止将在当前关处理完后生效)', 'gen-log-warn'); genRunSync(); }
     });
   }
 
@@ -6368,6 +6824,23 @@ AntSolver.App = (function() {
    *     ③ 心跳更新时间行，证明还在跑。
    */
   var genLastProgressPaint = 0;
+  function genPreviewGoal(idx, result, round) {
+    try {
+      var entry = levelList[idx];
+      if (!entry || !result || !result.level) return;
+      var rec = genBuildRec(entry, result);
+      // 【v437】明确标成“目标预览”，不是最终交付
+      rec.goalMode = true; rec.goalRounds = round; rec.goalPreview = true;
+      genShowResultBanner(rec);
+      genRenderReport(rec);
+      genMaybeAutoMap(rec);
+      genLog('[目标预览·未达标，继续跑] 第' + round + '轮 当前最好 · ' + (rec.qLabel || '-') +
+        ' · 首通' + (rec.playerPassPct == null ? '-' : rec.playerPassPct + '%') +
+        ' · T' + (rec.tPct == null ? '-' : rec.tPct) +
+        ' · freeLow' + (rec.freeLowPct == null ? '-' : rec.freeLowPct + '%'), 'gen-log-ok');
+    } catch (e) { genLog('目标预览失败：' + ((e && e.message) || e), 'gen-log-warn'); }
+  }
+
   function genSlotProgress(slot, p) {
     if (!p || !genBatchRunning) return;
     var now = Date.now();
@@ -6376,11 +6849,20 @@ AntSolver.App = (function() {
     var idx = (slot && slot.idx != null && slot.idx >= 0) ? slot.idx : 0;
     var total = (genBatch && genBatch.total) || levelList.length;
     var nm = (levelList[idx] && levelList[idx].name) || '';
+    var _ph = { roundStart: '开轮', roundDone: '本轮结果', candidate: '候选', variant: '变体' }[p.phase] || (p.phase || '生成');
+    var _extra = '';
+    if (p.phase === 'roundStart') _extra = ' · 切法' + (p.cut || '-') + ' · 冰' + (p.ice == null ? '-' : p.ice) + ' · 链' + (p.chain == null ? '-' : p.chain) + ' · 管' + (p.pipes == null ? '-' : p.pipes);
+    if (p.phase === 'roundDone') _extra = ' · ' + (p.valid ? '有关卡' : '无关卡') + ' · 首通' + (p.first == null ? '-' : p.first + '%') + ' · T' + (p.T == null ? '-' : p.T) + ' · freeLow' + (p.freeLow == null ? '-' : p.freeLow + '%') + ' · 压力' + (p.pressure == null ? '-' : p.pressure + '%');
     var el = document.getElementById('gen-progress-current');
     if (el) el.textContent = '处理中 (' + (idx + 1) + '/' + total + '): ' + nm +
-      '　· 候选 ' + (p.k || 1) + '/' + (p.K || 1) + ' · 轮 ' + (p.round || 0) + '/' + (p.N || 0) +
-      ' · 已试 ' + (p.evaluated || 0) + ' 个变体 · 本关 ' + ((p.elapsedMs || 0) / 1000).toFixed(0) + 's' +
+      '　· ' + _ph + ' · 轮 ' + (p.round || 0) + '/' + (p.N || 0) +
+      ' · 已试 ' + (p.evaluated || 0) + ' 个变体 · 本关 ' + ((p.elapsedMs || 0) / 1000).toFixed(0) + 's' + _extra +
       ((p.tier != null) ? (' · 当前最好档 ' + p.tier + '/3') : '');
+    var _flowKey = p.phase + ':' + (p.round || 0) + ':' + (p.tag || '');
+    if (slot && slot._lastFlow !== _flowKey) {
+      slot._lastFlow = _flowKey;
+      genLog('[流程] ' + nm + ' ' + _ph + ' 轮' + (p.round || 0) + '/' + (p.N || 0) + _extra, 'gen-log-ok');
+    }
     var te = document.getElementById('gen-progress-time');
     if (te) te.textContent = '已用时 ' + Math.round((Date.now() - (genBatchStartAt || Date.now())) / 1000) + 's · 本关已跑 ' + ((p.elapsedMs || 0) / 1000).toFixed(0) + 's（每关完成即可用，可随时停止）';
   }
@@ -6422,6 +6904,8 @@ AntSolver.App = (function() {
         return;
       }
       if (d.type === 'loadfail') { clearTimeout(readyTimer); genSlotDead(slot, '后台线程脚本加载失败'); return; }
+      if (d.type === 'goalBest') { genPreviewGoal(d.index, d.result, d.round); return; }
+      if (d.type === 'flow') { genLog('[流程] ' + (d.text || ''), 'gen-log-ok'); return; }
       if (d.type === 'progress') { genSlotProgress(slot, d.p); return; }   // 【v153】单关进度心跳
       if (d.type === 'result') {
         clearTimeout(slot.watchdog);
@@ -6507,26 +6991,42 @@ AntSolver.App = (function() {
     slot.busy = true; slot.idx = idx;
     genInFlightT0[idx] = Date.now();
     genPoolProgressText();
+    var taskMode = (b.mode === 'goal') ? 'goal' : 'time';
+    var taskCfg = Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
+      mapSize: entry.blocks.length, requireHardPass: !isEasy,
+      isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
+      forcedBoxes: wantPlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,  // 【v153】逐图现算车单直通
+      fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
+    });
+    if (taskMode === 'goal') {
+      // 【2026-10-22·用户裁决】目标模式：每轮 20 秒，不达标就换种子再来；
+      //   主线程点「结束」时发 stop，produceGoal 在两轮之间收尾并返回当前最好。
+      taskCfg.goalPerRoundMs = 20000;
+      taskCfg.goalBases = 3;   // 【v438】每轮 3 个基底，各自 A1~A4
+      taskCfg.timeBudgetMs = 20000;
+      taskCfg.goalMaxMs = 0;      // 【v416·用户裁决】目标模式不设上限：不达目标不放弃，手动停止才收
+      taskCfg.goalMaxRounds = 0;
+    }
+    taskCfg._build = APP_BUILD;
     slot.w.postMessage({
-      cmd: 'produce', index: idx, blocks: entry.blocks,
-      config: Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
-        mapSize: entry.blocks.length, requireHardPass: !isEasy,
-        isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
-        forcedBoxes: wantPlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,  // 【v153】逐图现算车单直通
-        fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
-      })
+      cmd: taskMode === 'goal' ? 'produceGoal' : 'produce',
+      index: idx, blocks: entry.blocks, config: taskCfg
     });
     genLog('▶ 线程' + (slot.no + 1) + ' 接单：' + entry.name + '（车单' + (wantPlan ? '=' + cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars.length + '辆' : '自动') +
-      ' · 候选' + (b.config.candidateCount || 1) + ' × 轮' + (b.config.difficultyRounds || 1) + '）', '');
+      ' · 候选' + (b.config.candidateCount || 1) + ' × 轮' + (b.config.difficultyRounds || 1) +
+      (taskMode === 'goal' ? ' · 目标模式（没达标自动重试）' : '') + '）', '');
     // 单关看门狗：超过【单关预算 + 2 分钟余量】仍无返回 → 判定该关卡死，跳过并只重启这一个槽（预算=0/不限时则不设）
     clearTimeout(slot.watchdog);
-    // 【v327】看门狗必须跟着「每图搜索时间」走：原来用批次默认 300s，选 8 分钟（≈495s）
-    //   必然先被看门狗判"卡死"，实测 00:38 那批就是 WATCHDOG_TIMEOUT。
-    var _smEl = document.getElementById('gen-search-min');
-    var _smMin = parseInt(_smEl && _smEl.value, 10);
-    var budget = (_smMin > 0) ? (_smMin * 60000) : ((b.config && b.config.timeBudgetMs != null) ? b.config.timeBudgetMs : 300000);
-    // 【v329】余量 120s → 240s：一轮 produce 可能超出预算（带外纠偏会再跑一次整轮），实测 40×40 被误判卡死。
-    if (budget > 0) slot.watchdog = setTimeout(function () { genOnLevelStuck(slot, idx); }, budget + 240000);
+    // 【2026-10-22】目标模式不设看门狗：它本来就要一直跑，看门狗会把它误杀。
+    if (taskMode !== 'goal') {
+      // 【v327】看门狗必须跟着「每图搜索时间」走：原来用批次默认 300s，选 8 分钟（≈495s）
+      //   必然先被看门狗判"卡死"，实测 00:38 那批就是 WATCHDOG_TIMEOUT。
+      var _smEl = document.getElementById('gen-search-min');
+      var _smMin = parseInt(_smEl && _smEl.value, 10);
+      var budget = (_smMin > 0) ? (_smMin * 60000) : ((b.config && b.config.timeBudgetMs != null) ? b.config.timeBudgetMs : 300000);
+      // 【v329】余量 120s → 240s：一轮 produce 可能超出预算（带外纠偏会再跑一次整轮），实测 40×40 被误判卡死。
+      if (budget > 0) slot.watchdog = setTimeout(function () { genOnLevelStuck(slot, idx); }, budget + 240000);
+    }
   }
 
   /** 进度行：并发下同时有多关在飞，逐个列出，不再只显示一关。 */
@@ -6576,12 +7076,111 @@ AntSolver.App = (function() {
     if (!genBatchRunning) return;
     var b = genBatch;
     if (!b) return;
-    if (b.retryQueue.length) return;
-    if (b.nextIdx < b.total) return;
+    // 【2026-10-22】停止时不再等"所有图都派过一遍"：在飞的结果交回来就收尾（目标模式的"结束输出最好"）。
+    if (!genBatchAborted) {
+      if (b.retryQueue.length) return;
+      if (b.nextIdx < b.total) return;
+    }
     var flying = genPool.some(function (s) { return s.busy; });
     if (flying) return;
     if (Object.keys(genPersist.pendingPayloads).length) return;   // 还有关卡等着重试落库 → 不收尾，别把它丢了
     genFinalizeBatch(genBatchAborted ? ('已停止（已落库 ' + b.doneCount + '/' + b.total + ' 关；已落库的关卡全部保留）') : null);
+  }
+
+  /** 【v440】单图目标模式：A/B/C 三个 branch 并行，收齐后只落库一次。 */
+  function _branchScore(r) {
+    if (!r || !r.level) return -1e15;
+    var s = 0;
+    if (r.valid) s += 1e6;
+    try { if (AntSolver.Generator.goalStructPass(r)) s += 1e12; } catch (e) {}
+    var fc = (r.goodV3 && r.goodV3.fillCurve) || {};
+    s += (fc.selectMedian || 0) * 1000 + (fc.earlyPeak10 || 0) * 5000;
+    s -= (fc.earlyFree10 || 0) * 1000 + (fc.freeLowPct || 0) * 100;
+    return s;
+  }
+  function genFinishGoalBranches(reason) {
+    var st = genBranchState;
+    if (!st || st.finished) return;
+    st.finished = true;
+    if (st.timer) { clearTimeout(st.timer); st.timer = null; }
+    st.ws.forEach(function (w) { try { w.terminate(); } catch (e) {} });
+    var best = st.passed || st.best;
+    if (!best) {
+      genOnError(st.entry, '目标三分支全部未返回结果（' + reason + '）', st.idx, function () {
+        genBatch.doneCount++; genUpdateProgressBar(genBatch.doneCount, genBatch.total); genMaybeFinalize();
+      });
+      genBranchState = null;
+      return;
+    }
+    genLog('[branch] 收尾：' + reason + ' · 最优分支 ' + (best._branch || '?'), 'gen-log-ok');
+    genOnResult(st.entry, best, st.idx, function () {
+      genBatch.doneCount++;
+      delete genInFlightT0[st.idx];
+      genUpdateProgressBar(genBatch.doneCount, genBatch.total);
+      genUpdateStatChips(genBatchResults);
+      genMaybeFinalize();
+    });
+    genBranchState = null;
+  }
+  function genStartGoalBranches() {
+    var entry = levelList[0];
+    var idx = 0;
+    var base = genApplyFixed(genBatch.config, entry.blocks, entry.name);
+    var recipes = [
+      { tag: 'A', over: {} },
+      { tag: 'B', over: { cutMode: 'exposeCut', maxPipes: 1, iceForceSteps: 4 } },
+      { tag: 'C', over: { cutMode: 'layerCut2', maxPipes: 2, chainByDemand: 4, iceForceSteps: 0 } }
+    ];
+    var st = { idx: idx, entry: entry, ws: [], results: [], best: null, passed: null,
+      done: 0, stopped: false, finished: false, timer: null };
+    genBranchState = st;
+    genBatch.nextIdx = 1;   // 这张图由 branch 接管
+    var baseSeed = (Date.now() & 0x7fffffff) >>> 0;
+    genLog('[branch] 单图目标模式：A/B/C 三个分支并行（每支 A1→A2→A3→A4）', 'gen-log-ok');
+    recipes.forEach(function (rec, bi) {
+      var w = null;
+      try { w = new Worker('js/gen-worker.js' + genScriptVersion()); } catch (e) { w = null; }
+      if (!w) return;
+      st.ws.push(w);
+      var cfg = Object.assign({}, base, rec.over, {
+        goalPerRoundMs: 20000, goalMaxMs: 0, goalMaxRounds: 0,
+        goalBases: 1, portfolioK: 1, p7BaseCount: 1,
+        timeBudgetMs: 20000, seed: (baseSeed + bi * 7919) >>> 0,
+        _build: APP_BUILD
+      });
+      w.onmessage = function (e) {
+        var d = e.data || {};
+        if (d.type === 'ready') { w.postMessage({ cmd: 'produceGoal', index: idx, blocks: entry.blocks, config: cfg }); return; }
+        if (d.type === 'flow') { genLog('[branch ' + rec.tag + '] ' + (d.text || ''), 'gen-log-ok'); return; }
+        if (d.type === 'error') {
+          genLog('[branch ' + rec.tag + '] 异常：' + (d.message || ''), 'gen-log-warn');
+          st.done++; _branchMaybeDone(); return;
+        }
+        if (d.type === 'result') {
+          var r = d.result || {};
+          r._branch = rec.tag;
+          st.results.push(r);
+          if (!st.best || _branchScore(r) > _branchScore(st.best)) st.best = r;
+          var passed = false;
+          try { passed = AntSolver.Generator.goalStructPass(r); } catch (e) {}
+          if (passed && !st.passed) {
+            st.passed = r;
+            genLog('[branch] ' + rec.tag + ' 达标，终止另外两支', 'gen-log-ok');
+            st.ws.forEach(function (ww) { try { ww.postMessage({ cmd: 'stop' }); } catch (e) {} });
+            if (st.timer) clearTimeout(st.timer);
+            st.timer = setTimeout(function () { genFinishGoalBranches('branch ' + rec.tag + ' 达标'); }, 2500);
+          }
+          st.done++; _branchMaybeDone(); return;
+        }
+      };
+      w.onerror = function () { st.done++; _branchMaybeDone(); };
+      w.postMessage({ cmd: 'ping' });
+    });
+    function _branchMaybeDone() {
+      if (st.finished) return;
+      if (st.done >= st.ws.length && !st.passed) genFinishGoalBranches(st.stopped ? '手动结束' : '三支均返回');
+    }
+    if (!st.ws.length) { genFinishGoalBranches('无法创建 worker'); return; }
   }
 
   /** 建池并启动。返回 false 表示连一个 Worker 都创建不出来（调用方回退主线程）。 */
@@ -6599,6 +7198,58 @@ AntSolver.App = (function() {
 
   // ---- 主线程模式(后台线程不可用时的回退)：只能串行，每关 produce 前先检查停止标记，避免多跑一关 ----
   //   本模式【不并发】——主线程跑 produce 本身就阻塞页面，多开无意义。仅在 Worker 完全不可用时兜底。
+  /**
+   * 【2026-10-22】主线程目标模式：一轮 produce + setTimeout 让出，轮间检查停止标记。
+   * 不能直接调同步的 Generator.produceGoal —— 主线程被它占满时，点「结束」也处理不了。
+   */
+  function genRunGoalSync(entry, baseCfg, idx, afterOne) {
+    var per = 20000, best = null, rounds = 0, t0 = Date.now();
+    var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
+    function passed(r) {
+      try { return AntSolver.Generator.goalStructPass(r); } catch (e) { return false; }
+    }
+    function score(r) {
+      if (!r || !r.level) return -1e15;
+      var s = 0;
+      if (r.valid) s += 1e6;
+      if (!r.fallback) s += 1e5;
+      if (r.goodV3 && r.goodV3.pass) s += 1e9;
+      var p = (r.goodV3 && r.goodV3.persist) || {};
+      s += (p.band3Pct || 0) * 1000;
+      s += (p.bandPeak || 0) * 10;
+      s += (r.difficulty && r.difficulty.score) || 0;
+      return s;
+    }
+    function done(why) {
+      if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(null);
+      if (!genBatchRunning) return;                 // 已经收尾了，别再补一条
+      if (!best) best = { level: null, valid: false, lastFailReason: 'goalNoRound' };
+      best.goalMode = true; best.goalRounds = rounds;
+      best.goalStopped = (why === 'stopped');
+      best.goalElapsedMs = Date.now() - t0;
+      genOnResult(entry, best, idx, afterOne);
+    }
+    function round() {
+      if (!genBatchRunning) return;
+      if (genBatchAborted) return done('stopped');
+      var cfg = Object.assign({}, baseCfg, {
+        goalMode: false, portfolioK: 3, timeBudgetMs: per * 3,
+        seed: (baseSeed + rounds * 7919) >>> 0, _trace: []
+      });
+      var r = null;
+      try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
+        r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
+      }
+      rounds++;
+      if (r) r.goalRound = rounds;
+      if (!best || score(r) > score(best)) best = r;
+      if (passed(r)) return done('pass');
+      setTimeout(round, 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
+    }
+    if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: idx, no: 0 }, p); });
+    round();
+  }
+
   function genRunSync() {
     var cutUseChecked = !!(document.getElementById('cutplan-use') || {}).checked;   // 【v153】切球规划器开关
     function step() {
@@ -6636,6 +7287,12 @@ AntSolver.App = (function() {
             forcedBoxes: usePlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,
             fragmentMaxRate: usePlan ? 0 : (b.config.fragmentMaxRate || 0)
           });
+          cfg._build = APP_BUILD;
+          if (b.mode === 'goal') {
+            // 【2026-10-22】主线程回退也走"一轮一让出"，否则点结束处理不了。
+            genRunGoalSync(entry, cfg, curIdx, afterOne);
+            return;
+          }
           var result = AntSolver.Generator.produce(entry.blocks, cfg);
           if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(null);
           genLog('✔ 主线程完成：' + entry.name + '　' + (result && result.level ? '有关卡' : ('无关卡 ' + ((result && result.lastFailReason) || '?'))) +
@@ -6682,7 +7339,8 @@ AntSolver.App = (function() {
           var skipStr = skipped.length
             ? ('　跳过 ' + skipped.length + '（' + Object.keys(skipByName).map(function (k) { return k + ' ×' + skipByName[k]; }).join('；') + '）')
             : '';
-          var msg = (genBatchAborted ? '生产已停止' : '生产完成') + '　输出目录：' + relDir + '　合格 ' + q + ' / 不合格 ' + u + ' / 异常 ' + er + skipStr;
+          var _rej = results.filter(function (r) { return r && r.rejected; }).length;
+          var msg = (genBatchAborted ? '生产已停止' : '生产完成') + '　输出目录：' + relDir + '　合格 ' + q + ' / 不合格 ' + u + ' / 异常 ' + er + skipStr + (_rej ? ('　未达qPass ' + _rej) : '');
           genLog(msg, 'gen-log-ok');
           genPersistStatusEl(msg, 'ok');
           // 跳过的每一关都把原因摊开写（最多 5 条），不用去翻逐关记录才知道为什么没产出。
@@ -6704,8 +7362,8 @@ AntSolver.App = (function() {
     if (!results.length) { genLog('本批没有产出任何结果，已中止。'); return; }
     var passCount = results.filter(function(r) { return r.valid; }).length;
     // 困难/简单合格认 audit.tier(不被 finalizeProduce 改写)；audit.pass 在 produce() 收尾后已是"整体合格"(两档合并)。
-    var hardCount = results.filter(function(r) { return r.audit && (r.audit.tier === '合格' || r.audit.tier === '困难合格'); }).length;
-    var easyCount = results.filter(function(r) { return r.audit && (r.audit.tier === '简单关·趋势过平' || r.audit.tier === '简单合格'); }).length;
+    var hardCount = results.filter(function(r) { return !!r.qPass; }).length;
+    var easyCount = results.filter(function(r) { return !r.qPass && r.qLabel && r.qLabel.indexOf('可玩') === 0; }).length;
     // 兜底统计(v86)：fallback=true 的关卡按 fallbackType 细分(超时兜底 / 遍历完兜底)
     var fallbackTimeout = results.filter(function(r) { return r.fallback && r.fallbackType === 'timeout'; }).length;
     var fallbackExhausted = results.filter(function(r) { return r.fallback && r.fallbackType === 'exhausted'; }).length;
@@ -6715,7 +7373,7 @@ AntSolver.App = (function() {
     var curEl = document.getElementById('gen-progress-current');
     if (curEl) curEl.textContent = '打包中...';
     genLog('完成! 通过: ' + passCount + '/' + results.length +
-      ' · 有卡点合格: ' + hardCount + ' · 简单关·趋势过平: ' + easyCount +
+      ' · 质量合格: ' + hardCount + ' · 可玩(未达标): ' + easyCount +
       ((fallbackTimeout + fallbackExhausted) ? ' · 兜底(超时' + fallbackTimeout + '/穷尽' + fallbackExhausted + ')' : '') +
       ' · 难度分布: ' + gradeStr);
     // 【v137】兜底模式同样把「跳过」与原因摊开（与正式落库路径口径一致）
@@ -6744,7 +7402,7 @@ AntSolver.App = (function() {
 
     // CSV 分析报告表头
     // 【v157】表尾追加卡点判据 v2 五列（新列一律加在表尾，避免历史表错位）
-    var csv = ['关卡,目标图入口模式,尺寸,棋盘,盒数,可解,难度分,难度等级,障碍,峰值暂存,均暂存,50%后均暂,50%后峰窗,求解遍可通率,审核合格,合格档,是否兜底,兜底类型,生成诊断分,全知后期封锁,玩家后期封锁,玩家暂存峰,玩家通关,卡点@,前期峰窗,中期峰窗,后期峰窗,不合格原因,卡点v2_独木桥_,卡点v2_预算判断点_,卡点v2_无满解_,卡点v2_70%前≥4占比,卡点v2_判定'];
+    var csv = ['关卡,目标图入口模式,尺寸,棋盘,盒数,可解,难度分,难度等级,障碍,峰值暂存,均暂存,50%后均暂,50%后峰窗,求解遍可通率,审核合格,合格档,是否兜底,兜底类型,生成诊断分,全知后期封锁,玩家后期封锁,玩家暂存峰,玩家通关,卡点@,前期峰窗,中期峰窗,后期峰窗,不合格原因,卡点v2_独木桥_,卡点v2_预算判断点_,卡点v2_无满解_,卡点v2_70%前≥4占比,卡点v2_判定,T陷阱密度,R后悔率,U废牌率,学会后通关,前瞻通关,质量结论,质量原因'];
     // 索引.csv（2026-08-05 §导出对齐）：与 348关工具导入包 的 索引.csv 同口径，
     // 一行一关标出三件套是否齐全，供人工/QA 核对。工具导入时会忽略本文件（只认 .txt/.json）。
     var idxRows = ['关卡名,目标图入口模式,难度分,难度等级,审核合格,合格档,是否可解,求解步数,总盒数,总像素,TXT,关卡,求解数据'];
@@ -6757,6 +7415,7 @@ AntSolver.App = (function() {
 
     for (var i = 0; i < results.length; i++) {
       var r = results[i];
+      if (r.rejected) continue;   // 【v389】未达 qPass 的结果不进 ZIP
       // 【v153 修复】前置闸门拦下/候选全灭的结果没有关卡体（level=undefined）——
       //   旧代码直接 parseLevel(undefined) 抛错 → 收尾中断 → 界面永远停在「生产中」，
       //   用户以为挂了只能手动停止（实测 2026-10-15 19:18 批次：规划车单 + 重度障碍 → 候选全灭 → 卡 12 分钟）。
@@ -6830,14 +7489,18 @@ AntSolver.App = (function() {
       var au = r.audit || { pass: false, lateAt: null, earlyMax: 0, midMax: 0, lateMax: 0, reasons: [] };
       var ge = r.generationEval || { score: 0, omni: { preview: {} }, player: { preview: {}, peak: 0, won: false } };
       var gop = ge.omni.preview || {}, gpp = ge.player.preview || {};
+      var qm = (r.goodV3 && r.goodV3.persist && r.goodV3.persist.quality) || (r.persist && r.persist.quality) || {};
+      var pv = (r.goodV3 && r.goodV3.persist) || r.persist || {};
+      var ql = r.qLabel || (r.audit && r.audit.tier) || (r.valid ? '可玩' : '不可解');
+      var qr = (r.qReasons || []).join('；');
       csv.push([
         '"' + r.name + '"', entryModeCN(r.entryMode), pr.rows + 'x' + pr.cols,
         (lv.board ? lv.board.rows + 'x' + lv.board.cols : ''), pr.totalBoxes,
         (r.valid ? '是' : '否'), r.difficulty, r.grade,
         '"' + (r.obstacleNames || '无') + '"',
         r.maxBuffer, pm.avgAll, pm.avg50, pm.maxWin, Math.round(pm.completedRate * 100) + '%',
-        (au.usable != null ? (au.usable ? '合格' : '不合格') : ((au.pass || au.easyPass) ? '合格' : '不合格')),
-        (au.tier || (au.pass ? '合格' : (au.easyPass ? '简单关·趋势过平' : '不合格'))),
+        '"' + (r.qLabel || (au.usable != null ? (au.usable ? '合格' : '不合格') : ((au.pass || au.easyPass) ? '合格' : '不合格'))) + '"',
+        '"' + (r.qPass ? '合格' : (r.qLabel || au.tier || '可玩')) + '"',
         (r.fallback ? '是' : '否'), (r.fallbackType || '-'), ge.score || 0,
         Math.round((gop.lateAvgLockRatio || 0) * 100) + '%', Math.round((gpp.lateAvgLockRatio || 0) * 100) + '%',
         ge.player.peak || 0, (ge.player.won ? '是' : '否'),
@@ -6854,13 +7517,20 @@ AntSolver.App = (function() {
             (o ? o.noGood : '-') + '_' + (p ? p.noGood : '-') + ',' +
             w.hiBefore70Pct + '%,' +
             '"' + (vio.length ? ('不通过:' + vio.join('、')) : '通过') + '"';
-        })()
+        })(),
+        (qm.T != null ? qm.T + '%' : '-'),
+        (qm.R != null ? qm.R : '-'),
+        (qm.U != null ? qm.U + '%' : '-'),
+        (pv.learnedPassPct != null ? pv.learnedPassPct + '%' : '-'),
+        (pv.lookaheadPassPct != null ? pv.lookaheadPassPct + '%' : '-'),
+        '"' + ql + '"',
+        '"' + qr + '"'
       ].join(','));
       // 索引行：三件套齐全性按本轮【实际写出的文件】判断，不假定
       idxRows.push([
         '"' + base + '"', entryModeCN(r.entryMode), r.difficulty, r.grade,
-        (au.usable != null ? (au.usable ? '合格' : '不合格') : ((au.pass || au.easyPass) ? '合格' : '不合格')),
-        (au.tier || (au.pass ? '合格' : (au.easyPass ? '简单关·趋势过平' : '不合格'))),
+        '"' + (r.qLabel || (au.usable != null ? (au.usable ? '合格' : '不合格') : ((au.pass || au.easyPass) ? '合格' : '不合格'))) + '"',
+        '"' + (r.qPass ? '合格' : (r.qLabel || au.tier || '可玩')) + '"',
         (r.valid ? '是' : '否'),
         (slv && slv.steps != null ? slv.steps : ''),
         pr.totalBoxes, pr.totalPixels,
@@ -6878,7 +7548,7 @@ AntSolver.App = (function() {
     files.push({ name: '索引.csv', text: '\ufeff' + idxRows.join('\n') });
 
     // 5) 生产报告 MD —— 中后期卡点审核（标准见 生产审核评分体系.md）
-    var auditPass = results.filter(function(r) { return r.audit && r.audit.pass; });
+    var auditPass = results.filter(function(r) { return !!r.qPass; });
     var bl = config.bufferLimit || 5;
     var md = '# 生产报告\n\n';
     md += '- 生成时间: ' + new Date().toLocaleString() + '\n';
@@ -6921,8 +7591,21 @@ AntSolver.App = (function() {
     md += '- 卡点审核标准(暂存上限 ' + bl + ')：高压阈值=' + (bl - 1.5) + '(上限−1.5) · 中压阈值=' + (bl - 2.5) + '(上限−2.5)\n';
     md += '  - ①50%后至少1个10%窗口均值≥高压(卡点) ②前期0-20%无窗口≥中压 ③中期20-50%无窗口≥高压\n';
     md += '- 审核+求解数据：见 `关卡数据/关卡数据.json`（汇总本批各关审核结论 + 合格轮 pickOrder/压力样本 + 完整关卡数据，供回溯复盘/重放/无损重导入）\n\n';
+    // 【v371·P1】T/R/U 只读代理：与 CSV 同源（goodV3Of 的 10 局首通结果），不参与合格判定
+    md += '## 质量指标（P1 只读代理）\n\n| 关卡 | 首通 | 学会后 | 前瞻 | T 陷阱 | R 后悔 | U 废牌 |\n|---|---|---|---|---|---|---|\n';
+    results.filter(function (r) { return !!r.level; }).forEach(function (r) {
+      var q = (r.goodV3 && r.goodV3.persist && r.goodV3.persist.quality) || {};
+      var pp = (r.goodV3 && r.goodV3.persist) ? r.goodV3.persist.playerPassPct : null;
+      var lp = (r.goodV3 && r.goodV3.persist) ? r.goodV3.persist.learnedPassPct : null;
+      var lk = (r.goodV3 && r.goodV3.persist) ? r.goodV3.persist.lookaheadPassPct : null;
+      md += '| ' + r.name + ' | ' + (pp == null ? '-' : pp + '%') + ' | ' + (lp == null ? '-' : lp + '%') + ' | ' + (lk == null ? '-' : lk + '%') + ' | '
+        + (q.T == null ? '-' : q.T + '%（' + q.trapCount + '/' + q.decisions + '）') + ' | '
+        + (q.R == null ? '-' : q.R + 'pp') + ' | '
+        + (q.U == null ? '-' : q.U + '%') + ' |\n';
+    });
+    md += '\n> T/R/U 为 10 局首通策略的代理值，只读，不参与合格判定。\n\n';
     md += '## 生成参数\n```json\n' + JSON.stringify(config, null, 2) + '\n```\n\n';
-    md += '## 审核合格关卡（' + auditPass.length + '）\n';
+    md += '## 质量合格关卡（' + auditPass.length + '）\n';
     if (auditPass.length) auditPass.forEach(function(r) {
       var a = r.audit;
       md += '- ' + r.name + '：难度' + r.difficulty + '[' + r.grade + '] 卡点@' + a.lateAt + '%(峰窗' + a.lateMax + ') · 前期' + a.earlyMax + ' 中期' + a.midMax + '\n';
@@ -6938,12 +7621,12 @@ AntSolver.App = (function() {
       });
     }
     // 不合格明细（列出原因，便于返工；不含上面已列出的兜底关卡，避免重复）
-    var auditFail = results.filter(function(r) { return r.valid && (!r.audit || !r.audit.pass) && !r.fallback; });
+    var auditFail = results.filter(function(r) { return r.valid && !r.qPass; });
     if (auditFail.length) {
       md += '\n## 不合格明细（' + auditFail.length + '）\n';
       auditFail.forEach(function(r) {
         var a = r.audit || { reasons: ['无审核数据'] };
-        md += '- ' + r.name + '：' + (a.reasons.join('；') || '不合格') + '\n';
+        md += '- ' + r.name + '：' + ((r.qReasons || a.reasons).join('；') || '可玩·未达标') + '\n';
       });
     }
     files.push({ name: '关卡数据/生产报告.md', text: md });
@@ -6988,11 +7671,13 @@ AntSolver.App = (function() {
   function genTierLabel(r) {
     if (r.fallback) return r.fallbackType === 'timeout' ? '兜底·超时' : '兜底·穷尽';
     if (!r.valid) return '不可解';
-    return (r.audit && r.audit.tier) || '不合格';
+    return r.qLabel || (r.audit && r.audit.tier) || '不可解';
   }
   function genTierClass(r) {
     if (r.fallback) return 'gen-tier-fallback';
     if (!r.valid) return 'gen-tier-fail';
+    if (r.qPass) return 'gen-tier-hard';
+    if (r.qLabel && r.qLabel.indexOf('可玩') === 0) return 'gen-tier-easy';
     if (r.audit && r.audit.tier === '困难合格') return 'gen-tier-hard';
     if (r.audit && r.audit.tier === '简单合格') return 'gen-tier-easy';
     return 'gen-tier-fail';

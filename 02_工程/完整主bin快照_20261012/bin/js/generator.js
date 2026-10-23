@@ -666,6 +666,9 @@ AntSolver.Generator = (function() {
         board = buildBoard(boxesR, pbCfg);
       }
       curCfg = pbCfg;
+      if (curCfg.semanticObstacles) {
+        try { applySemanticObstacles(board, blocks, curCfg); } catch (e) { }
+      }
 
       var level = { blocks: blocks, bufferLimit: curCfg.bufferLimit, board: board };
       var parsed = AntSolver.parseLevel(level);
@@ -690,7 +693,136 @@ AntSolver.Generator = (function() {
       lastLevel = level; lastResult = result; lastParsed = parsed;
 
       // 合格 = 结构无卡死 且 求解器可通关
+      try { level.board.routeLockEntry = { sdcOk: !!(sdc && sdc.ok), completed: !!(result && result.completed), reason: (sdc && sdc.reason) || null }; } catch (e) { }
       if (sdc.ok && result.completed) {
+        // 【v453】生成时 Route Lock：前10步换 partial + 锁替代，再重解
+  function applyGenerationRouteLock(level, config, sr) {
+    if (!level || !sr || !sr.pickOrder || !sr.pickOrder.length) return { tries: [{ reason: 'no level/sr' }] };
+    var parsed0 = AntSolver.parseLevel(level);
+    var cv0 = choiceCurve(parsed0, sr);
+    if (!cv0 || !cv0.steps) return { tries: [{ reason: 'no cv' }] };
+    var po = sr.pickOrder.slice().sort(function (a, b) { return (a.step || 0) - (b.step || 0); });
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var exp = {};
+    try {
+      var oe = openingExposure(level.blocks, level.board.rows, level.board.cols, false);
+      if (oe && oe.detail) for (var oi = 0; oi < oe.detail.length; oi++) exp[oe.detail[oi].color] = oe.detail[oi].px;
+    } catch (e) { }
+    var deep = [];
+    for (var pi = 0; pi < po.length; pi++) {
+      var p = po[pi], prog = pi / Math.max(1, po.length - 1);
+      if (prog >= 0.40 && prog <= 0.70 && plain(p.r, p.c)) deep.push(p);
+    }
+    if (!deep.length) return { tries: [{ reason: 'no deep' }] };
+    deep.sort(function (a, b) {
+      return ((b.count || 0) - (exp[b.color] || 0)) - ((a.count || 0) - (exp[a.color] || 0));
+    });
+    var best = null, bestScore = (cv0.earlyPeak10 || 0) * 100 - (cv0.earlyFree10 || 0) * 10;
+    var tried = 0, tries = [];
+    for (var si = 0; si < Math.min(10, cv0.steps.length) && tried < 4; si++) {
+      var st = cv0.steps[si];
+      if (!(st.full >= 2 && st.free >= 3)) continue;
+      if (!st.pick || !plain(st.pick.r, st.pick.c)) continue;
+      var alts = (st.moves || []).filter(function (m) {
+        return m.full && plain(m.r, m.c) && !(m.r === st.pick.r && m.c === st.pick.c);
+      });
+      if (!alts.length) continue;
+      // 【v455】同一段：所有 full 替代都锁；两种模式：换 pick / 锁 pick 本身
+      for (var mode = 0; mode < 2 && tried < 4; mode++) {
+        tried++;
+        var d = deep[0];
+        if (mode === 0 && d.r === st.pick.r && d.c === st.pick.c) continue;
+        var lv = JSON.parse(JSON.stringify(level));
+        var a = lv.board.cells[st.pick.r][st.pick.c];
+        if (mode === 0) {
+          var b = lv.board.cells[d.r][d.c];
+          if (!a || !b || a.t !== 'box' || b.t !== 'box') continue;
+          lv.board.cells[st.pick.r][st.pick.c] = b;
+          lv.board.cells[d.r][d.c] = a;
+        } else {
+          if (!a || a.t !== 'box' || a.chain || a.numice || a.q) continue;
+          a.numice = 1;   // 直接锁第一格
+        }
+        var _altLocked = 0;
+        for (var ai = 0; ai < alts.length; ai++) {
+          var altCell = lv.board.cells[alts[ai].r][alts[ai].c];
+          if (altCell && altCell.t === 'box' && !altCell.chain && !altCell.numice) { altCell.numice = 1; _altLocked++; }
+        }
+        var p2 = null, sr2 = null, cv2 = null;
+        try {
+          p2 = AntSolver.parseLevel(lv);
+          sr2 = AntSolver.Solver.solve(p2, { capturePreviewStats: true, bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain });
+          if (sr2 && sr2.completed) cv2 = choiceCurve(p2, sr2);
+        } catch (e) { }
+        if (!cv2) { tries.push({ step: si, mode: mode, pick: [st.pick.r, st.pick.c], deep: [d.r, d.c], alts: alts.length, locked: _altLocked, completed: false, reason: 'unsolved' }); continue; }
+        var sc = (cv2.earlyPeak10 || 0) * 100 - (cv2.earlyFree10 || 0) * 10;
+        tries.push({ step: si, mode: mode, pick: [st.pick.r, st.pick.c], deep: [d.r, d.c], alts: alts.length, locked: _altLocked, completed: true, free: cv2.earlyFree10, peak: cv2.earlyPeak10, score: sc, beforeScore: bestScore });
+        if (sc > bestScore) {
+          lv.routeLock = { step: si, mode: mode, pick: [st.pick.r, st.pick.c], deep: [d.r, d.c], alts: alts.length, locked: _altLocked,
+            before: { free: cv0.earlyFree10, peak: cv0.earlyPeak10 }, after: { free: cv2.earlyFree10, peak: cv2.earlyPeak10 } };
+          best = { level: lv, parsed: p2, sr: sr2, cv: cv2, score: sc, info: lv.routeLock };
+          bestScore = sc;
+        }
+      }
+    }
+    if (best) best.tries = tries;
+    return best || { tries: tries };
+  }
+
+  // 【v450】生成时 Early：先解一次，把前10步第一选择换 partial，再解一次；只保留更优
+        // 【v453】Route Lock：换 partial + 锁替代，再重解
+        var _rlTries = null, _rlInfo = null;
+        if (curCfg.semanticRouteLock) {
+          try {
+            var _rl = applyGenerationRouteLock(level, curCfg, result);
+            if (_rl && _rl.tries) { _rlTries = _rl.tries; level.board.routeLockTry = _rl.tries; }
+            if (level.board.routeLockEntry) level.board.routeLockEntry.routeRan = true;
+            if (_rl && _rl.score > ((choiceCurve(parsed, result).earlyPeak10 || 0) * 100 - (choiceCurve(parsed, result).earlyFree10 || 0) * 10)) {
+              level = _rl.level; parsed = _rl.parsed; result = _rl.sr;
+              _rlInfo = _rl.info; level.board.routeLock = _rl.info;
+            }
+          } catch (e) { }
+        }
+        if (curCfg.semanticEarly) {
+          var _seTry = { applied: false, reason: null, attempts: [] };
+          try {
+            level.board.semanticEarlyTry = _seTry;
+            var _bestLv = null, _bestP = null, _bestSr = null, _bestScore = -1e9;
+            for (var _ew = 0; _ew < 3; _ew++) {
+              var _lvE = applyGenerationEarly(level, curCfg, result, _ew);
+              if (!_lvE) { _seTry.attempts.push({ which: _ew, reason: 'no swap' }); continue; }
+              var _pE = null, _srE = null;
+              try {
+                _pE = AntSolver.parseLevel(_lvE);
+                _srE = AntSolver.Solver.solve(_pE, { capturePreviewStats: true, bottomOnly: !!curCfg.bottomOnly, instantChain: !!curCfg.instantChain });
+              } catch (e2) { _srE = null; }
+              if (!_srE || !_srE.completed) { _seTry.attempts.push({ which: _ew, reason: 're-solve failed' }); continue; }
+              var _cvE = choiceCurve(_pE, _srE);
+              var _ef = _cvE && _cvE.earlyFree10 != null ? _cvE.earlyFree10 : 99;
+              var _ep = _cvE && _cvE.earlyPeak10 != null ? _cvE.earlyPeak10 : 0;
+              var _sc = _ep * 100 - _ef * 10;
+              _seTry.attempts.push({ which: _ew, free: _ef, peak: _ep, score: _sc });
+              if (_sc > _bestScore) { _bestScore = _sc; _bestLv = _lvE; _bestP = _pE; _bestSr = _srE; }
+            }
+            if (_bestLv) {
+              var _cv0 = choiceCurve(parsed, result);
+              var _ef0 = _cv0 && _cv0.earlyFree10 != null ? _cv0.earlyFree10 : 99;
+              var _ep0 = _cv0 && _cv0.earlyPeak10 != null ? _cv0.earlyPeak10 : 0;
+              _seTry.before = { free: _ef0, peak: _ep0 };
+              _seTry.after = { free: _cv0 && _bestP ? choiceCurve(_bestP, _bestSr).earlyFree10 : null, peak: _cv0 && _bestP ? choiceCurve(_bestP, _bestSr).earlyPeak10 : null };
+              if (_bestScore > _ep0 * 100 - _ef0 * 10) {
+                level = _bestLv; parsed = _bestP; result = _bestSr;
+                _seTry.applied = true; _seTry.reason = 'accepted improved';
+              } else _seTry.reason = 'not better';
+            } else _seTry.reason = 'no viable variant';
+          } catch (e) { _seTry.reason = 'error:' + ((e && e.message) || e); }
+        }
+        // 【v457】routeLockTry 挂到最终 level（semanticEarly 可能替换过 level）
+        if (_rlTries) { try { level.board.routeLockTry = _rlTries; } catch (e) { } }
+        if (_rlInfo) { try { level.board.routeLock = _rlInfo; } catch (e) { } }
         // 注：基础阶段不做换球(v86 起)——基础候选到此直接采用；换球只在【卡点B支】(chokeSwap)定向执行，
         //   进入 produce() 的候选树后，未合格候选才会展开卡点分支。
         var generationEval = evaluateGeneration(result, parsed, curCfg);
@@ -806,6 +938,9 @@ AntSolver.Generator = (function() {
   //   config 缺省或非法时回落到原常量，保证「不传参 = 原行为」。
   function pipeDepthOf(config) {
     var v = config && config.pipeMaxDepth != null ? parseInt(config.pipeMaxDepth, 10) : MAX_PIPE_DEPTH;
+    // 【v386·用户裁决】单条管道最多 4 辆车：无论配置写多大，这里硬夹到 4。
+    if (!(v > 0)) v = MAX_PIPE_DEPTH;
+    if (v > 4) v = 4;
     if (!(v > 0)) v = MAX_PIPE_DEPTH;
     return v;
   }
@@ -991,6 +1126,86 @@ AntSolver.Generator = (function() {
     return out;
   }
 
+  // 【v425】生成时构造“代价替代”：40~60% 相邻两格，较大车加冰1，较小车留作替代
+  // 【v428】生成时预留小替代：同一颜色的 4 连块重新分配成 1 + 3 个大车
+  function reserveSmallAlt(board, config) {
+    if (!board || !board.cells) return null;
+    var maxCap = parseInt(config && config.boxSizeMax, 10) || 40;
+    var seen = {}, comps = [];
+    function plain(x) { return x && x.t === 'box' && !x.chain && !x.numice && !x.q; }
+    var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (var r = 0; r < board.rows; r++) for (var c = 0; c < board.cols; c++) {
+      var st = board.cells[r][c];
+      if (!plain(st) || seen[r + ',' + c]) continue;
+      var color = st.color, q = [[r, c]], cells = [];
+      seen[r + ',' + c] = 1;
+      while (q.length) {
+        var p = q.pop(); cells.push(p);
+        for (var d = 0; d < dirs.length; d++) {
+          var nr = p[0] + dirs[d][0], nc = p[1] + dirs[d][1], k = nr + ',' + nc;
+          if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols || seen[k]) continue;
+          var x = board.cells[nr][nc];
+          if (!plain(x) || x.color !== color) continue;
+          seen[k] = 1; q.push([nr, nc]);
+        }
+      }
+      if (cells.length >= 4) comps.push({ color: color, cells: cells });
+    }
+    for (var ci = 0; ci < comps.length; ci++) {
+      var cs = comps[ci].cells.slice(0, 4);
+      var sum = 0;
+      for (var k2 = 0; k2 < cs.length; k2++) sum += (board.cells[cs[k2][0]][cs[k2][1]].count || 0);
+      if (sum - 1 > 3 * maxCap) continue;
+      var rest = sum - 1, vals = [1];
+      for (var vi = 0; vi < 3; vi++) {
+        var v = Math.min(maxCap, Math.floor(rest / (3 - vi)));
+        vals.push(v); rest -= v;
+      }
+      if (rest !== 0) continue;
+      for (var ai = 0; ai < 4; ai++) board.cells[cs[ai][0]][cs[ai][1]].count = vals[ai];
+      board.cells[cs[0][0]][cs[0][1]].numice = 1;
+      return { color: comps[ci].color, cells: cs, counts: vals, sum: sum };
+    }
+    return null;
+  }
+
+  function injectCostlyAlt(board, config) {
+    if (!board || !board.cells || !board.rows) return null;
+    function plain(x) { return x && x.t === 'box' && !x.chain && !x.numice && !x.q; }
+    // 1) 先找一辆真正的小车（不要求在压力点旁）
+    var small = null;
+    for (var sr = 0; sr < board.rows && !small; sr++) {
+      for (var sc = 0; sc < board.cols; sc++) {
+        var sx = board.cells[sr][sc];
+        if (plain(sx) && (sx.count || 0) <= 15) { small = { r: sr, c: sc, cell: sx }; break; }
+      }
+    }
+    if (!small) return null;
+    // 2) 找 40~60% 的“大车 + 邻格”，把邻格换成小车
+    var rLo = Math.floor(board.rows * 0.40), rHi = Math.ceil(board.rows * 0.60);
+    var best = null, bestTrap = -1;
+    for (var r = rLo; r <= rHi && r < board.rows; r++) {
+      for (var c = 0; c < board.cols - 1; c++) {
+        var a = board.cells[r][c], b = board.cells[r][c + 1];
+        if (!plain(a) || !plain(b)) continue;
+        var trap = (a.count >= b.count) ? a : b;
+        var alt = (trap === a) ? b : a;
+        var altPos = (trap === a) ? { r: r, c: c + 1 } : { r: r, c: c };
+        if ((trap.count || 0) < 30) continue;
+        if (altPos.r === small.r && altPos.c === small.c) continue;
+        if ((trap.count || 0) > bestTrap) { bestTrap = trap.count; best = { trap: trap, altPos: altPos }; }
+      }
+    }
+    if (!best) return null;
+    // 3) 小车 ↔ 邻格大车交换；再给压力车加冰1
+    var oldAlt = board.cells[best.altPos.r][best.altPos.c];
+    board.cells[best.altPos.r][best.altPos.c] = small.cell;
+    board.cells[small.r][small.c] = oldAlt;
+    best.trap.numice = 1;
+    return { r: best.altPos.r, c: best.altPos.c, trap: best.trap.color, alt: small.cell.color,
+             trapCount: best.trap.count, altCount: small.cell.count, movedFrom: [small.r, small.c] };
+  }
+
   function buildRowMajorBoard(boxes, config) {
     var n = boxes.length;
     if (!n) return null;
@@ -999,6 +1214,8 @@ AntSolver.Generator = (function() {
     //   保持用 boardRowsMin（默认 6）：27 辆上 6×7，多出来的补黑块，玩家能过。
     var minR = Math.max(3, parseInt(config.boardRowsMin, 10) || 3);
     var maxR = Math.max(minR, parseInt(config.boardRowsMax, 10) || 14);
+    // 【v394】溢出优先加行：行优先摆盘也要允许比范围多 1 行，避免为了塞管道把盘做小。
+    if (config.boardExpandOnOverflow) maxR += 1;
     var best = null;
     for (var r = minR; r <= maxR; r++) {
       for (var c = r + 1; c <= r + 2; c++) {
@@ -1100,8 +1317,12 @@ AntSolver.Generator = (function() {
       }
     }
 
+    var _costly = null;
+    if (config && config.costlyAlt) {
+      try { _costly = injectCostlyAlt(board, config); } catch (e) { _costly = null; }
+    }
     board.rowMajorStat = { boxes: n, rows: rows, cols: cols, blanks: rows * cols - n,
-      chains: placedChains, avgCap: Math.round(avgCap) };
+      chains: placedChains, avgCap: Math.round(avgCap), costlyAlt: _costly };
     return board;
   }
 
@@ -1561,7 +1782,15 @@ AntSolver.Generator = (function() {
     // 注：换球已移至 generateFromBlocks 的【解后处理】(applyRegionSwaps)——
     // 需先跑全知求解器得到 pickOrder(每步取的棋盘盒)才能按进度%圈定换球区域。
 
-    return { rows: rows, cols: cols, cells: cells };
+    var _bd = { rows: rows, cols: cols, cells: cells };
+    if (config && config.costlyAlt) {
+      try {
+        var _ca = reserveSmallAlt(_bd, config);
+        if (!_ca) _ca = injectCostlyAlt(_bd, config);
+        if (_ca) _bd.costlyAlt = _ca;
+      } catch (e) { }
+    }
+    return _bd;
   }
 
   /* ==================================================================
@@ -1909,12 +2138,12 @@ AntSolver.Generator = (function() {
     var bp = config.blackPercent || 0;
     // 允许进管道的溢出上限：管道条数未定时按经验给一个温和的窗口，
     // 目的只是「别把几十个盒全推进管道」，真正的管道容量仍由后续 pipeCapacity 检查把关。
-    var pipeRoom = Math.max(3, Math.round(n * 0.25));
+    var pipeRoom = (config && config.boardFirst) ? 0 : Math.max(3, Math.round(n * 0.25));
     // 管道数下限 → 溢出盒下限（按每管容量区间的中值反推；0 = 不约束，原行为）
     //   原为写死的 minPipes*5，5 是 (4+6)/2；深度参数化后改为按实际区间取中值，
     //   默认 pipeMinFill=4 / pipeMaxDepth=6 时结果仍是 5，与参数引入前等价。
     var minPipes = parseInt(config.minPipes, 10) || 0;
-    var minOv = minPipes > 0 ? minPipes * Math.ceil((pipeMinFillOf(config) + pipeDepthOf(config)) / 2) : 0;
+    var minOv = (config && config.boardFirst) ? 0 : (minPipes > 0 ? minPipes * Math.ceil((pipeMinFillOf(config) + pipeDepthOf(config)) / 2) : 0);
     // ===== 可用空间一致性优先（用户 2026-08-04）=====
     // 开启目标可用空间后，尺寸的取舍标准就变成「该尺寸能否解出满足目标比例的(管道,黑块)组合」，
     // 而不再是原来的「溢出多少」。在所有有解的尺寸里【随机取一个】——这正是用户要的
@@ -1954,7 +2183,7 @@ AntSolver.Generator = (function() {
             tier: 'usableSpace', cap: fcap, boxCount: n,
             blackTarget: fq.blackTarget, surplusToBlack: 0,
             finalBlack: fq.blackTarget, finalBlackPct: Math.round(fq.blackPct * 1000) / 10,
-            shrinkUsed: shrinkUsed, shapeRelaxed: false,
+            shrinkUsed: shrinkUsed, expanded: dpick.expanded || null, shapeRelaxed: false,
             shapeDiff: dpick.cols - dpick.rows,
             rangeGiven: { rowsMin: rMin, rowsMax: rMax, colsMin: cMin, colsMax: cMax },
             // 可用空间自适应的诊断信息（供报告与验证如实展示）
@@ -1978,6 +2207,21 @@ AntSolver.Generator = (function() {
           if (d0) { d0.shrinkDist = 0; allDims.push(d0); }
         }
       }
+      // 【v388·用户裁决】溢出优先加行/列：先在当前范围外各试 +1 行 / +1 列，
+      //   能装下就优先用，避免"为了塞管道把盘做小"。只在 config.boardExpandOnOverflow 时开。
+      if (config.boardExpandOnOverflow) {
+        var _exCols = [], _exRows = [];
+        for (var xc = cMin; xc <= Math.min(cMax + 1, 30); xc++) _exCols.push(xc);
+        for (var xr = rMin; xr <= Math.min(rMax + 1, 20); xr++) _exRows.push(xr);
+        for (var xi = 0; xi < _exCols.length; xi++) {
+          var xd = feasAt(rMax + 1, _exCols[xi]);
+          if (xd) { xd.shrinkDist = 0; xd.expanded = 'row'; allDims.push(xd); }
+        }
+        for (var yi = 0; yi < _exRows.length; yi++) {
+          var yd = feasAt(_exRows[yi], cMax + 1);
+          if (yd) { yd.shrinkDist = 0; yd.expanded = 'col'; allDims.push(yd); }
+        }
+      }
       // 【v205】棋盘硬范围：开了 boardHardRange 就不许"向下缩小"出范围，
       //   也不许借缩小路径把棋盘做小（缩小会让周长/车数比例变差、暴露更多）。
       if (!config.boardHardRange) {
@@ -1991,6 +2235,13 @@ AntSolver.Generator = (function() {
         }
       }
       if (allDims.length) {
+        var _ov0 = function (d) { return (d.q && d.q.overflow || 0); };
+        // 【v393】先 board 后 pipe 的硬顺序：先找 overflow≤0 的尺寸，不塞管道。
+        // 范围本身能装下就先用；范围装不下才用 +1 行/列扩展盘；都没有才允许带管道。
+        var _fitIn = allDims.filter(function (d) { return !d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0; });
+        if (_fitIn.length) return emitUsable(pickRandom(_fitIn), false, allDims.length);
+        var _fitExp = allDims.filter(function (d) { return d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0; });
+        if (_fitExp.length) return emitUsable(pickRandom(_fitExp), false, allDims.length);
         // ① 优先「干净」尺寸（保管道 + 不突破墙上限），并取【缩小量最小】的那一级 → 只缩到刚好不突破，
         //    同一级内随机（保留尺寸多样性）。这直接实现用户「缩到不触发墙超限兜底为止」。
         var clean = allDims.filter(isClean);
@@ -2054,6 +2305,20 @@ AntSolver.Generator = (function() {
         if (boardShapeOk(rr, cc, !!config.boardAllowSquare)) inRange.push(e);
       }
     }
+    // 【v394】溢出优先加行/列：fallback（未开 usableSpaceTarget）也要把扩展尺寸纳入候选。
+    if (config.boardExpandOnOverflow) {
+      var _xc = Math.min(cMax + 1, 30), _xr = Math.min(rMax + 1, 20);
+      for (var xc2 = cMin; xc2 <= _xc; xc2++) {
+        var xe = evalPair(rMax + 1, xc2);
+        anyInRange.push(xe);
+        if (boardShapeOk(rMax + 1, xc2, !!config.boardAllowSquare)) inRange.push(xe);
+      }
+      for (var xr2 = rMin; xr2 <= _xr; xr2++) {
+        var ye = evalPair(xr2, cMax + 1);
+        anyInRange.push(ye);
+        if (boardShapeOk(xr2, cMax + 1, !!config.boardAllowSquare)) inRange.push(ye);
+      }
+    }
     // 向下缩小候选：行从 rMin-1 一直缩到 3，列只取 行+1 / 行+2（天然满足形态约束）
     // 【v316·用户裁决】开了棋盘硬范围（boardHardRange）就不许缩到范围外 ——
     //   原来这条路径不看该开关，22 辆的图被缩成 3×8 的怪盘。
@@ -2078,6 +2343,11 @@ AntSolver.Generator = (function() {
       if (minOv > 0) {
         var enough = list.filter(function (x) { return x.ov >= minOv; }).sort(byOvAsc);
         if (enough.length) return { e: enough[0], tier: 'minPipes' };
+      }
+      // 【v394】boardFirst：只要盘能装下（ov≤0），哪怕多 1~2 格，也优先于“溢出进管道”。
+      if (config && config.boardFirst) {
+        var fitBoard = list.filter(function (x) { return x.ov <= 0; }).sort(bySurplusAsc);
+        if (fitBoard.length) return { e: fitBoard[0], tier: 'fitBoard' };
       }
       var good = list.filter(function (x) { return x.ov >= 0 && x.ov <= pipeRoom; }).sort(byOvAsc);
       if (good.length) return { e: good[0], tier: 'fitPipe' };
@@ -7577,7 +7847,10 @@ AntSolver.Generator = (function() {
    */
   function curveFlattened(curve) {
     if (!curve || !curve.n || curve.n < 8) return false;      // 步数太少不表态
-    return (curve.lowPct >= 35) || (curve.medFull <= 2) || (curve.opening <= 1);
+    // 【v441】W≤1/中位1 不再算“压平”；只有可选中位<2 / 被迫步高才减压
+    if (curve.selectMedian != null && curve.selectMedian < 2) return true;
+    if (curve.forcedPct != null && curve.forcedPct > 25) return true;
+    return (curve.opening <= 1);
   }
   function applyPressureAdjust(config, audit, bufferLimit, curve) {
     if (!audit) {
@@ -7888,7 +8161,16 @@ AntSolver.Generator = (function() {
           if ((blob[cell.color] || 0) >= cell.count) full++;
         }
         var prog = st.totalBoxes ? (st.completedBoxes / st.totalBoxes) : 0;
-        steps.push({ prog: +prog.toFixed(4), full: full, free: limit - st.buffer.length });
+        // 【v380·P6】压力点检测要坐标/候选：把这一手的盒与“当前可点且能吃满”的候选一起记下
+        var _mvs = [];
+        for (var _mj = 0; _mj < mv.length; _mj++) {
+          if (mv[_mj].blocked) continue;
+          var _mc = st.cells[mv[_mj].r] && st.cells[mv[_mj].r][mv[_mj].c];
+          if (!_mc) continue;
+          _mvs.push({ r: mv[_mj].r, c: mv[_mj].c, color: _mc.color, count: _mc.count, full: ((blob[_mc.color] || 0) >= _mc.count) ? 1 : 0 });
+        }
+        steps.push({ prog: +prog.toFixed(4), full: full, free: limit - st.buffer.length,
+          pick: { r: p.r, c: p.c, color: p.color, count: p.count }, moves: _mvs });
         if (!S.applyPick(st, p.r, p.c)) break;
         if (st.gameOver) break;
       }
@@ -7904,8 +8186,90 @@ AntSolver.Generator = (function() {
     var sortedFull = steps.map(function (x) { return x.full; }).sort(function (a, b) { return a - b; });
     var mid = sortedFull[Math.floor(sortedFull.length / 2)];
     var forcedMid = forced.filter(function (p2) { return p2 >= 0.30 && p2 <= 0.80; }).length;
+    var _pn = 0, _of = 0, _op = 0;
+    var _freeSteps = 0, _pressSteps = 0, _freeRun = 0, _freeRunMax = 0;
+    var _lastPress = -1, _gapMax = 0, _afterFree = 0, _afterDen = 0;
+    for (var _pk2 = 0; _pk2 < steps.length; _pk2++) {
+      var _s2 = steps[_pk2];
+      var _isFree = (_s2.full >= 2 && _s2.free >= 3);
+      var _isPress = (_s2.full >= 2 && _s2.free <= 1);
+      if (_s2.prog >= 0.35 && _s2.prog <= 0.70 && _s2.free <= 1 && _s2.full >= 2) _pn++;
+      if (_pk2 < 12) {
+        if (_isFree) _of++;
+        if (_isPress) _op++;
+      }
+      if (_isFree) { _freeSteps++; _freeRun++; if (_freeRun > _freeRunMax) _freeRunMax = _freeRun; }
+      else _freeRun = 0;
+      if (_isPress) {
+        _pressSteps++;
+        if (_lastPress >= 0) { var _gap = _pk2 - _lastPress - 1; if (_gap > _gapMax) _gapMax = _gap; }
+        _lastPress = _pk2;
+      }
+    }
+    if (_lastPress >= 0) { var _tail = n - 1 - _lastPress; if (_tail > _gapMax) _gapMax = _tail; }
+    // 压力后 3 步内又回到免费步的比例
+    for (var _pi2 = 0; _pi2 < n; _pi2++) {
+      var _sp = steps[_pi2];
+      if (!(_sp.full >= 2 && _sp.free <= 1)) continue;
+      for (var _q2 = 1; _q2 <= 3; _q2++) {
+        var _sn = steps[_pi2 + _q2];
+        if (!_sn) break;
+        _afterDen++;
+        if (_sn.full >= 2 && _sn.free >= 3) _afterFree++;
+      }
+    }
+    var _freePct = n ? Math.round(_freeSteps / n * 100) : 0;
+    var _pressPct = n ? Math.round(_pressSteps / n * 100) : 0;
+    var _afterPct = _afterDen ? Math.round(_afterFree / _afterDen * 100) : 0;
+    // 【v409】白给车“位置”指标：低缓冲白给 vs 高缓冲减压
+    var _freeLow = 0, _freeHigh = 0, _minFree = limit;
+    for (var _ti2 = 0; _ti2 < n; _ti2++) {
+      var _st2 = steps[_ti2];
+      if (_st2.free < _minFree) _minFree = _st2.free;
+      if (_st2.full < 2) continue;
+      if (_st2.free >= 4) _freeLow++;    // 缓冲 ≤1
+      if (_st2.free <= 2) _freeHigh++;   // 缓冲 ≥3
+    }
+    var _freeLowPct = n ? Math.round(_freeLow / n * 100) : 0;
+    var _misPct = (_freeLow + _freeHigh) ? Math.round(_freeLow / (_freeLow + _freeHigh) * 100) : 0;
+    var _press3Pct = 0;
+    for (var _pi3 = 0; _pi3 < n; _pi3++) if (steps[_pi3].free <= 2) _press3Pct++;
+    _press3Pct = n ? Math.round(_press3Pct / n * 100) : 0;
+    var _peak = Math.max(0, limit - _minFree);
+    // 【v429】决策宽度：可选中位 / 吃满中位 / 被迫步 / 有 partial 的步
+    var _sels = [], _fulls = [], _forced = 0, _partialSteps = 0;
+    for (var _di = 0; _di < n; _di++) {
+      var _ds = steps[_di];
+      var _sel = (_ds.moves && _ds.moves.length) ? _ds.moves.length : 0;
+      var _ful = _ds.full || 0;
+      _sels.push(_sel); _fulls.push(_ful);
+      if (_sel <= 1) _forced++;
+      if (_sel - _ful >= 1) _partialSteps++;
+    }
+    function _median(arr) {
+      if (!arr.length) return 0;
+      var a = arr.slice().sort(function (x, y) { return x - y; });
+      return a[Math.floor(a.length / 2)];
+    }
+    var _selMed = _median(_sels), _fullMed2 = _median(_fulls);
+    var _forcedPct = n ? Math.round(_forced / n * 100) : 0;
+    var _partialStepPct = n ? Math.round(_partialSteps / n * 100) : 0;
+    // 【v432】前 10 步压力：前期太顺是用户体感“简单”的主因
+    var _eN = Math.min(10, n), _eFree = 0, _ePress = 0, _ePeak = 0;
+    for (var _ei = 0; _ei < _eN; _ei++) {
+      var _es = steps[_ei];
+      if (_es.full >= 2 && _es.free >= 3) _eFree++;
+      if (_es.free <= 2) _ePress++;
+      var _eb = limit - _es.free;
+      if (_eb > _ePeak) _ePeak = _eb;
+    }
     return {
-      steps: steps, n: n, opening: steps[0].full, medFull: mid,
+      steps: steps, n: n, pressureN: _pn, openingFree12: _of, openingPressure12: _op,
+      freePct: _freePct, pressurePct: _pressPct, freeRunMax: _freeRunMax,
+      pressureGapMax: _gapMax, freeAfterPressurePct: _afterPct, fullMedian: mid,
+      freeLowPct: _freeLowPct, misplacedFreePct: _misPct, pressurePct3: _press3Pct, pressurePeak: _peak,
+      selectMedian: _selMed, fullMedian2: _fullMed2, forcedPct: _forcedPct, partialStepPct: _partialStepPct,
+      earlyFree10: _eFree, earlyPressure10: _ePress, earlyPeak10: _ePeak, opening: steps[0].full, medFull: mid,
       forcedN: forced.length, forcedMid: forcedMid,
       forcedAt: forced.map(function (p3) { return Math.round(p3 * 100); }),
       lowPct: Math.round(low / n * 100), low2Pct: Math.round(low2 / n * 100),
@@ -7929,6 +8293,60 @@ AntSolver.Generator = (function() {
     else if (cur.forcedMid > 3) s -= 6;
     s += (cur.opening >= 3) ? 6 : -6;
     return s;
+  }
+
+  /**
+   * 【v371·P1】T/R/U 只读代理（不参与任何生成/合格决策）。
+   *   输入：goodV3Of 里已经跑过的 10 局玩家结果（_dbgRuns）、choiceCurve、总盒数。
+   *   T 陷阱密度 = 输给“最优通关局”的分歧步数 ÷ choiceCurve 里 full>=2 的决策点数；
+   *   R 后悔率   = 最优进度 − 10 局平均进度（百分点）；
+   *   U 废牌率   = 10 局都没碰过的盒 ÷ 总盒数。
+   *   这是 v0 代理：用策略间分歧近似“岔路”，P3 做真反事实（从同一状态换一手继续跑）。
+   */
+  function qualityRollup(runs, fill, totalBoxes) {
+    if (!runs || !runs.length) return null;
+    var picked = {}, union = 0, best = null, sumProg = 0, progN = 0;
+    for (var i = 0; i < runs.length; i++) {
+      var r = runs[i]; if (!r) continue;
+      var pn = (r.progress != null) ? +r.progress : 0;
+      sumProg += pn; progN++;
+      if (!best || (!!r.won && !best.won) || (!!r.won === !!best.won && pn > (best.progress || 0))) best = r;
+      var po = r.pickOrder || [];
+      for (var j = 0; j < po.length; j++) {
+        var k = po[j].r + ',' + po[j].c;
+        if (!picked[k]) { picked[k] = 1; union++; }
+      }
+    }
+    if (!progN) return null;
+    var bestProg = best ? (best.progress || 0) : 0;
+    var R = Math.max(0, Math.round(bestProg - sumProg / progN));
+    var U = (totalBoxes > 0) ? Math.max(0, Math.min(100, Math.round((1 - union / totalBoxes) * 100))) : null;
+    var dec = (fill && fill.steps) ? fill.steps.filter(function (s) { return s && s.full >= 2; }).length : 0;
+    var traps = {}, trapList = [];
+    if (best && best.won) {
+      var bp = best.pickOrder || [];
+      for (var ri = 0; ri < runs.length; ri++) {
+        var rr = runs[ri]; if (!rr || rr.won) continue;
+        var rp = rr.pickOrder || [], n = Math.min(bp.length, rp.length);
+        for (var k2 = 0; k2 < n; k2++) {
+          if (bp[k2].r !== rp[k2].r || bp[k2].c !== rp[k2].c) {
+            var sk = (bp[k2].step != null) ? bp[k2].step : k2;
+            if (!traps[sk]) {
+              traps[sk] = 1;
+              if (trapList.length < 20) trapList.push({ step: sk, color: bp[k2].color });
+            }
+            break;
+          }
+        }
+      }
+    }
+    var hasWinner = !!(best && best.won);
+    var trapN = 0; for (var tk in traps) trapN++;
+    // dec=0：整条最优路线没有 >=2 个可吃满的步 → 没有岔路，T=0；
+    // 有决策点但没有通关局 → 无法归因，T=null。
+    if (dec <= 0 || !hasWinner) { trapN = 0; trapList = []; }
+    var T = (dec <= 0) ? 0 : (hasWinner ? Math.max(0, Math.min(100, Math.round(trapN / dec * 100))) : null);
+    return { T: T, R: R, U: U, trapCount: trapN, decisions: dec, traps: trapList, runs: progN, bestProgress: bestProg, hasWinner: hasWinner };
   }
 
   function candScore(c) {
@@ -8024,7 +8442,12 @@ AntSolver.Generator = (function() {
     try {
       var _cv = choiceCurve(lv, sr);
       if (_cv) _fill = { medFull: _cv.medFull, lowPct: _cv.lowPct, low2Pct: _cv.low2Pct,
-                         opening: _cv.opening, forcedMid: _cv.forcedMid, n: _cv.n, spark: _cv.spark };
+                         opening: _cv.opening, forcedMid: _cv.forcedMid, n: _cv.n, spark: _cv.spark, steps: _cv.steps, pressureN: _cv.pressureN, openingFree12: _cv.openingFree12, openingPressure12: _cv.openingPressure12,
+                         freePct: _cv.freePct, pressurePct: _cv.pressurePct, freeRunMax: _cv.freeRunMax,
+                         pressureGapMax: _cv.pressureGapMax, freeAfterPressurePct: _cv.freeAfterPressurePct, fullMedian: _cv.fullMedian,
+                         freeLowPct: _cv.freeLowPct, misplacedFreePct: _cv.misplacedFreePct, pressurePct3: _cv.pressurePct3, pressurePeak: _cv.pressurePeak,
+                         selectMedian: _cv.selectMedian, fullMedian2: _cv.fullMedian2, forcedPct: _cv.forcedPct, partialStepPct: _cv.partialStepPct,
+                         earlyFree10: _cv.earlyFree10, earlyPressure10: _cv.earlyPressure10, earlyPeak10: _cv.earlyPeak10 };
     } catch (e) { _fill = null; }
     // 【v190】口径修正：spread 大不一定不公平——"稳健 100% / 乱点 33%" 很正常。
     //   真正要抓的是"稳打不如别的打法"：steadyGap = 最好打法 − 稳健。
@@ -8045,6 +8468,7 @@ AntSolver.Generator = (function() {
       var _sMin = (cand.config.targetSteadyMin != null) ? +cand.config.targetSteadyMin : 30;
       var _sMax = (cand.config.targetSteadyMax != null) ? +cand.config.targetSteadyMax : 80;
       var _tf = [];
+      var _qf = [];   // 【v366】质量线未过项（与旧 goodV3 的难度/稳健分开记）
       if (!sr.completed) _tf.push('可解');
       if (midLate == null || midLate < _pMin || midLate > _pMax) _tf.push('峰窗不在' + _pMin + '~' + _pMax);
       if (steady == null || steady < _sMin || steady > _sMax) _tf.push('稳健不在' + _sMin + '~' + _sMax);
@@ -8065,15 +8489,16 @@ AntSolver.Generator = (function() {
       // 【v324·用户裁决】容错门槛：单条全知线能解 ≠ 玩家能玩。
       //   用户这关 16/16 局死于"三锁链要 3 槽、只剩 2 槽"，但审计只写"险胜(用尽复活)"就放行了。
       //   做法：扫 5 种"手痒程度"（pickThreshold 0.3~0.9）× 2 个种子 = 10 局，都不给复活，
-      //   通关率低于 targetPlayerPassMin（默认 25%）就不算合格。
       //   只在其它条全过时才跑（贵，~0.9 秒），所以不会拖慢淘汰型候选。
+      // 【v365】改为**总是跑**：报告要显示“首通/主要死法”，不能因为旧峰窗失败就不量。
+      //   成本 ~0.9s/关（只对最终这一关，不是每个候选），换来四玩家里的“首通”永远有数。
       var _ppMin = (cand.config && cand.config.targetPlayerPassMin != null) ? +cand.config.targetPlayerPassMin : 0;
-      if (_ppMin > 0 && _tf.length === 0 && AntSolver.PlayerSim) {
+      if (AntSolver.PlayerSim) {
         var _thr = [0.3, 0.45, 0.6, 0.75, 0.9], _R = 0, _W = 0, _dbgRuns = [];
         for (var _ti = 0; _ti < _thr.length; _ti++) {
           for (var _si = 0; _si < 2; _si++) {
             try {
-              var _rr2 = AntSolver.PlayerSim.run(parsed, {
+              var _rr2 = AntSolver.PlayerSim.run(lv, {
                 pickThreshold: _thr[_ti], seed: 101 + _si * 37, useItems: false, reviveCap: 0,
                 bottomOnly: !!(cand.config && cand.config.bottomOnly), instantChain: !!(cand.config && cand.config.instantChain),
                 capturePreviewStats: false
@@ -8083,9 +8508,48 @@ AntSolver.Generator = (function() {
             } catch (e) { }
           }
         }
-        var _ppRate = _R ? (_W / _R) : 1;
-        if (_persist) _persist.playerPassPct = Math.round(_ppRate * 100);
-        if (_R && _ppRate < _ppMin) _tf.push('玩家通关率' + Math.round(_ppRate * 100) + '%<' + Math.round(_ppMin * 100) + '%');
+        var _ppRate = _R ? (_W / _R) : null;   // 【v371】没有一次跑成功 = 未测，绝不能伪装成 100%
+        if (_persist && _ppRate != null) _persist.playerPassPct = Math.round(_ppRate * 100);
+        if (_persist) { _persist.playerRuns = _R; _persist.playerWins = _W; }
+        // 【v373·P2】学会后（≤3 次重试，带“死色记忆”）：首通失败后，下一局给上局死色降权。
+        //   只写 persist.learned*，不参与 _tf/_qf；用来量“死过一次后能不能过”。
+        try {
+          var _lt = 0, _lw = 0, _la = 0;
+          for (var _li = 0; _li < _thr.length; _li++) {
+            for (var _lsi = 0; _lsi < 2; _lsi++) {
+              var _base = _dbgRuns[_li * 2 + _lsi];
+              _lt++;
+              if (_base && _base.won) { _lw++; _la++; continue; }
+              var _avoid = null;
+              var _bl = _base && (_base.lastBlocked || _base.lastRefuse);
+              if (_bl && _bl.color != null) _avoid = _bl.color;
+              var _tries = _base ? 1 : 0, _won = false;
+              for (var _at = 1; _at <= 2; _at++) {
+                _tries++;
+                var _thr2 = _thr[_li] + (_at === 1 ? 0.15 : -0.15);
+                if (_thr2 < 0.1) _thr2 = 0.1;
+                if (_thr2 > 0.95) _thr2 = 0.95;
+                try {
+                  var _lr = AntSolver.PlayerSim.run(lv, {
+                    pickThreshold: _thr2, seed: 101 + _lsi * 37 + _at * 97, useItems: false, reviveCap: 0,
+                    bottomOnly: !!(cand.config && cand.config.bottomOnly), instantChain: !!(cand.config && cand.config.instantChain),
+                    capturePreviewStats: false, avoidColor: _avoid
+                  });
+                  if (_lr && _lr.won) { _won = true; break; }
+                  var _lb2 = _lr && (_lr.lastBlocked || _lr.lastRefuse);
+                  if (_lb2 && _lb2.color != null) _avoid = _lb2.color;
+                } catch (e) { }
+              }
+              _la += _tries;
+              if (_won) _lw++;
+            }
+          }
+          if (_persist) {
+            _persist.learnedPassPct = _lt ? Math.round(_lw / _lt * 100) : null;
+            _persist.learnedRuns = _lt; _persist.learnedWins = _lw; _persist.learnedAttempts = _la;
+          }
+        } catch (e) { }
+        if (_R && _ppRate != null && _ppRate < _ppMin) _tf.push('玩家通关率' + Math.round(_ppRate * 100) + '%<' + Math.round(_ppMin * 100) + '%');
         // 【v336·用户裁决】死因归因：把没通关的那几局分类（链/冰/管道/形状/断供），
         //   落进 persist.deathCauses，并支持"要求主死因是某一类"（targetDeathCause，默认不限）。
         var _dc = { '链': 0, '冰': 0, '管道': 0, '形状': 0, '断供': 0, '其它': 0 };
@@ -8115,7 +8579,51 @@ AntSolver.Generator = (function() {
           if (_share < _wantMin) _tf.push('主死因不是' + _wantCause + '（' + _share + '%<' + _wantMin + '%）');
         }
       }
-    return { pass: _tf.length === 0, fails: _tf, solved: !!sr.completed,
+      // 【v374·P2】有限信息前瞻：3 局采样，前 6 个决策点做“候选 + 再贪心一手”回放。
+      //   只写 persist.lookahead*，不参与合格；回放代价高，所以只 3 局、只前 6 个决策点。
+      try {
+        var _laRuns = 3, _laWins = 0, _laProg = 0;
+        for (var _lai = 0; _lai < _laRuns; _lai++) {
+          var _lar = AntSolver.PlayerSim.run(lv, {
+            pickThreshold: 0.6, seed: 401 + _lai * 97, useItems: false, reviveCap: 0,
+            bottomOnly: !!(cand.config && cand.config.bottomOnly), instantChain: !!(cand.config && cand.config.instantChain),
+            capturePreviewStats: false, lookahead2: true, lookaheadLimit: 6
+          });
+          if (_lar && _lar.won) _laWins++;
+          _laProg += (_lar && _lar.progress != null) ? _lar.progress : 0;
+        }
+        if (_persist) {
+          _persist.lookaheadPassPct = Math.round(_laWins / _laRuns * 100);
+          _persist.lookaheadRuns = _laRuns; _persist.lookaheadWins = _laWins;
+          _persist.lookaheadProgress = Math.round(_laProg / _laRuns);
+        }
+      } catch (e) { }
+      // 【v371·P1】T/R/U 只读：用刚才这 10 局玩家结果现算；没有玩家结果则写 null。
+      //   只写 _persist.quality，不参与 _tf/_qf，不改任何生成决策。
+      if (_persist) {
+        try { _persist.quality = qualityRollup(_dbgRuns, _fill, lv.totalBoxes); } catch (e) { _persist.quality = null; }
+      }
+      // 【v366·用户裁决】质量线：首通 >80%、W 中位 <2、W≤1 占 >35%、隐藏信息死亡 >20%
+      //   任一不过 → 记进 _tf（goal 模式/早停会继续搜），同时单独记一份 _qf 给报告。
+      var _ppMax = (cand.config && cand.config.targetPlayerPassMax != null) ? +cand.config.targetPlayerPassMax : 80;
+      var _ppPct = (_persist && _persist.playerPassPct != null) ? _persist.playerPassPct : null;
+      if (_ppMax > 0 && _ppPct != null && _ppPct > _ppMax) {
+        var _q1 = '首通' + _ppPct + '%>' + _ppMax + '%';
+        _qf.push(_q1); _tf.push(_q1 + '（偏松）');
+      }
+      var _jMax = (cand.config && cand.config.targetHiddenDeathMax != null) ? +cand.config.targetHiddenDeathMax : 20;
+      if (_jMax > 0 && _persist && _persist.deathCauses) {
+        var _dsum = 0, _dh = 0;
+        for (var _ck in _persist.deathCauses) {
+          _dsum += _persist.deathCauses[_ck];
+          if (_ck === '管道' || _ck === '问号') _dh += _persist.deathCauses[_ck];
+        }
+        if (_dsum > 0) {
+          var _jp = Math.round(_dh / _dsum * 100);
+          if (_jp > _jMax) { var _q4 = '隐藏信息死亡' + _jp + '%>' + _jMax + '%'; _qf.push(_q4); _tf.push(_q4); }
+        }
+      }
+    return { pass: _tf.length === 0, fails: _tf, qualityFails: _qf, solved: !!sr.completed,
                steadyWonPct: steady, midLateMax: midLate, midLateAudit: midLateAudit,
                buried: buried, fillCurve: _fill, persist: _persist, targetScore: (function () {
                  var pv = (midLate == null || midLate < _pMin || midLate > _pMax) ? 1 : 0;
@@ -8192,8 +8700,33 @@ AntSolver.Generator = (function() {
     var b = c && c.generationEval && c.generationEval.buried;
     return (b && b.lateMax != null) ? b.lateMax : null;
   }
+  // 【v379】首通 headroom 档：30~80 最优，20~30/80~90 次之，0~20/90~100 最差。
+  //   先于 candTier 比较——否则“首通 100 的困难合格”会一直压住“首通 50 的简单合格”，
+  //   P3 陷阱后处理永远没有 headroom。
+  function headroomRank(c) {
+    var p = (c && c.goodV3 && c.goodV3.persist && c.goodV3.persist.playerPassPct != null)
+      ? c.goodV3.persist.playerPassPct : null;
+    if (p == null) return 2;
+    if (p >= 30 && p <= 80) return 0;
+    if (p >= 20 && p <= 90) return 1;
+    return 2;
+  }
+
   function candBetter(b, a, cfg) {
     if (a == null) return true;
+    var _hrb = headroomRank(b), _hra = headroomRank(a);
+    if (_hrb !== _hra) return _hrb < _hra;
+    var _pnb = (b && b.goodV3 && b.goodV3.fillCurve && b.goodV3.fillCurve.pressureN) ? b.goodV3.fillCurve.pressureN : 0;
+    var _pna = (a && a.goodV3 && a.goodV3.fillCurve && a.goodV3.fillCurve.pressureN) ? a.goodV3.fillCurve.pressureN : 0;
+    if ((_pnb > 0) !== (_pna > 0)) return _pnb > 0;
+    // 【v441】前10步压力优先
+    var _fcb = b && b.goodV3 && b.goodV3.fillCurve, _fca = a && a.goodV3 && a.goodV3.fillCurve;
+    var _epb = (_fcb && _fcb.earlyPeak10) || 0, _epa = (_fca && _fca.earlyPeak10) || 0;
+    var _efb = (_fcb && _fcb.earlyFree10) || 0, _efa = (_fca && _fca.earlyFree10) || 0;
+    var _eokB = _epb >= 3 && _efb <= 4, _eokA = _epa >= 3 && _efa <= 4;
+    if (_eokB !== _eokA) return _eokB;
+    if (Math.abs(_epb - _epa) >= 1) return _epb > _epa;
+    if (Math.abs(_efb - _efa) >= 2) return _efb < _efa;
     var tb = candTier(b), ta = candTier(a);
     if (tb !== ta) return tb > ta;
     // 【v182】结构闸门优先：被埋 ≥3 辆的候选（= 稳健玩家必死那种结构）排在后面
@@ -8207,6 +8740,15 @@ AntSolver.Generator = (function() {
     var _b3b = (b && b.goodV3 && b.goodV3.persist && b.goodV3.persist.band3Pct != null) ? b.goodV3.persist.band3Pct : -1;
     var _b3a = (a && a.goodV3 && a.goodV3.persist && a.goodV3.persist.band3Pct != null) ? a.goodV3.persist.band3Pct : -1;
     if (Math.abs(_b3b - _b3a) >= 5) return _b3b > _b3a;
+    // 【v378】首通分布：优先 30~80% 的候选（差 ≥10pp 才认），让 P3 后处理有 headroom
+    var _ppb = (b && b.goodV3 && b.goodV3.persist && b.goodV3.persist.playerPassPct != null) ? b.goodV3.persist.playerPassPct : null;
+    var _ppa = (a && a.goodV3 && a.goodV3.persist && a.goodV3.persist.playerPassPct != null) ? a.goodV3.persist.playerPassPct : null;
+    if (_ppb != null && _ppa != null) {
+      var _inB = (_ppb >= 30 && _ppb <= 80), _inA = (_ppa >= 30 && _ppa <= 80);
+      if (_inB !== _inA) return _inB;
+      var _db = Math.abs(_ppb - 55), _da = Math.abs(_ppa - 55);
+      if (Math.abs(_db - _da) >= 10) return _db < _da;
+    }
     var vb = chokeV2Ok(b), va = chokeV2Ok(a);
     if (vb !== va) return vb > va;
     // 【v191·实验】峰窗进带优先：先看"在不在 3.2~4.8 带里"，再看离 4.0 多远。
@@ -8251,6 +8793,8 @@ AntSolver.Generator = (function() {
    *   不达标就继续搜，最后仍取已评估里最好的那个（不会因此变差）。
    */
   function meetsEarlyStopQuality(cand, config) {
+    // 【v376】跑满时间：禁用一切“提前收工”，由 portfolioK 决定轮次
+    if (config && config.fullTime) return false;
     var g = cand && cand.goodV3;
     if (!g || !g.pass) return false;
     var p = g.midLateMax;
@@ -12283,7 +12827,8 @@ AntSolver.Generator = (function() {
     //   按深度上限估 → 棋盘偏小、全靠管道 → 实测 minPipes=4 的配置容易在结构层
     //   usablePipeShort（管道装不下）整关淘汰；按单管最少估又会让棋盘偏大（黑块超标）。
     //   中值与 chooseBoardDimsFixed 里的 minOv 同口径，实测最稳。
-    var dWant = hasPipes ? minPipes * Math.ceil((minFill + maxDepth) / 2) : 0;
+    // 【v392·用户裁决】先 board 后 pipe：boardFirst 时不预先给管道留溢出，先按全部车上盘反推棋盘。
+    var dWant = (config && config.boardFirst) ? 0 : (hasPipes ? minPipes * Math.ceil((minFill + maxDepth) / 2) : 0);
     var cAll = Math.ceil(cars / ust);                      // 全部车都上盘所需格数（= 没有管道时的口径）
     var cTarget = Math.floor((cars - dWant) / ust);        // 想留出这么多溢出时的棋盘大小
     // 车太少 / 管道配太多 → 溢出根本凑不出来 → 直接按"全部车上盘"给盘，管道交给生成器自己决定去留
@@ -13957,11 +14502,30 @@ AntSolver.Generator = (function() {
     return { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
              fc: (g.fillCurve ? g.fillCurve.medFull : null), lp: (g.fillCurve ? g.fillCurve.lowPct : null),
              ge: (g.persist ? g.persist.ge3Pct : null), lg: (g.persist ? g.persist.longest : null),
-             cw: (g.persist ? g.persist.chokeWin : null), b3: (g.persist ? g.persist.band3Pct : null) };
+             cw: (g.persist ? g.persist.chokeWin : null), b3: (g.persist ? g.persist.band3Pct : null), pp: (g.persist && g.persist.playerPassPct != null ? g.persist.playerPassPct : null), pn: (g.fillCurve ? g.fillCurve.pressureN : 0), of: (g.fillCurve ? g.fillCurve.openingFree12 : 0),
+             ep: (g.fillCurve ? g.fillCurve.earlyPeak10 : 0), ef: (g.fillCurve ? g.fillCurve.earlyFree10 : 0),
+             sm: (g.fillCurve ? g.fillCurve.selectMedian : 0), fp: (g.fillCurve ? g.fillCurve.forcedPct : 0),
+             ps: (g.fillCurve ? ((g.fillCurve.pressurePct3 || 0) * 2 + (g.fillCurve.pressurePeak || 0) * 10 - (g.fillCurve.freeLowPct || 0)) : 0) };
   }
   function portfolioBetter(x, y) {
     if (!y) return true;
     if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
+    // 【v379】首通 headroom 优先，避免 portfolio 一直选 0/100
+    var _hr = function (t) {
+      if (t.pp == null) return 2;
+      if (t.pp >= 30 && t.pp <= 80) return 0;
+      if (t.pp >= 20 && t.pp <= 90) return 1;
+      return 2;
+    };
+    if (_hr(x) !== _hr(y)) return _hr(x) < _hr(y);
+    // 【v441】前10步压力优先：earlyPeak≥3 且 earlyFree≤4 的候选优先
+    var _eokX = (x.ep || 0) >= 3 && (x.ef || 0) <= 4, _eokY = (y.ep || 0) >= 3 && (y.ef || 0) <= 4;
+    if (_eokX !== _eokY) return _eokX;
+    if (Math.abs((x.ep || 0) - (y.ep || 0)) >= 1) return (x.ep || 0) > (y.ep || 0);
+    if (Math.abs((x.ef || 0) - (y.ef || 0)) >= 2) return (x.ef || 0) < (y.ef || 0);
+    // 【v413】障碍变体：压力分差 ≥15 时优先压力高的，让冰/链/管道变体真正参与选择
+    if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
+    if ((x.pn > 0) !== (y.pn > 0)) return x.pn > 0;
     if (x.ts != null || y.ts != null) {
       if (!!x.ok !== !!y.ok) return !!x.ok;
       // 【v270 修】原来直接比 targetScore，而 targetScore 把"峰窗离 3.6 多远"算进去，
@@ -13970,6 +14534,13 @@ AntSolver.Generator = (function() {
       if (x.f !== y.f) return x.f < y.f;
       var _b3x = (x.b3 == null ? -1 : x.b3), _b3y = (y.b3 == null ? -1 : y.b3);
       if (_b3x !== _b3y) return _b3x > _b3y;
+      // 【v378】首通 30~80% 优先，其次离 55 近
+      if (x.pp != null && y.pp != null) {
+        var _inX = (x.pp >= 30 && x.pp <= 80), _inY = (y.pp >= 30 && y.pp <= 80);
+        if (_inX !== _inY) return _inX;
+        var _dx = Math.abs(x.pp - 55), _dy = Math.abs(y.pp - 55);
+        if (Math.abs(_dx - _dy) >= 10) return _dx < _dy;
+      }
       if ((x.ts || 9) !== (y.ts || 9)) return (x.ts || 9) < (y.ts || 9);
       // 【v238】目标分打平时的加赛：优先「吃满≤1 的步占比」落在 45~90%（实测合格关集中带）。
       //   只影响完全同分的情况，不改合格门、不改目标分公式。
@@ -13995,7 +14566,201 @@ AntSolver.Generator = (function() {
     return x.s > y.s;
   }
 
+  /**
+   * 【2026-10-22·用户裁决】前沿宽度：按“每次消除一种颜色”的贪心序，统计每一步同时露着几种颜色。
+   *   2~4 = 窄前沿（适合暴露序+行优先）；5+ = 宽前沿（适合按依赖层）。
+   *   只读，不改变任何关卡；结果挂在 blocks._frontier 做缓存。
+   */
+  function frontierWidthOf(blocks) {
+    try { if (blocks && blocks._frontier) return blocks._frontier; } catch (e) {}
+    var Sim = AntSolver.Simulator;
+    if (!Sim || !Sim.createState || !Sim.previewNextEliminationOrder || !Sim.elimDispatch) return null;
+    if (!blocks || !blocks.length || !blocks[0]) return null;
+    var rows = blocks.length, cols = blocks[0].length, total = 0;
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) if (blocks[r][c] > 0) total++;
+    if (!total) return null;
+    var s;
+    try {
+      s = Sim.createState({ blocks: blocks, rows: rows, cols: cols, totalPixels: total, totalBoxes: 0,
+        bufferLimit: 5, board: { rows: 0, cols: 0, cells: [] } }, {});
+    } catch (e) { return null; }
+    var sum = 0, steps = 0, max = 0, done = 0, guard = 0;
+    while (done < total && guard++ < 500) {
+      var pv;
+      try { pv = Sim.previewNextEliminationOrder(s); } catch (e) { break; }
+      var active = 0, best = -1, bestN = 0;
+      for (var k in pv.byColor) {
+        var e = pv.byColor[k];
+        if (e && e.reachable > 0) {
+          active++;
+          if (e.reachable > bestN) { bestN = e.reachable; best = +k; }
+        }
+      }
+      if (best < 0) break;
+      sum += active; steps++; if (active > max) max = active;
+      var got = 0;
+      try { got = Sim.elimDispatch(s, best, Infinity); } catch (e) { break; }
+      if (!(got > 0)) break;
+      done += got;
+    }
+    if (!steps) return null;
+    var out = { avg: +(sum / steps).toFixed(2), max: max, steps: steps };
+    try { blocks._frontier = out; } catch (e) {}
+    return out;
+  }
+
+  /**
+   * 【2026-10-22·用户裁决】按图推导容量带（用户不再手填上下限）。
+   *   m = 需求块中位数；[1.5m, 4.5m] 内挑“开局白给车 ≤2”的容量；
+   *   找不到 → 取上界，并在前端提示“需要冰/改图”。
+   * 结果挂在 blocks._capBand 做缓存。
+   */
+  function deriveCapacityBand(blocks) {
+    try { if (blocks && blocks._capBand) return blocks._capBand; } catch (e) {}
+    if (!blocks || !blocks.length || !blocks[0]) return null;
+    var R = blocks.length, C = blocks[0].length;
+    var total = 0, byColor = {};
+    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
+      var v = blocks[r][c];
+      if (v > 0) { total++; byColor[v] = (byColor[v] || 0) + 1; }
+    }
+    if (!total) return null;
+    var exp = openingExposure(blocks, R, C, false);
+    var E = {};
+    if (exp && exp.detail) for (var i = 0; i < exp.detail.length; i++) E[exp.detail[i].color] = exp.detail[i].px;
+    var dc = demandCurveOf(blocks);
+    var incs = [];
+    if (dc && dc.curve) {
+      for (var col in dc.curve) {
+        var arr = dc.curve[col], prev = 0;
+        for (var j = 0; j < arr.length; j++) {
+          var cum = arr[j][0];
+          if (cum > prev) { incs.push(cum - prev); prev = cum; }
+        }
+      }
+    }
+    incs.sort(function (a, b) { return a - b; });
+    var m = incs.length ? incs[Math.floor(incs.length / 2)] : 0;
+    var frontier = frontierWidthOf(blocks);
+    if (!(m > 0)) {
+      return { m: 0, lo: 30, hi: 60, band: [40, 60], chosen: 50, feasible: false,
+        free: null, freeHi: null, cars: null, frontier: frontier, reason: 'noChunk' };
+    }
+    var lo = Math.max(1, Math.ceil(m * 1.5));
+    var hi = Math.max(lo, Math.floor(m * 4.5));
+    function freeAt(cap) {
+      var n = 0;
+      for (var cc in E) n += Math.floor(E[cc] / cap);
+      return n;
+    }
+    function carsAt(cap) {
+      var n = 0;
+      for (var cc in byColor) n += Math.max(1, Math.round(byColor[cc] / cap));
+      return n;
+    }
+    var feas = [];
+    for (var cap = lo; cap <= hi; cap++) if (freeAt(cap) <= 2) feas.push(cap);
+    var feasible = feas.length > 0;
+    var chosen = feasible ? feas[Math.floor(feas.length / 2)] : hi;
+    var band = feasible ? [feas[0], feas[feas.length - 1]] : [hi, hi];
+    var out = { m: m, lo: lo, hi: hi, band: band, chosen: chosen, feasible: feasible,
+      free: freeAt(chosen), freeHi: freeAt(hi), cars: carsAt(chosen), frontier: frontier };
+    try { blocks._capBand = out; } catch (e) {}
+    return out;
+  }
+
+  /**
+   * 【2026-10-22·用户裁决】目标模式（headless 版）：一直产，直到这一关满足当前验收（goodV3 全过）或被停止。
+   *
+   * ⚠ 只能在【没有 UI 交互】的场景用（CLI / 测试脚本）：它在一个同步 while 里跑，
+   *   同线程的「结束」按钮 / Worker 的 {cmd:'stop'} 都处理不了。
+   *   UI 走 `gen-worker.js` 的"一轮 produce + setTimeout 让出"循环，以及主线程回退的 `genRunGoalSync`。
+   *
+   * 与按时间模式的区别：
+   *   - 按时间：每轮固定预算，到点返回最好；
+   *   - 按目标：每轮固定预算（默认 20s），没达标就换种子再来，直到达标 / 停止 / 到上限。
+   *
+   * @param {Array} blocks
+   * @param {object} config  goalPerRoundMs / goalMaxMs / goalMaxRounds（0 = 不限）
+   * @param {object} opts    { shouldStop: function():boolean }
+   */
+  // 【v415】目标模式的结构门：可解 + 首通≤50 + J≤20 + W≤1≤35 + freeLow≤30
+  //   不能再用旧 goodV3.pass，否则目标模式可能在旧判据上无限跑。
+  function goalStructPass(r) {
+    if (!r || !r.level || !r.valid || r.fallback) return false;
+    var p = r.goodV3 && r.goodV3.persist;
+    var fc = r.goodV3 && r.goodV3.fillCurve;
+    if (!p || !fc) return false;
+    // 【v436】目标模式追的结构门 = 当前 qGate-lite
+    if (p.playerPassPct == null || p.playerPassPct > 50) return false;
+    var dc = p.deathCauses || {}, dt = 0, dh = 0;
+    for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
+    var J = dt ? Math.round(dh / dt * 100) : 0;
+    if (J > 20) return false;
+    if (fc.selectMedian != null && fc.selectMedian < 2) return false;
+    if (fc.forcedPct != null && fc.forcedPct > 25) return false;
+    if (fc.freeLowPct != null && fc.freeLowPct > 30) return false;
+    return true;
+  }
+
+  function produceGoal(blocks, config, opts) {
+    opts = opts || {};
+    config = Object.assign({}, DEFAULT_CONFIG, config || {});
+    var t0 = Date.now();
+    var perMs = parseInt(config.goalPerRoundMs, 10);
+    if (!(perMs > 0)) perMs = 20000;
+    var maxMs = parseInt(config.goalMaxMs, 10);
+    if (!(maxMs > 0)) maxMs = 0;
+    var maxRounds = parseInt(config.goalMaxRounds, 10);
+    if (!(maxRounds > 0)) maxRounds = 0;
+    var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
+    function passed(r) { return goalStructPass(r); }
+    function score(r) {
+      if (!r || !r.level) return -1e15;
+      var s = 0;
+      if (r.valid) s += 1e6;
+      if (!r.fallback) s += 1e5;
+      if (r.goodV3 && r.goodV3.pass) s += 1e9;
+      var p = (r.goodV3 && r.goodV3.persist) || {};
+      s += (p.band3Pct || 0) * 1000;
+      s += (p.bandPeak || 0) * 10;
+      s += (r.difficulty && r.difficulty.score) || 0;
+      return s;
+    }
+    var best = null, rounds = 0, stopped = false;
+    while (true) {
+      if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
+      if (maxRounds && rounds >= maxRounds) break;
+      if (maxMs && (Date.now() - t0) >= maxMs) break;
+      var cfg = Object.assign({}, config, {
+        goalMode: false,
+        portfolioK: 1,
+        timeBudgetMs: perMs,
+        seed: (baseSeed + rounds * 7919) >>> 0,
+        _trace: []
+      });
+      var r = null;
+      try { r = produceDispatch(blocks, cfg, opts); } catch (e) {
+        r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
+      }
+      rounds++;
+      if (r) r.goalRound = rounds;
+      if (!best || score(r) > score(best)) best = r;
+      if (passed(r)) break;
+    }
+    if (best) {
+      best.goalMode = true;
+      best.goalRounds = rounds;
+      best.goalElapsedMs = Date.now() - t0;
+      best.goalStopped = stopped;
+    }
+    return best;
+  }
+
   function produceDispatch(blocks, config, opts) {
+    var _pdT0 = Date.now();
+    var _pdBudget = parseInt(config && config.timeBudgetMs, 10) || 180000;
+    function _pdLeft() { return _pdBudget - (Date.now() - _pdT0); }
     var flow = (config && config.generatorFlow) ||
       (AntSolver.Generator && AntSolver.Generator.FLOW) || DEFAULT_FLOW;
     // 【v194】一图多产：同图跑 K 次（seed + i），按最终 goodV3 择优；已全过就早停。
@@ -14264,9 +15029,32 @@ AntSolver.Generator = (function() {
           _cfg._mixTag = config && config.capTie ? ('capTie/' + _cfg.capPerColor) : _mix.join('/');
         }
         if (config && config.seed != null && !isNaN(+config.seed)) _cfg.seed = (+config.seed) + _pi;
+        // 【v413】障碍参数变体：冰值力度 / 链条数 / 管道数轮换，交给 portfolio 评估选
+        _cfg.iceForceSteps = [0, 2, 4][_pi % 3];
+        _cfg.chainByDemand = [2, 4][_pi % 2];
+        _cfg.maxPipes = [1, 2][_pi % 2];
         _cfg._traceRound = _pi + 1;
+        reportProgress({ phase: 'roundStart', round: _pi + 1, N: _pk, tag: _cfg._mixTag || '-', cut: _cfg.cutMode || 'auto', ice: _cfg.iceForceSteps, chain: _cfg.chainByDemand, pipes: _cfg.maxPipes });
         var _o = flow === 'old' ? produce(blocks, _cfg) : produceFixed(blocks, _cfg, opts);
+        try {
+          var _pf = _o && _o.goodV3 && _o.goodV3.fillCurve, _pp = _o && _o.goodV3 && _o.goodV3.persist, _qq = _pp && _pp.quality;
+          reportProgress({ phase: 'roundDone', round: _pi + 1, N: _pk, valid: !!(_o && _o.level),
+            first: (_pp && _pp.playerPassPct != null) ? _pp.playerPassPct : null,
+            T: (_qq && _qq.T != null) ? _qq.T : null,
+            freeLow: (_pf && _pf.freeLowPct != null) ? _pf.freeLowPct : null,
+            pressure: (_pf && _pf.pressurePct3 != null) ? _pf.pressurePct3 : null });
+        } catch (e) { }
         if (config._trace) { try { config._trace.push({ t: 'round', round: _pi + 1, mix: _cfg._mixTag || '-', cap: [_cfg.boxSizeMin, _cfg.boxSizeMax], ok: !!(_o && _o.level) }); } catch (e) { } }
+        // 【v405】ABC 三个基底各自修复：前 p7BaseCount 轮在比较前先跑 A1→A2→A3→A4
+        if (_o && _o.level && config && config.p7Repair && _pi < (parseInt(config.p7BaseCount, 10) || 3)) {
+          try {
+            var _p7b = p7RepairLevel(_o.level, config);
+            if (_p7b && _p7b.level && _p7b.valid) {
+              _o.level = _p7b.level; _o.solveResult = _p7b.solveResult; _o.audit = _p7b.audit;
+              _o.goodV3 = _p7b.goodV3; _o.valid = true; _o.p7 = _p7b.p7;
+            } else if (_p7b && _p7b.p7) { _o.p7 = _p7b.p7; }
+          } catch (e) { _o.p7 = { error: String(e && e.message || e) }; }
+        }
         _tried++;
         var _t = portfolioTuple(_o);
         if (_o && _o.goodV3 && _o.goodV3.pass) _passes++;
@@ -14302,7 +15090,7 @@ AntSolver.Generator = (function() {
             boxSizeMin: (config.boxSizeMin != null ? +config.boxSizeMin : Math.max(14, Math.round(_cap2 * 0.9))),
             boxSizeMax: (config.boxSizeMax != null ? +config.boxSizeMax : Math.max(Math.max(14, Math.round(_cap2 * 0.9)) + 6, Math.round(_cap2 * 1.1))),
             usableSpaceTarget: _fr2,
-            minPipes: 0, maxPipes: 2, pipeMaxDepth: 6, pipeMinFill: 2,
+            minPipes: 0, maxPipes: 2, pipeMaxDepth: 4, pipeMinFill: 2,
             portfolioK: 1, candidateCount: 1, difficultyRounds: 1,
             acceptMode: 'solvable', goodV3: false, requireHardPass: false,
             designSweep: false, designDebt: false, targetSweep: false,
@@ -14325,13 +15113,1204 @@ AntSolver.Generator = (function() {
       out.entryMode = (config && config.instantChain) ? 'fourSideInstantChain'
         : ((config && config.bottomOnly) ? 'bottomOnly' : 'fourSide');
     }
+    // 【v403·A3d】切法层修复：如果 freePct 仍高，换一种切法重生成一次，再比较。
+    if (out && out.level && config && config.p7Repair && !config._a3dTried && _pdLeft() > 25000) {
+      var _fc0 = out.goodV3 && out.goodV3.fillCurve;
+      var _fp0 = _fc0 ? _fc0.freePct : null;
+      if (_fp0 != null && _fp0 > 50) {
+        try {
+          var _curCut = (out.config && out.config.cutMode) || 'layerCut2';
+          var _altCut = (_curCut === 'exposeCut') ? 'layerCut2' : 'exposeCut';
+          var _a3dCfg = Object.assign({}, config, {
+            cutMode: _altCut, portfolioK: 1, candidateCount: 1,
+            p7Repair: false, trapPost: false, _a3dTried: true
+          });
+          var _alt = runFlowOnce(blocks, _a3dCfg, {});
+          var _afc = _alt && _alt.goodV3 && _alt.goodV3.fillCurve;
+          var _afp = _afc ? _afc.freePct : null;
+          if (_alt && _alt.level && _afp != null && _afp <= _fp0 - 5) {
+            out = _alt;
+            out.a3d = { fromCut: _curCut, toCut: _altCut, fromFreePct: _fp0, toFreePct: _afp };
+          } else {
+            out.a3d = { tried: true, fromCut: _curCut, toCut: _altCut, fromFreePct: _fp0, toFreePct: _afp };
+          }
+        } catch (e) { out.a3d = { error: String(e && e.message || e) }; }
+      }
+    }
+    // 【v396·P7 接入】失败原因驱动修复：先 diagno se，主因 J>20% 时只修管道公平性（A→A1→A2→A3 串行）。
+    if (out && out.level && config && !out.readyStats) {
+      try { out.readyStats = sampleReadyStats(out.level, config, 5); } catch (e) { out.readyStats = null; }
+    }
+    if (out && config && out.readyStats) config._readyStats = out.readyStats;
+    if (out && out.level && config && config.p7Repair && _pdLeft() > 15000) {
+      config._repairDeadline = _pdT0 + _pdBudget - 8000;
+      try {
+        var _p7 = p7RepairLevel(out.level, config);
+        if (_p7 && _p7.level && _p7.valid) {
+          out.level = _p7.level; out.solveResult = _p7.solveResult; out.audit = _p7.audit;
+          out.goodV3 = _p7.goodV3; out.valid = true; out.p7 = _p7.p7;
+        } else if (_p7 && _p7.p7) {
+          out.p7 = _p7.p7;
+        }
+      } catch (e) { out.p7 = { error: String(e && e.message || e) }; }
+    }
+    // 【v377·P3 接入】生成后陷阱后处理：只对最终关、首通 20~80% 的基准跑；
+    //   命中才替换，替换后用 evaluateLevel 重算 solve/audit/goodV3，绝不沿用旧指标。
+    if (out && out.level && config && config.trapPost && _pdLeft() > 12000) {
+      var _t0 = Date.now();
+      var _fcB = out.goodV3 && out.goodV3.fillCurve;
+      var _qB = out.goodV3 && out.goodV3.persist && out.goodV3.persist.quality;
+      try {
+        var _tp = trapPostProcess(out.level, config);
+        if (_tp && _tp.level) {
+          var _ev = evaluateLevel(_tp.level, config);
+          if (_ev && _ev.valid && _ev.goodV3) {
+            var _fcA = _ev.goodV3.fillCurve, _qA = _ev.goodV3.persist && _ev.goodV3.persist.quality;
+            // 【v404】trapPost 不能把“免费步/压力”修坏：free 变多或 T/R 掉 >5 就拒绝
+            var _bad = false;
+            if (_fcB && _fcA) {
+              if (_fcA.freePct != null && _fcB.freePct != null && _fcA.freePct > _fcB.freePct + 5) _bad = true;
+              if (_fcA.freeRunMax != null && _fcB.freeRunMax != null && _fcA.freeRunMax > _fcB.freeRunMax + 2) _bad = true;
+            }
+            if (_qB && _qA) {
+              if (_qA.T != null && _qB.T != null && _qA.T < _qB.T - 5) _bad = true;
+              if (_qA.R != null && _qB.R != null && _qA.R < _qB.R - 5) _bad = true;
+            }
+            if (_bad) {
+              out.trapPost = { applied: false, reason: 'free/T guard', ms: Date.now() - _t0 };
+            } else {
+              out.level = _ev.level; out.solveResult = _ev.solveResult; out.audit = _ev.audit;
+              out.goodV3 = _ev.goodV3; out.valid = true;
+              out.trapPost = { applied: true, ms: Date.now() - _t0, stats: _tp.stats };
+            }
+          } else {
+            out.trapPost = { applied: false, reason: 're-eval failed', ms: Date.now() - _t0 };
+          }
+        } else {
+          out.trapPost = { applied: false, reason: (_tp && _tp.reason) || 'no hit', ms: Date.now() - _t0 };
+        }
+      } catch (e) {
+        out.trapPost = { applied: false, error: String(e && e.message || e), ms: Date.now() - _t0 };
+      }
+    }
+    if (out && out.level && config && config.readyStats !== false) {
+      try { out.readyStats = sampleReadyStats(out.level, config, 5); } catch (e) { out.readyStats = null; }
+    }
     return out;
   }
+
+  // ==================== 【v377·P3 接入】生成后陷阱后处理 ====================
+  //   只对最终关、首通 20~80% 的基准跑；最多 20 个交换/同色偏斜变异；
+  //   命中才替换，替换后用 evaluateLevel 重算 solve/audit/goodV3（不沿用旧指标）。
+  function evalTrapLevel(level, config) {
+    var parsed;
+    try { parsed = AntSolver.parseLevel(level); } catch (e) { return null; }
+    var sr;
+    try {
+      sr = AntSolver.Solver.solve(parsed, {
+        timeBudgetMs: 1200, bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain
+      });
+    } catch (e) { return null; }
+    if (!sr || !sr.completed) return null;
+    var runs = [], thr = [0.3, 0.45, 0.6, 0.75, 0.9];
+    for (var ti = 0; ti < thr.length; ti++) for (var si = 0; si < 2; si++) {
+      try {
+        runs.push(AntSolver.PlayerSim.run(parsed, {
+          pickThreshold: thr[ti], seed: 101 + si * 37, useItems: false, reviveCap: 0,
+          bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain, capturePreviewStats: false
+        }));
+      } catch (e) { runs.push(null); }
+    }
+    var ok = runs.filter(Boolean);
+    if (!ok.length) return null;
+    var first = Math.round(ok.filter(function (r) { return r.won; }).length / ok.length * 100);
+    var lw = 0, lr = 0;
+    for (var ri = 0; ri < ok.length; ri++) {
+      var r0 = ok[ri]; lr++;
+      if (r0.won) { lw++; continue; }
+      var bl = r0.lastBlocked || r0.lastRefuse, avoid = (bl && bl.color != null) ? bl.color : null, won = false;
+      for (var at = 1; at <= 2; at++) {
+        try {
+          var rr = AntSolver.PlayerSim.run(parsed, {
+            pickThreshold: 0.6 + (at === 1 ? 0.15 : -0.15), seed: 500 + at * 97,
+            useItems: false, reviveCap: 0, bottomOnly: !!config.bottomOnly,
+            instantChain: !!config.instantChain, capturePreviewStats: false, avoidColor: avoid
+          });
+          if (rr && rr.won) { won = true; break; }
+          var b2 = rr && (rr.lastBlocked || rr.lastRefuse);
+          if (b2 && b2.color != null) avoid = b2.color;
+        } catch (e) { }
+      }
+      if (won) lw++;
+    }
+    var learned = Math.round(lw / lr * 100);
+    var lookW = 0;
+    for (var li = 0; li < 2; li++) {
+      try {
+        var lr2 = AntSolver.PlayerSim.run(parsed, {
+          pickThreshold: 0.6, seed: 401 + li * 97, useItems: false, reviveCap: 0,
+          bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain,
+          capturePreviewStats: false, lookahead2: true, lookaheadLimit: 6
+        });
+        if (lr2 && lr2.won) lookW++;
+      } catch (e) { }
+    }
+    var look = Math.round(lookW / 2 * 100);
+    var best = ok.reduce(function (a, b) {
+      return ((b.won && !a.won) || (b.won === a.won && (b.progress || 0) > (a.progress || 0))) ? b : a;
+    }, ok[0]);
+    var bestProg = best ? (best.progress || 0) : 0;
+    var avg = ok.reduce(function (s, r) { return s + (r.progress || 0); }, 0) / ok.length;
+    var R = Math.max(0, Math.round(bestProg - avg));
+    var picked = {}, pickedN = 0;
+    for (var pi = 0; pi < ok.length; pi++) {
+      var po = ok[pi].pickOrder || [];
+      for (var pj = 0; pj < po.length; pj++) {
+        var k = po[pj].r + ',' + po[pj].c;
+        if (!picked[k]) { picked[k] = 1; pickedN++; }
+      }
+    }
+    var U = parsed.totalBoxes ? Math.max(0, Math.min(100, Math.round((1 - pickedN / parsed.totalBoxes) * 100))) : null;
+    var fill = null;
+    try { fill = choiceCurve(parsed, sr); } catch (e) { }
+    var dec = (fill && fill.steps) ? fill.steps.filter(function (x) { return x.full >= 2; }).length : 0;
+    var traps = {};
+    if (best && best.won) {
+      for (var xi = 0; xi < ok.length; xi++) {
+        if (ok[xi].won) continue;
+        var bp = best.pickOrder || [], rp = ok[xi].pickOrder || [], n = Math.min(bp.length, rp.length);
+        for (var yi = 0; yi < n; yi++) {
+          if (bp[yi].r !== rp[yi].r || bp[yi].c !== rp[yi].c) {
+            traps[bp[yi].step != null ? bp[yi].step : yi] = 1; break;
+          }
+        }
+      }
+    }
+    var trapN = 0; for (var tk in traps) trapN++;
+    var T = dec > 0 && best && best.won ? Math.round(trapN / dec * 100) : 0;
+    return { first: first, learned: learned, look: look, T: T, R: R, U: U, bestProg: bestProg, dec: dec, po: sr.pickOrder };
+  }
+
+  function evaluateLevel(level, config) {
+    var parsed;
+    try { parsed = AntSolver.parseLevel(level); } catch (e) { return null; }
+    var sr;
+    try {
+      sr = AntSolver.Solver.solve(parsed, {
+        timeBudgetMs: (config && config.trapEvalMs) || 1500,
+        bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain)
+      });
+    } catch (e) { return null; }
+    if (!sr || !sr.completed) return null;
+    var audit = null;
+    try {
+      audit = AntSolver.Analysis.chokepointAudit(sr.pressureSamples || [], parsed.totalBoxes, level.bufferLimit);
+    } catch (e) { audit = null; }
+    var cand = { level: level, config: config || {}, solveResult: sr, audit: audit, generationEval: null, valid: true };
+    var gv = null;
+    try { gv = goodV3Of(cand); } catch (e) { gv = null; }
+    return { level: level, solveResult: sr, audit: audit, goodV3: gv, valid: true };
+  }
+
+  /**
+   * P7 v1：失败原因驱动的修复分支（A→A1→A2→A3）
+   *   - 只修主因 hidden（J>20%）：把管道里的车合并到同色上盘车，减少隐藏信息；
+   *   - 每次修复重算 evaluateLevel，J 不降就回退；
+   *   - ABC 基底并行留给上层，本函数只负责一个分支的串行修复。
+   */
+  function p7DiagnoseEv(ev) {
+    if (!ev || !ev.goodV3 || !ev.goodV3.persist) return null;
+    var p = ev.goodV3.persist, q = p.quality || {};
+    // J = 管道/问号死亡占比（与 app 的 _hidden0 同口径）
+    var dc = p.deathCauses || {}, dt = 0, dh = 0;
+    for (var dk in dc) { dt += dc[dk]; if (dk === '管道' || dk === '问号') dh += dc[dk]; }
+    var J = dt ? Math.round(dh / dt * 100) : null;
+    var T = (q.T != null) ? q.T : null, R = (q.R != null) ? q.R : null;
+    var fc = ev.goodV3.fillCurve || {};
+    var freePct = (fc.freePct != null) ? fc.freePct : null;
+    var freeRunMax = (fc.freeRunMax != null) ? fc.freeRunMax : null;
+    var freeLowPct = (fc.freeLowPct != null) ? fc.freeLowPct : null;
+    var misplacedFreePct = (fc.misplacedFreePct != null) ? fc.misplacedFreePct : null;
+    var pressurePct3 = (fc.pressurePct3 != null) ? fc.pressurePct3 : null;
+    var pressurePeak = (fc.pressurePeak != null) ? fc.pressurePeak : null;
+    var wLow = (fc.lowPct != null) ? fc.lowPct : null;
+    var partialStepPct = (fc.partialStepPct != null) ? fc.partialStepPct : null;
+    var fullMedian2 = (fc.fullMedian2 != null) ? fc.fullMedian2 : null;
+    var selectMedian = (fc.selectMedian != null) ? fc.selectMedian : null;
+    var earlyFree10 = (fc.earlyFree10 != null) ? fc.earlyFree10 : null;
+    var earlyPeak10 = (fc.earlyPeak10 != null) ? fc.earlyPeak10 : null;
+    var cause = null;
+    if (J != null && J > 20) cause = 'hidden';
+    // 【v452·用户裁决】不搞学习：learned/look 不再触发 black，A4 不跑
+    else if ((earlyFree10 != null && earlyFree10 > 4) || (earlyPeak10 != null && earlyPeak10 < 3)) cause = 'early';
+    else if (T != null && T < 10) cause = 'flat';
+    else if (R != null && R < 15) cause = 'flat';
+    else if (wLow != null && wLow > 35) cause = 'flat';
+    else if (freePct != null && freePct > 50) cause = 'free';
+    else if (freeRunMax != null && freeRunMax > 6) cause = 'free';
+    return { J: J, T: T, R: R, freePct: freePct, freeRunMax: freeRunMax,
+      learned: p.learnedPassPct, look: p.lookaheadPassPct,
+      freeLowPct: freeLowPct, misplacedFreePct: misplacedFreePct, pressurePct3: pressurePct3, pressurePeak: pressurePeak, wLow: wLow,
+      partialStepPct: partialStepPct, fullMedian2: fullMedian2, selectMedian: selectMedian,
+      earlyFree10: earlyFree10, earlyPeak10: earlyPeak10,
+      first: p.playerPassPct, pass: !!ev.goodV3.pass, cause: cause };
+  }
+
+  function p7PipeFairness(level, config) {
+    var best = null, bestJ = null, evals = 0;
+    var maxCap = parseInt(config && config.boxSizeMax, 10) || 60;
+    for (var r = 0; r < level.board.rows; r++) {
+      for (var c = 0; c < level.board.cols; c++) {
+        var cell = level.board.cells[r] && level.board.cells[r][c];
+        if (!cell || cell.t !== 'pipe' || !cell.queue || !cell.queue.length) continue;
+        for (var qi = 0; qi < cell.queue.length; qi++) {
+          var pc = cell.queue[qi];
+          // 找同色上盘车，合并后不超容量上限
+          for (var br = 0; br < level.board.rows; br++) {
+            for (var bc = 0; bc < level.board.cols; bc++) {
+              var bx = level.board.cells[br] && level.board.cells[br][bc];
+              if (!bx || bx.t !== 'box' || bx.color !== pc.color) continue;
+              if ((bx.count || 0) + (pc.count || 0) > maxCap) continue;
+              var lv = JSON.parse(JSON.stringify(level));
+              var pipe2 = lv.board.cells[r][c];
+              var car = pipe2.queue.splice(qi, 1)[0];
+              var target = lv.board.cells[br][bc];
+              target.count += car.count;
+              if (!pipe2.queue.length) { pipe2.t = 'black'; delete pipe2.queue; }
+              if (evals >= 6) return best ? { level: best, J: bestJ } : null;
+              evals++;
+              var ev = null;
+              try { ev = evaluateLevel(lv, config); } catch (e) { }
+              var d = p7DiagnoseEv(ev);
+              if (!d || d.J == null) continue;
+              if (best == null || d.J < bestJ) { best = lv; bestJ = d.J; }
+              break; // 同一管道车只试一个上盘目标
+            }
+            if (best && best !== level && bestJ != null && bestJ <= 0) break;
+          }
+        }
+      }
+    }
+    // 【v412】A1b：换位暴露——管道车和盘上车交换，不改总数，只让危险车可见
+    if (evals < 6) {
+      for (var pr2 = 0; pr2 < level.board.rows && evals < 6; pr2++) {
+        for (var pc2 = 0; pc2 < level.board.cols && evals < 6; pc2++) {
+          var pipeC = level.board.cells[pr2] && level.board.cells[pr2][pc2];
+          if (!pipeC || pipeC.t !== 'pipe' || !pipeC.queue || !pipeC.queue.length) continue;
+          for (var q2 = 0; q2 < pipeC.queue.length && evals < 6; q2++) {
+            var pcar = pipeC.queue[q2];
+            var bcar = null, bpos = null;
+            for (var br2 = 0; br2 < level.board.rows && !bcar; br2++) {
+              for (var bc2 = 0; bc2 < level.board.cols; bc2++) {
+                var bx2 = level.board.cells[br2] && level.board.cells[br2][bc2];
+                if (bx2 && bx2.t === 'box' && !bx2.chain && !bx2.numice && !bx2.q) { bcar = bx2; bpos = [br2, bc2]; break; }
+              }
+            }
+            if (!bcar) continue;
+            var lv3 = JSON.parse(JSON.stringify(level));
+            lv3.board.cells[pr2][pc2].queue[q2] = { color: bcar.color, count: bcar.count };
+            lv3.board.cells[bpos[0]][bpos[1]] = { t: 'box', color: pcar.color, count: pcar.count, chain: 0, q: false, numice: 0 };
+            evals++;
+            var ev3 = null;
+            try { ev3 = evaluateLevel(lv3, config); } catch (e) { }
+            var d3x = p7DiagnoseEv(ev3);
+            if (!d3x || d3x.J == null) continue;
+            if (best == null || d3x.J < bestJ) { best = lv3; bestJ = d3x.J; }
+          }
+        }
+      }
+    }
+    return best ? { level: best, J: bestJ } : null;
+  }
+
+  // P7-A3：收紧开局——前 20% 的早熟免费车加冰/链/换深
+  function p7TightenOpening(level, config, ev) {
+    var steps = ev && ev.goodV3 && ev.goodV3.fillCurve && ev.goodV3.fillCurve.steps;
+    if (!steps || !steps.length) return null;
+    var best = null, bestScore = null, evals = 0;
+    var maxCap = parseInt(config && config.boxSizeMax, 10) || 60;
+    function plainCell(lv, r, c) {
+      var x = lv.board.cells[r] && lv.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    function scoreOf(ev2) {
+      var fc = ev2 && ev2.goodV3 && ev2.goodV3.fillCurve;
+      if (!fc) return null;
+      return { freePct: fc.freePct, freeRunMax: fc.freeRunMax };
+    }
+    var tries = 0;
+    for (var si = 0; si < steps.length && tries < 4; si++) {
+      var st = steps[si];
+      if (!(st.prog <= 0.50 && st.full >= 2 && st.free >= 3)) continue;   // v408：免费步不一定在开局，前50%都可修
+      var cands = (st.moves || []).filter(function (m) { return m.full; });
+      if (st.pick && plainCell(level, st.pick.r, st.pick.c)) cands.push(st.pick);
+      for (var ci = 0; ci < cands.length && tries < 4; ci++) {
+        var cd = cands[ci];
+        if (!plainCell(level, cd.r, cd.c)) continue;
+        tries++;
+        // 变体 1：早熟车加冰
+        var lv1 = JSON.parse(JSON.stringify(level));
+        lv1.board.cells[cd.r][cd.c].numice = 2;
+        var ev1 = null;
+        try { ev1 = evaluateLevel(lv1, config); } catch (e) { }
+        var sc1 = scoreOf(ev1);
+        if (sc1 && (bestScore == null || sc1.freePct < bestScore.freePct)) { best = lv1; bestScore = sc1; }
+        // 变体 1b：只加 1 层冰（更温和）
+        var lv1b = JSON.parse(JSON.stringify(level));
+        lv1b.board.cells[cd.r][cd.c].numice = 1;
+        var ev1b = null;
+        try { ev1b = evaluateLevel(lv1b, config); } catch (e) { }
+        var sc1b = scoreOf(ev1b);
+        if (sc1b && (bestScore == null || sc1b.freePct < bestScore.freePct)) { best = lv1b; bestScore = sc1b; }
+        // 变体 1c：换深——早熟免费车和 40~65% 的债务车交换位置
+        var deepCands = [];
+        for (var sj = 0; sj < steps.length; sj++) {
+          var sd = steps[sj];
+          if (!(sd.prog >= 0.40 && sd.prog <= 0.65)) continue;
+          var dcs = (sd.moves || []).filter(function (m) { return m.full; });
+          if (sd.pick && plainCell(level, sd.pick.r, sd.pick.c)) dcs.push(sd.pick);
+          for (var dj = 0; dj < dcs.length; dj++) deepCands.push(dcs[dj]);
+        }
+        if (deepCands.length && evals < 5) {
+          var dsel = deepCands[0];
+          for (var dk = 1; dk < deepCands.length; dk++) {
+            if ((deepCands[dk].count || 0) > (dsel.count || 0)) dsel = deepCands[dk];
+          }
+          if (dsel.r !== cd.r || dsel.c !== cd.c) {
+            var lv1c = JSON.parse(JSON.stringify(level));
+            var ca = lv1c.board.cells[cd.r][cd.c];
+            var cb = lv1c.board.cells[dsel.r][dsel.c];
+            lv1c.board.cells[cd.r][cd.c] = cb;
+            lv1c.board.cells[dsel.r][dsel.c] = ca;
+            evals++;
+            var ev1c = null;
+            try { ev1c = evaluateLevel(lv1c, config); } catch (e) { }
+            var sc1c = scoreOf(ev1c);
+            if (sc1c && (bestScore == null || sc1c.freePct < bestScore.freePct)) { best = lv1c; bestScore = sc1c; }
+          }
+        }
+        // 变体 2：早熟车加链
+        for (var dr2 = 0; dr2 <= 1; dr2++) for (var dc2 = -1; dc2 <= 1; dc2++) {
+          if (dr2 === 0 && dc2 <= 0) continue;
+          var nr2 = cd.r + dr2, nc2 = cd.c + dc2;
+          if (!plainCell(level, nr2, nc2)) continue;
+          if (evals >= 5) break;
+          var lv2 = JSON.parse(JSON.stringify(level));
+          var maxCh = 0;
+          for (var rr2 = 0; rr2 < lv2.board.rows; rr2++) for (var cc2 = 0; cc2 < lv2.board.cols; cc2++) {
+            var xx2 = lv2.board.cells[rr2] && lv2.board.cells[rr2][cc2];
+            if (xx2 && xx2.chain > maxCh) maxCh = xx2.chain;
+          }
+          lv2.board.cells[cd.r][cd.c].chain = maxCh + 1;
+          lv2.board.cells[nr2][nc2].chain = maxCh + 1;
+          evals++;
+          var ev2 = null;
+          try { ev2 = evaluateLevel(lv2, config); } catch (e) { }
+          var sc2 = scoreOf(ev2);
+          if (sc2 && (bestScore == null || sc2.freePct < bestScore.freePct)) { best = lv2; bestScore = sc2; }
+        }
+      }
+    }
+    return best ? { level: best, freePct: bestScore.freePct, freeRunMax: bestScore.freeRunMax } : null;
+  }
+
+  // P7-A3b：开局供给结构——交换 2 组早熟免费车与 20~45% 债务车
+  function p7SupplyStructure(level, config, ev) {
+    var steps = ev && ev.goodV3 && ev.goodV3.fillCurve && ev.goodV3.fillCurve.steps;
+    if (!steps || !steps.length) return null;
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var early = [], deep = [], seenE = {}, seenD = {};
+    for (var i = 0; i < steps.length; i++) {
+      var st = steps[i];
+      var cands = (st.moves || []).filter(function (m) { return m.full; });
+      if (st.pick && plain(st.pick.r, st.pick.c)) cands.push(st.pick);
+      for (var j = 0; j < cands.length; j++) {
+        var m = cands[j];
+        if (!plain(m.r, m.c)) continue;
+        var key = m.r + ',' + m.c;
+        if (st.prog <= 0.18 && st.full >= 2 && st.free >= 3 && !seenE[key]) { seenE[key] = 1; early.push(m); }
+        if (st.prog >= 0.22 && st.prog <= 0.45 && !seenD[key]) { seenD[key] = 1; deep.push(m); }
+      }
+    }
+    if (early.length < 2 || deep.length < 2) return null;
+    deep.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    var lv = JSON.parse(JSON.stringify(level));
+    var used = {}, pairs = 0;
+    for (var ei = 0; ei < early.length && pairs < 2; ei++) {
+      var e = early[ei];
+      if (used[e.r + ',' + e.c]) continue;
+      for (var di = 0; di < deep.length; di++) {
+        var d = deep[di];
+        if (used[d.r + ',' + d.c] || (d.r === e.r && d.c === e.c)) continue;
+        var ca = lv.board.cells[e.r][e.c], cb = lv.board.cells[d.r][d.c];
+        if (!ca || !cb || ca.t !== 'box' || cb.t !== 'box') continue;
+        lv.board.cells[e.r][e.c] = cb;
+        lv.board.cells[d.r][d.c] = ca;
+        used[e.r + ',' + e.c] = 1; used[d.r + ',' + d.c] = 1; pairs++;
+        break;
+      }
+    }
+    if (!pairs) return null;
+    var ev2 = null;
+    try { ev2 = evaluateLevel(lv, config); } catch (e) { }
+    var fc = ev2 && ev2.goodV3 && ev2.goodV3.fillCurve;
+    if (!fc) return null;
+    return { level: lv, freePct: fc.freePct, freeRunMax: fc.freeRunMax };
+  }
+
+  // P7-A3R：把“低缓冲白给车”挪到“高缓冲窗口”，不是冻掉
+  function p7RelocateFree(level, config, ev) {
+    var steps = ev && ev.goodV3 && ev.goodV3.fillCurve && ev.goodV3.fillCurve.steps;
+    if (!steps || !steps.length) return null;
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var low = [], high = [], seen = {};
+    for (var i = 0; i < steps.length; i++) {
+      var st = steps[i];
+      var cands = (st.moves || []).filter(function (m) { return m.full; });
+      if (st.pick && plain(st.pick.r, st.pick.c)) cands.push(st.pick);
+      for (var j = 0; j < cands.length; j++) {
+        var m = cands[j];
+        if (!plain(m.r, m.c)) continue;
+        var k = m.r + ',' + m.c;
+        if (seen[k]) continue;
+        if (st.full >= 2 && st.free >= 4 && low.length < 6) { seen[k] = 1; low.push(m); }
+        if (st.free <= 2 && st.prog >= 0.20 && st.prog <= 0.65 && high.length < 8) { seen[k] = 1; high.push(m); }
+      }
+    }
+    if (!low.length || !high.length) return null;
+    high.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    var best = null, bestScore = null;
+    for (var li = 0; li < low.length && li < 3; li++) {
+      for (var hi = 0; hi < high.length && hi < 3; hi++) {
+        var a = low[li], b = high[hi];
+        if (a.r === b.r && a.c === b.c) continue;
+        var lv = JSON.parse(JSON.stringify(level));
+        var ca = lv.board.cells[a.r][a.c], cb = lv.board.cells[b.r][b.c];
+        if (!ca || !cb || ca.t !== 'box' || cb.t !== 'box') continue;
+        lv.board.cells[a.r][a.c] = cb;
+        lv.board.cells[b.r][b.c] = ca;
+        var ev2 = null;
+        try { ev2 = evaluateLevel(lv, config); } catch (e) { }
+        if (!ev2 || !ev2.goodV3) continue;
+        var fc = ev2.goodV3.fillCurve || {};
+        var _pp = (ev2.goodV3.persist && ev2.goodV3.persist.playerPassPct != null) ? ev2.goodV3.persist.playerPassPct : 100;
+        var sc = (100 - (fc.freeLowPct || 0)) + (fc.pressurePct3 || 0) * 2 + (fc.pressurePeak || 0) * 5 - _pp * 2;
+        if (bestScore == null || sc > bestScore) {
+          best = { level: lv, freeLowPct: fc.freeLowPct, pressurePct3: fc.pressurePct3, pressurePeak: fc.pressurePeak, misplacedFreePct: fc.misplacedFreePct, first: _pp };
+          bestScore = sc;
+        }
+      }
+    }
+    return best;
+  }
+
+  // P7-A2：压力点岔路——在 35~70%、free≤1、full≥2 处加链/冰
+  function p7ForceChoice(level, config, ev) {
+    var steps = ev && ev.goodV3 && ev.goodV3.fillCurve && ev.goodV3.fillCurve.steps;
+    if (!steps || !steps.length) return null;
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var best = null, bestScore = null, tries = 0;
+    for (var i = 0; i < steps.length && tries < 5; i++) {
+      var st = steps[i];
+      if (!(st.prog >= 0.20 && st.prog <= 0.75 && st.full >= 1)) continue;
+      var cands = (st.moves || []).slice();
+      if (st.pick && plain(st.pick.r, st.pick.c) && !cands.some(function (m) { return m.r === st.pick.r && m.c === st.pick.c; })) cands.push(st.pick);
+      for (var ci = 0; ci < cands.length && tries < 5; ci++) {
+        var cd = cands[ci];
+        if (!plain(level, cd.r, cd.c)) continue;
+        tries++;
+        // 优先加链，找不到相邻盒再加冰
+        var pair = null;
+        for (var dr = 0; dr <= 1 && !pair; dr++) for (var dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc <= 0) continue;
+          var nr = cd.r + dr, nc = cd.c + dc;
+          if (plain(level, nr, nc)) { pair = [nr, nc]; break; }
+        }
+        var consider = function (lvx) {
+          var ev2 = null;
+          try { ev2 = evaluateLevel(lvx, config); } catch (e) { }
+          if (!ev2 || !ev2.goodV3) return;
+          var q = ev2.goodV3.persist && ev2.goodV3.persist.quality || {};
+          var fc = ev2.goodV3.fillCurve || {};
+          var _wl = fc.lowPct != null ? fc.lowPct : 50;
+          var sc = (q.T || 0) * 2 + (q.R || 0) + (50 - _wl) * 0.8 - Math.max(0, (fc.freePct || 0) - 50) * 0.3;
+          if (bestScore == null || sc > bestScore) {
+            best = { level: lvx, T: q.T, R: q.R, freePct: fc.freePct, freeRunMax: fc.freeRunMax, wLow: fc.lowPct };
+            bestScore = sc;
+          }
+        };
+        // 先试最温和的冰1，链/冰2 可能直接把关打死
+        var lvIce = JSON.parse(JSON.stringify(level));
+        lvIce.board.cells[cd.r][cd.c].numice = 1;
+        consider(lvIce);
+        // 【v424】安全替代：和 35~65% 的深层车交换，不加障碍，通常不破坏可解
+        var deepCell = null;
+        for (var di2 = 0; di2 < steps.length && !deepCell; di2++) {
+          var sd2 = steps[di2];
+          if (!(sd2.prog >= 0.35 && sd2.prog <= 0.65)) continue;
+          var dm = (sd2.moves || []).filter(function (m) {
+            return plain(m.r, m.c) && !(m.r === cd.r && m.c === cd.c);
+          });
+          if (dm.length) deepCell = dm[0];
+        }
+        if (deepCell) {
+          var lvSwap = JSON.parse(JSON.stringify(level));
+          var ca2 = lvSwap.board.cells[cd.r][cd.c];
+          var cb2 = lvSwap.board.cells[deepCell.r][deepCell.c];
+          if (ca2 && cb2 && ca2.t === 'box' && cb2.t === 'box') {
+            lvSwap.board.cells[cd.r][cd.c] = cb2;
+            lvSwap.board.cells[deepCell.r][deepCell.c] = ca2;
+            consider(lvSwap);
+          }
+        }
+        var lv = JSON.parse(JSON.stringify(level));
+        if (pair) {
+          var maxCh = 0;
+          for (var rr = 0; rr < lv.board.rows; rr++) for (var cc = 0; cc < lv.board.cols; cc++) {
+            var xx = lv.board.cells[rr] && lv.board.cells[rr][cc];
+            if (xx && xx.chain > maxCh) maxCh = xx.chain;
+          }
+          lv.board.cells[cd.r][cd.c].chain = maxCh + 1;
+          lv.board.cells[pair[0]][pair[1]].chain = maxCh + 1;
+        } else {
+          lv.board.cells[cd.r][cd.c].numice = 2;
+        }
+        consider(lv);
+      }
+    }
+    return best;
+  }
+
+  // P7-A4：太黑减负——拆一组链/一块冰
+  // P7-A2c：partial 选项——把深层大车换到压力点，制造“能点但吃不满”
+  function p7PartialChoice(level, config, ev) {
+    var steps = ev && ev.goodV3 && ev.goodV3.fillCurve && ev.goodV3.fillCurve.steps;
+    if (!steps || !steps.length) return null;
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var pressure = [], deep = [];
+    for (var i = 0; i < steps.length; i++) {
+      var st = steps[i];
+      if (st.prog >= 0.25 && st.prog <= 0.70 && st.full >= 1) {
+        var cs = (st.moves || []).filter(function (m) { return plain(m.r, m.c); });
+        if (!cs.length && st.pick && plain(st.pick.r, st.pick.c)) cs = [st.pick];
+        for (var j = 0; j < cs.length; j++) pressure.push(cs[j]);
+      }
+      if (st.prog >= 0.40 && st.prog <= 0.70) {
+        var ds = (st.moves || []).filter(function (m) { return plain(m.r, m.c); });
+        for (var k = 0; k < ds.length; k++) deep.push(ds[k]);
+      }
+    }
+    if (!pressure.length || !deep.length) return null;
+    var _rs2 = (config && config._readyStats && config._readyStats.byCell) || {};
+    deep.sort(function (a, b) {
+      var _ra = _rs2[a.r + ',' + a.c] || {}, _rb = _rs2[b.r + ',' + b.c] || {};
+      var _qa = (_ra.median != null ? _ra.median : 0.5) * 100 - (_ra.spread || 0) * 40;
+      var _qb = (_rb.median != null ? _rb.median : 0.5) * 100 - (_rb.spread || 0) * 40;
+      if (Math.abs(_qb - _qa) >= 5) return _qb - _qa;
+      return (b.count || 0) - (a.count || 0);
+    });
+    var best = null, bestScore = -Infinity, tried = 0;
+    for (var pi = 0; pi < pressure.length && tried < 3; pi++) {
+      var p = pressure[pi];
+      for (var di = 0; di < deep.length && tried < 3; di++) {
+        var d = deep[di];
+        if (p.r === d.r && p.c === d.c) continue;
+        tried++;
+        var lv = JSON.parse(JSON.stringify(level));
+        var a = lv.board.cells[p.r][p.c], b = lv.board.cells[d.r][d.c];
+        if (!a || !b || a.t !== 'box' || b.t !== 'box') continue;
+        lv.board.cells[p.r][p.c] = b;
+        lv.board.cells[d.r][d.c] = a;
+        var ev2 = null;
+        try { ev2 = evaluateLevel(lv, config); } catch (e) { }
+        if (!ev2 || !ev2.goodV3) continue;
+        var q = ev2.goodV3.persist && ev2.goodV3.persist.quality || {};
+        var fc = ev2.goodV3.fillCurve || {};
+        var sc = (fc.partialStepPct || 0) * 2 - (fc.fullMedian2 || 0) * 10 + (q.T || 0) + (q.R || 0) * 0.3;
+        if (sc > bestScore) {
+          best = { level: lv, T: q.T, R: q.R, partialStepPct: fc.partialStepPct, fullMedian2: fc.fullMedian2, wLow: fc.lowPct };
+          bestScore = sc;
+        }
+      }
+    }
+    return best;
+  }
+
+  // P7-A2b：安全拆分——相邻同色两车合并再拆成 (sum-1,1)，不改总数，制造一个 1 块安全车
+  function p7SafeSplit(level, config) {
+    var best = null, bestScore = null, maxCap = parseInt(config && config.boxSizeMax, 10) || 60, tries = 0;
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    for (var r = 0; r < level.board.rows; r++) {
+      for (var c = 0; c < level.board.cols; c++) {
+        if (!plain(r, c) || tries >= 6) continue;
+        var a = level.board.cells[r][c];
+        var dirs = [[0, 1], [1, 0]];
+        for (var di = 0; di < dirs.length; di++) {
+          var nr = r + dirs[di][0], nc = c + dirs[di][1];
+          if (!plain(nr, nc)) continue;
+          var b = level.board.cells[nr][nc];
+          if (b.color !== a.color) continue;
+          var sum = (a.count || 0) + (b.count || 0);
+          if (sum - 1 > maxCap) continue;
+          tries++;
+          var lv = JSON.parse(JSON.stringify(level));
+          lv.board.cells[r][c].count = sum - 1;
+          lv.board.cells[nr][nc].count = 1;
+          var ev2 = null;
+          try { ev2 = evaluateLevel(lv, config); } catch (e) { }
+          if (!ev2 || !ev2.goodV3) continue;
+          var q = ev2.goodV3.persist && ev2.goodV3.persist.quality || {}, fc = ev2.goodV3.fillCurve || {};
+          var wl = fc.lowPct != null ? fc.lowPct : 50;
+          var sc = (q.T || 0) * 2 + (q.R || 0) + (50 - wl) * 0.8;
+          if (bestScore == null || sc > bestScore) {
+            best = { level: lv, T: q.T, R: q.R, wLow: fc.lowPct, freePct: fc.freePct, freeRunMax: fc.freeRunMax };
+            bestScore = sc;
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  function p7Soften(level, config, ev) {
+    var best = null, bestScore = null, tries = 0;
+    for (var r = 0; r < level.board.rows; r++) {
+      for (var c = 0; c < level.board.cols; c++) {
+        var x = level.board.cells[r] && level.board.cells[r][c];
+        if (!x || x.t !== 'box') continue;
+        if (!(x.chain > 0 || x.numice > 0)) continue;
+        if (tries >= 6) break;
+        tries++;
+        var lv = JSON.parse(JSON.stringify(level));
+        var y = lv.board.cells[r][c];
+        if (y.chain > 0) {
+          var g = y.chain;
+          for (var rr = 0; rr < lv.board.rows; rr++) for (var cc = 0; cc < lv.board.cols; cc++) {
+            var z = lv.board.cells[rr] && lv.board.cells[rr][cc];
+            if (z && z.chain === g) z.chain = 0;
+          }
+        } else { y.numice = 0; }
+        var ev2 = null;
+        try { ev2 = evaluateLevel(lv, config); } catch (e) { }
+        if (!ev2 || !ev2.goodV3) continue;
+        var p = ev2.goodV3.persist || {}, q = p.quality || {}, fc = ev2.goodV3.fillCurve || {};
+        var sc = (p.learnedPassPct || 0) + (p.lookaheadPassPct || 0) * 0.5 + (q.T || 0) * 0.3;
+        if (bestScore == null || sc > bestScore) {
+          best = { level: lv, learned: p.learnedPassPct, look: p.lookaheadPassPct, T: q.T, R: q.R, freePct: fc.freePct };
+          bestScore = sc;
+        }
+      }
+    }
+    return best;
+  }
+
+  // P7-A2E：前 10 步加压——把早期免费车和 40~70% 的大车交换，提升 earlyPeak10
+  function p7EarlyPressure(level, config, ev) {
+    var steps = ev && ev.goodV3 && ev.goodV3.fillCurve && ev.goodV3.fillCurve.steps;
+    if (!steps || !steps.length) return null;
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var early = [], deep = [];
+    for (var i = 0; i < steps.length; i++) {
+      var st = steps[i];
+      if (i < 10 && st.free >= 3 && st.full >= 2) {
+        var es = (st.moves || []).filter(function (m) { return plain(m.r, m.c); });
+        if (st.pick && plain(st.pick.r, st.pick.c)) es.push(st.pick);
+        for (var j = 0; j < es.length; j++) early.push(es[j]);
+      }
+      if (st.prog >= 0.40 && st.prog <= 0.70) {
+        var ds = (st.moves || []).filter(function (m) { return plain(m.r, m.c); });
+        for (var k = 0; k < ds.length; k++) deep.push(ds[k]);
+      }
+    }
+    if (!early.length || !deep.length) return null;
+    // 【v443】优先把“当前颜色还没露够”的车换到前期，才能顶高 earlyPeak
+    var _exp = {};
+    try {
+      var _oe = openingExposure(level.blocks, level.board.rows, level.board.cols, false);
+      if (_oe && _oe.detail) for (var _oi = 0; _oi < _oe.detail.length; _oi++) _exp[_oe.detail[_oi].color] = _oe.detail[_oi].px;
+    } catch (e) { }
+    var _rs = (config && config._readyStats && config._readyStats.byCell) || {};
+    deep.sort(function (a, b) {
+      var _ra = _rs[a.r + ',' + a.c] || {}, _rb = _rs[b.r + ',' + b.c] || {};
+      var _qa = ((a.count || 0) - (_exp[a.color] || 0)) * 100 + (_ra.median != null ? _ra.median : 0.5) * 20 - (_ra.spread || 0) * 40;
+      var _qb = ((b.count || 0) - (_exp[b.color] || 0)) * 100 + (_rb.median != null ? _rb.median : 0.5) * 20 - (_rb.spread || 0) * 40;
+      return _qb - _qa;
+    });
+    var best = null, bestScore = -Infinity, tried = 0;
+    for (var ei = 0; ei < early.length && tried < 3; ei++) {
+      for (var di = 0; di < deep.length && tried < 3; di++) {
+        var e = early[ei], d = deep[di];
+        if (e.r === d.r && e.c === d.c) continue;
+        tried++;
+        var lv = JSON.parse(JSON.stringify(level));
+        var a = lv.board.cells[e.r][e.c], b = lv.board.cells[d.r][d.c];
+        if (!a || !b || a.t !== 'box' || b.t !== 'box') continue;
+        lv.board.cells[e.r][e.c] = b;
+        lv.board.cells[d.r][d.c] = a;
+        var ev2 = null;
+        try { ev2 = evaluateLevel(lv, config); } catch (er) { }
+        if (!ev2 || !ev2.goodV3) continue;
+        var fc = ev2.goodV3.fillCurve || {};
+        var sc = (fc.earlyPeak10 || 0) * 100 - (fc.earlyFree10 || 0) * 10;
+        if (sc > bestScore) {
+          best = { level: lv, earlyFree10: fc.earlyFree10, earlyPeak10: fc.earlyPeak10, T: (ev2.goodV3.persist && ev2.goodV3.persist.quality || {}).T };
+          bestScore = sc;
+        }
+      }
+    }
+    // 【v442】多组交换：一次换 2~3 对，把前10步峰值再推高
+    for (var _pairs = 2; _pairs <= 3; _pairs++) {
+      if (early.length < _pairs || deep.length < _pairs) continue;
+      var lvM = JSON.parse(JSON.stringify(level)), okM = true;
+      for (var _pi = 0; _pi < _pairs; _pi++) {
+        var _e = early[_pi], _d = deep[_pi];
+        var _a = lvM.board.cells[_e.r][_e.c], _b = lvM.board.cells[_d.r][_d.c];
+        if (!_a || !_b || _a.t !== 'box' || _b.t !== 'box' || (_e.r === _d.r && _e.c === _d.c)) { okM = false; break; }
+        lvM.board.cells[_e.r][_e.c] = _b; lvM.board.cells[_d.r][_d.c] = _a;
+      }
+      if (!okM) continue;
+      var evM = null;
+      try { evM = evaluateLevel(lvM, config); } catch (e) { }
+      if (!evM || !evM.goodV3) continue;
+      var fcM = evM.goodV3.fillCurve || {};
+      var scM = (fcM.earlyPeak10 || 0) * 100 - (fcM.earlyFree10 || 0) * 10;
+      if (scM > bestScore) {
+        best = { level: lvM, earlyFree10: fcM.earlyFree10, earlyPeak10: fcM.earlyPeak10, T: (evM.goodV3.persist && evM.goodV3.persist.quality || {}).T };
+        bestScore = scM;
+      }
+    }
+    // 【v444】直接替换“当前取盒”：让第一选择本身 partial，同时保留另一个 full
+    for (var _si = 0; _si < steps.length && _si < 10; _si++) {
+      var _st = steps[_si];
+      if (!_st || _st.full < 2 || !_st.pick) continue;
+      if (!plain(_st.pick.r, _st.pick.c)) continue;
+      var _alts = (_st.moves || []).filter(function (m) {
+        return m.full && plain(m.r, m.c) && !(m.r === _st.pick.r && m.c === _st.pick.c);
+      });
+      if (!_alts.length) continue;
+      if (!deep.length) break;
+      var _d = deep[0];
+      if (_d.r === _st.pick.r && _d.c === _st.pick.c) continue;
+      var lvP = JSON.parse(JSON.stringify(level));
+      var _pa = lvP.board.cells[_st.pick.r][_st.pick.c], _pb = lvP.board.cells[_d.r][_d.c];
+      if (!_pa || !_pb || _pa.t !== 'box' || _pb.t !== 'box') continue;
+      lvP.board.cells[_st.pick.r][_st.pick.c] = _pb;
+      lvP.board.cells[_d.r][_d.c] = _pa;
+      var evP = null;
+      try { evP = evaluateLevel(lvP, config); } catch (e) { }
+      if (!evP || !evP.goodV3) continue;
+      var fcP = evP.goodV3.fillCurve || {};
+      var scP = (fcP.earlyPeak10 || 0) * 100 - (fcP.earlyFree10 || 0) * 10;
+      if (scP > bestScore) {
+        best = { level: lvP, earlyFree10: fcP.earlyFree10, earlyPeak10: fcP.earlyPeak10, T: (evP.goodV3.persist && evP.goodV3.persist.quality || {}).T };
+        bestScore = scP;
+      }
+    }
+    return best;
+  }
+
+  function p7RepairLevel(level, config) {
+    var ev0 = null;
+    try { ev0 = evaluateLevel(level, config); } catch (e) { }
+    var d0 = p7DiagnoseEv(ev0);
+    if (!d0) return null;
+    var cur = level, diag = d0, ev = ev0, tried = 0, accepted = 0, path = [], notes = [];
+    var _dl = config && config._repairDeadline;
+    // A1：管道公平性
+    for (var i = 0; i < 3 && diag.cause === 'hidden' && (!_dl || Date.now() < _dl); i++) {
+      tried++;
+      var rep = p7PipeFairness(cur, config);
+      if (!rep) break;
+      var ev2 = null;
+      try { ev2 = evaluateLevel(rep.level, config); } catch (e) { }
+      var d2 = p7DiagnoseEv(ev2);
+      if (!d2) break;
+      var improved = (diag.J != null && d2.J != null && d2.J <= diag.J - 5) || (d2.pass && !diag.pass);
+      if (!improved) break;
+      cur = rep.level; ev = ev2; diag = d2; accepted++;
+      path.push({ step: 'A1.' + (i + 1), J: d2.J, T: d2.T, R: d2.R, freePct: d2.freePct, pass: d2.pass });
+      if (d2.pass) break;
+    }
+    // Early：前10步加压
+    var _earlyBad = (diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3);
+    for (var ei2 = 0; ei2 < 2 && _earlyBad && (!_dl || Date.now() < _dl); ei2++) {
+      tried++;
+      var repE = p7EarlyPressure(cur, config, ev);
+      if (!repE) { notes.push('early no candidate'); break; }
+      var evE = null;
+      try { evE = evaluateLevel(repE.level, config); } catch (e) { }
+      var dE = p7DiagnoseEv(evE);
+      if (!dE) break;
+      var okE = (diag.earlyPeak10 != null && dE.earlyPeak10 != null && dE.earlyPeak10 >= diag.earlyPeak10 + 1) ||
+                (diag.earlyFree10 != null && dE.earlyFree10 != null && dE.earlyFree10 <= diag.earlyFree10 - 2);
+      if (!okE) { notes.push('early no improve'); break; }
+      cur = repE.level; ev = evE; diag = dE; accepted++;
+      path.push({ step: 'Early.' + (ei2 + 1), earlyFree10: dE.earlyFree10, earlyPeak10: dE.earlyPeak10, T: dE.T, pass: dE.pass });
+      if (dE.pass) break;
+    }
+    // A2：压力点岔路
+    for (var k = 0; k < 2 && diag.cause === 'flat' && (!_dl || Date.now() < _dl); k++) {
+      tried++;
+      var rep2 = p7ForceChoice(cur, config, ev);
+      if (!rep2) { rep2 = p7PartialChoice(cur, config, ev); if (rep2) notes.push('A2 partial'); }
+      if (!rep2) { rep2 = p7SafeSplit(cur, config); notes.push('A2 fallback split'); }
+      if (!rep2) { notes.push('A2 no candidate'); break; }
+      var ev2b = null;
+      try { ev2b = evaluateLevel(rep2.level, config); } catch (e) { }
+      var d2b = p7DiagnoseEv(ev2b);
+      if (!d2b) break;
+      var improved2 = (diag.T != null && d2b.T != null && d2b.T >= diag.T + 5) ||
+                      (diag.R != null && d2b.R != null && d2b.R >= diag.R + 5) ||
+                      (diag.wLow != null && d2b.wLow != null && d2b.wLow <= diag.wLow - 5) ||
+                      (diag.partialStepPct != null && d2b.partialStepPct != null && d2b.partialStepPct >= diag.partialStepPct + 5) ||
+                      (diag.fullMedian2 != null && d2b.fullMedian2 != null && d2b.fullMedian2 <= diag.fullMedian2 - 1);
+      if (diag.freePct != null && d2b.freePct != null && d2b.freePct > diag.freePct + 5) break;
+      if (diag.J != null && d2b.J != null && d2b.J > diag.J + 5) break;
+      if (!improved2) break;
+      cur = rep2.level; ev = ev2b; diag = d2b; accepted++;
+      path.push({ step: 'A2.' + (k + 1), J: d2b.J, T: d2b.T, R: d2b.R, freePct: d2b.freePct, pass: d2b.pass });
+      if (d2b.pass) break;
+    }
+    // A3：收紧开局（freePct/freeRunMax）
+    var _earlyOkForA3 = !((diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3));
+    for (var j = 0; j < 2 && diag.cause !== 'black' && _earlyOkForA3 && (!_dl || Date.now() < _dl) && (diag.cause === 'free' || (diag.freePct != null && diag.freePct > 50) || (diag.freeRunMax != null && diag.freeRunMax > 6)); j++) {
+      tried++;
+      // A3R：先挪位置（低缓冲白给 → 高缓冲窗口）
+      var repR = p7RelocateFree(cur, config, ev);
+      if (repR) {
+        var evR = null;
+        try { evR = evaluateLevel(repR.level, config); } catch (e) { }
+        var dR = p7DiagnoseEv(evR);
+        // 【v410·用户裁决】T/R/learned/look 都是模拟代理，不做硬守卫；
+        // A3R 只看“白给位置是否真的变好”+ 硬门可解/守恒。
+        var posImproved = (diag.freeLowPct != null && dR && dR.freeLowPct != null && dR.freeLowPct <= diag.freeLowPct - 5) ||
+                          (diag.pressurePct3 != null && dR && dR.pressurePct3 != null && dR.pressurePct3 >= diag.pressurePct3 + 5) ||
+                          (diag.pressurePeak != null && dR && dR.pressurePeak != null && dR.pressurePeak > diag.pressurePeak);
+        if (dR && posImproved && diag.first != null && dR.first != null && dR.first > 60) {
+          notes.push('A3R too easy first ' + dR.first + '>60');
+        } else if (dR && posImproved) {
+          cur = repR.level; ev = evR; diag = dR; accepted++;
+          path.push({ step: 'A3R.' + (j + 1), freeLowPct: dR.freeLowPct, pressurePct3: dR.pressurePct3, pressurePeak: dR.pressurePeak,
+            first: dR.first, learned: dR.learned, look: dR.look, T: dR.T, R: dR.R, pass: dR.pass });
+          if (dR.pass) break;
+          continue;
+        }
+      }
+      var rep3 = p7TightenOpening(cur, config, ev);
+      if (!rep3) { notes.push('A3 no candidate'); rep3 = p7SupplyStructure(cur, config, ev); }
+      if (!rep3) { notes.push('A3b no candidate'); break; }
+      var ev3 = null;
+      try { ev3 = evaluateLevel(rep3.level, config); } catch (e) { }
+      var d3 = p7DiagnoseEv(ev3);
+      if (!d3) break;
+      var improved3 = (diag.freePct != null && d3.freePct != null && d3.freePct <= diag.freePct - 5) ||
+                      (diag.freeRunMax != null && d3.freeRunMax != null && d3.freeRunMax <= diag.freeRunMax - 2);
+      // A3 不能把 T/R 修坏：T/R 掉 >5 就拒绝
+      if (diag.T != null && (d3.T == null || d3.T < diag.T - 5)) { notes.push('A3 T guard '+(d3.T)+'<'+diag.T+'-5'); break; }
+      if (diag.R != null && (d3.R == null || d3.R < diag.R - 5)) { notes.push('A3 R guard '+(d3.R)+'<'+diag.R+'-5'); break; }
+      if (!improved3) { notes.push('A3 free no improve '+diag.freePct+'->'+d3.freePct); break; }
+      cur = rep3.level; ev = ev3; diag = d3; accepted++;
+      path.push({ step: 'A3.' + (j + 1), J: d3.J, T: d3.T, R: d3.R, freePct: d3.freePct, freeRunMax: d3.freeRunMax, pass: d3.pass });
+      if (d3.pass) break;
+    }
+    // A4：太黑减负
+    if (diag.cause === 'black') {
+      for (var m = 0; m < 2; m++) {
+        tried++;
+        var rep4 = p7Soften(cur, config, ev);
+        if (!rep4) break;
+        var ev4 = null;
+        try { ev4 = evaluateLevel(rep4.level, config); } catch (e) { }
+        var d4 = p7DiagnoseEv(ev4);
+        if (!d4) break;
+        var improved4 = (diag.learned != null && d4.learned != null && d4.learned >= diag.learned + 5) ||
+                        (diag.look != null && d4.look != null && d4.look >= diag.look + 5);
+        if (!improved4) break;
+        cur = rep4.level; ev = ev4; diag = d4; accepted++;
+        path.push({ step: 'A4.' + (m + 1), learned: d4.learned, look: d4.look, T: d4.T, freePct: d4.freePct, pass: d4.pass });
+        if (d4.pass) break;
+      }
+    }
+    return {
+      level: cur, goodV3: ev && ev.goodV3, solveResult: ev && ev.solveResult,
+      audit: ev && ev.audit, valid: !!(ev && ev.valid),
+      p7: { tried: tried, accepted: accepted, fromJ: d0.J, toJ: diag.J,
+        fromT: d0.T, toT: diag.T, fromR: d0.R, toR: diag.R,
+        fromFreePct: d0.freePct, toFreePct: diag.freePct,
+        fromFreeRunMax: d0.freeRunMax, toFreeRunMax: diag.freeRunMax,
+        fromFreeLowPct: d0.freeLowPct, toFreeLowPct: diag.freeLowPct,
+        fromPressurePct3: d0.pressurePct3, toPressurePct3: diag.pressurePct3,
+        fromPressurePeak: d0.pressurePeak, toPressurePeak: diag.pressurePeak, path: path, notes: notes }
+    };
+  }
+
+  // 【v445】B-lite：多路径 ready 采样（只报告，不改障碍）
+  function sampleReadyStats(level, config, sampleN) {
+    var parsed = null;
+    try { parsed = AntSolver.parseLevel(level); } catch (e) { return null; }
+    var S = AntSolver.Simulator;
+    if (!S || !S.createState || !S.listMoves || !S.applyPick) return null;
+    var total = parsed.totalBoxes || 1;
+    var K = Math.max(2, Math.min(8, parseInt(sampleN, 10) || 5));
+    var byCell = {}, byPick = {};
+    var okSamples = 0;
+    for (var si = 0; si < K; si++) {
+      var st = null;
+      try { st = S.createState(parsed, { useSlotStart: true }); } catch (e) { continue; }
+      var local = {}, localPick = {}, steps = 0;
+      while (steps++ < total + 20) {
+        var moves = [];
+        try { moves = S.listMoves(st).filter(function (m) { return !m.blocked; }); } catch (e) { break; }
+        if (!moves.length) break;
+        var blob = null;
+        try { blob = exposedBlobByColor(st.eliminated, st.blocks, st.rows, st.cols); } catch (e) { break; }
+        for (var mi = 0; mi < moves.length; mi++) {
+          var mv = moves[mi], cell = st.cells[mv.r] && st.cells[mv.r][mv.c];
+          if (!cell) continue;
+          var key = mv.r + ',' + mv.c;
+          if (local[key] == null && (blob[cell.color] || 0) >= cell.count) {
+            local[key] = +((st.completedBoxes || 0) / total).toFixed(3);
+          }
+        }
+        var full = [];
+        for (var fi = 0; fi < moves.length; fi++) {
+          var cc = st.cells[moves[fi].r] && st.cells[moves[fi].r][moves[fi].c];
+          if (cc && (blob[cc.color] || 0) >= cc.count) full.push(moves[fi]);
+        }
+        var pool = (full.length && rnd() < 0.7) ? full : moves;
+        var pick = pool[Math.floor(rnd() * pool.length)];
+        if (!pick) break;
+        var _pk = pick.r + ',' + pick.c;
+        if (localPick[_pk] == null) localPick[_pk] = +((st.completedBoxes || 0) / total).toFixed(3);
+        if (!S.applyPick(st, pick.r, pick.c)) break;
+        if (st.gameOver) break;
+      }
+      // 没采到 ready 的盒按 1.0 处理
+      for (var rr = 0; rr < level.board.rows; rr++) for (var rc = 0; rc < level.board.cols; rc++) {
+        var bx = level.board.cells[rr] && level.board.cells[rr][rc];
+        if (!bx || bx.t !== 'box') continue;
+        var k2 = rr + ',' + rc;
+        if (local[k2] == null) local[k2] = 1;
+        if (!byCell[k2]) byCell[k2] = [];
+        byCell[k2].push(local[k2]);
+        if (!byPick[k2]) byPick[k2] = [];
+        byPick[k2].push(localPick[k2] != null ? localPick[k2] : 1);
+      }
+      okSamples++;
+    }
+    if (!okSamples) return null;
+    var stable = 0, spreadSum = 0, nCars = 0;
+    for (var k in byCell) {
+      var arr = byCell[k].slice().sort(function (a, b) { return a - b; });
+      var min = arr[0], max = arr[arr.length - 1];
+      var med = arr[Math.floor(arr.length / 2)];
+      var spread = +(max - min).toFixed(3);
+      var parr = (byPick[k] || [1]).slice().sort(function (a, b) { return a - b; });
+      var pmed = parr[Math.floor(parr.length / 2)];
+      byCell[k] = { min: min, max: max, median: med, spread: spread, n: arr.length, pickedMedian: pmed };
+      nCars++; spreadSum += spread;
+      if (spread <= 0.25) stable++;
+    }
+    return { samples: okSamples, cars: nCars, stablePct: nCars ? Math.round(stable / nCars * 100) : 0,
+      avgSpread: nCars ? +(spreadSum / nCars).toFixed(3) : 0, byCell: byCell };
+  }
+
+  // 【v447】两遍建盘：用多路径 ready 重放冰/链
+  // 【v450】生成时 Early：用首解 pickOrder 把前10步的第一选择换成“未暴露/吃不满”的车
+  function applyGenerationEarly(level, config, sr, which) {
+    if (!level || !sr || !sr.pickOrder || !sr.pickOrder.length) return { tries: [{ reason: 'no level/sr' }] };
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var po = sr.pickOrder.slice().sort(function (a, b) { return (a.step || 0) - (b.step || 0); });
+    var early = [], deep = [];
+    var exp = {};
+    try {
+      var oe = openingExposure(level.blocks, level.board.rows, level.board.cols, false);
+      if (oe && oe.detail) for (var oi = 0; oi < oe.detail.length; oi++) exp[oe.detail[oi].color] = oe.detail[oi].px;
+    } catch (e) { }
+    for (var i = 0; i < po.length; i++) {
+      var p = po[i];
+      if (!plain(p.r, p.c)) continue;
+      var prog = i / Math.max(1, po.length - 1);
+      if (i < 10) early.push(p);
+      if (prog >= 0.40 && prog <= 0.70) deep.push(p);
+    }
+    if (!early.length || !deep.length) return null;
+    deep.sort(function (a, b) {
+      var _a = (a.count || 0) - (exp[a.color] || 0), _b = (b.count || 0) - (exp[b.color] || 0);
+      if (_b !== _a) return _b - _a;
+      return (b.count || 0) - (a.count || 0);
+    });
+    var lv = JSON.parse(JSON.stringify(level));
+    var e = early[Math.min(early.length - 1, Math.max(0, which || 0))], d = deep[0];
+    if (e.r === d.r && e.c === d.c) return null;
+    var a = lv.board.cells[e.r][e.c], b = lv.board.cells[d.r][d.c];
+    if (!a || !b || a.t !== 'box' || b.t !== 'box') return null;
+    lv.board.cells[e.r][e.c] = b; lv.board.cells[d.r][d.c] = a;
+    lv.semanticEarly = { from: [e.r, e.c], to: [d.r, d.c], early: e.color, deep: d.color };
+    return lv;
+  }
+
+  function applySemanticObstacles(board, blocks, config) {
+    if (!board || !config || !config.semanticObstacles) return null;
+    var level = { blocks: blocks, bufferLimit: config.bufferLimit || 5, board: board };
+    var rs = null;
+    try { rs = sampleReadyStats(level, config, 5); } catch (e) { rs = null; }
+    if (!rs || !rs.byCell) return null;
+    var total = 0;
+    for (var r0 = 0; r0 < board.rows; r0++) for (var c0 = 0; c0 < board.cols; c0++) {
+      var x0 = board.cells[r0][c0];
+      if (x0 && x0.t === 'box') total++;
+      else if (x0 && x0.t === 'pipe') total += (x0.queue ? x0.queue.length : 0);
+    }
+    // 清掉旧冰/链
+    for (var r1 = 0; r1 < board.rows; r1++) for (var c1 = 0; c1 < board.cols; c1++) {
+      var x1 = board.cells[r1][c1];
+      if (!x1) continue;
+      if (x1.numice) x1.numice = 0;
+      if (x1.chain) x1.chain = 0;
+    }
+    function st(r, c) { return rs.byCell[r + ',' + c] || null; }
+    // 冰：稳定晚熟车
+    var iceC = [], iceFallback = [];
+    for (var r2 = 0; r2 < board.rows; r2++) for (var c2 = 0; c2 < board.cols; c2++) {
+      var x2 = board.cells[r2][c2];
+      if (!x2 || x2.t !== 'box' || x2.chain || x2.numice || x2.q) continue;
+      var s2 = st(r2, c2);
+      if (!s2 || s2.spread > 0.35) continue;
+      var _pk2 = (s2.pickedMedian != null) ? s2.pickedMedian : 1;
+      // 前10步会被点到的车：优先锁它
+      if (_pk2 <= 0.35) iceC.push({ r: r2, c: c2, s: s2, cell: x2, picked: _pk2 });
+      else if (s2.median >= 0.25) iceFallback.push({ r: r2, c: c2, s: s2, cell: x2, picked: _pk2 });
+    }
+    iceC.sort(function (a, b) { return (a.picked - b.picked) || (b.s.median - a.s.median); });
+    if (!iceC.length) {
+      iceFallback.sort(function (a, b) { return b.s.median - a.s.median; });
+      iceC = iceFallback;
+    }
+    var iceN = Math.min(4, iceC.length), iced = 0;
+    var force = parseInt(config.iceForceSteps, 10); if (isNaN(force)) force = 2;
+    for (var ii = 0; ii < iceN; ii++) {
+      var ic = iceC[ii];
+      var val = Math.max(2, Math.min(12, Math.round(ic.s.median * total) + force));
+      ic.cell.numice = val; iced++;
+    }
+    // 链：稳定一早一晚
+    var chains = 0, group = 0;
+    for (var r3 = 0; r3 < board.rows && chains < 2; r3++) for (var c3 = 0; c3 < board.cols - 1 && chains < 2; c3++) {
+      var a3 = board.cells[r3][c3], b3 = board.cells[r3][c3 + 1];
+      if (!a3 || !b3 || a3.t !== 'box' || b3.t !== 'box') continue;
+      if (a3.chain || b3.chain || a3.numice || b3.numice || a3.q || b3.q) continue;
+      var sa = st(r3, c3), sb = st(r3, c3 + 1);
+      if (!sa || !sb || sa.spread > 0.25 || sb.spread > 0.25) continue;
+      var early = (sa.median <= sb.median) ? sa : sb;
+      var late = (early === sa) ? sb : sa;
+      if (!(early.median + 0.05 < late.median)) continue;
+      group++;
+      a3.chain = group; b3.chain = group; chains++;
+    }
+    var info = { ice: iced, chains: chains, stablePct: rs.stablePct, total: total };
+    try { board.semanticObstacles = info; } catch (e) { }
+    return info;
+  }
+
+  function trapPostProcess(level, config) {
+    if (!level || !AntSolver.PlayerSim || !AntSolver.Solver) return null;
+    var base = evalTrapLevel(level, config);
+    if (!base || base.first < 20 || base.first > 80) return { applied: false, reason: 'base first ' + (base ? base.first : '?') };
+    var plain = function (r, c) {
+      var cell = level.board && level.board.cells && level.board.cells[r] && level.board.cells[r][c];
+      return cell && cell.t === 'box' && !cell.chain && !cell.numice && !cell.q;
+    };
+    var po = base.po || [], early = [], deep = [];
+    for (var i = 0; i < po.length; i++) {
+      var p = po[i];
+      if (!plain(p.r, p.c)) continue;
+      if (i < 6) early.push(p);
+      if (i >= Math.floor(po.length * 0.3) && i <= Math.floor(po.length * 0.6)) deep.push(p);
+    }
+    var muts = [];
+    for (var ei = 0; ei < early.length; ei++) for (var di = 0; di < deep.length; di++) {
+      var e = early[ei], d = deep[di];
+      if (e.color !== d.color) muts.push({ type: 'swap', a: e, b: d });
+      else if (e.count > 1 && d.count > 1) {
+        var delta = Math.max(1, Math.min(10, Math.floor(d.count / 2)));
+        if (e.count + delta > d.count) muts.push({ type: 'skew', a: e, b: d, delta: delta });
+      }
+    }
+    var best = null;
+    for (var mi = 0; mi < muts.length && mi < 30; mi++) {
+      var mut = muts[mi];
+      var lv = JSON.parse(JSON.stringify(level));
+      if (mut.type === 'swap') {
+        var a = lv.board.cells[mut.a.r][mut.a.c], b = lv.board.cells[mut.b.r][mut.b.c];
+        lv.board.cells[mut.a.r][mut.a.c] = b; lv.board.cells[mut.b.r][mut.b.c] = a;
+      } else {
+        var a2 = lv.board.cells[mut.a.r][mut.a.c], b2 = lv.board.cells[mut.b.r][mut.b.c];
+        if (!a2 || !b2) continue;
+        a2.count += mut.delta; b2.count -= mut.delta;
+        if (b2.count <= 0) continue;
+      }
+      var m = evalTrapLevel(lv, config);
+      if (!m) continue;
+      if (m.T <= 0 || m.first < 10 || m.first > 90 || (m.U != null && m.U > 30)) continue;
+      if (m.first > base.first + 5) continue;
+      if (m.learned < base.learned - 5 || m.look < base.look - 5 || m.T < base.T) continue;
+      if (m.learned <= m.first) continue;
+      if (m.learned <= base.learned && m.look <= base.look && m.T <= base.T) continue;
+      var score = (m.learned - base.learned) * 3 + (m.look - base.look) + (m.T - base.T) * 2 + (m.R - base.R) * 0.2 - Math.max(0, m.first - base.first) * 2;
+      if (!best || score > best.score) best = { score: score, level: lv, mut: mut, m: m };
+    }
+    if (!best) return { applied: false, reason: 'no hit', base: base };
+    return { applied: true, level: best.level, stats: { base: base, best: best.m, score: best.score, mut: best.mut } };
+  }
+
+  // 【v394·调试】打印一组尺寸的 solveSpaceQuota 结果，排查“扩展盘为什么进不去”
+  function debugBoardDims(n, config) {
+    var out = [];
+    for (var r = 3; r <= 20; r++) {
+      for (var c = 3; c <= 30; c++) {
+        if (!boardShapeOk(r, c, !!(config && config.boardAllowSquare))) continue;
+        var q = null;
+        try { q = solveSpaceQuota(n, r, c, config); } catch (e) { q = null; }
+        out.push({
+          rows: r, cols: c, cells: r * c, ok: !!(q && q.ok),
+          overflow: q ? q.overflow : null, pipeWant: q ? q.pipeWant : null,
+          breach: q ? q.breachLevel : null, black: q ? q.blackTarget : null,
+          usable: q ? Math.round(q.usable * 1000) / 10 : null,
+          blackPct: q ? Math.round(q.blackPct * 1000) / 10 : null
+        });
+      }
+    }
+    return out;
+  }
+
   return {
     generate: generate,
     generateFromBlocks: generateFromBlocks,
     // produce 为正式默认入口：v95 起分发到纠偏版；produceLegacy 是 v94 及以前的旧实现。
     produce: produceDispatch,
+    produceGoal: produceGoal,               // 【2026-10-22】目标模式：没达标就换种子再来，停止时返回当前最好
     produceLegacy: produce,
     FLOW: DEFAULT_FLOW,
     // ===== 纠偏版（R01-R07）入口与可单测的内部函数 =====
@@ -14367,6 +16346,7 @@ AntSolver.Generator = (function() {
     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
     isCurveScore: isCurveScore,
     choiceCurveScore: choiceCurveScore,
+    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
     exposedBlobByColor: exposedBlobByColor,
     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
     sampleCarCount: sampleCarCount,
@@ -14430,6 +16410,8 @@ AntSolver.Generator = (function() {
     chainActivatable: chainActivatable,
     splitIntoBoxes: splitIntoBoxes,
     demandCurveOf: demandCurveOf, demandAt: demandAt,   // 【v253】需求日程（供工具/单测）
+    frontierWidthOf: frontierWidthOf,                   // 【2026-10-22】前沿宽度（自动选切法用）
+    deriveCapacityBand: deriveCapacityBand,             // 【2026-10-22】按图推导容量带（自动容量用）
     computeDifficulty: computeDifficulty,
     evaluateGeneration: evaluateGeneration,
     generationScore: generationScore,

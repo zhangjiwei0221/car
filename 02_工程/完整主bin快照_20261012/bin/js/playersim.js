@@ -47,6 +47,19 @@ AntSolver.PlayerSim = (function () {
   function run(level, opts) {
     opts = opts || {};
     var pickThreshold = opts.pickThreshold != null ? opts.pickThreshold : 0.6;
+    // 【v373·P2】学会后：上一局死在这个颜色上 → 下一局给它降权（不是禁止，没别的可点还会点）
+    var avoidColor = (opts.avoidColor != null) ? opts.avoidColor : null;
+    // 【v381·P6】可绕开性测试：避开指定格（但不禁同色）
+    var avoidCells = opts.avoidCells || null;
+    var avoidHard = !!opts.avoidHard;
+    var _avoidMap = {};
+    if (avoidCells) for (var _ai = 0; _ai < avoidCells.length; _ai++) _avoidMap[avoidCells[_ai].r + ',' + avoidCells[_ai].c] = 1;
+    // 【v374·P2】2 步前瞻（回放版）：强制前缀 + 在当前决策点用“候选 + 再贪心一手”回放两次
+    var forcedPicks = opts.forcedPicks || null;
+    var stopAfterPicks = (opts.stopAfterPicks != null) ? +opts.stopAfterPicks : 0;
+    var lookahead2 = !!opts.lookahead2;
+    var lookaheadLimit = (opts.lookaheadLimit != null) ? +opts.lookaheadLimit : 6;
+    var pickHistory = [];
     var capture = !!opts.capture;             // 记录逐 tick 帧供前端并发回放
     var capturePreviewStats = !!opts.capturePreviewStats; // 图表/调试才采集下一槽位可消/封锁快照
     var bottomOnly = !!opts.bottomOnly;       // 仅底部入口(见上)；透传给 Simulator 并用于本文件自有可达判定
@@ -168,11 +181,14 @@ AntSolver.PlayerSim = (function () {
     }
 
     // ---- 玩家取球决策(有限信息、乐观、贪心；探索窄路/清可达区/问号试探) ----
+    var _lastSecond = null;
     function choosePlayerPick() {
       var moves = Sim.listMoves(s);
       if (!moves.length) { s.lastRefuse = { reason: 'noMoves', free: freeSlotCount() }; return null; }
       var highPressure = balls.length >= bufferLimit - 1;
       var best = null, bestScore = -Infinity, _blk = null;
+      var second = null, secondScore = -Infinity;
+      var bestSafe = null, bestSafeScore = -Infinity;
       for (var mi = 0; mi < moves.length; mi++) {
         var mv = moves[mi];
         if (mv.blocked) {   // 暂存放不下(普通盒满且消不完 / 锁链组空位不足) → 玩家不取(严格避免超暂存)
@@ -190,13 +206,17 @@ AntSolver.PlayerSim = (function () {
           var need = cell.count;
           consumable = optimisticConsumable(cell.color, need); // 玩家乐观估计(可能错)
           score += consumable ? 30 : -12;
+          if (avoidColor != null && cell.color === avoidColor) score -= 60;   // 【v373】避开上局死色
+          if (_avoidMap[mv.r + ',' + mv.c]) score -= 1000;                    // 【v381】可绕开性测试
           // 与暂存同色可连锁 → 略偏好
           for (var bi = 0; bi < balls.length; bi++) if (balls[bi].color === cell.color) { score += 6; break; }
           // 清理可达区：靠上(先暴露)略优先
           score -= mv.r * 0.05;
         }
         if (highPressure && !consumable) score -= 40;          // 高压不接不可消的球
-        if (score > bestScore) { bestScore = score; best = mv; }
+        if (score > bestScore) { secondScore = bestScore; second = best; bestScore = score; best = mv; }
+        else if (score > secondScore) { secondScore = score; second = mv; }
+        if (!_avoidMap[mv.r + ',' + mv.c] && score > bestSafeScore) { bestSafeScore = score; bestSafe = mv; }
       }
       // 高压且最佳仍是"不可消" → 宁可不取(等消)
       if (best) {
@@ -212,7 +232,36 @@ AntSolver.PlayerSim = (function () {
         var _bcb = s.cells[_blk.r][_blk.c];
         s.lastRefuse = { reason: 'blocked', r: _blk.r, c: _blk.c, need: _blk.groupSize || 1, free: freeSlotCount(), color: _bcb ? _bcb.color : null, chain: _bcb ? (_bcb.chain || 0) : 0 };
       }
+      _lastSecond = second;
+      // 【v382·P6】avoidHard：有非避开的走法就绝不点被避开的格；全被避开才退回 best
+      if (avoidHard && bestSafe) return bestSafe;
       return best;
+    }
+
+    // 【v374·P2】2 步前瞻：对当前最优/次优两手里各做一次“回放”——
+    //   强制前缀（历史 + 这一手），再让贪心走 1 手，比较 progress/暂存/胜负。
+    //   只在前 lookaheadLimit 个决策点启用；回放从关卡重开，代价高，所以只做 2 个候选。
+    function chooseWithLookahead() {
+      var b = choosePlayerPick();
+      var s2 = _lastSecond;
+      if (!b || !s2 || (b.r === s2.r && b.c === s2.c)) return b;
+      var base = pickHistory.slice();
+      function evalMove(mv) {
+        try {
+          var forced = base.concat([{ r: mv.r, c: mv.c }]);
+          var rr = run(level, Object.assign({}, opts, {
+            forcedPicks: forced,
+            stopAfterPicks: forced.length + 1,   // 候选 + 再贪心 1 手
+            lookahead2: false, capture: false,
+            seed: ((opts && opts.seed) || 12345) + 7919,
+            avoidColor: avoidColor
+          }));
+          if (!rr) return -1e9;
+          return (rr.progress || 0) * 10 - (rr.stalledAtEnd || 0) * 3 - (rr.bufferPeak || 0) * 2 + (rr.won ? 1000 : 0);
+        } catch (e) { return -1e9; }
+      }
+      var sb = evalMove(b), ss = evalMove(s2);
+      return (ss > sb) ? s2 : b;
     }
 
     function doPick(mv) {
@@ -493,13 +542,24 @@ AntSolver.PlayerSim = (function () {
       if (!anyEating && freeSlotCount() > 0) wantPick = true;
 
       if (wantPick) {
-        var mv = choosePlayerPick();
+        var mv = null;
+        // 【v374】强制前缀（回放用）
+        if (forcedPicks && forcedPicks[picks]) {
+          var _fm = forcedPicks[picks], _ms = Sim.listMoves(s);
+          for (var _mi2 = 0; _mi2 < _ms.length; _mi2++) {
+            if (!_ms[_mi2].blocked && _ms[_mi2].r === _fm.r && _ms[_mi2].c === _fm.c) { mv = _ms[_mi2]; break; }
+          }
+        }
+        // 【v374】2 步前瞻：只在前几个决策点做；回放代价高
+        if (!mv && lookahead2 && picks < lookaheadLimit) mv = chooseWithLookahead();
+        if (!mv) mv = choosePlayerPick();
         if (mv) {
           var cell = s.cells[mv.r][mv.c];
           var wasQ = cell.q && !Sim.isRevealed(s, mv.r, mv.c);
           var thought = wasQ ? false : optimisticConsumable(cell.color, cell.count);
           if (doPick(mv)) {
             picks++;
+            pickHistory.push({ r: mv.r, c: mv.c });
             // 记录本次选择的盒（需求 §八.2 第1项）
             // v113：补锁链逐盒明细与暂存入场态（与 v112 solver 侧 pickOrder/stepStats 同口径）。
             // 改前只有 groupSize，color/need 都只是【触发盒】的 —— 知道这 tick 取了 3 盒，
@@ -652,6 +712,8 @@ AntSolver.PlayerSim = (function () {
       ticks++;
 
       if (s.eliminatedPixels >= totalPixels) { s.gameWon = true; s.gameOver = true; finishTick(); if (capture && !framePushedThisTick && (curFrame.picks.length || curFrame.eats.length || curFrame.done.length || curFrame.revive)) { frames.push(curFrame); framePushedThisTick = true; } break; }
+      // 【v374】回放截断：候选 + 再贪心一手后停，用于 2 步前瞻评分
+      if (stopAfterPicks && picks >= stopAfterPicks) { finishTick(); break; }
 
       // 停滞检测：本 tick 没消除、也没取到新球 → 累计
       if (!progressed) stallTicks++; else stallTicks = 0;

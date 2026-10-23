@@ -1109,3 +1109,48 @@ section h3 span { color: var(--muted); font-weight: normal; }
 .trace-cov{min-width:64px;font-weight:700}
 .trace-peak{min-width:52px}
 .trace-tier{color:#666}
+
+/* ===== v418：左右两栏合并到左侧，右侧棋盘，整体 50/50 ===== */
+.main-layout,
+.main-layout.with-right,
+.main-layout.left-collapsed {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+}
+#left-stack {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+#left-stack > #panel-left,
+#left-stack > #panel-right {
+  border: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+  min-width: 0;
+}
+#panel-center {
+  grid-column: 2 !important;
+  grid-row: 1;
+  min-width: 0;
+}
+.panel-resizer { display: none !important; }
+.main-layout.left-collapsed #panel-left { padding: 0 !important; overflow: visible !important; }
+.main-layout.left-collapsed #panel-left > *:not(.panel-head) { display: block !important; }
+
+/* ===== v422：左右调换——左边关卡，右边控制 ===== */
+#left-stack {
+  grid-column: 2;
+  border-right: 0;
+  border-left: 1px solid var(--border);
+}
+#panel-center {
+  grid-column: 1 !important;
+}

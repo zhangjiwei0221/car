@@ -1,0 +1,585 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index de70fda..8272958 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -3,13 +3,13 @@
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-  <title>车接小人 v358 · 圈序v8·每层重算·顺序闪白·摆盒v6·形状填充·压力图现算·锚点切盒·数字冰v151</title>
+-  <link rel="stylesheet" href="css/style.css?v=358">
++  <title>车接小人 v359 · 目标模式·按时间/按目标·体检报告·圈序v8·摆盒v6·形状填充·锚点切盒·数字冰</title>
++  <link rel="stylesheet" href="css/style.css?v=359">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="圈序v8·每层重算·顺序闪白·摆盒v6·形状填充·压力图现算·锚点切盒·数字冰v151">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v358</span></h1>
++    <h1 title="目标模式·按时间/按目标·体检报告·圈序v8·摆盒v6·形状填充·锚点切盒·数字冰">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v359</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -392,6 +392,16 @@
+         <input type="number" id="gen-death-share" min="0" max="100" value="60" style="width:56px">
+         <span class="gen-hint">%</span>
+       </div>
++      <!-- 【2026-10-22·用户裁决】两种出关模式：
++           按时间 = 到点输出最好；按目标 = 没达标一直重试，点「结束」输出当前最好。 -->
++      <div class="gen-row" style="margin-top:8px" title="按时间：到点就停，输出手里最好的一关；按目标：不达标就一直换种子重试，点「结束」才收尾，收尾时输出当前最好的一关。">
++        <label>生成模式</label>
++        <select id="gen-mode" style="width:150px">
++          <option value="time" selected>按时间（到点出最好）</option>
++          <option value="goal">按目标（不达标一直做）</option>
++        </select>
++        <span class="gen-hint" id="gen-mode-hint">到点输出最好</span>
++      </div>
+       <div class="gen-row" style="margin-top:8px" title="每张图允许搜索多久。时间越长，尝试的候选越多、覆盖率达标的机会越大；合格会提前停。">
+         <label>每图搜索时间</label>
+         <select id="gen-search-min" style="width:110px">
+@@ -399,6 +409,8 @@
+           <option value="3" selected>3 分钟</option>
+           <option value="5">5 分钟</option>
+           <option value="8">8 分钟</option>
++          <option value="10">10 分钟</option>
++          <option value="15">15 分钟</option>
+         </select>
+         <span class="gen-hint" id="gen-search-plan">≈ 4 轮 × 45 秒</span>
+       </div>
+@@ -911,20 +923,20 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=358"></script>
+-  <script src="js/utils.js?v=358"></script>
++  <script src="js/zip.js?v=359"></script>
++  <script src="js/utils.js?v=359"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=358"></script>
+-  <script src="js/simulator.js?v=358"></script>
++  <script src="js/color-libs.js?v=359"></script>
++  <script src="js/simulator.js?v=359"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=358"></script>
+-  <script src="js/solver-strategy.js?v=358"></script>
+-  <script src="js/solver.js?v=358"></script>
+-  <script src="js/playersim.js?v=358"></script>
+-  <script src="js/generator.js?v=358"></script>
+-  <script src="js/analysis.js?v=358"></script>
++  <script src="js/anchor-cut.js?v=359"></script>
++  <script src="js/solver-strategy.js?v=359"></script>
++  <script src="js/solver.js?v=359"></script>
++  <script src="js/playersim.js?v=359"></script>
++  <script src="js/generator.js?v=359"></script>
++  <script src="js/analysis.js?v=359"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=358"></script>
+-  <script src="js/app.js?v=358"></script>
++  <script src="js/level-editor.js?v=359"></script>
++  <script src="js/app.js?v=359"></script>
+ </body>
+ </html>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 356cb8d..cad671c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -477,6 +477,16 @@ AntSolver.App = (function() {
+       if (_smPlan) _smPlan.textContent = '≈ ' + pk + ' 轮 × ' + per + ' 秒（合格早停）';
+     };
+     if (_smEl) { _smEl.addEventListener('change', syncSearchPlan); syncSearchPlan(); }
++    // 【2026-10-22·用户裁决】生成模式：时间模式用到「每图搜索时间」；目标模式不用（每轮 20s 自动重试）。
++    var _mdEl = document.getElementById('gen-mode');
++    var _mdHint = document.getElementById('gen-mode-hint');
++    var syncGenMode = function () {
++      var goal = !!(_mdEl && _mdEl.value === 'goal');
++      if (_mdHint) _mdHint.textContent = goal ? '不达标一直做；点「结束」输出当前最好' : '到点输出最好';
++      if (_smEl) _smEl.disabled = goal;
++      if (_smPlan) _smPlan.style.opacity = goal ? '0.4' : '1';
++    };
++    if (_mdEl) { _mdEl.addEventListener('change', syncGenMode); syncGenMode(); }
+     // 【v153】自动档：切到手动档时把「关卡时长」那行收起来（避免误以为它还有效）
+     // 【v153】生产档位：一次设定候选数 / 难度轮数 / 单关时间预算（三个数决定一批多久）
+     var _stEl = document.getElementById('gen-speed-tier');
+@@ -5594,6 +5604,17 @@ AntSolver.App = (function() {
+     function chip(label, val, warn) {
+       return '<span class="grb-chip' + (warn ? ' warn' : '') + '">' + label + ' <b>' + val + '</b></span>';
+     }
++    // 【2026-10-22】开局白给车（近似）：用开局暴露的每色像素 ÷ 本关容量上限。
++    //   精确值（按每色实际容量）看工具 `03_工具/难度关系/容量推导.js`。
++    var freeTxt = '-';
++    try {
++      var oe = rec.openingExposure, capMax = rec.appliedParams && rec.appliedParams.capMax;
++      if (oe && oe.detail && capMax > 0) {
++        var nf = 0;
++        for (var oi = 0; oi < oe.detail.length; oi++) nf += Math.floor(oe.detail[oi].px / capMax);
++        freeTxt = nf;
++      }
++    } catch (e) {}
+     var html = '<span class="grb-verdict">' + verdict + '</span>' +
+       chip('覆盖', cov == null ? '-' : cov + '%', cov != null && cov < 45) +
+       chip('尖峰≥4', spk == null ? '-' : spk + '%', false) +
+@@ -5603,10 +5624,14 @@ AntSolver.App = (function() {
+       chip('棋盘', bs.rows ? (bs.rows + '×' + bs.cols) : '-', false) +
+       chip('车', bs.boardBoxes == null ? '-' : bs.boardBoxes, false) +
+       chip('容量', rec.appliedParams ? (rec.appliedParams.capMin + '~' + rec.appliedParams.capMax) : '-', false) +
++      chip('白给车≈', freeTxt, freeTxt !== '-' && freeTxt > 2) +
++      chip('类型', rec.type || '-', false) +
++      (rec.goalMode ? chip('目标轮', rec.goalRounds || 1, false) : '') +
+       chip('难度', rec.difficulty || '-', false) +
+       chip('用时', ((rec._elapsedMs || 0) / 1000).toFixed(0) + 's', false);
+     var fails = (rec.goodV3Fails || []).join('、');
+     if (fails) html += '<span class="grb-note">' + fails + '</span>';
++    if (rec.goalMode) html += '<span class="grb-note">目标模式：' + (rec.goalStopped ? '点结束时输出当前最好' : '已达标') + '（第 ' + (rec.goalRounds || 1) + ' 轮）</span>';
+     el.className = 'gen-result-banner ' + cls;
+     el.innerHTML = html;
+   }
+@@ -5700,6 +5725,22 @@ AntSolver.App = (function() {
+       genLog('注意：有 ' + pendingN + ' 关已生成但尚未落库成功，停止后仍可点「重试落库」把它们写盘。', 'gen-log-warn');
+     }
+     if (genPool.length) {
++      // 【2026-10-22·用户裁决】目标模式：不立刻 terminate，先让每关把"当前最好"交回来。
++      //   目标模式的 produceGoal 在两轮之间检查 stopFlag；一轮默认 20s，所以最多等 ~25s。
++      if (genBatch && genBatch.mode === 'goal') {
++        genPool.forEach(function (s) {
++          try { if (s && s.w) s.w.postMessage({ cmd: 'stop' }); } catch (e) {}
++        });
++        var _per = (genBatch.config && genBatch.config.goalPerRoundMs) || 20000;
++        var _wait = Math.max(10000, Math.min(90000, _per + 15000));   // 一轮 20s + 15s 余量
++        genLog('已请求结束：正在收尾，最多等 ' + Math.round(_wait / 1000) + ' 秒输出当前最好的一关…', 'gen-log-warn');
++        if (genBatch._stopTimer) clearTimeout(genBatch._stopTimer);
++        genBatch._stopTimer = setTimeout(function () {
++          if (genBatchRunning) genFinalizeBatch('已停止（收尾超时；已落库的关卡全部保留）');
++        }, _wait);
++        genMaybeFinalize();   // 若此刻没有在飞的关，立即收尾；有则等它们把最好交回来
++        return;
++      }
+       genFinalizeBatch('已停止（已落库 ' + (genBatch ? genBatch.doneCount : 0) + '/' + (genBatch ? genBatch.total : 0) + ' 关；已落库的关卡全部保留）');
+     } else {
+       genLog('已请求停止，将在当前关处理完后生效（主线程模式无法中途打断当前关）...', 'gen-log-warn');
+@@ -5799,6 +5840,7 @@ AntSolver.App = (function() {
+         bottomEntryFeasibility: (result && result.bottomEntryFeasibility) || null,
+         entryMode: (result && result.entryMode) || 'fourSide',
+         audit: null, difficulty: 0, grade: '-', fallback: false,
++        goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped),
+         perf: (result && result.perf) || null
+       };
+     }
+@@ -5890,6 +5932,9 @@ AntSolver.App = (function() {
+       fallbackTier: result.fallbackTier != null ? result.fallbackTier : null,
+       fallbackType: result.fallbackType || null,
+       fallbackReason: result.fallbackReason || null,
++      // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
++      goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped,
++      openingExposure: (result.boardFit && result.boardFit.openingExposure) || null,
+       generationEval: result.generationEval || null,
+       solve: {
+         completed: !!sr.completed, retryRound: sr.retryRound || 0, steps: sr.steps,
+@@ -6240,6 +6285,11 @@ AntSolver.App = (function() {
+     if (genBatchRunning) return;
+ 
+     var config = getGenConfig();
++    // 【2026-10-22·用户裁决】两种出关模式：
++    //   time = 按时间（到点输出最好）；goal = 按目标（没达标一直重试，点结束输出当前最好）。
++    var modeEl = document.getElementById('gen-mode');
++    var genMode = (modeEl && modeEl.value === 'goal') ? 'goal' : 'time';
++    config.genMode = genMode;   // 写进批次配置，便于回看“这批是按时间还是按目标跑的”
+     // 【v153】切球规划器：哪几张图勾了「使用这份车单」，就把规划车单作为该关的切法（forcedBoxes 直通），
+     //   并临时关闭碎色闸门——规划内的碎色是「背债车」的压力素材，不是缺陷（用户 2026-10-15 模型）。
+     var cutUseChecked = !!(document.getElementById('cutplan-use') || {}).checked;
+@@ -6315,13 +6365,15 @@ AntSolver.App = (function() {
+     genInFlightT0 = {};
+     genBatch = {
+       config: config, easySlot: easySlot, bossSlot: bossSlot, bossInterval: bossInterval,
++      mode: genMode,         // 【2026-10-22】time=按时间 / goal=按目标
+       nextIdx: 0,            // 下一个待派发的输入下标（取代原来的单游标 idx）
+       doneCount: 0,          // 已结算（落库完成/失败跳过）的关数——并发下进度只能按这个算
+       retryQueue: [],        // 因线程死亡而需要另一个槽重跑的下标，优先于 nextIdx
+       total: levelList.length
+     };
+     genLog('开始批量生产，共 ' + levelList.length + ' 张源图，并发 ' + genPoolSize + ' 线程' +
+-      (genPoolSize < (isNaN(poolInput) ? 6 : poolInput) ? '（已按本机 ' + hw + ' 核上限收窄）' : '') + '。');
++      (genPoolSize < (isNaN(poolInput) ? 6 : poolInput) ? '（已按本机 ' + hw + ' 核上限收窄）' : '') +
++      ' · 模式：' + (genMode === 'goal' ? '按目标（没达标自动重试；点「结束」输出当前最好）' : '按时间（到点输出最好）') + '。');
+ 
+     // 先探测本地生产服务：可用 → 开批次(逐关落库，正式路径)；不可用 → 回退旧内存+ZIP模式并明确告知
+     genPersist = { enabled: false, batchId: null, batchToken: null, relDir: '', dirName: '', persistedCount: 0, pendingPayloads: {}, failed: false };
+@@ -6507,26 +6559,40 @@ AntSolver.App = (function() {
+     slot.busy = true; slot.idx = idx;
+     genInFlightT0[idx] = Date.now();
+     genPoolProgressText();
++    var taskMode = (b.mode === 'goal') ? 'goal' : 'time';
++    var taskCfg = Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
++      mapSize: entry.blocks.length, requireHardPass: !isEasy,
++      isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
++      forcedBoxes: wantPlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,  // 【v153】逐图现算车单直通
++      fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
++    });
++    if (taskMode === 'goal') {
++      // 【2026-10-22·用户裁决】目标模式：每轮 20 秒，不达标就换种子再来；
++      //   主线程点「结束」时发 stop，produceGoal 在两轮之间收尾并返回当前最好。
++      taskCfg.goalPerRoundMs = 20000;
++      taskCfg.timeBudgetMs = 20000;
++      taskCfg.goalMaxMs = 0;      // 0 = 不限，直到达标或用户停止
++      taskCfg.goalMaxRounds = 0;
++    }
+     slot.w.postMessage({
+-      cmd: 'produce', index: idx, blocks: entry.blocks,
+-      config: Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
+-        mapSize: entry.blocks.length, requireHardPass: !isEasy,
+-        isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
+-        forcedBoxes: wantPlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,  // 【v153】逐图现算车单直通
+-        fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
+-      })
++      cmd: taskMode === 'goal' ? 'produceGoal' : 'produce',
++      index: idx, blocks: entry.blocks, config: taskCfg
+     });
+     genLog('▶ 线程' + (slot.no + 1) + ' 接单：' + entry.name + '（车单' + (wantPlan ? '=' + cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars.length + '辆' : '自动') +
+-      ' · 候选' + (b.config.candidateCount || 1) + ' × 轮' + (b.config.difficultyRounds || 1) + '）', '');
++      ' · 候选' + (b.config.candidateCount || 1) + ' × 轮' + (b.config.difficultyRounds || 1) +
++      (taskMode === 'goal' ? ' · 目标模式（没达标自动重试）' : '') + '）', '');
+     // 单关看门狗：超过【单关预算 + 2 分钟余量】仍无返回 → 判定该关卡死，跳过并只重启这一个槽（预算=0/不限时则不设）
+     clearTimeout(slot.watchdog);
+-    // 【v327】看门狗必须跟着「每图搜索时间」走：原来用批次默认 300s，选 8 分钟（≈495s）
+-    //   必然先被看门狗判"卡死"，实测 00:38 那批就是 WATCHDOG_TIMEOUT。
+-    var _smEl = document.getElementById('gen-search-min');
+-    var _smMin = parseInt(_smEl && _smEl.value, 10);
+-    var budget = (_smMin > 0) ? (_smMin * 60000) : ((b.config && b.config.timeBudgetMs != null) ? b.config.timeBudgetMs : 300000);
+-    // 【v329】余量 120s → 240s：一轮 produce 可能超出预算（带外纠偏会再跑一次整轮），实测 40×40 被误判卡死。
+-    if (budget > 0) slot.watchdog = setTimeout(function () { genOnLevelStuck(slot, idx); }, budget + 240000);
++    // 【2026-10-22】目标模式不设看门狗：它本来就要一直跑，看门狗会把它误杀。
++    if (taskMode !== 'goal') {
++      // 【v327】看门狗必须跟着「每图搜索时间」走：原来用批次默认 300s，选 8 分钟（≈495s）
++      //   必然先被看门狗判"卡死"，实测 00:38 那批就是 WATCHDOG_TIMEOUT。
++      var _smEl = document.getElementById('gen-search-min');
++      var _smMin = parseInt(_smEl && _smEl.value, 10);
++      var budget = (_smMin > 0) ? (_smMin * 60000) : ((b.config && b.config.timeBudgetMs != null) ? b.config.timeBudgetMs : 300000);
++      // 【v329】余量 120s → 240s：一轮 produce 可能超出预算（带外纠偏会再跑一次整轮），实测 40×40 被误判卡死。
++      if (budget > 0) slot.watchdog = setTimeout(function () { genOnLevelStuck(slot, idx); }, budget + 240000);
++    }
+   }
+ 
+   /** 进度行：并发下同时有多关在飞，逐个列出，不再只显示一关。 */
+@@ -6576,8 +6642,11 @@ AntSolver.App = (function() {
+     if (!genBatchRunning) return;
+     var b = genBatch;
+     if (!b) return;
+-    if (b.retryQueue.length) return;
+-    if (b.nextIdx < b.total) return;
++    // 【2026-10-22】停止时不再等"所有图都派过一遍"：在飞的结果交回来就收尾（目标模式的"结束输出最好"）。
++    if (!genBatchAborted) {
++      if (b.retryQueue.length) return;
++      if (b.nextIdx < b.total) return;
++    }
+     var flying = genPool.some(function (s) { return s.busy; });
+     if (flying) return;
+     if (Object.keys(genPersist.pendingPayloads).length) return;   // 还有关卡等着重试落库 → 不收尾，别把它丢了
+@@ -6599,6 +6668,61 @@ AntSolver.App = (function() {
+ 
+   // ---- 主线程模式(后台线程不可用时的回退)：只能串行，每关 produce 前先检查停止标记，避免多跑一关 ----
+   //   本模式【不并发】——主线程跑 produce 本身就阻塞页面，多开无意义。仅在 Worker 完全不可用时兜底。
++  /**
++   * 【2026-10-22】主线程目标模式：一轮 produce + setTimeout 让出，轮间检查停止标记。
++   * 不能直接调同步的 Generator.produceGoal —— 主线程被它占满时，点「结束」也处理不了。
++   */
++  function genRunGoalSync(entry, baseCfg, idx, afterOne) {
++    var per = 20000, best = null, rounds = 0, t0 = Date.now();
++    var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
++    function passed(r) {
++      if (!r || !r.level || !r.valid || r.fallback) return false;
++      if (r.goodV3 && typeof r.goodV3.pass === 'boolean') return r.goodV3.pass;
++      var t = r.audit && r.audit.tier;
++      return !!(t === '合格' || t === '困难合格');
++    }
++    function score(r) {
++      if (!r || !r.level) return -1e15;
++      var s = 0;
++      if (r.valid) s += 1e6;
++      if (!r.fallback) s += 1e5;
++      if (r.goodV3 && r.goodV3.pass) s += 1e9;
++      var p = (r.goodV3 && r.goodV3.persist) || {};
++      s += (p.band3Pct || 0) * 1000;
++      s += (p.bandPeak || 0) * 10;
++      s += (r.difficulty && r.difficulty.score) || 0;
++      return s;
++    }
++    function done(why) {
++      if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(null);
++      if (!genBatchRunning) return;                 // 已经收尾了，别再补一条
++      if (!best) best = { level: null, valid: false, lastFailReason: 'goalNoRound' };
++      best.goalMode = true; best.goalRounds = rounds;
++      best.goalStopped = (why === 'stopped');
++      best.goalElapsedMs = Date.now() - t0;
++      genOnResult(entry, best, idx, afterOne);
++    }
++    function round() {
++      if (!genBatchRunning) return;
++      if (genBatchAborted) return done('stopped');
++      var cfg = Object.assign({}, baseCfg, {
++        goalMode: false, portfolioK: 1, timeBudgetMs: per,
++        seed: (baseSeed + rounds * 7919) >>> 0, _trace: []
++      });
++      var r = null;
++      try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
++        r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
++      }
++      rounds++;
++      if (r) r.goalRound = rounds;
++      if (!best || score(r) > score(best)) best = r;
++      if (passed(r)) return done('pass');
++      setTimeout(round, 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
++    }
++    if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: idx, no: 0 }, p); });
++    round();
++  }
++
+   function genRunSync() {
+     var cutUseChecked = !!(document.getElementById('cutplan-use') || {}).checked;   // 【v153】切球规划器开关
+     function step() {
+@@ -6636,6 +6760,11 @@ AntSolver.App = (function() {
+             forcedBoxes: usePlan ? cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars : null,
+             fragmentMaxRate: usePlan ? 0 : (b.config.fragmentMaxRate || 0)
+           });
++          if (b.mode === 'goal') {
++            // 【2026-10-22】主线程回退也走"一轮一让出"，否则点结束处理不了。
++            genRunGoalSync(entry, cfg, curIdx, afterOne);
++            return;
++          }
+           var result = AntSolver.Generator.produce(entry.blocks, cfg);
+           if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(null);
+           genLog('✔ 主线程完成：' + entry.name + '　' + (result && result.level ? '有关卡' : ('无关卡 ' + ((result && result.lastFailReason) || '?'))) +
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index 5ee0678..f1f5151 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -1,15 +1,25 @@
+ /* 批量生产后台线程(Web Worker)
+  * 把耗时的 produce() 放到独立线程运行，主线程保持响应：
+  *   - 进度条/统计/日志能实时刷新（主线程不再被 produce 阻塞）；
+- *   - "停止"点击即时生效（主线程调用 worker.terminate() 立刻杀掉当前计算）。
++ *   - 按时间模式："停止"仍可 terminate 立刻杀掉；
++ *   - 按目标模式：主线程发 {cmd:'stop'}，worker 在两轮之间收尾并返回【当前最好】。
+  * 通过 importScripts 复用与页面完全相同的一套 AntSolver 模块（保证生成结果一致）。
+  *
+  * 消息协议：
+  *   主→worker: {cmd:'ping'} / {cmd:'produce', index, blocks, config}
+- *   worker→主: {type:'ready'|'loadfail'} / {type:'result', index, result} / {type:'error', index, message}
++ *              / {cmd:'produceGoal', index, blocks, config} / {cmd:'stop'}
++ *   worker→主: {type:'ready'|'loadfail'} / {type:'result', index, result}
++ *              / {type:'error', index, message} / {type:'stopping'}
++ *
++ * 【2026-10-22·重要】目标模式为什么不用 generator.produceGoal：
++ *   Worker 的 onmessage 是同步跑完的。如果在一个同步 while 里调 produce，
++ *   {cmd:'stop'} 永远排在消息队列里进不来 → 点结束也停不下。
++ *   所以这里把"一轮 produce + setTimeout 让出"做成循环：
++ *   每轮最多 20s，轮与轮之间 worker 能处理 stop 消息，收尾时返回当前最好。
+  */
+ var _v = (self.location && self.location.search) || '';   // 页面传入的 ?v=版本，透传给依赖脚本(缓存版本一致)
+ var _loaded = false;
++var _goal = null;     // 目标模式的运行态：{blocks, config, index, best, rounds, stop, t0, baseSeed, perMs}
+ try {
+   importScripts(
+     'utils.js' + _v, 'simulator.js' + _v, 'solver-strategy.js' + _v,
+@@ -21,17 +31,88 @@ try {
+ }
+ 
+ // 【v153】注册进度钩子：produce 内部每跑完一个候选/变体就上报一次，主线程据此刷新"跑到哪了"。
+-//   为什么要它：单关最坏要烧满时间预算（默认 5 分钟），期间界面只有一句"处理中"，看起来像卡死。
+ if (_loaded && AntSolver.Generator.setProgressHook) {
+   AntSolver.Generator.setProgressHook(function (p) { self.postMessage({ type: 'progress', p: p }); });
+ }
+ 
++function _goalPassed(r) {
++  if (!r || !r.level || !r.valid || r.fallback) return false;
++  if (r.goodV3 && typeof r.goodV3.pass === 'boolean') return r.goodV3.pass;
++  var t = r.audit && r.audit.tier;
++  return !!(t === '合格' || t === '困难合格');
++}
++function _goalScore(r) {
++  if (!r || !r.level) return -1e15;
++  var s = 0;
++  if (r.valid) s += 1e6;
++  if (!r.fallback) s += 1e5;
++  if (r.goodV3 && r.goodV3.pass) s += 1e9;
++  var p = (r.goodV3 && r.goodV3.persist) || {};
++  s += (p.band3Pct || 0) * 1000;
++  s += (p.bandPeak || 0) * 10;
++  s += (r.difficulty && r.difficulty.score) || 0;
++  return s;
++}
++function _goalFinish(stopReason) {
++  var g = _goal;
++  if (!g) return;
++  _goal = null;
++  if (g.timer) { clearTimeout(g.timer); g.timer = null; }
++  var best = g.best;
++  if (best) {
++    best.goalMode = true;
++    best.goalRounds = g.rounds;
++    best.goalStopped = !!g.stop;
++    best.goalElapsedMs = Date.now() - g.t0;
++  } else {
++    best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };
++  }
++  self.postMessage({ type: 'result', index: g.index, result: best });
++}
++function _goalRound() {
++  var g = _goal;
++  if (!g) return;
++  g.timer = null;
++  if (g.stop) { _goalFinish('stopped'); return; }
++  var perMs = g.perMs;
++  if (g.maxMs && (Date.now() - g.t0) >= g.maxMs) { _goalFinish('goalTimeUp'); return; }
++  if (g.maxRounds && g.rounds >= g.maxRounds) { _goalFinish('goalMaxRounds'); return; }
++  var cfg = {};
++  for (var k in g.config) cfg[k] = g.config[k];
++  cfg.goalMode = false;
++  cfg.portfolioK = 1;
++  cfg.timeBudgetMs = perMs;
++  cfg.seed = (g.baseSeed + g.rounds * 7919) >>> 0;
++  cfg._trace = [];
++  var r = null;
++  try {
++    r = AntSolver.Generator.produce(g.blocks, cfg);
++  } catch (err) {
++    r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
++  }
++  g.rounds++;
++  if (r) r.goalRound = g.rounds;
++  if (!g.best || _goalScore(r) > _goalScore(g.best)) g.best = r;
++  if (_goalPassed(r)) { _goalFinish('pass'); return; }
++  // 让出事件循环：这一行之后 worker 才能处理 {cmd:'stop'}
++  g.timer = setTimeout(_goalRound, 0);
++}
++
+ self.onmessage = function (e) {
+   var d = e.data || {};
+   if (d.cmd === 'ping') {
+     self.postMessage({ type: _loaded ? 'ready' : 'loadfail' });
+     return;
+   }
++  if (d.cmd === 'stop') {
++    if (_goal) {
++      _goal.stop = true;
++      if (_goal.timer) { clearTimeout(_goal.timer); _goal.timer = null; }
++      self.postMessage({ type: 'stopping' });
++      _goalFinish('stopped');   // 只在轮间收到（同步轮内消息进不来），可立即收尾
++    }
++    return;
++  }
+   if (d.cmd === 'produce') {
+     if (!_loaded) { self.postMessage({ type: 'error', index: d.index, message: '后台线程模块未加载' }); return; }
+     try {
+@@ -40,5 +121,21 @@ self.onmessage = function (e) {
+     } catch (err) {
+       self.postMessage({ type: 'error', index: d.index, message: String((err && err.message) || err) });
+     }
++    return;
++  }
++  if (d.cmd === 'produceGoal') {
++    if (!_loaded) { self.postMessage({ type: 'error', index: d.index, message: '后台线程模块未加载' }); return; }
++    if (_goal) { self.postMessage({ type: 'error', index: d.index, message: '上一关目标模式还没结束' }); return; }
++    var per = parseInt(d.config && d.config.goalPerRoundMs, 10);
++    if (!(per > 0)) per = 20000;
++    var baseSeed = (d.config && d.config.seed != null && !isNaN(+d.config.seed)) ? (+d.config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
++    _goal = {
++      blocks: d.blocks, config: d.config || {}, index: d.index,
++      best: null, rounds: 0, stop: false, t0: Date.now(), perMs: per, baseSeed: baseSeed,
++      maxMs: parseInt(d.config && d.config.goalMaxMs, 10) || 0,
++      maxRounds: parseInt(d.config && d.config.goalMaxRounds, 10) || 0,
++      timer: null
++    };
++    _goalRound();
+   }
+ };
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index be2b477..199e8fe 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -13995,6 +13995,80 @@ AntSolver.Generator = (function() {
+     return x.s > y.s;
+   }
+ 
++  /**
++   * 【2026-10-22·用户裁决】目标模式（headless 版）：一直产，直到这一关满足当前验收（goodV3 全过）或被停止。
++   *
++   * ⚠ 只能在【没有 UI 交互】的场景用（CLI / 测试脚本）：它在一个同步 while 里跑，
++   *   同线程的「结束」按钮 / Worker 的 {cmd:'stop'} 都处理不了。
++   *   UI 走 `gen-worker.js` 的"一轮 produce + setTimeout 让出"循环，以及主线程回退的 `genRunGoalSync`。
++   *
++   * 与按时间模式的区别：
++   *   - 按时间：每轮固定预算，到点返回最好；
++   *   - 按目标：每轮固定预算（默认 20s），没达标就换种子再来，直到达标 / 停止 / 到上限。
++   *
++   * @param {Array} blocks
++   * @param {object} config  goalPerRoundMs / goalMaxMs / goalMaxRounds（0 = 不限）
++   * @param {object} opts    { shouldStop: function():boolean }
++   */
++  function produceGoal(blocks, config, opts) {
++    opts = opts || {};
++    config = Object.assign({}, DEFAULT_CONFIG, config || {});
++    var t0 = Date.now();
++    var perMs = parseInt(config.goalPerRoundMs, 10);
++    if (!(perMs > 0)) perMs = 20000;
++    var maxMs = parseInt(config.goalMaxMs, 10);
++    if (!(maxMs > 0)) maxMs = 0;
++    var maxRounds = parseInt(config.goalMaxRounds, 10);
++    if (!(maxRounds > 0)) maxRounds = 0;
++    var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
++    function passed(r) {
++      if (!r || !r.level || !r.valid || r.fallback) return false;
++      if (r.goodV3 && typeof r.goodV3.pass === 'boolean') return r.goodV3.pass;
++      var t = r.audit && r.audit.tier;
++      return !!(t === '合格' || t === '困难合格');
++    }
++    function score(r) {
++      if (!r || !r.level) return -1e15;
++      var s = 0;
++      if (r.valid) s += 1e6;
++      if (!r.fallback) s += 1e5;
++      if (r.goodV3 && r.goodV3.pass) s += 1e9;
++      var p = (r.goodV3 && r.goodV3.persist) || {};
++      s += (p.band3Pct || 0) * 1000;
++      s += (p.bandPeak || 0) * 10;
++      s += (r.difficulty && r.difficulty.score) || 0;
++      return s;
++    }
++    var best = null, rounds = 0, stopped = false;
++    while (true) {
++      if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
++      if (maxRounds && rounds >= maxRounds) break;
++      if (maxMs && (Date.now() - t0) >= maxMs) break;
++      var cfg = Object.assign({}, config, {
++        goalMode: false,
++        portfolioK: 1,
++        timeBudgetMs: perMs,
++        seed: (baseSeed + rounds * 7919) >>> 0,
++        _trace: []
++      });
++      var r = null;
++      try { r = produceDispatch(blocks, cfg, opts); } catch (e) {
++        r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
++      }
++      rounds++;
++      if (r) r.goalRound = rounds;
++      if (!best || score(r) > score(best)) best = r;
++      if (passed(r)) break;
++    }
++    if (best) {
++      best.goalMode = true;
++      best.goalRounds = rounds;
++      best.goalElapsedMs = Date.now() - t0;
++      best.goalStopped = stopped;
++    }
++    return best;
++  }
++
+   function produceDispatch(blocks, config, opts) {
+     var flow = (config && config.generatorFlow) ||
+       (AntSolver.Generator && AntSolver.Generator.FLOW) || DEFAULT_FLOW;
+@@ -14332,6 +14406,7 @@ AntSolver.Generator = (function() {
+     generateFromBlocks: generateFromBlocks,
+     // produce 为正式默认入口：v95 起分发到纠偏版；produceLegacy 是 v94 及以前的旧实现。
+     produce: produceDispatch,
++    produceGoal: produceGoal,               // 【2026-10-22】目标模式：没达标就换种子再来，停止时返回当前最好
+     produceLegacy: produce,
+     FLOW: DEFAULT_FLOW,
+     // ===== 纠偏版（R01-R07）入口与可单测的内部函数 =====
