@@ -14660,8 +14660,11 @@ AntSolver.Generator = (function() {
     var J = dt ? Math.round(dh / dt * 100) : 0;
     if (J > 20) return false;
     if (fc.selectMedian != null && fc.selectMedian < 2) return false;
-    if (fc.forcedPct != null && fc.forcedPct > 25) return false;
+    if (fc.forcedPct != null && fc.forcedPct > 20) return false;
+    if (fc.partialStepPct != null && fc.partialStepPct < 20) return false;
+    if (fc.fullMedian2 != null && fc.fullMedian2 > 2) return false;
     if (fc.freeLowPct != null && fc.freeLowPct > 30) return false;
+    if (fc.freeRunMax != null && fc.freeRunMax > 5) return false;
     return true;
   }
 

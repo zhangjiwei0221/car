@@ -1,0 +1,150 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index a53a59c..5a66f8f 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=461">
++  <link rel="stylesheet" href="css/style.css?v=462">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v461</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v462</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -763,21 +763,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=461"></script>
+-  <script src="js/utils.js?v=461"></script>
++  <script src="js/zip.js?v=462"></script>
++  <script src="js/utils.js?v=462"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=461"></script>
+-  <script src="js/simulator.js?v=461"></script>
++  <script src="js/color-libs.js?v=462"></script>
++  <script src="js/simulator.js?v=462"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=461"></script>
+-  <script src="js/solver-strategy.js?v=461"></script>
+-  <script src="js/solver.js?v=461"></script>
+-  <script src="js/playersim.js?v=461"></script>
+-  <script src="js/generator.js?v=461"></script>
+-  <script src="js/analysis.js?v=461"></script>
++  <script src="js/anchor-cut.js?v=462"></script>
++  <script src="js/solver-strategy.js?v=462"></script>
++  <script src="js/solver.js?v=462"></script>
++  <script src="js/playersim.js?v=462"></script>
++  <script src="js/generator.js?v=462"></script>
++  <script src="js/analysis.js?v=462"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=461"></script>
+-  <script src="js/app.js?v=461"></script>
++  <script src="js/level-editor.js?v=462"></script>
++  <script src="js/app.js?v=462"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index f9ef756..4e8e21c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "461";
++var APP_BUILD = "462";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -5793,7 +5793,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v461 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v462 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5833,7 +5833,8 @@ AntSolver.App = (function() {
+       row('ready稳定', rec.readyStats ? (rec.readyStats.stablePct + '% · 均spread ' + rec.readyStats.avgSpread) : '未测') +
+       row('决策宽度', (rec.selectMed == null ? '-' : ('可选中位 ' + rec.selectMed)) +
+         (rec.fullMed2 == null ? '' : ('　吃满中位 ' + rec.fullMed2)) +
+-        (rec.forcedPct == null ? '' : ('　被迫步 ' + rec.forcedPct + '%'))) +
++        (rec.forcedPct == null ? '' : ('　被迫步 ' + rec.forcedPct + '%')) +
++        (rec.partialStepPct == null ? '' : ('　partial ' + rec.partialStepPct + '%'))) +
+       row('前10步', (rec.earlyFree10 == null ? '-' : ('免费 ' + rec.earlyFree10 + ' 步')) +
+         (rec.earlyPeak10 == null ? '' : ('　峰值 ' + rec.earlyPeak10))) +
+       row('白给位置', (rec.freeLowPct == null ? '-' : ('低缓冲免费步 ' + rec.freeLowPct + '%')) +
+@@ -5861,7 +5862,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v461', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v462', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+@@ -6106,14 +6107,18 @@ AntSolver.App = (function() {
+     else if (o.r < 15) r.push('R后悔' + o.r + 'pp<15（没岔路）');
+     if (o.hidden != null && o.hidden > 20) r.push('隐藏信息死亡' + o.hidden + '%>20%');
+     if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
+-    if (o.freeRunMax != null && o.freeRunMax > 6) r.push('最长免费连' + o.freeRunMax + '步>6');
++    if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
++    if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
+     var pass = r.length === 0;
+     // 【v461】qGate-lite：可解/守恒 + J/决策宽度/freeLow；首通只报告
+     var g = [];
+     if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
+     if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
+-    if (o.forcedPct != null && o.forcedPct > 25) g.push('被迫步 ' + o.forcedPct + '%>25%');
++    if (o.forcedPct != null && o.forcedPct > 20) g.push('被迫步 ' + o.forcedPct + '%>20%');
++    if (o.partialStepPct != null && o.partialStepPct < 20) g.push('partial步 ' + o.partialStepPct + '%<20');
++    if (o.fullMed2 != null && o.fullMed2 > 2) g.push('吃满中位 ' + o.fullMed2 + '>2');
+     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
++    if (o.freeRunMax != null && o.freeRunMax > 5) g.push('最长免费连 ' + o.freeRunMax + '>5');
+     var gatePass = g.length === 0;
+     var label = pass ? '合格' :
+       (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
+@@ -6184,7 +6189,7 @@ AntSolver.App = (function() {
+       valid: !!result.valid, level: result.level, ply: _ps.playerPassPct,
+       learned: _ps.learnedPassPct, look: _ps.lookaheadPassPct,
+       wMed: _wMed0, wLow: _wLow0, t: (_q.T != null ? _q.T : null), r: (_q.R != null ? _q.R : null), hidden: _hidden0,
+-      white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null),
++      white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null), partialStepPct: (_fc ? _fc.partialStepPct : null),
+       earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null)
+     });
+     return {
+@@ -6232,7 +6237,7 @@ AntSolver.App = (function() {
+       lookaheadPassPct: (_ps.lookaheadPassPct != null ? _ps.lookaheadPassPct : null),
+       wMed: _wMed0, wLow: _wLow0, tPct: (_q.T != null ? _q.T : null),
+       freeLowPct: _fc ? _fc.freeLowPct : null, misplacedFreePct: _fc ? _fc.misplacedFreePct : null,
+-      selectMed: _fc ? _fc.selectMedian : null, fullMed2: _fc ? _fc.fullMedian2 : null, forcedPct: _fc ? _fc.forcedPct : null,
++      selectMed: _fc ? _fc.selectMedian : null, fullMed2: _fc ? _fc.fullMedian2 : null, forcedPct: _fc ? _fc.forcedPct : null, partialStepPct: _fc ? _fc.partialStepPct : null, freeRunMax: _fc ? _fc.freeRunMax : null,
+       earlyFree10: _fc ? _fc.earlyFree10 : null, earlyPeak10: _fc ? _fc.earlyPeak10 : null,
+       pressurePct3: _fc ? _fc.pressurePct3 : null, pressurePeak: _fc ? _fc.pressurePeak : null,
+       rPct: (_q.R != null ? _q.R : null), uPct: (_q.U != null ? _q.U : null),
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 629137b..fe3546d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14660,8 +14660,11 @@ AntSolver.Generator = (function() {
+     var J = dt ? Math.round(dh / dt * 100) : 0;
+     if (J > 20) return false;
+     if (fc.selectMedian != null && fc.selectMedian < 2) return false;
+-    if (fc.forcedPct != null && fc.forcedPct > 25) return false;
++    if (fc.forcedPct != null && fc.forcedPct > 20) return false;
++    if (fc.partialStepPct != null && fc.partialStepPct < 20) return false;
++    if (fc.fullMedian2 != null && fc.fullMedian2 > 2) return false;
+     if (fc.freeLowPct != null && fc.freeLowPct > 30) return false;
++    if (fc.freeRunMax != null && fc.freeRunMax > 5) return false;
+     return true;
+   }
+ 

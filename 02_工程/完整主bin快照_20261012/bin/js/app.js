@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "461";
+var APP_BUILD = "462";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5793,7 +5793,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v461 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v462 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5833,7 +5833,8 @@ AntSolver.App = (function() {
       row('ready稳定', rec.readyStats ? (rec.readyStats.stablePct + '% · 均spread ' + rec.readyStats.avgSpread) : '未测') +
       row('决策宽度', (rec.selectMed == null ? '-' : ('可选中位 ' + rec.selectMed)) +
         (rec.fullMed2 == null ? '' : ('　吃满中位 ' + rec.fullMed2)) +
-        (rec.forcedPct == null ? '' : ('　被迫步 ' + rec.forcedPct + '%'))) +
+        (rec.forcedPct == null ? '' : ('　被迫步 ' + rec.forcedPct + '%')) +
+        (rec.partialStepPct == null ? '' : ('　partial ' + rec.partialStepPct + '%'))) +
       row('前10步', (rec.earlyFree10 == null ? '-' : ('免费 ' + rec.earlyFree10 + ' 步')) +
         (rec.earlyPeak10 == null ? '' : ('　峰值 ' + rec.earlyPeak10))) +
       row('白给位置', (rec.freeLowPct == null ? '-' : ('低缓冲免费步 ' + rec.freeLowPct + '%')) +
@@ -5861,7 +5862,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v461', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v462', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6106,14 +6107,18 @@ AntSolver.App = (function() {
     else if (o.r < 15) r.push('R后悔' + o.r + 'pp<15（没岔路）');
     if (o.hidden != null && o.hidden > 20) r.push('隐藏信息死亡' + o.hidden + '%>20%');
     if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
-    if (o.freeRunMax != null && o.freeRunMax > 6) r.push('最长免费连' + o.freeRunMax + '步>6');
+    if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
+    if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
     var pass = r.length === 0;
     // 【v461】qGate-lite：可解/守恒 + J/决策宽度/freeLow；首通只报告
     var g = [];
     if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
     if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
-    if (o.forcedPct != null && o.forcedPct > 25) g.push('被迫步 ' + o.forcedPct + '%>25%');
+    if (o.forcedPct != null && o.forcedPct > 20) g.push('被迫步 ' + o.forcedPct + '%>20%');
+    if (o.partialStepPct != null && o.partialStepPct < 20) g.push('partial步 ' + o.partialStepPct + '%<20');
+    if (o.fullMed2 != null && o.fullMed2 > 2) g.push('吃满中位 ' + o.fullMed2 + '>2');
     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
+    if (o.freeRunMax != null && o.freeRunMax > 5) g.push('最长免费连 ' + o.freeRunMax + '>5');
     var gatePass = g.length === 0;
     var label = pass ? '合格' :
       (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
@@ -6184,7 +6189,7 @@ AntSolver.App = (function() {
       valid: !!result.valid, level: result.level, ply: _ps.playerPassPct,
       learned: _ps.learnedPassPct, look: _ps.lookaheadPassPct,
       wMed: _wMed0, wLow: _wLow0, t: (_q.T != null ? _q.T : null), r: (_q.R != null ? _q.R : null), hidden: _hidden0,
-      white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null),
+      white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null), partialStepPct: (_fc ? _fc.partialStepPct : null),
       earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null)
     });
     return {
@@ -6232,7 +6237,7 @@ AntSolver.App = (function() {
       lookaheadPassPct: (_ps.lookaheadPassPct != null ? _ps.lookaheadPassPct : null),
       wMed: _wMed0, wLow: _wLow0, tPct: (_q.T != null ? _q.T : null),
       freeLowPct: _fc ? _fc.freeLowPct : null, misplacedFreePct: _fc ? _fc.misplacedFreePct : null,
-      selectMed: _fc ? _fc.selectMedian : null, fullMed2: _fc ? _fc.fullMedian2 : null, forcedPct: _fc ? _fc.forcedPct : null,
+      selectMed: _fc ? _fc.selectMedian : null, fullMed2: _fc ? _fc.fullMedian2 : null, forcedPct: _fc ? _fc.forcedPct : null, partialStepPct: _fc ? _fc.partialStepPct : null, freeRunMax: _fc ? _fc.freeRunMax : null,
       earlyFree10: _fc ? _fc.earlyFree10 : null, earlyPeak10: _fc ? _fc.earlyPeak10 : null,
       pressurePct3: _fc ? _fc.pressurePct3 : null, pressurePeak: _fc ? _fc.pressurePeak : null,
       rPct: (_q.R != null ? _q.R : null), uPct: (_q.U != null ? _q.U : null),
