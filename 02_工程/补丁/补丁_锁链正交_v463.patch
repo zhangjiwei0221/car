@@ -1,0 +1,148 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 5a66f8f..0a38d85 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=462">
++  <link rel="stylesheet" href="css/style.css?v=463">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v462</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v463</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -763,21 +763,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=462"></script>
+-  <script src="js/utils.js?v=462"></script>
++  <script src="js/zip.js?v=463"></script>
++  <script src="js/utils.js?v=463"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=462"></script>
+-  <script src="js/simulator.js?v=462"></script>
++  <script src="js/color-libs.js?v=463"></script>
++  <script src="js/simulator.js?v=463"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=462"></script>
+-  <script src="js/solver-strategy.js?v=462"></script>
+-  <script src="js/solver.js?v=462"></script>
+-  <script src="js/playersim.js?v=462"></script>
+-  <script src="js/generator.js?v=462"></script>
+-  <script src="js/analysis.js?v=462"></script>
++  <script src="js/anchor-cut.js?v=463"></script>
++  <script src="js/solver-strategy.js?v=463"></script>
++  <script src="js/solver.js?v=463"></script>
++  <script src="js/playersim.js?v=463"></script>
++  <script src="js/generator.js?v=463"></script>
++  <script src="js/analysis.js?v=463"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=462"></script>
+-  <script src="js/app.js?v=462"></script>
++  <script src="js/level-editor.js?v=463"></script>
++  <script src="js/app.js?v=463"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 4e8e21c..3cd5e0f 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "462";
++var APP_BUILD = "463";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -5793,7 +5793,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v462 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v463 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5862,7 +5862,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v462', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v463', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index fe3546d..2dc1000 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -669,6 +669,7 @@ AntSolver.Generator = (function() {
+       if (curCfg.semanticObstacles) {
+         try { applySemanticObstacles(board, blocks, curCfg); } catch (e) { }
+       }
++      try { sanitizeChainGroups(board); } catch (e) { }
+ 
+       var level = { blocks: blocks, bufferLimit: curCfg.bufferLimit, board: board };
+       var parsed = AntSolver.parseLevel(level);
+@@ -15458,6 +15459,7 @@ AntSolver.Generator = (function() {
+         // 变体 2：早熟车加链
+         for (var dr2 = 0; dr2 <= 1; dr2++) for (var dc2 = -1; dc2 <= 1; dc2++) {
+           if (dr2 === 0 && dc2 <= 0) continue;
++          if (dr2 === 1 && dc2 !== 0) continue;   // 【v463】只允许右/下正交，禁止斜链
+           var nr2 = cd.r + dr2, nc2 = cd.c + dc2;
+           if (!plainCell(level, nr2, nc2)) continue;
+           if (evals >= 5) break;
+@@ -15598,6 +15600,7 @@ AntSolver.Generator = (function() {
+         var pair = null;
+         for (var dr = 0; dr <= 1 && !pair; dr++) for (var dc = -1; dc <= 1; dc++) {
+           if (dr === 0 && dc <= 0) continue;
++          if (dr === 1 && dc !== 0) continue;   // 【v463】只允许右/下正交
+           var nr = cd.r + dr, nc = cd.c + dc;
+           if (plain(level, nr, nc)) { pair = [nr, nc]; break; }
+         }
+@@ -16099,6 +16102,35 @@ AntSolver.Generator = (function() {
+       avgSpread: nCars ? +(spreadSum / nCars).toFixed(3) : 0, byCell: byCell };
+   }
+ 
++  // 【v463】链组校验：2 连必须正交相邻；3 连必须正交连通；其它非法组清掉
++  function sanitizeChainGroups(board) {
++    if (!board || !board.cells) return 0;
++    var groups = {};
++    for (var r = 0; r < board.rows; r++) for (var c = 0; c < board.cols; c++) {
++      var x = board.cells[r][c];
++      if (x && x.chain > 0) { (groups[x.chain] = groups[x.chain] || []).push({ r: r, c: c }); }
++    }
++    var cleared = 0;
++    function adj(a, b) { return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1; }
++    for (var g in groups) {
++      var ps = groups[g], ok = false;
++      if (ps.length === 2) ok = adj(ps[0], ps[1]);
++      else if (ps.length === 3) {
++        // 3 连允许 L/反L/直线：从任一格出发，正交连通即可
++        var seen = { 0: true }, q = [0], cnt = 1;
++        while (q.length) {
++          var i = q.shift();
++          for (var j = 0; j < ps.length; j++) if (!seen[j] && adj(ps[i], ps[j])) { seen[j] = true; q.push(j); cnt++; }
++        }
++        ok = cnt === 3;
++      }
++      if (!ok) {
++        for (var k = 0; k < ps.length; k++) { board.cells[ps[k].r][ps[k].c].chain = 0; cleared++; }
++      }
++    }
++    return cleared;
++  }
++
+   // 【v447】两遍建盘：用多路径 ready 重放冰/链
+   // 【v450】生成时 Early：用首解 pickOrder 把前10步的第一选择换成“未暴露/吃不满”的车
+   function applyGenerationEarly(level, config, sr, which) {

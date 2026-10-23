@@ -669,6 +669,7 @@ AntSolver.Generator = (function() {
       if (curCfg.semanticObstacles) {
         try { applySemanticObstacles(board, blocks, curCfg); } catch (e) { }
       }
+      try { sanitizeChainGroups(board); } catch (e) { }
 
       var level = { blocks: blocks, bufferLimit: curCfg.bufferLimit, board: board };
       var parsed = AntSolver.parseLevel(level);
@@ -15458,6 +15459,7 @@ AntSolver.Generator = (function() {
         // 变体 2：早熟车加链
         for (var dr2 = 0; dr2 <= 1; dr2++) for (var dc2 = -1; dc2 <= 1; dc2++) {
           if (dr2 === 0 && dc2 <= 0) continue;
+          if (dr2 === 1 && dc2 !== 0) continue;   // 【v463】只允许右/下正交，禁止斜链
           var nr2 = cd.r + dr2, nc2 = cd.c + dc2;
           if (!plainCell(level, nr2, nc2)) continue;
           if (evals >= 5) break;
@@ -15598,6 +15600,7 @@ AntSolver.Generator = (function() {
         var pair = null;
         for (var dr = 0; dr <= 1 && !pair; dr++) for (var dc = -1; dc <= 1; dc++) {
           if (dr === 0 && dc <= 0) continue;
+          if (dr === 1 && dc !== 0) continue;   // 【v463】只允许右/下正交
           var nr = cd.r + dr, nc = cd.c + dc;
           if (plain(level, nr, nc)) { pair = [nr, nc]; break; }
         }
@@ -16097,6 +16100,35 @@ AntSolver.Generator = (function() {
     }
     return { samples: okSamples, cars: nCars, stablePct: nCars ? Math.round(stable / nCars * 100) : 0,
       avgSpread: nCars ? +(spreadSum / nCars).toFixed(3) : 0, byCell: byCell };
+  }
+
+  // 【v463】链组校验：2 连必须正交相邻；3 连必须正交连通；其它非法组清掉
+  function sanitizeChainGroups(board) {
+    if (!board || !board.cells) return 0;
+    var groups = {};
+    for (var r = 0; r < board.rows; r++) for (var c = 0; c < board.cols; c++) {
+      var x = board.cells[r][c];
+      if (x && x.chain > 0) { (groups[x.chain] = groups[x.chain] || []).push({ r: r, c: c }); }
+    }
+    var cleared = 0;
+    function adj(a, b) { return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1; }
+    for (var g in groups) {
+      var ps = groups[g], ok = false;
+      if (ps.length === 2) ok = adj(ps[0], ps[1]);
+      else if (ps.length === 3) {
+        // 3 连允许 L/反L/直线：从任一格出发，正交连通即可
+        var seen = { 0: true }, q = [0], cnt = 1;
+        while (q.length) {
+          var i = q.shift();
+          for (var j = 0; j < ps.length; j++) if (!seen[j] && adj(ps[i], ps[j])) { seen[j] = true; q.push(j); cnt++; }
+        }
+        ok = cnt === 3;
+      }
+      if (!ok) {
+        for (var k = 0; k < ps.length; k++) { board.cells[ps[k].r][ps[k].c].chain = 0; cleared++; }
+      }
+    }
+    return cleared;
   }
 
   // 【v447】两遍建盘：用多路径 ready 重放冰/链
