@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "460";
+var APP_BUILD = "461";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5793,7 +5793,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v460 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v461 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5861,7 +5861,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v460', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v461', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6087,10 +6087,7 @@ AntSolver.App = (function() {
     var r = [];
     if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
     if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
-    // 【v397】qPass 改成“带上下限”的带，不再奖励学会后100/首通60。
-    if (o.ply == null) r.push('首通未测');
-    else if (o.ply < 20) r.push('首通' + o.ply + '%<20%（偏难）');
-    else if (o.ply > 50) r.push('首通' + o.ply + '%>50%（偏松）');
+    // 【v461】首通只报告，不进 qPass 判定（贪心是随便选）
     if (o.learned == null) r.push('学会后未测');
     else if (o.learned < 55) r.push('学会后' + o.learned + '%<55%（学不会）');
     else if (o.learned > 85) r.push('学会后' + o.learned + '%>85%（一学就会）');
@@ -6111,18 +6108,14 @@ AntSolver.App = (function() {
     if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
     if (o.freeRunMax != null && o.freeRunMax > 6) r.push('最长免费连' + o.freeRunMax + '步>6');
     var pass = r.length === 0;
-    // 【v411·用户裁决】qPass-lite 结构硬门：可解/守恒之外，只看 J/W/freeLow/首通
+    // 【v461】qGate-lite：可解/守恒 + J/决策宽度/freeLow；首通只报告
     var g = [];
-    if (o.ply == null) g.push('首通未测');
-    else if (o.ply > 50) g.push('首通' + o.ply + '%>50%');
     if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
     if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
     if (o.forcedPct != null && o.forcedPct > 25) g.push('被迫步 ' + o.forcedPct + '%>25%');
     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
     var gatePass = g.length === 0;
     var label = pass ? '合格' :
-      (o.ply != null && o.ply > 50) ? '可玩·偏松' :
-      (o.ply != null && o.ply < 20) ? '可玩·偏难' :
       (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
       (o.look != null && o.look > 85) ? '可玩·偏透' :
       (o.t != null && o.t < 10) ? '可玩·没压力' :

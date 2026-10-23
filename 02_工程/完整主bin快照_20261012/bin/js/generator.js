@@ -8704,13 +8704,8 @@ AntSolver.Generator = (function() {
   //   先于 candTier 比较——否则“首通 100 的困难合格”会一直压住“首通 50 的简单合格”，
   //   P3 陷阱后处理永远没有 headroom。
   function headroomRank(c) {
-    var p = (c && c.goodV3 && c.goodV3.persist && c.goodV3.persist.playerPassPct != null)
-      ? c.goodV3.persist.playerPassPct : null;
-    if (p == null) return 2;
-    // 【v460】qGate 要首通≤50；旧 30~80 会把 60~80 的“偏松关”排在 20% 前
-    if (p <= 50) return 0;
-    if (p <= 65) return 1;
-    return 2;
+    // 【v461·用户裁决】贪心首通是随便选，不作为选关依据；只保留指标报告
+    return 0;
   }
 
   function candBetter(b, a, cfg) {
@@ -8733,15 +8728,6 @@ AntSolver.Generator = (function() {
     var _b3b = (b && b.goodV3 && b.goodV3.persist && b.goodV3.persist.band3Pct != null) ? b.goodV3.persist.band3Pct : -1;
     var _b3a = (a && a.goodV3 && a.goodV3.persist && a.goodV3.persist.band3Pct != null) ? a.goodV3.persist.band3Pct : -1;
     if (Math.abs(_b3b - _b3a) >= 5) return _b3b > _b3a;
-    // 【v378】首通分布：优先 30~80% 的候选（差 ≥10pp 才认），让 P3 后处理有 headroom
-    var _ppb = (b && b.goodV3 && b.goodV3.persist && b.goodV3.persist.playerPassPct != null) ? b.goodV3.persist.playerPassPct : null;
-    var _ppa = (a && a.goodV3 && a.goodV3.persist && a.goodV3.persist.playerPassPct != null) ? a.goodV3.persist.playerPassPct : null;
-    if (_ppb != null && _ppa != null) {
-      var _inB = (_ppb >= 30 && _ppb <= 80), _inA = (_ppa >= 30 && _ppa <= 80);
-      if (_inB !== _inA) return _inB;
-      var _db = Math.abs(_ppb - 55), _da = Math.abs(_ppa - 55);
-      if (Math.abs(_db - _da) >= 10) return _db < _da;
-    }
     var vb = chokeV2Ok(b), va = chokeV2Ok(a);
     if (vb !== va) return vb > va;
     // 【v191·实验】峰窗进带优先：先看"在不在 3.2~4.8 带里"，再看离 4.0 多远。
@@ -14506,14 +14492,6 @@ AntSolver.Generator = (function() {
     if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
     // 【v460】结构门优先：qGate 过 > 不过
     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
-    // 【v460】首通优先 ≤50；旧 30~80 会优先选偏松关
-    var _hr = function (t) {
-      if (t.pp == null) return 2;
-      if (t.pp <= 50) return 0;
-      if (t.pp <= 65) return 1;
-      return 2;
-    };
-    if (_hr(x) !== _hr(y)) return _hr(x) < _hr(y);
     // 【v413】障碍变体：压力分差 ≥15 时优先压力高的，让冰/链/管道变体真正参与选择
     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
     if ((x.pn > 0) !== (y.pn > 0)) return x.pn > 0;
@@ -14525,13 +14503,6 @@ AntSolver.Generator = (function() {
       if (x.f !== y.f) return x.f < y.f;
       var _b3x = (x.b3 == null ? -1 : x.b3), _b3y = (y.b3 == null ? -1 : y.b3);
       if (_b3x !== _b3y) return _b3x > _b3y;
-      // 【v378】首通 30~80% 优先，其次离 55 近
-      if (x.pp != null && y.pp != null) {
-        var _inX = (x.pp >= 30 && x.pp <= 80), _inY = (y.pp >= 30 && y.pp <= 80);
-        if (_inX !== _inY) return _inX;
-        var _dx = Math.abs(x.pp - 55), _dy = Math.abs(y.pp - 55);
-        if (Math.abs(_dx - _dy) >= 10) return _dx < _dy;
-      }
       if ((x.ts || 9) !== (y.ts || 9)) return (x.ts || 9) < (y.ts || 9);
       // 【v238】目标分打平时的加赛：优先「吃满≤1 的步占比」落在 45~90%（实测合格关集中带）。
       //   只影响完全同分的情况，不改合格门、不改目标分公式。
@@ -14683,7 +14654,7 @@ AntSolver.Generator = (function() {
     var fc = r.goodV3 && r.goodV3.fillCurve;
     if (!p || !fc) return false;
     // 【v436】目标模式追的结构门 = 当前 qGate-lite
-    if (p.playerPassPct == null || p.playerPassPct > 50) return false;
+    // 【v461】首通只报告，不进结构门
     var dc = p.deathCauses || {}, dt = 0, dh = 0;
     for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
     var J = dt ? Math.round(dh / dt * 100) : 0;

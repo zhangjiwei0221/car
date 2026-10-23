@@ -1,0 +1,190 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index af90d29..a53a59c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=460">
++  <link rel="stylesheet" href="css/style.css?v=461">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v460</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v461</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -763,21 +763,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=460"></script>
+-  <script src="js/utils.js?v=460"></script>
++  <script src="js/zip.js?v=461"></script>
++  <script src="js/utils.js?v=461"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=460"></script>
+-  <script src="js/simulator.js?v=460"></script>
++  <script src="js/color-libs.js?v=461"></script>
++  <script src="js/simulator.js?v=461"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=460"></script>
+-  <script src="js/solver-strategy.js?v=460"></script>
+-  <script src="js/solver.js?v=460"></script>
+-  <script src="js/playersim.js?v=460"></script>
+-  <script src="js/generator.js?v=460"></script>
+-  <script src="js/analysis.js?v=460"></script>
++  <script src="js/anchor-cut.js?v=461"></script>
++  <script src="js/solver-strategy.js?v=461"></script>
++  <script src="js/solver.js?v=461"></script>
++  <script src="js/playersim.js?v=461"></script>
++  <script src="js/generator.js?v=461"></script>
++  <script src="js/analysis.js?v=461"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=460"></script>
+-  <script src="js/app.js?v=460"></script>
++  <script src="js/level-editor.js?v=461"></script>
++  <script src="js/app.js?v=461"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index cd60232..f9ef756 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "460";
++var APP_BUILD = "461";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -5793,7 +5793,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v460 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v461 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5861,7 +5861,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v460', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v461', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+@@ -6087,10 +6087,7 @@ AntSolver.App = (function() {
+     var r = [];
+     if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
+     if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
+-    // 【v397】qPass 改成“带上下限”的带，不再奖励学会后100/首通60。
+-    if (o.ply == null) r.push('首通未测');
+-    else if (o.ply < 20) r.push('首通' + o.ply + '%<20%（偏难）');
+-    else if (o.ply > 50) r.push('首通' + o.ply + '%>50%（偏松）');
++    // 【v461】首通只报告，不进 qPass 判定（贪心是随便选）
+     if (o.learned == null) r.push('学会后未测');
+     else if (o.learned < 55) r.push('学会后' + o.learned + '%<55%（学不会）');
+     else if (o.learned > 85) r.push('学会后' + o.learned + '%>85%（一学就会）');
+@@ -6111,18 +6108,14 @@ AntSolver.App = (function() {
+     if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
+     if (o.freeRunMax != null && o.freeRunMax > 6) r.push('最长免费连' + o.freeRunMax + '步>6');
+     var pass = r.length === 0;
+-    // 【v411·用户裁决】qPass-lite 结构硬门：可解/守恒之外，只看 J/W/freeLow/首通
++    // 【v461】qGate-lite：可解/守恒 + J/决策宽度/freeLow；首通只报告
+     var g = [];
+-    if (o.ply == null) g.push('首通未测');
+-    else if (o.ply > 50) g.push('首通' + o.ply + '%>50%');
+     if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
+     if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
+     if (o.forcedPct != null && o.forcedPct > 25) g.push('被迫步 ' + o.forcedPct + '%>25%');
+     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
+     var gatePass = g.length === 0;
+     var label = pass ? '合格' :
+-      (o.ply != null && o.ply > 50) ? '可玩·偏松' :
+-      (o.ply != null && o.ply < 20) ? '可玩·偏难' :
+       (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
+       (o.look != null && o.look > 85) ? '可玩·偏透' :
+       (o.t != null && o.t < 10) ? '可玩·没压力' :
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 05723e1..629137b 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -8704,13 +8704,8 @@ AntSolver.Generator = (function() {
+   //   先于 candTier 比较——否则“首通 100 的困难合格”会一直压住“首通 50 的简单合格”，
+   //   P3 陷阱后处理永远没有 headroom。
+   function headroomRank(c) {
+-    var p = (c && c.goodV3 && c.goodV3.persist && c.goodV3.persist.playerPassPct != null)
+-      ? c.goodV3.persist.playerPassPct : null;
+-    if (p == null) return 2;
+-    // 【v460】qGate 要首通≤50；旧 30~80 会把 60~80 的“偏松关”排在 20% 前
+-    if (p <= 50) return 0;
+-    if (p <= 65) return 1;
+-    return 2;
++    // 【v461·用户裁决】贪心首通是随便选，不作为选关依据；只保留指标报告
++    return 0;
+   }
+ 
+   function candBetter(b, a, cfg) {
+@@ -8733,15 +8728,6 @@ AntSolver.Generator = (function() {
+     var _b3b = (b && b.goodV3 && b.goodV3.persist && b.goodV3.persist.band3Pct != null) ? b.goodV3.persist.band3Pct : -1;
+     var _b3a = (a && a.goodV3 && a.goodV3.persist && a.goodV3.persist.band3Pct != null) ? a.goodV3.persist.band3Pct : -1;
+     if (Math.abs(_b3b - _b3a) >= 5) return _b3b > _b3a;
+-    // 【v378】首通分布：优先 30~80% 的候选（差 ≥10pp 才认），让 P3 后处理有 headroom
+-    var _ppb = (b && b.goodV3 && b.goodV3.persist && b.goodV3.persist.playerPassPct != null) ? b.goodV3.persist.playerPassPct : null;
+-    var _ppa = (a && a.goodV3 && a.goodV3.persist && a.goodV3.persist.playerPassPct != null) ? a.goodV3.persist.playerPassPct : null;
+-    if (_ppb != null && _ppa != null) {
+-      var _inB = (_ppb >= 30 && _ppb <= 80), _inA = (_ppa >= 30 && _ppa <= 80);
+-      if (_inB !== _inA) return _inB;
+-      var _db = Math.abs(_ppb - 55), _da = Math.abs(_ppa - 55);
+-      if (Math.abs(_db - _da) >= 10) return _db < _da;
+-    }
+     var vb = chokeV2Ok(b), va = chokeV2Ok(a);
+     if (vb !== va) return vb > va;
+     // 【v191·实验】峰窗进带优先：先看"在不在 3.2~4.8 带里"，再看离 4.0 多远。
+@@ -14506,14 +14492,6 @@ AntSolver.Generator = (function() {
+     if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
+     // 【v460】结构门优先：qGate 过 > 不过
+     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
+-    // 【v460】首通优先 ≤50；旧 30~80 会优先选偏松关
+-    var _hr = function (t) {
+-      if (t.pp == null) return 2;
+-      if (t.pp <= 50) return 0;
+-      if (t.pp <= 65) return 1;
+-      return 2;
+-    };
+-    if (_hr(x) !== _hr(y)) return _hr(x) < _hr(y);
+     // 【v413】障碍变体：压力分差 ≥15 时优先压力高的，让冰/链/管道变体真正参与选择
+     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
+     if ((x.pn > 0) !== (y.pn > 0)) return x.pn > 0;
+@@ -14525,13 +14503,6 @@ AntSolver.Generator = (function() {
+       if (x.f !== y.f) return x.f < y.f;
+       var _b3x = (x.b3 == null ? -1 : x.b3), _b3y = (y.b3 == null ? -1 : y.b3);
+       if (_b3x !== _b3y) return _b3x > _b3y;
+-      // 【v378】首通 30~80% 优先，其次离 55 近
+-      if (x.pp != null && y.pp != null) {
+-        var _inX = (x.pp >= 30 && x.pp <= 80), _inY = (y.pp >= 30 && y.pp <= 80);
+-        if (_inX !== _inY) return _inX;
+-        var _dx = Math.abs(x.pp - 55), _dy = Math.abs(y.pp - 55);
+-        if (Math.abs(_dx - _dy) >= 10) return _dx < _dy;
+-      }
+       if ((x.ts || 9) !== (y.ts || 9)) return (x.ts || 9) < (y.ts || 9);
+       // 【v238】目标分打平时的加赛：优先「吃满≤1 的步占比」落在 45~90%（实测合格关集中带）。
+       //   只影响完全同分的情况，不改合格门、不改目标分公式。
+@@ -14683,7 +14654,7 @@ AntSolver.Generator = (function() {
+     var fc = r.goodV3 && r.goodV3.fillCurve;
+     if (!p || !fc) return false;
+     // 【v436】目标模式追的结构门 = 当前 qGate-lite
+-    if (p.playerPassPct == null || p.playerPassPct > 50) return false;
++    // 【v461】首通只报告，不进结构门
+     var dc = p.deathCauses || {}, dt = 0, dh = 0;
+     for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
+     var J = dt ? Math.round(dh / dt * 100) : 0;
