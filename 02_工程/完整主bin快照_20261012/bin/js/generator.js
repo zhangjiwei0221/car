@@ -8707,8 +8707,9 @@ AntSolver.Generator = (function() {
     var p = (c && c.goodV3 && c.goodV3.persist && c.goodV3.persist.playerPassPct != null)
       ? c.goodV3.persist.playerPassPct : null;
     if (p == null) return 2;
-    if (p >= 30 && p <= 80) return 0;
-    if (p >= 20 && p <= 90) return 1;
+    // 【v460】qGate 要首通≤50；旧 30~80 会把 60~80 的“偏松关”排在 20% 前
+    if (p <= 50) return 0;
+    if (p <= 65) return 1;
     return 2;
   }
 
@@ -8719,14 +8720,6 @@ AntSolver.Generator = (function() {
     var _pnb = (b && b.goodV3 && b.goodV3.fillCurve && b.goodV3.fillCurve.pressureN) ? b.goodV3.fillCurve.pressureN : 0;
     var _pna = (a && a.goodV3 && a.goodV3.fillCurve && a.goodV3.fillCurve.pressureN) ? a.goodV3.fillCurve.pressureN : 0;
     if ((_pnb > 0) !== (_pna > 0)) return _pnb > 0;
-    // 【v441】前10步压力优先
-    var _fcb = b && b.goodV3 && b.goodV3.fillCurve, _fca = a && a.goodV3 && a.goodV3.fillCurve;
-    var _epb = (_fcb && _fcb.earlyPeak10) || 0, _epa = (_fca && _fca.earlyPeak10) || 0;
-    var _efb = (_fcb && _fcb.earlyFree10) || 0, _efa = (_fca && _fca.earlyFree10) || 0;
-    var _eokB = _epb >= 3 && _efb <= 4, _eokA = _epa >= 3 && _efa <= 4;
-    if (_eokB !== _eokA) return _eokB;
-    if (Math.abs(_epb - _epa) >= 1) return _epb > _epa;
-    if (Math.abs(_efb - _efa) >= 2) return _efb < _efa;
     var tb = candTier(b), ta = candTier(a);
     if (tb !== ta) return tb > ta;
     // 【v182】结构闸门优先：被埋 ≥3 辆的候选（= 稳健玩家必死那种结构）排在后面
@@ -14505,24 +14498,22 @@ AntSolver.Generator = (function() {
              cw: (g.persist ? g.persist.chokeWin : null), b3: (g.persist ? g.persist.band3Pct : null), pp: (g.persist && g.persist.playerPassPct != null ? g.persist.playerPassPct : null), pn: (g.fillCurve ? g.fillCurve.pressureN : 0), of: (g.fillCurve ? g.fillCurve.openingFree12 : 0),
              ep: (g.fillCurve ? g.fillCurve.earlyPeak10 : 0), ef: (g.fillCurve ? g.fillCurve.earlyFree10 : 0),
              sm: (g.fillCurve ? g.fillCurve.selectMedian : 0), fp: (g.fillCurve ? g.fillCurve.forcedPct : 0),
-             ps: (g.fillCurve ? ((g.fillCurve.pressurePct3 || 0) * 2 + (g.fillCurve.pressurePeak || 0) * 10 - (g.fillCurve.freeLowPct || 0)) : 0) };
+             ps: (g.fillCurve ? ((g.fillCurve.pressurePct3 || 0) * 2 + (g.fillCurve.pressurePeak || 0) * 10 - (g.fillCurve.freeLowPct || 0)) : 0),
+             qg: (function () { try { return goalStructPass(out) ? 1 : 0; } catch (e) { return 0; } })() };
   }
   function portfolioBetter(x, y) {
     if (!y) return true;
     if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
-    // 【v379】首通 headroom 优先，避免 portfolio 一直选 0/100
+    // 【v460】结构门优先：qGate 过 > 不过
+    if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
+    // 【v460】首通优先 ≤50；旧 30~80 会优先选偏松关
     var _hr = function (t) {
       if (t.pp == null) return 2;
-      if (t.pp >= 30 && t.pp <= 80) return 0;
-      if (t.pp >= 20 && t.pp <= 90) return 1;
+      if (t.pp <= 50) return 0;
+      if (t.pp <= 65) return 1;
       return 2;
     };
     if (_hr(x) !== _hr(y)) return _hr(x) < _hr(y);
-    // 【v441】前10步压力优先：earlyPeak≥3 且 earlyFree≤4 的候选优先
-    var _eokX = (x.ep || 0) >= 3 && (x.ef || 0) <= 4, _eokY = (y.ep || 0) >= 3 && (y.ef || 0) <= 4;
-    if (_eokX !== _eokY) return _eokX;
-    if (Math.abs((x.ep || 0) - (y.ep || 0)) >= 1) return (x.ep || 0) > (y.ep || 0);
-    if (Math.abs((x.ef || 0) - (y.ef || 0)) >= 2) return (x.ef || 0) < (y.ef || 0);
     // 【v413】障碍变体：压力分差 ≥15 时优先压力高的，让冰/链/管道变体真正参与选择
     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
     if ((x.pn > 0) !== (y.pn > 0)) return x.pn > 0;
@@ -14760,6 +14751,7 @@ AntSolver.Generator = (function() {
   function produceDispatch(blocks, config, opts) {
     var _pdT0 = Date.now();
     var _pdBudget = parseInt(config && config.timeBudgetMs, 10) || 180000;
+    var _pdReserve = Math.min(30000, Math.max(5000, Math.round(_pdBudget * 0.2)));
     function _pdLeft() { return _pdBudget - (Date.now() - _pdT0); }
     var flow = (config && config.generatorFlow) ||
       (AntSolver.Generator && AntSolver.Generator.FLOW) || DEFAULT_FLOW;
@@ -14910,7 +14902,7 @@ AntSolver.Generator = (function() {
       out = flow === 'old' ? produce(blocks, config) : produceFixed(blocks, config, opts);
     } else {
       var _best = null, _bestT = null, _tried = 0, _passes = 0;
-      for (var _pi = 0; _pi < _pk; _pi++) {
+      for (var _pi = 0; _pi < _pk && _pdLeft() > _pdReserve; _pi++) {
         var _cfg = Object.assign({}, config, { portfolioK: 1 });
         // 【v344】轮换切法：奇数轮尝试按依赖层切车（layerCut2），由 portfolioBetter 按覆盖率择优。
         //   用户手动指定 cutMode 时不轮换（尊重用户）；_pk=1 时也不轮换（没有可比对象）。
