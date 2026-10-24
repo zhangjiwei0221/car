@@ -14713,10 +14713,15 @@ AntSolver.Generator = (function() {
       var s = 0;
       if (r.valid) s += 1e6;
       if (!r.fallback) s += 1e5;
-      if (r.goodV3 && r.goodV3.pass) s += 1e9;
+      // 【v475】目标模式 best 按结构门选，不再按旧 goodV3/覆盖率
+      try { if (goalStructPass(r)) s += 1e12; } catch (e) { }
       var p = (r.goodV3 && r.goodV3.persist) || {};
-      s += (p.band3Pct || 0) * 1000;
-      s += (p.bandPeak || 0) * 10;
+      var fc = (r.goodV3 && r.goodV3.fillCurve) || {};
+      s += (fc.selectMedian || 0) * 1000;
+      s -= (fc.freeLowPct || 0) * 100;
+      if (fc.freeRunMax != null && fc.freeRunMax > 5) s -= (fc.freeRunMax - 5) * 1000;
+      if (fc.fullMedian2 != null && fc.fullMedian2 > 3) s -= (fc.fullMedian2 - 3) * 1000;
+      s += (p.band3Pct || 0) * 10;
       s += (r.difficulty && r.difficulty.score) || 0;
       return s;
     }
