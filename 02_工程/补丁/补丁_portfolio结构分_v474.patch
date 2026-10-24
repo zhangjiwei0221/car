@@ -1,0 +1,127 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 9844382..79c5d49 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=473">
++  <link rel="stylesheet" href="css/style.css?v=474">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v473</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v474</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -760,21 +760,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=473"></script>
+-  <script src="js/utils.js?v=473"></script>
++  <script src="js/zip.js?v=474"></script>
++  <script src="js/utils.js?v=474"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=473"></script>
+-  <script src="js/simulator.js?v=473"></script>
++  <script src="js/color-libs.js?v=474"></script>
++  <script src="js/simulator.js?v=474"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=473"></script>
+-  <script src="js/solver-strategy.js?v=473"></script>
+-  <script src="js/solver.js?v=473"></script>
+-  <script src="js/playersim.js?v=473"></script>
+-  <script src="js/generator.js?v=473"></script>
+-  <script src="js/analysis.js?v=473"></script>
++  <script src="js/anchor-cut.js?v=474"></script>
++  <script src="js/solver-strategy.js?v=474"></script>
++  <script src="js/solver.js?v=474"></script>
++  <script src="js/playersim.js?v=474"></script>
++  <script src="js/generator.js?v=474"></script>
++  <script src="js/analysis.js?v=474"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=473"></script>
+-  <script src="js/app.js?v=473"></script>
++  <script src="js/level-editor.js?v=474"></script>
++  <script src="js/app.js?v=474"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 3aeb39b..410c326 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "473";
++var APP_BUILD = "474";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -5810,7 +5810,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v473 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v474 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5879,7 +5879,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v473', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v474', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 3995f02..c83acbf 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14487,20 +14487,37 @@ AntSolver.Generator = (function() {
+     if (!g || !g.fails) return { f: 99, d: 1e9, s: -1 };
+     var p = g.midLateMax;
+     var d = (p == null) ? 1e9 : (p < 3.2 ? (3.2 - p) : (p > 4.8 ? (p - 4.8) : 0));
+-    return { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
++    var _t = { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
+              fc: (g.fillCurve ? g.fillCurve.medFull : null), lp: (g.fillCurve ? g.fillCurve.lowPct : null),
+              ge: (g.persist ? g.persist.ge3Pct : null), lg: (g.persist ? g.persist.longest : null),
+              cw: (g.persist ? g.persist.chokeWin : null), b3: (g.persist ? g.persist.band3Pct : null), pp: (g.persist && g.persist.playerPassPct != null ? g.persist.playerPassPct : null), pn: (g.fillCurve ? g.fillCurve.pressureN : 0), of: (g.fillCurve ? g.fillCurve.openingFree12 : 0),
+              ep: (g.fillCurve ? g.fillCurve.earlyPeak10 : 0), ef: (g.fillCurve ? g.fillCurve.earlyFree10 : 0),
+              sm: (g.fillCurve ? g.fillCurve.selectMedian : 0), fp: (g.fillCurve ? g.fillCurve.forcedPct : 0),
+              ps: (g.fillCurve ? ((g.fillCurve.pressurePct3 || 0) * 2 + (g.fillCurve.pressurePeak || 0) * 10 - (g.fillCurve.freeLowPct || 0)) : 0),
++             gl: (g.fillCurve && g.fillCurve.freeLowPct != null ? g.fillCurve.freeLowPct : null),
++             gr: (g.fillCurve && g.fillCurve.freeRunMax != null ? g.fillCurve.freeRunMax : null),
++             gp: (g.fillCurve && g.fillCurve.partialStepPct != null ? g.fillCurve.partialStepPct : null),
++             gs: (g.fillCurve && g.fillCurve.selectMedian != null ? g.fillCurve.selectMedian : null),
++             gf: (g.fillCurve && g.fillCurve.forcedPct != null ? g.fillCurve.forcedPct : null),
++             gfull: (g.fillCurve && g.fillCurve.fullMedian2 != null ? g.fillCurve.fullMedian2 : null),
+              qg: (function () { try { return goalStructPass(out) ? 1 : 0; } catch (e) { return 0; } })() };
++    var _gv = 0;
++    if (_t.gl != null && _t.gl > 30) _gv += (_t.gl - 30);
++    if (_t.gr != null && _t.gr > 5) _gv += (_t.gr - 5) * 5;
++    if (_t.gs != null && _t.gs < 2) _gv += (2 - _t.gs) * 20;
++    if (_t.gp != null && _t.gp < 20) _gv += (20 - _t.gp);
++    if (_t.gf != null && _t.gf > 20) _gv += (_t.gf - 20);
++    if (_t.gfull != null && _t.gfull > 3) _gv += (_t.gfull - 3) * 10;
++    _t.gv = _gv;
++    return _t;
+   }
+   function portfolioBetter(x, y) {
+     if (!y) return true;
+     if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
+     // 【v460】结构门优先：qGate 过 > 不过
+     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
++    // 【v474】结构失败分小优先
++    if ((x.gv || 0) !== (y.gv || 0)) return (x.gv || 0) < (y.gv || 0);
+     // 【v413】障碍变体：压力分差 ≥15 时优先压力高的，让冰/链/管道变体真正参与选择
+     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
+     if ((x.pn > 0) !== (y.pn > 0)) return x.pn > 0;

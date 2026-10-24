@@ -14487,20 +14487,37 @@ AntSolver.Generator = (function() {
     if (!g || !g.fails) return { f: 99, d: 1e9, s: -1 };
     var p = g.midLateMax;
     var d = (p == null) ? 1e9 : (p < 3.2 ? (3.2 - p) : (p > 4.8 ? (p - 4.8) : 0));
-    return { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
+    var _t = { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
              fc: (g.fillCurve ? g.fillCurve.medFull : null), lp: (g.fillCurve ? g.fillCurve.lowPct : null),
              ge: (g.persist ? g.persist.ge3Pct : null), lg: (g.persist ? g.persist.longest : null),
              cw: (g.persist ? g.persist.chokeWin : null), b3: (g.persist ? g.persist.band3Pct : null), pp: (g.persist && g.persist.playerPassPct != null ? g.persist.playerPassPct : null), pn: (g.fillCurve ? g.fillCurve.pressureN : 0), of: (g.fillCurve ? g.fillCurve.openingFree12 : 0),
              ep: (g.fillCurve ? g.fillCurve.earlyPeak10 : 0), ef: (g.fillCurve ? g.fillCurve.earlyFree10 : 0),
              sm: (g.fillCurve ? g.fillCurve.selectMedian : 0), fp: (g.fillCurve ? g.fillCurve.forcedPct : 0),
              ps: (g.fillCurve ? ((g.fillCurve.pressurePct3 || 0) * 2 + (g.fillCurve.pressurePeak || 0) * 10 - (g.fillCurve.freeLowPct || 0)) : 0),
+             gl: (g.fillCurve && g.fillCurve.freeLowPct != null ? g.fillCurve.freeLowPct : null),
+             gr: (g.fillCurve && g.fillCurve.freeRunMax != null ? g.fillCurve.freeRunMax : null),
+             gp: (g.fillCurve && g.fillCurve.partialStepPct != null ? g.fillCurve.partialStepPct : null),
+             gs: (g.fillCurve && g.fillCurve.selectMedian != null ? g.fillCurve.selectMedian : null),
+             gf: (g.fillCurve && g.fillCurve.forcedPct != null ? g.fillCurve.forcedPct : null),
+             gfull: (g.fillCurve && g.fillCurve.fullMedian2 != null ? g.fillCurve.fullMedian2 : null),
              qg: (function () { try { return goalStructPass(out) ? 1 : 0; } catch (e) { return 0; } })() };
+    var _gv = 0;
+    if (_t.gl != null && _t.gl > 30) _gv += (_t.gl - 30);
+    if (_t.gr != null && _t.gr > 5) _gv += (_t.gr - 5) * 5;
+    if (_t.gs != null && _t.gs < 2) _gv += (2 - _t.gs) * 20;
+    if (_t.gp != null && _t.gp < 20) _gv += (20 - _t.gp);
+    if (_t.gf != null && _t.gf > 20) _gv += (_t.gf - 20);
+    if (_t.gfull != null && _t.gfull > 3) _gv += (_t.gfull - 3) * 10;
+    _t.gv = _gv;
+    return _t;
   }
   function portfolioBetter(x, y) {
     if (!y) return true;
     if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
     // 【v460】结构门优先：qGate 过 > 不过
     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
+    // 【v474】结构失败分小优先
+    if ((x.gv || 0) !== (y.gv || 0)) return (x.gv || 0) < (y.gv || 0);
     // 【v413】障碍变体：压力分差 ≥15 时优先压力高的，让冰/链/管道变体真正参与选择
     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
     if ((x.pn > 0) !== (y.pn > 0)) return x.pn > 0;
