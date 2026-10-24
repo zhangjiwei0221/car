@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "477";
+var APP_BUILD = "478";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -4854,6 +4854,10 @@ AntSolver.App = (function() {
     var _hasRoute = !!(currentRouteOrder && currentRouteOrder.length);
     var _cutMode = _hasRoute ? 'exposeCut'
       : ((_frontAvg != null && _frontAvg >= 2 && _frontAvg <= 4.5) ? 'exposeCut' : 'layerCut2');
+    // 【v478】切法策略：默认 layerCut2；auto 保留路线/前沿规则
+    var _cutPolicy = (document.getElementById('gen-cut-policy') || {}).value || 'layer';
+    if (_cutPolicy === 'layer') _cutMode = 'layerCut2';
+    else if (_cutPolicy === 'expose') _cutMode = 'exposeCut';
     // 覆盖率 / 主死因 / 只要难关：用户已裁决
     //   · 覆盖率只报告，不再当门槛（targetBand3Min = 0）
     //   · 主死因整行删除，代码路径留待“关卡类型”
@@ -4966,6 +4970,7 @@ AntSolver.App = (function() {
       fillOrder: 'exposure',                // 【v220】铺球：按暴露距离（第 k 辆 ≈ 第 k 步出现）
       debtCarCap: _debtCap,                 // 【v221】债车目标容量（由自适应均值推出）
       cutMode: _cutMode,                    // 【v207】'' = 默认趋势切；'layerAware' = 按层切车；'component' = 合球
+      cutPolicy: _cutPolicy,                 // 【v478】layer/auto/expose
       // 【v350·用户裁决】选 exposeCut 时同步打开行优先摆盘（车单顺序 = 棋盘自上而下）。
       boardLayout: (_cutMode === 'exposeCut') ? 'rowMajor' : undefined,
       // 【2026-10-22·用户裁决】自动切法/自动容量的依据，随记录走（结果条显示）
@@ -5198,7 +5203,7 @@ AntSolver.App = (function() {
     });
     // 【2026-10-22·用户裁决】把“自动选了什么”写进日志，结果条也会显示。
     try {
-      genLog('自动：切法 ' + (_cutMode === 'exposeCut' ? '暴露序+行优先' : '按依赖层') +
+      genLog('切法策略 ' + _cutPolicy + '：' + (_cutMode === 'exposeCut' ? '暴露序+行优先' : '按依赖层') +
         '（前沿 ' + (_frontAvg == null ? '?' : _frontAvg) + '）· 容量 ' + out.boxSizeMin + '~' + out.boxSizeMax +
         (_autoCap ? ' · 容量策略 ' + _capProfile + '（需求块 ' + _autoCap.m + ' · 白给车 ' + _autoCap.free + ' · ' +
           (_autoCap.feasible ? '可压到≤2' : '压不下来，建议冰/改图') + '）' : ''), 'gen-log-ok');
@@ -5811,7 +5816,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v477 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v478 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5883,6 +5888,7 @@ AntSolver.App = (function() {
       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
       row('容量策略', ap.capacityProfile || 'auto') +
       row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
+      row('切法策略', ap.cutPolicy || 'auto') +
       row('棋盘范围', (ap.rows || '-') + ' 行 × ' + (ap.cols || '-') + ' 列') +
       row('候选 / 轮', (ap.candidateCount == null ? '-' : ap.candidateCount) + ' / ' + (ap.portfolioK == null ? '-' : ap.portfolioK)) +
       row('P7 基底', ap.p7BaseCount == null ? '-' : ap.p7BaseCount) +
@@ -5893,7 +5899,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v477', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v478', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6266,6 +6272,7 @@ AntSolver.App = (function() {
         flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs,
         capacityProfile: result.config.capacityProfile || 'auto',
         cutMode: result.config.cutMode || null,
+        cutPolicy: result.config.cutPolicy || 'auto',
         semanticObstacles: !!result.config.semanticObstacles,
         candidateCount: result.config.candidateCount, portfolioK: result.config.portfolioK,
         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime
