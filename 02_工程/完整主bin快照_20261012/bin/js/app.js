@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "478";
+var APP_BUILD = "479";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -4855,7 +4855,7 @@ AntSolver.App = (function() {
     var _cutMode = _hasRoute ? 'exposeCut'
       : ((_frontAvg != null && _frontAvg >= 2 && _frontAvg <= 4.5) ? 'exposeCut' : 'layerCut2');
     // 【v478】切法策略：默认 layerCut2；auto 保留路线/前沿规则
-    var _cutPolicy = (document.getElementById('gen-cut-policy') || {}).value || 'layer';
+    var _cutPolicy = (document.getElementById('gen-cut-policy') || {}).value || 'auto';
     if (_cutPolicy === 'layer') _cutMode = 'layerCut2';
     else if (_cutPolicy === 'expose') _cutMode = 'exposeCut';
     // 覆盖率 / 主死因 / 只要难关：用户已裁决
@@ -5816,7 +5816,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v478 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v479 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5899,7 +5899,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v478', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v479', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
