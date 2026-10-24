@@ -6483,12 +6483,7 @@ AntSolver.Generator = (function() {
     var budget = config.timeBudgetMs != null ? config.timeBudgetMs : 300000;
     var requireHard = !!config.requireHardPass;
     setCurveScore(!!config.curveScore);   // 【v151】曲线评分开关（默认关；见 CURVE_SCORE_ON 注释）
-    // 【v157】卡点判据 v2（R1~R9）：达标才算"可以早停"。因为实测 v2 通过率很低（好关标尺下现批次 0~13%），
-    //   若一直搜到 v2 达标会把每关时间预算烧满 → 这里给"多搜几个候选"设上限（默认 1 个），
-    //   到点就用已评估候选里 v2 最好的那个收尾（candBetter 里的 v2 键负责挑）。config.chokeV2 === false 可整段关掉。
-    var v2On = !(config.chokeV2 === false);
-    var v2Patience = (config.chokeV2Patience != null) ? config.chokeV2Patience : 1;
-    var v2Extra = 0, v2Stop = false;
+    // 【v481】候选搜索只按统一结构门早停；旧 chokeV2 patience 不再结束搜索。
     var t0 = Date.now(), timedOut = false;
     PROGRESS_T0 = t0; PROGRESS_LAST = 0;      // 【v153】进度计时基准（每个 produce 重置）
     // 【仅底部入口】生产前门：源图在底部规则下若有永久不可达像素，直接判"结构不适配"，
@@ -6598,7 +6593,7 @@ AntSolver.Generator = (function() {
       if (c) { c.timedOut = timedOut; c.elapsedMs = Date.now() - t0; }
       GENPERF.totalMs = Date.now() - t0;
       if (!GENPERF.stopReason) {
-        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (candPass(c, requireHard, config) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
+        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (goalStructPass(c) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
       }
       var out = finalizeProduce(c, K, evaluated);
       if (out && fragGate && fragGate.ok === false) out.fragmentWarn = fragGate.detail;   // 【v153】如实带出"碎色超上限但已放行"
@@ -6630,7 +6625,6 @@ AntSolver.Generator = (function() {
     }
     for (var k = 0; k < K; k++) {
       if (timeUp()) break;
-      if (v2Stop) break;                       // 【v157】v2 已多搜够数 → 收手
       GENPERF.baseCandidates++;
       // 【v115】每个候选独立采样一组区间参数 —— 用户裁决「不同的候选都可以随机选取参数限制范围内」，
       // 目的是解决「当前批次关卡都是同样的参数，输出的关卡结构会同质化」。
@@ -6645,28 +6639,21 @@ AntSolver.Generator = (function() {
       mergeFlowStats(flowStats, base.flowStats);
       if (!base.valid) continue;
       consider(base);
-      if (candPass(base, requireHard, config) && meetsEarlyStopQuality(base, config)) return done(base);
-      // 【v157】旧门过了但 v2 没达标 → 不算"可以停"，再给它 v2Patience 个候选的机会
-      if (v2On && candPassLegacy(base, requireHard) && ++v2Extra > v2Patience) v2Stop = true;
-      if (v2Stop) break;
+      if (meetsEarlyStopQuality(base, config)) return done(base);
       var layer = [base];
       for (var round = 1; round <= N && layer.length; round++) {
         if (timeUp()) break;
-        if (v2Stop) break;
         var next = [];
         for (var li = 0; li < layer.length; li++) {
           if (timeUp()) break;
-          if (v2Stop) break;
           for (var b = 0; b < B; b++) {
             if (timeUp()) break;
-            if (v2Stop) break;
             GENPERF.chokeVariants++;
             var child = makeChokeVariantFixed(layer[li], blocks, config, round, flowStats);
             if (!child) continue;
             consider(child);
             reportProgress({ phase: 'variant', k: k + 1, K: K, round: round, N: N, evaluated: evaluated, tier: candTier(child) });
-            if (candPass(child, requireHard, config)) return done(child);
-            if (v2On && candPassLegacy(child, requireHard) && ++v2Extra > v2Patience) v2Stop = true;
+            if (goalStructPass(child)) return done(child);
             next.push(child);
           }
         }
@@ -7960,7 +7947,7 @@ AntSolver.Generator = (function() {
       if (c) { c.timedOut = timedOut; c.elapsedMs = Date.now() - t0; }
       GENPERF.totalMs = Date.now() - t0;
       if (!GENPERF.stopReason) {
-        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (candPass(c, requireHard, config) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
+        GENPERF.stopReason = timedOut ? 'budget_timeout' : (c ? (goalStructPass(c) ? 'pass_early_stop' : 'exhausted') : 'no_candidate');
       }
       var out = finalizeProduce(c, K, evaluated);
       if (out) {
@@ -7973,18 +7960,12 @@ AntSolver.Generator = (function() {
       return out;
     }
     // K 个候选，各初生成(合法性门)；未合格则展开 B 分支 × N 轮 卡点制造树；任一变体合格即停；超时随时兜底退出。
-    var v2Extra = 0, v2Stop = false;   // 【v157】卡点判据 v2 的"多搜几个候选"计数（与 produceFixed 同口径）
     for (var k = 0; k < K; k++) {
       if (timeUp()) break;
-      if (v2Stop) break;
       GENPERF.baseCandidates++;                    // 埋点：基础候选数
       var base = tagAudit(generateFromBlocks(blocks, config));
       consider(base);
-      // 【v157】早停同样要求卡点判据 v2 达标；多搜 v2Patience 个候选为上限（与 produceFixed 同口径）
-      if (candPass(base, requireHard, config) && meetsEarlyStopQuality(base, config)) return done(base);   // 【v257】初生成即合格且到带中段才收工
-      if (!(config.chokeV2 === false) && candPassLegacy(base, requireHard) &&
-          ++v2Extra > ((config.chokeV2Patience != null) ? config.chokeV2Patience : 1)) v2Stop = true;
-      if (v2Stop) break;
+      if (meetsEarlyStopQuality(base, config)) return done(base);   // 【v481】初生成即过统一结构门才收工
       if (!base.valid) continue;                                        // 不可解候选不展开树
       var layer = [base];
       for (var round = 1; round <= N && layer.length; round++) {
@@ -7998,9 +7979,7 @@ AntSolver.Generator = (function() {
             var child = makeChokeVariant(layer[li], blocks, config, round);
             if (!child) continue;
             consider(child);
-            if (candPass(child, requireHard, config)) return done(child);   // 合格即停（旧门 + v2）
-            if (!(config.chokeV2 === false) && candPassLegacy(child, requireHard) &&
-                ++v2Extra > ((config.chokeV2Patience != null) ? config.chokeV2Patience : 1)) { v2Stop = true; break; }
+            if (goalStructPass(child)) return done(child);   // 【v481】统一结构门通过即停
             next.push(child);
           }
         }
@@ -8703,119 +8682,18 @@ AntSolver.Generator = (function() {
     var b = c && c.generationEval && c.generationEval.buried;
     return (b && b.lateMax != null) ? b.lateMax : null;
   }
-  // 【v379】首通 headroom 档：30~80 最优，20~30/80~90 次之，0~20/90~100 最差。
-  //   先于 candTier 比较——否则“首通 100 的困难合格”会一直压住“首通 50 的简单合格”，
-  //   P3 陷阱后处理永远没有 headroom。
-  function headroomRank(c) {
-    // 【v461·用户裁决】贪心首通是随便选，不作为选关依据；只保留指标报告
-    return 0;
-  }
-
   function candBetter(b, a, cfg) {
+    // 【v481】produce/produceFixed 与外层 portfolio 共用同一候选顺序。
+    // 旧审核档、覆盖率、chokeV2 和 targetScore 不再决定候选胜负。
     if (a == null) return true;
-    var _hrb = headroomRank(b), _hra = headroomRank(a);
-    if (_hrb !== _hra) return _hrb < _hra;
-    var _pnb = (b && b.goodV3 && b.goodV3.fillCurve && b.goodV3.fillCurve.pressureN) ? b.goodV3.fillCurve.pressureN : 0;
-    var _pna = (a && a.goodV3 && a.goodV3.fillCurve && a.goodV3.fillCurve.pressureN) ? a.goodV3.fillCurve.pressureN : 0;
-    if ((_pnb > 0) !== (_pna > 0)) return _pnb > 0;
-    var tb = candTier(b), ta = candTier(a);
-    if (tb !== ta) return tb > ta;
-    // 【v182】结构闸门优先：被埋 ≥3 辆的候选（= 稳健玩家必死那种结构）排在后面
-    var bb = buriedOfCand(b), ba = buriedOfCand(a);
-    if ((bb >= 3) !== (ba >= 3)) return ba >= 3;
-    // 【v157】同档第一优先键：卡点判据 v2（用户 R1~R9）
-    //   达标 > 未达标；都达标/都不达标时再比 v2 分（独木桥少、预算判断点多、硬垫步数少、高压不早爆）。
-    // 【v307·用户裁决】兜底也要"挑覆盖率最高的那个"：
-    //   原来 candBetter 完全没有考虑 30~80% 覆盖率（band3Pct），兜底时挑的是"峰窗更高"的，
-    //   跟用户设的覆盖率门槛无关。这里加一档：差距 ≥5 个百分点就按覆盖率高的胜。
-    var _b3b = (b && b.goodV3 && b.goodV3.persist && b.goodV3.persist.band3Pct != null) ? b.goodV3.persist.band3Pct : -1;
-    var _b3a = (a && a.goodV3 && a.goodV3.persist && a.goodV3.persist.band3Pct != null) ? a.goodV3.persist.band3Pct : -1;
-    if (Math.abs(_b3b - _b3a) >= 5) return _b3b > _b3a;
-    var vb = chokeV2Ok(b), va = chokeV2Ok(a);
-    if (vb !== va) return vb > va;
-    // 【v191·实验】峰窗进带优先：先看"在不在 3.2~4.8 带里"，再看离 4.0 多远。
-    //   现行 v183 键是"谁高选谁"，会把峰窗往 5 推——这正是 104/105/110/116 过压的原因。
-    if (cfg && cfg.pressBand) {
-      var qb2 = pressOfCand(b), qa2 = pressOfCand(a);
-      if (qb2 != null && qa2 != null) {
-        var inB = (qb2 >= 3.2 && qb2 <= 4.8), inA2 = (qa2 >= 3.2 && qa2 <= 4.8);
-        if (inB !== inA2) return inB;
-        var db2 = Math.abs(qb2 - 4.0), da2 = Math.abs(qa2 - 4.0);
-        if (Math.abs(db2 - da2) >= 0.3) return db2 < da2;
-      }
-    }
-    // 【v183】压力优先键：两条候选都过了上面两关时，优先"稳健玩家也会被顶住"的那个
-    //   （用已算好的那一局稳健模拟的卡点区峰窗；差 ≥0.5 才认，避免抖动）。
-    var pbP = pressOfCand(b), paP = pressOfCand(a);
-    if (pbP != null && paP != null && Math.abs(pbP - paP) >= 0.5) return pbP > paP;
-    var sb = chokeV2Score(b), sa = chokeV2Score(a);
-    if (sb !== sa) return sb > sa;
-    // 旧键保留（v151/v153）：30~80% 里有没有真卡点（有 > 无），再看曲线分/审核分
-    var mb = (midChokeOf(b) > 0) ? 1 : 0, ma = (midChokeOf(a) > 0) ? 1 : 0;
-    if (mb !== ma) return mb > ma;
-    return candScore(b) > candScore(a);
-  }
-  // requireHard=true 时只认【困难合格】(真实卡点，omniAudit.pass)；简单合格(趋势符合)不算早停条件，继续搜索。
-  function candPassLegacy(c, requireHard) {
-    if (!c || !c.generationEval || !c.generationEval.pass) return false;
-    if (requireHard) return !!(c.audit && c.audit.pass);
-    return true;
-  }
-  /**
-   * 【v157】早停条件 = 旧合格门 **且** 卡点判据 v2 达标（用户 R1~R9）。
-   *   · 可关掉：config.chokeV2 === false 时逐值回到旧行为（只认旧门）。
-   *   · v2 指标缺失（老关卡/异常）时**不拦**——宁可按旧门早停，也不因为量不出指标就把这一关无限搜下去。
-   */
-  /**
-   * 【v257·用户反馈"压力曲线不够"】早停的质量门槛。
-   *   原来的早停条件是 goodV3.pass，而 pass 的下界刚好是目标带下界 3.2 ——
-   *   峰窗 3.2 的关和 3.9 的关一样"合格"，搜索就停在第一个勉强及格的候选上，
-   *   实测最新批次一关只试了 **1 个基础候选、1.75 秒**就收工。
-   *   这里要求"真的到带中段"才允许早停：峰窗 ≥ earlyStopPeak（默认 3.5）、稳健 ≤ earlyStopSteady（默认 70）。
-   *   不达标就继续搜，最后仍取已评估里最好的那个（不会因此变差）。
-   */
-  function meetsEarlyStopQuality(cand, config) {
-    // 【v376】跑满时间：禁用一切“提前收工”，由 portfolioK 决定轮次
-    if (config && config.fullTime) return false;
-    var g = cand && cand.goodV3;
-    if (!g || !g.pass) return false;
-    var p = g.midLateMax;
-    var pMin = (config && config.earlyStopPeak != null) ? +config.earlyStopPeak : 3.5;
-    var sMax = (config && config.earlyStopSteady != null) ? +config.earlyStopSteady : 70;
-    if (p == null || p < pMin) return false;
-    if (g.steadyWonPct != null && g.steadyWonPct > sMax) return false;
-    // 【v262】还要"持久"：只高不行，得扛得久。两个门槛都可配。
-    var geMin = (config && config.earlyStopGe3 != null) ? +config.earlyStopGe3 : 0;
-    var lgMin = (config && config.earlyStopLongest != null) ? +config.earlyStopLongest : 0;
-    var ps = g.persist;
-    if (geMin > 0 || lgMin > 0) {
-      if (!ps) return false;
-      if (geMin > 0 && (ps.ge3Pct || 0) < geMin) return false;
-      if (lgMin > 0 && (ps.longest || 0) < lgMin) return false;
-    }
-    // 【v264】用户目标：30~80% 区间基本都在 ≥3，且最高不超过 4
-    var bMin = (config && config.earlyStopBand3 != null) ? +config.earlyStopBand3 : 0;
-    var bpMax = (config && config.earlyStopBandPeak != null) ? +config.earlyStopBandPeak : 0;
-    if (bMin > 0 || bpMax > 0) {
-      var pp = g.persist;
-      if (!pp) return false;
-      if (bMin > 0 && (pp.band3Pct == null || pp.band3Pct < bMin)) return false;
-      if (bpMax > 0 && (pp.bandPeak || 0) > bpMax) return false;
-    }
-    // 【v263】全知线至少要有 N 个 5% 窗到达卡点线（默认 2），否则继续搜
-    var cwMin = (config && config.earlyStopChokeWin != null) ? +config.earlyStopChokeWin : 0;
-    if (cwMin > 0) {
-      if (!g.persist || (g.persist.chokeWin || 0) < cwMin) return false;
-    }
-    return true;
+    return portfolioBetter(portfolioTuple(b), portfolioTuple(a));
   }
 
-  function candPass(c, requireHard, config) {
-    if (!candPassLegacy(c, requireHard)) return false;
-    if (config && config.chokeV2 === false) return true;
-    var v2 = c.generationEval && c.generationEval.auditV2;
-    if (!v2) return true;
-    return chokeV2Pass(v2.worst);
+  // requireHard/candPass 旧公式已退出生产决策；chokeV2 仍只作报告指标。
+  function meetsEarlyStopQuality(cand, config) {
+    // 【v481】早停与目标/落库共用结构门，不再叠加旧 goodV3 峰窗与稳健线。
+    if (config && config.fullTime) return false;
+    return goalStructPass(cand);
   }
   function tagAudit(c) { if (c && !c.audit && c.generationEval) c.audit = c.generationEval.omni.audit; return c; }
   // 通用：取 pickOrder 进度落在 [lo,hi) 的【普通盒】坐标(去重)
@@ -14403,6 +14281,7 @@ AntSolver.Generator = (function() {
   function bandFixOnce(out, blocks, config) {
     try {
       var gv = out && out.goodV3;
+      if (goalStructPass(out)) return out;
       if (!gv || gv.midLateMax == null) return out;
       var lo = (config && config.targetPeakMin != null) ? +config.targetPeakMin : 3.2;
       var hi = (config && config.targetPeakMax != null) ? +config.targetPeakMax : 4.0;
@@ -14435,23 +14314,7 @@ AntSolver.Generator = (function() {
       var f0 = (gv.fails || []).length, f2 = (alt.goodV3.fails || []).length;
       // 稳健也要算"离带距离"，不能只看峰窗：稳健 100%（怎么打都过）和 峰窗 2.0（没压力）
       //   都是 1 条不合格，但前者是"太简单"、后者是"没做出来"，对用户的价值完全不同。
-      var slo = (config && config.targetSteadyMin != null) ? +config.targetSteadyMin : 30;
-      var shi = (config && config.targetSteadyMax != null) ? +config.targetSteadyMax : 80;
-      function dSteady(v) {
-        if (v == null) return 9;
-        return (v < slo) ? (slo - v) / 20 : (v > shi ? (v - shi) / 20 : 0);
-      }
-      var c0 = d0 + dSteady(gv.steadyWonPct), c2 = d2 + dSteady(alt.goodV3.steadyWonPct);
-      // 【v272】纠偏重产的关**不走 portfolio 的结构组合**，所以覆盖率天然偏低；
-      //   原来只要"离带更近"就替换，实测会把 cov=48% 的关换成 cov=18% 的。
-      //   现在同违规条数时先比覆盖率，覆盖不掉才比带距。
-      var b0 = (gv.persist && gv.persist.band3Pct != null) ? gv.persist.band3Pct : -1;
-      var b2 = (alt.goodV3.persist && alt.goodV3.persist.band3Pct != null) ? alt.goodV3.persist.band3Pct : -1;
-      var better = false;
-      if (f2 !== f0) better = (f2 < f0);
-      else if (b2 !== b0) better = (b2 > b0);
-      else if (Math.abs(c2 - c0) > 0.05) better = (c2 < c0);
-      else better = ((alt.goodV3.steadyWonPct || 0) > (gv.steadyWonPct || 0));
+      var better = candBetter(alt, out, cfg);
       if (better) { alt.bandFix = { from: p, to: p2, ice: ni, failsFrom: f0, failsTo: f2 }; return alt; }
       return out;
     } catch (e) { return out; }
@@ -14483,75 +14346,33 @@ AntSolver.Generator = (function() {
   }
 
   function portfolioTuple(out) {
-    var g = out && out.goodV3;
-    if (!g || !g.fails) return { f: 99, d: 1e9, s: -1 };
-    var p = g.midLateMax;
-    var d = (p == null) ? 1e9 : (p < 3.2 ? (3.2 - p) : (p > 4.8 ? (p - 4.8) : 0));
-    var _t = { f: g.fails.length, d: d, s: (g.steadyWonPct || 0), p: (p == null ? -1 : p), ok: !!g.pass, ap: (g.midLateAudit == null ? -1 : g.midLateAudit), ts: (g.targetScore == null ? null : g.targetScore),
-             fc: (g.fillCurve ? g.fillCurve.medFull : null), lp: (g.fillCurve ? g.fillCurve.lowPct : null),
-             ge: (g.persist ? g.persist.ge3Pct : null), lg: (g.persist ? g.persist.longest : null),
-             cw: (g.persist ? g.persist.chokeWin : null), b3: (g.persist ? g.persist.band3Pct : null), pp: (g.persist && g.persist.playerPassPct != null ? g.persist.playerPassPct : null), pn: (g.fillCurve ? g.fillCurve.pressureN : 0), of: (g.fillCurve ? g.fillCurve.openingFree12 : 0),
-             ep: (g.fillCurve ? g.fillCurve.earlyPeak10 : 0), ef: (g.fillCurve ? g.fillCurve.earlyFree10 : 0),
-             sm: (g.fillCurve ? g.fillCurve.selectMedian : 0), fp: (g.fillCurve ? g.fillCurve.forcedPct : 0),
-             ps: (g.fillCurve ? ((g.fillCurve.pressurePct3 || 0) * 2 + (g.fillCurve.pressurePeak || 0) * 10 - (g.fillCurve.freeLowPct || 0)) : 0),
-             gl: (g.fillCurve && g.fillCurve.freeLowPct != null ? g.fillCurve.freeLowPct : null),
-             gr: (g.fillCurve && g.fillCurve.freeRunMax != null ? g.fillCurve.freeRunMax : null),
-             gp: (g.fillCurve && g.fillCurve.partialStepPct != null ? g.fillCurve.partialStepPct : null),
-             gs: (g.fillCurve && g.fillCurve.selectMedian != null ? g.fillCurve.selectMedian : null),
-             gf: (g.fillCurve && g.fillCurve.forcedPct != null ? g.fillCurve.forcedPct : null),
-             gfull: (g.fillCurve && g.fillCurve.fullMedian2 != null ? g.fillCurve.fullMedian2 : null),
-             qg: (function () { try { return goalStructPass(out) ? 1 : 0; } catch (e) { return 0; } })() };
-    var _gv = 0;
-    if (_t.gl != null && _t.gl > 30) _gv += (_t.gl - 30);
-    if (_t.gr != null && _t.gr > 5) _gv += (_t.gr - 5) * 5;
-    if (_t.gs != null && _t.gs < 2) _gv += (2 - _t.gs) * 20;
-    if (_t.gp != null && _t.gp < 20) _gv += (20 - _t.gp);
-    if (_t.gf != null && _t.gf > 20) _gv += (_t.gf - 20);
-    if (_t.gfull != null && _t.gfull > 3) _gv += (_t.gfull - 3) * 10;
-    _t.gv = _gv;
-    return _t;
+    var g = out && out.goodV3, fc = g && g.fillCurve, ps = g && g.persist;
+    var q = AntSolver.Quality && AntSolver.Quality.fromGeneration(out);
+    // ok 只表示有效关卡，不再冒充 goodV3.pass。qGate/qPass 来自统一 Quality。
+    var t = {
+      ok: !!(out && out.level && out.valid),
+      qg: q && q.gatePass ? 1 : 0,
+      gc: q && q.gateReasons ? q.gateReasons.length : 99,
+      gv: q && q.gateDistance != null ? q.gateDistance : 1e9,
+      qv: q && q.reasons ? q.reasons.length : 99,
+      // 现行压力代理仍保留作同结构、同质量违规数时的比较项；后续由压力曲线 v2 替换。
+      ps: fc ? ((fc.pressurePct3 || 0) * 2 + (fc.pressurePeak || 0) * 10 - (fc.freeLowPct || 0)) : 0,
+      pn: fc && fc.pressureN ? 1 : 0
+    };
+    return t;
   }
   function portfolioBetter(x, y) {
     if (!y) return true;
-    if (!!x.ok !== !!y.ok) return !!x.ok;                 // 能过（可解）优先
-    // 【v460】结构门优先：qGate 过 > 不过
+    if (!!x.ok !== !!y.ok) return !!x.ok;
     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
-    // 【v474】结构失败分小优先
-    if ((x.gv || 0) !== (y.gv || 0)) return (x.gv || 0) < (y.gv || 0);
-    // 【v413】障碍变体：压力分差 ≥15 时优先压力高的，让冰/链/管道变体真正参与选择
+    if ((x.gc == null ? 99 : x.gc) !== (y.gc == null ? 99 : y.gc)) return (x.gc == null ? 99 : x.gc) < (y.gc == null ? 99 : y.gc);
+    if ((x.gv == null ? 1e9 : x.gv) !== (y.gv == null ? 1e9 : y.gv)) return (x.gv == null ? 1e9 : x.gv) < (y.gv == null ? 1e9 : y.gv);
+    // qPass 不是交付硬门；只比较未过项数量，避免旧覆盖率/targetScore 改写质量目标。
+    if ((x.qv == null ? 99 : x.qv) !== (y.qv == null ? 99 : y.qv)) return (x.qv == null ? 99 : x.qv) < (y.qv == null ? 99 : y.qv);
     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
-    if ((x.pn > 0) !== (y.pn > 0)) return x.pn > 0;
-    if (x.ts != null || y.ts != null) {
-      if (!!x.ok !== !!y.ok) return !!x.ok;
-      // 【v270 修】原来直接比 targetScore，而 targetScore 把"峰窗离 3.6 多远"算进去，
-      //   0.1 的峰窗差异就能压过 30 个百分点的覆盖率 —— 实测 seed401 选了 cov=4% 而丢掉 cov=35%。
-      //   用户口径是"30~80 覆盖优先"，所以：同违规条数时**先比覆盖率**，再比 targetScore。
-      if (x.f !== y.f) return x.f < y.f;
-      var _b3x = (x.b3 == null ? -1 : x.b3), _b3y = (y.b3 == null ? -1 : y.b3);
-      if (_b3x !== _b3y) return _b3x > _b3y;
-      if ((x.ts || 9) !== (y.ts || 9)) return (x.ts || 9) < (y.ts || 9);
-      // 【v238】目标分打平时的加赛：优先「吃满≤1 的步占比」落在 45~90%（实测合格关集中带）。
-      //   只影响完全同分的情况，不改合格门、不改目标分公式。
-      var _band = function (v) { return (v == null) ? 99 : (Math.max(0, 45 - v) + Math.max(0, v - 90)); };
-      if (_band(x.lp) !== _band(y.lp)) return _band(x.lp) < _band(y.lp);
-      // 【v262】仍然同分：优先"全知压力更持久"的（≥3 步占比 + 最长连续）
-      var _pers = function (t) { return ((t.b3 || 0) * 10.0 + (t.cw || 0) * 2.0 + (t.ge || 0) * 1.0 + (t.lg || 0) * 2.0); };  // v264：30-80 覆盖占比优先
-      if (_pers(x) !== _pers(y)) return _pers(x) > _pers(y);
-      return false;
-    }
-    if (_AUDIT_FIRST) {
-      if (x.ap !== y.ap) return x.ap > y.ap;              // 全知线峰窗大的胜
-      if (x.p !== y.p) return x.p > y.p;
-      return x.s > y.s;
-    }
-    if (_PRESSURE_FIRST) {
-      if (x.p !== y.p) return x.p > y.p;                  // 压力优先：峰窗大的胜
-      if (x.f !== y.f) return x.f < y.f;
-      return x.s > y.s;
-    }
-    if (x.f !== y.f) return x.f < y.f;
-    if (Math.abs(x.d - y.d) > 0.05) return x.d < y.d;
-    return x.s > y.s;
+    if ((x.pn || 0) !== (y.pn || 0)) return (x.pn || 0) > (y.pn || 0);
+    if ((x.ps || 0) !== (y.ps || 0)) return (x.ps || 0) > (y.ps || 0);
+    return false;
   }
 
   /**
@@ -14692,24 +14513,7 @@ AntSolver.Generator = (function() {
     if (!(maxRounds > 0)) maxRounds = 0;
     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
     function passed(r) { return goalStructPass(r); }
-    function score(r) {
-      if (!r || !r.level) return -1e15;
-      var s = 0;
-      if (r.valid) s += 1e6;
-      if (!r.fallback) s += 1e5;
-      // 【v475】目标模式 best 按结构门选，不再按旧 goodV3/覆盖率
-      try { if (goalStructPass(r)) s += 1e12; } catch (e) { }
-      var p = (r.goodV3 && r.goodV3.persist) || {};
-      var fc = (r.goodV3 && r.goodV3.fillCurve) || {};
-      s += (fc.selectMedian || 0) * 1000;
-      s -= (fc.freeLowPct || 0) * 100;
-      if (fc.freeRunMax != null && fc.freeRunMax > 5) s -= (fc.freeRunMax - 5) * 1000;
-      if (fc.fullMedian2 != null && fc.fullMedian2 > 3) s -= (fc.fullMedian2 - 3) * 1000;
-      s += (p.band3Pct || 0) * 10;
-      s += (r.difficulty && r.difficulty.score) || 0;
-      return s;
-    }
-    var best = null, rounds = 0, stopped = false;
+    var best = null, bestT = null, rounds = 0, stopped = false;
     while (true) {
       if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
       if (maxRounds && rounds >= maxRounds) break;
@@ -14727,7 +14531,8 @@ AntSolver.Generator = (function() {
       }
       rounds++;
       if (r) r.goalRound = rounds;
-      if (!best || score(r) > score(best)) best = r;
+      var rt = portfolioTuple(r);
+      if (!best || portfolioBetter(rt, bestT)) { best = r; bestT = rt; }
       if (passed(r)) break;
     }
     if (best) {
@@ -14809,7 +14614,7 @@ AntSolver.Generator = (function() {
           var _to = flow === 'old' ? produce(blocks, _tc) : produceFixed(blocks, _tc, opts);
           var _tt = portfolioTuple(_to);
           if (_to && (!_bestT || portfolioBetter(_tt, _bestTT))) { _bestT = _to; _bestTT = _tt; _bestTv = _v; }
-          if (_bestT && _bestT.goodV3 && _bestT.goodV3.pass) break;
+          if (_bestT && goalStructPass(_bestT)) break;
         }
         out = _bestT;
         if (out) out.targetSweep = { best: _bestTv };
@@ -14854,9 +14659,9 @@ AntSolver.Generator = (function() {
           var _po = flow === 'old' ? produce(blocks, _pc) : produceFixed(blocks, _pc, opts);
           _triedP++;
           var _pt = portfolioTuple(_po);
-          if (_po && _po.goodV3 && _po.goodV3.pass) _passP++;
+          if (_po && goalStructPass(_po)) _passP++;
           if (_po && (!_bestP || portfolioBetter(_pt, _bestPT))) { _bestP = _po; _bestPT = _pt; _bestPV = _v2; }
-          if (_bestP && _bestP.goodV3 && _bestP.goodV3.pass && (_bestP.goodV3.midLateMax || 0) >= 4.5) break;
+          if (_bestP && goalStructPass(_bestP)) break;
         }
         out = _bestP;
         if (out) out.pressureSweep = { tried: _triedP, passes: _passP, best: _bestPV };
@@ -14883,9 +14688,9 @@ AntSolver.Generator = (function() {
         var _do = flow === 'old' ? produce(blocks, _dcfg) : produceFixed(blocks, _dcfg, opts);
         _triedD++;
         var _dt = portfolioTuple(_do);
-        if (_do && _do.goodV3 && _do.goodV3.pass) _passD++;
+        if (_do && goalStructPass(_do)) _passD++;
         if (_do && (!_bestD || portfolioBetter(_dt, _bestDT))) { _bestD = _do; _bestDT = _dt; _bestTarget = _v.target + ("" + (_v.inflate ? '/' + _v.inflate : '')); }
-        if (_bestD && _bestD.goodV3 && _bestD.goodV3.pass) break;
+        if (_bestD && goalStructPass(_bestD)) break;
       }
       out = _bestD;
       if (out) out.designSweep = { variants: _variants, tried: _triedD, passes: _passD, best: _bestTarget };
@@ -15044,11 +14849,11 @@ AntSolver.Generator = (function() {
         }
         _tried++;
         var _t = portfolioTuple(_o);
-        if (_o && _o.goodV3 && _o.goodV3.pass) _passes++;
+        if (_o && goalStructPass(_o)) _passes++;
         if (_o && (!_best || portfolioBetter(_t, _bestT))) { _best = _o; _bestT = _t; }
         if (!config._attemptLog) config._attemptLog = [];
         config._attemptLog.push({ dim: _cfg.boardRowsMax + 'x' + _cfg.boardColsMax, mix: _cfg._mixTag || '-', ok: !!( _o && _o.level), cov: (_o && _o.goodV3 && _o.goodV3.persist) ? _o.goodV3.persist.band3Pct : null });
-        if (_best && meetsEarlyStopQuality(_best, config)) break;   // 【v257】到带中段才早停
+        if (_best && meetsEarlyStopQuality(_best, config)) break;   // 【v481】统一结构门通过才早停
       }
       out = _best;
       if (out) out.portfolio = { K: _pk, tried: _tried, passes: _passes, tuple: _bestT };
@@ -15115,7 +14920,7 @@ AntSolver.Generator = (function() {
           var _alt = runFlowOnce(blocks, _a3dCfg, {});
           var _afc = _alt && _alt.goodV3 && _alt.goodV3.fillCurve;
           var _afp = _afc ? _afc.freePct : null;
-          if (_alt && _alt.level && _afp != null && _afp <= _fp0 - 5) {
+          if (_alt && _alt.level && _afp != null && _afp <= _fp0 - 5 && candBetter(_alt, out, config)) {
             out = _alt;
             out.a3d = { fromCut: _curCut, toCut: _altCut, fromFreePct: _fp0, toFreePct: _afp };
           } else {
@@ -15163,8 +14968,9 @@ AntSolver.Generator = (function() {
               if (_qA.T != null && _qB.T != null && _qA.T < _qB.T - 5) _bad = true;
               if (_qA.R != null && _qB.R != null && _qA.R < _qB.R - 5) _bad = true;
             }
+            if (!_bad && !candBetter(_ev, out, config)) _bad = true;
             if (_bad) {
-              out.trapPost = { applied: false, reason: 'free/T guard', ms: Date.now() - _t0 };
+              out.trapPost = { applied: false, reason: 'quality/structure guard', ms: Date.now() - _t0 };
             } else {
               out.level = _ev.level; out.solveResult = _ev.solveResult; out.audit = _ev.audit;
               out.goodV3 = _ev.goodV3; out.valid = true;

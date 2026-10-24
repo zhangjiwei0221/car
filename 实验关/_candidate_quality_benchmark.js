@@ -1,0 +1,14 @@
+// v481 候选质量基准：node 实验关/_candidate_quality_benchmark.js [git-ref或空串] 输出.jsonl
+// 3图×3seed；容量取各图推导值且三处一致，不改容量边界；只写指定 JSONL，不改输出文件。
+const vm=require('vm'),fs=require('fs'),path=require('path'),crypto=require('crypto'),cp=require('child_process');
+const ref=process.argv[2]||'',outPath=process.argv[3];if(!outPath)throw Error('usage: script [ref] out.jsonl');
+const BIN='02_工程/完整主bin快照_20261012/bin/js',FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','generator.js'];
+const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,setTimeout,clearTimeout,Infinity,Math,JSON,Date};vm.createContext(sb);
+for(const f of FILES){const rel=BIN+'/'+f,src=ref?cp.execFileSync('git',['show',ref+':'+rel],{encoding:'utf8',maxBuffer:20*1024*1024}):fs.readFileSync(rel,'utf8');vm.runInContext(src,sb,{filename:f});}
+const G=sb.AntSolver.Generator,Q=sb.AntSolver.Quality,images=['实验关/35x35拼接图纸_006.txt','实验关/好图_35x35_碎块_20261023.txt','实验关/推荐_35x35_碎块_20261023.txt'];fs.writeFileSync(outPath,'');
+for(const image of images){const blocks=G.blocksFromTXT(fs.readFileSync(image,'utf8')),band=G.deriveCapacityBand(blocks),cap=band.chosen;
+ for(const seed of [1001,1002,1003]){const cfg=Object.assign({},G.DEFAULT_CONFIG,{boxSizeMin:cap,boxSizeMax:cap,capNormMin:cap,capNormMax:cap,boardRowsMin:6,boardRowsMax:9,boardColsMin:6,boardColsMax:10,candidateCount:1,portfolioK:3,difficultyRounds:1,timeBudgetMs:20000,generatorFlow:'old',targetCarCount:0,hardOnly:true,acceptMode:'target',targetPeakMin:3.2,targetPeakMax:4.8,targetSteadyMin:0,targetSteadyMax:100,targetBand3Min:0,targetBand4Min:0,targetPlayerPassMin:0,targetPlayerPassMax:100,targetWMin:0,targetWLowMax:100,targetHiddenDeathMax:20,p7Repair:false,boardFirst:true,costlyAlt:false,semanticObstacles:false,semanticEarly:false,semanticRouteLock:false,fullTime:false,trapPost:false,cutMode:undefined,cutPolicy:'auto',seed,row0FreeMax:1,row0FreeIce:1,row0ColorMax:2,iceSchedule:true});
+ const t=Date.now(),r=G.produce(blocks,cfg),fc=r&&r.goodV3&&r.goodV3.fillCurve||{},p=r&&r.goodV3&&r.goodV3.persist||{},q=r&&Q&&Q.fromGeneration(r)||{};
+ const row={ref:ref||'worktree',image:path.basename(image),seed,cap,ms:Date.now()-t,hash:crypto.createHash('sha256').update(JSON.stringify(r&&r.level)).digest('hex'),valid:!!(r&&r.valid),gate:G.goalStructPass(r),qPass:!!q.pass,qViolations:(q.reasons||[]).length,fallback:!!(r&&r.fallback),tried:r&&r.portfolio&&r.portfolio.tried,freeLow:fc.freeLowPct,freeRun:fc.freeRunMax,full:fc.fullMedian2,select:fc.selectMedian,partial:fc.partialStepPct,pressure3:fc.pressurePct3,peak:fc.pressurePeak,first:p.playerPassPct,learned:p.learnedPassPct,look:p.lookaheadPassPct,T:p.quality&&p.quality.T,R:p.quality&&p.quality.R};
+ fs.appendFileSync(outPath,JSON.stringify(row)+'\n');console.log(JSON.stringify(row));
+ }}

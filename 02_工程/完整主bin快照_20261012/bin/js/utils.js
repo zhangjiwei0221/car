@@ -773,7 +773,7 @@ AntSolver.fromGameFormat = function (g) {
 /**
  * 唯一的 qPass / qGate 口径来源。
  *
- * 这里只集中“现行数值口径”，v480 不调整任何阈值，也不改变候选排序。
+ * v480 集中现行数值口径；v481 增加 gateDistance 供候选排序，qGate/qPass 阈值不变。
  * 输入是已经求值后的指标，不在本模块重复求解或跑玩家，避免 app 与 generator 各算一套。
  * fromGeneration() 同时接受 produce 候选 {level, goodV3} 与落库关卡数据
  * {blocks, board, generationEval:{goodV3}}，便于用真关卡做等价回归。
@@ -829,6 +829,21 @@ AntSolver.Quality = (function () {
     return { pass: pass, gatePass: gatePass, gateReasons: g, label: label, reasons: r };
   }
 
+  // 两个候选都未过结构门时，先比较“离门有多远”，再比较 qPass。
+  // 只用于候选排序，不是新的交付门；权重沿用 v474 的相对量级并补齐 hidden。
+  function gateDistance(o) {
+    if (!o || !o.level || !o.valid) return 1e9;
+    var d = 0;
+    if (o.hidden != null && o.hidden > 20) d += o.hidden - 20;
+    if (o.freeLowPct != null && o.freeLowPct > 30) d += o.freeLowPct - 30;
+    if (o.freeRunMax != null && o.freeRunMax > 6) d += (o.freeRunMax - 6) * 5;
+    if (o.selectMed != null && o.selectMed < 2) d += (2 - o.selectMed) * 20;
+    if (o.partialStepPct != null && o.partialStepPct < 20) d += 20 - o.partialStepPct;
+    if (o.forcedPct != null && o.forcedPct > 20) d += o.forcedPct - 20;
+    if (o.fullMed2 != null && o.fullMed2 > 3) d += (o.fullMed2 - 3) * 10;
+    return d;
+  }
+
   function fromGeneration(result) {
     var r = result || {};
     var level = r.level || ((r.blocks && r.board) ? r : null);
@@ -836,7 +851,7 @@ AntSolver.Quality = (function () {
     var p = g.persist || {}, fc = g.fillCurve || {}, q = p.quality || {};
     var dc = p.deathCauses || {}, dt = 0, dh = 0;
     for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
-    var out = verdict({
+    var input = {
       valid: !!r.valid, level: level,
       learned: p.learnedPassPct != null ? p.learnedPassPct : null,
       look: p.lookaheadPassPct != null ? p.lookaheadPassPct : null,
@@ -850,16 +865,18 @@ AntSolver.Quality = (function () {
       freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
       freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
       partialStepPct: fc.partialStepPct != null ? fc.partialStepPct : null
-    });
+    };
+    var out = verdict(input);
     // 与旧 goalStructPass 一致：没有完整 persist/fillCurve 时，结构门是“未测不通过”，
     // 不能把 null 指标当成全部合格。qPass 文案仍由 verdict 按缺项报告。
     if (!g.persist || !g.fillCurve) {
       out.gatePass = false;
       out.gateReasons = ['结构指标未测'];
     }
+    out.gateDistance = (g.persist && g.fillCurve) ? gateDistance(input) : 1e9;
     out.schema = SCHEMA;
     return out;
   }
 
-  return { schema: SCHEMA, verdict: verdict, fromGeneration: fromGeneration };
+  return { schema: SCHEMA, verdict: verdict, gateDistance: gateDistance, fromGeneration: fromGeneration };
 })();
