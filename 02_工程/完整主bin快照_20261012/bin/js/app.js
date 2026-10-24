@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "464";
+var APP_BUILD = "465";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -2117,13 +2117,16 @@ AntSolver.App = (function() {
   function renderLevelInfo() {
     if (!currentLevel) return;
     var html = '';
-    html += '<p>尺寸: ' + currentLevel.rows + '×' + currentLevel.cols + '</p>';
-    html += '<p>像素: ' + currentLevel.totalPixels + '</p>';
+    // 【v465】顶部关卡信息横向排，减少高度
+    html += '<div class="lvl-meta">';
+    html += '<span><b>尺寸</b> ' + currentLevel.rows + '×' + currentLevel.cols + '</span>';
+    html += '<span><b>像素</b> ' + currentLevel.totalPixels + '</span>';
     if (currentLevel.board) {
-      html += '<p>棋盘: ' + currentLevel.board.rows + '×' + currentLevel.board.cols + '</p>';
+      html += '<span><b>棋盘</b> ' + currentLevel.board.rows + '×' + currentLevel.board.cols + '</span>';
     }
-    html += '<p>蚂蚁盒: ' + (currentLevel.totalBoxes || 0) + '个</p>';
-    html += '<p>暂存: ' + currentLevel.bufferLimit + '格</p>';
+    html += '<span><b>蚂蚁盒</b> ' + (currentLevel.totalBoxes || 0) + '</span>';
+    html += '<span><b>暂存</b> ' + currentLevel.bufferLimit + '格</span>';
+    html += '</div>';
     // 【v120】卡点类型信息与位置（用户：「输出报告和模拟游玩的关卡信息要显示卡点类型的信息和位置等」）。
     //   数据来自生成期的 chokeMarks / chokePlan / chokeStat，只有【本次在页面上生成】的关卡才有；
     //   导入的关卡本体不含这些（卡点信息只进生产侧记录，不入关卡 JSON），此时如实不显示，
@@ -2164,11 +2167,13 @@ AntSolver.App = (function() {
       }
     }
     html += '<hr style="border-color:#4a3a2c;margin:8px 0">';
+    html += '<div class="lvl-colors">';
     for (var id in currentLevel.colorCounts) {
       var c = AntSolver.getColorCSS(parseInt(id));
-      html += '<span style="display:inline-block;width:10px;height:10px;background:' + c + ';border-radius:2px;margin-right:4px;vertical-align:middle"></span>';
-      html += '<span style="font-size:11px;color:#999">' + AntSolver.getColorName(parseInt(id)) + ': ' + currentLevel.colorCounts[id] + '</span><br>';
+      html += '<span class="lvl-color"><i style="background:' + c + '"></i>' +
+        AntSolver.getColorName(parseInt(id)) + ' <b>' + currentLevel.colorCounts[id] + '</b></span>';
     }
+    html += '</div>';
     document.getElementById('status-content').innerHTML = html;
   }
 
@@ -5793,7 +5798,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v464 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v465 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5862,7 +5867,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v464', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v465', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -5921,9 +5926,17 @@ AntSolver.App = (function() {
     results.forEach(function (r) {
       if (!r.valid) { fail++; return; }
       if (r.fallback) { fallback++; return; }
-      // v104：档次字样改为「合格 / 简单关·趋势过平」；旧字样一并认，历史批次口径不变
-      if (r.qPass) hard++;
-      else if (r.qLabel && r.qLabel.indexOf('可玩') === 0) easy++;
+      // 【v465】进度条与落库口径统一：结构门 qGate 通过 = 合格
+      if (r.qGatePass === true) {
+        hard++;
+        if (!r.qPass) easy++;   // 子集：结构合格但质量项未全过
+      } else if (r.qGatePass === false) {
+        fail++;
+      } else if (r.qPass) {
+        hard++;
+      } else if (r.qLabel && r.qLabel.indexOf('可玩') === 0) {
+        easy++;
+      }
     });
     var setTxt = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
     setTxt('gen-stat-hard', hard); setTxt('gen-stat-easy', easy);
@@ -6407,6 +6420,8 @@ AntSolver.App = (function() {
       name: rec.name, valid: !!rec.valid,
       audit: rec.audit ? { tier: rec.audit.tier, pass: rec.audit.pass, easyPass: rec.audit.easyPass,
         usable: rec.audit.usable, easyQuota: rec.audit.easyQuota, hasChoke: rec.audit.hasChoke } : null,
+      qGatePass: rec.qGatePass, qGateReasons: rec.qGateReasons || null,
+      qPass: !!rec.qPass, qLabel: rec.qLabel || null,
       difficulty: rec.difficulty, grade: rec.grade,
       fallback: !!rec.fallback, fallbackType: rec.fallbackType,
       elapsedMs: rec._elapsedMs || null, outPath: (paths && (paths.level || paths.txt)) || '', persisted: true
@@ -6834,9 +6849,10 @@ AntSolver.App = (function() {
       genShowResultBanner(rec);
       genRenderReport(rec);
       genMaybeAutoMap(rec);
-      genLog('[目标预览·未达标，继续跑] 第' + round + '轮 当前最好 · ' + (rec.qLabel || '-') +
-        ' · 首通' + (rec.playerPassPct == null ? '-' : rec.playerPassPct + '%') +
-        ' · T' + (rec.tPct == null ? '-' : rec.tPct) +
+      genLog('[目标预览] 第' + round + '轮 当前最好 · ' + (rec.qLabel || '-') +
+        ' · 可选中位' + (rec.selectMed == null ? '-' : rec.selectMed) +
+        ' · 吃满' + (rec.fullMed2 == null ? '-' : rec.fullMed2) +
+        ' · partial' + (rec.partialStepPct == null ? '-' : rec.partialStepPct + '%') +
         ' · freeLow' + (rec.freeLowPct == null ? '-' : rec.freeLowPct + '%'), 'gen-log-ok');
     } catch (e) { genLog('目标预览失败：' + ((e && e.message) || e), 'gen-log-warn'); }
   }
@@ -6852,7 +6868,7 @@ AntSolver.App = (function() {
     var _ph = { roundStart: '开轮', roundDone: '本轮结果', candidate: '候选', variant: '变体' }[p.phase] || (p.phase || '生成');
     var _extra = '';
     if (p.phase === 'roundStart') _extra = ' · 切法' + (p.cut || '-') + ' · 冰' + (p.ice == null ? '-' : p.ice) + ' · 链' + (p.chain == null ? '-' : p.chain) + ' · 管' + (p.pipes == null ? '-' : p.pipes);
-    if (p.phase === 'roundDone') _extra = ' · ' + (p.valid ? '有关卡' : '无关卡') + ' · 首通' + (p.first == null ? '-' : p.first + '%') + ' · T' + (p.T == null ? '-' : p.T) + ' · freeLow' + (p.freeLow == null ? '-' : p.freeLow + '%') + ' · 压力' + (p.pressure == null ? '-' : p.pressure + '%');
+    if (p.phase === 'roundDone') _extra = ' · ' + (p.valid ? '有关卡' : '无关卡') + ' · 可选中位' + (p.select == null ? '-' : p.select) + ' · 吃满' + (p.full == null ? '-' : p.full) + ' · partial' + (p.partial == null ? '-' : p.partial + '%') + ' · freeLow' + (p.freeLow == null ? '-' : p.freeLow + '%') + ' · 免费连' + (p.freeRun == null ? '-' : p.freeRun);
     var el = document.getElementById('gen-progress-current');
     if (el) el.textContent = '处理中 (' + (idx + 1) + '/' + total + '): ' + nm +
       '　· ' + _ph + ' · 轮 ' + (p.round || 0) + '/' + (p.N || 0) +
@@ -7349,6 +7365,15 @@ AntSolver.App = (function() {
           }
           var curEl2 = document.getElementById('gen-progress-current');
           if (curEl2) curEl2.textContent = (genBatchAborted ? '已停止' : '已完成') + '，输出目录：' + relDir;
+          var _teF = document.getElementById('gen-progress-time');
+          if (_teF) {
+            var _lastMs = 0;
+            for (var _ri = 0; _ri < results.length; _ri++) {
+              if (results[_ri] && results[_ri].elapsedMs != null && results[_ri].elapsedMs > _lastMs) _lastMs = results[_ri].elapsedMs;
+            }
+            _teF.textContent = '已用时 ' + Math.round((Date.now() - (genBatchStartAt || Date.now())) / 1000) +
+              's · 本关已跑 ' + Math.round(_lastMs / 1000) + 's（每关完成即可用，可随时停止）';
+          }
         })
         .catch(function (e) { genLog('收尾通知服务失败：' + e.message + '（已落库的关卡不受影响）', 'gen-log-warn'); });
       renderGenResultTable(genResultHistory, true);   // 【v153】收尾也用历史渲染（跨批次保留）

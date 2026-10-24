@@ -1,0 +1,348 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css"
+index 6ee0c3f..b74bb08 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/css/style.css"
+@@ -1154,3 +1154,46 @@ section h3 span { color: var(--muted); font-weight: normal; }
+ #panel-center {
+   grid-column: 1 !important;
+ }
++
++/* ===== v465：关卡信息横向紧凑 ===== */
++#status-content .lvl-meta {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 3px 10px;
++  margin: 0 0 4px;
++  font-size: 12px;
++  line-height: 1.5;
++}
++#status-content .lvl-meta span {
++  white-space: nowrap;
++}
++#status-content .lvl-meta b {
++  color: var(--muted);
++  font-weight: 500;
++  margin-right: 2px;
++}
++#status-content .lvl-colors {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 3px 8px;
++  margin-top: 2px;
++}
++#status-content .lvl-color {
++  display: inline-flex;
++  align-items: center;
++  gap: 3px;
++  font-size: 11px;
++  color: #999;
++  white-space: nowrap;
++}
++#status-content .lvl-color i {
++  width: 9px;
++  height: 9px;
++  border-radius: 2px;
++  display: inline-block;
++  flex: 0 0 auto;
++}
++#status-content .lvl-color b {
++  color: var(--text);
++  font-weight: 600;
++}
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 3482220..0f90690 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=464">
++  <link rel="stylesheet" href="css/style.css?v=465">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v464</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v465</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -393,15 +393,6 @@
+         <label><input type="checkbox" id="gen-semantic-obstacles" checked> 语义障碍（ready 重放冰/链）</label>
+         <span class="gen-hint">关掉 = 纯基线</span>
+       </div>
+-      <!-- 【v352·用户裁决】指针/路线：用路径工具画一条消除路线，导出 JSON 后从这里导入，
+-           生成器按该路线的【颜色先后】切车单 —— 目标图能消什么仍由几何决定，这里只改「先给哪个颜色的车」。 -->
+-      <div class="gen-row" style="margin-top:8px" title="导入路径工具导出的 JSON。生成器按该路线给出的颜色先后切球，让玩家从你指定的方向突破。只在「按暴露顺序切」模式下生效。">
+-        <label>路线（指针）</label>
+-        <button id="btn-import-route" style="padding:3px 10px">导入路线 JSON</button>
+-        <button id="btn-clear-route" style="padding:3px 10px">清除</button>
+-        <span class="gen-hint" id="gen-route-name">未导入（不导入 = 按目标图自动顺序）</span>
+-      </div>
+-      <input type="file" id="route-input" accept=".json" style="display:none">
+       
+       </div>
+ 
+@@ -577,19 +568,6 @@
+       </div>
+       <div id="cutplan-body" style="white-space:pre-wrap;font-size:11px;color:#5a4632;line-height:1.5"></div>
+     </section>
+-    <!-- 2. 开始生成 -->
+-    <section class="gen-card">
+-      <h2>3. 开始生产</h2>
+-      <div class="gen-row">
+-        <button id="btn-gen-start" class="gen-btn-primary">▶ 批量生产（每关自动落库）</button>
+-        <button id="btn-gen-stop" class="gen-btn-danger hidden">■ 停止</button>
+-        <button id="btn-gen-persist-retry" class="gen-btn-danger hidden" title="上一关写盘失败后，修好问题(如重启本地生产服务)再点此重试；服务端幂等，不会重复写">↻ 重试落库</button>
+-      </div>
+-      <div class="gen-row" style="margin-top:6px">
+-        <label class="gen-hint" title="每生产完一关，就把该关【直接装到中间的棋盘区】（不进模拟游玩），方便一边生产一边看棋盘。&#10;取消勾选则只记录、不动棋盘。想看详细局面时点结果行末尾的「🎮 带入棋盘」进模拟态。"><input type="checkbox" id="gen-auto-map" checked> 生成后自动映射到棋盘</label>
+-      </div>
+-      <div id="gen-persist-status" class="gen-persist-status">用 网页启动器/启动生产器(http).command 启动后，每生产完一关会立即写入 输出文件/&lt;批次名&gt;-月-日/，无需下载ZIP。</div>
+-    </section>
+ 
+     <!-- 批量分析结果（快速难度分析，不落 ZIP） -->
+     <section id="analysis-result" class="gen-card hidden">
+@@ -603,19 +581,28 @@
+       <div id="choke-audit-body"></div>
+     </section>
+ 
+-    <!-- 3. 生产进度可视化 -->
+-    <section id="gen-progress-card" class="gen-card hidden">
+-      <h2>4. 生产进度</h2>
+-      <div id="gen-progress-bar-wrap">
++    <!-- 3. 开始生产 + 进度（v465 合并） -->
++    <section id="gen-progress-card" class="gen-card">
++      <h2>3. 开始生产与进度</h2>
++      <div class="gen-row">
++        <button id="btn-gen-start" class="gen-btn-primary">▶ 批量生产（每关自动落库）</button>
++        <button id="btn-gen-stop" class="gen-btn-danger hidden">■ 停止</button>
++        <button id="btn-gen-persist-retry" class="gen-btn-danger hidden" title="上一关写盘失败后，修好问题(如重启本地生产服务)再点此重试；服务端幂等，不会重复写">↻ 重试落库</button>
++      </div>
++      <div class="gen-row" style="margin-top:6px">
++        <label class="gen-hint" title="每生产完一关，就把该关【直接装到中间的棋盘区】（不进模拟游玩），方便一边生产一边看棋盘。&#10;取消勾选则只记录、不动棋盘。想看详细局面时点结果行末尾的「🎮 带入棋盘」进模拟态。"><input type="checkbox" id="gen-auto-map" checked> 生成后自动映射到棋盘</label>
++      </div>
++      <div id="gen-persist-status" class="gen-persist-status">用 网页启动器/启动生产器(http).command 启动后，每生产完一关会立即写入 输出文件/&lt;批次名&gt;-月-日/，无需下载ZIP。</div>
++      <div id="gen-progress-bar-wrap" style="margin-top:8px">
+         <div id="gen-progress-bar"><div id="gen-progress-fill"></div></div>
+         <span id="gen-progress-pct">0%</span>
+       </div>
+       <div id="gen-progress-current" class="gen-progress-current">—</div>
+       <div id="gen-progress-stats" class="gen-stat-chips">
+-        <span class="gen-chip gen-chip-hard" title="qPass 质量合格">质量合格 <b id="gen-stat-hard">0</b></span>
+-        <span class="gen-chip gen-chip-easy" title="未达 qPass，只可见不交付">未达标 <b id="gen-stat-easy">0</b></span>
++        <span class="gen-chip gen-chip-hard" title="结构门 qGate 通过即交付合格">合格 <b id="gen-stat-hard">0</b></span>
++        <span class="gen-chip gen-chip-easy" title="结构门已过，但 qPass 质量项未全过">质量未达 <b id="gen-stat-easy">0</b></span>
+         <span class="gen-chip gen-chip-fallback" title="搜索超时或穷尽仍无合格，选出的最接近候选">兜底 <b id="gen-stat-fallback">0</b></span>
+-        <span class="gen-chip gen-chip-fail" title="不可解/异常">失败 <b id="gen-stat-fail">0</b></span>
++        <span class="gen-chip gen-chip-fail" title="不可解 / 异常 / 结构门未过">失败 <b id="gen-stat-fail">0</b></span>
+       </div>
+       <div id="gen-progress-time" class="gen-progress-time">已用时 0s · 预估剩余 —</div>
+       <div class="gen-log-head">
+@@ -763,21 +750,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=464"></script>
+-  <script src="js/utils.js?v=464"></script>
++  <script src="js/zip.js?v=465"></script>
++  <script src="js/utils.js?v=465"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=464"></script>
+-  <script src="js/simulator.js?v=464"></script>
++  <script src="js/color-libs.js?v=465"></script>
++  <script src="js/simulator.js?v=465"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=464"></script>
+-  <script src="js/solver-strategy.js?v=464"></script>
+-  <script src="js/solver.js?v=464"></script>
+-  <script src="js/playersim.js?v=464"></script>
+-  <script src="js/generator.js?v=464"></script>
+-  <script src="js/analysis.js?v=464"></script>
++  <script src="js/anchor-cut.js?v=465"></script>
++  <script src="js/solver-strategy.js?v=465"></script>
++  <script src="js/solver.js?v=465"></script>
++  <script src="js/playersim.js?v=465"></script>
++  <script src="js/generator.js?v=465"></script>
++  <script src="js/analysis.js?v=465"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=464"></script>
+-  <script src="js/app.js?v=464"></script>
++  <script src="js/level-editor.js?v=465"></script>
++  <script src="js/app.js?v=465"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 52ba85e..66fdfeb 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "464";
++var APP_BUILD = "465";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -2117,13 +2117,16 @@ AntSolver.App = (function() {
+   function renderLevelInfo() {
+     if (!currentLevel) return;
+     var html = '';
+-    html += '<p>尺寸: ' + currentLevel.rows + '×' + currentLevel.cols + '</p>';
+-    html += '<p>像素: ' + currentLevel.totalPixels + '</p>';
++    // 【v465】顶部关卡信息横向排，减少高度
++    html += '<div class="lvl-meta">';
++    html += '<span><b>尺寸</b> ' + currentLevel.rows + '×' + currentLevel.cols + '</span>';
++    html += '<span><b>像素</b> ' + currentLevel.totalPixels + '</span>';
+     if (currentLevel.board) {
+-      html += '<p>棋盘: ' + currentLevel.board.rows + '×' + currentLevel.board.cols + '</p>';
++      html += '<span><b>棋盘</b> ' + currentLevel.board.rows + '×' + currentLevel.board.cols + '</span>';
+     }
+-    html += '<p>蚂蚁盒: ' + (currentLevel.totalBoxes || 0) + '个</p>';
+-    html += '<p>暂存: ' + currentLevel.bufferLimit + '格</p>';
++    html += '<span><b>蚂蚁盒</b> ' + (currentLevel.totalBoxes || 0) + '</span>';
++    html += '<span><b>暂存</b> ' + currentLevel.bufferLimit + '格</span>';
++    html += '</div>';
+     // 【v120】卡点类型信息与位置（用户：「输出报告和模拟游玩的关卡信息要显示卡点类型的信息和位置等」）。
+     //   数据来自生成期的 chokeMarks / chokePlan / chokeStat，只有【本次在页面上生成】的关卡才有；
+     //   导入的关卡本体不含这些（卡点信息只进生产侧记录，不入关卡 JSON），此时如实不显示，
+@@ -2164,11 +2167,13 @@ AntSolver.App = (function() {
+       }
+     }
+     html += '<hr style="border-color:#4a3a2c;margin:8px 0">';
++    html += '<div class="lvl-colors">';
+     for (var id in currentLevel.colorCounts) {
+       var c = AntSolver.getColorCSS(parseInt(id));
+-      html += '<span style="display:inline-block;width:10px;height:10px;background:' + c + ';border-radius:2px;margin-right:4px;vertical-align:middle"></span>';
+-      html += '<span style="font-size:11px;color:#999">' + AntSolver.getColorName(parseInt(id)) + ': ' + currentLevel.colorCounts[id] + '</span><br>';
++      html += '<span class="lvl-color"><i style="background:' + c + '"></i>' +
++        AntSolver.getColorName(parseInt(id)) + ' <b>' + currentLevel.colorCounts[id] + '</b></span>';
+     }
++    html += '</div>';
+     document.getElementById('status-content').innerHTML = html;
+   }
+ 
+@@ -5793,7 +5798,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v464 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v465 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5862,7 +5867,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v464', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v465', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+@@ -5921,9 +5926,17 @@ AntSolver.App = (function() {
+     results.forEach(function (r) {
+       if (!r.valid) { fail++; return; }
+       if (r.fallback) { fallback++; return; }
+-      // v104：档次字样改为「合格 / 简单关·趋势过平」；旧字样一并认，历史批次口径不变
+-      if (r.qPass) hard++;
+-      else if (r.qLabel && r.qLabel.indexOf('可玩') === 0) easy++;
++      // 【v465】进度条与落库口径统一：结构门 qGate 通过 = 合格
++      if (r.qGatePass === true) {
++        hard++;
++        if (!r.qPass) easy++;   // 子集：结构合格但质量项未全过
++      } else if (r.qGatePass === false) {
++        fail++;
++      } else if (r.qPass) {
++        hard++;
++      } else if (r.qLabel && r.qLabel.indexOf('可玩') === 0) {
++        easy++;
++      }
+     });
+     var setTxt = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+     setTxt('gen-stat-hard', hard); setTxt('gen-stat-easy', easy);
+@@ -6407,6 +6420,8 @@ AntSolver.App = (function() {
+       name: rec.name, valid: !!rec.valid,
+       audit: rec.audit ? { tier: rec.audit.tier, pass: rec.audit.pass, easyPass: rec.audit.easyPass,
+         usable: rec.audit.usable, easyQuota: rec.audit.easyQuota, hasChoke: rec.audit.hasChoke } : null,
++      qGatePass: rec.qGatePass, qGateReasons: rec.qGateReasons || null,
++      qPass: !!rec.qPass, qLabel: rec.qLabel || null,
+       difficulty: rec.difficulty, grade: rec.grade,
+       fallback: !!rec.fallback, fallbackType: rec.fallbackType,
+       elapsedMs: rec._elapsedMs || null, outPath: (paths && (paths.level || paths.txt)) || '', persisted: true
+@@ -6834,9 +6849,10 @@ AntSolver.App = (function() {
+       genShowResultBanner(rec);
+       genRenderReport(rec);
+       genMaybeAutoMap(rec);
+-      genLog('[目标预览·未达标，继续跑] 第' + round + '轮 当前最好 · ' + (rec.qLabel || '-') +
+-        ' · 首通' + (rec.playerPassPct == null ? '-' : rec.playerPassPct + '%') +
+-        ' · T' + (rec.tPct == null ? '-' : rec.tPct) +
++      genLog('[目标预览] 第' + round + '轮 当前最好 · ' + (rec.qLabel || '-') +
++        ' · 可选中位' + (rec.selectMed == null ? '-' : rec.selectMed) +
++        ' · 吃满' + (rec.fullMed2 == null ? '-' : rec.fullMed2) +
++        ' · partial' + (rec.partialStepPct == null ? '-' : rec.partialStepPct + '%') +
+         ' · freeLow' + (rec.freeLowPct == null ? '-' : rec.freeLowPct + '%'), 'gen-log-ok');
+     } catch (e) { genLog('目标预览失败：' + ((e && e.message) || e), 'gen-log-warn'); }
+   }
+@@ -6852,7 +6868,7 @@ AntSolver.App = (function() {
+     var _ph = { roundStart: '开轮', roundDone: '本轮结果', candidate: '候选', variant: '变体' }[p.phase] || (p.phase || '生成');
+     var _extra = '';
+     if (p.phase === 'roundStart') _extra = ' · 切法' + (p.cut || '-') + ' · 冰' + (p.ice == null ? '-' : p.ice) + ' · 链' + (p.chain == null ? '-' : p.chain) + ' · 管' + (p.pipes == null ? '-' : p.pipes);
+-    if (p.phase === 'roundDone') _extra = ' · ' + (p.valid ? '有关卡' : '无关卡') + ' · 首通' + (p.first == null ? '-' : p.first + '%') + ' · T' + (p.T == null ? '-' : p.T) + ' · freeLow' + (p.freeLow == null ? '-' : p.freeLow + '%') + ' · 压力' + (p.pressure == null ? '-' : p.pressure + '%');
++    if (p.phase === 'roundDone') _extra = ' · ' + (p.valid ? '有关卡' : '无关卡') + ' · 可选中位' + (p.select == null ? '-' : p.select) + ' · 吃满' + (p.full == null ? '-' : p.full) + ' · partial' + (p.partial == null ? '-' : p.partial + '%') + ' · freeLow' + (p.freeLow == null ? '-' : p.freeLow + '%') + ' · 免费连' + (p.freeRun == null ? '-' : p.freeRun);
+     var el = document.getElementById('gen-progress-current');
+     if (el) el.textContent = '处理中 (' + (idx + 1) + '/' + total + '): ' + nm +
+       '　· ' + _ph + ' · 轮 ' + (p.round || 0) + '/' + (p.N || 0) +
+@@ -7349,6 +7365,15 @@ AntSolver.App = (function() {
+           }
+           var curEl2 = document.getElementById('gen-progress-current');
+           if (curEl2) curEl2.textContent = (genBatchAborted ? '已停止' : '已完成') + '，输出目录：' + relDir;
++          var _teF = document.getElementById('gen-progress-time');
++          if (_teF) {
++            var _lastMs = 0;
++            for (var _ri = 0; _ri < results.length; _ri++) {
++              if (results[_ri] && results[_ri].elapsedMs != null && results[_ri].elapsedMs > _lastMs) _lastMs = results[_ri].elapsedMs;
++            }
++            _teF.textContent = '已用时 ' + Math.round((Date.now() - (genBatchStartAt || Date.now())) / 1000) +
++              's · 本关已跑 ' + Math.round(_lastMs / 1000) + 's（每关完成即可用，可随时停止）';
++          }
+         })
+         .catch(function (e) { genLog('收尾通知服务失败：' + e.message + '（已落库的关卡不受影响）', 'gen-log-warn'); });
+       renderGenResultTable(genResultHistory, true);   // 【v153】收尾也用历史渲染（跨批次保留）
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index bee24fd..c7f51cf 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -123,9 +123,11 @@ function _goalRound() {
+     var _p = r && r.goodV3 && r.goodV3.persist, _q = _p && _p.quality, _f = r && r.goodV3 && r.goodV3.fillCurve;
+     self.postMessage({ type: 'flow', index: g.index, round: g.rounds,
+       text: '目标第' + g.rounds + '轮结果 · ' + (r && r.level ? '有关卡' : '无关卡') +
+-        ' · 首通' + (_p && _p.playerPassPct != null ? _p.playerPassPct + '%' : '-') +
+-        ' · T' + (_q && _q.T != null ? _q.T : '-') +
++        ' · 可选中位' + (_f && _f.selectMedian != null ? _f.selectMedian : '-') +
++        ' · 吃满' + (_f && _f.fullMedian2 != null ? _f.fullMedian2 : '-') +
++        ' · partial' + (_f && _f.partialStepPct != null ? _f.partialStepPct + '%' : '-') +
+         ' · freeLow' + (_f && _f.freeLowPct != null ? _f.freeLowPct + '%' : '-') +
++        ' · 免费连' + (_f && _f.freeRunMax != null ? _f.freeRunMax : '-') +
+         ' · 压力' + (_f && _f.pressurePct3 != null ? _f.pressurePct3 + '%' : '-') });
+   } catch (e) { }
+   if (r) r.goalRound = g.rounds;
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 2dc1000..fdd14d9 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -15008,7 +15008,11 @@ AntSolver.Generator = (function() {
+           reportProgress({ phase: 'roundDone', round: _pi + 1, N: _pk, valid: !!(_o && _o.level),
+             first: (_pp && _pp.playerPassPct != null) ? _pp.playerPassPct : null,
+             T: (_qq && _qq.T != null) ? _qq.T : null,
++            select: (_pf && _pf.selectMedian != null) ? _pf.selectMedian : null,
++            full: (_pf && _pf.fullMedian2 != null) ? _pf.fullMedian2 : null,
++            partial: (_pf && _pf.partialStepPct != null) ? _pf.partialStepPct : null,
+             freeLow: (_pf && _pf.freeLowPct != null) ? _pf.freeLowPct : null,
++            freeRun: (_pf && _pf.freeRunMax != null) ? _pf.freeRunMax : null,
+             pressure: (_pf && _pf.pressurePct3 != null) ? _pf.pressurePct3 : null });
+         } catch (e) { }
+         if (config._trace) { try { config._trace.push({ t: 'round', round: _pi + 1, mix: _cfg._mixTag || '-', cap: [_cfg.boxSizeMin, _cfg.boxSizeMax], ok: !!(_o && _o.level) }); } catch (e) { } }

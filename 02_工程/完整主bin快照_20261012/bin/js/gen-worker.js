@@ -123,9 +123,11 @@ function _goalRound() {
     var _p = r && r.goodV3 && r.goodV3.persist, _q = _p && _p.quality, _f = r && r.goodV3 && r.goodV3.fillCurve;
     self.postMessage({ type: 'flow', index: g.index, round: g.rounds,
       text: '目标第' + g.rounds + '轮结果 · ' + (r && r.level ? '有关卡' : '无关卡') +
-        ' · 首通' + (_p && _p.playerPassPct != null ? _p.playerPassPct + '%' : '-') +
-        ' · T' + (_q && _q.T != null ? _q.T : '-') +
+        ' · 可选中位' + (_f && _f.selectMedian != null ? _f.selectMedian : '-') +
+        ' · 吃满' + (_f && _f.fullMedian2 != null ? _f.fullMedian2 : '-') +
+        ' · partial' + (_f && _f.partialStepPct != null ? _f.partialStepPct + '%' : '-') +
         ' · freeLow' + (_f && _f.freeLowPct != null ? _f.freeLowPct + '%' : '-') +
+        ' · 免费连' + (_f && _f.freeRunMax != null ? _f.freeRunMax : '-') +
         ' · 压力' + (_f && _f.pressurePct3 != null ? _f.pressurePct3 + '%' : '-') });
   } catch (e) { }
   if (r) r.goalRound = g.rounds;

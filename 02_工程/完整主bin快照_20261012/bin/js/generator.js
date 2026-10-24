@@ -15008,7 +15008,11 @@ AntSolver.Generator = (function() {
           reportProgress({ phase: 'roundDone', round: _pi + 1, N: _pk, valid: !!(_o && _o.level),
             first: (_pp && _pp.playerPassPct != null) ? _pp.playerPassPct : null,
             T: (_qq && _qq.T != null) ? _qq.T : null,
+            select: (_pf && _pf.selectMedian != null) ? _pf.selectMedian : null,
+            full: (_pf && _pf.fullMedian2 != null) ? _pf.fullMedian2 : null,
+            partial: (_pf && _pf.partialStepPct != null) ? _pf.partialStepPct : null,
             freeLow: (_pf && _pf.freeLowPct != null) ? _pf.freeLowPct : null,
+            freeRun: (_pf && _pf.freeRunMax != null) ? _pf.freeRunMax : null,
             pressure: (_pf && _pf.pressurePct3 != null) ? _pf.pressurePct3 : null });
         } catch (e) { }
         if (config._trace) { try { config._trace.push({ t: 'round', round: _pi + 1, mix: _cfg._mixTag || '-', cap: [_cfg.boxSizeMin, _cfg.boxSizeMax], ok: !!(_o && _o.level) }); } catch (e) { } }

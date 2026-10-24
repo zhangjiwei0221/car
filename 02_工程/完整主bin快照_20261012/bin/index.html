@@ -7,12 +7,12 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
-  <link rel="stylesheet" href="css/style.css?v=464">
+  <link rel="stylesheet" href="css/style.css?v=465">
 </head>
 <body>
   <header>
     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v464</span></h1>
+    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v465</span></h1>
     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
          退出模拟就自动回到生成器的参数面板。 -->
@@ -393,15 +393,6 @@
         <label><input type="checkbox" id="gen-semantic-obstacles" checked> 语义障碍（ready 重放冰/链）</label>
         <span class="gen-hint">关掉 = 纯基线</span>
       </div>
-      <!-- 【v352·用户裁决】指针/路线：用路径工具画一条消除路线，导出 JSON 后从这里导入，
-           生成器按该路线的【颜色先后】切车单 —— 目标图能消什么仍由几何决定，这里只改「先给哪个颜色的车」。 -->
-      <div class="gen-row" style="margin-top:8px" title="导入路径工具导出的 JSON。生成器按该路线给出的颜色先后切球，让玩家从你指定的方向突破。只在「按暴露顺序切」模式下生效。">
-        <label>路线（指针）</label>
-        <button id="btn-import-route" style="padding:3px 10px">导入路线 JSON</button>
-        <button id="btn-clear-route" style="padding:3px 10px">清除</button>
-        <span class="gen-hint" id="gen-route-name">未导入（不导入 = 按目标图自动顺序）</span>
-      </div>
-      <input type="file" id="route-input" accept=".json" style="display:none">
       
       </div>
 
@@ -577,19 +568,6 @@
       </div>
       <div id="cutplan-body" style="white-space:pre-wrap;font-size:11px;color:#5a4632;line-height:1.5"></div>
     </section>
-    <!-- 2. 开始生成 -->
-    <section class="gen-card">
-      <h2>3. 开始生产</h2>
-      <div class="gen-row">
-        <button id="btn-gen-start" class="gen-btn-primary">▶ 批量生产（每关自动落库）</button>
-        <button id="btn-gen-stop" class="gen-btn-danger hidden">■ 停止</button>
-        <button id="btn-gen-persist-retry" class="gen-btn-danger hidden" title="上一关写盘失败后，修好问题(如重启本地生产服务)再点此重试；服务端幂等，不会重复写">↻ 重试落库</button>
-      </div>
-      <div class="gen-row" style="margin-top:6px">
-        <label class="gen-hint" title="每生产完一关，就把该关【直接装到中间的棋盘区】（不进模拟游玩），方便一边生产一边看棋盘。&#10;取消勾选则只记录、不动棋盘。想看详细局面时点结果行末尾的「🎮 带入棋盘」进模拟态。"><input type="checkbox" id="gen-auto-map" checked> 生成后自动映射到棋盘</label>
-      </div>
-      <div id="gen-persist-status" class="gen-persist-status">用 网页启动器/启动生产器(http).command 启动后，每生产完一关会立即写入 输出文件/&lt;批次名&gt;-月-日/，无需下载ZIP。</div>
-    </section>
 
     <!-- 批量分析结果（快速难度分析，不落 ZIP） -->
     <section id="analysis-result" class="gen-card hidden">
@@ -603,19 +581,28 @@
       <div id="choke-audit-body"></div>
     </section>
 
-    <!-- 3. 生产进度可视化 -->
-    <section id="gen-progress-card" class="gen-card hidden">
-      <h2>4. 生产进度</h2>
-      <div id="gen-progress-bar-wrap">
+    <!-- 3. 开始生产 + 进度（v465 合并） -->
+    <section id="gen-progress-card" class="gen-card">
+      <h2>3. 开始生产与进度</h2>
+      <div class="gen-row">
+        <button id="btn-gen-start" class="gen-btn-primary">▶ 批量生产（每关自动落库）</button>
+        <button id="btn-gen-stop" class="gen-btn-danger hidden">■ 停止</button>
+        <button id="btn-gen-persist-retry" class="gen-btn-danger hidden" title="上一关写盘失败后，修好问题(如重启本地生产服务)再点此重试；服务端幂等，不会重复写">↻ 重试落库</button>
+      </div>
+      <div class="gen-row" style="margin-top:6px">
+        <label class="gen-hint" title="每生产完一关，就把该关【直接装到中间的棋盘区】（不进模拟游玩），方便一边生产一边看棋盘。&#10;取消勾选则只记录、不动棋盘。想看详细局面时点结果行末尾的「🎮 带入棋盘」进模拟态。"><input type="checkbox" id="gen-auto-map" checked> 生成后自动映射到棋盘</label>
+      </div>
+      <div id="gen-persist-status" class="gen-persist-status">用 网页启动器/启动生产器(http).command 启动后，每生产完一关会立即写入 输出文件/&lt;批次名&gt;-月-日/，无需下载ZIP。</div>
+      <div id="gen-progress-bar-wrap" style="margin-top:8px">
         <div id="gen-progress-bar"><div id="gen-progress-fill"></div></div>
         <span id="gen-progress-pct">0%</span>
       </div>
       <div id="gen-progress-current" class="gen-progress-current">—</div>
       <div id="gen-progress-stats" class="gen-stat-chips">
-        <span class="gen-chip gen-chip-hard" title="qPass 质量合格">质量合格 <b id="gen-stat-hard">0</b></span>
-        <span class="gen-chip gen-chip-easy" title="未达 qPass，只可见不交付">未达标 <b id="gen-stat-easy">0</b></span>
+        <span class="gen-chip gen-chip-hard" title="结构门 qGate 通过即交付合格">合格 <b id="gen-stat-hard">0</b></span>
+        <span class="gen-chip gen-chip-easy" title="结构门已过，但 qPass 质量项未全过">质量未达 <b id="gen-stat-easy">0</b></span>
         <span class="gen-chip gen-chip-fallback" title="搜索超时或穷尽仍无合格，选出的最接近候选">兜底 <b id="gen-stat-fallback">0</b></span>
-        <span class="gen-chip gen-chip-fail" title="不可解/异常">失败 <b id="gen-stat-fail">0</b></span>
+        <span class="gen-chip gen-chip-fail" title="不可解 / 异常 / 结构门未过">失败 <b id="gen-stat-fail">0</b></span>
       </div>
       <div id="gen-progress-time" class="gen-progress-time">已用时 0s · 预估剩余 —</div>
       <div class="gen-log-head">
@@ -763,21 +750,21 @@
     </div>
   </div>
 
-  <script src="js/zip.js?v=464"></script>
-  <script src="js/utils.js?v=464"></script>
+  <script src="js/zip.js?v=465"></script>
+  <script src="js/utils.js?v=465"></script>
   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
-  <script src="js/color-libs.js?v=464"></script>
-  <script src="js/simulator.js?v=464"></script>
+  <script src="js/color-libs.js?v=465"></script>
+  <script src="js/simulator.js?v=465"></script>
   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
-  <script src="js/anchor-cut.js?v=464"></script>
-  <script src="js/solver-strategy.js?v=464"></script>
-  <script src="js/solver.js?v=464"></script>
-  <script src="js/playersim.js?v=464"></script>
-  <script src="js/generator.js?v=464"></script>
-  <script src="js/analysis.js?v=464"></script>
+  <script src="js/anchor-cut.js?v=465"></script>
+  <script src="js/solver-strategy.js?v=465"></script>
+  <script src="js/solver.js?v=465"></script>
+  <script src="js/playersim.js?v=465"></script>
+  <script src="js/generator.js?v=465"></script>
+  <script src="js/analysis.js?v=465"></script>
   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
-  <script src="js/level-editor.js?v=464"></script>
-  <script src="js/app.js?v=464"></script>
+  <script src="js/level-editor.js?v=465"></script>
+  <script src="js/app.js?v=465"></script>
   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
     体检报告已生成
     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
