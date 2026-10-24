@@ -1,0 +1,155 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 2e220e4..260fb41 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=476">
++  <link rel="stylesheet" href="css/style.css?v=477">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v476</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v477</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -291,9 +291,9 @@
+              0 = 关闭闪白（直接整批消失）。手点模拟与「单步(全知)」都走这条路径。 -->
+         <div class="ctl-row">
+           <label title="小车进轨道后，即将被它选走的小人会按消除顺序依次闪白（白色格子+格子里的橙色数字=第几个被选）。闪完再一起消失。0=关闭">闪白</label>
+-          <input type="range" id="flash-speed" min="0" max="200" value="40" step="5"
++          <input type="range" id="flash-speed" min="0" max="200" value="0" step="5"
+                  title="顺序闪白速度：每个小人亮起的间隔(ms)。0=关闭闪白（直接整批消失）；往左拉=扫得更快，往右拉=一个一个人慢慢亮，便于核对选取顺序">
+-          <span id="flash-speed-val">40ms/个</span>
++          <span id="flash-speed-val">关闭</span>
+         </div>
+         <div id="sim-stats">
+           <span>步数: <b id="stat-steps">0</b></span>
+@@ -760,21 +760,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=476"></script>
+-  <script src="js/utils.js?v=476"></script>
++  <script src="js/zip.js?v=477"></script>
++  <script src="js/utils.js?v=477"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=476"></script>
+-  <script src="js/simulator.js?v=476"></script>
++  <script src="js/color-libs.js?v=477"></script>
++  <script src="js/simulator.js?v=477"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=476"></script>
+-  <script src="js/solver-strategy.js?v=476"></script>
+-  <script src="js/solver.js?v=476"></script>
+-  <script src="js/playersim.js?v=476"></script>
+-  <script src="js/generator.js?v=476"></script>
+-  <script src="js/analysis.js?v=476"></script>
++  <script src="js/anchor-cut.js?v=477"></script>
++  <script src="js/solver-strategy.js?v=477"></script>
++  <script src="js/solver.js?v=477"></script>
++  <script src="js/playersim.js?v=477"></script>
++  <script src="js/generator.js?v=477"></script>
++  <script src="js/analysis.js?v=477"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=476"></script>
+-  <script src="js/app.js?v=476"></script>
++  <script src="js/level-editor.js?v=477"></script>
++  <script src="js/app.js?v=477"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index cedf661..98a323f 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "476";
++var APP_BUILD = "477";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -718,9 +718,9 @@ AntSolver.App = (function() {
+     var fspd = document.getElementById('flash-speed');
+     if (fspd) {
+       // 控件缺省/读数非法 → 取 40ms（开着闪白）；显式的 0 才是「关闭」
+-      var fv0 = parseInt(fspd.value, 10); flashMs = isNaN(fv0) ? 40 : Math.max(0, fv0);
++      var fv0 = parseInt(fspd.value, 10); flashMs = isNaN(fv0) ? 0 : Math.max(0, fv0);
+       fspd.addEventListener('input', function () {
+-        var fv = parseInt(this.value, 10); flashMs = isNaN(fv) ? 40 : Math.max(0, fv);
++        var fv = parseInt(this.value, 10); flashMs = isNaN(fv) ? 0 : Math.max(0, fv);
+         var flbl = document.getElementById('flash-speed-val');
+         if (flbl) flbl.textContent = flashMs <= 0 ? '关闭' : (flashMs + 'ms/个');
+       });
+@@ -3084,7 +3084,7 @@ AntSolver.App = (function() {
+   //   闪完再一起消失（保持真机「整批一起下楼」的观感）。闪白速度可调（速度滑块），0 = 关闭。
+   // 顺序来源 = 求解器这一笔取盒实际吃掉的像素序列（Simulator.getCapOps 里的 eat.cells，
+   //   即「圈 → 由下到上 → 由左到右」那套口径），**不另算一份**，所以闪白顺序永远等于真实消除顺序。
+-  var flashMs = 40;              // 每个小人亮起的间隔(ms)；<=0 表示关闭闪白
++  var flashMs = 0;               // 默认关闭闪白；>0 才按间隔逐个亮起
+   var flashTimer = null;         // 闪白计时器
+   var flashSeq = null;           // 本轮闪白的像素序列 [[r,c], ...]（按消除顺序）
+   var flashPendingCells = null;  // 本轮将要被选走的格子 {key:true}（闪白期间保持本色）
+@@ -5109,6 +5109,7 @@ AntSolver.App = (function() {
+       //   ② 冰值夹到 [2,12]。
+       //   实测（5×7 盘、容量 40~60、数字冰）：6 seed 覆盖 26/11/100/11/58/58，中位 58%，形态全部合法。
+       generatorFlow: 'old',
++      capacityProfile: _capProfile,
+       // 【v303·用户要求】球容量改成"用户预设"，界面上 gen-boxmin / gen-boxmax 就是它；
+       //   只有没填时才回落到原工程的 40~60。
+       boxSizeMin: _autoCap ? _capLo : (cfg.boxSizeMin || 40),
+@@ -5810,7 +5811,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v476 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v477 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5876,10 +5877,23 @@ AntSolver.App = (function() {
+         ' / ' + ((rec._elapsedMs || 0) / 1000).toFixed(0) + 's') +
+       row('worker build', rec.workerBuild || '未标记') +
+       row('一图多产', rec.portfolio ? (rec.portfolio.tried + '/' + rec.portfolio.K + ' 试，过 ' + rec.portfolio.passes) : '-') +
++      '</table>' +
++      sec('生成参数（本次选择）') +
++      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
++      row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
++      row('容量策略', ap.capacityProfile || 'auto') +
++      row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
++      row('棋盘范围', (ap.rows || '-') + ' 行 × ' + (ap.cols || '-') + ' 列') +
++      row('候选 / 轮', (ap.candidateCount == null ? '-' : ap.candidateCount) + ' / ' + (ap.portfolioK == null ? '-' : ap.portfolioK)) +
++      row('P7 基底', ap.p7BaseCount == null ? '-' : ap.p7BaseCount) +
++      row('时间预算', ap.budgetMs == null ? '-' : (Math.round(ap.budgetMs / 1000) + 's')) +
++      row('跑满 / 陷阱后处理', (rec.fullTime ? '开' : '关') + ' / ' + (rec.trapPost ? '开' : '关')) +
++      row('语义障碍', ap.semanticObstacles ? '开' : '关') +
++      row('采样参数', rec.sampledConfig ? ('容量 ' + (rec.sampledConfig.boxSizeMin != null ? rec.sampledConfig.boxSizeMin + '~' + rec.sampledConfig.boxSizeMax : '-') + ' · 冰 ' + (rec.sampledConfig.iceForceSteps == null ? '-' : rec.sampledConfig.iceForceSteps)) : '-') +
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v476', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v477', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+@@ -6249,7 +6263,12 @@ AntSolver.App = (function() {
+         targetCarCount: result.config.targetCarCount,
+         rows: result.config.boardRowsMin + '~' + result.config.boardRowsMax,
+         cols: result.config.boardColsMin + '~' + result.config.boardColsMax,
+-        flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs
++        flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs,
++        capacityProfile: result.config.capacityProfile || 'auto',
++        cutMode: result.config.cutMode || null,
++        semanticObstacles: !!result.config.semanticObstacles,
++        candidateCount: result.config.candidateCount, portfolioK: result.config.portfolioK,
++        p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime
+       } : null,
+       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
+       cutInfo: (result.config && result.config._cutAuto) || null,

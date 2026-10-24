@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "476";
+var APP_BUILD = "477";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -718,9 +718,9 @@ AntSolver.App = (function() {
     var fspd = document.getElementById('flash-speed');
     if (fspd) {
       // 控件缺省/读数非法 → 取 40ms（开着闪白）；显式的 0 才是「关闭」
-      var fv0 = parseInt(fspd.value, 10); flashMs = isNaN(fv0) ? 40 : Math.max(0, fv0);
+      var fv0 = parseInt(fspd.value, 10); flashMs = isNaN(fv0) ? 0 : Math.max(0, fv0);
       fspd.addEventListener('input', function () {
-        var fv = parseInt(this.value, 10); flashMs = isNaN(fv) ? 40 : Math.max(0, fv);
+        var fv = parseInt(this.value, 10); flashMs = isNaN(fv) ? 0 : Math.max(0, fv);
         var flbl = document.getElementById('flash-speed-val');
         if (flbl) flbl.textContent = flashMs <= 0 ? '关闭' : (flashMs + 'ms/个');
       });
@@ -3084,7 +3084,7 @@ AntSolver.App = (function() {
   //   闪完再一起消失（保持真机「整批一起下楼」的观感）。闪白速度可调（速度滑块），0 = 关闭。
   // 顺序来源 = 求解器这一笔取盒实际吃掉的像素序列（Simulator.getCapOps 里的 eat.cells，
   //   即「圈 → 由下到上 → 由左到右」那套口径），**不另算一份**，所以闪白顺序永远等于真实消除顺序。
-  var flashMs = 40;              // 每个小人亮起的间隔(ms)；<=0 表示关闭闪白
+  var flashMs = 0;               // 默认关闭闪白；>0 才按间隔逐个亮起
   var flashTimer = null;         // 闪白计时器
   var flashSeq = null;           // 本轮闪白的像素序列 [[r,c], ...]（按消除顺序）
   var flashPendingCells = null;  // 本轮将要被选走的格子 {key:true}（闪白期间保持本色）
@@ -5109,6 +5109,7 @@ AntSolver.App = (function() {
       //   ② 冰值夹到 [2,12]。
       //   实测（5×7 盘、容量 40~60、数字冰）：6 seed 覆盖 26/11/100/11/58/58，中位 58%，形态全部合法。
       generatorFlow: 'old',
+      capacityProfile: _capProfile,
       // 【v303·用户要求】球容量改成"用户预设"，界面上 gen-boxmin / gen-boxmax 就是它；
       //   只有没填时才回落到原工程的 40~60。
       boxSizeMin: _autoCap ? _capLo : (cfg.boxSizeMin || 40),
@@ -5810,7 +5811,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v476 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v477 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5876,10 +5877,23 @@ AntSolver.App = (function() {
         ' / ' + ((rec._elapsedMs || 0) / 1000).toFixed(0) + 's') +
       row('worker build', rec.workerBuild || '未标记') +
       row('一图多产', rec.portfolio ? (rec.portfolio.tried + '/' + rec.portfolio.K + ' 试，过 ' + rec.portfolio.passes) : '-') +
+      '</table>' +
+      sec('生成参数（本次选择）') +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
+      row('容量策略', ap.capacityProfile || 'auto') +
+      row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
+      row('棋盘范围', (ap.rows || '-') + ' 行 × ' + (ap.cols || '-') + ' 列') +
+      row('候选 / 轮', (ap.candidateCount == null ? '-' : ap.candidateCount) + ' / ' + (ap.portfolioK == null ? '-' : ap.portfolioK)) +
+      row('P7 基底', ap.p7BaseCount == null ? '-' : ap.p7BaseCount) +
+      row('时间预算', ap.budgetMs == null ? '-' : (Math.round(ap.budgetMs / 1000) + 's')) +
+      row('跑满 / 陷阱后处理', (rec.fullTime ? '开' : '关') + ' / ' + (rec.trapPost ? '开' : '关')) +
+      row('语义障碍', ap.semanticObstacles ? '开' : '关') +
+      row('采样参数', rec.sampledConfig ? ('容量 ' + (rec.sampledConfig.boxSizeMin != null ? rec.sampledConfig.boxSizeMin + '~' + rec.sampledConfig.boxSizeMax : '-') + ' · 冰 ' + (rec.sampledConfig.iceForceSteps == null ? '-' : rec.sampledConfig.iceForceSteps)) : '-') +
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v476', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v477', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6249,7 +6263,12 @@ AntSolver.App = (function() {
         targetCarCount: result.config.targetCarCount,
         rows: result.config.boardRowsMin + '~' + result.config.boardRowsMax,
         cols: result.config.boardColsMin + '~' + result.config.boardColsMax,
-        flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs
+        flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs,
+        capacityProfile: result.config.capacityProfile || 'auto',
+        cutMode: result.config.cutMode || null,
+        semanticObstacles: !!result.config.semanticObstacles,
+        candidateCount: result.config.candidateCount, portfolioK: result.config.portfolioK,
+        p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime
       } : null,
       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
       cutInfo: (result.config && result.config._cutAuto) || null,
