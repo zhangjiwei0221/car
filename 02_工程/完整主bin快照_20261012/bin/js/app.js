@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "463";
+var APP_BUILD = "464";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5793,7 +5793,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v463 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v464 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5862,7 +5862,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v463', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v464', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6357,6 +6357,8 @@ AntSolver.App = (function() {
       name: entry.name, txt: entry.txt || null,
       valid: !!rec.valid, omniWon: omniWon, playerWon: playerWon,
       audit: rec.audit || null,
+      qGatePass: rec.qGatePass === true ? true : (rec.qGatePass === false ? false : null),
+      qGateReasons: rec.qGateReasons || null, qLabel: rec.qLabel || null, qPass: rec.qPass === true,
       entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,

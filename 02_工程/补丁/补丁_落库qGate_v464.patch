@@ -1,0 +1,146 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 0a38d85..3482220 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=463">
++  <link rel="stylesheet" href="css/style.css?v=464">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v463</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v464</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -763,21 +763,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=463"></script>
+-  <script src="js/utils.js?v=463"></script>
++  <script src="js/zip.js?v=464"></script>
++  <script src="js/utils.js?v=464"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=463"></script>
+-  <script src="js/simulator.js?v=463"></script>
++  <script src="js/color-libs.js?v=464"></script>
++  <script src="js/simulator.js?v=464"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=463"></script>
+-  <script src="js/solver-strategy.js?v=463"></script>
+-  <script src="js/solver.js?v=463"></script>
+-  <script src="js/playersim.js?v=463"></script>
+-  <script src="js/generator.js?v=463"></script>
+-  <script src="js/analysis.js?v=463"></script>
++  <script src="js/anchor-cut.js?v=464"></script>
++  <script src="js/solver-strategy.js?v=464"></script>
++  <script src="js/solver.js?v=464"></script>
++  <script src="js/playersim.js?v=464"></script>
++  <script src="js/generator.js?v=464"></script>
++  <script src="js/analysis.js?v=464"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=463"></script>
+-  <script src="js/app.js?v=463"></script>
++  <script src="js/level-editor.js?v=464"></script>
++  <script src="js/app.js?v=464"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 3cd5e0f..52ba85e 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "463";
++var APP_BUILD = "464";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -5793,7 +5793,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v463 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v464 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5862,7 +5862,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v463', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v464', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+@@ -6357,6 +6357,8 @@ AntSolver.App = (function() {
+       name: entry.name, txt: entry.txt || null,
+       valid: !!rec.valid, omniWon: omniWon, playerWon: playerWon,
+       audit: rec.audit || null,
++      qGatePass: rec.qGatePass === true ? true : (rec.qGatePass === false ? false : null),
++      qGateReasons: rec.qGateReasons || null, qLabel: rec.qLabel || null, qPass: rec.qPass === true,
+       entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
+       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
+       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+index f1bb2f5..b42e023 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+@@ -258,16 +258,26 @@ function classify(rec) {
+   const a = rec.audit || {};
+   const tier = a.tier || '';
+   const omniWon = !!(rec.omniWon), playerWon = !!(rec.playerWon);
++  // 【v464】结构门 qGate 是交付口径；旧 audit/playerWon 只报告。
++  //   qGatePass=true → qualified（不看 playerWon / audit.tier）
++  //   qGatePass=false → unqualified（结构门未过）
++  //   老批次没有 qGatePass 字段 → 回退旧口径。
++  if (rec.fallback === true) {
++    const t = rec.fallbackType === 'timeout' ? '超时兜底' : (rec.fallbackType === 'exhausted' ? '遍历兜底' : '兜底');
++    return { kind: 'fallback', label: t };
++  }
++  if (rec.qGatePass === true && rec.valid === true && omniWon) {
++    return { kind: 'qualified', label: rec.qLabel || '合格' };
++  }
++  if (rec.qGatePass === false) {
++    return { kind: 'unqualified', label: '结构门未过' };
++  }
+   // v104 合格门语义重置：档次字样由「困难合格/简单合格」改为「合格/简单关·趋势过平」。
+   //   两套字样都认——新批次用新字样，历史批次重放(resumeBatch)时仍是旧字样，不能因此判成不合格。
+   const QUALIFIED_TIERS = ['合格', '简单关·趋势过平', '困难合格', '简单合格'];
+   const isQualified = rec.valid === true && omniWon && playerWon &&
+     QUALIFIED_TIERS.indexOf(tier) >= 0 && rec.fallback !== true;
+   if (isQualified) return { kind: 'qualified', label: tier };
+-  if (rec.fallback === true) {
+-    const t = rec.fallbackType === 'timeout' ? '超时兜底' : (rec.fallbackType === 'exhausted' ? '遍历兜底' : '兜底');
+-    return { kind: 'fallback', label: t };
+-  }
+   if (rec.valid !== true) return { kind: 'unqualified', label: '不可解' };
+   if (!playerWon) return { kind: 'unqualified', label: '玩家不合格' };
+   return { kind: 'unqualified', label: '审核不合格' };
+@@ -374,7 +384,7 @@ function persistResult(b, payload) {
+     //   两者不一致本身就是有价值的信号（例如「余格补黑」会让实际墙数超过配额目标）。
+     棋盘结构: rec.boardStat || null,
+     结果分类: cls.label, 状态: rec.status || (cleanLevel ? 'OK' : 'ERROR'),
+-    合格档: a.tier || null,
++    合格档: rec.qGatePass === true ? (rec.qLabel || '合格') : (a.tier || null),
+     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
+     fallbackType: rec.fallbackType || null, fallbackReason: rec.fallbackReason || null,
+     难度分: rec.difficulty != null ? rec.difficulty : null, 难度等级: rec.grade || null,
+@@ -418,7 +428,7 @@ function persistResult(b, payload) {
+   const sc = rec.sampledConfig || {}, cpl = rec.chokePlan || {};   // v115 采样参数 / 卡点概率计划
+   const bs = rec.boardStat || {};                                  // v116 棋盘结构实测
+   appendLine(docPath(b, '分析报告.csv'), [
+-    b.batchId, idx, rec.name || '', 'PERSISTED', entryModeCN(rec.entryMode), cls.label, a.tier || '',
++    b.batchId, idx, rec.name || '', 'PERSISTED', entryModeCN(rec.entryMode), cls.label, (rec.qGatePass === true ? (rec.qLabel || '合格') : (a.tier || '')),
+     rec.fallback ? '是' : '否', rec.fallbackType || '-',
+     rec.size || '', rec.boardSize || '', rec.totalBoxes != null ? rec.totalBoxes : '',
+     rec.valid ? '是' : '否', rec.difficulty != null ? rec.difficulty : '', rec.grade || '',

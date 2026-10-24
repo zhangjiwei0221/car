@@ -258,16 +258,26 @@ function classify(rec) {
   const a = rec.audit || {};
   const tier = a.tier || '';
   const omniWon = !!(rec.omniWon), playerWon = !!(rec.playerWon);
+  // 【v464】结构门 qGate 是交付口径；旧 audit/playerWon 只报告。
+  //   qGatePass=true → qualified（不看 playerWon / audit.tier）
+  //   qGatePass=false → unqualified（结构门未过）
+  //   老批次没有 qGatePass 字段 → 回退旧口径。
+  if (rec.fallback === true) {
+    const t = rec.fallbackType === 'timeout' ? '超时兜底' : (rec.fallbackType === 'exhausted' ? '遍历兜底' : '兜底');
+    return { kind: 'fallback', label: t };
+  }
+  if (rec.qGatePass === true && rec.valid === true && omniWon) {
+    return { kind: 'qualified', label: rec.qLabel || '合格' };
+  }
+  if (rec.qGatePass === false) {
+    return { kind: 'unqualified', label: '结构门未过' };
+  }
   // v104 合格门语义重置：档次字样由「困难合格/简单合格」改为「合格/简单关·趋势过平」。
   //   两套字样都认——新批次用新字样，历史批次重放(resumeBatch)时仍是旧字样，不能因此判成不合格。
   const QUALIFIED_TIERS = ['合格', '简单关·趋势过平', '困难合格', '简单合格'];
   const isQualified = rec.valid === true && omniWon && playerWon &&
     QUALIFIED_TIERS.indexOf(tier) >= 0 && rec.fallback !== true;
   if (isQualified) return { kind: 'qualified', label: tier };
-  if (rec.fallback === true) {
-    const t = rec.fallbackType === 'timeout' ? '超时兜底' : (rec.fallbackType === 'exhausted' ? '遍历兜底' : '兜底');
-    return { kind: 'fallback', label: t };
-  }
   if (rec.valid !== true) return { kind: 'unqualified', label: '不可解' };
   if (!playerWon) return { kind: 'unqualified', label: '玩家不合格' };
   return { kind: 'unqualified', label: '审核不合格' };
@@ -374,7 +384,7 @@ function persistResult(b, payload) {
     //   两者不一致本身就是有价值的信号（例如「余格补黑」会让实际墙数超过配额目标）。
     棋盘结构: rec.boardStat || null,
     结果分类: cls.label, 状态: rec.status || (cleanLevel ? 'OK' : 'ERROR'),
-    合格档: a.tier || null,
+    合格档: rec.qGatePass === true ? (rec.qLabel || '合格') : (a.tier || null),
     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
     fallbackType: rec.fallbackType || null, fallbackReason: rec.fallbackReason || null,
     难度分: rec.difficulty != null ? rec.difficulty : null, 难度等级: rec.grade || null,
@@ -418,7 +428,7 @@ function persistResult(b, payload) {
   const sc = rec.sampledConfig || {}, cpl = rec.chokePlan || {};   // v115 采样参数 / 卡点概率计划
   const bs = rec.boardStat || {};                                  // v116 棋盘结构实测
   appendLine(docPath(b, '分析报告.csv'), [
-    b.batchId, idx, rec.name || '', 'PERSISTED', entryModeCN(rec.entryMode), cls.label, a.tier || '',
+    b.batchId, idx, rec.name || '', 'PERSISTED', entryModeCN(rec.entryMode), cls.label, (rec.qGatePass === true ? (rec.qLabel || '合格') : (a.tier || '')),
     rec.fallback ? '是' : '否', rec.fallbackType || '-',
     rec.size || '', rec.boardSize || '', rec.totalBoxes != null ? rec.totalBoxes : '',
     rec.valid ? '是' : '否', rec.difficulty != null ? rec.difficulty : '', rec.grade || '',
