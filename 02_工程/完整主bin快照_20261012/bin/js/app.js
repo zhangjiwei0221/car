@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "469";
+var APP_BUILD = "470";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -4871,6 +4871,9 @@ AntSolver.App = (function() {
       var cMin = parseInt((document.getElementById('gen-cols-min') || {}).value, 10) || 5;
       var cMax = parseInt((document.getElementById('gen-cols-max') || {}).value, 10) || 10;
       if (cMax < cMin) { var t2 = cMin; cMin = cMax; cMax = t2; }
+      // 【v470】行列最小 6
+      if (rMin < 6) rMin = 6; if (rMax < rMin) rMax = rMin;
+      if (cMin < 6) cMin = 6; if (cMax < cMin) cMax = cMin;
       var ok = false;
       for (var r = rMin; r <= rMax && !ok; r++) for (var c = cMin; c <= cMax; c++) { if (c - r === 0 || c - r === 1 || c - r === 2) { ok = true; break; } }
       if (!ok) {
@@ -5798,7 +5801,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v469 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v470 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5867,7 +5870,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v469', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v470', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”

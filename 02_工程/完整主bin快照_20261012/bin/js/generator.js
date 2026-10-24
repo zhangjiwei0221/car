@@ -965,10 +965,11 @@ AntSolver.Generator = (function() {
   // 溢出盒由管道守恒吸收(每管容量4~6)；若容量严重错位(装不下/空太多)，由上层盒容量兜底调整。
   // 注：n 保留为入参（供未来"随机但保容量下限"的兜底判断）。
   function chooseBoardDims(n, config) {
-    var rMin = clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20);
-    var rMax = clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20);
-    var cMin = clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30);
-    var cMax = clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30);
+    // 【v470】行列最小 6
+    var rMin = Math.max(6, clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20));
+    var rMax = Math.max(rMin, clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20));
+    var cMin = Math.max(6, clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30));
+    var cMax = Math.max(cMin, clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30));
     var rows = rMin + Math.floor(rnd() * (rMax - rMin + 1));
     var cols = cMin + Math.floor(rnd() * (cMax - cMin + 1));
     // ===== 管道数量下限保证（用户 2026-08-04：管道太少，要确保不低于 4 个）=====
@@ -2132,10 +2133,11 @@ AntSolver.Generator = (function() {
   }
 
   function chooseBoardDimsFixed(n, config) {
-    var rMin = clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20);
-    var rMax = clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20);
-    var cMin = clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30);
-    var cMax = clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30);
+    // 【v470】行列最小 6
+    var rMin = Math.max(6, clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20));
+    var rMax = Math.max(rMin, clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20));
+    var cMin = Math.max(6, clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30));
+    var cMax = Math.max(cMin, clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30));
     var bp = config.blackPercent || 0;
     // 允许进管道的溢出上限：管道条数未定时按经验给一个温和的窗口，
     // 目的只是「别把几十个盒全推进管道」，真正的管道容量仍由后续 pipeCapacity 检查把关。
@@ -12756,10 +12758,11 @@ AntSolver.Generator = (function() {
    *   · 只在「必然淘汰」时拦截（boardFitGuard:'block'，默认）；其余只 warn（偏大/偏小），不改生产结果。
    */
   function boardCellsExtent(config) {
-    var rMin = clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20);
-    var rMax = clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20);
-    var cMin = clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30);
-    var cMax = clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30);
+    // 【v470】行列最小 6
+    var rMin = Math.max(6, clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20));
+    var rMax = Math.max(rMin, clampInt(config.boardRowsMax, AntSolver.BOARD_ROWS, rMin, 20));
+    var cMin = Math.max(6, clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30));
+    var cMax = Math.max(cMin, clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30));
     var minA = Infinity, maxA = 0, minDim = null, maxDim = null, legal = 0;
     function consider(r, c) {
       if (!boardShapeOk(r, c, !!config.boardAllowSquare)) return;
@@ -12827,6 +12830,7 @@ AntSolver.Generator = (function() {
     //   往下放会让 chooseBoardDimsFixed 随机挑到极小的盘：实测条带放到 r−3 时，
     //   16 辆车被挑到 3×4=12 格（盘上只放 7 辆、其余全塞管道），完全不像一关。
     //   棋盘略大于目标只意味着溢出的盒少一点（管道退到下限以下时生成器本就会去掉管道）。
+    if (rHi < 6) rHi = 6;
     return {
       rowsMin: rHi, rowsMax: rHi + 1, colsMin: rHi + 1, colsMax: rHi + 2,
       cars: cars, ust: ust, dWant: dWant, cTarget: cTarget, cTop: cTop, cAll: cAll,
