@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "470";
+var APP_BUILD = "471";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5801,7 +5801,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v470 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v471 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5870,7 +5870,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v470', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v471', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6208,6 +6208,8 @@ AntSolver.App = (function() {
       white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null), partialStepPct: (_fc ? _fc.partialStepPct : null),
       earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null)
     });
+    // 【v471】结构门过：不再把 fallback 当交付否决
+    var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
     return {
       name: entry.name, txt: entry.txt || null, level: result.level, valid: result.valid,
       chokeTypes: cp ? cp.types : null, chokeTypesCN: cp ? cp.cn : null,
@@ -6309,10 +6311,12 @@ AntSolver.App = (function() {
       // 只记录在生产侧记录里（CSV/关卡数据.json/报告），关卡本体不含该字段。
       entryMode: result.entryMode || 'fourSide',
       // 兜底标记(v86)：fallback=true 表示这关不是正常合格输出，是"最接近标准/安全垫底"的兜底交付。
-      fallback: !!result.fallback,
-      fallbackTier: result.fallbackTier != null ? result.fallbackTier : null,
-      fallbackType: result.fallbackType || null,
-      fallbackReason: result.fallbackReason || null,
+      fallback: _qgFromFallback ? false : !!result.fallback,
+      fallbackOriginal: !!result.fallback,
+      qGateFallback: _qgFromFallback,
+      fallbackTier: _qgFromFallback ? null : (result.fallbackTier != null ? result.fallbackTier : null),
+      fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
+      fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped,
       // 【v368】搜索为什么停：pass_early_stop / budget_timeout / exhausted / no_candidate

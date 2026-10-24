@@ -1,0 +1,138 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index ad88f96..ab2a168 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=470">
++  <link rel="stylesheet" href="css/style.css?v=471">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v470</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v471</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -750,21 +750,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=470"></script>
+-  <script src="js/utils.js?v=470"></script>
++  <script src="js/zip.js?v=471"></script>
++  <script src="js/utils.js?v=471"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=470"></script>
+-  <script src="js/simulator.js?v=470"></script>
++  <script src="js/color-libs.js?v=471"></script>
++  <script src="js/simulator.js?v=471"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=470"></script>
+-  <script src="js/solver-strategy.js?v=470"></script>
+-  <script src="js/solver.js?v=470"></script>
+-  <script src="js/playersim.js?v=470"></script>
+-  <script src="js/generator.js?v=470"></script>
+-  <script src="js/analysis.js?v=470"></script>
++  <script src="js/anchor-cut.js?v=471"></script>
++  <script src="js/solver-strategy.js?v=471"></script>
++  <script src="js/solver.js?v=471"></script>
++  <script src="js/playersim.js?v=471"></script>
++  <script src="js/generator.js?v=471"></script>
++  <script src="js/analysis.js?v=471"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=470"></script>
+-  <script src="js/app.js?v=470"></script>
++  <script src="js/level-editor.js?v=471"></script>
++  <script src="js/app.js?v=471"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 5748849..acb48d7 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "470";
++var APP_BUILD = "471";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -5801,7 +5801,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v470 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v471 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5870,7 +5870,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v470', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v471', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+@@ -6208,6 +6208,8 @@ AntSolver.App = (function() {
+       white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null), partialStepPct: (_fc ? _fc.partialStepPct : null),
+       earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null)
+     });
++    // 【v471】结构门过：不再把 fallback 当交付否决
++    var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
+     return {
+       name: entry.name, txt: entry.txt || null, level: result.level, valid: result.valid,
+       chokeTypes: cp ? cp.types : null, chokeTypesCN: cp ? cp.cn : null,
+@@ -6309,10 +6311,12 @@ AntSolver.App = (function() {
+       // 只记录在生产侧记录里（CSV/关卡数据.json/报告），关卡本体不含该字段。
+       entryMode: result.entryMode || 'fourSide',
+       // 兜底标记(v86)：fallback=true 表示这关不是正常合格输出，是"最接近标准/安全垫底"的兜底交付。
+-      fallback: !!result.fallback,
+-      fallbackTier: result.fallbackTier != null ? result.fallbackTier : null,
+-      fallbackType: result.fallbackType || null,
+-      fallbackReason: result.fallbackReason || null,
++      fallback: _qgFromFallback ? false : !!result.fallback,
++      fallbackOriginal: !!result.fallback,
++      qGateFallback: _qgFromFallback,
++      fallbackTier: _qgFromFallback ? null : (result.fallbackTier != null ? result.fallbackTier : null),
++      fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
++      fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
+       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
+       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped,
+       // 【v368】搜索为什么停：pass_early_stop / budget_timeout / exhausted / no_candidate
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index e6a05be..a471504 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -10233,8 +10233,12 @@ AntSolver.Generator = (function() {
+     try { rescueDeathEdge(cand); } catch (e) { if (cand) cand.rescue = { applied: false, error: String(e && e.message || e) }; }
+     // 必须在改写 audit.pass 之前算档次——candTier() 读的是【原始】audit.pass(是否真困难合格)，
+     // finalizeProduce 稍后会把 audit.pass 覆写成"整体合格"，届时语义已变，不能再用来分档。
++    // 【v471】结构门优先：qGate 过 → 不因旧 candTier 掉进 fallback
++    var _qgPre = false;
++    try { _qgPre = goalStructPass(Object.assign({}, cand, { fallback: false, valid: true })); } catch (e) { _qgPre = false; }
+     var tier = candTier(cand);
+-    cand.fallback = tier < 2;
++    cand.fallback = _qgPre ? false : (tier < 2);
++    if (_qgPre) cand.qGatePreferred = true;
+     if (cand.fallback) {
+       cand.fallbackTier = tier;
+       cand.fallbackType = cand.timedOut ? 'timeout' : 'exhausted';
+@@ -14654,7 +14658,8 @@ AntSolver.Generator = (function() {
+   // 【v415】目标模式的结构门：可解 + 首通≤50 + J≤20 + W≤1≤35 + freeLow≤30
+   //   不能再用旧 goodV3.pass，否则目标模式可能在旧判据上无限跑。
+   function goalStructPass(r) {
+-    if (!r || !r.level || !r.valid || r.fallback) return false;
++    // 【v471】结构门过就收；fallback 只报告，不再由它一票否决
++    if (!r || !r.level || !r.valid) return false;
+     var p = r.goodV3 && r.goodV3.persist;
+     var fc = r.goodV3 && r.goodV3.fillCurve;
+     if (!p || !fc) return false;

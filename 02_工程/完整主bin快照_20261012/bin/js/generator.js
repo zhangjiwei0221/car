@@ -10233,8 +10233,12 @@ AntSolver.Generator = (function() {
     try { rescueDeathEdge(cand); } catch (e) { if (cand) cand.rescue = { applied: false, error: String(e && e.message || e) }; }
     // 必须在改写 audit.pass 之前算档次——candTier() 读的是【原始】audit.pass(是否真困难合格)，
     // finalizeProduce 稍后会把 audit.pass 覆写成"整体合格"，届时语义已变，不能再用来分档。
+    // 【v471】结构门优先：qGate 过 → 不因旧 candTier 掉进 fallback
+    var _qgPre = false;
+    try { _qgPre = goalStructPass(Object.assign({}, cand, { fallback: false, valid: true })); } catch (e) { _qgPre = false; }
     var tier = candTier(cand);
-    cand.fallback = tier < 2;
+    cand.fallback = _qgPre ? false : (tier < 2);
+    if (_qgPre) cand.qGatePreferred = true;
     if (cand.fallback) {
       cand.fallbackTier = tier;
       cand.fallbackType = cand.timedOut ? 'timeout' : 'exhausted';
@@ -14654,7 +14658,8 @@ AntSolver.Generator = (function() {
   // 【v415】目标模式的结构门：可解 + 首通≤50 + J≤20 + W≤1≤35 + freeLow≤30
   //   不能再用旧 goodV3.pass，否则目标模式可能在旧判据上无限跑。
   function goalStructPass(r) {
-    if (!r || !r.level || !r.valid || r.fallback) return false;
+    // 【v471】结构门过就收；fallback 只报告，不再由它一票否决
+    if (!r || !r.level || !r.valid) return false;
     var p = r.goodV3 && r.goodV3.persist;
     var fc = r.goodV3 && r.goodV3.fillCurve;
     if (!p || !fc) return false;
