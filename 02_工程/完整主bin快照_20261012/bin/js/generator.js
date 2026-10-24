@@ -15901,6 +15901,8 @@ AntSolver.Generator = (function() {
   }
 
   function p7RepairLevel(level, config) {
+    var _p7T0 = Date.now();
+    var _p7Stage = { A1: 0, Early: 0, A2: 0, A3: 0, A4: 0 };
     var ev0 = null;
     try { ev0 = evaluateLevel(level, config); } catch (e) { }
     var d0 = p7DiagnoseEv(ev0);
@@ -15908,6 +15910,7 @@ AntSolver.Generator = (function() {
     var cur = level, diag = d0, ev = ev0, tried = 0, accepted = 0, path = [], notes = [];
     var _dl = config && config._repairDeadline;
     // A1：管道公平性
+    var _stA1 = Date.now();
     for (var i = 0; i < 3 && diag.cause === 'hidden' && (!_dl || Date.now() < _dl); i++) {
       tried++;
       var rep = p7PipeFairness(cur, config);
@@ -15922,7 +15925,9 @@ AntSolver.Generator = (function() {
       path.push({ step: 'A1.' + (i + 1), J: d2.J, T: d2.T, R: d2.R, freePct: d2.freePct, pass: d2.pass });
       if (d2.pass) break;
     }
+    _p7Stage.A1 += Date.now() - _stA1;
     // Early：前10步加压
+    var _stEarly = Date.now();
     var _earlyBad = (diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3);
     for (var ei2 = 0; ei2 < 2 && _earlyBad && (!_dl || Date.now() < _dl); ei2++) {
       tried++;
@@ -15939,7 +15944,9 @@ AntSolver.Generator = (function() {
       path.push({ step: 'Early.' + (ei2 + 1), earlyFree10: dE.earlyFree10, earlyPeak10: dE.earlyPeak10, T: dE.T, pass: dE.pass });
       if (dE.pass) break;
     }
+    _p7Stage.Early += Date.now() - _stEarly;
     // A2：压力点岔路
+    var _stA2 = Date.now();
     for (var k = 0; k < 2 && diag.cause === 'flat' && (!_dl || Date.now() < _dl); k++) {
       tried++;
       var rep2 = p7ForceChoice(cur, config, ev);
@@ -15963,6 +15970,7 @@ AntSolver.Generator = (function() {
       if (d2b.pass) break;
     }
     // A3：收紧开局（freePct/freeRunMax）
+    var _stA3 = Date.now();
     var _earlyOkForA3 = !((diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3));
     for (var j = 0; j < 2 && diag.cause !== 'black' && _earlyOkForA3 && (!_dl || Date.now() < _dl) && (diag.cause === 'free' || (diag.freePct != null && diag.freePct > 50) || (diag.freeRunMax != null && diag.freeRunMax > 6)); j++) {
       tried++;
@@ -16004,7 +16012,9 @@ AntSolver.Generator = (function() {
       path.push({ step: 'A3.' + (j + 1), J: d3.J, T: d3.T, R: d3.R, freePct: d3.freePct, freeRunMax: d3.freeRunMax, pass: d3.pass });
       if (d3.pass) break;
     }
+    _p7Stage.A3 += Date.now() - _stA3;
     // A4：太黑减负
+    var _stA4 = Date.now();
     if (diag.cause === 'black') {
       for (var m = 0; m < 2; m++) {
         tried++;
@@ -16022,10 +16032,11 @@ AntSolver.Generator = (function() {
         if (d4.pass) break;
       }
     }
+    _p7Stage.A4 += Date.now() - _stA4;
     return {
       level: cur, goodV3: ev && ev.goodV3, solveResult: ev && ev.solveResult,
       audit: ev && ev.audit, valid: !!(ev && ev.valid),
-      p7: { tried: tried, accepted: accepted, fromJ: d0.J, toJ: diag.J,
+      p7: { ms: Date.now() - _p7T0, stage: _p7Stage, tried: tried, accepted: accepted, fromJ: d0.J, toJ: diag.J,
         fromT: d0.T, toT: diag.T, fromR: d0.R, toR: diag.R,
         fromFreePct: d0.freePct, toFreePct: diag.freePct,
         fromFreeRunMax: d0.freeRunMax, toFreeRunMax: diag.freeRunMax,

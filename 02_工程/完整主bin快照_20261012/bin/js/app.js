@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "465";
+var APP_BUILD = "466";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5798,7 +5798,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v465 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v466 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5854,7 +5854,7 @@ AntSolver.App = (function() {
       row('跑满时间', rec.fullTime ? '开（不早停）' : '关') +
       row('陷阱后处理', rec.trapPost ? (rec.trapPost.applied ? ('命中 / +' + Math.round((rec.trapPost.ms || 0) / 1000) + 's') : ('未命中（' + (rec.trapPost.reason || rec.trapPost.error || '无') + '）')) : '未开') +
       row('P7修复', rec.p7 ? ('试' + (rec.p7.tried || 0) + ' / 收' + (rec.p7.accepted || 0) +
-        '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
+        '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
         '　freeLow ' + (rec.p7.fromFreeLowPct == null ? '-' : rec.p7.fromFreeLowPct) + '→' + (rec.p7.toFreeLowPct == null ? '-' : rec.p7.toFreeLowPct) +
         '　压力 ' + (rec.p7.fromPressurePct3 == null ? '-' : rec.p7.fromPressurePct3) + '→' + (rec.p7.toPressurePct3 == null ? '-' : rec.p7.toPressurePct3) +
@@ -5867,7 +5867,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v465', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v466', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6112,7 +6112,7 @@ AntSolver.App = (function() {
     // 【v429】W≤1 不再判窄：一个正确 + 多个 partial 是解谜，不是窄
     if (o.selectMed == null) r.push('可选项中位未测');
     else if (o.selectMed < 2) r.push('可选中位' + o.selectMed + '<2（被迫单线）');
-    if (o.forcedPct != null && o.forcedPct > 25) r.push('被迫步' + o.forcedPct + '%>25%');
+    if (o.forcedPct != null && o.forcedPct > 20) r.push('被迫步' + o.forcedPct + '%>20%');
     if (o.fullMed2 != null && o.fullMed2 > 2) r.push('吃满中位' + o.fullMed2 + '>2（太白给）');
     if (o.t == null) r.push('T未测');
     else if (o.t < 10) r.push('T陷阱' + o.t + '%<10%（没压力）');
@@ -6372,6 +6372,7 @@ AntSolver.App = (function() {
       audit: rec.audit || null,
       qGatePass: rec.qGatePass === true ? true : (rec.qGatePass === false ? false : null),
       qGateReasons: rec.qGateReasons || null, qLabel: rec.qLabel || null, qPass: rec.qPass === true,
+      qReasons: rec.qReasons || null, p7Ms: rec.p7 ? rec.p7.ms : null, p7: rec.p7 || null,
       entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
@@ -6402,6 +6403,9 @@ AntSolver.App = (function() {
         bufferLimit: rec.level ? rec.level.bufferLimit : null,
         blocks: rec.level ? rec.level.blocks : null, board: rec.level ? rec.level.board : null,
         audit: rec.audit || null, generationEval: rec.generationEval || null, solve: rec.solve || null,
+        qGatePass: rec.qGatePass === true ? true : (rec.qGatePass === false ? false : null),
+        qGateReasons: rec.qGateReasons || null, qPass: rec.qPass === true, qLabel: rec.qLabel || null,
+        qReasons: rec.qReasons || null, p7: rec.p7 || null,
         chokeV2: rec.chokeV2 || null,   // 【v157】卡点判据 v2（R1~R9）明细（无损数据里，单关级复查用）
         fallback: !!rec.fallback, fallbackTier: rec.fallbackTier, fallbackType: rec.fallbackType, fallbackReason: rec.fallbackReason,
         // v115：完整内部数据里同样保留采样值与卡点计划，便于单关级复查（不只看汇总 CSV）
@@ -6540,7 +6544,7 @@ AntSolver.App = (function() {
     var dt = (rec._elapsedMs / 1000).toFixed(1);
     if (rec.p7) {
       genLog(entry.name + '  P7 试' + (rec.p7.tried || 0) + ' 收' + (rec.p7.accepted || 0) +
-        '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
+        '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
         (rec.p7.path && rec.p7.path.length ? ('　' + rec.p7.path.map(function (x) { return x.step; }).join('→')) : '') +
         (rec.p7.notes && rec.p7.notes.length ? ('　注 ' + rec.p7.notes.slice(0, 2).join('；')) : ''), 'gen-log-warn');

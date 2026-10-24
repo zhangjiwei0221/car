@@ -1,0 +1,216 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 0f90690..323a948 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -7,12 +7,12 @@
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+   <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=465">
++  <link rel="stylesheet" href="css/style.css?v=466">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v465</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v466</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -750,21 +750,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=465"></script>
+-  <script src="js/utils.js?v=465"></script>
++  <script src="js/zip.js?v=466"></script>
++  <script src="js/utils.js?v=466"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=465"></script>
+-  <script src="js/simulator.js?v=465"></script>
++  <script src="js/color-libs.js?v=466"></script>
++  <script src="js/simulator.js?v=466"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=465"></script>
+-  <script src="js/solver-strategy.js?v=465"></script>
+-  <script src="js/solver.js?v=465"></script>
+-  <script src="js/playersim.js?v=465"></script>
+-  <script src="js/generator.js?v=465"></script>
+-  <script src="js/analysis.js?v=465"></script>
++  <script src="js/anchor-cut.js?v=466"></script>
++  <script src="js/solver-strategy.js?v=466"></script>
++  <script src="js/solver.js?v=466"></script>
++  <script src="js/playersim.js?v=466"></script>
++  <script src="js/generator.js?v=466"></script>
++  <script src="js/analysis.js?v=466"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=465"></script>
+-  <script src="js/app.js?v=465"></script>
++  <script src="js/level-editor.js?v=466"></script>
++  <script src="js/app.js?v=466"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 66fdfeb..e2ffa3a 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "465";
++var APP_BUILD = "466";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -5798,7 +5798,7 @@ AntSolver.App = (function() {
+     }
+ 
+     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
+-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v465 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
++      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v466 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+       sec('硬门（2 条）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
+@@ -5854,7 +5854,7 @@ AntSolver.App = (function() {
+       row('跑满时间', rec.fullTime ? '开（不早停）' : '关') +
+       row('陷阱后处理', rec.trapPost ? (rec.trapPost.applied ? ('命中 / +' + Math.round((rec.trapPost.ms || 0) / 1000) + 's') : ('未命中（' + (rec.trapPost.reason || rec.trapPost.error || '无') + '）')) : '未开') +
+       row('P7修复', rec.p7 ? ('试' + (rec.p7.tried || 0) + ' / 收' + (rec.p7.accepted || 0) +
+-        '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
++        '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
+         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
+         '　freeLow ' + (rec.p7.fromFreeLowPct == null ? '-' : rec.p7.fromFreeLowPct) + '→' + (rec.p7.toFreeLowPct == null ? '-' : rec.p7.toFreeLowPct) +
+         '　压力 ' + (rec.p7.fromPressurePct3 == null ? '-' : rec.p7.fromPressurePct3) + '→' + (rec.p7.toPressurePct3 == null ? '-' : rec.p7.toPressurePct3) +
+@@ -5867,7 +5867,7 @@ AntSolver.App = (function() {
+       row('这关难在', intent) +
+       '</table>';
+     if (title) title.textContent = rec.name || '';
+-    try { console.log('[gen-report] v465', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
++    try { console.log('[gen-report] v466', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+     card.classList.remove('hidden');
+     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
+     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
+@@ -6112,7 +6112,7 @@ AntSolver.App = (function() {
+     // 【v429】W≤1 不再判窄：一个正确 + 多个 partial 是解谜，不是窄
+     if (o.selectMed == null) r.push('可选项中位未测');
+     else if (o.selectMed < 2) r.push('可选中位' + o.selectMed + '<2（被迫单线）');
+-    if (o.forcedPct != null && o.forcedPct > 25) r.push('被迫步' + o.forcedPct + '%>25%');
++    if (o.forcedPct != null && o.forcedPct > 20) r.push('被迫步' + o.forcedPct + '%>20%');
+     if (o.fullMed2 != null && o.fullMed2 > 2) r.push('吃满中位' + o.fullMed2 + '>2（太白给）');
+     if (o.t == null) r.push('T未测');
+     else if (o.t < 10) r.push('T陷阱' + o.t + '%<10%（没压力）');
+@@ -6372,6 +6372,7 @@ AntSolver.App = (function() {
+       audit: rec.audit || null,
+       qGatePass: rec.qGatePass === true ? true : (rec.qGatePass === false ? false : null),
+       qGateReasons: rec.qGateReasons || null, qLabel: rec.qLabel || null, qPass: rec.qPass === true,
++      qReasons: rec.qReasons || null, p7Ms: rec.p7 ? rec.p7.ms : null, p7: rec.p7 || null,
+       entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
+       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
+       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
+@@ -6402,6 +6403,9 @@ AntSolver.App = (function() {
+         bufferLimit: rec.level ? rec.level.bufferLimit : null,
+         blocks: rec.level ? rec.level.blocks : null, board: rec.level ? rec.level.board : null,
+         audit: rec.audit || null, generationEval: rec.generationEval || null, solve: rec.solve || null,
++        qGatePass: rec.qGatePass === true ? true : (rec.qGatePass === false ? false : null),
++        qGateReasons: rec.qGateReasons || null, qPass: rec.qPass === true, qLabel: rec.qLabel || null,
++        qReasons: rec.qReasons || null, p7: rec.p7 || null,
+         chokeV2: rec.chokeV2 || null,   // 【v157】卡点判据 v2（R1~R9）明细（无损数据里，单关级复查用）
+         fallback: !!rec.fallback, fallbackTier: rec.fallbackTier, fallbackType: rec.fallbackType, fallbackReason: rec.fallbackReason,
+         // v115：完整内部数据里同样保留采样值与卡点计划，便于单关级复查（不只看汇总 CSV）
+@@ -6540,7 +6544,7 @@ AntSolver.App = (function() {
+     var dt = (rec._elapsedMs / 1000).toFixed(1);
+     if (rec.p7) {
+       genLog(entry.name + '  P7 试' + (rec.p7.tried || 0) + ' 收' + (rec.p7.accepted || 0) +
+-        '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
++        '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
+         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
+         (rec.p7.path && rec.p7.path.length ? ('　' + rec.p7.path.map(function (x) { return x.step; }).join('→')) : '') +
+         (rec.p7.notes && rec.p7.notes.length ? ('　注 ' + rec.p7.notes.slice(0, 2).join('；')) : ''), 'gen-log-warn');
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index fdd14d9..7d1f98d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -15901,6 +15901,8 @@ AntSolver.Generator = (function() {
+   }
+ 
+   function p7RepairLevel(level, config) {
++    var _p7T0 = Date.now();
++    var _p7Stage = { A1: 0, Early: 0, A2: 0, A3: 0, A4: 0 };
+     var ev0 = null;
+     try { ev0 = evaluateLevel(level, config); } catch (e) { }
+     var d0 = p7DiagnoseEv(ev0);
+@@ -15908,6 +15910,7 @@ AntSolver.Generator = (function() {
+     var cur = level, diag = d0, ev = ev0, tried = 0, accepted = 0, path = [], notes = [];
+     var _dl = config && config._repairDeadline;
+     // A1：管道公平性
++    var _stA1 = Date.now();
+     for (var i = 0; i < 3 && diag.cause === 'hidden' && (!_dl || Date.now() < _dl); i++) {
+       tried++;
+       var rep = p7PipeFairness(cur, config);
+@@ -15922,7 +15925,9 @@ AntSolver.Generator = (function() {
+       path.push({ step: 'A1.' + (i + 1), J: d2.J, T: d2.T, R: d2.R, freePct: d2.freePct, pass: d2.pass });
+       if (d2.pass) break;
+     }
++    _p7Stage.A1 += Date.now() - _stA1;
+     // Early：前10步加压
++    var _stEarly = Date.now();
+     var _earlyBad = (diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3);
+     for (var ei2 = 0; ei2 < 2 && _earlyBad && (!_dl || Date.now() < _dl); ei2++) {
+       tried++;
+@@ -15939,7 +15944,9 @@ AntSolver.Generator = (function() {
+       path.push({ step: 'Early.' + (ei2 + 1), earlyFree10: dE.earlyFree10, earlyPeak10: dE.earlyPeak10, T: dE.T, pass: dE.pass });
+       if (dE.pass) break;
+     }
++    _p7Stage.Early += Date.now() - _stEarly;
+     // A2：压力点岔路
++    var _stA2 = Date.now();
+     for (var k = 0; k < 2 && diag.cause === 'flat' && (!_dl || Date.now() < _dl); k++) {
+       tried++;
+       var rep2 = p7ForceChoice(cur, config, ev);
+@@ -15963,6 +15970,7 @@ AntSolver.Generator = (function() {
+       if (d2b.pass) break;
+     }
+     // A3：收紧开局（freePct/freeRunMax）
++    var _stA3 = Date.now();
+     var _earlyOkForA3 = !((diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3));
+     for (var j = 0; j < 2 && diag.cause !== 'black' && _earlyOkForA3 && (!_dl || Date.now() < _dl) && (diag.cause === 'free' || (diag.freePct != null && diag.freePct > 50) || (diag.freeRunMax != null && diag.freeRunMax > 6)); j++) {
+       tried++;
+@@ -16004,7 +16012,9 @@ AntSolver.Generator = (function() {
+       path.push({ step: 'A3.' + (j + 1), J: d3.J, T: d3.T, R: d3.R, freePct: d3.freePct, freeRunMax: d3.freeRunMax, pass: d3.pass });
+       if (d3.pass) break;
+     }
++    _p7Stage.A3 += Date.now() - _stA3;
+     // A4：太黑减负
++    var _stA4 = Date.now();
+     if (diag.cause === 'black') {
+       for (var m = 0; m < 2; m++) {
+         tried++;
+@@ -16022,10 +16032,11 @@ AntSolver.Generator = (function() {
+         if (d4.pass) break;
+       }
+     }
++    _p7Stage.A4 += Date.now() - _stA4;
+     return {
+       level: cur, goodV3: ev && ev.goodV3, solveResult: ev && ev.solveResult,
+       audit: ev && ev.audit, valid: !!(ev && ev.valid),
+-      p7: { tried: tried, accepted: accepted, fromJ: d0.J, toJ: diag.J,
++      p7: { ms: Date.now() - _p7T0, stage: _p7Stage, tried: tried, accepted: accepted, fromJ: d0.J, toJ: diag.J,
+         fromT: d0.T, toT: diag.T, fromR: d0.R, toR: diag.R,
+         fromFreePct: d0.freePct, toFreePct: diag.freePct,
+         fromFreeRunMax: d0.freeRunMax, toFreeRunMax: diag.freeRunMax,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+index b42e023..a0b06c1 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+@@ -385,6 +385,10 @@ function persistResult(b, payload) {
+     棋盘结构: rec.boardStat || null,
+     结果分类: cls.label, 状态: rec.status || (cleanLevel ? 'OK' : 'ERROR'),
+     合格档: rec.qGatePass === true ? (rec.qLabel || '合格') : (a.tier || null),
++    结构门: rec.qGatePass === true ? '通过' : (rec.qGatePass === false ? '未过' : null),
++    质量标签: rec.qLabel || null,
++    质量未过项: rec.qReasons || null,
++    P7耗时ms: rec.p7Ms != null ? rec.p7Ms : null,
+     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
+     fallbackType: rec.fallbackType || null, fallbackReason: rec.fallbackReason || null,
+     难度分: rec.difficulty != null ? rec.difficulty : null, 难度等级: rec.grade || null,
