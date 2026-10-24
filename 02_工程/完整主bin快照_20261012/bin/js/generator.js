@@ -15900,9 +15900,70 @@ AntSolver.Generator = (function() {
     return best;
   }
 
+  // P7-A3R：专门打断连续免费段
+  function p7BreakFreeRun(level, config, ev) {
+    var steps = ev && ev.goodV3 && ev.goodV3.fillCurve && ev.goodV3.fillCurve.steps;
+    if (!steps || !steps.length) return null;
+    function plain(r, c) {
+      var x = level.board.cells[r] && level.board.cells[r][c];
+      return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
+    }
+    var runs = [], cur = [];
+    for (var i = 0; i < steps.length; i++) {
+      var st = steps[i];
+      if (st.full >= 2 && st.free >= 3) cur.push({ st: st, i: i });
+      else { if (cur.length) runs.push(cur); cur = []; }
+    }
+    if (cur.length) runs.push(cur);
+    runs.sort(function (a, b) { return b.length - a.length; });
+    if (!runs.length || runs[0].length < 6) return null;
+    var run = runs[0];
+    var early = [];
+    var picks = [run[0], run[Math.floor(run.length / 2)], run[run.length - 1]];
+    for (var pi = 0; pi < picks.length; pi++) {
+      var st2 = picks[pi].st;
+      var cs = (st2.moves || []).filter(function (m) { return plain(m.r, m.c); });
+      if (st2.pick && plain(st2.pick.r, st2.pick.c)) cs.push(st2.pick);
+      for (var cj = 0; cj < cs.length && early.length < 4; cj++) early.push(cs[cj]);
+    }
+    var deep = [];
+    for (var di = 0; di < steps.length; di++) {
+      var sd = steps[di];
+      if (!(sd.prog >= 0.40 && sd.prog <= 0.72)) continue;
+      var ds = (sd.moves || []).filter(function (m) { return plain(m.r, m.c); });
+      for (var dj = 0; dj < ds.length; dj++) deep.push(ds[dj]);
+    }
+    if (!early.length || !deep.length) return null;
+    deep.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
+    var best = null, bestScore = -Infinity, tried = 0;
+    var curRun = ev.goodV3.fillCurve.freeRunMax || 0;
+    for (var ei = 0; ei < early.length && tried < 6; ei++) {
+      for (var dj2 = 0; dj2 < deep.length && tried < 6; dj2++) {
+        var e = early[ei], d = deep[dj2];
+        if (e.r === d.r && e.c === d.c) continue;
+        tried++;
+        var lv = JSON.parse(JSON.stringify(level));
+        var a = lv.board.cells[e.r][e.c], b = lv.board.cells[d.r][d.c];
+        if (!a || !b || a.t !== 'box' || b.t !== 'box') continue;
+        lv.board.cells[e.r][e.c] = b; lv.board.cells[d.r][d.c] = a;
+        var ev2 = null;
+        try { ev2 = evaluateLevel(lv, config); } catch (er) { }
+        if (!ev2 || !ev2.goodV3) continue;
+        var fc = ev2.goodV3.fillCurve || {};
+        if (fc.freeRunMax == null || fc.freeRunMax > 5 || fc.freeRunMax >= curRun) continue;
+        var sc = (curRun - fc.freeRunMax) * 20 + (100 - (fc.freeLowPct || 0)) + (fc.pressurePct3 || 0);
+        if (sc > bestScore) {
+          best = { level: lv, freeRunMax: fc.freeRunMax, freeLowPct: fc.freeLowPct, freePct: fc.freePct, pressurePct3: fc.pressurePct3 };
+          bestScore = sc;
+        }
+      }
+    }
+    return best;
+  }
+
   function p7RepairLevel(level, config) {
     var _p7T0 = Date.now();
-    var _p7Stage = { A1: 0, Early: 0, A2: 0, A3: 0, A4: 0 };
+    var _p7Stage = { A1: 0, Early: 0, Run: 0, A2: 0, A3: 0, A4: 0 };
     var ev0 = null;
     try { ev0 = evaluateLevel(level, config); } catch (e) { }
     var d0 = p7DiagnoseEv(ev0);
@@ -15945,6 +16006,24 @@ AntSolver.Generator = (function() {
       if (dE.pass) break;
     }
     _p7Stage.Early += Date.now() - _stEarly;
+    // 【v469】连续免费段：Early 后仍 >5，专门打断
+    var _stRun = Date.now();
+    if (diag.cause !== 'black' && diag.freeRunMax != null && diag.freeRunMax > 5 && (!_dl || Date.now() < _dl)) {
+      tried++;
+      var _repRun = null;
+      try { _repRun = p7BreakFreeRun(cur, config, ev); } catch (e) { _repRun = null; }
+      if (_repRun) {
+        var _evRun = null;
+        try { _evRun = evaluateLevel(_repRun.level, config); } catch (e) { }
+        var _dRun = p7DiagnoseEv(_evRun);
+        if (_dRun && _dRun.freeRunMax != null && _dRun.freeRunMax <= 5 && _dRun.freeRunMax <= diag.freeRunMax - 2 &&
+            (_dRun.freeLowPct == null || diag.freeLowPct == null || _dRun.freeLowPct <= diag.freeLowPct + 5)) {
+          cur = _repRun.level; ev = _evRun; diag = _dRun; accepted++;
+          path.push({ step: 'Run.1', freeRunMax: _dRun.freeRunMax, freeLowPct: _dRun.freeLowPct, freePct: _dRun.freePct, pass: _dRun.pass });
+        } else notes.push('Run no improve');
+      } else notes.push('Run no candidate');
+    }
+    _p7Stage.Run += Date.now() - _stRun;
     // A2：压力点岔路
     var _stA2 = Date.now();
     for (var k = 0; k < 2 && diag.cause === 'flat' && (!_dl || Date.now() < _dl); k++) {
