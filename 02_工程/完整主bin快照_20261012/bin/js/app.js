@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "471";
+var APP_BUILD = "472";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -4841,6 +4841,15 @@ AntSolver.App = (function() {
     //   切法 = 有路线 → 暴露序；前沿 2~4 → 暴露序+行优先；否则按依赖层
     var _autoCap = null;
     try { _autoCap = AntSolver.Generator.deriveCapacityBand(blocks); } catch (e) {}
+    var _capProfile = (document.getElementById('gen-cap-profile') || {}).value || 'auto';
+    var _capLo = _autoCap ? _autoCap.band[0] : null;
+    var _capHi = _autoCap ? _autoCap.band[1] : null;
+    var _capMid = _autoCap ? _autoCap.chosen : null;
+    if (_autoCap) {
+      if (_capProfile === 'low') _capHi = _capLo;
+      else if (_capProfile === 'high') _capLo = _capHi;
+      else if (_capProfile === 'mid') _capLo = _capHi = _capMid;
+    }
     var _frontAvg = (_autoCap && _autoCap.frontier) ? _autoCap.frontier.avg : null;
     var _hasRoute = !!(currentRouteOrder && currentRouteOrder.length);
     var _cutMode = _hasRoute ? 'exposeCut'
@@ -5102,8 +5111,8 @@ AntSolver.App = (function() {
       generatorFlow: 'old',
       // 【v303·用户要求】球容量改成"用户预设"，界面上 gen-boxmin / gen-boxmax 就是它；
       //   只有没填时才回落到原工程的 40~60。
-      boxSizeMin: _autoCap ? _autoCap.band[0] : (cfg.boxSizeMin || 40),
-      boxSizeMax: _autoCap ? _autoCap.band[1] : (cfg.boxSizeMax || 60),
+      boxSizeMin: _autoCap ? _capLo : (cfg.boxSizeMin || 40),
+      boxSizeMax: _autoCap ? _capHi : (cfg.boxSizeMax || 60),
       blackPercent: 5, blackPercentMin: 5, blackPercentMax: 8,
       icePercent: 0, chainCount: 2, chainCountMin: 1, chainCountMax: 3,
       questionPercent: 8, questionPercentMin: 6, questionPercentMax: 10,
@@ -5146,8 +5155,8 @@ AntSolver.App = (function() {
       //   原来写死 [_capAvg×0.6, _capAvg×1.6]：35×35 图 _capAvg = px÷77 = 16 →
       //   [16, 26]，于是不管界面填 30~50 还是 40~60，最后一步 normalize 会把每辆车
       //   重新切成 16~26（58 辆小车、管道塞满）。用户三次说「还是不对」都是它。
-      capNormMin: _autoCap ? _autoCap.band[0] : (cfg.boxSizeMin || 40),
-      capNormMax: _autoCap ? _autoCap.band[1] : (cfg.boxSizeMax || 60),
+      capNormMin: _autoCap ? _capLo : (cfg.boxSizeMin || 40),
+      capNormMax: _autoCap ? _capHi : (cfg.boxSizeMax || 60),
       icePercent: 0, icePercentMin: 0, icePercentMax: 0, row0IceMax: 2,
       // 【v253·用户裁决】冰当"顺序闸门"：只冻开局就能装满的车，冻 3 辆、各滞后 2 步。
       //   随机撒冰停用（icePercent 仍留一点做背景障碍）。
@@ -5190,7 +5199,7 @@ AntSolver.App = (function() {
     try {
       genLog('自动：切法 ' + (_cutMode === 'exposeCut' ? '暴露序+行优先' : '按依赖层') +
         '（前沿 ' + (_frontAvg == null ? '?' : _frontAvg) + '）· 容量 ' + out.boxSizeMin + '~' + out.boxSizeMax +
-        (_autoCap ? '（需求块 ' + _autoCap.m + ' · 白给车 ' + _autoCap.free + ' · ' +
+        (_autoCap ? ' · 容量策略 ' + _capProfile + '（需求块 ' + _autoCap.m + ' · 白给车 ' + _autoCap.free + ' · ' +
           (_autoCap.feasible ? '可压到≤2' : '压不下来，建议冰/改图') + '）' : ''), 'gen-log-ok');
     } catch (e) {}
     try {
@@ -5801,7 +5810,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v471 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v472 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5870,7 +5879,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v471', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v472', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
