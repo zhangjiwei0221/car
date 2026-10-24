@@ -15558,9 +15558,8 @@ AntSolver.Generator = (function() {
     if (!low.length || !high.length) return null;
     high.sort(function (a, b) { return (b.count || 0) - (a.count || 0); });
     var best = null, bestScore = null;
-    var _lim = (config && config._p7Quick) ? 2 : 3;
-    for (var li = 0; li < low.length && li < _lim; li++) {
-      for (var hi = 0; hi < high.length && hi < _lim; hi++) {
+    for (var li = 0; li < low.length && li < 3; li++) {
+      for (var hi = 0; hi < high.length && hi < 3; hi++) {
         var a = low[li], b = high[hi];
         if (a.r === b.r && a.c === b.c) continue;
         var lv = JSON.parse(JSON.stringify(level));
@@ -15573,7 +15572,7 @@ AntSolver.Generator = (function() {
         if (!ev2 || !ev2.goodV3) continue;
         var fc = ev2.goodV3.fillCurve || {};
         var _pp = (ev2.goodV3.persist && ev2.goodV3.persist.playerPassPct != null) ? ev2.goodV3.persist.playerPassPct : 100;
-        var sc = (100 - (fc.freeLowPct || 0)) + (fc.pressurePct3 || 0) * 2 + (fc.pressurePeak || 0) * 5 - _pp * 2 - (fc.freeRunMax || 0) * 10;
+        var sc = (100 - (fc.freeLowPct || 0)) + (fc.pressurePct3 || 0) * 2 + (fc.pressurePeak || 0) * 5 - _pp * 2;
         if (bestScore == null || sc > bestScore) {
           best = { level: lv, freeLowPct: fc.freeLowPct, pressurePct3: fc.pressurePct3, pressurePeak: fc.pressurePeak, misplacedFreePct: fc.misplacedFreePct, first: _pp };
           bestScore = sc;
@@ -15592,13 +15591,12 @@ AntSolver.Generator = (function() {
       return x && x.t === 'box' && !x.chain && !x.numice && !x.q;
     }
     var best = null, bestScore = null, tries = 0;
-    var _maxTry = (config && config._p7Quick) ? 2 : 5;
-    for (var i = 0; i < steps.length && tries < _maxTry; i++) {
+    for (var i = 0; i < steps.length && tries < 5; i++) {
       var st = steps[i];
       if (!(st.prog >= 0.20 && st.prog <= 0.75 && st.full >= 1)) continue;
       var cands = (st.moves || []).slice();
       if (st.pick && plain(st.pick.r, st.pick.c) && !cands.some(function (m) { return m.r === st.pick.r && m.c === st.pick.c; })) cands.push(st.pick);
-      for (var ci = 0; ci < cands.length && tries < _maxTry; ci++) {
+      for (var ci = 0; ci < cands.length && tries < 5; ci++) {
         var cd = cands[ci];
         if (!plain(level, cd.r, cd.c)) continue;
         tries++;
@@ -15697,10 +15695,9 @@ AntSolver.Generator = (function() {
       return (b.count || 0) - (a.count || 0);
     });
     var best = null, bestScore = -Infinity, tried = 0;
-    var _maxTry = (config && config._p7Quick) ? 2 : 3;
-    for (var pi = 0; pi < pressure.length && tried < _maxTry; pi++) {
+    for (var pi = 0; pi < pressure.length && tried < 3; pi++) {
       var p = pressure[pi];
-      for (var di = 0; di < deep.length && tried < _maxTry; di++) {
+      for (var di = 0; di < deep.length && tried < 3; di++) {
         var d = deep[di];
         if (p.r === d.r && p.c === d.c) continue;
         tried++;
@@ -15831,9 +15828,8 @@ AntSolver.Generator = (function() {
       return _qb - _qa;
     });
     var best = null, bestScore = -Infinity, tried = 0;
-    var _maxTry = (config && config._p7Quick) ? 1 : 3;
-    for (var ei = 0; ei < early.length && tried < _maxTry; ei++) {
-      for (var di = 0; di < deep.length && tried < _maxTry; di++) {
+    for (var ei = 0; ei < early.length && tried < 3; ei++) {
+      for (var di = 0; di < deep.length && tried < 3; di++) {
         var e = early[ei], d = deep[di];
         if (e.r === d.r && e.c === d.c) continue;
         tried++;
@@ -15906,7 +15902,6 @@ AntSolver.Generator = (function() {
 
   function p7RepairLevel(level, config) {
     var _p7T0 = Date.now();
-    try { config._p7Quick = true; } catch (e) { }
     var _p7Stage = { A1: 0, Early: 0, A2: 0, A3: 0, A4: 0 };
     var ev0 = null;
     try { ev0 = evaluateLevel(level, config); } catch (e) { }
@@ -15934,7 +15929,7 @@ AntSolver.Generator = (function() {
     // Early：前10步加压
     var _stEarly = Date.now();
     var _earlyBad = (diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3);
-    for (var ei2 = 0; ei2 < ((config && config._p7Quick) ? 1 : 2) && _earlyBad && (!_dl || Date.now() < _dl); ei2++) {
+    for (var ei2 = 0; ei2 < 2 && _earlyBad && (!_dl || Date.now() < _dl); ei2++) {
       tried++;
       var repE = p7EarlyPressure(cur, config, ev);
       if (!repE) { notes.push('early no candidate'); break; }
@@ -15952,7 +15947,7 @@ AntSolver.Generator = (function() {
     _p7Stage.Early += Date.now() - _stEarly;
     // A2：压力点岔路
     var _stA2 = Date.now();
-    for (var k = 0; k < ((config && config._p7Quick) ? 1 : 2) && diag.cause === 'flat' && (!_dl || Date.now() < _dl); k++) {
+    for (var k = 0; k < 2 && diag.cause === 'flat' && (!_dl || Date.now() < _dl); k++) {
       tried++;
       var rep2 = p7ForceChoice(cur, config, ev);
       if (!rep2) { rep2 = p7PartialChoice(cur, config, ev); if (rep2) notes.push('A2 partial'); }
@@ -15976,10 +15971,8 @@ AntSolver.Generator = (function() {
     }
     // A3：收紧开局（freePct/freeRunMax）
     var _stA3 = Date.now();
-    // 【v467】freeLow 高时允许 A3 接手，不被 Early 永久挡住
-    var _a3Need = (diag.cause === 'free' || (diag.freeLowPct != null && diag.freeLowPct > 30) || (diag.freePct != null && diag.freePct > 50) || (diag.freeRunMax != null && diag.freeRunMax > 6));
-    var _a3Max = (config && config._p7Quick && !(diag.freeRunMax != null && diag.freeRunMax > 5)) ? 1 : 2;
-    for (var j = 0; j < _a3Max && diag.cause !== 'black' && _a3Need && (!_dl || Date.now() < _dl) && (diag.cause === 'free' || (diag.freePct != null && diag.freePct > 50) || (diag.freeRunMax != null && diag.freeRunMax > 6)); j++) {
+    var _earlyOkForA3 = !((diag.earlyFree10 != null && diag.earlyFree10 > 4) || (diag.earlyPeak10 != null && diag.earlyPeak10 < 3));
+    for (var j = 0; j < 2 && diag.cause !== 'black' && _earlyOkForA3 && (!_dl || Date.now() < _dl) && (diag.cause === 'free' || (diag.freePct != null && diag.freePct > 50) || (diag.freeRunMax != null && diag.freeRunMax > 6)); j++) {
       tried++;
       // A3R：先挪位置（低缓冲白给 → 高缓冲窗口）
       var repR = p7RelocateFree(cur, config, ev);
@@ -16014,7 +16007,6 @@ AntSolver.Generator = (function() {
       // A3 不能把 T/R 修坏：T/R 掉 >5 就拒绝
       if (diag.T != null && (d3.T == null || d3.T < diag.T - 5)) { notes.push('A3 T guard '+(d3.T)+'<'+diag.T+'-5'); break; }
       if (diag.R != null && (d3.R == null || d3.R < diag.R - 5)) { notes.push('A3 R guard '+(d3.R)+'<'+diag.R+'-5'); break; }
-      if (diag.freeRunMax != null && d3.freeRunMax != null && d3.freeRunMax > diag.freeRunMax) { notes.push('A3 freeRun guard '+(d3.freeRunMax)+'>'+diag.freeRunMax); break; }
       if (!improved3) { notes.push('A3 free no improve '+diag.freePct+'->'+d3.freePct); break; }
       cur = rep3.level; ev = ev3; diag = d3; accepted++;
       path.push({ step: 'A3.' + (j + 1), J: d3.J, T: d3.T, R: d3.R, freePct: d3.freePct, freeRunMax: d3.freeRunMax, pass: d3.pass });
