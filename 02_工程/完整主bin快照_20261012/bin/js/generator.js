@@ -14675,26 +14675,9 @@ AntSolver.Generator = (function() {
   // 【v415】目标模式的结构门：可解 + 首通≤50 + J≤20 + W≤1≤35 + freeLow≤30
   //   不能再用旧 goodV3.pass，否则目标模式可能在旧判据上无限跑。
   function goalStructPass(r) {
-    // 【v471】结构门过就收；fallback 只报告，不再由它一票否决
-    if (!r || !r.level || !r.valid) return false;
-    var p = r.goodV3 && r.goodV3.persist;
-    var fc = r.goodV3 && r.goodV3.fillCurve;
-    if (!p || !fc) return false;
-    // 【v436】目标模式追的结构门 = 当前 qGate-lite
-    // 【v461】首通只报告，不进结构门
-    var dc = p.deathCauses || {}, dt = 0, dh = 0;
-    for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
-    var J = dt ? Math.round(dh / dt * 100) : 0;
-    if (J > 20) return false;
-    if (fc.selectMedian != null && fc.selectMedian < 2) return false;
-    if (fc.forcedPct != null && fc.forcedPct > 20) return false;
-    if (fc.partialStepPct != null && fc.partialStepPct < 20) return false;
-    // 【v473·用户裁决】结构门 fullMedian 放宽到 ≤3
-    if (fc.fullMedian2 != null && fc.fullMedian2 > 3) return false;
-    if (fc.freeLowPct != null && fc.freeLowPct > 30) return false;
-    // 【v476】结构门 freeRun≤6；qPass 质量仍≤5
-    if (fc.freeRunMax != null && fc.freeRunMax > 6) return false;
-    return true;
+    // 【v480】与 app/落库共用同一结构门；本步只搬家，不改阈值与候选排序。
+    var q = AntSolver.Quality && AntSolver.Quality.fromGeneration(r);
+    return !!(q && q.gatePass);
   }
 
   function produceGoal(blocks, config, opts) {

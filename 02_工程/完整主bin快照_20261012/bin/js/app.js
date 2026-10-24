@@ -6130,50 +6130,9 @@ AntSolver.App = (function() {
    *   缺任何一项数据 → 待评，不冒充合格。
    */
   function genQualityVerdict(o) {
-    var r = [];
-    if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
-    if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
-    // 【v461】首通只报告，不进 qPass 判定（贪心是随便选）
-    if (o.learned == null) r.push('学会后未测');
-    else if (o.learned < 55) r.push('学会后' + o.learned + '%<55%（学不会）');
-    else if (o.learned > 85) r.push('学会后' + o.learned + '%>85%（一学就会）');
-    if (o.look == null) r.push('前瞻未测');
-    else if (o.look < 40) r.push('前瞻' + o.look + '%<40%（偏黑）');
-    else if (o.look > 85) r.push('前瞻' + o.look + '%>85%（一眼看穿）');
-    if (o.wMed == null) r.push('W未测');
-    // 【v429】W≤1 不再判窄：一个正确 + 多个 partial 是解谜，不是窄
-    if (o.selectMed == null) r.push('可选项中位未测');
-    else if (o.selectMed < 2) r.push('可选中位' + o.selectMed + '<2（被迫单线）');
-    if (o.forcedPct != null && o.forcedPct > 20) r.push('被迫步' + o.forcedPct + '%>20%');
-    if (o.fullMed2 != null && o.fullMed2 > 2) r.push('吃满中位' + o.fullMed2 + '>2（太白给）');
-    if (o.t == null) r.push('T未测');
-    else if (o.t < 10) r.push('T陷阱' + o.t + '%<10%（没压力）');
-    if (o.r == null) r.push('R未测');
-    else if (o.r < 15) r.push('R后悔' + o.r + 'pp<15（没岔路）');
-    if (o.hidden != null && o.hidden > 20) r.push('隐藏信息死亡' + o.hidden + '%>20%');
-    if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
-    if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
-    if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
-    var pass = r.length === 0;
-    // 【v461】qGate-lite：可解/守恒 + J/决策宽度/freeLow；首通只报告
-    var g = [];
-    if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
-    if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
-    if (o.forcedPct != null && o.forcedPct > 20) g.push('被迫步 ' + o.forcedPct + '%>20%');
-    if (o.partialStepPct != null && o.partialStepPct < 20) g.push('partial步 ' + o.partialStepPct + '%<20');
-    if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
-    if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
-    if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
-    var gatePass = g.length === 0;
-    var label = pass ? '合格' :
-      (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
-      (o.look != null && o.look > 85) ? '可玩·偏透' :
-      (o.t != null && o.t < 10) ? '可玩·没压力' :
-      (o.r != null && o.r < 15) ? '可玩·没岔路' :
-      (o.selectMed != null && o.selectMed < 2) ? '可玩·被迫单线' :
-      (o.hidden != null && o.hidden > 20) ? '可玩·偏黑' :
-      '可玩·待评';
-    return { pass: pass, gatePass: gatePass, gateReasons: g, label: label, reasons: r };
+    // 【v480】数值口径唯一来源：utils.js → AntSolver.Quality。
+    // app 只负责把 result 指标装配成输入，不再维护第二份 qGate/qPass 阈值。
+    return AntSolver.Quality.verdict(o);
   }
 
   function genBuildRec(entry, result) {

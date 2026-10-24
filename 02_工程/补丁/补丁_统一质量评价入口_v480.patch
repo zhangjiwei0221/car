@@ -1,0 +1,250 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index cefd4c2..9a5ecb6 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v405 · A1-A4修复链·前三基底各自修复</title>
+-  <link rel="stylesheet" href="css/style.css?v=479">
++  <title>车接小人 v480 · 统一质量评价入口</title>
++  <link rel="stylesheet" href="css/style.css?v=480">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v479</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v480</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,21 +769,21 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=479"></script>
+-  <script src="js/utils.js?v=479"></script>
++  <script src="js/zip.js?v=480"></script>
++  <script src="js/utils.js?v=480"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=479"></script>
+-  <script src="js/simulator.js?v=479"></script>
++  <script src="js/color-libs.js?v=480"></script>
++  <script src="js/simulator.js?v=480"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=479"></script>
+-  <script src="js/solver-strategy.js?v=479"></script>
+-  <script src="js/solver.js?v=479"></script>
+-  <script src="js/playersim.js?v=479"></script>
+-  <script src="js/generator.js?v=479"></script>
+-  <script src="js/analysis.js?v=479"></script>
++  <script src="js/anchor-cut.js?v=480"></script>
++  <script src="js/solver-strategy.js?v=480"></script>
++  <script src="js/solver.js?v=480"></script>
++  <script src="js/playersim.js?v=480"></script>
++  <script src="js/generator.js?v=480"></script>
++  <script src="js/analysis.js?v=480"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=479"></script>
+-  <script src="js/app.js?v=479"></script>
++  <script src="js/level-editor.js?v=480"></script>
++  <script src="js/app.js?v=480"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 57ec63b..23a4946 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -6130,50 +6130,9 @@ AntSolver.App = (function() {
+    *   缺任何一项数据 → 待评，不冒充合格。
+    */
+   function genQualityVerdict(o) {
+-    var r = [];
+-    if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
+-    if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
+-    // 【v461】首通只报告，不进 qPass 判定（贪心是随便选）
+-    if (o.learned == null) r.push('学会后未测');
+-    else if (o.learned < 55) r.push('学会后' + o.learned + '%<55%（学不会）');
+-    else if (o.learned > 85) r.push('学会后' + o.learned + '%>85%（一学就会）');
+-    if (o.look == null) r.push('前瞻未测');
+-    else if (o.look < 40) r.push('前瞻' + o.look + '%<40%（偏黑）');
+-    else if (o.look > 85) r.push('前瞻' + o.look + '%>85%（一眼看穿）');
+-    if (o.wMed == null) r.push('W未测');
+-    // 【v429】W≤1 不再判窄：一个正确 + 多个 partial 是解谜，不是窄
+-    if (o.selectMed == null) r.push('可选项中位未测');
+-    else if (o.selectMed < 2) r.push('可选中位' + o.selectMed + '<2（被迫单线）');
+-    if (o.forcedPct != null && o.forcedPct > 20) r.push('被迫步' + o.forcedPct + '%>20%');
+-    if (o.fullMed2 != null && o.fullMed2 > 2) r.push('吃满中位' + o.fullMed2 + '>2（太白给）');
+-    if (o.t == null) r.push('T未测');
+-    else if (o.t < 10) r.push('T陷阱' + o.t + '%<10%（没压力）');
+-    if (o.r == null) r.push('R未测');
+-    else if (o.r < 15) r.push('R后悔' + o.r + 'pp<15（没岔路）');
+-    if (o.hidden != null && o.hidden > 20) r.push('隐藏信息死亡' + o.hidden + '%>20%');
+-    if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
+-    if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
+-    if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
+-    var pass = r.length === 0;
+-    // 【v461】qGate-lite：可解/守恒 + J/决策宽度/freeLow；首通只报告
+-    var g = [];
+-    if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
+-    if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
+-    if (o.forcedPct != null && o.forcedPct > 20) g.push('被迫步 ' + o.forcedPct + '%>20%');
+-    if (o.partialStepPct != null && o.partialStepPct < 20) g.push('partial步 ' + o.partialStepPct + '%<20');
+-    if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
+-    if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
+-    if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
+-    var gatePass = g.length === 0;
+-    var label = pass ? '合格' :
+-      (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
+-      (o.look != null && o.look > 85) ? '可玩·偏透' :
+-      (o.t != null && o.t < 10) ? '可玩·没压力' :
+-      (o.r != null && o.r < 15) ? '可玩·没岔路' :
+-      (o.selectMed != null && o.selectMed < 2) ? '可玩·被迫单线' :
+-      (o.hidden != null && o.hidden > 20) ? '可玩·偏黑' :
+-      '可玩·待评';
+-    return { pass: pass, gatePass: gatePass, gateReasons: g, label: label, reasons: r };
++    // 【v480】数值口径唯一来源：utils.js → AntSolver.Quality。
++    // app 只负责把 result 指标装配成输入，不再维护第二份 qGate/qPass 阈值。
++    return AntSolver.Quality.verdict(o);
+   }
+ 
+   function genBuildRec(entry, result) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 2a722f8..6ce66a6 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14675,26 +14675,9 @@ AntSolver.Generator = (function() {
+   // 【v415】目标模式的结构门：可解 + 首通≤50 + J≤20 + W≤1≤35 + freeLow≤30
+   //   不能再用旧 goodV3.pass，否则目标模式可能在旧判据上无限跑。
+   function goalStructPass(r) {
+-    // 【v471】结构门过就收；fallback 只报告，不再由它一票否决
+-    if (!r || !r.level || !r.valid) return false;
+-    var p = r.goodV3 && r.goodV3.persist;
+-    var fc = r.goodV3 && r.goodV3.fillCurve;
+-    if (!p || !fc) return false;
+-    // 【v436】目标模式追的结构门 = 当前 qGate-lite
+-    // 【v461】首通只报告，不进结构门
+-    var dc = p.deathCauses || {}, dt = 0, dh = 0;
+-    for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
+-    var J = dt ? Math.round(dh / dt * 100) : 0;
+-    if (J > 20) return false;
+-    if (fc.selectMedian != null && fc.selectMedian < 2) return false;
+-    if (fc.forcedPct != null && fc.forcedPct > 20) return false;
+-    if (fc.partialStepPct != null && fc.partialStepPct < 20) return false;
+-    // 【v473·用户裁决】结构门 fullMedian 放宽到 ≤3
+-    if (fc.fullMedian2 != null && fc.fullMedian2 > 3) return false;
+-    if (fc.freeLowPct != null && fc.freeLowPct > 30) return false;
+-    // 【v476】结构门 freeRun≤6；qPass 质量仍≤5
+-    if (fc.freeRunMax != null && fc.freeRunMax > 6) return false;
+-    return true;
++    // 【v480】与 app/落库共用同一结构门；本步只搬家，不改阈值与候选排序。
++    var q = AntSolver.Quality && AntSolver.Quality.fromGeneration(r);
++    return !!(q && q.gatePass);
+   }
+ 
+   function produceGoal(blocks, config, opts) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+index ad390c1..654b755 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+@@ -768,3 +768,98 @@ AntSolver.fromGameFormat = function (g) {
+     bufferLimit: g.bufferLimit || 5
+   };
+ };
++
++// ==================== 统一关卡质量判定（v480） ====================
++/**
++ * 唯一的 qPass / qGate 口径来源。
++ *
++ * 这里只集中“现行数值口径”，v480 不调整任何阈值，也不改变候选排序。
++ * 输入是已经求值后的指标，不在本模块重复求解或跑玩家，避免 app 与 generator 各算一套。
++ * fromGeneration() 同时接受 produce 候选 {level, goodV3} 与落库关卡数据
++ * {blocks, board, generationEval:{goodV3}}，便于用真关卡做等价回归。
++ */
++AntSolver.Quality = (function () {
++  var SCHEMA = 'quality-v1';
++
++  function verdict(o) {
++    var r = [];
++    if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
++    if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
++
++    // qPass：质量报告门。首通不在这里卡交付；learned/look/T/R 仍是代理指标。
++    if (o.learned == null) r.push('学会后未测');
++    else if (o.learned < 55) r.push('学会后' + o.learned + '%<55%（学不会）');
++    else if (o.learned > 85) r.push('学会后' + o.learned + '%>85%（一学就会）');
++    if (o.look == null) r.push('前瞻未测');
++    else if (o.look < 40) r.push('前瞻' + o.look + '%<40%（偏黑）');
++    else if (o.look > 85) r.push('前瞻' + o.look + '%>85%（一眼看穿）');
++    if (o.wMed == null) r.push('W未测');
++    if (o.selectMed == null) r.push('可选项中位未测');
++    else if (o.selectMed < 2) r.push('可选中位' + o.selectMed + '<2（被迫单线）');
++    if (o.forcedPct != null && o.forcedPct > 20) r.push('被迫步' + o.forcedPct + '%>20%');
++    if (o.fullMed2 != null && o.fullMed2 > 2) r.push('吃满中位' + o.fullMed2 + '>2（太白给）');
++    if (o.t == null) r.push('T未测');
++    else if (o.t < 10) r.push('T陷阱' + o.t + '%<10%（没压力）');
++    if (o.r == null) r.push('R未测');
++    else if (o.r < 15) r.push('R后悔' + o.r + 'pp<15（没岔路）');
++    if (o.hidden != null && o.hidden > 20) r.push('隐藏信息死亡' + o.hidden + '%>20%');
++    if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
++    if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
++    if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
++    var pass = r.length === 0;
++
++    // qGate：交付结构门，阈值独立于 qPass。
++    var g = [];
++    if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
++    if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
++    if (o.forcedPct != null && o.forcedPct > 20) g.push('被迫步 ' + o.forcedPct + '%>20%');
++    if (o.partialStepPct != null && o.partialStepPct < 20) g.push('partial步 ' + o.partialStepPct + '%<20');
++    if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
++    if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
++    if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
++    var gatePass = g.length === 0;
++    var label = pass ? '合格' :
++      (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
++      (o.look != null && o.look > 85) ? '可玩·偏透' :
++      (o.t != null && o.t < 10) ? '可玩·没压力' :
++      (o.r != null && o.r < 15) ? '可玩·没岔路' :
++      (o.selectMed != null && o.selectMed < 2) ? '可玩·被迫单线' :
++      (o.hidden != null && o.hidden > 20) ? '可玩·偏黑' :
++      '可玩·待评';
++    return { pass: pass, gatePass: gatePass, gateReasons: g, label: label, reasons: r };
++  }
++
++  function fromGeneration(result) {
++    var r = result || {};
++    var level = r.level || ((r.blocks && r.board) ? r : null);
++    var g = r.goodV3 || (r.generationEval && r.generationEval.goodV3) || {};
++    var p = g.persist || {}, fc = g.fillCurve || {}, q = p.quality || {};
++    var dc = p.deathCauses || {}, dt = 0, dh = 0;
++    for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
++    var out = verdict({
++      valid: !!r.valid, level: level,
++      learned: p.learnedPassPct != null ? p.learnedPassPct : null,
++      look: p.lookaheadPassPct != null ? p.lookaheadPassPct : null,
++      wMed: fc.medFull != null ? fc.medFull : null,
++      selectMed: fc.selectMedian != null ? fc.selectMedian : null,
++      forcedPct: fc.forcedPct != null ? fc.forcedPct : null,
++      fullMed2: fc.fullMedian2 != null ? fc.fullMedian2 : null,
++      t: q.T != null ? q.T : null, r: q.R != null ? q.R : null,
++      hidden: dt ? Math.round(dh / dt * 100) : null,
++      freePct: fc.freePct != null ? fc.freePct : null,
++      freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
++      freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
++      partialStepPct: fc.partialStepPct != null ? fc.partialStepPct : null
++    });
++    // 与旧 goalStructPass 一致：没有完整 persist/fillCurve 时，结构门是“未测不通过”，
++    // 不能把 null 指标当成全部合格。qPass 文案仍由 verdict 按缺项报告。
++    if (!g.persist || !g.fillCurve) {
++      out.gatePass = false;
++      out.gateReasons = ['结构指标未测'];
++    }
++    out.schema = SCHEMA;
++    return out;
++  }
++
++  return { schema: SCHEMA, verdict: verdict, fromGeneration: fromGeneration };
++})();

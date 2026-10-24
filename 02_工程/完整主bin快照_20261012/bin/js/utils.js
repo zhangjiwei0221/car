@@ -768,3 +768,98 @@ AntSolver.fromGameFormat = function (g) {
     bufferLimit: g.bufferLimit || 5
   };
 };
+
+// ==================== 统一关卡质量判定（v480） ====================
+/**
+ * 唯一的 qPass / qGate 口径来源。
+ *
+ * 这里只集中“现行数值口径”，v480 不调整任何阈值，也不改变候选排序。
+ * 输入是已经求值后的指标，不在本模块重复求解或跑玩家，避免 app 与 generator 各算一套。
+ * fromGeneration() 同时接受 produce 候选 {level, goodV3} 与落库关卡数据
+ * {blocks, board, generationEval:{goodV3}}，便于用真关卡做等价回归。
+ */
+AntSolver.Quality = (function () {
+  var SCHEMA = 'quality-v1';
+
+  function verdict(o) {
+    var r = [];
+    if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
+    if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
+
+    // qPass：质量报告门。首通不在这里卡交付；learned/look/T/R 仍是代理指标。
+    if (o.learned == null) r.push('学会后未测');
+    else if (o.learned < 55) r.push('学会后' + o.learned + '%<55%（学不会）');
+    else if (o.learned > 85) r.push('学会后' + o.learned + '%>85%（一学就会）');
+    if (o.look == null) r.push('前瞻未测');
+    else if (o.look < 40) r.push('前瞻' + o.look + '%<40%（偏黑）');
+    else if (o.look > 85) r.push('前瞻' + o.look + '%>85%（一眼看穿）');
+    if (o.wMed == null) r.push('W未测');
+    if (o.selectMed == null) r.push('可选项中位未测');
+    else if (o.selectMed < 2) r.push('可选中位' + o.selectMed + '<2（被迫单线）');
+    if (o.forcedPct != null && o.forcedPct > 20) r.push('被迫步' + o.forcedPct + '%>20%');
+    if (o.fullMed2 != null && o.fullMed2 > 2) r.push('吃满中位' + o.fullMed2 + '>2（太白给）');
+    if (o.t == null) r.push('T未测');
+    else if (o.t < 10) r.push('T陷阱' + o.t + '%<10%（没压力）');
+    if (o.r == null) r.push('R未测');
+    else if (o.r < 15) r.push('R后悔' + o.r + 'pp<15（没岔路）');
+    if (o.hidden != null && o.hidden > 20) r.push('隐藏信息死亡' + o.hidden + '%>20%');
+    if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
+    if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
+    if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
+    var pass = r.length === 0;
+
+    // qGate：交付结构门，阈值独立于 qPass。
+    var g = [];
+    if (o.hidden != null && o.hidden > 20) g.push('J ' + o.hidden + '%>20%');
+    if (o.selectMed != null && o.selectMed < 2) g.push('可选中位 ' + o.selectMed + '<2');
+    if (o.forcedPct != null && o.forcedPct > 20) g.push('被迫步 ' + o.forcedPct + '%>20%');
+    if (o.partialStepPct != null && o.partialStepPct < 20) g.push('partial步 ' + o.partialStepPct + '%<20');
+    if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
+    if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
+    if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
+    var gatePass = g.length === 0;
+    var label = pass ? '合格' :
+      (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
+      (o.look != null && o.look > 85) ? '可玩·偏透' :
+      (o.t != null && o.t < 10) ? '可玩·没压力' :
+      (o.r != null && o.r < 15) ? '可玩·没岔路' :
+      (o.selectMed != null && o.selectMed < 2) ? '可玩·被迫单线' :
+      (o.hidden != null && o.hidden > 20) ? '可玩·偏黑' :
+      '可玩·待评';
+    return { pass: pass, gatePass: gatePass, gateReasons: g, label: label, reasons: r };
+  }
+
+  function fromGeneration(result) {
+    var r = result || {};
+    var level = r.level || ((r.blocks && r.board) ? r : null);
+    var g = r.goodV3 || (r.generationEval && r.generationEval.goodV3) || {};
+    var p = g.persist || {}, fc = g.fillCurve || {}, q = p.quality || {};
+    var dc = p.deathCauses || {}, dt = 0, dh = 0;
+    for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
+    var out = verdict({
+      valid: !!r.valid, level: level,
+      learned: p.learnedPassPct != null ? p.learnedPassPct : null,
+      look: p.lookaheadPassPct != null ? p.lookaheadPassPct : null,
+      wMed: fc.medFull != null ? fc.medFull : null,
+      selectMed: fc.selectMedian != null ? fc.selectMedian : null,
+      forcedPct: fc.forcedPct != null ? fc.forcedPct : null,
+      fullMed2: fc.fullMedian2 != null ? fc.fullMedian2 : null,
+      t: q.T != null ? q.T : null, r: q.R != null ? q.R : null,
+      hidden: dt ? Math.round(dh / dt * 100) : null,
+      freePct: fc.freePct != null ? fc.freePct : null,
+      freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
+      freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
+      partialStepPct: fc.partialStepPct != null ? fc.partialStepPct : null
+    });
+    // 与旧 goalStructPass 一致：没有完整 persist/fillCurve 时，结构门是“未测不通过”，
+    // 不能把 null 指标当成全部合格。qPass 文案仍由 verdict 按缺项报告。
+    if (!g.persist || !g.fillCurve) {
+      out.gatePass = false;
+      out.gateReasons = ['结构指标未测'];
+    }
+    out.schema = SCHEMA;
+    return out;
+  }
+
+  return { schema: SCHEMA, verdict: verdict, fromGeneration: fromGeneration };
+})();
