@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "475";
+var APP_BUILD = "476";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5810,7 +5810,7 @@ AntSolver.App = (function() {
     }
 
     body.innerHTML = '<div style="font-size:14px;margin:2px 0 2px"><b>' + verdict + '</b>　' + esc(rec.name || '') + '</div>' +
-      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v475 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
+      '<div class="gen-hint" style="margin-bottom:4px">报告版本 v476 · 结论按「硬门 2 条 + 四玩家/六指标」写；旧 goodV3 只作参考。结果表 / CSV / 本报告已统一为同一质量结论。</div>' +
       sec('硬门（2 条）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('可解', solvable ? '✅ 全知通关' : '❌ 未通关') +
@@ -5879,7 +5879,7 @@ AntSolver.App = (function() {
       row('这关难在', intent) +
       '</table>';
     if (title) title.textContent = rec.name || '';
-    try { console.log('[gen-report] v475', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
+    try { console.log('[gen-report] v476', rec.name, { ply: ply, wMed: wMed, wLow: wLow, qualityFails: qualityFails }); } catch (e) {}
     card.classList.remove('hidden');
     try { card.scrollIntoView({ block: 'center' }); } catch (e) {}
     // 【v370】报告卡移到右栏顶部后，再给一个固定 toast：即使右栏滚在日志底部也能点“查看”
@@ -6143,7 +6143,7 @@ AntSolver.App = (function() {
     if (o.partialStepPct != null && o.partialStepPct < 20) g.push('partial步 ' + o.partialStepPct + '%<20');
     if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
-    if (o.freeRunMax != null && o.freeRunMax > 5) g.push('最长免费连 ' + o.freeRunMax + '>5');
+    if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
     var gatePass = g.length === 0;
     var label = pass ? '合格' :
       (o.learned != null && o.learned > 85) ? '可玩·一学就会' :

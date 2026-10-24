@@ -14692,7 +14692,8 @@ AntSolver.Generator = (function() {
     // 【v473·用户裁决】结构门 fullMedian 放宽到 ≤3
     if (fc.fullMedian2 != null && fc.fullMedian2 > 3) return false;
     if (fc.freeLowPct != null && fc.freeLowPct > 30) return false;
-    if (fc.freeRunMax != null && fc.freeRunMax > 5) return false;
+    // 【v476】结构门 freeRun≤6；qPass 质量仍≤5
+    if (fc.freeRunMax != null && fc.freeRunMax > 6) return false;
     return true;
   }
 
