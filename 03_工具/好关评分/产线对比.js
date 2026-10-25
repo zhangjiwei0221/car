@@ -109,6 +109,11 @@ const CAP_MAX_FIX = (function () {
   const i = process.argv.indexOf('--cap-max');
   return i > 0 ? parseInt(process.argv[i + 1], 10) : null;
 })();
+// --target-cars N：直接给生成器目标车数（生产当前把 targetCarCount 设成 0，所以车数不可控）
+const TARGET_CARS = (function () {
+  const i = process.argv.indexOf('--target-cars');
+  return i > 0 ? parseInt(process.argv[i + 1], 10) : null;
+})();
 const CAP_SCALE_PLAN = (function () {
   const i = process.argv.indexOf('--cap-scale-plan');
   return i > 0 ? process.argv[i + 1].split(',').map(Number).filter(x => x > 0) : null;
@@ -135,6 +140,7 @@ function configOf(env, flow, seed) {
   if (ROW0_FREE_MAX != null) { cfg.row0FreeMax = ROW0_FREE_MAX; cfg.row0FreeIce = ROW0_FREE_ICE; }
   if (CAP_MAX_SCALE != null && cfg.boxSizeMax != null) cfg.boxSizeMax = Math.round(cfg.boxSizeMax * CAP_MAX_SCALE);
   if (CAP_SCALE_PLAN != null) cfg.capScalePlan = CAP_SCALE_PLAN;
+  if (TARGET_CARS != null) cfg.targetCarCount = TARGET_CARS;
   if (CAP_MIN_FIX != null) cfg.boxSizeMin = CAP_MIN_FIX;
   if (CAP_MAX_FIX != null) cfg.boxSizeMax = CAP_MAX_FIX;
   return cfg;
