@@ -131,6 +131,43 @@ AntSolver.ExperienceGoal = (function () {
       nearMiss: !!replayed.completed && (curve.midBuffer34Pct || 0) >= Math.max(0, o.minBuffer34Pct - 20),
       elapsedMs: Date.now() - t0 };
   }
+  /** v507：两条已知路线首次分岔的同父状态对照；不把低压力直接命名为聪明。 */
+  function routeChoiceContrast(level, baselineRoute, lowRoute, opts) {
+    opts = opts || {}; var lv = parsed(level), Sim = AntSolver.Simulator;
+    var a = SA.normalizeActions(baselineRoute), b = SA.normalizeActions(lowRoute), n = Math.min(a.length, b.length), at = -1;
+    for (var i = 0; i < n; i++) if (a[i].r !== b[i].r || a[i].c !== b[i].c) { at = i; break; }
+    if (at < 0) return { status: 'no_divergence' };
+    var s = Sim.createState(lv, { useSlotStart: true, bottomOnly: !!opts.bottomOnly, instantChain: !!opts.instantChain });
+    for (var j = 0; j < at; j++) { if (!Sim.isPickable(s, a[j].r, a[j].c)) return { status: 'invalid_prefix', step: j + 1 }; Sim.applyPick(s, a[j].r, a[j].c); }
+    function inspect(m) {
+      if (!m) return { legal: false };
+      var cell = s.cells[m.r] && s.cells[m.r][m.c], after = AntSolver.SolverStrategy.cloneState(s), beforeE = s.eliminatedPixels, beforeB = s.buffer.length;
+      Sim.applyPick(after, m.r, m.c);
+      return { legal: true, r: m.r, c: m.c, color: m.antBox ? m.antBox.color : cell && cell.color,
+        count: m.antBox ? m.antBox.count : cell && cell.count, canConsume: !!m.canConsume,
+        q: !!(cell && cell.q), numice: (cell && cell.numice) || 0, chain: (cell && cell.chain) || 0,
+        immediateEliminated: after.eliminatedPixels - beforeE, bufferBefore: beforeB, bufferAfter: after.buffer.length,
+        overflow: !!after.overflow };
+    }
+    var moves = Sim.listMoves(s), baseMove = null, lowMove = null;
+    for (var mi = 0; mi < moves.length; mi++) {
+      var m = moves[mi]; if (m.blocked) continue;
+      if (m.r === a[at].r && m.c === a[at].c) baseMove = m;
+      if (m.r === b[at].r && m.c === b[at].c) lowMove = m;
+    }
+    var base = inspect(baseMove), low = inspect(lowMove), baselinePct = opts.baselineBuffer34Pct, lowPct = opts.lowBuffer34Pct;
+    var pressureDrop = baselinePct != null && lowPct != null ? +(baselinePct - lowPct).toFixed(1) : null;
+    return { status: base.legal && low.legal ? 'compared' : 'missing_legal_action', step: at + 1,
+      progress: s.totalPixels ? +(s.eliminatedPixels / s.totalPixels).toFixed(3) : null,
+      parentBuffer: s.buffer.length, baselineAction: base, lowAction: low, pressureDropPp: pressureDrop,
+      immediateYieldRelation: base.immediateEliminated == null || low.immediateEliminated == null ? null :
+        (low.immediateEliminated < base.immediateEliminated ? 'lower_short_term' : (low.immediateEliminated > base.immediateEliminated ? 'higher_short_term' : 'equal')),
+      planningLikeCandidate: !!(base.legal && low.legal && pressureDrop >= 20 && low.immediateEliminated <= base.immediateEliminated && !low.q),
+      obviousBypassCandidate: !!(base.legal && low.legal && pressureDrop >= 20 &&
+        ((low.canConsume && !base.canConsume) || low.immediateEliminated > base.immediateEliminated)),
+      note: '仅描述分岔证据；planningLike/obviousBypass都需玩家模型或真人复核。' };
+  }
+
   /** v506：baseline + 有界多路线；bestVerified 不是全局最优，未找到不证明不存在。 */
   function evaluateRoutes(level, opts) {
     opts = opts || {}; var lv = parsed(level), t0 = Date.now();
@@ -186,7 +223,14 @@ AntSolver.ExperienceGoal = (function () {
       spreadPp: minPct != null && maxPct != null ? +(maxPct - minPct).toFixed(1) : null,
       lowPressureRoute: lowRoute ? { source: lowRoute.source, midBuffer34Pct: lowRoute.quick.metrics.midBuffer34Pct,
         significantReleaseCount: lowRoute.quick.metrics.significantReleaseCount,
-        firstDivergence: divergence(lowRoute) } : null,
+        firstDivergence: divergence(lowRoute),
+        choiceContrast: (function () {
+          var lowInternal = null;
+          for (var li = 0; li < routes.length; li++) if (routes[li].signature === lowRoute.signature) { lowInternal = routes[li]; break; }
+          return lowInternal && routes.length ? routeChoiceContrast(lv, routes[0].route, lowInternal.route, Object.assign({}, opts, {
+            baselineBuffer34Pct: baselineEval.quick.metrics.midBuffer34Pct,
+            lowBuffer34Pct: lowRoute.quick.metrics.midBuffer34Pct })) : null;
+        })() } : null,
       note: '低压力路线可能代表聪明解法，不自动判为关卡缺陷；明显性仍需玩家模型/真人判断。' };
     return { schema: 'experience-routes-v1', pass: !!(best && best.full && best.full.pass),
       routeDistribution: distribution,
@@ -218,5 +262,5 @@ AntSolver.ExperienceGoal = (function () {
     else { out.primary = ev.pass ? 'pass' : 'inspect_remaining_target'; out.action = ev.pass ? 'done' : 'inspect_target'; }
     return out;
   }
-  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, evaluateRoutes: evaluateRoutes, curveFromTrace: curveFromTrace, diagnose: diagnose };
+  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, evaluateRoutes: evaluateRoutes, routeChoiceContrast: routeChoiceContrast, curveFromTrace: curveFromTrace, diagnose: diagnose };
 })();
