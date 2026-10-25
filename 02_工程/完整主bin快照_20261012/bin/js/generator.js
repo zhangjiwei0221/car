@@ -12648,6 +12648,14 @@ AntSolver.Generator = (function() {
 
   function pickBoxSplit(blocks, config) {
     var boxes = null;
+    // 【v501·单旋钮】车数规划器直通：外部已按"目标车数"算好完整车单（每色拆几辆、每辆多少），
+    //   这里直接采用，跳过切法与容量采样。守恒由规划器保证，生成端后续仍会做守恒基线校验。
+    //   不设 config.forcedBoxes 时行为与之前逐字节一致。
+    if (config && config.forcedBoxes && config.forcedBoxes.length) {
+      return config.forcedBoxes.map(function (b, i) {
+        return { color: b.color, count: b.count, elimSeq: i, trendStart: 0 };
+      });
+    }
     // 【v350·用户裁决】按目标图暴露顺序切车单（配合 boardLayout='rowMajor' 使用）。
     if (!boxes && config && config.cutMode === 'exposeCut') {
       try { var _ec = exposeCut(blocks, config); if (_ec && _ec.length) boxes = _ec; } catch (e) { }
