@@ -1,0 +1,7061 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index de3cdaa..df60fc4 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -19563,3 +19563,44 @@ S2后需要知道未达标分别该局部精调、换基底还是修释放/结
+ 1. `repair_release_supply` 目前只是诊断路由，尚未有专门修复器；下一步需针对“压力接近但显著释放0”做车序/解锁供给实验。
+ 2. 诊断基于一条参考路线，末段风险不是自动判死，顶格也不必然等于坏关。
+ 3. 失败样本仍小，需每轮持续累积，不把分类比例当全图分布。
++
++### 496. 【2026-10-26】v505：释放同步与供给组合85变体未过，负结果留档
++
++#### 496.1 问题（原话）
++
++```
++根据我们刚才的计划清单，不断靠近目标。遇到边界以及卡住的地方要记录。
++```
++
++S3的 `release_curve_missing` 需要专项验证：小容量同步完成或前移偿还解锁车，能否比泛化容量精调更有效。
++
++#### 496.2 证据
++
++- 复现010 seed32677：35.7%中段3/4、显著释放0、结构门通过、容量带35~62；原36个容量变体全部未过。
++- 释放同步找到1个候选：第二辆在step19剩3px，目标41→38；但同色只有一辆donor，必须+3，参考回放曲线完全不变。说明同色转移不减少总债务，donor时序会抵消目标变化。
++- 释放供给12个候选中，1个把显著释放0→1，却使中段3/4从35.7%降到7.1%；其他多数无变化或退化。对该中间关再跑36个容量变体仍0通过。
++- 因而“释放改善”与“压力占比改善”必须分别验收，不能把中间指标变好当成功。
++
++#### 496.3 改动
++
++- 新 `release-tuner.js`：release-sync识别同一步第二辆近完成车；release-supply识别后续新增可达颜色的解锁车并做有限交换。
++- 新只读工具 `释放同步精调.js`、`释放供给精调.js`；保存真实基底、逐步报告与汇总。
++- 版本升v505；生产生成、目标停止和障碍配方均未接入这套实验，避免无效组合进入默认。
++
++#### 496.4 验证（改前后数字）
++
++| 阶段 | 变体数 | 完整通过 | 结论 |
++|---|---:|---:|---|
++| 原容量精调 | 36 | 0 | 不治该释放缺失 |
++| 释放同步 | 1 | 0 | donor补偿，曲线不变 |
++| 释放供给 | 12 | 0 | 1个释放0→1，但3/4→7.1% |
++| 供给后再容量 | 36 | 0 | 组合仍失败 |
++| 合计 | **85** | **0** | 否决，不投产 |
++
++`node --check`：release-tuner、两个工具、generator/app/playersim通过。未改默认生成逻辑，无需宣称默认hash变化。
++
++#### 496.5 遗留
++
++1. 此负结果只否决该基底和这两类局部方法，不证明所有释放缺失都不可修。
++2. 下一步先换失败基底，并用多路线/最佳已验证路线评价，排除单Solver路线漏掉更优释压路径。
++3. donor选择需记录时序副作用；后续若重试同步，不能把目标车减少量直接当预期释放收益。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 976d001..a234d9d 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v504 目标失败诊断）　|　当前版本：**v504**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v505 释放修复负结果）　|　当前版本：**v505**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~492。默认生产仍未开启 experienceGoal。**
+ >
+@@ -1088,3 +1088,11 @@ M0 固定基准 + 统一评价与候选口径
+ - 修复路由：近压力不足→小容量；远压力不足→换基底；释放曲线缺失→偿还供给；结构失败→修结构；释放未知→增加证据预算。当前只自动执行已有的近/远/结构分流，偿还供给专项修复尚未实现。
+ - 两轮A/B去重后10个失败基底：近3、远5、释放曲线缺失1、结构失败1。007三轮分别为近/结构/远，不是同一根因。
+ - 新 `目标失败归因.js` 和报告；`capacityTune` 附 diagnosis。默认目标/时间生成逻辑不变，仅诊断与报告增加。
++
++
++### 17.32 v505：释放同步/供给实验否决，未接生产
++
++- 样本：010 seed32677，35.7%中段3/4、显著释放0；现有36个容量变体未达标。
++- 释放同步：第二辆剩3px时减3，但同色唯一donor必须+3，曲线不变。说明容量转移只改分配，不减少该色总债务。
++- 释放供给：12个前移解锁车候选中，1个让显著释放0→1，但3/4降至7.1%；再对该中间关跑36个容量变体仍失败。总计85个局部变体，完整通过0。
++- `release-tuner.js` 与两个只读工具、真实基底和报告留档；生产目标/时间策略不变，禁止把该组合路径设为默认。后续应先换失败基底并补多路线评价，不在此样本继续叠加。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index da74cee..027cfce 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -98,3 +98,11 @@
+ - 已把结构失败、远/近压力不足、显著释放缺失、释放未知分开；顶格和末段作为独立风险。
+ - 10个去重失败基底：近3、远5、释放曲线缺失1、结构失败1。007不是单根因。
+ - 当前控制器已有近→局部、远→换基底、结构→不精调；下一步专做 `repair_release_supply`，不再让释放缺失只依赖容量碰巧修复。
++
++
++## 11. S3 边界：释放修复组合否决（v505）
++
++- `release_curve_missing` 不等于简单减容量或前移解锁车就能修。
++- 同色容量转移不减少该色总债务，donor可能完全抵消目标车变化。
++- 解锁供给前移可以改善释放，却可能同时摧毁3/4占比；中间改善不能当最终成功。
++- 010 seed32677 共85个局部变体0完整通过，该组合路径不投产。下一步先换基底，并检查目标评价是否因单参考路线漏掉更优路线。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 3e1af05..9dcdf68 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,8 +6,8 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v504 · 目标失败诊断</title>
+-  <link rel="stylesheet" href="css/style.css?v=504">
++  <title>车接小人 v505 · 释放修复实验</title>
++  <link rel="stylesheet" href="css/style.css?v=505">
+ </head>
+ <body>
+   <header>
+@@ -773,26 +773,26 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=504"></script>
+-  <script src="js/utils.js?v=504"></script>
++  <script src="js/zip.js?v=505"></script>
++  <script src="js/utils.js?v=505"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=504"></script>
+-  <script src="js/simulator.js?v=504"></script>
++  <script src="js/color-libs.js?v=505"></script>
++  <script src="js/simulator.js?v=505"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=504"></script>
+-  <script src="js/solver-strategy.js?v=504"></script>
+-  <script src="js/solver.js?v=504"></script>
+-  <script src="js/playersim.js?v=504"></script>
++  <script src="js/anchor-cut.js?v=505"></script>
++  <script src="js/solver-strategy.js?v=505"></script>
++  <script src="js/solver.js?v=505"></script>
++  <script src="js/playersim.js?v=505"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=504"></script>
+-  <script src="js/car-sequencer.js?v=504"></script>
+-  <script src="js/experience-goal.js?v=504"></script>
+-  <script src="js/capacity-tuner.js?v=504"></script>
+-  <script src="js/generator.js?v=504"></script>
+-  <script src="js/analysis.js?v=504"></script>
++  <script src="js/solver-analysis.js?v=505"></script>
++  <script src="js/car-sequencer.js?v=505"></script>
++  <script src="js/experience-goal.js?v=505"></script>
++  <script src="js/capacity-tuner.js?v=505"></script>
++  <script src="js/generator.js?v=505"></script>
++  <script src="js/analysis.js?v=505"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=504"></script>
+-  <script src="js/app.js?v=504"></script>
++  <script src="js/level-editor.js?v=505"></script>
++  <script src="js/app.js?v=505"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/release-tuner.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/release-tuner.js"
+new file mode 100644
+index 0000000..92a0842
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/release-tuner.js"
+@@ -0,0 +1,101 @@
++/** v505 · 释放同步：寻找同一步第二辆接近完成的车，做小容量守恒精调。 */
++var AntSolver = AntSolver || {};
++AntSolver.ReleaseTuner = (function () {
++  function parsed(level) { return level && level.rows && level.totalPixels != null && level.board ? level : AntSolver.parseLevel(level); }
++  function variants(level, route, opts) {
++    opts = opts || {}; var lv = parsed(level), Sim = AntSolver.Simulator, SA = AntSolver.SolverAnalysis;
++    var actions = SA.normalizeActions(route), debt = AntSolver.CarSequencer.debtTimeline(lv, route, opts);
++    var sourceByKey = {}; (debt.items || []).forEach(function (d) { if (d.source) sourceByKey[d.key] = d.source; });
++    var s = Sim.createState(lv, { useSlotStart: true, bottomOnly: !!opts.bottomOnly, instantChain: !!opts.instantChain });
++    s.capture = true;
++    var candidates = [], seen = {}, maxDelta = Math.max(1, opts.maxDelta || 4), maxVariants = Math.max(1, opts.maxVariants || 12);
++    for (var i = 0; i < actions.length && candidates.length < maxVariants; i++) {
++      if (s.gameWon || s.gameOver) break;
++      var a = actions[i]; if (!Sim.isPickable(s, a.r, a.c)) break;
++      var before = s.buffer.length, progress = s.totalPixels ? s.eliminatedPixels / s.totalPixels : 0;
++      s.capOps = [];
++      Sim.applyPick(s, a.r, a.c);
++      var after = s.buffer.length;
++      // 只研究高压开始下降、但一次只退1格的步骤；目标是把第二辆同步补完。
++      if (before >= 3 && after < before && before - after === 1 && progress >= 0.15 && progress <= 0.90) {
++        for (var bi = 0; bi < s.buffer.length; bi++) {
++          var item = s.buffer[bi], remaining = item.need - item.progress, source = sourceByKey[item.key];
++          if (!source || remaining < 1 || remaining > maxDelta) continue;
++          var car = { r: source.r, c: source.c, color: item.color, count: item.need };
++          var key = car.r + ',' + car.c + ':-' + remaining;
++          if (seen[key]) continue; seen[key] = true;
++          var v = AntSolver.CapacityTuner.transfer(lv, car, -remaining, opts);
++          if (v) {
++            v.meta.releaseSync = { referenceStep: s.steps, beforeBuffer: before, afterBuffer: after,
++              remainingAfterStep: remaining, key: item.key, expectedExtraRelease: 1 };
++            candidates.push(v);
++          }
++        }
++      }
++    }
++    return { variants: candidates, reason: candidates.length ? null : 'no_release_sync_candidate' };
++  }
++  return { variants: variants };
++})();
++
++/** v505 · 偿还供给：把能解锁暂存颜色的车适当前移，和近邻非关键车交换。 */
++AntSolver.ReleaseTuner.supplyVariants = function (level, route, opts) {
++  opts = opts || {};
++  var lv = level && level.rows && level.totalPixels != null && level.board ? level : AntSolver.parseLevel(level);
++  var Sim = AntSolver.Simulator, SA = AntSolver.SolverAnalysis, dual = AntSolver.CarSequencer.dualTimeline(lv, route, opts);
++  if (!dual.completed) return { variants: [], reason: 'incomplete_reference' };
++  var byKey = {}; (dual.items || []).forEach(function (x) { byKey[x.key] = x; });
++  var actions = SA.normalizeActions(route), s = Sim.createState(lv, { useSlotStart: true,
++    bottomOnly: !!opts.bottomOnly, instantChain: !!opts.instantChain });
++  var out = [], seen = {}, maxVariants = Math.max(1, opts.maxSupplyVariants || 12);
++  function plain(x) {
++    if (!x) return false;
++    var cell = lv.board.cells[x.r] && lv.board.cells[x.r][x.c];
++    return cell && cell.t === 'box' && !cell.chain && !cell.numice && !cell.q;
++  }
++  function plainEarlier(x) {
++    if (!x) return false;
++    var cell = lv.board.cells[x.r] && lv.board.cells[x.r][x.c];
++    // 允许交换到数字冰位置：冰原样保留且会按球数倒计时，重解验证实际时机；不移入锁链/隐藏色。
++    return cell && cell.t === 'box' && !cell.chain && !cell.q;
++  }
++  for (var i = 0; i < actions.length && out.length < maxVariants; i++) {
++    if (s.gameWon || s.gameOver) break;
++    var a = actions[i]; if (!Sim.isPickable(s, a.r, a.c)) break;
++    var debtColors = {}; for (var bi = 0; bi < s.buffer.length; bi++) debtColors[s.buffer[bi].color] = true;
++    var progress = s.totalPixels ? s.eliminatedPixels / s.totalPixels : 0;
++    if (s.buffer.length >= 3 && progress >= 0.15 && progress <= 0.90) {
++      for (var color in debtColors) {
++        for (var si = i + 1; si < dual.steps.length && out.length < maxVariants; si++) {
++          var event = dual.steps[si];
++          if (!event.added || !(event.added[color] > 0) || !event.removed.length) continue;
++          for (var ri = 0; ri < event.removed.length && out.length < maxVariants; ri++) {
++            var unlocker = byKey[event.removed[ri]];
++            if (!plain(unlocker) || unlocker.color === +color || unlocker.pickStep == null) continue;
++            for (var oi = 0; oi < dual.items.length && out.length < maxVariants; oi++) {
++              var earlier = dual.items[oi];
++              if (!plainEarlier(earlier) || earlier.key === unlocker.key || earlier.pickStep == null) continue;
++              var gap = unlocker.pickStep - earlier.pickStep;
++              if (gap < 1 || gap > (opts.maxMoveEarlierSteps || 8) || (earlier.opens || []).length > (opts.maxEarlierOpens == null ? 1 : opts.maxEarlierOpens) || debtColors[earlier.color]) continue;
++              var swapKey = unlocker.key + ':' + earlier.key + ':' + color;
++              if (seen[swapKey]) continue; seen[swapKey] = true;
++              var v = JSON.parse(JSON.stringify(lv)), ua = v.board.cells[unlocker.r][unlocker.c], eb = v.board.cells[earlier.r][earlier.c];
++              var temp = { color: ua.color, count: ua.count }; ua.color = eb.color; ua.count = eb.count; eb.color = temp.color; eb.count = temp.count;
++              var before = AntSolver.CapacityTuner.sumByColor(lv), after = AntSolver.CapacityTuner.sumByColor(v), ok = true;
++              for (var col in before) if (before[col] !== after[col]) ok = false;
++              if (!ok) continue;
++              out.push({ level: v, meta: { releaseSupply: { debtColor: +color, referenceStep: i + 1,
++                unlockStep: event.step, unlocker: { r: unlocker.r, c: unlocker.c, color: unlocker.color, count: unlocker.count },
++                earlier: { r: earlier.r, c: earlier.c, color: earlier.color, count: earlier.count }, moveEarlierSteps: gap },
++                conserved: true, obstaclesPreserved: true } });
++            }
++          }
++          break; // 每个暂存颜色只看最近一次新增供给，避免组合爆炸。
++        }
++      }
++    }
++    Sim.applyPick(s, a.r, a.c);
++    if (s.eliminatedPixels >= s.totalPixels) { s.gameWon = true; s.gameOver = true; }
++  }
++  return { variants: out, reason: out.length ? null : 'no_release_supply_candidate' };
++};
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index a5362eb..e3f7a1e 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -31,6 +31,7 @@
+ | v502 目标体验+容量精调 | ±几px能否低成本命中暂存3/4目标 | ✅ 未达标4关中转化2关，均±1px且过结构/守恒/回放；默认6/6 hash不变；未默认投产 | `目标体验与容量精调.js` | §491~492 |
+ | v503 同预算目标搜索 | 局部精调是否比纯换seed省时 | ✅ 5/6 vs 4/6、总时-20.9%，收益主要1例；独立007共同失败；目标模式接入、时间模式不变 | `目标搜索同预算对照.js` | §493~494 |
+ | v504 目标失败诊断 | 失败是否同一原因 | 去重10基底：近3/远5/缺释放1/结构1；007三类都有，不能统一加容量预算 | `目标失败归因.js` | §495 |
++| v505 释放修复 | 缺显著释放能否专项修复 | ❌ 85变体0通过；同步被donor抵消，供给改善释放但3/4崩；不投产 | `释放同步精调.js` / `释放供给精调.js` | §496 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231_010_v505.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231_010_v505.json"
+new file mode 100644
+index 0000000..ca85c9a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231_010_v505.json"
+@@ -0,0 +1,501 @@
++{
++  "file": "/tmp/release-base-010-r5.json",
++  "base": {
++    "metrics": {
++      "midSteps": 14,
++      "midBuffer34Pct": 35.7,
++      "midBuffer5Pct": 0,
++      "maxBuffer5Run": 0,
++      "significantReleaseCount": 0,
++      "oscillationCount": 2,
++      "lateHighPressurePct": 28.6,
++      "maxBuffer": 3,
++      "distance": 39.3
++    },
++    "release": "found"
++  },
++  "reason": null,
++  "variants": [
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 1,
++          "referenceStep": 5,
++          "unlockStep": 6,
++          "unlocker": {
++            "r": 2,
++            "c": 0,
++            "color": 24,
++            "count": 56
++          },
++          "earlier": {
++            "r": 0,
++            "c": 5,
++            "color": 3,
++            "count": 42
++          },
++          "moveEarlierSteps": 5
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 15,
++        "midBuffer34Pct": 6.7,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 43.3
++      },
++      "release": "found",
++      "struct": false,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 1,
++          "referenceStep": 15,
++          "unlockStep": 20,
++          "unlocker": {
++            "r": 1,
++            "c": 4,
++            "color": 24,
++            "count": 35
++          },
++          "earlier": {
++            "r": 1,
++            "c": 5,
++            "color": 33,
++            "count": 42
++          },
++          "moveEarlierSteps": 8
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 15,
++        "midBuffer34Pct": 0,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 0,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 2,
++        "distance": 100
++      },
++      "release": "no_high_pressure_state",
++      "struct": false,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 1,
++          "referenceStep": 15,
++          "unlockStep": 20,
++          "unlocker": {
++            "r": 1,
++            "c": 4,
++            "color": 24,
++            "count": 35
++          },
++          "earlier": {
++            "r": 2,
++            "c": 3,
++            "color": 3,
++            "count": 62
++          },
++          "moveEarlierSteps": 5
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 14.3,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 16.7,
++        "maxBuffer": 3,
++        "distance": 60.7
++      },
++      "release": "found",
++      "struct": false,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 1,
++          "referenceStep": 15,
++          "unlockStep": 20,
++          "unlocker": {
++            "r": 1,
++            "c": 4,
++            "color": 24,
++            "count": 35
++          },
++          "earlier": {
++            "r": 2,
++            "c": 4,
++            "color": 5,
++            "count": 59
++          },
++          "moveEarlierSteps": 3
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 21.4,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 16.7,
++        "maxBuffer": 3,
++        "distance": 53.6
++      },
++      "release": "found",
++      "struct": false,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 1,
++          "referenceStep": 15,
++          "unlockStep": 20,
++          "unlocker": {
++            "r": 1,
++            "c": 4,
++            "color": 24,
++            "count": 35
++          },
++          "earlier": {
++            "r": 2,
++            "c": 5,
++            "color": 32,
++            "count": 47
++          },
++          "moveEarlierSteps": 2
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 35.7,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 28.6,
++        "maxBuffer": 3,
++        "distance": 39.3
++      },
++      "release": "found",
++      "struct": true,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 1,
++          "referenceStep": 15,
++          "unlockStep": 20,
++          "unlocker": {
++            "r": 1,
++            "c": 4,
++            "color": 24,
++            "count": 35
++          },
++          "earlier": {
++            "r": 3,
++            "c": 3,
++            "color": 30,
++            "count": 53
++          },
++          "moveEarlierSteps": 4
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 0,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 3,
++        "distance": 100
++      },
++      "release": "no_high_pressure_state",
++      "struct": true,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 1,
++          "referenceStep": 15,
++          "unlockStep": 20,
++          "unlocker": {
++            "r": 1,
++            "c": 4,
++            "color": 24,
++            "count": 35
++          },
++          "earlier": {
++            "r": 4,
++            "c": 3,
++            "color": 33,
++            "count": 42
++          },
++          "moveEarlierSteps": 1
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 0,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 3,
++        "distance": 100
++      },
++      "release": "no_high_pressure_state",
++      "struct": true,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 25,
++          "referenceStep": 15,
++          "unlockStep": 16,
++          "unlocker": {
++            "r": 3,
++            "c": 3,
++            "color": 30,
++            "count": 53
++          },
++          "earlier": {
++            "r": 1,
++            "c": 5,
++            "color": 33,
++            "count": 42
++          },
++          "moveEarlierSteps": 4
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 7.1,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 1,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 42.9
++      },
++      "release": "found",
++      "struct": true,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 25,
++          "referenceStep": 15,
++          "unlockStep": 16,
++          "unlocker": {
++            "r": 3,
++            "c": 3,
++            "color": 30,
++            "count": 53
++          },
++          "earlier": {
++            "r": 2,
++            "c": 1,
++            "color": 30,
++            "count": 54
++          },
++          "moveEarlierSteps": 8
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 35.7,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 28.6,
++        "maxBuffer": 3,
++        "distance": 39.3
++      },
++      "release": "found",
++      "struct": true,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 25,
++          "referenceStep": 15,
++          "unlockStep": 16,
++          "unlocker": {
++            "r": 3,
++            "c": 3,
++            "color": 30,
++            "count": 53
++          },
++          "earlier": {
++            "r": 2,
++            "c": 3,
++            "color": 3,
++            "count": 62
++          },
++          "moveEarlierSteps": 1
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 35.7,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 28.6,
++        "maxBuffer": 3,
++        "distance": 39.3
++      },
++      "release": "found",
++      "struct": true,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 25,
++          "referenceStep": 15,
++          "unlockStep": 16,
++          "unlocker": {
++            "r": 3,
++            "c": 3,
++            "color": 30,
++            "count": 53
++          },
++          "earlier": {
++            "r": 4,
++            "c": 1,
++            "color": 5,
++            "count": 59
++          },
++          "moveEarlierSteps": 6
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 0,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 3,
++        "distance": 100
++      },
++      "release": "no_high_pressure_state",
++      "struct": false,
++      "conserved": true,
++      "aboveMax": 0
++    },
++    {
++      "meta": {
++        "releaseSupply": {
++          "debtColor": 25,
++          "referenceStep": 15,
++          "unlockStep": 16,
++          "unlocker": {
++            "r": 3,
++            "c": 3,
++            "color": 30,
++            "count": 53
++          },
++          "earlier": {
++            "r": 5,
++            "c": 1,
++            "color": 32,
++            "count": 50
++          },
++          "moveEarlierSteps": 5
++        },
++        "conserved": true,
++        "obstaclesPreserved": true
++      },
++      "pass": false,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 0,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 3,
++        "distance": 100
++      },
++      "release": "no_high_pressure_state",
++      "struct": true,
++      "conserved": true,
++      "aboveMax": 0
++    }
++  ],
++  "won": false
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231\345\220\216\345\256\271\351\207\217_010_v505.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231\345\220\216\345\256\271\351\207\217_010_v505.json"
+new file mode 100644
+index 0000000..cc290fb
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231\345\220\216\345\256\271\351\207\217_010_v505.json"
+@@ -0,0 +1,2216 @@
++{
++  "schema": "experience-capacity-tuning-v1",
++  "config": {
++    "capMin": 35,
++    "capMax": 62,
++    "budget": 15000,
++    "maxCars": 8,
++    "maxVariants": 48
++  },
++  "summary": {
++    "levels": 1,
++    "basePass": 0,
++    "variantsWon": 0,
++    "variantsTested": 36,
++    "totalMs": 1310
++  },
++  "rows": [
++    {
++      "file": "../../../../tmp/release-supply-candidate-010.json",
++      "capRange": [
++        35,
++        62
++      ],
++      "base": {
++        "pass": false,
++        "curvePass": false,
++        "status": "fail",
++        "reasons": [
++          "buffer34_below_50"
++        ],
++        "metrics": {
++          "midSteps": 14,
++          "midBuffer34Pct": 7.1,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 1,
++          "oscillationCount": 2,
++          "lateHighPressurePct": 0,
++          "maxBuffer": 4,
++          "distance": 42.9
++        },
++        "releaseDecision": {
++          "status": "found",
++          "found": true,
++          "decisionsTried": 1,
++          "alternativesTried": 1,
++          "solvedNoRelease": 0,
++          "unknownAlternatives": 0,
++          "highPressureStates": 1,
++          "searchLimited": true,
++          "evidence": {
++            "referenceStep": 6,
++            "progress": 0.235,
++            "beforeBuffer": 4,
++            "action": {
++              "r": 1,
++              "c": 2,
++              "color": 5
++            },
++            "minBufferWithinWindow": 0,
++            "releaseAmplitude": 4,
++            "releaseWindow": 4,
++            "finalReplayValid": true,
++            "routeActions": 17,
++            "source": "reference_action",
++            "choiceContrast": null
++          },
++          "elapsedMs": 15
++        },
++        "nearMiss": false,
++        "elapsedMs": 31
++      },
++      "tested": 36,
++      "curveCandidates": 0,
++      "variants": [
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 42,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 58,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 43,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 58,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 45,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 58,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 9
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 40,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 58,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 39,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 58,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 37,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 58,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 44,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 32.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 1,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 45,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 32.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 1,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 47,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 32.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 1,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 42,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 3,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 32.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 1,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 41,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 3,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 32.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 1,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 39,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 3,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 32.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 1,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 42,
++              "after": 43,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 26,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 42,
++              "after": 44,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 26,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 42,
++              "after": 46,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 26,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 42,
++              "after": 41,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 4,
++                "c": 3,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 26,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 42,
++              "after": 40,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 4,
++                "c": 3,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 26,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 42,
++              "after": 38,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 4,
++                "c": 3,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 26,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 54,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 1,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 55,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 1,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 57,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 1,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 52,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 5,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 51,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 5,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 49,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 5,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 14
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 30,
++              "before": 53,
++              "after": 54,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 1,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 30,
++              "before": 53,
++              "after": 55,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 1,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 30,
++              "before": 53,
++              "after": 57,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 1,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 30,
++              "before": 53,
++              "after": 52,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 1,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 30,
++              "before": 53,
++              "after": 51,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 1,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 30,
++              "before": 53,
++              "after": 49,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 1,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 1,
++              "color": 30,
++              "before": 54,
++              "after": 55,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 10,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 1,
++              "color": 30,
++              "before": 54,
++              "after": 56,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 10,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 1,
++              "color": 30,
++              "before": 54,
++              "after": 58,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 10,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 1,
++              "color": 30,
++              "before": 54,
++              "after": 53,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 10,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 1,
++              "color": 30,
++              "before": 54,
++              "after": 52,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 10,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 1,
++              "color": 30,
++              "before": 54,
++              "after": 50,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 10,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 7.1,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 42.9
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 7
++          }
++        }
++      ],
++      "best": null,
++      "elapsedMs": 1310,
++      "keyCars": [
++        {
++          "r": 0,
++          "c": 0,
++          "color": 1,
++          "count": 41,
++          "score": 58,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": false,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 41
++          }
++        },
++        {
++          "r": 0,
++          "c": 2,
++          "color": 33,
++          "count": 43,
++          "score": 32.5,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 1,
++            "waitSteps": 1,
++            "initialDebt": 15
++          }
++        },
++        {
++          "r": 1,
++          "c": 1,
++          "color": 34,
++          "count": 39,
++          "score": 26,
++          "reasons": {
++            "opens": 0,
++            "soleSupply": true,
++            "timingGap": 14,
++            "waitSteps": 1,
++            "initialDebt": 4
++          }
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 33,
++          "count": 42,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 0,
++          "c": 4,
++          "color": 34,
++          "count": 39,
++          "score": 23.5,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": false,
++            "timingGap": 1,
++            "waitSteps": 1,
++            "initialDebt": 1
++          }
++        },
++        {
++          "r": 0,
++          "c": 1,
++          "color": 32,
++          "count": 53,
++          "score": 19,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 1,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 1,
++          "c": 5,
++          "color": 30,
++          "count": 53,
++          "score": 19,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 1,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 2,
++          "c": 1,
++          "color": 30,
++          "count": 54,
++          "score": 18,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 10,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        }
++      ]
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231\347\262\276\350\260\203.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231\347\262\276\350\260\203.js"
+new file mode 100755
+index 0000000..52bcf43
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\276\233\347\273\231\347\262\276\350\260\203.js"
+@@ -0,0 +1,8 @@
++#!/usr/bin/env node
++'use strict';
++const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
++const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','release-tuner.js','generator.js'];const sb={console:{log(){},warn(){},error(){}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
++const args=process.argv.slice(2),file=args[0];function opt(n,d){const i=args.indexOf('--'+n);return i>=0?+args[i+1]:d;}function str(n,d){const i=args.indexOf('--'+n);return i>=0?args[i+1]:d;}const capMin=opt('cap-min',0),capMax=opt('cap-max',0),out=str('out',''),dump=str('dump-best','');if(!file||!(capMin>0&&capMax>=capMin))throw new Error('需要关卡和容量上下界');
++const raw=JSON.parse(fs.readFileSync(file,'utf8')),level=A.parseLevel(raw.spools?A.fromGameFormat(raw):raw),sr=A.Solver.solve(level),base=A.ExperienceGoal.evaluate(level,{solveResult:sr,decision:true}),made=A.ReleaseTuner.supplyVariants(level,sr,{capMin,capMax}),rec={file,base:{metrics:base.metrics,release:base.releaseDecision.status},reason:made.reason,variants:[]};let win=null;
++for(const v of made.variants){const vsr=A.Solver.solve(v.level),ev=A.ExperienceGoal.evaluate(v.level,{solveResult:vsr,decision:true}),ge=A.Generator.evaluateLevel(v.level,{}),q=A.Quality.fromGeneration({level:v.level,valid:ge.valid,goodV3:ge.goodV3}),ca=A.Quality.capacityEvidence(v.level,{boxSizeMin:capMin,boxSizeMax:capMax}),item={meta:v.meta,pass:ev.pass,metrics:ev.metrics,release:ev.releaseDecision.status,struct:q.gatePass,conserved:ca.conserved,aboveMax:ca.aboveMax};rec.variants.push(item);if(ev.pass&&q.gatePass&&ca.conserved&&ca.boardFloorPass&&ca.aboveMax===0){win={level:v.level,item};break;}}
++rec.won=!!win;if(win&&dump)fs.writeFileSync(dump,JSON.stringify(win.level,null,2)+'\n');if(out)fs.writeFileSync(out,JSON.stringify(rec,null,2)+'\n');console.log(JSON.stringify({base:rec.base,candidates:rec.variants.length,won:rec.won,best:win&&win.item},null,2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\277\256\345\244\215\346\261\207\346\200\273_v505.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\277\256\345\244\215\346\261\207\346\200\273_v505.json"
+new file mode 100644
+index 0000000..b15384a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\344\277\256\345\244\215\346\261\207\346\200\273_v505.json"
+@@ -0,0 +1,36 @@
++{
++  "schema": "release-repair-negative-v1",
++  "base": {
++    "image": "010",
++    "seed": 32677,
++    "midBuffer34Pct": 35.7,
++    "significantReleaseCount": 0
++  },
++  "steps": [
++    {
++      "method": "capacity",
++      "variants": 36,
++      "passed": 0
++    },
++    {
++      "method": "release-sync",
++      "variants": 1,
++      "passed": 0,
++      "note": "同色donor补偿，曲线不变"
++    },
++    {
++      "method": "release-supply",
++      "variants": 12,
++      "passed": 0,
++      "note": "1个释放0→1，但3/4 35.7→7.1"
++    },
++    {
++      "method": "supply-then-capacity",
++      "variants": 36,
++      "passed": 0
++    }
++  ],
++  "totalVariants": 85,
++  "totalPassed": 0,
++  "decision": "reject_not_for_production"
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\220\214\346\255\245_010_v505.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\220\214\346\255\245_010_v505.json"
+new file mode 100644
+index 0000000..2dc5b1d
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\220\214\346\255\245_010_v505.json"
+@@ -0,0 +1,74 @@
++{
++  "file": "/tmp/release-base-010-r5.json",
++  "capRange": [
++    35,
++    62
++  ],
++  "base": {
++    "pass": false,
++    "metrics": {
++      "midSteps": 14,
++      "midBuffer34Pct": 35.7,
++      "midBuffer5Pct": 0,
++      "maxBuffer5Run": 0,
++      "significantReleaseCount": 0,
++      "oscillationCount": 2,
++      "lateHighPressurePct": 28.6,
++      "maxBuffer": 3,
++      "distance": 39.3
++    },
++    "release": "found"
++  },
++  "reason": null,
++  "variants": [
++    {
++      "meta": {
++        "target": {
++          "r": 2,
++          "c": 2,
++          "color": 1,
++          "before": 41,
++          "after": 38,
++          "delta": -3
++        },
++        "donors": [
++          {
++            "r": 0,
++            "c": 0,
++            "delta": 3
++          }
++        ],
++        "capRange": [
++          35,
++          62
++        ],
++        "conserved": true,
++        "obstaclesPreserved": true,
++        "existingBelowMinMayOnlyIncrease": true,
++        "releaseSync": {
++          "referenceStep": 19,
++          "beforeBuffer": 3,
++          "afterBuffer": 2,
++          "remainingAfterStep": 3,
++          "key": 16,
++          "expectedExtraRelease": 1
++        }
++      },
++      "quick": {
++        "curvePass": false,
++        "metrics": {
++          "midSteps": 14,
++          "midBuffer34Pct": 35.7,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 0,
++          "oscillationCount": 2,
++          "lateHighPressurePct": 28.6,
++          "maxBuffer": 3,
++          "distance": 39.3
++        }
++      }
++    }
++  ],
++  "won": false
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\220\214\346\255\245\347\262\276\350\260\203.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\220\214\346\255\245\347\262\276\350\260\203.js"
+new file mode 100755
+index 0000000..46b5b18
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\220\214\346\255\245\347\262\276\350\260\203.js"
+@@ -0,0 +1,13 @@
++#!/usr/bin/env node
++/** v505 只读：release-sync候选 → 重解 → 目标/结构/容量复核。 */
++'use strict';
++const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
++const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','release-tuner.js','generator.js'];
++const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
++const args=process.argv.slice(2),file=args[0];function opt(n,d){const i=args.indexOf('--'+n);return i>=0?+args[i+1]:d;}function str(n,d){const i=args.indexOf('--'+n);return i>=0?args[i+1]:d;}if(!file)throw new Error('需要关卡');
++const capMin=opt('cap-min',0),capMax=opt('cap-max',0),out=str('out',''),dump=str('dump-best','');if(!(capMin>0&&capMax>=capMin))throw new Error('需要容量上下界');
++const raw=JSON.parse(fs.readFileSync(file,'utf8')),level=A.parseLevel(raw.spools?A.fromGameFormat(raw):raw),sr=A.Solver.solve(level),base=A.ExperienceGoal.evaluate(level,{solveResult:sr,decision:true});
++const made=A.ReleaseTuner.variants(level,sr,{capMin,capMax,maxDelta:opt('max-delta',4),maxVariants:opt('variants',12)}),rec={file,capRange:[capMin,capMax],base:{pass:base.pass,metrics:base.metrics,release:base.releaseDecision.status},reason:made.reason,variants:[]};let win=null;
++for(const v of made.variants){const vsr=A.Solver.solve(v.level),quick=A.ExperienceGoal.evaluate(v.level,{solveResult:vsr,decision:false}),item={meta:v.meta,quick:{curvePass:quick.curvePass,metrics:quick.metrics}};rec.variants.push(item);
++ if(quick.curvePass){const full=A.ExperienceGoal.evaluate(v.level,{solveResult:vsr,decision:true}),ge=A.Generator.evaluateLevel(v.level,{}),q=A.Quality.fromGeneration({level:v.level,valid:ge.valid,goodV3:ge.goodV3}),ca=A.Quality.capacityEvidence(v.level,{boxSizeMin:capMin,boxSizeMax:capMax});item.full={pass:full.pass,metrics:full.metrics,release:full.releaseDecision.status,struct:q.gatePass,capacity:ca};if(full.pass&&q.gatePass&&ca.conserved&&ca.boardFloorPass&&ca.aboveMax===0){win={level:v.level,item};break;}}}
++rec.won=!!win;if(win&&dump)fs.writeFileSync(dump,JSON.stringify(win.level,null,2)+'\n');if(out)fs.writeFileSync(out,JSON.stringify(rec,null,2)+'\n');console.log(JSON.stringify({base:rec.base,candidates:rec.variants.length,won:rec.won,best:win&&win.item},null,2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\237\272\345\272\225_010_v505.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\237\272\345\272\225_010_v505.json"
+new file mode 100644
+index 0000000..207903c
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\237\272\345\272\225_010_v505.json"
+@@ -0,0 +1,1583 @@
++{
++  "blocks": [
++    [
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      33,
++      33,
++      33,
++      33,
++      33,
++      33,
++      33,
++      33,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      33,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      33,
++      33,
++      33,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      32,
++      33,
++      33,
++      33,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      33,
++      33,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      33,
++      33,
++      24,
++      24,
++      33,
++      25,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      33,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      33,
++      33,
++      24,
++      24,
++      24,
++      33,
++      33,
++      33,
++      25,
++      30,
++      25,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      33,
++      25,
++      33,
++      24,
++      24,
++      33,
++      26,
++      2,
++      2,
++      33,
++      33,
++      25,
++      25,
++      25,
++      25,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      33,
++      33,
++      33,
++      24,
++      33,
++      2,
++      26,
++      2,
++      2,
++      26,
++      26,
++      33,
++      33,
++      30,
++      30,
++      25,
++      25,
++      25,
++      25,
++      25,
++      25,
++      30,
++      25,
++      25,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      33,
++      25,
++      33,
++      24,
++      33,
++      2,
++      2,
++      2,
++      26,
++      26,
++      2,
++      24,
++      24,
++      33,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      25,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      33,
++      30,
++      33,
++      24,
++      33,
++      2,
++      26,
++      26,
++      2,
++      26,
++      2,
++      26,
++      24,
++      24,
++      33,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      25,
++      32,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      33,
++      33,
++      30,
++      33,
++      33,
++      26,
++      2,
++      26,
++      26,
++      2,
++      26,
++      2,
++      26,
++      24,
++      24,
++      33,
++      25,
++      25,
++      25,
++      25,
++      25,
++      32,
++      32,
++      33,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      33,
++      33,
++      30,
++      30,
++      33,
++      26,
++      26,
++      2,
++      26,
++      26,
++      26,
++      24,
++      33,
++      33,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      14,
++      14,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      33,
++      30,
++      30,
++      33,
++      33,
++      33,
++      2,
++      2,
++      24,
++      33,
++      33,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      14,
++      14,
++      25,
++      25,
++      30,
++      33,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      33,
++      33,
++      33,
++      30,
++      30,
++      30,
++      33,
++      33,
++      33,
++      33,
++      14,
++      14,
++      14,
++      14,
++      14,
++      14,
++      14,
++      14,
++      14,
++      25,
++      30,
++      30,
++      30,
++      33,
++      5,
++      5,
++      5,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      5,
++      5,
++      33,
++      33,
++      33,
++      25,
++      25,
++      25,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      33,
++      33,
++      5,
++      5,
++      5,
++      34,
++      34,
++      34,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      5,
++      5,
++      5,
++      5,
++      5,
++      33,
++      33,
++      33,
++      25,
++      25,
++      25,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      30,
++      33,
++      33,
++      33,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      33,
++      34,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      33,
++      33,
++      33,
++      33,
++      25,
++      25,
++      30,
++      30,
++      30,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      33,
++      34,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      33,
++      33,
++      33,
++      33,
++      33,
++      33,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      34,
++      33,
++      34,
++      32,
++      34
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      33,
++      33,
++      34,
++      34,
++      33
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      33,
++      34,
++      34,
++      33,
++      14
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      34,
++      33,
++      34,
++      33,
++      14,
++      14
++    ],
++    [
++      3,
++      24,
++      24,
++      24,
++      24,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      24,
++      24,
++      24,
++      24,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      34,
++      33,
++      33,
++      14,
++      14,
++      34
++    ],
++    [
++      24,
++      1,
++      1,
++      1,
++      1,
++      24,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      24,
++      1,
++      1,
++      1,
++      1,
++      24,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      34,
++      33,
++      14,
++      34,
++      34,
++      33
++    ],
++    [
++      24,
++      1,
++      1,
++      1,
++      1,
++      1,
++      24,
++      5,
++      24,
++      24,
++      5,
++      24,
++      1,
++      1,
++      1,
++      1,
++      1,
++      24,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      34,
++      33,
++      14,
++      14,
++      34,
++      34,
++      33
++    ],
++    [
++      24,
++      1,
++      1,
++      1,
++      26,
++      26,
++      1,
++      24,
++      1,
++      1,
++      24,
++      1,
++      26,
++      26,
++      1,
++      1,
++      1,
++      24,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      14,
++      33,
++      14,
++      34,
++      34,
++      33,
++      33,
++      34
++    ],
++    [
++      24,
++      1,
++      1,
++      1,
++      26,
++      26,
++      26,
++      24,
++      1,
++      1,
++      24,
++      26,
++      26,
++      26,
++      1,
++      1,
++      1,
++      24,
++      5,
++      5,
++      5,
++      34,
++      34,
++      34,
++      34,
++      34,
++      33,
++      33,
++      14,
++      34,
++      33,
++      33,
++      34,
++      34,
++      3
++    ],
++    [
++      24,
++      1,
++      1,
++      1,
++      1,
++      1,
++      1,
++      24,
++      1,
++      1,
++      24,
++      1,
++      1,
++      1,
++      1,
++      1,
++      1,
++      24,
++      5,
++      5,
++      34,
++      33,
++      33,
++      33,
++      33,
++      33,
++      33,
++      34,
++      34,
++      33,
++      34,
++      34,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      24,
++      1,
++      1,
++      1,
++      24,
++      24,
++      26,
++      24,
++      24,
++      24,
++      24,
++      24,
++      1,
++      1,
++      1,
++      1,
++      24,
++      5,
++      34,
++      33,
++      2,
++      2,
++      2,
++      2,
++      2,
++      33,
++      34,
++      34,
++      33,
++      34,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      24,
++      24,
++      24,
++      24,
++      1,
++      26,
++      1,
++      24,
++      24,
++      1,
++      26,
++      1,
++      24,
++      24,
++      24,
++      24,
++      5,
++      5,
++      34,
++      33,
++      2,
++      33,
++      33,
++      33,
++      2,
++      33,
++      33,
++      33,
++      33,
++      34,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      24,
++      1,
++      26,
++      1,
++      1,
++      24,
++      5,
++      24,
++      1,
++      26,
++      1,
++      24,
++      5,
++      5,
++      5,
++      5,
++      34,
++      33,
++      2,
++      33,
++      34,
++      34,
++      33,
++      2,
++      2,
++      33,
++      34,
++      5,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      24,
++      1,
++      26,
++      1,
++      1,
++      24,
++      5,
++      5,
++      24,
++      1,
++      1,
++      26,
++      1,
++      24,
++      5,
++      5,
++      5,
++      34,
++      33,
++      2,
++      33,
++      34,
++      33,
++      33,
++      33,
++      2,
++      2,
++      33,
++      34,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      24,
++      1,
++      1,
++      26,
++      1,
++      1,
++      24,
++      5,
++      5,
++      5,
++      24,
++      24,
++      24,
++      1,
++      1,
++      24,
++      5,
++      5,
++      34,
++      33,
++      2,
++      2,
++      33,
++      33,
++      34,
++      34,
++      33,
++      2,
++      33,
++      34,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      24,
++      24,
++      24,
++      1,
++      1,
++      24,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      24,
++      1,
++      24,
++      32,
++      32,
++      32,
++      34,
++      33,
++      33,
++      33,
++      33,
++      2,
++      33,
++      34,
++      33,
++      2,
++      33,
++      34,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      24,
++      1,
++      24,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      24,
++      32,
++      32,
++      32,
++      32,
++      32,
++      34,
++      34,
++      34,
++      33,
++      2,
++      2,
++      33,
++      2,
++      2,
++      33,
++      34,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      32,
++      32,
++      32,
++      24,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      32,
++      34,
++      33,
++      2,
++      2,
++      33,
++      33,
++      34,
++      32,
++      32,
++      32,
++      32,
++      3
++    ],
++    [
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      3,
++      34,
++      33,
++      33,
++      34,
++      34,
++      34,
++      3,
++      3,
++      3,
++      3,
++      3
++    ]
++  ],
++  "bufferLimit": 5,
++  "board": {
++    "rows": 6,
++    "cols": 6,
++    "cells": [
++      [
++        {
++          "t": "box",
++          "color": 1,
++          "count": 41,
++          "chain": 3,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 32,
++          "count": 53,
++          "chain": 3,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 33,
++          "count": 43,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 5,
++          "count": 59,
++          "chain": 2,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 34,
++          "count": 39,
++          "chain": 2,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 3,
++          "count": 42,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        }
++      ],
++      [
++        {
++          "t": "box",
++          "color": 32,
++          "count": 49,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 34,
++          "count": 39,
++          "chain": 0,
++          "q": true,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 5,
++          "count": 59,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 26,
++          "count": 38,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 24,
++          "count": 35,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 33,
++          "count": 42,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        }
++      ],
++      [
++        {
++          "t": "box",
++          "color": 24,
++          "count": 56,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 30,
++          "count": 54,
++          "chain": 0,
++          "q": false,
++          "numice": 5
++        },
++        {
++          "t": "box",
++          "color": 1,
++          "count": 41,
++          "chain": 1,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 3,
++          "count": 62,
++          "chain": 0,
++          "q": false,
++          "numice": 4
++        },
++        {
++          "t": "box",
++          "color": 5,
++          "count": 59,
++          "chain": 0,
++          "q": false,
++          "numice": 5
++        },
++        {
++          "t": "box",
++          "color": 32,
++          "count": 47,
++          "chain": 0,
++          "q": false,
++          "numice": 6
++        }
++      ],
++      [
++        {
++          "t": "black"
++        },
++        {
++          "t": "box",
++          "color": 33,
++          "count": 54,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 25,
++          "count": 35,
++          "chain": 1,
++          "q": false,
++          "numice": 5
++        },
++        {
++          "t": "box",
++          "color": 30,
++          "count": 53,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "black"
++        },
++        {
++          "t": "black"
++        }
++      ],
++      [
++        {
++          "t": "black"
++        },
++        {
++          "t": "box",
++          "color": 5,
++          "count": 59,
++          "chain": 0,
++          "q": false,
++          "numice": 7
++        },
++        {
++          "t": "black"
++        },
++        {
++          "t": "box",
++          "color": 33,
++          "count": 42,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 2,
++          "count": 42,
++          "chain": 0,
++          "q": true,
++          "numice": 0
++        },
++        {
++          "t": "box",
++          "color": 14,
++          "count": 32,
++          "chain": 0,
++          "q": false,
++          "numice": 3
++        }
++      ],
++      [
++        {
++          "t": "black"
++        },
++        {
++          "t": "box",
++          "color": 32,
++          "count": 50,
++          "chain": 0,
++          "q": false,
++          "numice": 0
++        },
++        {
++          "t": "black"
++        },
++        {
++          "t": "black"
++        },
++        {
++          "t": "black"
++        },
++        {
++          "t": "black"
++        }
++      ]
++    ],
++    "pipeStat": {
++      "want": 0,
++      "placed": 0,
++      "overflowPlanned": 0,
++      "overflowActual": 0,
++      "capacityPerPipe": 4,
++      "coords": [],
++      "floorCount": 2,
++      "floorDepth": 2
++    },
++    "narrowStat": {
++      "enabled": true,
++      "prob": 1,
++      "hit": true,
++      "gaps": 2,
++      "applied": true,
++      "source": "legacy:narrowPathProb",
++      "byChokeType": false,
++      "gapsMin": 2,
++      "gapsMax": 3
++    },
++    "spaceQuota": null,
++    "_chokeBigBox": {
++      "target": 89,
++      "color": 24,
++      "count": 56
++    }
++  }
++}
+\ No newline at end of file
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\237\272\345\272\225\345\256\271\351\207\217_010_v505.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\237\272\345\272\225\345\256\271\351\207\217_010_v505.json"
+new file mode 100644
+index 0000000..a6f1f8f
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\345\237\272\345\272\225\345\256\271\351\207\217_010_v505.json"
+@@ -0,0 +1,2301 @@
++{
++  "schema": "experience-capacity-tuning-v1",
++  "config": {
++    "capMin": 35,
++    "capMax": 62,
++    "budget": 15000,
++    "maxCars": 8,
++    "maxVariants": 48
++  },
++  "summary": {
++    "levels": 1,
++    "basePass": 0,
++    "variantsWon": 0,
++    "variantsTested": 36,
++    "totalMs": 1712
++  },
++  "rows": [
++    {
++      "file": "../../../../tmp/release-base-010-r5.json",
++      "capRange": [
++        35,
++        62
++      ],
++      "base": {
++        "pass": false,
++        "curvePass": false,
++        "status": "fail",
++        "reasons": [
++          "buffer34_below_50",
++          "significant_release_missing"
++        ],
++        "metrics": {
++          "midSteps": 14,
++          "midBuffer34Pct": 35.7,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 0,
++          "oscillationCount": 2,
++          "lateHighPressurePct": 28.6,
++          "maxBuffer": 3,
++          "distance": 39.3
++        },
++        "releaseDecision": {
++          "status": "found",
++          "found": true,
++          "decisionsTried": 1,
++          "alternativesTried": 1,
++          "solvedNoRelease": 0,
++          "unknownAlternatives": 0,
++          "highPressureStates": 1,
++          "searchLimited": true,
++          "evidence": {
++            "referenceStep": 15,
++            "progress": 0.652,
++            "beforeBuffer": 3,
++            "action": {
++              "r": 2,
++              "c": 3,
++              "color": 3
++            },
++            "minBufferWithinWindow": 2,
++            "releaseAmplitude": 1,
++            "releaseWindow": 4,
++            "finalReplayValid": true,
++            "routeActions": 8,
++            "source": "reference_action",
++            "choiceContrast": null
++          },
++          "elapsedMs": 21
++        },
++        "nearMiss": true,
++        "elapsedMs": 40
++      },
++      "tested": 36,
++      "curveCandidates": 0,
++      "variants": [
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 42,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 52,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 4,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 43,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 52,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 4,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 45,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 52,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 4,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 40,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 52,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 4,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 39,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 52,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 4,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 0,
++              "color": 1,
++              "before": 41,
++              "after": 37,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 52,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 4,
++              "initialDebt": 41
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 1,
++              "before": 41,
++              "after": 42,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 0,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 51.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 6,
++              "initialDebt": 3
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 1,
++              "before": 41,
++              "after": 43,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 0,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 51.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 6,
++              "initialDebt": 3
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 1,
++              "before": 41,
++              "after": 45,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 0,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 51.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 6,
++              "initialDebt": 3
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 1,
++              "before": 41,
++              "after": 40,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 0,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 51.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 6,
++              "initialDebt": 3
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 1,
++              "before": 41,
++              "after": 39,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 0,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 51.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 6,
++              "initialDebt": 3
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 1,
++              "before": 41,
++              "after": 37,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 0,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 51.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 6,
++              "initialDebt": 3
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 44,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 33.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": false,
++              "timingGap": 2,
++              "waitSteps": 2,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 45,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 33.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": false,
++              "timingGap": 2,
++              "waitSteps": 2,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 47,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 33.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": false,
++              "timingGap": 2,
++              "waitSteps": 2,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 42,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 33.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": false,
++              "timingGap": 2,
++              "waitSteps": 2,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 41,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 33.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": false,
++              "timingGap": 2,
++              "waitSteps": 2,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 2,
++              "color": 33,
++              "before": 43,
++              "after": 39,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 33.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": false,
++              "timingGap": 2,
++              "waitSteps": 2,
++              "initialDebt": 15
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 42.9,
++              "maxBuffer": 3,
++              "distance": 14.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 1,
++              "color": 33,
++              "before": 54,
++              "after": 55,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 2,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 20,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 1,
++              "color": 33,
++              "before": 54,
++              "after": 56,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 2,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 20,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 1,
++              "color": 33,
++              "before": 54,
++              "after": 58,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 0,
++                "c": 2,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 20,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 42.9,
++              "maxBuffer": 3,
++              "distance": 14.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 1,
++              "color": 33,
++              "before": 54,
++              "after": 53,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 20,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 1,
++              "color": 33,
++              "before": 54,
++              "after": 52,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 20,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 1,
++              "color": 33,
++              "before": 54,
++              "after": 50,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 5,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 20,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": false,
++              "timingGap": 4,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 54,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 1,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 55,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 1,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 57,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 1,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 52,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 5,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 51,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 5,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 0,
++              "c": 1,
++              "color": 32,
++              "before": 53,
++              "after": 49,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 5,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 19,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 1,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 75
++            },
++            "releaseDecision": null,
++            "nearMiss": false,
++            "elapsedMs": 8
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 33,
++              "before": 42,
++              "after": 43,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 33,
++              "before": 42,
++              "after": 44,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 10
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 33,
++              "before": 42,
++              "after": 46,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 3,
++                "c": 1,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 33,
++              "before": 42,
++              "after": 41,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 4,
++                "c": 3,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 33,
++              "before": 42,
++              "after": 40,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 4,
++                "c": 3,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 5,
++              "color": 33,
++              "before": 42,
++              "after": 38,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 4,
++                "c": 3,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              35,
++              62
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 18,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 8,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "quick": {
++            "pass": false,
++            "curvePass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 14,
++              "midBuffer34Pct": 35.7,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 28.6,
++              "maxBuffer": 3,
++              "distance": 39.3
++            },
++            "releaseDecision": null,
++            "nearMiss": true,
++            "elapsedMs": 11
++          }
++        }
++      ],
++      "best": {
++        "meta": {
++          "target": {
++            "r": 0,
++            "c": 2,
++            "color": 33,
++            "before": 43,
++            "after": 39,
++            "delta": -4
++          },
++          "donors": [
++            {
++              "r": 1,
++              "c": 5,
++              "delta": 4
++            }
++          ],
++          "capRange": [
++            35,
++            62
++          ],
++          "conserved": true,
++          "obstaclesPreserved": true,
++          "existingBelowMinMayOnlyIncrease": true,
++          "keyScore": 33.5,
++          "keyReasons": {
++            "opens": 1,
++            "soleSupply": false,
++            "timingGap": 2,
++            "waitSteps": 2,
++            "initialDebt": 15
++          }
++        },
++        "result": {
++          "pass": false,
++          "curvePass": false,
++          "status": "fail",
++          "reasons": [
++            "buffer34_below_50"
++          ],
++          "metrics": {
++            "midSteps": 14,
++            "midBuffer34Pct": 35.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 42.9,
++            "maxBuffer": 3,
++            "distance": 14.3
++          },
++          "releaseDecision": null,
++          "nearMiss": true,
++          "elapsedMs": 11
++        }
++      },
++      "elapsedMs": 1712,
++      "keyCars": [
++        {
++          "r": 0,
++          "c": 0,
++          "color": 1,
++          "count": 41,
++          "score": 52,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": false,
++            "timingGap": 4,
++            "waitSteps": 4,
++            "initialDebt": 41
++          }
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "color": 1,
++          "count": 41,
++          "score": 51.5,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 6,
++            "initialDebt": 3
++          }
++        },
++        {
++          "r": 3,
++          "c": 2,
++          "color": 25,
++          "count": 35,
++          "score": 48,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": false,
++            "timingGap": 2,
++            "waitSteps": 6,
++            "initialDebt": 12
++          }
++        },
++        {
++          "r": 1,
++          "c": 1,
++          "color": 34,
++          "count": 39,
++          "score": 34.5,
++          "reasons": {
++            "opens": 0,
++            "soleSupply": true,
++            "timingGap": 9,
++            "waitSteps": 6,
++            "initialDebt": 1
++          }
++        },
++        {
++          "r": 0,
++          "c": 2,
++          "color": 33,
++          "count": 43,
++          "score": 33.5,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": false,
++            "timingGap": 2,
++            "waitSteps": 2,
++            "initialDebt": 15
++          }
++        },
++        {
++          "r": 3,
++          "c": 1,
++          "color": 33,
++          "count": 54,
++          "score": 20,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": false,
++            "timingGap": 4,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 0,
++          "c": 1,
++          "color": 32,
++          "count": 53,
++          "score": 19,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 1,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 1,
++          "c": 5,
++          "color": 33,
++          "count": 42,
++          "score": 18,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        }
++      ]
++    }
++  ]
++}
+diff --git a/README.md b/README.md
+index d06b5e5..3d0ff54 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v504**（目标失败诊断；目标模式体验精调，时间模式不变）。
++> 当前版本 **v505**（释放修复负结果留档；生产仍v504策略）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
