@@ -6239,6 +6239,7 @@ AntSolver.App = (function() {
       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
       cutInfo: (result.config && result.config._cutAuto) || null,
       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
+      capacityAudit: result.capacityAudit || null,
       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
       qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
       fullTime: !!(result.config && result.config.fullTime),

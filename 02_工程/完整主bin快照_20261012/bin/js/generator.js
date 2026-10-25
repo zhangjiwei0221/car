@@ -6471,9 +6471,20 @@ AntSolver.Generator = (function() {
     try { PROGRESS_HOOK(Object.assign({ elapsedMs: PROGRESS_T0 ? (now - PROGRESS_T0) : 0 }, o)); } catch (e) {}
   }
 
+  function normalizeBoardFloor(config) {
+    var o = Object.assign({}, config || {});
+    var rMin = Math.max(6, parseInt(o.boardRowsMin, 10) || 6);
+    var rMax = Math.max(rMin, parseInt(o.boardRowsMax, 10) || rMin);
+    var cMin = Math.max(6, parseInt(o.boardColsMin, 10) || 6);
+    var cMax = Math.max(cMin, parseInt(o.boardColsMax, 10) || cMin);
+    o.boardRowsMin = rMin; o.boardRowsMax = rMax;
+    o.boardColsMin = cMin; o.boardColsMax = cMax;
+    return o;
+  }
+
   function produceFixed(blocks, config, opts) {
     seedRng(config && config.seed);
-    config = Object.assign({}, DEFAULT_CONFIG, config || {});
+    config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
     // 【v239】需求日程按图算一次（与候选无关），供 fillStructureFixed 按需求序铺盘。
     if (!config._demandCurve) { try { config._demandCurve = demandCurveOf(blocks); } catch (e) { config._demandCurve = null; } }
     opts = opts || {};
@@ -7905,7 +7916,7 @@ AntSolver.Generator = (function() {
    */
   function produce(blocks, config) {
     seedRng(config && config.seed);
-    config = Object.assign({}, DEFAULT_CONFIG, config || {});
+    config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
     // 【v334】生成轨迹：每次评估一条，供界面"生成过程"面板回放
     if (config.trace !== false) { if (!config._trace) config._trace = []; }
     var K = Math.max(1, config.candidateCount || 1);
@@ -10245,6 +10256,8 @@ AntSolver.Generator = (function() {
       ensureCandidateQuality(cand);
     }
 
+    try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(cand.level, cand.config || {}); }
+    catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
     return cand;
   }
 
@@ -11735,7 +11748,7 @@ AntSolver.Generator = (function() {
    *   合并后总量守恒；实在并无可并（该色只有这一辆）就保留。
    *   用户实测：合球切法会产出容量 1 的车，看起来像 bug。
    */
-  function fixTinyBoxes(boxes, minCount) {
+  function fixTinyBoxes(boxes, minCount, maxCount) {
     if (!boxes || boxes.length < 2 || !(minCount > 1)) return boxes;
     var out = boxes.map(function (b) { return { color: b.color, count: b.count, layer: b.layer }; });
     for (var pass = 0; pass < 3; pass++) {
@@ -11743,7 +11756,7 @@ AntSolver.Generator = (function() {
       for (var i = out.length - 1; i >= 0; i--) {
         if (out[i].count >= minCount) continue;
         // 找同色、有空间的车（容量上限 = 同色最大容量或 48）
-        var cap = 48;
+        var cap = maxCount > 0 ? maxCount : 48;
         for (var j = 0; j < out.length; j++) if (out[j].color === out[i].color && out[j].count > cap) cap = out[j].count;
         var need = out[i].count, donor = -1;
         for (var k = 0; k < out.length; k++) {
@@ -12475,47 +12488,50 @@ AntSolver.Generator = (function() {
   }
 
   function pickBoxSplit(blocks, config) {
+    var boxes = null;
     // 【v350·用户裁决】按目标图暴露顺序切车单（配合 boardLayout='rowMajor' 使用）。
-    if (config && config.cutMode === 'exposeCut') {
-      try { var _ec = exposeCut(blocks, config); if (_ec && _ec.length) return _ec; } catch (e) { }
+    if (!boxes && config && config.cutMode === 'exposeCut') {
+      try { var _ec = exposeCut(blocks, config); if (_ec && _ec.length) boxes = _ec; } catch (e) { }
     }
     // 【v347·用户裁决】按「依赖层 × 色块」切车：先有自然块，再合并到目标车数
-    if (config && config.cutMode === 'roundCut') {
-      try { var _rc = roundCut(blocks, config); if (_rc && _rc.length) return _rc; } catch (e) { blocks._rcErr = String(e && e.message); }
+    if (!boxes && config && config.cutMode === 'roundCut') {
+      try { var _rc = roundCut(blocks, config); if (_rc && _rc.length) boxes = _rc; } catch (e) { blocks._rcErr = String(e && e.message); }
     }
-    if (config && config.cutMode === 'debtBlock') {
-      try { var _db = debtBlockCut(blocks, config); if (_db && _db.length) return _db; } catch (e) { blocks._dbErr = String(e && e.message); }
+    if (!boxes && config && config.cutMode === 'debtBlock') {
+      try { var _db = debtBlockCut(blocks, config); if (_db && _db.length) boxes = _db; } catch (e) { blocks._dbErr = String(e && e.message); }
     }
-    if (config && config.cutMode === 'colorSegment') {
-      try { var _cs = colorSegmentCut(blocks, config); if (_cs && _cs.length) return _cs; } catch (e) { blocks._csErr = String(e && e.message); }
+    if (!boxes && config && config.cutMode === 'colorSegment') {
+      try { var _cs = colorSegmentCut(blocks, config); if (_cs && _cs.length) boxes = _cs; } catch (e) { blocks._csErr = String(e && e.message); }
     }
-    if (config && config.cutMode === 'layerAdaptive') {
+    if (!boxes && config && config.cutMode === 'layerAdaptive') {
       try {
         var _la = layerAdaptiveCut(blocks, config);
         blocks._laStat = _la ? { n: _la.length } : null;
-        if (_la && _la.length) return _la;
+        if (_la && _la.length) boxes = _la;
       } catch (e) { blocks._laErr = String(e && e.message); }
     }
-    if (config && config.cutMode === 'layerUnit') {
-      try { var _lu = layerUnitCut(blocks, config); if (_lu && _lu.length) return _lu; } catch (e) { }
+    if (!boxes && config && config.cutMode === 'layerUnit') {
+      try { var _lu = layerUnitCut(blocks, config); if (_lu && _lu.length) boxes = _lu; } catch (e) { }
     }
-    if (config && config.cutMode === 'layerBlock') {
+    if (!boxes && config && config.cutMode === 'layerBlock') {
       try {
         var _lb = layerBlockCut(blocks, config);
         var _sum = 0; if (_lb) for (var _li = 0; _li < _lb.length; _li++) _sum += _lb[_li].count;
         blocks._lbStat = { n: _lb ? _lb.length : 0, sum: _sum };
-        if (_lb && _lb.length) return _lb;
+        if (_lb && _lb.length) boxes = _lb;
       } catch (e) { blocks._lbErr = String(e && e.message); }
     }
     // 【v342·实验】层切：按依赖层切车 + 按到期排序（失败自动落回默认切法）
-    if (config && config.cutMode === 'layerCut2') {
+    if (!boxes && config && config.cutMode === 'layerCut2') {
       try {
         var _lc = layerCutBoxes2(blocks, config);
-        if (_lc && _lc.length) return _lc;
+        if (_lc && _lc.length) boxes = _lc;
       } catch (e) { }
     }
-    var boxes = pickBoxSplitRaw(blocks, config);
-    boxes = applyBoxPhase(boxes, config);
+    if (!boxes) {
+      boxes = pickBoxSplitRaw(blocks, config);
+      boxes = applyBoxPhase(boxes, config);
+    }
     // 【v284】先做容量归一化（同色内拆分/合并），再走后面的容量策略
     if (config.capNormalize !== false) {
       try {
@@ -12560,7 +12576,7 @@ AntSolver.Generator = (function() {
       }
     } catch (e) { }
     // 【v218】收尾清理微型车（<3px），避免出现容量 1 的车
-    try { boxes = fixTinyBoxes(boxes, Math.max(3, parseInt(config.boxSizeMin, 10) > 0 ? 3 : 3)); } catch (e) { }
+    try { boxes = fixTinyBoxes(boxes, 3, parseInt(config.boxSizeMax, 10) || 0); } catch (e) { }
     // 【v337·诊断】如果调用方传了 _cutLog，就把"这次切球的关键参数"记下来（默认不传 = 零开销）
     if (config && config._cutLog) {
       try { config._cutLog.push({ n: boxes.length, tc: config.targetCarCount, min: config.boxSizeMin, max: config.boxSizeMax, st: (new Error()).stack.split('\n').slice(2, 5).map(function (x) { return x.trim().split(' ')[1]; }).join(' < ') }); } catch (e) { }

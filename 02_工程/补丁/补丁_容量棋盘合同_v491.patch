@@ -1,0 +1,312 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 456388f..f88f3b5 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v490 · 多路线压力过程</title>
+-  <link rel="stylesheet" href="css/style.css?v=490">
++  <title>车接小人 v491 · 容量与棋盘合同</title>
++  <link rel="stylesheet" href="css/style.css?v=491">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v490</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v491</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,23 +769,23 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=490"></script>
+-  <script src="js/utils.js?v=490"></script>
++  <script src="js/zip.js?v=491"></script>
++  <script src="js/utils.js?v=491"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=490"></script>
+-  <script src="js/simulator.js?v=490"></script>
++  <script src="js/color-libs.js?v=491"></script>
++  <script src="js/simulator.js?v=491"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=490"></script>
+-  <script src="js/solver-strategy.js?v=490"></script>
+-  <script src="js/solver.js?v=490"></script>
+-  <script src="js/playersim.js?v=490"></script>
++  <script src="js/anchor-cut.js?v=491"></script>
++  <script src="js/solver-strategy.js?v=491"></script>
++  <script src="js/solver.js?v=491"></script>
++  <script src="js/playersim.js?v=491"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=490"></script>
+-  <script src="js/generator.js?v=490"></script>
+-  <script src="js/analysis.js?v=490"></script>
++  <script src="js/solver-analysis.js?v=491"></script>
++  <script src="js/generator.js?v=491"></script>
++  <script src="js/analysis.js?v=491"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=490"></script>
+-  <script src="js/app.js?v=490"></script>
++  <script src="js/level-editor.js?v=491"></script>
++  <script src="js/app.js?v=491"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 23a4946..f9b57e1 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -6239,6 +6239,7 @@ AntSolver.App = (function() {
+       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
+       cutInfo: (result.config && result.config._cutAuto) || null,
+       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
++      capacityAudit: result.capacityAudit || null,
+       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+       qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
+       fullTime: !!(result.config && result.config.fullTime),
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 531f9ec..8a7472c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -6471,9 +6471,20 @@ AntSolver.Generator = (function() {
+     try { PROGRESS_HOOK(Object.assign({ elapsedMs: PROGRESS_T0 ? (now - PROGRESS_T0) : 0 }, o)); } catch (e) {}
+   }
+ 
++  function normalizeBoardFloor(config) {
++    var o = Object.assign({}, config || {});
++    var rMin = Math.max(6, parseInt(o.boardRowsMin, 10) || 6);
++    var rMax = Math.max(rMin, parseInt(o.boardRowsMax, 10) || rMin);
++    var cMin = Math.max(6, parseInt(o.boardColsMin, 10) || 6);
++    var cMax = Math.max(cMin, parseInt(o.boardColsMax, 10) || cMin);
++    o.boardRowsMin = rMin; o.boardRowsMax = rMax;
++    o.boardColsMin = cMin; o.boardColsMax = cMax;
++    return o;
++  }
++
+   function produceFixed(blocks, config, opts) {
+     seedRng(config && config.seed);
+-    config = Object.assign({}, DEFAULT_CONFIG, config || {});
++    config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
+     // 【v239】需求日程按图算一次（与候选无关），供 fillStructureFixed 按需求序铺盘。
+     if (!config._demandCurve) { try { config._demandCurve = demandCurveOf(blocks); } catch (e) { config._demandCurve = null; } }
+     opts = opts || {};
+@@ -7905,7 +7916,7 @@ AntSolver.Generator = (function() {
+    */
+   function produce(blocks, config) {
+     seedRng(config && config.seed);
+-    config = Object.assign({}, DEFAULT_CONFIG, config || {});
++    config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
+     // 【v334】生成轨迹：每次评估一条，供界面"生成过程"面板回放
+     if (config.trace !== false) { if (!config._trace) config._trace = []; }
+     var K = Math.max(1, config.candidateCount || 1);
+@@ -10245,6 +10256,8 @@ AntSolver.Generator = (function() {
+       ensureCandidateQuality(cand);
+     }
+ 
++    try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(cand.level, cand.config || {}); }
++    catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
+     return cand;
+   }
+ 
+@@ -11735,7 +11748,7 @@ AntSolver.Generator = (function() {
+    *   合并后总量守恒；实在并无可并（该色只有这一辆）就保留。
+    *   用户实测：合球切法会产出容量 1 的车，看起来像 bug。
+    */
+-  function fixTinyBoxes(boxes, minCount) {
++  function fixTinyBoxes(boxes, minCount, maxCount) {
+     if (!boxes || boxes.length < 2 || !(minCount > 1)) return boxes;
+     var out = boxes.map(function (b) { return { color: b.color, count: b.count, layer: b.layer }; });
+     for (var pass = 0; pass < 3; pass++) {
+@@ -11743,7 +11756,7 @@ AntSolver.Generator = (function() {
+       for (var i = out.length - 1; i >= 0; i--) {
+         if (out[i].count >= minCount) continue;
+         // 找同色、有空间的车（容量上限 = 同色最大容量或 48）
+-        var cap = 48;
++        var cap = maxCount > 0 ? maxCount : 48;
+         for (var j = 0; j < out.length; j++) if (out[j].color === out[i].color && out[j].count > cap) cap = out[j].count;
+         var need = out[i].count, donor = -1;
+         for (var k = 0; k < out.length; k++) {
+@@ -12475,47 +12488,50 @@ AntSolver.Generator = (function() {
+   }
+ 
+   function pickBoxSplit(blocks, config) {
++    var boxes = null;
+     // 【v350·用户裁决】按目标图暴露顺序切车单（配合 boardLayout='rowMajor' 使用）。
+-    if (config && config.cutMode === 'exposeCut') {
+-      try { var _ec = exposeCut(blocks, config); if (_ec && _ec.length) return _ec; } catch (e) { }
++    if (!boxes && config && config.cutMode === 'exposeCut') {
++      try { var _ec = exposeCut(blocks, config); if (_ec && _ec.length) boxes = _ec; } catch (e) { }
+     }
+     // 【v347·用户裁决】按「依赖层 × 色块」切车：先有自然块，再合并到目标车数
+-    if (config && config.cutMode === 'roundCut') {
+-      try { var _rc = roundCut(blocks, config); if (_rc && _rc.length) return _rc; } catch (e) { blocks._rcErr = String(e && e.message); }
++    if (!boxes && config && config.cutMode === 'roundCut') {
++      try { var _rc = roundCut(blocks, config); if (_rc && _rc.length) boxes = _rc; } catch (e) { blocks._rcErr = String(e && e.message); }
+     }
+-    if (config && config.cutMode === 'debtBlock') {
+-      try { var _db = debtBlockCut(blocks, config); if (_db && _db.length) return _db; } catch (e) { blocks._dbErr = String(e && e.message); }
++    if (!boxes && config && config.cutMode === 'debtBlock') {
++      try { var _db = debtBlockCut(blocks, config); if (_db && _db.length) boxes = _db; } catch (e) { blocks._dbErr = String(e && e.message); }
+     }
+-    if (config && config.cutMode === 'colorSegment') {
+-      try { var _cs = colorSegmentCut(blocks, config); if (_cs && _cs.length) return _cs; } catch (e) { blocks._csErr = String(e && e.message); }
++    if (!boxes && config && config.cutMode === 'colorSegment') {
++      try { var _cs = colorSegmentCut(blocks, config); if (_cs && _cs.length) boxes = _cs; } catch (e) { blocks._csErr = String(e && e.message); }
+     }
+-    if (config && config.cutMode === 'layerAdaptive') {
++    if (!boxes && config && config.cutMode === 'layerAdaptive') {
+       try {
+         var _la = layerAdaptiveCut(blocks, config);
+         blocks._laStat = _la ? { n: _la.length } : null;
+-        if (_la && _la.length) return _la;
++        if (_la && _la.length) boxes = _la;
+       } catch (e) { blocks._laErr = String(e && e.message); }
+     }
+-    if (config && config.cutMode === 'layerUnit') {
+-      try { var _lu = layerUnitCut(blocks, config); if (_lu && _lu.length) return _lu; } catch (e) { }
++    if (!boxes && config && config.cutMode === 'layerUnit') {
++      try { var _lu = layerUnitCut(blocks, config); if (_lu && _lu.length) boxes = _lu; } catch (e) { }
+     }
+-    if (config && config.cutMode === 'layerBlock') {
++    if (!boxes && config && config.cutMode === 'layerBlock') {
+       try {
+         var _lb = layerBlockCut(blocks, config);
+         var _sum = 0; if (_lb) for (var _li = 0; _li < _lb.length; _li++) _sum += _lb[_li].count;
+         blocks._lbStat = { n: _lb ? _lb.length : 0, sum: _sum };
+-        if (_lb && _lb.length) return _lb;
++        if (_lb && _lb.length) boxes = _lb;
+       } catch (e) { blocks._lbErr = String(e && e.message); }
+     }
+     // 【v342·实验】层切：按依赖层切车 + 按到期排序（失败自动落回默认切法）
+-    if (config && config.cutMode === 'layerCut2') {
++    if (!boxes && config && config.cutMode === 'layerCut2') {
+       try {
+         var _lc = layerCutBoxes2(blocks, config);
+-        if (_lc && _lc.length) return _lc;
++        if (_lc && _lc.length) boxes = _lc;
+       } catch (e) { }
+     }
+-    var boxes = pickBoxSplitRaw(blocks, config);
+-    boxes = applyBoxPhase(boxes, config);
++    if (!boxes) {
++      boxes = pickBoxSplitRaw(blocks, config);
++      boxes = applyBoxPhase(boxes, config);
++    }
+     // 【v284】先做容量归一化（同色内拆分/合并），再走后面的容量策略
+     if (config.capNormalize !== false) {
+       try {
+@@ -12560,7 +12576,7 @@ AntSolver.Generator = (function() {
+       }
+     } catch (e) { }
+     // 【v218】收尾清理微型车（<3px），避免出现容量 1 的车
+-    try { boxes = fixTinyBoxes(boxes, Math.max(3, parseInt(config.boxSizeMin, 10) > 0 ? 3 : 3)); } catch (e) { }
++    try { boxes = fixTinyBoxes(boxes, 3, parseInt(config.boxSizeMax, 10) || 0); } catch (e) { }
+     // 【v337·诊断】如果调用方传了 _cutLog，就把"这次切球的关键参数"记下来（默认不传 = 零开销）
+     if (config && config._cutLog) {
+       try { config._cutLog.push({ n: boxes.length, tc: config.targetCarCount, min: config.boxSizeMin, max: config.boxSizeMax, st: (new Error()).stack.split('\n').slice(2, 5).map(function (x) { return x.trim().split(' ')[1]; }).join(' < ') }); } catch (e) { }
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+index 2439e8f..a2be4ae 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+@@ -817,6 +817,8 @@ AntSolver.Quality = (function () {
+     if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
+     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
+     if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
++    var board = o.level && o.level.board;
++    if (board && (board.rows < 6 || board.cols < 6)) g.push('棋盘 ' + board.rows + '×' + board.cols + ' 行列<6');
+     var gatePass = g.length === 0;
+     var label = pass ? '合格' :
+       (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
+@@ -834,6 +836,8 @@ AntSolver.Quality = (function () {
+   function gateDistance(o) {
+     if (!o || !o.level || !o.valid) return 1e9;
+     var d = 0;
++    var board = o.level && o.level.board;
++    if (board && (board.rows < 6 || board.cols < 6)) d += 1000;
+     if (o.hidden != null && o.hidden > 20) d += o.hidden - 20;
+     if (o.freeLowPct != null && o.freeLowPct > 30) d += o.freeLowPct - 30;
+     if (o.freeRunMax != null && o.freeRunMax > 6) d += (o.freeRunMax - 6) * 5;
+@@ -1008,3 +1012,63 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
+     }
+   };
+ };
++
++// ==================== 容量与棋盘合同证据（v491） ====================
++AntSolver.Quality.capacityEvidence = function (level, config) {
++  var board = level && level.board || { rows: 0, cols: 0, cells: [] };
++  var cfg = config || {}, minC = parseInt(cfg.boxSizeMin, 10) || 0, maxC = parseInt(cfg.boxSizeMax, 10) || 0;
++  var microMax = cfg.microCarMax != null ? Math.max(0, parseInt(cfg.microCarMax, 10) || 0) : 2;
++  var cars = [], row0 = [], byColor = {}, pixels = 0;
++  for (var r = 0; r < board.rows; r++) for (var c = 0; c < board.cols; c++) {
++    var cell = board.cells[r] && board.cells[r][c];
++    if (!cell) continue;
++    if (cell.t === 'box') {
++      var item = { r: r, c: c, color: cell.color, count: cell.count || 0, inPipe: false };
++      cars.push(item); if (r === 0) row0.push(item);
++      byColor[cell.color] = (byColor[cell.color] || 0) + (cell.count || 0);
++    } else if (cell.t === 'pipe') {
++      for (var q = 0; q < (cell.queue || []).length; q++) {
++        var b = cell.queue[q];
++        cars.push({ r: r, c: c, color: b.color, count: b.count || 0, inPipe: true, queueIndex: q });
++        byColor[b.color] = (byColor[b.color] || 0) + (b.count || 0);
++      }
++    }
++  }
++  var blocks = level && level.blocks || [];
++  for (var br = 0; br < blocks.length; br++) for (var bc = 0; bc < blocks[br].length; bc++) if (blocks[br][bc] > 0) pixels++;
++  var sum = 0, below = 0, above = 0, micro = [], minCap = null, maxCap = null;
++  for (var i = 0; i < cars.length; i++) {
++    var car = cars[i], n = car.count;
++    sum += n; if (minCap == null || n < minCap) minCap = n; if (maxCap == null || n > maxCap) maxCap = n;
++    if (minC > 0 && n < minC) below++;
++    if (maxC > 0 && n > maxC) above++;
++    if (n <= microMax) micro.push(car);
++  }
++  var infeasible = [];
++  if (minC > 0 && maxC >= minC) {
++    for (var color in byColor) {
++      var total = byColor[color], possible = false;
++      for (var nCar = 1; nCar <= Math.ceil(total / minC); nCar++) {
++        if (nCar * minC <= total && nCar * maxC >= total) { possible = true; break; }
++      }
++      if (!possible) infeasible.push({ color: +color, total: total });
++    }
++  }
++  var row0Colors = {}, row0MaxSame = 0;
++  for (var ri = 0; ri < row0.length; ri++) {
++    var rc = row0[ri].color; row0Colors[rc] = (row0Colors[rc] || 0) + 1;
++    row0MaxSame = Math.max(row0MaxSame, row0Colors[rc]);
++  }
++  return {
++    schema: 'capacity-evidence-v1', rows: board.rows, cols: board.cols,
++    boardFloorPass: board.rows >= 6 && board.cols >= 6,
++    cars: cars.length, capacitySum: sum, pixels: pixels, conserved: sum === pixels,
++    minCap: minCap, maxCap: maxCap, boxSizeMin: minC || null, boxSizeMax: maxC || null,
++    belowMin: below, aboveMax: above,
++    microCarMax: microMax, microCars: micro, microCount: micro.length,
++    rangeExactFeasible: infeasible.length === 0, infeasibleColors: infeasible,
++    row0Cars: row0.length, row0Colors: Object.keys(row0Colors).length,
++    row0MaxSameColor: row0MaxSame,
++    note: 'belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。'
++  };
++};
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\273\237\344\270\200\350\264\250\351\207\217\345\233\236\345\275\222.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\273\237\344\270\200\350\264\250\351\207\217\345\233\236\345\275\222.js"
+index dd94375..b5d7ec0 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\273\237\344\270\200\350\264\250\351\207\217\345\233\236\345\275\222.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\273\237\344\270\200\350\264\250\351\207\217\345\233\236\345\275\222.js"
+@@ -48,9 +48,9 @@ const dir=path.join(BASE,'输出文件'),files=[];
+ for(const batch of fs.readdirSync(dir)){const d=path.join(dir,batch,'生产文档/关卡数据');if(!fs.existsSync(d))continue;for(const f of fs.readdirSync(d))if(f.endsWith('.json'))files.push(path.join(d,f));}
+ files.sort();const selected=files.slice(-20);const rows=selected.map(file=>{const x=JSON.parse(fs.readFileSync(file,'utf8')),o=inputOf(x),oldApp=legacyVerdict(o),genInput={level:x,valid:x.valid,goodV3:x.goodV3||(x.generationEval&&x.generationEval.goodV3)},oldGen=legacyGoal(genInput);
+   const sharedApp=A.Quality?A.Quality.verdict(o):null,sharedGen=A.Quality?A.Quality.fromGeneration(x).gatePass:null;
+-  return{file:path.relative(ROOT,file),oldGen,oldApp,sharedGen,sharedApp,storedGate:x.qGatePass==null?null:x.qGatePass};});
++  return{file:path.relative(ROOT,file),boardBelow6:!!(x.board&&(x.board.rows<6||x.board.cols<6)),oldGen,oldApp,sharedGen,sharedApp,storedGate:x.qGatePass==null?null:x.qGatePass};});
+ const out={count:rows.length,oldGatePass:rows.filter(x=>x.oldGen).length,oldQPass:rows.filter(x=>x.oldApp.pass).length,sharedGatePass:rows.filter(x=>x.sharedGen).length,
+-  genMismatch:rows.filter(x=>x.sharedGen!=null&&x.sharedGen!==x.oldGen).length,appMismatch:rows.filter(x=>x.sharedApp&&JSON.stringify(x.sharedApp)!==JSON.stringify(x.oldApp)).length,
++  genMismatch:rows.filter(x=>!x.boardBelow6&&x.sharedGen!=null&&x.sharedGen!==x.oldGen).length,appMismatch:rows.filter(x=>!x.boardBelow6&&x.sharedApp&&JSON.stringify(x.sharedApp)!==JSON.stringify(x.oldApp)).length,boardFloorChanges:rows.filter(x=>x.boardBelow6&&(x.sharedGen!==x.oldGen||JSON.stringify(x.sharedApp)!==JSON.stringify(x.oldApp))).length,
+   storedGateMismatch:rows.filter(x=>x.storedGate!=null&&x.storedGate!==x.oldGen).length,rows};
+ console.log(JSON.stringify(out,null,2));
+ if(out.genMismatch||out.appMismatch)process.exitCode=1;

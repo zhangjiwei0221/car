@@ -817,6 +817,8 @@ AntSolver.Quality = (function () {
     if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
     if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
+    var board = o.level && o.level.board;
+    if (board && (board.rows < 6 || board.cols < 6)) g.push('棋盘 ' + board.rows + '×' + board.cols + ' 行列<6');
     var gatePass = g.length === 0;
     var label = pass ? '合格' :
       (o.learned != null && o.learned > 85) ? '可玩·一学就会' :
@@ -834,6 +836,8 @@ AntSolver.Quality = (function () {
   function gateDistance(o) {
     if (!o || !o.level || !o.valid) return 1e9;
     var d = 0;
+    var board = o.level && o.level.board;
+    if (board && (board.rows < 6 || board.cols < 6)) d += 1000;
     if (o.hidden != null && o.hidden > 20) d += o.hidden - 20;
     if (o.freeLowPct != null && o.freeLowPct > 30) d += o.freeLowPct - 30;
     if (o.freeRunMax != null && o.freeRunMax > 6) d += (o.freeRunMax - 6) * 5;
@@ -1006,5 +1010,65 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
       sufficientForReadonlyResearch: verified.length > 0 && alternatives.length > 0 && replayErrors === 0,
       sufficientForQualityGate: false
     }
+  };
+};
+
+// ==================== 容量与棋盘合同证据（v491） ====================
+AntSolver.Quality.capacityEvidence = function (level, config) {
+  var board = level && level.board || { rows: 0, cols: 0, cells: [] };
+  var cfg = config || {}, minC = parseInt(cfg.boxSizeMin, 10) || 0, maxC = parseInt(cfg.boxSizeMax, 10) || 0;
+  var microMax = cfg.microCarMax != null ? Math.max(0, parseInt(cfg.microCarMax, 10) || 0) : 2;
+  var cars = [], row0 = [], byColor = {}, pixels = 0;
+  for (var r = 0; r < board.rows; r++) for (var c = 0; c < board.cols; c++) {
+    var cell = board.cells[r] && board.cells[r][c];
+    if (!cell) continue;
+    if (cell.t === 'box') {
+      var item = { r: r, c: c, color: cell.color, count: cell.count || 0, inPipe: false };
+      cars.push(item); if (r === 0) row0.push(item);
+      byColor[cell.color] = (byColor[cell.color] || 0) + (cell.count || 0);
+    } else if (cell.t === 'pipe') {
+      for (var q = 0; q < (cell.queue || []).length; q++) {
+        var b = cell.queue[q];
+        cars.push({ r: r, c: c, color: b.color, count: b.count || 0, inPipe: true, queueIndex: q });
+        byColor[b.color] = (byColor[b.color] || 0) + (b.count || 0);
+      }
+    }
+  }
+  var blocks = level && level.blocks || [];
+  for (var br = 0; br < blocks.length; br++) for (var bc = 0; bc < blocks[br].length; bc++) if (blocks[br][bc] > 0) pixels++;
+  var sum = 0, below = 0, above = 0, micro = [], minCap = null, maxCap = null;
+  for (var i = 0; i < cars.length; i++) {
+    var car = cars[i], n = car.count;
+    sum += n; if (minCap == null || n < minCap) minCap = n; if (maxCap == null || n > maxCap) maxCap = n;
+    if (minC > 0 && n < minC) below++;
+    if (maxC > 0 && n > maxC) above++;
+    if (n <= microMax) micro.push(car);
+  }
+  var infeasible = [];
+  if (minC > 0 && maxC >= minC) {
+    for (var color in byColor) {
+      var total = byColor[color], possible = false;
+      for (var nCar = 1; nCar <= Math.ceil(total / minC); nCar++) {
+        if (nCar * minC <= total && nCar * maxC >= total) { possible = true; break; }
+      }
+      if (!possible) infeasible.push({ color: +color, total: total });
+    }
+  }
+  var row0Colors = {}, row0MaxSame = 0;
+  for (var ri = 0; ri < row0.length; ri++) {
+    var rc = row0[ri].color; row0Colors[rc] = (row0Colors[rc] || 0) + 1;
+    row0MaxSame = Math.max(row0MaxSame, row0Colors[rc]);
+  }
+  return {
+    schema: 'capacity-evidence-v1', rows: board.rows, cols: board.cols,
+    boardFloorPass: board.rows >= 6 && board.cols >= 6,
+    cars: cars.length, capacitySum: sum, pixels: pixels, conserved: sum === pixels,
+    minCap: minCap, maxCap: maxCap, boxSizeMin: minC || null, boxSizeMax: maxC || null,
+    belowMin: below, aboveMax: above,
+    microCarMax: microMax, microCars: micro, microCount: micro.length,
+    rangeExactFeasible: infeasible.length === 0, infeasibleColors: infeasible,
+    row0Cars: row0.length, row0Colors: Object.keys(row0Colors).length,
+    row0MaxSameColor: row0MaxSame,
+    note: 'belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。'
   };
 };

@@ -48,9 +48,9 @@ const dir=path.join(BASE,'输出文件'),files=[];
 for(const batch of fs.readdirSync(dir)){const d=path.join(dir,batch,'生产文档/关卡数据');if(!fs.existsSync(d))continue;for(const f of fs.readdirSync(d))if(f.endsWith('.json'))files.push(path.join(d,f));}
 files.sort();const selected=files.slice(-20);const rows=selected.map(file=>{const x=JSON.parse(fs.readFileSync(file,'utf8')),o=inputOf(x),oldApp=legacyVerdict(o),genInput={level:x,valid:x.valid,goodV3:x.goodV3||(x.generationEval&&x.generationEval.goodV3)},oldGen=legacyGoal(genInput);
   const sharedApp=A.Quality?A.Quality.verdict(o):null,sharedGen=A.Quality?A.Quality.fromGeneration(x).gatePass:null;
-  return{file:path.relative(ROOT,file),oldGen,oldApp,sharedGen,sharedApp,storedGate:x.qGatePass==null?null:x.qGatePass};});
+  return{file:path.relative(ROOT,file),boardBelow6:!!(x.board&&(x.board.rows<6||x.board.cols<6)),oldGen,oldApp,sharedGen,sharedApp,storedGate:x.qGatePass==null?null:x.qGatePass};});
 const out={count:rows.length,oldGatePass:rows.filter(x=>x.oldGen).length,oldQPass:rows.filter(x=>x.oldApp.pass).length,sharedGatePass:rows.filter(x=>x.sharedGen).length,
-  genMismatch:rows.filter(x=>x.sharedGen!=null&&x.sharedGen!==x.oldGen).length,appMismatch:rows.filter(x=>x.sharedApp&&JSON.stringify(x.sharedApp)!==JSON.stringify(x.oldApp)).length,
+  genMismatch:rows.filter(x=>!x.boardBelow6&&x.sharedGen!=null&&x.sharedGen!==x.oldGen).length,appMismatch:rows.filter(x=>!x.boardBelow6&&x.sharedApp&&JSON.stringify(x.sharedApp)!==JSON.stringify(x.oldApp)).length,boardFloorChanges:rows.filter(x=>x.boardBelow6&&(x.sharedGen!==x.oldGen||JSON.stringify(x.sharedApp)!==JSON.stringify(x.oldApp))).length,
   storedGateMismatch:rows.filter(x=>x.storedGate!=null&&x.storedGate!==x.oldGen).length,rows};
 console.log(JSON.stringify(out,null,2));
 if(out.genMismatch||out.appMismatch)process.exitCode=1;
