@@ -14553,18 +14553,19 @@ AntSolver.Generator = (function() {
       // 现行压力代理仍保留作同结构、同质量违规数时的比较项；后续由压力曲线 v2 替换。
       ps: fc ? ((fc.pressurePct3 || 0) * 2 + (fc.pressurePeak || 0) * 10 - (fc.freeLowPct || 0)) : 0,
       pn: fc && fc.pressureN ? 1 : 0,
-      // 【v497】黑块占比：结构门通过后，先按"黑块 ≤30%"分两档，再比距离/质量；都不合格时才退回全局最优。
+      // 【v498·用户裁决 B】黑块占比：≤15% 是硬优先档（排在结构门之前），
+      //   即"宁可选一个结构稍差但黑块达标的候选，也不交 28% 黑块的关"。
       bk: blackPctOfBoard(out && out.level && out.level.board)
     };
-    t.bk30 = (t.bk != null && t.bk <= 30) ? 1 : 0;
+    t.bk15 = (t.bk != null && t.bk <= 15) ? 1 : 0;
     return t;
   }
   function portfolioBetter(x, y) {
     if (!y) return true;
     if (!!x.ok !== !!y.ok) return !!x.ok;
+    // 【v498·B】黑块 ≤15% 优先于结构门：这是用户拍板的观感硬线（宁可结构让步）。
+    if ((x.bk15 || 0) !== (y.bk15 || 0)) return (x.bk15 || 0) > (y.bk15 || 0);
     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
-    // 【v497】过了结构门之后，黑块 ≤30% 的候选优先（用户：38% 成片黑块不合理）
-    if ((x.bk30 || 0) !== (y.bk30 || 0)) return (x.bk30 || 0) > (y.bk30 || 0);
     if ((x.gc == null ? 99 : x.gc) !== (y.gc == null ? 99 : y.gc)) return (x.gc == null ? 99 : x.gc) < (y.gc == null ? 99 : y.gc);
     if ((x.gv == null ? 1e9 : x.gv) !== (y.gv == null ? 1e9 : y.gv)) return (x.gv == null ? 1e9 : x.gv) < (y.gv == null ? 1e9 : y.gv);
     // qPass 不是交付硬门；只比较未过项数量，避免旧覆盖率/targetScore 改写质量目标。
