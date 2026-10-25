@@ -56,6 +56,11 @@ const OUT_PREFIX = (function () {
   const i = process.argv.indexOf('--out');
   return i > 0 ? process.argv[i + 1] : path.join(__dirname, '产线对比_20261025');
 })();
+// --dump-levels <dir>：把未过结构门的关卡导成客户端 JSON，供只读归因（双时间线/债务/压力）复用
+const DUMP_DIR = (function () {
+  const i = process.argv.indexOf('--dump-levels');
+  return i > 0 ? path.resolve(process.argv[i + 1]) : '';
+})();
 const JSONL = OUT_PREFIX + '.jsonl';
 const SUMMARY = path.join(path.dirname(OUT_PREFIX), '产线对比汇总_' + path.basename(OUT_PREFIX).replace(/^产线对比_/, '') + '.json');
 
@@ -183,6 +188,15 @@ function main() {
         const ms = Date.now() - t0;
         const rec = err ? { image: img.id, flow: flow, seed: seed, error: err, elapsedMs: ms }
           : recordOf(envs[img.id], img, flow, seed, r, ms);
+        if (DUMP_DIR && rec.gatePass === false && r && r.level) {
+          try {
+            fs.mkdirSync(DUMP_DIR, { recursive: true });
+            const cf = A.toGameFormat(r.level);
+            const lf = path.join(DUMP_DIR, rec.image + '_' + flow + '_s' + seed + '.json');
+            fs.writeFileSync(lf, JSON.stringify(cf));
+            rec.levelFile = path.relative(ROOT, lf);
+          } catch (e) { rec.levelDumpError = String(e && e.message || e); }
+        }
         rows.push(rec);
         fs.appendFileSync(JSONL, JSON.stringify(rec) + '\n');
         console.log('[' + rec.image + '] ' + flow + ' seed' + seed + ' => '
