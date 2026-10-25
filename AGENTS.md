@@ -30,7 +30,7 @@
 ```bash
 cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
 node --check bin/js/generator.js && node --check bin/js/app.js && node --check bin/js/playersim.js
-node 03_工具/难度关系/死因分析.js <关卡json>
-node 03_工具/难度关系/生成过程动画.js <关卡json>
+node 03_工具/好关评分/产线对比.js --flows new_fixed --seed-list 1001,1002 --cap-scale-plan 1.45,1.15
+node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
 grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
 ```
