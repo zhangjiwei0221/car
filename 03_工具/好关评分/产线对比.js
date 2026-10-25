@@ -95,6 +95,11 @@ const CAP_MAX_SCALE = (function () {
   const i = process.argv.indexOf('--cap-max-scale');
   return i > 0 ? parseFloat(process.argv[i + 1]) : null;
 })();
+// --cap-scale-plan 1.45,1.15：交给生成器的容量上沿候选臂（与生产 app 配置同口径）
+const CAP_SCALE_PLAN = (function () {
+  const i = process.argv.indexOf('--cap-scale-plan');
+  return i > 0 ? process.argv[i + 1].split(',').map(Number).filter(x => x > 0) : null;
+})();
 
 function configOf(env, flow, seed) {
   const cfg = {
@@ -110,6 +115,7 @@ function configOf(env, flow, seed) {
   // D1 实验开关：不传 --row0-free-max 时与 v495 完全一致（不接 limitRow0Free）
   if (ROW0_FREE_MAX != null) { cfg.row0FreeMax = ROW0_FREE_MAX; cfg.row0FreeIce = ROW0_FREE_ICE; }
   if (CAP_MAX_SCALE != null && cfg.boxSizeMax != null) cfg.boxSizeMax = Math.round(cfg.boxSizeMax * CAP_MAX_SCALE);
+  if (CAP_SCALE_PLAN != null) cfg.capScalePlan = CAP_SCALE_PLAN;
   return cfg;
 }
 

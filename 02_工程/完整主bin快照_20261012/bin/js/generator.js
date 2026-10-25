@@ -14737,9 +14737,40 @@ AntSolver.Generator = (function() {
     return best;
   }
 
+  /**
+   * 【v496·E2】容量上沿候选臂：同一个关卡按不同的 boxSizeMax 档各产一次，由统一候选比较器择优。
+   *   为什么需要它：好图的 40 上沿太小（各色 85~114px，40 的车开局就能吃满，freeLow 45~65%），
+   *   把上沿放大到 1.45 倍后 5 seed 4/5；但同一倍数会把 010 的带撑到 [35,86] → 整图产不出。
+   *   所以"放大"不能一刀切，必须按图试档，由候选比较器决定用哪档，不人工按图指定。
+   *   合同：每一档缩放后的上沿会写进 _userCapMin/_userCapMax 快照，v495 的越界夹紧仍按该档执行。
+   *   不设 config.capScalePlan 时行为与 v495 逐字节一致。
+   */
   function produceDispatch(blocks, config, opts) {
+    var _plan = (config && config.capScalePlan) || null;
+    if (!_plan || !_plan.length) return produceDispatchCore(blocks, config, opts);
+    var _capMax0 = parseInt(config.boxSizeMax, 10) || 0;
+    var _best = null, _bestT = null, _last = null;
+    for (var _si = 0; _si < _plan.length; _si++) {
+      var _sc = _plan[_si];
+      var _cfg2 = Object.assign({}, config, { capScalePlan: null, _capScale: _sc, _userCapMin: null, _userCapMax: null });
+      if (_capMax0 > 0 && _sc > 0) _cfg2.boxSizeMax = Math.max(1, Math.round(_capMax0 * _sc));
+      var _r = null;
+      try { _r = produceDispatchCore(blocks, _cfg2, opts); } catch (e) { _r = null; }
+      if (!_r) continue;
+      _last = _r;
+      try { _r.capScale = _sc; } catch (e) { }
+      var _t = portfolioTuple(_r);
+      if (!_best || portfolioBetter(_t, _bestT)) { _best = _r; _bestT = _t; }
+    }
+    if (_best) return _best;
+    // 所有档都产不出时，退回原始带宽再跑一次（等价于 v495 的兜底，绝不因为新策略把结果变成空）
+    return produceDispatchCore(blocks, Object.assign({}, config, { capScalePlan: null, _userCapMin: null, _userCapMax: null }), opts);
+  }
+
+  function produceDispatchCore(blocks, config, opts) {
     // 【v495·第2步】容量上限合同：把用户最初输入的容量区间钉成快照，后续所有“按棋盘反推 / 溢出救援 /
     //   管道深度补救”的容量缩放都读这个快照，不许越过用户上限（踩过：v238 反推、管道 +12%、管道 +3）。
+    //   v496 注意：_userCapMin 为 null 表示"本档的上沿已由 capScalePlan 显式给定，需要重新快照"。
     config = (config && typeof config === 'object') ? config : {};
     if (config._userCapMin == null) {
       var _ucMn = parseInt(config.boxSizeMin, 10) || 0, _ucMx = parseInt(config.boxSizeMax, 10) || 0;
