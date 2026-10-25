@@ -14558,19 +14558,21 @@ AntSolver.Generator = (function() {
       bk: blackPctOfBoard(out && out.level && out.level.board)
     };
     t.bk15 = (t.bk != null && t.bk <= 15) ? 1 : 0;
+    t.bk30 = (t.bk != null && t.bk <= 30) ? 1 : 0;
     return t;
   }
   function portfolioBetter(x, y) {
     if (!y) return true;
     if (!!x.ok !== !!y.ok) return !!x.ok;
-    // 【v498·B】黑块 ≤15% 优先于结构门：这是用户拍板的观感硬线（宁可结构让步）。
-    if ((x.bk15 || 0) !== (y.bk15 || 0)) return (x.bk15 || 0) > (y.bk15 || 0);
     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
+    // 【v499·折中】结构门通过后：先保证黑块 ≤30%（挡掉 36% 那种极端），再比距离/质量，最后 ≤15% 优先。
+    if ((x.bk30 || 0) !== (y.bk30 || 0)) return (x.bk30 || 0) > (y.bk30 || 0);
     if ((x.gc == null ? 99 : x.gc) !== (y.gc == null ? 99 : y.gc)) return (x.gc == null ? 99 : x.gc) < (y.gc == null ? 99 : y.gc);
     if ((x.gv == null ? 1e9 : x.gv) !== (y.gv == null ? 1e9 : y.gv)) return (x.gv == null ? 1e9 : x.gv) < (y.gv == null ? 1e9 : y.gv);
     // qPass 不是交付硬门；只比较未过项数量，避免旧覆盖率/targetScore 改写质量目标。
     if ((x.qv == null ? 99 : x.qv) !== (y.qv == null ? 99 : y.qv)) return (x.qv == null ? 99 : x.qv) < (y.qv == null ? 99 : y.qv);
-    // 【v497】结构/质量打平时，黑块少的优先（差 5 个百分点才换，避免噪声抢位）
+    // 【v499】结构/质量打平时：≤15% 优先，其次黑块少者优先（差 5pp 才换）
+    if ((x.bk15 || 0) !== (y.bk15 || 0)) return (x.bk15 || 0) > (y.bk15 || 0);
     if (Math.abs((x.bk == null ? 99 : x.bk) - (y.bk == null ? 99 : y.bk)) >= 5) return (x.bk == null ? 99 : x.bk) < (y.bk == null ? 99 : y.bk);
     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
     if ((x.pn || 0) !== (y.pn || 0)) return (x.pn || 0) > (y.pn || 0);
