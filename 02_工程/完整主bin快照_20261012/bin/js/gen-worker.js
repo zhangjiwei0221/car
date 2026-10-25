@@ -57,6 +57,10 @@ function _goalScore(r) {
   s += (r.difficulty && r.difficulty.score) || 0;
   return s;
 }
+function _goalBetter(r, reference) {
+  try { return AntSolver.Generator.goalCandidateBetter(r, reference, _goal && _goal.config); }
+  catch (e) { return _goalScore(r) > _goalScore(reference); }
+}
 function _goalFinish(stopReason) {
   var g = _goal;
   if (!g) return;
@@ -139,7 +143,7 @@ function _goalRound() {
     if (_repSteps) { r = _repCur; r.goalRepairSteps = _repSteps; }
   }
   g.rounds++;
-  var _better = r && (!g.best || _goalScore(r) > _goalScore(g.best));
+  var _better = r && (!g.best || _goalBetter(r, g.best));
   if (_better) {
     try { self.postMessage({ type: 'goalBest', index: g.index, round: g.rounds, result: r }); } catch (e) {}
   }
@@ -155,7 +159,7 @@ function _goalRound() {
         ' · 压力' + (_f && _f.pressurePct3 != null ? _f.pressurePct3 + '%' : '-') });
   } catch (e) { }
   if (r) r.goalRound = g.rounds;
-  if (!g.best || _goalScore(r) > _goalScore(g.best)) g.best = r;
+  if (!g.best || _goalBetter(r, g.best)) g.best = r;
   if (_goalPassed(r)) { _goalFinish('pass'); return; }
   // 让出事件循环：这一行之后 worker 才能处理 {cmd:'stop'}
   g.timer = setTimeout(_goalRound, 0);

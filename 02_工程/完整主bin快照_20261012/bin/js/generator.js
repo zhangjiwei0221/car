@@ -14798,6 +14798,24 @@ AntSolver.Generator = (function() {
     return config && config.experienceGoal === true ? goalExperiencePass(cand, config) : goalStructPass(cand);
   }
 
+  /** 【v515】有效/结构门优先，完整体验距离其次，原结构portfolio最后；与通过判定共享完整评价缓存。 */
+  function goalCandidateBetter(cand, reference, config) {
+    if (!reference) return !!cand;
+    if (!cand) return false;
+    var a = portfolioTuple(cand), b = portfolioTuple(reference);
+    if (!!a.ok !== !!b.ok) return !!a.ok;
+    if ((a.qg || 0) !== (b.qg || 0)) return (a.qg || 0) > (b.qg || 0);
+    if (config && config.experienceGoal === true) {
+      var ea = experienceEvalOfCand(cand, config, true), eb = experienceEvalOfCand(reference, config, true);
+      var da = ea && ea.metrics && ea.metrics.distance != null ? ea.metrics.distance : null;
+      var db = eb && eb.metrics && eb.metrics.distance != null ? eb.metrics.distance : null;
+      if (da != null && db != null && da !== db) return da < db;
+      if (da != null && db == null) return true;
+      if (da == null && db != null) return false;
+    }
+    return portfolioBetter(a, b);
+  }
+
   /** 近目标才做局部容量；只接受完整目标通过的变体，否则保留原候选。 */
   function tuneExperienceCandidate(cand, config) {
     var t0 = Date.now(), report = { schema: 'capacity-tune-run-v1', applied: false, tested: 0,
@@ -14888,7 +14906,7 @@ AntSolver.Generator = (function() {
     if (!(maxRounds > 0)) maxRounds = 0;
     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
     function passed(r) { return goalAcceptPass(r, config); }
-    var best = null, bestT = null, rounds = 0, stopped = false;
+    var best = null, rounds = 0, stopped = false;
     while (true) {
       if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
       if (maxRounds && rounds >= maxRounds) break;
@@ -14918,8 +14936,7 @@ AntSolver.Generator = (function() {
         try { r = tuneExperienceCandidate(r, tuneCfg); r.goalRound = rounds; }
         catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
       }
-      var rt = portfolioTuple(r);
-      if (!best || portfolioBetter(rt, bestT)) { best = r; bestT = rt; }
+      if (!best || goalCandidateBetter(r, best, config)) best = r;
       if (passed(r)) break;
     }
     if (best) {
@@ -16721,7 +16738,7 @@ AntSolver.Generator = (function() {
     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
     isCurveScore: isCurveScore,
     choiceCurveScore: choiceCurveScore,
-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
     exposedBlobByColor: exposedBlobByColor,
     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
     sampleCarCount: sampleCarCount,

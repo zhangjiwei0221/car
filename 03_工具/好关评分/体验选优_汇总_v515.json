@@ -1,0 +1,210 @@
+{
+  "schema": "goal-candidate-full-evidence-summary-v1",
+  "version": "v515",
+  "sourceFiles": [
+    "体验选优_006完整评价_v515.json",
+    "体验选优_成功保护_v515.json",
+    "体验选优_007长搜索_v515.json"
+  ],
+  "summary": {
+    "pairs": 5,
+    "targetPass": [
+      4,
+      4
+    ],
+    "structPass": [
+      5,
+      5
+    ],
+    "sameHashPairs": 4,
+    "wallTotalMs": [
+      167388,
+      166875
+    ],
+    "wallChangePct": -0.3
+  },
+  "pairs": [
+    {
+      "image": "006",
+      "seed": 1952510899,
+      "pass": [
+        false,
+        false
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        62327,
+        62101
+      ],
+      "distance": [
+        44.4,
+        21.4
+      ],
+      "midBuffer34Pct": [
+        5.6,
+        28.6
+      ],
+      "sameHash": false
+    },
+    {
+      "image": "006",
+      "seed": 1001,
+      "pass": [
+        true,
+        true
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        19052,
+        19014
+      ],
+      "distance": [
+        0,
+        0
+      ],
+      "midBuffer34Pct": [
+        64.7,
+        64.7
+      ],
+      "sameHash": true
+    },
+    {
+      "image": "007",
+      "seed": 1001,
+      "pass": [
+        true,
+        true
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        18537,
+        18487
+      ],
+      "distance": [
+        0,
+        0
+      ],
+      "midBuffer34Pct": [
+        76.2,
+        76.2
+      ],
+      "sameHash": true
+    },
+    {
+      "image": "010",
+      "seed": 1001,
+      "pass": [
+        true,
+        true
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        9103,
+        9053
+      ],
+      "distance": [
+        0,
+        0
+      ],
+      "midBuffer34Pct": [
+        53.8,
+        53.8
+      ],
+      "sameHash": true
+    },
+    {
+      "image": "007",
+      "seed": 1952511079,
+      "pass": [
+        true,
+        true
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        58369,
+        58220
+      ],
+      "distance": [
+        0,
+        0
+      ],
+      "midBuffer34Pct": [
+        57.9,
+        57.9
+      ],
+      "sameHash": true
+    }
+  ],
+  "quickExperiment": {
+    "file": "体验选优_006长搜索_v515.json",
+    "adopted": false,
+    "reason": "quick distance 44.4→0但完整目标仍未通过，且耗时增加；证明quick不能单独选best。"
+  },
+  "realUI": {
+    "batch": "unnamed-10-26-15",
+    "status": "COMPLETED",
+    "qualified": 1,
+    "unqualified": 1,
+    "results": [
+      {
+        "input": "35x35拼接图纸_006.txt",
+        "class": "可玩·待评",
+        "elapsedMs": 119636,
+        "experiencePass": true,
+        "metrics": {
+          "midSteps": 20,
+          "midBuffer34Pct": 60,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 2,
+          "oscillationCount": 4,
+          "lateHighPressurePct": 28.6,
+          "maxBuffer": 4,
+          "distance": 0
+        },
+        "release": "found",
+        "stop": "pass"
+      },
+      {
+        "input": "35x35拼接图纸_007.txt",
+        "class": "目标未达·到时最好",
+        "elapsedMs": 123477,
+        "experiencePass": false,
+        "metrics": {
+          "midSteps": 21,
+          "midBuffer34Pct": 28.6,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 3,
+          "oscillationCount": 3,
+          "lateHighPressurePct": 14.3,
+          "maxBuffer": 4,
+          "distance": 21.4
+        },
+        "release": "found",
+        "stop": "goalTimeUp"
+      }
+    ]
+  },
+  "decision": "采用完整体验距离比较，顺序为有效/结构门→完整体验距离→原portfolio；不采用quick-only。",
+  "boundaries": [
+    "006长搜索仍未完整通过，distance 44.4→21.4只表示当前best更接近。",
+    "UI批次15仅1/2达标，不能宣称所有seed必达。",
+    "PlayerSim与真人可学习性仍需校准。"
+  ]
+}

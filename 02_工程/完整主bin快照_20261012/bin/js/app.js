@@ -7250,6 +7250,10 @@ AntSolver.App = (function() {
     s -= (fc.earlyFree10 || 0) * 1000 + (fc.freeLowPct || 0) * 100;
     return s;
   }
+  function _branchBetter(r, reference) {
+    try { return AntSolver.Generator.goalCandidateBetter(r, reference, (r && r.config) || (genBatch && genBatch.config)); }
+    catch (e) { return _branchScore(r) > _branchScore(reference); }
+  }
   function genFinishGoalBranches(reason) {
     var st = genBranchState;
     if (!st || st.finished) return;
@@ -7315,7 +7319,7 @@ AntSolver.App = (function() {
           var r = d.result || {};
           r._branch = rec.tag;
           st.results.push(r);
-          if (!st.best || _branchScore(r) > _branchScore(st.best)) st.best = r;
+          if (!st.best || _branchBetter(r, st.best)) st.best = r;
           var passed = false;
           try { passed = AntSolver.Generator.goalAcceptPass(r, cfg); } catch (e) {}
           if (passed && !st.passed) {
@@ -7417,7 +7421,10 @@ AntSolver.App = (function() {
       }
       rounds++;
       if (r) r.goalRound = rounds;
-      if (!best || score(r) > score(best)) best = r;
+      var better = false;
+      try { better = AntSolver.Generator.goalCandidateBetter(r, best, baseCfg); }
+      catch (e) { better = score(r) > score(best); }
+      if (!best || better) best = r;
       if (passed(r)) return done('pass');
       setTimeout(round, 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
     }
