@@ -1417,7 +1417,7 @@ AntSolver.Generator = (function() {
         var _guard = 0;
         while (dims.rows * dims.cols - n > 2 && _guard++ < 6) {
           var _r = dims.rows, _c = dims.cols, _done = false;
-          var _ok = function (rr, cc) { var d = cc - rr; return d >= 1 && d <= 2 && rr >= 3 && cc >= 3 && rr * cc >= n; };
+          var _ok = function (rr, cc) { var d = cc - rr; return d >= 1 && d <= 2 && rr >= 6 && cc >= 6 && rr * cc >= n; };
           if (_ok(_r, _c - 1)) { dims = { rows: _r, cols: _c - 1 }; _done = true; }
           else if (_ok(_r - 1, _c)) { dims = { rows: _r - 1, cols: _c }; _done = true; }
           if (!_done) break;
@@ -2338,13 +2338,13 @@ AntSolver.Generator = (function() {
         if (boardShapeOk(xr2, cMax + 1, !!config.boardAllowSquare)) inRange.push(ye);
       }
     }
-    // 向下缩小候选：行从 rMin-1 一直缩到 3，列只取 行+1 / 行+2（天然满足形态约束）
+    // 向下缩小候选：行从 rMin-1 一直缩到 6，列只取 行+1 / 行+2（天然满足形态与最小尺寸合同）
     // 【v316·用户裁决】开了棋盘硬范围（boardHardRange）就不许缩到范围外 ——
     //   原来这条路径不看该开关，22 辆的图被缩成 3×8 的怪盘。
-    for (rr = rMin - 1; config.boardHardRange ? false : rr >= 3; rr--) {
+    for (rr = rMin - 1; config.boardHardRange ? false : rr >= 6; rr--) {
       for (var d = 1; d <= 2; d++) {
         cc = rr + d;
-        if (cc < 3) continue;
+        if (cc < 6) continue;
         shrunk.push(evalPair(rr, cc));
       }
     }
@@ -7958,10 +7958,79 @@ AntSolver.Generator = (function() {
     return out;
   }
 
+  function evaluateTimelineLevel(level, config) {
+    var parsed = null, sr = null;
+    try { parsed = AntSolver.parseLevel(level); } catch (e) { return { level: level, valid: false, config: config, reason: 'timeline-parse-failed' }; }
+    try { sr = AntSolver.Solver.solve(parsed, { capturePreviewStats: true, bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain }); }
+    catch (e) { return { level: level, valid: false, config: config, reason: 'timeline-solve-error' }; }
+    var structural = null;
+    try { structural = structuralDeadlockCheck(level.board); } catch (e) { structural = { ok: false, reason: String((e && e.message) || e) }; }
+    if (!sr || !sr.completed || !structural.ok) return { level: level, valid: false, solveResult: sr,
+      config: config, structural: structural, reason: 'timeline-not-solved' };
+    var generationEval = evaluateGeneration(sr, parsed, config);
+    var cand = { level: level, valid: true, solveResult: sr,
+      difficulty: computeDifficulty(sr, parsed, config, generationEval),
+      generationEval: generationEval, config: config, retries: 0, structural: structural,
+      timelineGenerated: true };
+    ensureCandidateQuality(cand);
+    try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(level, config || {}); }
+    catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
+    return cand;
+  }
+
+  /** v494：仅结构失败的有效参考关生成双时间线变体；每轮独立重解，比较统一走 candBetter。 */
+  function produceTimelineCompare(blocks, config) {
+    var t0 = Date.now();
+    var base = produce(blocks, Object.assign({}, config, { roleSchedule: false }));
+    auditRoleCandidate(base);
+    var pool = [base], role = null, reference = base;
+    // 无参考解时先复用 v492 首行角色候选；已有有效解则绝不额外双跑 role。
+    if (!base.valid) {
+      role = produce(blocks, Object.assign({}, config, { roleSchedule: true }));
+      auditRoleCandidate(role); pool.push(role);
+      if (role.valid && candBetter(role, base, config)) reference = role;
+    }
+    var attempts = [], current = reference;
+    var maxIterations = Math.max(1, Math.min(3, parseInt(config.timelineIterations, 10) || 2));
+    if (current && current.valid && !goalStructPass(current)) {
+      for (var round = 0; round < maxIterations; round++) {
+        var timeline = null, scheduled = null, variant = null;
+        try {
+          timeline = AntSolver.CarSequencer.dualTimeline(current.level, current.solveResult, current.config || config);
+          scheduled = AntSolver.CarSequencer.rescheduleByTimeline(current.level, timeline, config);
+          if (!scheduled.level) { attempts.push({ round: round + 1, applied: false, plan: scheduled.plan }); break; }
+          variant = evaluateTimelineLevel(scheduled.level, Object.assign({}, current.config || config, { roleSchedule: 'timelineCompare' }));
+          variant.timelineSchedule = scheduled.plan;
+          if (variant.valid) {
+            variant.carTimeline = AntSolver.CarSequencer.dualTimeline(variant.level, variant.solveResult, variant.config || config);
+            variant.debtTimeline = AntSolver.CarSequencer.debtTimeline(variant.level, variant.solveResult, variant.config || config);
+            auditRoleCandidate(variant); pool.push(variant);
+          }
+          attempts.push({ round: round + 1, applied: true, valid: !!variant.valid,
+            plan: scheduled.plan, quality: roleCompareSummary(variant),
+            debt: variant.debtTimeline ? variant.debtTimeline.summary : null });
+        } catch (e) {
+          attempts.push({ round: round + 1, applied: false, error: String((e && e.message) || e) }); break;
+        }
+        if (!variant || !variant.valid) break;
+        current = variant; // 下一轮使用新参考解，重新测量真实激活与需求窗口。
+      }
+    }
+    var out = base;
+    for (var i = 1; i < pool.length; i++) if (candBetter(pool[i], out, config)) out = pool[i];
+    out.timelineCompare = { schema: 'timeline-compare-v1', elapsedMs: Date.now() - t0,
+      base: roleCompareSummary(base), role: role ? roleCompareSummary(role) : null,
+      reference: reference === base ? 'base' : 'role', attempts: attempts,
+      generatedVariants: pool.length - (role ? 2 : 1), chosen: out === base ? 'base' : (out === role ? 'role' : 'timeline'),
+      skipped: attempts.length === 0 ? (out && goalStructPass(out) ? 'base-gate-pass' : 'no-valid-reference') : null };
+    return out;
+  }
+
   function produce(blocks, config) {
     seedRng(config && config.seed);
     config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
     if (config.roleSchedule === 'compare') return produceRoleCompare(blocks, config);
+    if (config.roleSchedule === 'timelineCompare') return produceTimelineCompare(blocks, config);
     // 【v334】生成轨迹：每次评估一条，供界面"生成过程"面板回放
     if (config.trace !== false) { if (!config._trace) config._trace = []; }
     var K = Math.max(1, config.candidateCount || 1);

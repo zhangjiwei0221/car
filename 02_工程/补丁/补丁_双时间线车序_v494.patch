@@ -1,0 +1,3078 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 0ee1a7e..f8ecfba 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -17953,3 +17953,60 @@ A 的具体债车可看到 enterStep、initialDebt、doneStep 和 waitSteps；v3
+ 1. 当前以 bestKnown 路线为主，玩家其他路线的债务生命周期仍需后续分布，不代表所有路线。
+ 2. “全部偿还”不等于体验好；v3B 的集中债务与最长14步说明释放时机仍可能不合理。
+ 3. 尚未用债务窗口反向排车；下一步才把需求时间线与激活时间线连接起来，并设置可验证的目标窗口而非凭感觉冻结阈值。
++
++### 454. 【2026-10-25】v494：双时间线出数；全局车序代理被否决，补齐棋盘6行漏洞
++
++#### 454.1 问题（原话）
++
++```
++下一步
++```
++
++进入 M2.3：把目标图需求时间线与车场激活时间线连起来，迭代排车；同时必须遵守“棋盘行列均不小于6”、容量守恒和可回退要求。
++
++#### 454.2 证据
++
++- 仅按层号无法知道车辆何时真的可用；障碍与参考路线都会改变激活时刻。最新006只读回放：38辆上盘车全部激活、13色有需求事件、23步发生新激活或新色解锁；说明可以测量真实依赖，不再凭层号猜测。
++- 初版把 activateStep 当债务形成时刻，变体虽可解却明显增加免费供给。原因是**早激活不等于玩家必须早取车**，债务应以实际 pick/enter 为准。
++- 修正为“参考路线 pickStep 决定排程位置，activateStep 只约束届时可用”后，seed1001/1002 各两轮变体均重解成功，但统一质量比较仍全部保留 base：
++  - 1001：base freeLow24 / freeRun7；两轮42/10、45/10；
++  - 1002：base65/6；两轮71/9、79/26；
++  - 1003：base 已结构通过（freeLow3/freeRun1），变体数0，定向跳过生效。
++- 4/4 时间线变体可解，0/4 被采用；说明“安全重解”有效，但当前全局目标匹配代理不代表好关，不能默认。
++- 真生成另发现 v491 合同漏口：旧产线 tightBoard 仍写 rr/cc≥3；new_fixed 的向下缩盘候选也允许3~5行。v493 new_fixed 三 seed 实际都是5×7，最终结构门全失败。
++
++#### 454.3 改动
++
++- `car-sequencer.js` 新增 `dualTimeline`：真实激活、取车、移除、openedBy/opens、唯一可取供给、分色首次/新增可达与 readyStep。含管道时明确标 `initial-board-cars-only`，不冒充覆盖管道车辆。
++- 新增默认关闭的 `roleSchedule='timelineCompare'` 旧产线实验：仅结构失败项运行；base 无有效解才补 role；每轮只换普通上盘车 color/count，重新求解与评价，最多两轮，最终统一 `candBetter`。默认 false 不变，new_fixed 尚未接入该实验。
++- 排程合同检查：全车容量守恒、障碍/管道 queue 签名不变、行列≥6；microCar 不设置债务等待目标。保留每轮计划、债务与质量结果，失败可回退 base。
++- 修正排程口径：激活是供给约束，实际取车才是债务形成参考；不把早激活直接罚成错误。
++- tightBoard 与 chooseBoardDimsFixed 的缩盘下限由3补为6；不动用户容量区间、不拆车、不改默认产线。
++- 新增 `双时间线.js`、`车序双时间线对比.js`，保存真生成与时间线报告。版本升 v494；回滚标签 `checkpoint-v493-pre-dual-timeline`。
++
++#### 454.4 验证（改前后数字）
++
++006 / cap20~40 / seed1001~1003 / candidateCount3 / 20s / fullTime：
++
++| 产线 | 指标 | v493 | v494 |
++|---|---|---:|---:|
++| old | 有效 | 3/3 | 3/3 |
++| old | 行列≥6 | 2/3 | 3/3 |
++| old | 结构门 | 0/3 | 1/3 |
++| new_fixed | 有效 | 3/3 | 3/3 |
++| new_fixed | 行列≥6 | 0/3（均5×7） | 3/3（均7×8） |
++| new_fixed | 结构门 | 0/3 | 3/3 |
++
++- old seed1002 从5×7补为6×7；old/new_fixed 的 hash 变化是修合同后的预期结果，不做“默认完全不变”声明。
++- new_fixed 改后 freeLow/freeRun：1001=3/1，1002=30/5，1003=9/2。尺寸与后续随机序列同时变化，不能把全部改善归因于下限或车序。
++- 最终时间线实验3关全部保留 base，4个变体只作为候选证据；seed1003 因 base 过门不额外双跑。所有最终保留关容量总和=1225、micro=0、above40=0。
++- 4/4 变体的容量守恒、障碍签名与棋盘下限检查全部通过；变体重解成功不等于质量好，compare 未让 freeLow/freeRun 退化项替换 base。
++- `node --check`：generator / app / playersim / car-sequencer / 两个新工具均通过。
++
++#### 454.5 遗留
++
++1. M2.3 **尚未验收完成**：双时间线与安全 compare 已完成，全局目标匹配公式被真实结果否决，默认不启用。
++2. 下一步改为局部单交换：每次只修一个明确失败项，以重解后的实际债务、压力与统一质量反馈决定保留，不再扩大代理分全局排序。
++3. 当前时间线沿一条参考解；激活依赖路线，不能代表多路线唯一车序。排程也未证明压力起伏或持续高压改善。
++4. 管道 queue 车辆未纳入完整激活时间线；unlockCar/reserveSupply 仍无充分证据，不按层号冒充角色。
++5. timelineCompare 目前只在旧产线实验；验证目标有效前不接 new_fixed，更不设默认。未经过真人校准，不新增“好关”压力阈值。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 7ad3b3c..c30bbda 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-25（v493 债务生命周期）　|　当前版本：**v493**（Kimi M2 开发分支）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-25（v494 双时间线与棋盘合同补漏）　|　当前版本：**v494**（Kimi M2 开发分支）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ 
+ > ## ⚠ 当前能力边界（2026-10-22，用户明确）
+ >
+@@ -776,10 +776,10 @@ qGate 通过时，原 fallback 转正常交付，保留 `fallbackOriginal`。
+ ### 16.8 当前版本
+ 
+ ```
+-版本：v479
+-检查点：checkpoint-v469
+-分支：从v357继续
+-日志：§434 总览，§435 索引
++版本：v494
++检查点：checkpoint-v493-pre-dual-timeline
++分支：codex/kimi-quality-framework
++日志：§436 计划，§437~454 实施与验证
+ ```
+ 
+ 
+@@ -824,12 +824,12 @@ M0 固定基准 + 统一评价与候选口径
+ ### 17.5 版本与回滚
+ 
+ ```text
+-版本：v493
++版本：v494
+ 开发分支：codex/kimi-quality-framework
+ 改造前标签：checkpoint-v479-pre-kimi-quality
+-本阶段标签：checkpoint-v492-pre-debt-timeline
++本阶段标签：checkpoint-v493-pre-dual-timeline
+ 原始分支：从v357继续
+-日志：§436 Kimi 评估与计划；§437~453 v480~v493 评价、候选、解法、容量与车序
++日志：§436 Kimi 评估与计划；§437~454 v480~v494 评价、候选、解法、容量与车序
+ ```
+ 
+ 
+@@ -969,3 +969,13 @@ M0 固定基准 + 统一评价与候选口径
+ - 006_v3B：16辆全部偿还，等待中位3/最长14，最大同时债车5、债务像素205，含1个 microDebt。
+ - 最新006：11辆全部偿还，等待中位2/最长13，最大同时债车5、债务像素64。
+ - 结论：债车不是越多越好；集中债务和等待时长必须与释放一起排程。下一步才用这些窗口改车序。
++
++
++### 17.20 双时间线、定向车序实验与棋盘下限补漏（v494）
++
++- `CarSequencer.dualTimeline` 沿参考解记录每辆上盘车的真实激活/取车/移除时刻、由谁开路、打开哪些车、是否曾是该色唯一可取供给；同时记录每色首次可达与新增可达像素。它是路线证据，不是全局最优或所有玩家路线。
++- `timelineCompare` 是默认关闭的旧产线实验：base 结构通过则不跑变体；无有效参考解时才尝试 role；有参考解且结构失败时最多两轮“重排→重解→重测”，最终仍由 `candBetter` 统一选择。
++- 重排只交换普通上盘车的 color/count，容量、棋盘、冰链、问号与管道 queue 不动；每轮检查守恒和障碍签名。microCar 不设目标等待窗口。
++- 初版把激活时间当债务形成时间，导致免费曲线退化；修正为“实际取车步排程、激活只作供给约束”后，4/4 变体可解但仍 0/4 胜过 base。该全局目标匹配公式不进入默认生产。
++- 另修复 tightBoard 与 chooseBoardDimsFixed 仍允许缩到 3~5 行的合同漏洞，现行下限统一为6。默认 new_fixed 的006三 seed 从5×7、结构0/3变为合规棋盘、结构3/3；质量变化同时受尺寸和随机序列影响，不能全归功车序。
++- 当前 M2.3 只完成双时间线和安全实验框架；全局排程原型被否决。下一步应做实际质量/债务/压力反馈的局部单交换，不再扩大全局排序代理分。管道车辆时间线覆盖、多路线排程与 new_fixed 接入仍未完成。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 6f8f11e..dab3fc8 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v493 · 债务生命周期</title>
++  <title>车接小人 v494 · 双时间线车序实验</title>
+   <link rel="stylesheet" href="css/style.css?v=493">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v493</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v494</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
+index 0b7cf54..dadf896 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
+@@ -162,3 +162,204 @@ AntSolver.CarSequencer.debtTimeline = function (level, route, opts) {
+     items: list, series: series
+   };
+ };
++
++/** v494 · 双时间线：参考解中的真实供给激活 × 目标图可达需求。只读，不把层号当激活时刻。 */
++AntSolver.CarSequencer.dualTimeline = function (level, route, opts) {
++  opts = opts || {};
++  var Sim = AntSolver.Simulator;
++  var lv = level && level.rows && level.totalPixels != null ? level : AntSolver.parseLevel(level);
++  var actions = AntSolver.SolverAnalysis ? AntSolver.SolverAnalysis.normalizeActions(route) : (route.actions || route.pickOrder || route || []);
++  var s = Sim.createState(lv, { useSlotStart: true, bottomOnly: !!opts.bottomOnly, instantChain: !!opts.instantChain });
++  var items = {}, order = [], steps = [], demand = {}, firstReachStep = {}, lastAvailable = {};
++  var r, c, key, cell;
++  for (r = 0; r < lv.board.rows; r++) for (c = 0; c < lv.board.cols; c++) {
++    cell = lv.board.cells[r] && lv.board.cells[r][c];
++    if (!cell || cell.t !== 'box') continue;
++    key = r + ',' + c;
++    items[key] = { key: key, r: r, c: c, color: cell.color, count: cell.count,
++      activateStep: null, pickStep: null, removedStep: null, openedBy: [], opens: [], solePickableSupplySteps: 0 };
++    order.push(key);
++  }
++  function colorsNow() {
++    var out = {};
++    for (var rr = 0; rr < lv.rows; rr++) for (var cc = 0; cc < lv.cols; cc++) {
++      var col = lv.blocks[rr][cc]; if (col > 0) out[col] = true;
++    }
++    return out;
++  }
++  var allColors = colorsNow();
++  function snapshot(step, removedKeys, actionColor) {
++    var pv = Sim.previewNextEliminationOrder(s), available = {}, added = {}, unlockedColors = [];
++    for (var col in allColors) {
++      var av = (s.eliminatedPixelsByColor && s.eliminatedPixelsByColor[col]) || 0;
++      // consumed 必须按 blocks 实算；Simulator 没有稳定的分色消耗字段。
++      av = 0;
++      for (var rr = 0; rr < lv.rows; rr++) for (var cc = 0; cc < lv.cols; cc++) {
++        if (lv.blocks[rr][cc] === +col && s.eliminated[rr][cc]) av++;
++      }
++      av += (pv.byColor[col] && pv.byColor[col].reachable) || 0;
++      available[col] = av;
++      var prev = lastAvailable[col] || 0, delta = Math.max(0, av - prev);
++      if (delta > 0) {
++        added[col] = delta;
++        if (firstReachStep[col] == null) firstReachStep[col] = step;
++        (demand[col] || (demand[col] = [])).push({ step: step, added: delta, available: av });
++        if (step > 0 && prev === 0) unlockedColors.push(+col);
++      }
++      lastAvailable[col] = av;
++    }
++    var activated = [];
++    for (var k in s.activated) {
++      if (!items[k] || items[k].activateStep != null || !AntSolver.isBox(s.cells[k.split(',')[0]] && s.cells[k.split(',')[0]][k.split(',')[1]])) continue;
++      items[k].activateStep = step; items[k].openedBy = (removedKeys || []).slice(); activated.push(k);
++    }
++    for (var ai = 0; ai < activated.length; ai++) {
++      var opened = items[activated[ai]];
++      for (var bi = 0; bi < opened.openedBy.length; bi++) {
++        var blocker = items[opened.openedBy[bi]];
++        if (blocker && blocker.opens.indexOf(opened.key) < 0) blocker.opens.push(opened.key);
++      }
++    }
++    var rec = { step: step, available: available, added: added, activated: activated,
++      removed: (removedKeys || []).slice(), actionColor: actionColor == null ? null : actionColor,
++      unlockedColors: unlockedColors, buffer: s.buffer.length, eliminated: s.eliminatedPixels };
++    steps.push(rec); return rec;
++  }
++  function remainingKeys() {
++    var out = {};
++    for (var rr = 0; rr < s.boardRows; rr++) for (var cc = 0; cc < s.boardCols; cc++) {
++      if (AntSolver.isBox(s.cells[rr][cc])) out[rr + ',' + cc] = true;
++    }
++    return out;
++  }
++  snapshot(0, [], null);
++  for (var i = 0; i < actions.length; i++) {
++    if (s.gameWon || s.gameOver) break;
++    var a = actions[i];
++    if (!Sim.isPickable(s, a.r, a.c)) return { schema: 'dual-timeline-v1', completed: false,
++      reason: 'illegal_pick@' + i, items: order.map(function (k) { return items[k]; }), demand: demand, steps: steps };
++    var before = remainingKeys(), sameColorPickable = 0;
++    for (var pk in before) {
++      var pp = pk.split(',');
++      if (s.cells[+pp[0]][+pp[1]].color === s.cells[a.r][a.c].color && Sim.isPickable(s, +pp[0], +pp[1])) sameColorPickable++;
++    }
++    var pickedColor = s.cells[a.r][a.c].color;
++    Sim.applyPick(s, a.r, a.c);
++    if (s.eliminatedPixels >= s.totalPixels) { s.gameWon = true; s.gameOver = true; }
++    var after = remainingKeys(), removed = [];
++    for (var bk in before) if (!after[bk]) {
++      removed.push(bk);
++      if (items[bk]) { items[bk].removedStep = s.steps; if (items[bk].pickStep == null) items[bk].pickStep = s.steps; }
++    }
++    if (sameColorPickable === 1) {
++      for (var ri = 0; ri < removed.length; ri++) if (items[removed[ri]] && items[removed[ri]].color === pickedColor) items[removed[ri]].solePickableSupplySteps++;
++    }
++    snapshot(s.steps, removed, pickedColor);
++  }
++  // readyStep = 该色累计曾可达像素首次足够装满此车的参考解步数；不是全局最优或玩家必然时刻。
++  for (var oi = 0; oi < order.length; oi++) {
++    var item = items[order[oi]]; item.readyStep = null;
++    for (var si = 0; si < steps.length; si++) {
++      if ((steps[si].available[item.color] || 0) >= item.count) { item.readyStep = steps[si].step; break; }
++    }
++  }
++  var pipeCars = 0;
++  for (var pr = 0; pr < lv.board.rows; pr++) for (var pc = 0; pc < lv.board.cols; pc++) {
++    var pcell = lv.board.cells[pr] && lv.board.cells[pr][pc];
++    if (pcell && pcell.t === 'pipe' && pcell.queue) pipeCars += pcell.queue.length;
++  }
++  var activeN = 0, unlockSteps = 0, soleN = 0;
++  for (var ii = 0; ii < order.length; ii++) {
++    if (items[order[ii]].activateStep != null) activeN++;
++    if (items[order[ii]].solePickableSupplySteps > 0) soleN++;
++  }
++  for (var us = 1; us < steps.length; us++) if (steps[us].unlockedColors.length || steps[us].activated.length) unlockSteps++;
++  return { schema: 'dual-timeline-v1', completed: !!s.gameWon, routeSteps: s.steps,
++    summary: { cars: order.length, activatedCars: activeN, unlockOrActivationSteps: unlockSteps,
++      demandColors: Object.keys(demand).length, solePickableSupplyCars: soleN,
++      pipeQueueCars: pipeCars, coverage: pipeCars ? 'initial-board-cars-only' : 'all-cars' },
++    firstReachStep: firstReachStep, demand: demand, steps: steps,
++    items: order.map(function (k) { return items[k]; }) };
++};
++
++/** v494 · 实验排程：只换普通上盘车的 color/count；障碍、管道、容量与棋盘完全不动。 */
++AntSolver.CarSequencer.rescheduleByTimeline = function (level, timeline, config) {
++  config = config || {};
++  if (!level || !level.board || !timeline || !timeline.completed) return { level: null, plan: { applied: false, reason: 'incomplete-reference' } };
++  var microMax = config.microCarMax == null ? 2 : +config.microCarMax;
++  var wait = config.debtWaitTarget == null ? 3 : Math.max(1, +config.debtWaitTarget);
++  var tolerance = config.timelineTolerance == null ? 2 : Math.max(0, +config.timelineTolerance);
++  var out = JSON.parse(JSON.stringify(level)), cells = out.board.cells;
++  var byKey = {}; (timeline.items || []).forEach(function (x) { byKey[x.key] = x; });
++  var positions = [], cars = [], beforeTotals = {}, afterTotals = {};
++  for (var r = 0; r < out.board.rows; r++) for (var c = 0; c < out.board.cols; c++) {
++    var cell = cells[r][c];
++    if (!cell || cell.t !== 'box' || cell.chain || cell.numice || cell.q) continue;
++    var tm = byKey[r + ',' + c]; if (!tm) continue;
++    var ready = tm.readyStep == null ? timeline.routeSteps + 1 : tm.readyStep;
++    var target = Math.max(0, ready - (ready > 0 && cell.count > microMax ? wait : 0));
++    var activation = tm.activateStep == null ? timeline.routeSteps + 1 : tm.activateStep;
++    var pickStep = tm.pickStep == null ? timeline.routeSteps + 1 : tm.pickStep;
++    positions.push({ r: r, c: c, activation: activation, pickStep: pickStep });
++    cars.push({ color: cell.color, count: cell.count, target: target, frozen: Math.abs(pickStep - target) <= tolerance });
++    beforeTotals[cell.color] = (beforeTotals[cell.color] || 0) + cell.count;
++  }
++  if (cars.length < 2) return { level: null, plan: { applied: false, reason: 'insufficient-plain-cars', plainCars: cars.length } };
++  function cost(car, pos) {
++    var e = Math.abs(car.target - pos.pickStep), value = Math.min(e, 20) * Math.min(e, 20);
++    // 激活只是供给约束：希望在第 target 步取时必须先可用；早激活本身不罚。
++    if (pos.activation > car.target) value += (pos.activation - car.target) * 100;
++    return value;
++  }
++  function score() { var n = 0; for (var i = 0; i < cars.length; i++) n += cost(cars[i], positions[i]); return n; }
++  var beforeScore = score(), swaps = [], guard = 0;
++  while (guard++ < cars.length * 2) {
++    var best = null, bestDelta = 0;
++    for (var i = 0; i < cars.length; i++) for (var j = i + 1; j < cars.length; j++) {
++      if (cars[i].frozen && cars[j].frozen) continue;
++      var old = cost(cars[i], positions[i]) + cost(cars[j], positions[j]);
++      var neu = cost(cars[j], positions[i]) + cost(cars[i], positions[j]);
++      var delta = neu - old;
++      if (delta < bestDelta) { bestDelta = delta; best = [i, j]; }
++    }
++    if (!best) break;
++    var x = best[0], y = best[1], tmp = cars[x]; cars[x] = cars[y]; cars[y] = tmp;
++    swaps.push({ from: [positions[x].r, positions[x].c], to: [positions[y].r, positions[y].c],
++      color: cars[y].color, count: cars[y].count, delta: bestDelta });
++  }
++  for (var wi = 0; wi < cars.length; wi++) {
++    var dst = cells[positions[wi].r][positions[wi].c];
++    dst.color = cars[wi].color; dst.count = cars[wi].count;
++    afterTotals[dst.color] = (afterTotals[dst.color] || 0) + dst.count;
++  }
++  for (var col in beforeTotals) if (beforeTotals[col] !== afterTotals[col]) return { level: null, plan: { applied: false, reason: 'conservation-check-failed' } };
++  var afterScore = score();
++  if (!swaps.length || afterScore >= beforeScore) return { level: null, plan: { applied: false, reason: 'no-improving-swap', plainCars: cars.length, beforeScore: beforeScore } };
++  function obstacleSignature(lv) {
++    var sig = [];
++    for (var rr = 0; rr < lv.board.rows; rr++) for (var cc = 0; cc < lv.board.cols; cc++) {
++      var x = lv.board.cells[rr][cc];
++      if (!x) { sig.push('.'); continue; }
++      if (x.t === 'box') sig.push(['box', x.chain || 0, x.numice || 0, x.q ? 1 : 0, x.ice || 0]);
++      else sig.push(x); // 管道及 queue 原样参与比较。
++    }
++    return JSON.stringify(sig);
++  }
++  function capacityTotal(lv) {
++    var total = 0;
++    for (var rr = 0; rr < lv.board.rows; rr++) for (var cc = 0; cc < lv.board.cols; cc++) {
++      var x = lv.board.cells[rr][cc]; if (!x) continue;
++      if (x.t === 'box') total += x.count || 0;
++      else if (x.t === 'pipe' && x.queue) for (var qi = 0; qi < x.queue.length; qi++) total += x.queue[qi].count || 0;
++    }
++    return total;
++  }
++  var contract = { conserved: capacityTotal(level) === capacityTotal(out),
++    obstaclesPreserved: obstacleSignature(level) === obstacleSignature(out),
++    rows: out.board.rows, cols: out.board.cols,
++    boardFloorPass: out.board.rows >= 6 && out.board.cols >= 6 };
++  if (!contract.conserved || !contract.obstaclesPreserved) return { level: null, plan: { applied: false, reason: 'post-swap-contract-failed', contract: contract } };
++  return { level: out, plan: { schema: 'timeline-schedule-plan-v1', applied: true, plainCars: cars.length,
++    debtWaitTarget: wait, tolerance: tolerance, swaps: swaps.length, beforeScore: beforeScore, afterScore: afterScore,
++    frozenCars: cars.filter(function (x) { return x.frozen; }).length, contract: contract, details: swaps } };
++};
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 192174e..cc6b4d8 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -1417,7 +1417,7 @@ AntSolver.Generator = (function() {
+         var _guard = 0;
+         while (dims.rows * dims.cols - n > 2 && _guard++ < 6) {
+           var _r = dims.rows, _c = dims.cols, _done = false;
+-          var _ok = function (rr, cc) { var d = cc - rr; return d >= 1 && d <= 2 && rr >= 3 && cc >= 3 && rr * cc >= n; };
++          var _ok = function (rr, cc) { var d = cc - rr; return d >= 1 && d <= 2 && rr >= 6 && cc >= 6 && rr * cc >= n; };
+           if (_ok(_r, _c - 1)) { dims = { rows: _r, cols: _c - 1 }; _done = true; }
+           else if (_ok(_r - 1, _c)) { dims = { rows: _r - 1, cols: _c }; _done = true; }
+           if (!_done) break;
+@@ -2338,13 +2338,13 @@ AntSolver.Generator = (function() {
+         if (boardShapeOk(xr2, cMax + 1, !!config.boardAllowSquare)) inRange.push(ye);
+       }
+     }
+-    // 向下缩小候选：行从 rMin-1 一直缩到 3，列只取 行+1 / 行+2（天然满足形态约束）
++    // 向下缩小候选：行从 rMin-1 一直缩到 6，列只取 行+1 / 行+2（天然满足形态与最小尺寸合同）
+     // 【v316·用户裁决】开了棋盘硬范围（boardHardRange）就不许缩到范围外 ——
+     //   原来这条路径不看该开关，22 辆的图被缩成 3×8 的怪盘。
+-    for (rr = rMin - 1; config.boardHardRange ? false : rr >= 3; rr--) {
++    for (rr = rMin - 1; config.boardHardRange ? false : rr >= 6; rr--) {
+       for (var d = 1; d <= 2; d++) {
+         cc = rr + d;
+-        if (cc < 3) continue;
++        if (cc < 6) continue;
+         shrunk.push(evalPair(rr, cc));
+       }
+     }
+@@ -7958,10 +7958,79 @@ AntSolver.Generator = (function() {
+     return out;
+   }
+ 
++  function evaluateTimelineLevel(level, config) {
++    var parsed = null, sr = null;
++    try { parsed = AntSolver.parseLevel(level); } catch (e) { return { level: level, valid: false, config: config, reason: 'timeline-parse-failed' }; }
++    try { sr = AntSolver.Solver.solve(parsed, { capturePreviewStats: true, bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain }); }
++    catch (e) { return { level: level, valid: false, config: config, reason: 'timeline-solve-error' }; }
++    var structural = null;
++    try { structural = structuralDeadlockCheck(level.board); } catch (e) { structural = { ok: false, reason: String((e && e.message) || e) }; }
++    if (!sr || !sr.completed || !structural.ok) return { level: level, valid: false, solveResult: sr,
++      config: config, structural: structural, reason: 'timeline-not-solved' };
++    var generationEval = evaluateGeneration(sr, parsed, config);
++    var cand = { level: level, valid: true, solveResult: sr,
++      difficulty: computeDifficulty(sr, parsed, config, generationEval),
++      generationEval: generationEval, config: config, retries: 0, structural: structural,
++      timelineGenerated: true };
++    ensureCandidateQuality(cand);
++    try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(level, config || {}); }
++    catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
++    return cand;
++  }
++
++  /** v494：仅结构失败的有效参考关生成双时间线变体；每轮独立重解，比较统一走 candBetter。 */
++  function produceTimelineCompare(blocks, config) {
++    var t0 = Date.now();
++    var base = produce(blocks, Object.assign({}, config, { roleSchedule: false }));
++    auditRoleCandidate(base);
++    var pool = [base], role = null, reference = base;
++    // 无参考解时先复用 v492 首行角色候选；已有有效解则绝不额外双跑 role。
++    if (!base.valid) {
++      role = produce(blocks, Object.assign({}, config, { roleSchedule: true }));
++      auditRoleCandidate(role); pool.push(role);
++      if (role.valid && candBetter(role, base, config)) reference = role;
++    }
++    var attempts = [], current = reference;
++    var maxIterations = Math.max(1, Math.min(3, parseInt(config.timelineIterations, 10) || 2));
++    if (current && current.valid && !goalStructPass(current)) {
++      for (var round = 0; round < maxIterations; round++) {
++        var timeline = null, scheduled = null, variant = null;
++        try {
++          timeline = AntSolver.CarSequencer.dualTimeline(current.level, current.solveResult, current.config || config);
++          scheduled = AntSolver.CarSequencer.rescheduleByTimeline(current.level, timeline, config);
++          if (!scheduled.level) { attempts.push({ round: round + 1, applied: false, plan: scheduled.plan }); break; }
++          variant = evaluateTimelineLevel(scheduled.level, Object.assign({}, current.config || config, { roleSchedule: 'timelineCompare' }));
++          variant.timelineSchedule = scheduled.plan;
++          if (variant.valid) {
++            variant.carTimeline = AntSolver.CarSequencer.dualTimeline(variant.level, variant.solveResult, variant.config || config);
++            variant.debtTimeline = AntSolver.CarSequencer.debtTimeline(variant.level, variant.solveResult, variant.config || config);
++            auditRoleCandidate(variant); pool.push(variant);
++          }
++          attempts.push({ round: round + 1, applied: true, valid: !!variant.valid,
++            plan: scheduled.plan, quality: roleCompareSummary(variant),
++            debt: variant.debtTimeline ? variant.debtTimeline.summary : null });
++        } catch (e) {
++          attempts.push({ round: round + 1, applied: false, error: String((e && e.message) || e) }); break;
++        }
++        if (!variant || !variant.valid) break;
++        current = variant; // 下一轮使用新参考解，重新测量真实激活与需求窗口。
++      }
++    }
++    var out = base;
++    for (var i = 1; i < pool.length; i++) if (candBetter(pool[i], out, config)) out = pool[i];
++    out.timelineCompare = { schema: 'timeline-compare-v1', elapsedMs: Date.now() - t0,
++      base: roleCompareSummary(base), role: role ? roleCompareSummary(role) : null,
++      reference: reference === base ? 'base' : 'role', attempts: attempts,
++      generatedVariants: pool.length - (role ? 2 : 1), chosen: out === base ? 'base' : (out === role ? 'role' : 'timeline'),
++      skipped: attempts.length === 0 ? (out && goalStructPass(out) ? 'base-gate-pass' : 'no-valid-reference') : null };
++    return out;
++  }
++
+   function produce(blocks, config) {
+     seedRng(config && config.seed);
+     config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
+     if (config.roleSchedule === 'compare') return produceRoleCompare(blocks, config);
++    if (config.roleSchedule === 'timelineCompare') return produceTimelineCompare(blocks, config);
+     // 【v334】生成轨迹：每次评估一条，供界面"生成过程"面板回放
+     if (config.trace !== false) { if (!config._trace) config._trace = []; }
+     var K = Math.max(1, config.candidateCount || 1);
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\214\346\227\266\351\227\264\347\272\277.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\214\346\227\266\351\227\264\347\272\277.js"
+new file mode 100755
+index 0000000..eac18ef
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\214\346\227\266\351\227\264\347\272\277.js"
+@@ -0,0 +1,18 @@
++#!/usr/bin/env node
++/* 只读双时间线：node 03_工具/好关评分/双时间线.js <关卡.json> [--out 报告.json] */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const BIN = path.join(__dirname, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'solver-analysis.js', 'car-sequencer.js'];
++const sandbox = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON };
++vm.createContext(sandbox); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sandbox, { filename: f });
++const A = sandbox.AntSolver, file = process.argv[2]; if (!file) throw new Error('需要关卡 JSON');
++const out = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : '';
++const raw = JSON.parse(fs.readFileSync(file, 'utf8')), level = A.parseLevel(raw.spools ? A.fromGameFormat(raw) : raw);
++const solved = A.Solver.solve(level, { timeBudgetMs: 10000 });
++const result = A.CarSequencer.dualTimeline(level, solved);
++result.input = path.resolve(file); result.solverCompleted = !!solved.completed;
++if (out) fs.writeFileSync(out, JSON.stringify(result, null, 2) + '\n');
++console.log(JSON.stringify({ file, solverCompleted: result.solverCompleted, replayCompleted: result.completed,
++  reason: result.reason || null, summary: result.summary,
++  sample: (result.items || []).filter(x => x.opens.length || x.solePickableSupplySteps).slice(0, 5) }, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\214\346\227\266\351\227\264\347\272\277_\346\234\200\346\226\260006_v494.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\214\346\227\266\351\227\264\347\272\277_\346\234\200\346\226\260006_v494.json"
+new file mode 100644
+index 0000000..53886d6
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\214\346\227\266\351\227\264\347\272\277_\346\234\200\346\226\260006_v494.json"
+@@ -0,0 +1,2341 @@
++{
++  "schema": "dual-timeline-v1",
++  "completed": true,
++  "routeSteps": 34,
++  "summary": {
++    "cars": 38,
++    "activatedCars": 38,
++    "unlockOrActivationSteps": 23,
++    "demandColors": 13,
++    "solePickableSupplyCars": 28,
++    "pipeQueueCars": 0,
++    "coverage": "all-cars"
++  },
++  "firstReachStep": {
++    "4": 5,
++    "5": 0,
++    "13": 4,
++    "14": 9,
++    "15": 2,
++    "17": 1,
++    "21": 9,
++    "22": 9,
++    "28": 5,
++    "30": 0,
++    "31": 0,
++    "33": 16,
++    "34": 1
++  },
++  "demand": {
++    "4": [
++      {
++        "step": 5,
++        "added": 11,
++        "available": 11
++      },
++      {
++        "step": 6,
++        "added": 7,
++        "available": 18
++      },
++      {
++        "step": 16,
++        "added": 38,
++        "available": 56
++      },
++      {
++        "step": 19,
++        "added": 5,
++        "available": 61
++      }
++    ],
++    "5": [
++      {
++        "step": 0,
++        "added": 30,
++        "available": 30
++      },
++      {
++        "step": 1,
++        "added": 8,
++        "available": 38
++      },
++      {
++        "step": 5,
++        "added": 3,
++        "available": 41
++      },
++      {
++        "step": 9,
++        "added": 1,
++        "available": 42
++      },
++      {
++        "step": 14,
++        "added": 7,
++        "available": 49
++      },
++      {
++        "step": 16,
++        "added": 12,
++        "available": 61
++      },
++      {
++        "step": 18,
++        "added": 15,
++        "available": 76
++      },
++      {
++        "step": 19,
++        "added": 10,
++        "available": 86
++      },
++      {
++        "step": 26,
++        "added": 11,
++        "available": 97
++      },
++      {
++        "step": 30,
++        "added": 6,
++        "available": 103
++      }
++    ],
++    "13": [
++      {
++        "step": 4,
++        "added": 30,
++        "available": 30
++      },
++      {
++        "step": 6,
++        "added": 4,
++        "available": 34
++      },
++      {
++        "step": 9,
++        "added": 2,
++        "available": 36
++      },
++      {
++        "step": 12,
++        "added": 9,
++        "available": 45
++      },
++      {
++        "step": 16,
++        "added": 9,
++        "available": 54
++      },
++      {
++        "step": 19,
++        "added": 1,
++        "available": 55
++      }
++    ],
++    "14": [
++      {
++        "step": 9,
++        "added": 54,
++        "available": 54
++      },
++      {
++        "step": 16,
++        "added": 4,
++        "available": 58
++      },
++      {
++        "step": 23,
++        "added": 1,
++        "available": 59
++      },
++      {
++        "step": 24,
++        "added": 2,
++        "available": 61
++      },
++      {
++        "step": 26,
++        "added": 1,
++        "available": 62
++      },
++      {
++        "step": 27,
++        "added": 6,
++        "available": 68
++      },
++      {
++        "step": 28,
++        "added": 16,
++        "available": 84
++      },
++      {
++        "step": 30,
++        "added": 3,
++        "available": 87
++      },
++      {
++        "step": 34,
++        "added": 2,
++        "available": 89
++      }
++    ],
++    "15": [
++      {
++        "step": 2,
++        "added": 58,
++        "available": 58
++      },
++      {
++        "step": 4,
++        "added": 12,
++        "available": 70
++      },
++      {
++        "step": 10,
++        "added": 5,
++        "available": 75
++      },
++      {
++        "step": 11,
++        "added": 13,
++        "available": 88
++      },
++      {
++        "step": 14,
++        "added": 28,
++        "available": 116
++      },
++      {
++        "step": 19,
++        "added": 10,
++        "available": 126
++      },
++      {
++        "step": 24,
++        "added": 1,
++        "available": 127
++      },
++      {
++        "step": 26,
++        "added": 4,
++        "available": 131
++      },
++      {
++        "step": 27,
++        "added": 28,
++        "available": 159
++      },
++      {
++        "step": 30,
++        "added": 12,
++        "available": 171
++      }
++    ],
++    "17": [
++      {
++        "step": 1,
++        "added": 16,
++        "available": 16
++      },
++      {
++        "step": 2,
++        "added": 14,
++        "available": 30
++      },
++      {
++        "step": 6,
++        "added": 20,
++        "available": 50
++      },
++      {
++        "step": 8,
++        "added": 4,
++        "available": 54
++      },
++      {
++        "step": 9,
++        "added": 4,
++        "available": 58
++      },
++      {
++        "step": 19,
++        "added": 7,
++        "available": 65
++      },
++      {
++        "step": 21,
++        "added": 1,
++        "available": 66
++      },
++      {
++        "step": 22,
++        "added": 10,
++        "available": 76
++      }
++    ],
++    "21": [
++      {
++        "step": 9,
++        "added": 26,
++        "available": 26
++      },
++      {
++        "step": 10,
++        "added": 2,
++        "available": 28
++      },
++      {
++        "step": 16,
++        "added": 2,
++        "available": 30
++      },
++      {
++        "step": 24,
++        "added": 6,
++        "available": 36
++      }
++    ],
++    "22": [
++      {
++        "step": 9,
++        "added": 3,
++        "available": 3
++      },
++      {
++        "step": 16,
++        "added": 13,
++        "available": 16
++      },
++      {
++        "step": 25,
++        "added": 4,
++        "available": 20
++      },
++      {
++        "step": 28,
++        "added": 2,
++        "available": 22
++      },
++      {
++        "step": 30,
++        "added": 12,
++        "available": 34
++      },
++      {
++        "step": 33,
++        "added": 1,
++        "available": 35
++      }
++    ],
++    "28": [
++      {
++        "step": 5,
++        "added": 15,
++        "available": 15
++      },
++      {
++        "step": 16,
++        "added": 5,
++        "available": 20
++      },
++      {
++        "step": 27,
++        "added": 49,
++        "available": 69
++      }
++    ],
++    "30": [
++      {
++        "step": 0,
++        "added": 30,
++        "available": 30
++      },
++      {
++        "step": 1,
++        "added": 25,
++        "available": 55
++      },
++      {
++        "step": 8,
++        "added": 3,
++        "available": 58
++      },
++      {
++        "step": 9,
++        "added": 20,
++        "available": 78
++      },
++      {
++        "step": 12,
++        "added": 16,
++        "available": 94
++      },
++      {
++        "step": 16,
++        "added": 24,
++        "available": 118
++      },
++      {
++        "step": 18,
++        "added": 1,
++        "available": 119
++      },
++      {
++        "step": 20,
++        "added": 5,
++        "available": 124
++      },
++      {
++        "step": 22,
++        "added": 11,
++        "available": 135
++      }
++    ],
++    "31": [
++      {
++        "step": 0,
++        "added": 76,
++        "available": 76
++      },
++      {
++        "step": 2,
++        "added": 59,
++        "available": 135
++      },
++      {
++        "step": 3,
++        "added": 57,
++        "available": 192
++      },
++      {
++        "step": 4,
++        "added": 46,
++        "available": 238
++      },
++      {
++        "step": 8,
++        "added": 3,
++        "available": 241
++      },
++      {
++        "step": 9,
++        "added": 18,
++        "available": 259
++      },
++      {
++        "step": 10,
++        "added": 3,
++        "available": 262
++      },
++      {
++        "step": 12,
++        "added": 23,
++        "available": 285
++      },
++      {
++        "step": 19,
++        "added": 2,
++        "available": 287
++      },
++      {
++        "step": 20,
++        "added": 1,
++        "available": 288
++      },
++      {
++        "step": 24,
++        "added": 2,
++        "available": 290
++      },
++      {
++        "step": 25,
++        "added": 4,
++        "available": 294
++      },
++      {
++        "step": 28,
++        "added": 5,
++        "available": 299
++      },
++      {
++        "step": 30,
++        "added": 2,
++        "available": 301
++      },
++      {
++        "step": 33,
++        "added": 3,
++        "available": 304
++      }
++    ],
++    "33": [
++      {
++        "step": 16,
++        "added": 7,
++        "available": 7
++      },
++      {
++        "step": 23,
++        "added": 12,
++        "available": 19
++      },
++      {
++        "step": 26,
++        "added": 17,
++        "available": 36
++      },
++      {
++        "step": 30,
++        "added": 5,
++        "available": 41
++      }
++    ],
++    "34": [
++      {
++        "step": 1,
++        "added": 5,
++        "available": 5
++      },
++      {
++        "step": 2,
++        "added": 8,
++        "available": 13
++      },
++      {
++        "step": 3,
++        "added": 9,
++        "available": 22
++      },
++      {
++        "step": 6,
++        "added": 5,
++        "available": 27
++      },
++      {
++        "step": 7,
++        "added": 5,
++        "available": 32
++      },
++      {
++        "step": 12,
++        "added": 2,
++        "available": 34
++      },
++      {
++        "step": 13,
++        "added": 6,
++        "available": 40
++      },
++      {
++        "step": 17,
++        "added": 10,
++        "available": 50
++      }
++    ]
++  },
++  "steps": [
++    {
++      "step": 0,
++      "available": {
++        "4": 0,
++        "5": 30,
++        "13": 0,
++        "14": 0,
++        "15": 0,
++        "17": 0,
++        "21": 0,
++        "22": 0,
++        "28": 0,
++        "30": 30,
++        "31": 76,
++        "33": 0,
++        "34": 0
++      },
++      "added": {
++        "5": 30,
++        "30": 30,
++        "31": 76
++      },
++      "activated": [
++        "0,0",
++        "0,1",
++        "0,2",
++        "0,3",
++        "0,4",
++        "0,5",
++        "0,6"
++      ],
++      "removed": [],
++      "actionColor": null,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 0
++    },
++    {
++      "step": 1,
++      "available": {
++        "4": 0,
++        "5": 38,
++        "13": 0,
++        "14": 0,
++        "15": 0,
++        "17": 16,
++        "21": 0,
++        "22": 0,
++        "28": 0,
++        "30": 55,
++        "31": 76,
++        "33": 0,
++        "34": 5
++      },
++      "added": {
++        "5": 8,
++        "17": 16,
++        "30": 25,
++        "34": 5
++      },
++      "activated": [
++        "1,0"
++      ],
++      "removed": [
++        "0,0"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [
++        17,
++        34
++      ],
++      "buffer": 0,
++      "eliminated": 34
++    },
++    {
++      "step": 2,
++      "available": {
++        "4": 0,
++        "5": 38,
++        "13": 0,
++        "14": 0,
++        "15": 58,
++        "17": 30,
++        "21": 0,
++        "22": 0,
++        "28": 0,
++        "30": 55,
++        "31": 135,
++        "33": 0,
++        "34": 13
++      },
++      "added": {
++        "15": 58,
++        "17": 14,
++        "31": 59,
++        "34": 8
++      },
++      "activated": [],
++      "removed": [
++        "0,3"
++      ],
++      "actionColor": 30,
++      "unlockedColors": [
++        15
++      ],
++      "buffer": 0,
++      "eliminated": 68
++    },
++    {
++      "step": 3,
++      "available": {
++        "4": 0,
++        "5": 38,
++        "13": 0,
++        "14": 0,
++        "15": 58,
++        "17": 30,
++        "21": 0,
++        "22": 0,
++        "28": 0,
++        "30": 55,
++        "31": 192,
++        "33": 0,
++        "34": 22
++      },
++      "added": {
++        "31": 57,
++        "34": 9
++      },
++      "activated": [
++        "1,5"
++      ],
++      "removed": [
++        "0,5"
++      ],
++      "actionColor": 5,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 102
++    },
++    {
++      "step": 4,
++      "available": {
++        "4": 0,
++        "5": 38,
++        "13": 30,
++        "14": 0,
++        "15": 70,
++        "17": 30,
++        "21": 0,
++        "22": 0,
++        "28": 0,
++        "30": 55,
++        "31": 238,
++        "33": 0,
++        "34": 22
++      },
++      "added": {
++        "13": 30,
++        "15": 12,
++        "31": 46
++      },
++      "activated": [
++        "1,2"
++      ],
++      "removed": [
++        "0,2"
++      ],
++      "actionColor": 17,
++      "unlockedColors": [
++        13
++      ],
++      "buffer": 1,
++      "eliminated": 132
++    },
++    {
++      "step": 5,
++      "available": {
++        "4": 11,
++        "5": 41,
++        "13": 30,
++        "14": 0,
++        "15": 70,
++        "17": 30,
++        "21": 0,
++        "22": 0,
++        "28": 15,
++        "30": 55,
++        "31": 238,
++        "33": 0,
++        "34": 22
++      },
++      "added": {
++        "4": 11,
++        "5": 3,
++        "28": 15
++      },
++      "activated": [
++        "1,1",
++        "2,2"
++      ],
++      "removed": [
++        "1,2"
++      ],
++      "actionColor": 34,
++      "unlockedColors": [
++        4,
++        28
++      ],
++      "buffer": 2,
++      "eliminated": 154
++    },
++    {
++      "step": 6,
++      "available": {
++        "4": 18,
++        "5": 41,
++        "13": 34,
++        "14": 0,
++        "15": 70,
++        "17": 50,
++        "21": 0,
++        "22": 0,
++        "28": 15,
++        "30": 55,
++        "31": 238,
++        "33": 0,
++        "34": 27
++      },
++      "added": {
++        "4": 7,
++        "13": 4,
++        "17": 20,
++        "34": 5
++      },
++      "activated": [
++        "2,1"
++      ],
++      "removed": [
++        "1,1"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 199
++    },
++    {
++      "step": 7,
++      "available": {
++        "4": 18,
++        "5": 41,
++        "13": 34,
++        "14": 0,
++        "15": 70,
++        "17": 50,
++        "21": 0,
++        "22": 0,
++        "28": 15,
++        "30": 55,
++        "31": 238,
++        "33": 0,
++        "34": 32
++      },
++      "added": {
++        "34": 5
++      },
++      "activated": [
++        "2,0"
++      ],
++      "removed": [
++        "1,0"
++      ],
++      "actionColor": 30,
++      "unlockedColors": [],
++      "buffer": 1,
++      "eliminated": 220
++    },
++    {
++      "step": 8,
++      "available": {
++        "4": 18,
++        "5": 41,
++        "13": 34,
++        "14": 0,
++        "15": 70,
++        "17": 54,
++        "21": 0,
++        "22": 0,
++        "28": 15,
++        "30": 58,
++        "31": 241,
++        "33": 0,
++        "34": 32
++      },
++      "added": {
++        "17": 4,
++        "30": 3,
++        "31": 3
++      },
++      "activated": [
++        "3,0"
++      ],
++      "removed": [
++        "2,0"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [],
++      "buffer": 1,
++      "eliminated": 251
++    },
++    {
++      "step": 9,
++      "available": {
++        "4": 18,
++        "5": 42,
++        "13": 36,
++        "14": 54,
++        "15": 70,
++        "17": 58,
++        "21": 26,
++        "22": 3,
++        "28": 15,
++        "30": 78,
++        "31": 259,
++        "33": 0,
++        "34": 32
++      },
++      "added": {
++        "5": 1,
++        "13": 2,
++        "14": 54,
++        "17": 4,
++        "21": 26,
++        "22": 3,
++        "30": 20,
++        "31": 18
++      },
++      "activated": [
++        "3,1",
++        "4,0"
++      ],
++      "removed": [
++        "3,0"
++      ],
++      "actionColor": 15,
++      "unlockedColors": [
++        14,
++        21,
++        22
++      ],
++      "buffer": 0,
++      "eliminated": 300
++    },
++    {
++      "step": 10,
++      "available": {
++        "4": 18,
++        "5": 42,
++        "13": 36,
++        "14": 54,
++        "15": 75,
++        "17": 58,
++        "21": 28,
++        "22": 3,
++        "28": 15,
++        "30": 78,
++        "31": 262,
++        "33": 0,
++        "34": 32
++      },
++      "added": {
++        "15": 5,
++        "21": 2,
++        "31": 3
++      },
++      "activated": [],
++      "removed": [
++        "2,1"
++      ],
++      "actionColor": 14,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 329
++    },
++    {
++      "step": 11,
++      "available": {
++        "4": 18,
++        "5": 42,
++        "13": 36,
++        "14": 54,
++        "15": 88,
++        "17": 58,
++        "21": 28,
++        "22": 3,
++        "28": 15,
++        "30": 78,
++        "31": 262,
++        "33": 0,
++        "34": 32
++      },
++      "added": {
++        "15": 13
++      },
++      "activated": [
++        "3,2",
++        "4,1"
++      ],
++      "removed": [
++        "3,1"
++      ],
++      "actionColor": 21,
++      "unlockedColors": [],
++      "buffer": 1,
++      "eliminated": 357
++    },
++    {
++      "step": 12,
++      "available": {
++        "4": 18,
++        "5": 42,
++        "13": 45,
++        "14": 54,
++        "15": 88,
++        "17": 58,
++        "21": 28,
++        "22": 3,
++        "28": 15,
++        "30": 94,
++        "31": 285,
++        "33": 0,
++        "34": 34
++      },
++      "added": {
++        "13": 9,
++        "30": 16,
++        "31": 23,
++        "34": 2
++      },
++      "activated": [
++        "3,3",
++        "4,2"
++      ],
++      "removed": [
++        "3,2"
++      ],
++      "actionColor": 17,
++      "unlockedColors": [],
++      "buffer": 2,
++      "eliminated": 377
++    },
++    {
++      "step": 13,
++      "available": {
++        "4": 18,
++        "5": 42,
++        "13": 45,
++        "14": 54,
++        "15": 88,
++        "17": 58,
++        "21": 28,
++        "22": 3,
++        "28": 15,
++        "30": 94,
++        "31": 285,
++        "33": 0,
++        "34": 40
++      },
++      "added": {
++        "34": 6
++      },
++      "activated": [
++        "5,1"
++      ],
++      "removed": [
++        "4,1"
++      ],
++      "actionColor": 30,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 403
++    },
++    {
++      "step": 14,
++      "available": {
++        "4": 18,
++        "5": 49,
++        "13": 45,
++        "14": 54,
++        "15": 116,
++        "17": 58,
++        "21": 28,
++        "22": 3,
++        "28": 15,
++        "30": 94,
++        "31": 285,
++        "33": 0,
++        "34": 40
++      },
++      "added": {
++        "5": 7,
++        "15": 28
++      },
++      "activated": [],
++      "removed": [
++        "0,1"
++      ],
++      "actionColor": 4,
++      "unlockedColors": [],
++      "buffer": 4,
++      "eliminated": 421
++    },
++    {
++      "step": 15,
++      "available": {
++        "4": 18,
++        "5": 49,
++        "13": 45,
++        "14": 54,
++        "15": 116,
++        "17": 58,
++        "21": 28,
++        "22": 3,
++        "28": 15,
++        "30": 94,
++        "31": 285,
++        "33": 0,
++        "34": 40
++      },
++      "added": {},
++      "activated": [
++        "1,4"
++      ],
++      "removed": [
++        "0,4"
++      ],
++      "actionColor": 28,
++      "unlockedColors": [],
++      "buffer": 5,
++      "eliminated": 436
++    },
++    {
++      "step": 16,
++      "available": {
++        "4": 56,
++        "5": 61,
++        "13": 54,
++        "14": 58,
++        "15": 116,
++        "17": 58,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 118,
++        "31": 285,
++        "33": 7,
++        "34": 40
++      },
++      "added": {
++        "4": 38,
++        "5": 12,
++        "13": 9,
++        "14": 4,
++        "21": 2,
++        "22": 13,
++        "28": 5,
++        "30": 24,
++        "33": 7
++      },
++      "activated": [
++        "2,4"
++      ],
++      "removed": [
++        "1,4"
++      ],
++      "actionColor": 15,
++      "unlockedColors": [
++        33
++      ],
++      "buffer": 3,
++      "eliminated": 501
++    },
++    {
++      "step": 17,
++      "available": {
++        "4": 56,
++        "5": 61,
++        "13": 54,
++        "14": 58,
++        "15": 116,
++        "17": 58,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 118,
++        "31": 285,
++        "33": 7,
++        "34": 50
++      },
++      "added": {
++        "34": 10
++      },
++      "activated": [
++        "5,0"
++      ],
++      "removed": [
++        "4,0"
++      ],
++      "actionColor": 5,
++      "unlockedColors": [],
++      "buffer": 4,
++      "eliminated": 528
++    },
++    {
++      "step": 18,
++      "available": {
++        "4": 56,
++        "5": 76,
++        "13": 54,
++        "14": 58,
++        "15": 116,
++        "17": 58,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 119,
++        "31": 285,
++        "33": 7,
++        "34": 50
++      },
++      "added": {
++        "5": 15,
++        "30": 1
++      },
++      "activated": [
++        "2,3",
++        "2,5",
++        "3,4"
++      ],
++      "removed": [
++        "2,4"
++      ],
++      "actionColor": 34,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 560
++    },
++    {
++      "step": 19,
++      "available": {
++        "4": 61,
++        "5": 86,
++        "13": 55,
++        "14": 58,
++        "15": 126,
++        "17": 65,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 119,
++        "31": 287,
++        "33": 7,
++        "34": 50
++      },
++      "added": {
++        "4": 5,
++        "5": 10,
++        "13": 1,
++        "15": 10,
++        "17": 7,
++        "31": 2
++      },
++      "activated": [],
++      "removed": [
++        "2,3"
++      ],
++      "actionColor": 13,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 595
++    },
++    {
++      "step": 20,
++      "available": {
++        "4": 61,
++        "5": 86,
++        "13": 55,
++        "14": 58,
++        "15": 126,
++        "17": 65,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 124,
++        "31": 288,
++        "33": 7,
++        "34": 50
++      },
++      "added": {
++        "30": 5,
++        "31": 1
++      },
++      "activated": [],
++      "removed": [
++        "5,0"
++      ],
++      "actionColor": 4,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 626
++    },
++    {
++      "step": 21,
++      "available": {
++        "4": 61,
++        "5": 86,
++        "13": 55,
++        "14": 58,
++        "15": 126,
++        "17": 66,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 124,
++        "31": 288,
++        "33": 7,
++        "34": 50
++      },
++      "added": {
++        "17": 1
++      },
++      "activated": [
++        "3,5",
++        "4,4"
++      ],
++      "removed": [
++        "3,4"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 654
++    },
++    {
++      "step": 22,
++      "available": {
++        "4": 61,
++        "5": 86,
++        "13": 55,
++        "14": 58,
++        "15": 126,
++        "17": 76,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 135,
++        "31": 288,
++        "33": 7,
++        "34": 50
++      },
++      "added": {
++        "17": 10,
++        "30": 11
++      },
++      "activated": [
++        "4,5",
++        "5,4"
++      ],
++      "removed": [
++        "4,4"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [],
++      "buffer": 2,
++      "eliminated": 702
++    },
++    {
++      "step": 23,
++      "available": {
++        "4": 61,
++        "5": 86,
++        "13": 55,
++        "14": 59,
++        "15": 126,
++        "17": 76,
++        "21": 30,
++        "22": 16,
++        "28": 20,
++        "30": 135,
++        "31": 288,
++        "33": 19,
++        "34": 50
++      },
++      "added": {
++        "14": 1,
++        "33": 12
++      },
++      "activated": [
++        "5,3"
++      ],
++      "removed": [
++        "5,4"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [],
++      "buffer": 2,
++      "eliminated": 740
++    },
++    {
++      "step": 24,
++      "available": {
++        "4": 61,
++        "5": 86,
++        "13": 55,
++        "14": 61,
++        "15": 127,
++        "17": 76,
++        "21": 36,
++        "22": 16,
++        "28": 20,
++        "30": 135,
++        "31": 290,
++        "33": 19,
++        "34": 50
++      },
++      "added": {
++        "14": 2,
++        "15": 1,
++        "21": 6,
++        "31": 2
++      },
++      "activated": [
++        "2,6"
++      ],
++      "removed": [
++        "2,5"
++      ],
++      "actionColor": 14,
++      "unlockedColors": [],
++      "buffer": 1,
++      "eliminated": 776
++    },
++    {
++      "step": 25,
++      "available": {
++        "4": 61,
++        "5": 86,
++        "13": 55,
++        "14": 61,
++        "15": 127,
++        "17": 76,
++        "21": 36,
++        "22": 20,
++        "28": 20,
++        "30": 135,
++        "31": 294,
++        "33": 19,
++        "34": 50
++      },
++      "added": {
++        "22": 4,
++        "31": 4
++      },
++      "activated": [
++        "1,6",
++        "3,6"
++      ],
++      "removed": [
++        "2,6"
++      ],
++      "actionColor": 15,
++      "unlockedColors": [],
++      "buffer": 1,
++      "eliminated": 816
++    },
++    {
++      "step": 26,
++      "available": {
++        "4": 61,
++        "5": 97,
++        "13": 55,
++        "14": 62,
++        "15": 131,
++        "17": 76,
++        "21": 36,
++        "22": 20,
++        "28": 20,
++        "30": 135,
++        "31": 294,
++        "33": 36,
++        "34": 50
++      },
++      "added": {
++        "5": 11,
++        "14": 1,
++        "15": 4,
++        "33": 17
++      },
++      "activated": [],
++      "removed": [
++        "0,6",
++        "1,5",
++        "1,6"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [],
++      "buffer": 1,
++      "eliminated": 920
++    },
++    {
++      "step": 27,
++      "available": {
++        "4": 61,
++        "5": 97,
++        "13": 55,
++        "14": 68,
++        "15": 159,
++        "17": 76,
++        "21": 36,
++        "22": 20,
++        "28": 69,
++        "30": 135,
++        "31": 294,
++        "33": 36,
++        "34": 50
++      },
++      "added": {
++        "14": 6,
++        "15": 28,
++        "28": 49
++      },
++      "activated": [],
++      "removed": [
++        "2,2"
++      ],
++      "actionColor": 33,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 955
++    },
++    {
++      "step": 28,
++      "available": {
++        "4": 61,
++        "5": 97,
++        "13": 55,
++        "14": 84,
++        "15": 159,
++        "17": 76,
++        "21": 36,
++        "22": 22,
++        "28": 69,
++        "30": 135,
++        "31": 299,
++        "33": 36,
++        "34": 50
++      },
++      "added": {
++        "14": 16,
++        "22": 2,
++        "31": 5
++      },
++      "activated": [
++        "4,6"
++      ],
++      "removed": [
++        "4,5"
++      ],
++      "actionColor": 15,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 982
++    },
++    {
++      "step": 29,
++      "available": {
++        "4": 61,
++        "5": 97,
++        "13": 55,
++        "14": 84,
++        "15": 159,
++        "17": 76,
++        "21": 36,
++        "22": 22,
++        "28": 69,
++        "30": 135,
++        "31": 299,
++        "33": 36,
++        "34": 50
++      },
++      "added": {},
++      "activated": [
++        "5,2"
++      ],
++      "removed": [
++        "5,3"
++      ],
++      "actionColor": 13,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 1009
++    },
++    {
++      "step": 30,
++      "available": {
++        "4": 61,
++        "5": 103,
++        "13": 55,
++        "14": 87,
++        "15": 171,
++        "17": 76,
++        "21": 36,
++        "22": 34,
++        "28": 69,
++        "30": 135,
++        "31": 301,
++        "33": 41,
++        "34": 50
++      },
++      "added": {
++        "5": 6,
++        "14": 3,
++        "15": 12,
++        "22": 12,
++        "31": 2,
++        "33": 5
++      },
++      "activated": [],
++      "removed": [
++        "4,2",
++        "5,1",
++        "5,2"
++      ],
++      "actionColor": 28,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 1104
++    },
++    {
++      "step": 31,
++      "available": {
++        "4": 61,
++        "5": 103,
++        "13": 55,
++        "14": 87,
++        "15": 171,
++        "17": 76,
++        "21": 36,
++        "22": 34,
++        "28": 69,
++        "30": 135,
++        "31": 301,
++        "33": 41,
++        "34": 50
++      },
++      "added": {},
++      "activated": [],
++      "removed": [
++        "4,6"
++      ],
++      "actionColor": 5,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 1139
++    },
++    {
++      "step": 32,
++      "available": {
++        "4": 61,
++        "5": 103,
++        "13": 55,
++        "14": 87,
++        "15": 171,
++        "17": 76,
++        "21": 36,
++        "22": 34,
++        "28": 69,
++        "30": 135,
++        "31": 301,
++        "33": 41,
++        "34": 50
++      },
++      "added": {},
++      "activated": [],
++      "removed": [
++        "3,3"
++      ],
++      "actionColor": 33,
++      "unlockedColors": [],
++      "buffer": 3,
++      "eliminated": 1159
++    },
++    {
++      "step": 33,
++      "available": {
++        "4": 61,
++        "5": 103,
++        "13": 55,
++        "14": 87,
++        "15": 171,
++        "17": 76,
++        "21": 36,
++        "22": 35,
++        "28": 69,
++        "30": 135,
++        "31": 304,
++        "33": 41,
++        "34": 50
++      },
++      "added": {
++        "22": 1,
++        "31": 3
++      },
++      "activated": [],
++      "removed": [
++        "3,6"
++      ],
++      "actionColor": 14,
++      "unlockedColors": [],
++      "buffer": 1,
++      "eliminated": 1188
++    },
++    {
++      "step": 34,
++      "available": {
++        "4": 61,
++        "5": 103,
++        "13": 55,
++        "14": 89,
++        "15": 171,
++        "17": 76,
++        "21": 36,
++        "22": 35,
++        "28": 69,
++        "30": 135,
++        "31": 304,
++        "33": 41,
++        "34": 50
++      },
++      "added": {
++        "14": 2
++      },
++      "activated": [],
++      "removed": [
++        "3,5"
++      ],
++      "actionColor": 31,
++      "unlockedColors": [],
++      "buffer": 0,
++      "eliminated": 1225
++    }
++  ],
++  "items": [
++    {
++      "key": "0,0",
++      "r": 0,
++      "c": 0,
++      "color": 31,
++      "count": 34,
++      "activateStep": 0,
++      "pickStep": 1,
++      "removedStep": 1,
++      "openedBy": [],
++      "opens": [
++        "1,0"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 0
++    },
++    {
++      "key": "0,1",
++      "r": 0,
++      "c": 1,
++      "color": 4,
++      "count": 30,
++      "activateStep": 0,
++      "pickStep": 14,
++      "removedStep": 14,
++      "openedBy": [],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 16
++    },
++    {
++      "key": "0,2",
++      "r": 0,
++      "c": 2,
++      "color": 17,
++      "count": 38,
++      "activateStep": 0,
++      "pickStep": 4,
++      "removedStep": 4,
++      "openedBy": [],
++      "opens": [
++        "1,2"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 6
++    },
++    {
++      "key": "0,3",
++      "r": 0,
++      "c": 3,
++      "color": 30,
++      "count": 34,
++      "activateStep": 0,
++      "pickStep": 2,
++      "removedStep": 2,
++      "openedBy": [],
++      "opens": [],
++      "solePickableSupplySteps": 0,
++      "readyStep": 1
++    },
++    {
++      "key": "0,4",
++      "r": 0,
++      "c": 4,
++      "color": 28,
++      "count": 34,
++      "activateStep": 0,
++      "pickStep": 15,
++      "removedStep": 15,
++      "openedBy": [],
++      "opens": [
++        "1,4"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 27
++    },
++    {
++      "key": "0,5",
++      "r": 0,
++      "c": 5,
++      "color": 5,
++      "count": 34,
++      "activateStep": 0,
++      "pickStep": 3,
++      "removedStep": 3,
++      "openedBy": [],
++      "opens": [
++        "1,5"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 1
++    },
++    {
++      "key": "0,6",
++      "r": 0,
++      "c": 6,
++      "color": 31,
++      "count": 35,
++      "activateStep": 0,
++      "pickStep": 26,
++      "removedStep": 26,
++      "openedBy": [],
++      "opens": [],
++      "solePickableSupplySteps": 0,
++      "readyStep": 0
++    },
++    {
++      "key": "1,0",
++      "r": 1,
++      "c": 0,
++      "color": 30,
++      "count": 34,
++      "activateStep": 1,
++      "pickStep": 7,
++      "removedStep": 7,
++      "openedBy": [
++        "0,0"
++      ],
++      "opens": [
++        "2,0"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 1
++    },
++    {
++      "key": "1,1",
++      "r": 1,
++      "c": 1,
++      "color": 31,
++      "count": 34,
++      "activateStep": 5,
++      "pickStep": 6,
++      "removedStep": 6,
++      "openedBy": [
++        "1,2"
++      ],
++      "opens": [
++        "2,1"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 0
++    },
++    {
++      "key": "1,2",
++      "r": 1,
++      "c": 2,
++      "color": 34,
++      "count": 25,
++      "activateStep": 4,
++      "pickStep": 5,
++      "removedStep": 5,
++      "openedBy": [
++        "0,2"
++      ],
++      "opens": [
++        "1,1",
++        "2,2"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 6
++    },
++    {
++      "key": "1,4",
++      "r": 1,
++      "c": 4,
++      "color": 15,
++      "count": 39,
++      "activateStep": 15,
++      "pickStep": 16,
++      "removedStep": 16,
++      "openedBy": [
++        "0,4"
++      ],
++      "opens": [
++        "2,4"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 2
++    },
++    {
++      "key": "1,5",
++      "r": 1,
++      "c": 5,
++      "color": 31,
++      "count": 35,
++      "activateStep": 3,
++      "pickStep": 26,
++      "removedStep": 26,
++      "openedBy": [
++        "0,5"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 0,
++      "readyStep": 0
++    },
++    {
++      "key": "1,6",
++      "r": 1,
++      "c": 6,
++      "color": 30,
++      "count": 34,
++      "activateStep": 25,
++      "pickStep": 26,
++      "removedStep": 26,
++      "openedBy": [
++        "2,6"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 0,
++      "readyStep": 1
++    },
++    {
++      "key": "2,0",
++      "r": 2,
++      "c": 0,
++      "color": 31,
++      "count": 28,
++      "activateStep": 7,
++      "pickStep": 8,
++      "removedStep": 8,
++      "openedBy": [
++        "1,0"
++      ],
++      "opens": [
++        "3,0"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 0
++    },
++    {
++      "key": "2,1",
++      "r": 2,
++      "c": 1,
++      "color": 14,
++      "count": 29,
++      "activateStep": 6,
++      "pickStep": 10,
++      "removedStep": 10,
++      "openedBy": [
++        "1,1"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 9
++    },
++    {
++      "key": "2,2",
++      "r": 2,
++      "c": 2,
++      "color": 33,
++      "count": 21,
++      "activateStep": 5,
++      "pickStep": 27,
++      "removedStep": 27,
++      "openedBy": [
++        "1,2"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 0,
++      "readyStep": 26
++    },
++    {
++      "key": "2,3",
++      "r": 2,
++      "c": 3,
++      "color": 13,
++      "count": 28,
++      "activateStep": 18,
++      "pickStep": 19,
++      "removedStep": 19,
++      "openedBy": [
++        "2,4"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 4
++    },
++    {
++      "key": "2,4",
++      "r": 2,
++      "c": 4,
++      "color": 34,
++      "count": 25,
++      "activateStep": 16,
++      "pickStep": 18,
++      "removedStep": 18,
++      "openedBy": [
++        "1,4"
++      ],
++      "opens": [
++        "2,3",
++        "2,5",
++        "3,4"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 6
++    },
++    {
++      "key": "2,5",
++      "r": 2,
++      "c": 5,
++      "color": 14,
++      "count": 30,
++      "activateStep": 18,
++      "pickStep": 24,
++      "removedStep": 24,
++      "openedBy": [
++        "2,4"
++      ],
++      "opens": [
++        "2,6"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 9
++    },
++    {
++      "key": "2,6",
++      "r": 2,
++      "c": 6,
++      "color": 15,
++      "count": 40,
++      "activateStep": 24,
++      "pickStep": 25,
++      "removedStep": 25,
++      "openedBy": [
++        "2,5"
++      ],
++      "opens": [
++        "1,6",
++        "3,6"
++      ],
++      "solePickableSupplySteps": 0,
++      "readyStep": 2
++    },
++    {
++      "key": "3,0",
++      "r": 3,
++      "c": 0,
++      "color": 15,
++      "count": 39,
++      "activateStep": 8,
++      "pickStep": 9,
++      "removedStep": 9,
++      "openedBy": [
++        "2,0"
++      ],
++      "opens": [
++        "3,1",
++        "4,0"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 2
++    },
++    {
++      "key": "3,1",
++      "r": 3,
++      "c": 1,
++      "color": 21,
++      "count": 36,
++      "activateStep": 9,
++      "pickStep": 11,
++      "removedStep": 11,
++      "openedBy": [
++        "3,0"
++      ],
++      "opens": [
++        "3,2",
++        "4,1"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 24
++    },
++    {
++      "key": "3,2",
++      "r": 3,
++      "c": 2,
++      "color": 17,
++      "count": 38,
++      "activateStep": 11,
++      "pickStep": 12,
++      "removedStep": 12,
++      "openedBy": [
++        "3,1"
++      ],
++      "opens": [
++        "3,3",
++        "4,2"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 6
++    },
++    {
++      "key": "3,3",
++      "r": 3,
++      "c": 3,
++      "color": 33,
++      "count": 20,
++      "activateStep": 12,
++      "pickStep": 32,
++      "removedStep": 32,
++      "openedBy": [
++        "3,2"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 26
++    },
++    {
++      "key": "3,4",
++      "r": 3,
++      "c": 4,
++      "color": 31,
++      "count": 27,
++      "activateStep": 18,
++      "pickStep": 21,
++      "removedStep": 21,
++      "openedBy": [
++        "2,4"
++      ],
++      "opens": [
++        "3,5",
++        "4,4"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 0
++    },
++    {
++      "key": "3,5",
++      "r": 3,
++      "c": 5,
++      "color": 31,
++      "count": 35,
++      "activateStep": 21,
++      "pickStep": 34,
++      "removedStep": 34,
++      "openedBy": [
++        "3,4"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 0
++    },
++    {
++      "key": "3,6",
++      "r": 3,
++      "c": 6,
++      "color": 14,
++      "count": 30,
++      "activateStep": 25,
++      "pickStep": 33,
++      "removedStep": 33,
++      "openedBy": [
++        "2,6"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 9
++    },
++    {
++      "key": "4,0",
++      "r": 4,
++      "c": 0,
++      "color": 5,
++      "count": 34,
++      "activateStep": 9,
++      "pickStep": 17,
++      "removedStep": 17,
++      "openedBy": [
++        "3,0"
++      ],
++      "opens": [
++        "5,0"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 1
++    },
++    {
++      "key": "4,1",
++      "r": 4,
++      "c": 1,
++      "color": 30,
++      "count": 33,
++      "activateStep": 11,
++      "pickStep": 13,
++      "removedStep": 13,
++      "openedBy": [
++        "3,1"
++      ],
++      "opens": [
++        "5,1"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 1
++    },
++    {
++      "key": "4,2",
++      "r": 4,
++      "c": 2,
++      "color": 28,
++      "count": 35,
++      "activateStep": 12,
++      "pickStep": 30,
++      "removedStep": 30,
++      "openedBy": [
++        "3,2"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 27
++    },
++    {
++      "key": "4,4",
++      "r": 4,
++      "c": 4,
++      "color": 31,
++      "count": 38,
++      "activateStep": 21,
++      "pickStep": 22,
++      "removedStep": 22,
++      "openedBy": [
++        "3,4"
++      ],
++      "opens": [
++        "4,5",
++        "5,4"
++      ],
++      "solePickableSupplySteps": 0,
++      "readyStep": 0
++    },
++    {
++      "key": "4,5",
++      "r": 4,
++      "c": 5,
++      "color": 15,
++      "count": 27,
++      "activateStep": 22,
++      "pickStep": 28,
++      "removedStep": 28,
++      "openedBy": [
++        "4,4"
++      ],
++      "opens": [
++        "4,6"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 2
++    },
++    {
++      "key": "4,6",
++      "r": 4,
++      "c": 6,
++      "color": 5,
++      "count": 35,
++      "activateStep": 28,
++      "pickStep": 31,
++      "removedStep": 31,
++      "openedBy": [
++        "4,5"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 1
++    },
++    {
++      "key": "5,0",
++      "r": 5,
++      "c": 0,
++      "color": 4,
++      "count": 31,
++      "activateStep": 17,
++      "pickStep": 20,
++      "removedStep": 20,
++      "openedBy": [
++        "4,0"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 1,
++      "readyStep": 16
++    },
++    {
++      "key": "5,1",
++      "r": 5,
++      "c": 1,
++      "color": 22,
++      "count": 35,
++      "activateStep": 13,
++      "pickStep": 30,
++      "removedStep": 30,
++      "openedBy": [
++        "4,1"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 0,
++      "readyStep": 33
++    },
++    {
++      "key": "5,2",
++      "r": 5,
++      "c": 2,
++      "color": 15,
++      "count": 26,
++      "activateStep": 29,
++      "pickStep": 30,
++      "removedStep": 30,
++      "openedBy": [
++        "5,3"
++      ],
++      "opens": [],
++      "solePickableSupplySteps": 0,
++      "readyStep": 2
++    },
++    {
++      "key": "5,3",
++      "r": 5,
++      "c": 3,
++      "color": 13,
++      "count": 27,
++      "activateStep": 23,
++      "pickStep": 29,
++      "removedStep": 29,
++      "openedBy": [
++        "5,4"
++      ],
++      "opens": [
++        "5,2"
++      ],
++      "solePickableSupplySteps": 1,
++      "readyStep": 4
++    },
++    {
++      "key": "5,4",
++      "r": 5,
++      "c": 4,
++      "color": 31,
++      "count": 38,
++      "activateStep": 22,
++      "pickStep": 23,
++      "removedStep": 23,
++      "openedBy": [
++        "4,4"
++      ],
++      "opens": [
++        "5,3"
++      ],
++      "solePickableSupplySteps": 0,
++      "readyStep": 0
++    }
++  ],
++  "input": "/Users/red/Desktop/毛线汽车/02_工程/完整主bin快照_20261012/输出文件/unnamed-10-25-3/生产文档/关卡数据/35x35拼接图纸_006.json",
++  "solverCompleted": true
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\344\270\213\351\231\220\344\277\256\345\244\215\345\257\271\346\257\224_v494.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\344\270\213\351\231\220\344\277\256\345\244\215\345\257\271\346\257\224_v494.json"
+new file mode 100644
+index 0000000..a14899a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\344\270\213\351\231\220\344\277\256\345\244\215\345\257\271\346\257\224_v494.json"
+@@ -0,0 +1,185 @@
++{
++  "schema": "board-floor-regression-v1",
++  "config": "006 cap20-40; seed1001-1003; candidateCount3; 20s; fullTime",
++  "old": {
++    "summary": {
++      "validBefore": 3,
++      "validAfter": 3,
++      "gateBefore": 0,
++      "gateAfter": 1,
++      "floorBefore": 2,
++      "floorAfter": 3
++    },
++    "rows": [
++      {
++        "seed": 1001,
++        "v493": {
++          "hash": "5583300d2591e683cc40f82bbe5774d2c14af26c27586db81693da239880a68c",
++          "valid": true,
++          "gate": false,
++          "freeLow": 55,
++          "freeRun": 17,
++          "board": [
++            6,
++            7
++          ]
++        },
++        "v494": {
++          "hash": "d0ed6a09be754da8eb5f208971f8857bcf36cc529b5255cf422d20648cdc6332",
++          "valid": true,
++          "gate": false,
++          "freeLow": 24,
++          "freeRun": 7,
++          "board": [
++            6,
++            7
++          ]
++        },
++        "same": false
++      },
++      {
++        "seed": 1002,
++        "v493": {
++          "hash": "152d76e67abddd0013a1ddce2ee6fee34a0650f91a8e2ac8991075ff724fd4b7",
++          "valid": true,
++          "gate": false,
++          "freeLow": 21,
++          "freeRun": 4,
++          "board": [
++            5,
++            7
++          ]
++        },
++        "v494": {
++          "hash": "abc34da3d2ce277b79b1e9ac01f54504f7bc2b7a278e0d9d099a9cb0fe588585",
++          "valid": true,
++          "gate": false,
++          "freeLow": 65,
++          "freeRun": 6,
++          "board": [
++            6,
++            7
++          ]
++        },
++        "same": false
++      },
++      {
++        "seed": 1003,
++        "v493": {
++          "hash": "a8a5fbc51a205cea0cd5eb8433fd9c3873c812fbb6afd156e3979ab9d244d416",
++          "valid": true,
++          "gate": false,
++          "freeLow": 39,
++          "freeRun": 5,
++          "board": [
++            6,
++            7
++          ]
++        },
++        "v494": {
++          "hash": "39bd2196c31a7c50461dc82589c6e4c874acb63ca1d2b861e6d91027bfb4a4b9",
++          "valid": true,
++          "gate": true,
++          "freeLow": 3,
++          "freeRun": 1,
++          "board": [
++            6,
++            7
++          ]
++        },
++        "same": false
++      }
++    ]
++  },
++  "new_fixed": {
++    "summary": {
++      "validBefore": 3,
++      "validAfter": 3,
++      "gateBefore": 0,
++      "gateAfter": 3,
++      "floorBefore": 0,
++      "floorAfter": 3
++    },
++    "rows": [
++      {
++        "seed": 1001,
++        "v493": {
++          "hash": "a0039bde89d921555477d233b4de4a7c039c285f3ba2d78f3b4f9c7ad0b0ed28",
++          "valid": true,
++          "gate": false,
++          "freeLow": 23,
++          "freeRun": 2,
++          "board": [
++            5,
++            7
++          ]
++        },
++        "v494": {
++          "hash": "8a3e366219e0ef8e6ec93b5130bc6b312678a0fae790ebeaeb4538b20cf6cd04",
++          "valid": true,
++          "gate": true,
++          "freeLow": 3,
++          "freeRun": 1,
++          "board": [
++            7,
++            8
++          ]
++        },
++        "same": false
++      },
++      {
++        "seed": 1002,
++        "v493": {
++          "hash": "6d65def8cdbe0abc922939d5bb50b10e214ea4f0744ace0fe5b675a4f00f1136",
++          "valid": true,
++          "gate": false,
++          "freeLow": 28,
++          "freeRun": 11,
++          "board": [
++            5,
++            7
++          ]
++        },
++        "v494": {
++          "hash": "3eb60d82b583484723e4f1c778da785c7bedc9899fb92bc2f689ac23a1e18b1c",
++          "valid": true,
++          "gate": true,
++          "freeLow": 30,
++          "freeRun": 5,
++          "board": [
++            7,
++            8
++          ]
++        },
++        "same": false
++      },
++      {
++        "seed": 1003,
++        "v493": {
++          "hash": "c070caf8a026601824f4420e38de4dcba3235e955badacfad57fc5cf920af85b",
++          "valid": true,
++          "gate": false,
++          "freeLow": 9,
++          "freeRun": 4,
++          "board": [
++            5,
++            7
++          ]
++        },
++        "v494": {
++          "hash": "809b1d3239d8be4d74660b37d0802fed534a3c34ed0aebc2b82db9d0d66c9dc2",
++          "valid": true,
++          "gate": true,
++          "freeLow": 9,
++          "freeRun": 2,
++          "board": [
++            7,
++            8
++          ]
++        },
++        "same": false
++      }
++    ]
++  },
++  "note": "新时间线默认关闭；old 的 v494 取 timelineCompare 最终保留项，三例均保留 base。棋盘变化包含尺寸与后续随机序列变化，质量变化不能全部归因于车序。"
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\275\246\345\272\217\345\217\214\346\227\266\351\227\264\347\272\277\345\257\271\346\257\224.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\275\246\345\272\217\345\217\214\346\227\266\351\227\264\347\272\277\345\257\271\346\257\224.js"
+new file mode 100755
+index 0000000..4b1f06b
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\275\246\345\272\217\345\217\214\346\227\266\351\227\264\347\272\277\345\257\271\346\257\224.js"
+@@ -0,0 +1,39 @@
++#!/usr/bin/env node
++/**
++ * v494 真生成对照（默认不改生产）：006 / cap20~40 / 6×7下限 / seed1001~1003。
++ * node 03_工具/好关评分/车序双时间线对比.js --mode timeline --flow old --out 报告.jsonl
++ * --mode base 不生成变体；--mode timeline 只在旧产线结构失败项运行 timelineCompare。
++ */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'solver-analysis.js', 'car-sequencer.js', 'generator.js'];
++const sandbox = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sandbox); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sandbox, { filename: f });
++const A = sandbox.AntSolver;
++function arg(name, fallback) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : fallback; }
++const mode = arg('mode', 'timeline'), flow = arg('flow', 'old'), out = arg('out', '');
++const seeds = arg('seeds', '1001,1002,1003').split(',').map(Number);
++const txtFile = arg('txt', path.join(ROOT, '蚂蚁图库', '拼接图', '拼接图图库', '35x35拼接图纸_006.txt'));
++const blocks = A.Generator.blocksFromTXT(fs.readFileSync(txtFile, 'utf8'));
++const rows = [];
++for (const seed of seeds) {
++  const cfg = { seed, generatorFlow: flow, cutMode: 'auto', boxSizeMin: 20, boxSizeMax: 40,
++    capNormMin: 20, capNormMax: 40, boardRowsMin: 6, boardRowsMax: 6,
++    boardColsMin: 7, boardColsMax: 7, candidateCount: 3, timeBudgetMs: 20000,
++    fullTime: true, difficultyRounds: 1, roleSchedule: mode === 'timeline' ? 'timelineCompare' : false,
++    timelineIterations: 2 };
++  const t = Date.now(), r = A.Generator.produce(blocks, cfg), fc = r.goodV3 && r.goodV3.fillCurve || {};
++  const row = { schema: 'timeline-generation-record-v1', seed, mode, flow, ms: Date.now() - t,
++    hash: r.level && crypto.createHash('sha256').update(JSON.stringify(r.level)).digest('hex'),
++    valid: !!r.valid, gate: A.Generator.goalStructPass(r), freeLow: fc.freeLowPct != null ? fc.freeLowPct : null,
++    freeRun: fc.freeRunMax != null ? fc.freeRunMax : null, capacity: r.capacityAudit || null,
++    chosen: r.timelineCompare ? r.timelineCompare.chosen : 'base', skipped: r.timelineCompare ? r.timelineCompare.skipped : null,
++    attempts: r.timelineCompare ? r.timelineCompare.attempts : [], debt: r.debtTimeline ? r.debtTimeline.summary : null,
++    timeline: r.carTimeline ? r.carTimeline.summary : null };
++  rows.push(row); console.log(JSON.stringify({ seed, ms: row.ms, valid: row.valid, gate: row.gate,
++    board: row.capacity && [row.capacity.rows, row.capacity.cols], chosen: row.chosen, skipped: row.skipped,
++    attempts: row.attempts.length, hash: row.hash && row.hash.slice(0, 12) }));
++}
++if (out) fs.writeFileSync(out, rows.map(x => JSON.stringify(x)).join('\n') + '\n');
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\275\246\345\272\217\345\217\214\346\227\266\351\227\264\347\272\277\345\257\271\346\257\224_v494.jsonl" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\275\246\345\272\217\345\217\214\346\227\266\351\227\264\347\272\277\345\257\271\346\257\224_v494.jsonl"
+new file mode 100644
+index 0000000..795c0e8
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\275\246\345\272\217\345\217\214\346\227\266\351\227\264\347\272\277\345\257\271\346\257\224_v494.jsonl"
+@@ -0,0 +1,3 @@
++{"schema":"timeline-generation-record-v1","seed":1001,"mode":"timeline","flow":"old","ms":15932,"hash":"d0ed6a09be754da8eb5f208971f8857bcf36cc529b5255cf422d20648cdc6332","valid":true,"gate":false,"freeLow":24,"freeRun":7,"capacity":{"schema":"capacity-evidence-v1","rows":6,"cols":7,"boardFloorPass":true,"cars":37,"capacitySum":1225,"pixels":1225,"conserved":true,"minCap":20,"maxCap":40,"boxSizeMin":20,"boxSizeMax":40,"belowMin":0,"aboveMax":0,"microCarMax":2,"microCars":[],"microCount":0,"rangeExactFeasible":true,"infeasibleColors":[],"row0Cars":7,"row0Colors":4,"row0MaxSameColor":3,"note":"belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"},"chosen":"base","skipped":null,"attempts":[{"round":1,"applied":true,"valid":true,"plan":{"schema":"timeline-schedule-plan-v1","applied":true,"plainCars":21,"debtWaitTarget":3,"tolerance":2,"swaps":6,"beforeScore":21959,"afterScore":17298,"frozenCars":3,"contract":{"conserved":true,"obstaclesPreserved":true,"rows":6,"cols":7,"boardFloorPass":true},"details":[{"from":[0,0],"to":[5,0],"color":28,"count":40,"delta":-2380},{"from":[2,6],"to":[4,5],"color":33,"count":20,"delta":-1209},{"from":[0,3],"to":[3,5],"color":13,"count":27,"delta":-784},{"from":[1,4],"to":[4,3],"color":17,"count":40,"delta":-228},{"from":[2,1],"to":[3,3],"color":34,"count":25,"delta":-56},{"from":[3,5],"to":[4,3],"color":13,"count":27,"delta":-4}]},"quality":{"valid":true,"gate":false,"freeLow":42,"freeRun":10,"row0":{"freeSupply":4,"debtCar":3,"microCar":0,"deficits":[40,26,40]}},"debt":{"debtCars":6,"repaidLater":6,"repaidSameStep":0,"unrepaid":0,"microDebtCars":0,"repaidLaterPct":100,"medianWaitSteps":2,"maxWaitSteps":6,"maxActiveDebtCars":2,"maxDebtPixels":28}},{"round":2,"applied":true,"valid":true,"plan":{"schema":"timeline-schedule-plan-v1","applied":true,"plainCars":21,"debtWaitTarget":3,"tolerance":2,"swaps":7,"beforeScore":20196,"afterScore":19846,"frozenCars":2,"contract":{"conserved":true,"obstaclesPreserved":true,"rows":6,"cols":7,"boardFloorPass":true},"details":[{"from":[4,3],"to":[5,5],"color":13,"count":27,"delta":-180},{"from":[5,0],"to":[5,2],"color":28,"count":40,"delta":-44},{"from":[2,6],"to":[3,3],"color":31,"count":40,"delta":-20},{"from":[3,5],"to":[4,5],"color":17,"count":40,"delta":-1},{"from":[4,5],"to":[5,5],"color":17,"count":40,"delta":-15},{"from":[5,2],"to":[5,5],"color":28,"count":40,"delta":-84},{"from":[2,6],"to":[3,5],"color":34,"count":25,"delta":-6}]},"quality":{"valid":true,"gate":false,"freeLow":45,"freeRun":10,"row0":{"freeSupply":4,"debtCar":3,"microCar":0,"deficits":[40,26,40]}},"debt":{"debtCars":9,"repaidLater":9,"repaidSameStep":0,"unrepaid":0,"microDebtCars":0,"repaidLaterPct":100,"medianWaitSteps":4,"maxWaitSteps":6,"maxActiveDebtCars":5,"maxDebtPixels":83}}],"debt":null,"timeline":null}
++{"schema":"timeline-generation-record-v1","seed":1002,"mode":"timeline","flow":"old","ms":22860,"hash":"abc34da3d2ce277b79b1e9ac01f54504f7bc2b7a278e0d9d099a9cb0fe588585","valid":true,"gate":false,"freeLow":65,"freeRun":6,"capacity":{"schema":"capacity-evidence-v1","rows":6,"cols":7,"boardFloorPass":true,"cars":37,"capacitySum":1225,"pixels":1225,"conserved":true,"minCap":20,"maxCap":40,"boxSizeMin":20,"boxSizeMax":40,"belowMin":0,"aboveMax":0,"microCarMax":2,"microCars":[],"microCount":0,"rangeExactFeasible":true,"infeasibleColors":[],"row0Cars":7,"row0Colors":2,"row0MaxSameColor":5,"note":"belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"},"chosen":"base","skipped":null,"attempts":[{"round":1,"applied":true,"valid":true,"plan":{"schema":"timeline-schedule-plan-v1","applied":true,"plainCars":23,"debtWaitTarget":3,"tolerance":2,"swaps":10,"beforeScore":19537,"afterScore":14966,"frozenCars":2,"contract":{"conserved":true,"obstaclesPreserved":true,"rows":6,"cols":7,"boardFloorPass":true},"details":[{"from":[4,2],"to":[4,6],"color":22,"count":35,"delta":-1789},{"from":[3,2],"to":[4,5],"color":28,"count":29,"delta":-1372},{"from":[2,6],"to":[3,4],"color":28,"count":40,"delta":-690},{"from":[4,4],"to":[5,1],"color":33,"count":21,"delta":-468},{"from":[2,6],"to":[4,3],"color":4,"count":40,"delta":-122},{"from":[2,0],"to":[4,2],"color":31,"count":24,"delta":-68},{"from":[2,0],"to":[5,1],"color":33,"count":20,"delta":-40},{"from":[3,3],"to":[4,3],"color":13,"count":28,"delta":-12},{"from":[5,1],"to":[5,2],"color":33,"count":20,"delta":-8},{"from":[2,0],"to":[4,3],"color":33,"count":21,"delta":-2}]},"quality":{"valid":true,"gate":false,"freeLow":71,"freeRun":9,"row0":{"freeSupply":5,"debtCar":2,"microCar":0,"deficits":[10,10]}},"debt":{"debtCars":2,"repaidLater":2,"repaidSameStep":0,"unrepaid":0,"microDebtCars":0,"repaidLaterPct":100,"medianWaitSteps":1.5,"maxWaitSteps":2,"maxActiveDebtCars":1,"maxDebtPixels":4}},{"round":2,"applied":true,"valid":true,"plan":{"schema":"timeline-schedule-plan-v1","applied":true,"plainCars":23,"debtWaitTarget":3,"tolerance":2,"swaps":6,"beforeScore":15648,"afterScore":14828,"frozenCars":1,"contract":{"conserved":true,"obstaclesPreserved":true,"rows":6,"cols":7,"boardFloorPass":true},"details":[{"from":[3,3],"to":[4,3],"color":4,"count":40,"delta":-680},{"from":[1,6],"to":[5,2],"color":5,"count":23,"delta":-72},{"from":[2,6],"to":[4,3],"color":15,"count":40,"delta":-39},{"from":[1,6],"to":[2,0],"color":33,"count":20,"delta":-18},{"from":[3,4],"to":[4,3],"color":28,"count":40,"delta":-7},{"from":[4,4],"to":[4,5],"color":21,"count":36,"delta":-4}]},"quality":{"valid":true,"gate":false,"freeLow":79,"freeRun":26,"row0":{"freeSupply":5,"debtCar":2,"microCar":0,"deficits":[10,10]}},"debt":{"debtCars":2,"repaidLater":2,"repaidSameStep":0,"unrepaid":0,"microDebtCars":0,"repaidLaterPct":100,"medianWaitSteps":2.5,"maxWaitSteps":4,"maxActiveDebtCars":1,"maxDebtPixels":4}}],"debt":null,"timeline":null}
++{"schema":"timeline-generation-record-v1","seed":1003,"mode":"timeline","flow":"old","ms":3732,"hash":"39bd2196c31a7c50461dc82589c6e4c874acb63ca1d2b861e6d91027bfb4a4b9","valid":true,"gate":true,"freeLow":3,"freeRun":1,"capacity":{"schema":"capacity-evidence-v1","rows":6,"cols":7,"boardFloorPass":true,"cars":37,"capacitySum":1225,"pixels":1225,"conserved":true,"minCap":20,"maxCap":40,"boxSizeMin":20,"boxSizeMax":40,"belowMin":0,"aboveMax":0,"microCarMax":2,"microCars":[],"microCount":0,"rangeExactFeasible":true,"infeasibleColors":[],"row0Cars":7,"row0Colors":6,"row0MaxSameColor":2,"note":"belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"},"chosen":"base","skipped":"base-gate-pass","attempts":[],"debt":null,"timeline":null}
