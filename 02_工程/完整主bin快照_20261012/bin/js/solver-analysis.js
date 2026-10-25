@@ -104,10 +104,11 @@ AntSolver.SolverAnalysis = (function () {
     parts.push([s.steps, s.eliminatedPixels, s.completedBoxes, s._linkSeq || 0, s._keySeq || 0, s.overflow ? 1 : 0].join(':'));
     return parts.join('|');
   }
-  function score(s) {
+  function score(s, moves) {
     if (won(s)) return 1e12;
     if (dead(s)) return -1e12;
-    var moves = Sim.listMoves(s), open = 0;
+    moves = moves || Sim.listMoves(s);
+    var open = 0;
     for (var i = 0; i < moves.length; i++) if (!moves[i].blocked) open++;
     var pressure = Math.max(0, s.buffer.length - (s.bufferLimit - 2));
     return s.eliminatedPixels * 4 + s.completedBoxes * 20 + open * 3 - s.buffer.length * 24 - pressure * pressure * 90;
@@ -164,11 +165,15 @@ AntSolver.SolverAnalysis = (function () {
             } else rejected.push({ steps: actions.length, reason: replayed.reason || 'replay_failed' });
             continue;
           }
-          if (dead(childState)) continue;
+          // v486：原子节点的死活与评分共用一次 listMoves。
+          // finishFlags 已处理 won/overflow；isDeadEnd 的剩余语义就是没有任何非阻塞动作。
+          var nextMoves = Sim.listMoves(childState), hasLegal = false;
+          for (var lm = 0; lm < nextMoves.length; lm++) if (!nextMoves[lm].blocked) { hasLegal = true; break; }
+          if (!hasLegal) continue;
           var key = stateKey(childState);
           if (seen[key]) continue;
           seen[key] = true;
-          children.push({ state: childState, actions: actions, maxBuffer: maxBuf, score: score(childState) });
+          children.push({ state: childState, actions: actions, maxBuffer: maxBuf, score: score(childState, nextMoves) });
         }
         if (exhausted || routes.length >= maxRoutes) break;
       }
@@ -204,7 +209,7 @@ AntSolver.SolverAnalysis = (function () {
     var targetRoutes = Math.max(1, opts.targetRoutes || 4), pressureFloor = opts.pressureFloor == null ? 1 : opts.pressureFloor;
     var tiers = opts.tiers || [
       { name: 'standard', timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
-      { name: 'deep', timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 }
+      { name: 'deep', timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 8, maxRoutes: 8 }
     ];
     var allRoutes = [], seen = {}, attempts = [], totalNodes = 0, t0 = Date.now(), finalStatus = 'not_found_within_budget';
     for (var ti = 0; ti < tiers.length; ti++) {

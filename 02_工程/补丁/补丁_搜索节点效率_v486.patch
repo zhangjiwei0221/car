@@ -1,0 +1,119 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index b10dde0..dea91e8 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v485 · 自适应预算实验</title>
+-  <link rel="stylesheet" href="css/style.css?v=485">
++  <title>车接小人 v486 · 搜索节点效率</title>
++  <link rel="stylesheet" href="css/style.css?v=486">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v485</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v486</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,23 +769,23 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=485"></script>
+-  <script src="js/utils.js?v=485"></script>
++  <script src="js/zip.js?v=486"></script>
++  <script src="js/utils.js?v=486"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=485"></script>
+-  <script src="js/simulator.js?v=485"></script>
++  <script src="js/color-libs.js?v=486"></script>
++  <script src="js/simulator.js?v=486"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=485"></script>
+-  <script src="js/solver-strategy.js?v=485"></script>
+-  <script src="js/solver.js?v=485"></script>
+-  <script src="js/playersim.js?v=485"></script>
++  <script src="js/anchor-cut.js?v=486"></script>
++  <script src="js/solver-strategy.js?v=486"></script>
++  <script src="js/solver.js?v=486"></script>
++  <script src="js/playersim.js?v=486"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=485"></script>
+-  <script src="js/generator.js?v=485"></script>
+-  <script src="js/analysis.js?v=485"></script>
++  <script src="js/solver-analysis.js?v=486"></script>
++  <script src="js/generator.js?v=486"></script>
++  <script src="js/analysis.js?v=486"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=485"></script>
+-  <script src="js/app.js?v=485"></script>
++  <script src="js/level-editor.js?v=486"></script>
++  <script src="js/app.js?v=486"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+index c637863..71c7cc4 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+@@ -104,10 +104,11 @@ AntSolver.SolverAnalysis = (function () {
+     parts.push([s.steps, s.eliminatedPixels, s.completedBoxes, s._linkSeq || 0, s._keySeq || 0, s.overflow ? 1 : 0].join(':'));
+     return parts.join('|');
+   }
+-  function score(s) {
++  function score(s, moves) {
+     if (won(s)) return 1e12;
+     if (dead(s)) return -1e12;
+-    var moves = Sim.listMoves(s), open = 0;
++    moves = moves || Sim.listMoves(s);
++    var open = 0;
+     for (var i = 0; i < moves.length; i++) if (!moves[i].blocked) open++;
+     var pressure = Math.max(0, s.buffer.length - (s.bufferLimit - 2));
+     return s.eliminatedPixels * 4 + s.completedBoxes * 20 + open * 3 - s.buffer.length * 24 - pressure * pressure * 90;
+@@ -164,11 +165,15 @@ AntSolver.SolverAnalysis = (function () {
+             } else rejected.push({ steps: actions.length, reason: replayed.reason || 'replay_failed' });
+             continue;
+           }
+-          if (dead(childState)) continue;
++          // v486：原子节点的死活与评分共用一次 listMoves。
++          // finishFlags 已处理 won/overflow；isDeadEnd 的剩余语义就是没有任何非阻塞动作。
++          var nextMoves = Sim.listMoves(childState), hasLegal = false;
++          for (var lm = 0; lm < nextMoves.length; lm++) if (!nextMoves[lm].blocked) { hasLegal = true; break; }
++          if (!hasLegal) continue;
+           var key = stateKey(childState);
+           if (seen[key]) continue;
+           seen[key] = true;
+-          children.push({ state: childState, actions: actions, maxBuffer: maxBuf, score: score(childState) });
++          children.push({ state: childState, actions: actions, maxBuffer: maxBuf, score: score(childState, nextMoves) });
+         }
+         if (exhausted || routes.length >= maxRoutes) break;
+       }
+@@ -204,7 +209,7 @@ AntSolver.SolverAnalysis = (function () {
+     var targetRoutes = Math.max(1, opts.targetRoutes || 4), pressureFloor = opts.pressureFloor == null ? 1 : opts.pressureFloor;
+     var tiers = opts.tiers || [
+       { name: 'standard', timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
+-      { name: 'deep', timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 }
++      { name: 'deep', timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 8, maxRoutes: 8 }
+     ];
+     var allRoutes = [], seen = {}, attempts = [], totalNodes = 0, t0 = Date.now(), finalStatus = 'not_found_within_budget';
+     for (var ti = 0; ti < tiers.length; ti++) {
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js"
+index 59bd2bd..f4c490b 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js"
+@@ -22,7 +22,10 @@ const tierNames = opt('tiers', 'quick,standard,deep').split(',').filter(Boolean)
+ const TIERS = {
+   quick: { timeBudgetMs: 1000, maxNodes: 1500, beamWidth: 12, branchWidth: 6, maxRoutes: 4 },
+   standard: { timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
+-  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 },
++  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 8, maxRoutes: 8 },
++  deep_b10: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 },
++  deep_b8: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 8, maxRoutes: 8 },
++  deep_b6: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 6, maxRoutes: 8 },
+   adaptive_coverage: { adaptive: true, profile: 'coverage' },
+   adaptive_pressure: { adaptive: true, profile: 'pressure' }
+ };

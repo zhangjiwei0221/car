@@ -22,7 +22,10 @@ const tierNames = opt('tiers', 'quick,standard,deep').split(',').filter(Boolean)
 const TIERS = {
   quick: { timeBudgetMs: 1000, maxNodes: 1500, beamWidth: 12, branchWidth: 6, maxRoutes: 4 },
   standard: { timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
-  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 },
+  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 8, maxRoutes: 8 },
+  deep_b10: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 },
+  deep_b8: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 8, maxRoutes: 8 },
+  deep_b6: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 6, maxRoutes: 8 },
   adaptive_coverage: { adaptive: true, profile: 'coverage' },
   adaptive_pressure: { adaptive: true, profile: 'pressure' }
 };
