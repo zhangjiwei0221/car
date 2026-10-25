@@ -14933,12 +14933,15 @@ AntSolver.Generator = (function() {
       if (maxMs && (Date.now() - t0) >= maxMs) break;
       var roundBudgetMs = maxMs ? Math.max(1000, Math.min(perMs, maxMs - (Date.now() - t0))) : perMs;
       var roundT0 = Date.now();
+      var reviewExpose = config.reviewMix === true && (rounds % 2 === 1);
       var cfg = Object.assign({}, config, {
         goalMode: false,
+        cutMode: reviewExpose ? 'exposeCut' : config.cutMode,
+        boardLayout: reviewExpose ? 'rowMajor' : config.boardLayout,
         portfolioK: 1,
         timeBudgetMs: roundBudgetMs,
         capBudgetShared: config.goalSharedBudget !== false,
-        seed: (baseSeed + rounds * 7919) >>> 0,
+        seed: (baseSeed + (config.reviewMix === true ? Math.floor(rounds / 2) : rounds) * 7919) >>> 0,
         _trace: []
       });
       var r = null;

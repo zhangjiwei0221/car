@@ -1,0 +1,91 @@
+{
+  "schema": "preflight-cut-policy-summary-v1",
+  "version": "v517",
+  "summary": {
+    "layerCut2": {
+      "runs": 6,
+      "pass": 1,
+      "struct": 4,
+      "wallTotalMs": 396527,
+      "overrunTotalMs": 36527,
+      "byImage": {
+        "007": {
+          "pass": 0,
+          "runs": 2
+        },
+        "recommend": {
+          "pass": 0,
+          "runs": 2
+        },
+        "good": {
+          "pass": 1,
+          "runs": 2
+        }
+      }
+    },
+    "exposeCut": {
+      "runs": 6,
+      "pass": 1,
+      "struct": 4,
+      "wallTotalMs": 353473,
+      "overrunTotalMs": 25898,
+      "byImage": {
+        "007": {
+          "pass": 0,
+          "runs": 2
+        },
+        "recommend": {
+          "pass": 0,
+          "runs": 2
+        },
+        "good": {
+          "pass": 1,
+          "runs": 2
+        }
+      }
+    },
+    "reviewMixIndependentSeeds": {
+      "runs": 6,
+      "pass": 2,
+      "struct": 4,
+      "wallTotalMs": 379077,
+      "overrunTotalMs": 29174,
+      "byImage": {
+        "007": {
+          "pass": 0,
+          "runs": 2
+        },
+        "recommend": {
+          "pass": 0,
+          "runs": 2
+        },
+        "good": {
+          "pass": 2,
+          "runs": 2
+        }
+      }
+    }
+  },
+  "sourceFiles": [
+    "独立回归_32677_v516.json",
+    "独立回归_1002_v516.json",
+    "预检切法_expose_32677_v517.json",
+    "预检切法_expose_1002_v517.json",
+    "预检切法_混合独立seed_32677_v517.json",
+    "预检切法_混合独立seed_1002_v517.json"
+  ],
+  "observations": [
+    "单layer与单expose各1/6，成功样本互补；独立seed混合2/6，结构通过均4/6。",
+    "推荐图expose稳定退化，不能统一默认；混合保留layer近目标best。",
+    "首轮混合切法×seed混淆0/3，不用于否决；改为每切法独立seed后才覆盖成功配方。",
+    "混合是覆盖策略，不保证007/推荐图通过。"
+  ],
+  "ui": {
+    "batch": "unnamed-10-26-18",
+    "status": "COMPLETED",
+    "qualified": 0,
+    "unqualified": 2,
+    "evidence": "日志确认第2/4轮exposeCut、第1/3/5轮layerCut2，且同对轮次同seed；随机批未命中，不用于宣称提升。"
+  },
+  "decision": "仅预检review启用交替layerCut2/exposeCut，每切法独立seed序列，完整体验选优；ready不变。"
+}

@@ -7152,7 +7152,7 @@ AntSolver.App = (function() {
     genInFlightT0[idx] = Date.now();
     genPoolProgressText();
     var taskMode = (b.mode === 'goal') ? 'goal' : 'time';
-    genLogPreflightOnce(entry);
+    var taskPreflight = genLogPreflightOnce(entry);
     var taskCfg = Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
       mapSize: entry.blocks.length, requireHardPass: !isEasy,
       isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
@@ -7160,6 +7160,7 @@ AntSolver.App = (function() {
       fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
     });
     if (taskMode === 'goal') {
+      taskCfg.reviewMix = !!(taskPreflight && taskPreflight.status === 'review');
       // 【2026-10-22·用户裁决】目标模式：每轮 20 秒，不达标就换种子再来；
       //   主线程点「结束」时发 stop，produceGoal 在两轮之间收尾并返回当前最好。
       taskCfg.goalPerRoundMs = 20000;
@@ -7292,8 +7293,9 @@ AntSolver.App = (function() {
   function genStartGoalBranches() {
     var entry = levelList[0];
     var idx = 0;
-    genLogPreflightOnce(entry);
+    var branchPreflight = genLogPreflightOnce(entry);
     var base = genApplyFixed(genBatch.config, entry.blocks, entry.name);
+    base.reviewMix = !!(branchPreflight && branchPreflight.status === 'review');
     base.experienceGoal = genExperienceGoalEnabled();
     base.capacityTuneMs = 5000; base.capacityTuneCars = 8; base.capacityTuneVariants = 48;
     var recipes = [
@@ -7416,10 +7418,13 @@ AntSolver.App = (function() {
       if (maxMs && Date.now() - t0 >= maxMs) return done('goalTimeUp');
       if (genBatchAborted) return done('stopped');
       var roundBudgetMs = maxMs ? Math.max(1000, Math.min(per, maxMs - (Date.now() - t0))) : per;
+      var reviewExpose = baseCfg.reviewMix === true && (rounds % 2 === 1);
       var cfg = Object.assign({}, baseCfg, {
         goalMode: false, portfolioK: 3, timeBudgetMs: roundBudgetMs,
         capBudgetShared: baseCfg.goalSharedBudget !== false,
-        seed: (baseSeed + rounds * 7919) >>> 0, _trace: []
+        cutMode: reviewExpose ? 'exposeCut' : baseCfg.cutMode,
+        boardLayout: reviewExpose ? 'rowMajor' : baseCfg.boardLayout,
+        seed: (baseSeed + (baseCfg.reviewMix === true ? Math.floor(rounds / 2) : rounds) * 7919) >>> 0, _trace: []
       });
       var r = null, roundT0 = Date.now();
       try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
@@ -7474,7 +7479,7 @@ AntSolver.App = (function() {
           // 【v153】主线程路径也接进度钩子（同一套显示；跑完清掉，避免影响后面的求解/模拟）
           if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: curIdx, no: 0 }, p); });
           var usePlan = cutPlanParams && cutUseChecked;   // 【v153】主线程串行路径同样逐图现算车单直通
-          genLogPreflightOnce(entry);
+          var syncPreflight = genLogPreflightOnce(entry);
           var cfgAuto = genApplyFixed(b.config, entry.blocks, entry.name);   // 【v153】自动档
           var cfg = Object.assign({}, cfgAuto, {
             mapSize: entry.blocks.length, requireHardPass: !isEasy,
@@ -7484,6 +7489,7 @@ AntSolver.App = (function() {
           });
           cfg._build = APP_BUILD;
           if (b.mode === 'goal') {
+            cfg.reviewMix = !!(syncPreflight && syncPreflight.status === 'review');
             cfg.experienceGoal = genExperienceGoalEnabled();
             cfg.goalMaxMs = genGoalBudgetMs();
             cfg.capacityTuneMs = 5000; cfg.capacityTuneCars = 8; cfg.capacityTuneVariants = 48;

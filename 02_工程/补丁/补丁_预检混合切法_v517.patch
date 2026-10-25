@@ -1,0 +1,361 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+index 19dd4c5..b4294b5 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+@@ -4,7 +4,7 @@
+ > 本文件只描述**当前状态、做过什么、哪些路已证否、下一步**；细节按节号去查工作日志。
+ > 上层文档仍以 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md) 与 [`工程说明.md`](工程说明.md) 为准。
+ >
+-> **后续更新（2026-10-26）**：当前已到 v516；目标体验与±1px容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~492。本文件保留 v495~v500 历史基线。
++> **后续更新（2026-10-26）**：当前已到 v517；目标体验与±1px容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~492。本文件保留 v495~v500 历史基线。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index 4e8dc9c..eed6ef2 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -7,7 +7,7 @@
+ > 本文档由 Kimi 整理。文中严格区分 **[用户要求]、[已验证]、[Kimi建议]、[待校准]**。
+ >
+ > 2026-10-26 新实施卡：[`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md)。小色可按解锁贡献承担关键债务，不按面积排除。
+-> 当前结果：已到v516。容量精调、目标模式、失败诊断、多路线、目标图预检和真实UI落库均已落地；最新验收批次目标pass且COMPLETED。v514已修复容量臂box/capNorm上限不一致，真实UI 006/007均体验达标；P7后修复20次0转化已否决。v515已统一完整体验距离选优且quick-only否决；v516独立回归ready 3/4、review 1/6，已验证替代路线可救回参考unknown；下一步预检策略、结构近失与PlayerSim校准，障碍目标化仍未完成。
++> 当前结果：已到v517。容量精调、目标模式、失败诊断、多路线、目标图预检和真实UI落库均已落地；最新验收批次目标pass且COMPLETED。v514已修复容量臂box/capNorm上限不一致，真实UI 006/007均体验达标；P7后修复20次0转化已否决。v515已统一完整体验距离选优且quick-only否决；v516独立回归ready 3/4、review 1/6，已验证替代路线可救回参考unknown；v517预检review已策略化混合切法，单臂1/6→混合2/6；下一步推荐图结构近失与PlayerSim校准，障碍目标化仍未完成。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index e093b4c..0a8cbfa 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -19960,3 +19960,36 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 2. 推荐图49%但结构失败可作结构容量精调候选；两个seed不足以判“不可救”。
+ 3. 所有独立通过样本仍有PlayerSim 0%项；需玩家模型/真人校准。
+ 4. 多路线ringMaskOf异常与单图UI资源失控需后续稳定性处理；searchLimited不等于全局证明。
++
++### 507. 【2026-10-26】v517：预检review混合切法——独立seed后单臂1/6到混合2/6
++
++#### 507.1 问题（原话）
++
++- “每一次设置验证不达标后，他会怎么修改呢……这决定一关要生成多久。”
++- “遇到边界以及卡住的地方要记录。”
++
++#### 507.2 证据
++
++- v516 ready 3/4、review 1/6；review搜索主要反复layerCut2，exposeCut缺系统对照。
++- 单layer与单expose在007/推荐/好图两seed各1/6通过，成功样本互补：layer救好图1002，expose救好图32677。
++- expose在推荐图稳定退化（32677压力49%→4.8%），不能设为review统一默认。
++- 首轮混合同时改变切法和seed，0/3存在实验混淆；改为每切法独立seed序列后，混合2/6，结构4/6不变。
++
++#### 507.3 改动
++
++- Kimi接入 `reviewMix`：仅预检review时，奇数轮layerCut2、偶数轮exposeCut+rowMajor；每切法独立seed序列，同对轮次同seed。
++- produceGoal、worker、单图branch、主线程回退统一；app按SourcePreflight传参，ready不变，完整体验选优保留best。
++- 版本升v517，保存预登记、单臂结果、混淆边界、修正混合与UI轮次证据。
++
++#### 507.4 验证（改前后数字）
++
++- 同一6样本：layer 1/6、expose 1/6、混合2/6；三者结构均4/6。好图两个seed均由混合覆盖成功，007/推荐仍未达。
++- 好图32677混合第2轮49.903s通过；好图1002由已验证替代路线通过。推荐图仍保留layer 49%近目标而非expose约5%。
++- 真实UI批次18：第2/4轮exposeCut、其他轮layerCut2且同对轮次同seed；随机结果0/2、均落库COMPLETED，不用于夸命中率。
++- `node --check`：generator/app/playersim/gen-worker通过；`git diff --check`通过。
++
++#### 507.5 遗留
++
++1. 混合只扩覆盖，007和推荐图仍0通过；需结构近失精调或图型修改，不继续单纯加切法。
++2. 推荐图32677压力49%但freeLow45%/免费连20，后续可做有容量边界保护的结构容量实验。
++3. PlayerSim/真人可学习性未校准，混合成功不等于真人好关。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 724630d..c70d046 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v516 已验证替代路线验收与独立回归）　|　当前版本：**v516**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v517 预检混合切法）　|　当前版本：**v517**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~502。目标模式已默认开启 experienceGoal 与近目标容量精调；时间模式不变。v512 多图实测0/2达标，目标总预算仍存在长轮超时，不能宣称泛化完成。**
+ >
+@@ -1178,3 +1178,11 @@ M0 固定基准 + 统一评价与候选口径
+ - 多路线只在最终报告阶段使用，searchLimited保留，不宣称全局最优或玩家必然找到。
+ - 单图UI批次16失控，已STOPPED、0落库；双worker批次17 COMPLETED，006在24.217s通过，好图未达。直接多路线复核曾触发ringMaskOf异常，需后续稳定性修复，不能隐瞒。
+ - 所有4个独立目标通过样本均有PlayerSim 0%项；真人好关仍未证明。下一步预检review策略、推荐图结构近失与PlayerSim校准。
++
++### 17.43 v517：预检review的混合切法与独立seed序列
++
++- 单layerCut2与单exposeCut在007/推荐/好图两seed各1/6通过，成功样本互补；expose在推荐图稳定退化，不能统一默认。
++- 首轮混合把切法与seed一起改变，0/3只作实验边界。改为每切法独立seed序列，同对轮次同seed比较，之后各自递增。
++- 修正后混合2/6通过、结构4/6不变：好图两个seed都覆盖成功路径；007/推荐仍未通过。
++- produceGoal/worker/main按轮次交替，app仅在SourcePreflight.status=review时传reviewMix；ready不改变原配置。
++- 真实UI批次18确认第2/4轮exposeCut、其余layerCut2和同seed对照，随机批0/2，不用于夸大命中率。下一阶段推荐图结构近失与PlayerSim校准。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 8ce85c0..0f68a1e 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -147,7 +147,7 @@
+ - 修复真实UI旧逻辑：目标模式不再禁用“每图搜索时间”，而是明确显示总预算；并发日志使用同一预算函数。
+ - 006/007以各180s、双worker、`fullTime=false`运行，均逐关落库且批次COMPLETED；实际239.5/272.9s，证明预算仅是轮间控制。
+ - 结果0/2目标达标：006为44.4%且最长免费连失败，007为0%且freeLow/免费连失败。二者都因结构门失败跳过容量精调，不能把“精调0变体”误写成精调无效。
+-- 007静态预检review与最终免费供给过高一致；预检目前只提示，没有自动缩短或调整搜索。
++- 007静态预检review与最终免费供给过高一致；v517已用review驱动混合切法，非单纯提示。
+ - 下一阶段预登记：先审计 `produceGoal → runFlowOnce` 的预算传递和各阶段不可中断耗时，用本批两关及独立seed记录“轮预算/实际轮时/最终评价耗时”；再决定缩短单轮、轮内检查或安全 watchdog。不得直接杀worker导致当前最好丢失，也不得把180s宣称为硬上限。
+ 
+ ## 18. v513：目标轮预算收口与目标未达口径
+@@ -182,3 +182,11 @@
+ - 非替代通过不标acceptedByVerifiedRoute；其他release unknown不自动放行。
+ - 单图UI失控记STOPPED；双worker稳定。直接多路线ringMaskOf异常为稳定性遗留。
+ - 下一步：预检review短探针/策略分派；推荐图49%但结构失败的容量精调；PlayerSim偏黑与真人校准。
++
++## 22. v517：预检review驱动混合切法
++
++- 单layer/expose各1/6，成功样本互补；推荐图expose明显退化，不能统一默认。
++- 首轮切法×seed混淆0/3，改每切法独立seed序列后混合2/6，结构4/6不变。
++- 仅review启用，produceGoal/worker/branch/main统一交替，ready不变；完整体验选优保留best。
++- UI批次18确认轮次和同seed正确，随机0/2如实记录；不把混合当必达。
++- 下一步推荐图49%但结构失败的容量精调，以及PlayerSim偏黑校准。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index fc8b13c..59bf779 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v516 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=516">
++  <title>车接小人 v517 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=517">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v516</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v517</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,27 +773,27 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=516"></script>
+-  <script src="js/utils.js?v=516"></script>
++  <script src="js/zip.js?v=517"></script>
++  <script src="js/utils.js?v=517"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=516"></script>
+-  <script src="js/simulator.js?v=516"></script>
++  <script src="js/color-libs.js?v=517"></script>
++  <script src="js/simulator.js?v=517"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=516"></script>
+-  <script src="js/solver-strategy.js?v=516"></script>
+-  <script src="js/solver.js?v=516"></script>
+-  <script src="js/playersim.js?v=516"></script>
++  <script src="js/anchor-cut.js?v=517"></script>
++  <script src="js/solver-strategy.js?v=517"></script>
++  <script src="js/solver.js?v=517"></script>
++  <script src="js/playersim.js?v=517"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=516"></script>
+-  <script src="js/car-sequencer.js?v=516"></script>
+-  <script src="js/experience-goal.js?v=516"></script>
+-  <script src="js/capacity-tuner.js?v=516"></script>
+-  <script src="js/generator.js?v=516"></script>
+-  <script src="js/source-preflight.js?v=516"></script>
+-  <script src="js/analysis.js?v=516"></script>
++  <script src="js/solver-analysis.js?v=517"></script>
++  <script src="js/car-sequencer.js?v=517"></script>
++  <script src="js/experience-goal.js?v=517"></script>
++  <script src="js/capacity-tuner.js?v=517"></script>
++  <script src="js/generator.js?v=517"></script>
++  <script src="js/source-preflight.js?v=517"></script>
++  <script src="js/analysis.js?v=517"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=516"></script>
+-  <script src="js/app.js?v=516"></script>
++  <script src="js/level-editor.js?v=517"></script>
++  <script src="js/app.js?v=517"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index b196e79..2e6b648 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7152,7 +7152,7 @@ AntSolver.App = (function() {
+     genInFlightT0[idx] = Date.now();
+     genPoolProgressText();
+     var taskMode = (b.mode === 'goal') ? 'goal' : 'time';
+-    genLogPreflightOnce(entry);
++    var taskPreflight = genLogPreflightOnce(entry);
+     var taskCfg = Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
+       mapSize: entry.blocks.length, requireHardPass: !isEasy,
+       isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
+@@ -7160,6 +7160,7 @@ AntSolver.App = (function() {
+       fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
+     });
+     if (taskMode === 'goal') {
++      taskCfg.reviewMix = !!(taskPreflight && taskPreflight.status === 'review');
+       // 【2026-10-22·用户裁决】目标模式：每轮 20 秒，不达标就换种子再来；
+       //   主线程点「结束」时发 stop，produceGoal 在两轮之间收尾并返回当前最好。
+       taskCfg.goalPerRoundMs = 20000;
+@@ -7292,8 +7293,9 @@ AntSolver.App = (function() {
+   function genStartGoalBranches() {
+     var entry = levelList[0];
+     var idx = 0;
+-    genLogPreflightOnce(entry);
++    var branchPreflight = genLogPreflightOnce(entry);
+     var base = genApplyFixed(genBatch.config, entry.blocks, entry.name);
++    base.reviewMix = !!(branchPreflight && branchPreflight.status === 'review');
+     base.experienceGoal = genExperienceGoalEnabled();
+     base.capacityTuneMs = 5000; base.capacityTuneCars = 8; base.capacityTuneVariants = 48;
+     var recipes = [
+@@ -7416,10 +7418,13 @@ AntSolver.App = (function() {
+       if (maxMs && Date.now() - t0 >= maxMs) return done('goalTimeUp');
+       if (genBatchAborted) return done('stopped');
+       var roundBudgetMs = maxMs ? Math.max(1000, Math.min(per, maxMs - (Date.now() - t0))) : per;
++      var reviewExpose = baseCfg.reviewMix === true && (rounds % 2 === 1);
+       var cfg = Object.assign({}, baseCfg, {
+         goalMode: false, portfolioK: 3, timeBudgetMs: roundBudgetMs,
+         capBudgetShared: baseCfg.goalSharedBudget !== false,
+-        seed: (baseSeed + rounds * 7919) >>> 0, _trace: []
++        cutMode: reviewExpose ? 'exposeCut' : baseCfg.cutMode,
++        boardLayout: reviewExpose ? 'rowMajor' : baseCfg.boardLayout,
++        seed: (baseSeed + (baseCfg.reviewMix === true ? Math.floor(rounds / 2) : rounds) * 7919) >>> 0, _trace: []
+       });
+       var r = null, roundT0 = Date.now();
+       try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
+@@ -7474,7 +7479,7 @@ AntSolver.App = (function() {
+           // 【v153】主线程路径也接进度钩子（同一套显示；跑完清掉，避免影响后面的求解/模拟）
+           if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: curIdx, no: 0 }, p); });
+           var usePlan = cutPlanParams && cutUseChecked;   // 【v153】主线程串行路径同样逐图现算车单直通
+-          genLogPreflightOnce(entry);
++          var syncPreflight = genLogPreflightOnce(entry);
+           var cfgAuto = genApplyFixed(b.config, entry.blocks, entry.name);   // 【v153】自动档
+           var cfg = Object.assign({}, cfgAuto, {
+             mapSize: entry.blocks.length, requireHardPass: !isEasy,
+@@ -7484,6 +7489,7 @@ AntSolver.App = (function() {
+           });
+           cfg._build = APP_BUILD;
+           if (b.mode === 'goal') {
++            cfg.reviewMix = !!(syncPreflight && syncPreflight.status === 'review');
+             cfg.experienceGoal = genExperienceGoalEnabled();
+             cfg.goalMaxMs = genGoalBudgetMs();
+             cfg.capacityTuneMs = 5000; cfg.capacityTuneCars = 8; cfg.capacityTuneVariants = 48;
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index f8af0ee..942e098 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -99,13 +99,15 @@ function _goalRound() {
+   var cfg = {};
+   for (var k in g.config) cfg[k] = g.config[k];
+   cfg.goalMode = false;
++  var reviewExpose = g.config.reviewMix === true && (g.rounds % 2 === 1);
++  if (reviewExpose) { cfg.cutMode = 'exposeCut'; cfg.boardLayout = 'rowMajor'; }
+   // 【v438】ABC 三个基底：逻辑并行，单 worker 先顺序执行；每个基底各自跑 A1~A4
+   var _goalK = Math.max(1, Math.min(3, parseInt(g.config.goalBases, 10) || 3));
+   cfg.portfolioK = _goalK;
+   // 【v513】goalBases是本轮内的候选数，不再把20秒放大成60秒；容量臂也共享这份预算。
+   cfg.timeBudgetMs = roundBudgetMs;
+   cfg.capBudgetShared = g.config.goalSharedBudget !== false;
+-  cfg.seed = (g.baseSeed + g.rounds * 7919) >>> 0;
++  cfg.seed = (g.baseSeed + (g.config.reviewMix === true ? Math.floor(g.rounds / 2) : g.rounds) * 7919) >>> 0;
+   cfg._trace = [];
+   self.postMessage({ type: 'flow', index: g.index, round: g.rounds + 1,
+     text: '目标第' + (g.rounds + 1) + '轮开始 · seed ' + cfg.seed });
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index e5c594b..795e315 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14933,12 +14933,15 @@ AntSolver.Generator = (function() {
+       if (maxMs && (Date.now() - t0) >= maxMs) break;
+       var roundBudgetMs = maxMs ? Math.max(1000, Math.min(perMs, maxMs - (Date.now() - t0))) : perMs;
+       var roundT0 = Date.now();
++      var reviewExpose = config.reviewMix === true && (rounds % 2 === 1);
+       var cfg = Object.assign({}, config, {
+         goalMode: false,
++        cutMode: reviewExpose ? 'exposeCut' : config.cutMode,
++        boardLayout: reviewExpose ? 'rowMajor' : config.boardLayout,
+         portfolioK: 1,
+         timeBudgetMs: roundBudgetMs,
+         capBudgetShared: config.goalSharedBudget !== false,
+-        seed: (baseSeed + rounds * 7919) >>> 0,
++        seed: (baseSeed + (config.reviewMix === true ? Math.floor(rounds / 2) : rounds) * 7919) >>> 0,
+         _trace: []
+       });
+       var r = null;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 19f7258..860ff39 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -44,15 +44,16 @@
+ | v515 完整体验选优 | best能否按真实目标而非结构启发式选择 | quick-only否决；full后5组通过无回退、4组hash不变，006失败distance 44.4→21.4；UI 1/2 | `体验选优_汇总_v515.json` | §505 |
+ | v516 独立图/seed | 当前生成器能否泛化到五图与困难seed | 目标4/10；ready 3/4、review 1/6；所有目标通过样本仍有PlayerSim 0%项 | `目标独立回归.js` + `独立图种子汇总_v516.json` | §506 |
+ | v516 替代路线验收 | 参考unknown但另一路线完整达标是否被误杀 | 好图1002由beam 73.7%+释放回放验收，保存signature；不放宽其他unknown | `多路线最终验收_预登记_v516.md` + `好图1002_替代路线验收_v516.json` | §506 |
++| v517 预检混合切法 | review该选layer还是expose | 单臂各1/6且成功互补；独立seed混合2/6，结构不变；expose不推荐默认 | `预检切法分派_预登记_v517.md` + `预检切法分派_汇总_v517.json` | §507 |
+ 
+ ## 当前权威产物
+ 
+ | 用途 | 文件 |
+ |---|---|
+ | 生产现状 | `01_交接文档/交接摘要_v500_20261025.md` |
+-| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（独立回归已做，下一项预检策略/结构近失/真人校准） |
++| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（预检混合已接，下一项结构近失/真人校准） |
+ | 手册/参数 | `01_交接文档/工程说明.md` |
+ | 历史决策 | `01_交接文档/工作日志_20261012.md`（按节号查） |
+ | 结论摘要 | 本目录 `归因_v495.md`、`E5_结果.md`、`E6a_结果.md`、`E6b_结果.md`、`E6c_*.md`、`P4_枚举.md` |
+-| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v516.patch` |
++| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v517.patch` |
+ | 历史版本 | `git log --oneline`（删除项都在 git 历史里） |
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\347\213\254\347\253\213\345\233\236\345\275\222.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\347\213\254\347\253\213\345\233\236\345\275\222.js"
+index 1ce49a7..20d4485 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\347\213\254\347\253\213\345\233\236\345\275\222.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\347\213\254\347\253\213\345\233\236\345\275\222.js"
+@@ -4,12 +4,13 @@
+ const fs=require('fs'),path=require('path'),vm=require('vm'),crypto=require('crypto');
+ const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
+ const FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','generator.js','source-preflight.js'];
+-const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON,setTimeout,clearTimeout,Infinity};vm.createContext(sb);for(const f of FILES)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver,G=A.Generator;
+-function opt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?process.argv[i+1]:d;}const seed=+opt('seed','32677'),budgetMs=+opt('budget','60000'),roundMs=+opt('round','20000'),out=opt('out',''),dumpDir=opt('dump-dir',''),only=opt('images','006,007,010,recommend,good').split(',');
++const generatorPath=opt('generator','');
++const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON,setTimeout,clearTimeout,Infinity};vm.createContext(sb);for(const f of FILES){const src=f==='generator.js'&&generatorPath?fs.readFileSync(path.resolve(ROOT,generatorPath),'utf8'):fs.readFileSync(path.join(BIN,f),'utf8');vm.runInContext(src,sb,{filename:f});}const A=sb.AntSolver,G=A.Generator;
++function opt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?process.argv[i+1]:d;}const seed=+opt('seed','32677'),budgetMs=+opt('budget','60000'),roundMs=+opt('round','20000'),out=opt('out',''),dumpDir=opt('dump-dir',''),cutMode=opt('cut','layerCut2'),reviewMix=opt('review-mix','0')==='1',only=opt('images','006,007,010,recommend,good').split(',');
+ const images={'006':'蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt','007':'蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt','010':'蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_010.txt',recommend:'实验关/已知不可救/推荐_35x35_碎块_20261023.txt',good:'实验关/已知冲突/好图_35x35_碎块_20261023.txt'};
+ function hash(x){return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');}
+ function run(id){const file=images[id];if(!file)throw new Error('未知图 '+id);const blocks=G.blocksFromTXT(fs.readFileSync(path.join(ROOT,file),'utf8')),band=G.deriveCapacityBand(blocks),pf=A.SourcePreflight?A.SourcePreflight.analyze(blocks):null,t0=Date.now();
+- const cfg={seed,goalPerRoundMs:roundMs,goalMaxMs:budgetMs,goalMaxRounds:0,goalSharedBudget:true,experienceGoal:true,generatorFlow:'new_fixed',boxSizeMin:band.band[0],boxSizeMax:band.band[1],capNormMin:band.band[0],capNormMax:band.band[1],capScalePlan:[1.45,1.15],cutMode:'layerCut2',candidateCount:3,fullTime:true,portfolioK:1,acceptMode:'target',targetPeakMin:3.2,targetPeakMax:4.8,targetSteadyMin:0,targetSteadyMax:100,targetBand3Min:0,targetBand4Min:0,targetPlayerPassMin:.25,boardAllowSquare:true,boardRowsMin:6,boardRowsMax:9,boardColsMin:6,boardColsMax:11,boardHardRange:true,boardAuto:false,capacityTuneMs:5000,capacityTuneCars:8,capacityTuneVariants:48};
++ const cfg={seed,goalPerRoundMs:roundMs,goalMaxMs:budgetMs,goalMaxRounds:0,goalSharedBudget:true,experienceGoal:true,reviewMix,generatorFlow:'new_fixed',boxSizeMin:band.band[0],boxSizeMax:band.band[1],capNormMin:band.band[0],capNormMax:band.band[1],capScalePlan:[1.45,1.15],cutMode,boardLayout:cutMode==='exposeCut'?'rowMajor':undefined,candidateCount:3,fullTime:true,portfolioK:1,acceptMode:'target',targetPeakMin:3.2,targetPeakMax:4.8,targetSteadyMin:0,targetSteadyMax:100,targetBand3Min:0,targetBand4Min:0,targetPlayerPassMin:.25,boardAllowSquare:true,boardRowsMin:6,boardRowsMax:9,boardColsMin:6,boardColsMax:11,boardHardRange:true,boardAuto:false,capacityTuneMs:5000,capacityTuneCars:8,capacityTuneVariants:48};
+  let r=null;try{r=G.produceGoal(blocks,cfg);}catch(e){r={level:null,valid:false,error:String(e&&e.message||e)};}const wallMs=Date.now()-t0,ev=r&&r._experienceFull||(r&&r.level?A.ExperienceGoal.evaluate(r.level,{solveResult:r.solveResult,decision:true}):null),ca=r&&r.level?A.Quality.capacityEvidence(r.level,r.config||cfg):null,q=r&&r.level?A.Quality.fromGeneration(r):null,p=r&&r.goodV3&&r.goodV3.persist||{};
+  const rec={image:id,file,seed,preflight:pf&&{status:pf.status,warnings:pf.warnings,free:pf.capacity&&pf.capacity.free,band:pf.capacity&&pf.capacity.band},wallMs,overrunMs:Math.max(0,wallMs-budgetMs),rounds:r&&r.goalRounds||0,stop:r&&r.goalStopReason||null,valid:!!(r&&r.valid),struct:!!(r&&r.level&&G.goalStructPass(r)),pass:!!(r&&r.level&&G.goalResultExperiencePass(r,cfg)),acceptedByVerifiedRoute:!!(r&&r.acceptedByVerifiedRoute),
+  experience:ev&&{pass:ev.pass,status:ev.status,reasons:ev.reasons,metrics:ev.metrics,release:ev.releaseDecision&&{status:ev.releaseDecision.status,unknown:ev.releaseDecision.unknownAlternatives,alternatives:ev.releaseDecision.alternativesTried}},route:r&&r.experienceRouteEvidence&&{pass:r.experienceRouteEvidence.pass,count:r.experienceRouteEvidence.routeCount,limited:r.experienceRouteEvidence.searchLimited,multi:r.experienceRouteEvidence.multi,bestVerified:r.experienceRouteEvidence.bestVerified,distribution:r.experienceRouteEvidence.routeDistribution,error:r.experienceRouteEvidence.error||null},
+@@ -19,4 +20,4 @@ function run(id){const file=images[id];if(!file)throw new Error('未知图 '+id)
+ }
+ const rows=[];for(const id of only){if(images[id])rows.push(run(id));}
+ const summary={runs:rows.length,pass:rows.filter(r=>r.pass).length,struct:rows.filter(r=>r.struct).length,wallTotalMs:rows.reduce((n,r)=>n+r.wallMs,0),overrunTotalMs:rows.reduce((n,r)=>n+r.overrunMs,0),byPreflight:Object.fromEntries(['ready','review'].map(s=>{const a=rows.filter(r=>r.preflight&&r.preflight.status===s);return [s,{runs:a.length,pass:a.filter(r=>r.pass).length}];})),releaseUnknown:rows.filter(r=>r.experience&&r.experience.release&&r.experience.release.status!=='found').map(r=>r.image),playerBlack:rows.filter(r=>r.pass&&(r.player.first===0||r.player.learned===0||r.player.look===0)).map(r=>r.image)};
+-const report={schema:'goal-independent-regression-v1',version:'v516',config:{seed,budgetMs,roundMs,images:only},summary,rows};if(out)fs.writeFileSync(path.resolve(ROOT,out),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(summary,null,2));
++const report={schema:'goal-independent-regression-v1',version:'v516',config:{seed,budgetMs,roundMs,images:only,cutMode,reviewMix},summary,rows};if(out)fs.writeFileSync(path.resolve(ROOT,out),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(summary,null,2));
+diff --git a/README.md b/README.md
+index 925868a..57ae9a7 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v516**（独立图回归与已验证替代路线验收）。
++> 当前版本 **v517**（预检review的混合切法与独立seed搜索）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看框架图** | [`01_交接文档/框架图_生成流程_动画版.html`](01_交接文档/框架图_生成流程_动画版.html)（五阶段播放 + 详细流程图） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施（v502~v516）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施（v502~v517）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **查某天为什么这么改** | [`01_交接文档/工作日志_20261012.md`](01_交接文档/工作日志_20261012.md)（401 节，**按主题索引查，别整份读**） |

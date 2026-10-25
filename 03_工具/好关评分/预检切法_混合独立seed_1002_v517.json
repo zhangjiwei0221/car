@@ -1,0 +1,477 @@
+{
+  "schema": "goal-independent-regression-v1",
+  "version": "v516",
+  "config": {
+    "seed": 1002,
+    "budgetMs": 60000,
+    "roundMs": 20000,
+    "images": [
+      "007",
+      "recommend",
+      "good"
+    ],
+    "cutMode": "layerCut2",
+    "reviewMix": true
+  },
+  "summary": {
+    "runs": 3,
+    "pass": 1,
+    "struct": 2,
+    "wallTotalMs": 201882,
+    "overrunTotalMs": 21882,
+    "byPreflight": {
+      "ready": {
+        "runs": 0,
+        "pass": 0
+      },
+      "review": {
+        "runs": 3,
+        "pass": 1
+      }
+    },
+    "releaseUnknown": [
+      "recommend",
+      "good"
+    ],
+    "playerBlack": [
+      "good"
+    ]
+  },
+  "rows": [
+    {
+      "image": "007",
+      "file": "蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt",
+      "seed": 1002,
+      "preflight": {
+        "status": "review",
+        "warnings": [
+          "opening_free_supply"
+        ],
+        "free": 6,
+        "band": [
+          31,
+          31
+        ]
+      },
+      "wallMs": 66877,
+      "overrunMs": 6877,
+      "rounds": 3,
+      "stop": "goalTimeUp",
+      "valid": true,
+      "struct": true,
+      "pass": false,
+      "acceptedByVerifiedRoute": false,
+      "experience": {
+        "pass": false,
+        "status": "fail",
+        "reasons": [
+          "buffer34_below_50"
+        ],
+        "metrics": {
+          "midSteps": 19,
+          "midBuffer34Pct": 31.6,
+          "midBuffer5Pct": 5.3,
+          "maxBuffer5Run": 1,
+          "significantReleaseCount": 2,
+          "oscillationCount": 3,
+          "lateHighPressurePct": 0,
+          "maxBuffer": 5,
+          "distance": 18.4
+        },
+        "release": {
+          "status": "found",
+          "unknown": 0,
+          "alternatives": 1
+        }
+      },
+      "route": {
+        "pass": false,
+        "count": 1,
+        "limited": true,
+        "multi": {
+          "status": "budget_exhausted",
+          "routes": 0,
+          "distinctRoutes": 0,
+          "nodes": 1744,
+          "budgetExhausted": true,
+          "elapsedMs": 2010
+        },
+        "bestVerified": {
+          "source": "baseline",
+          "metrics": {
+            "midSteps": 19,
+            "midBuffer34Pct": 31.6,
+            "midBuffer5Pct": 5.3,
+            "maxBuffer5Run": 1,
+            "significantReleaseCount": 2,
+            "oscillationCount": 3,
+            "lateHighPressurePct": 0,
+            "maxBuffer": 5,
+            "distance": 18.4
+          },
+          "signature": "0,5 0,3 0,4 1,3 2,5 2,3 2,4 2,2 2,1 1,1 1,0 2,0 2,2 0,1 3,3 2,2 2,2 4,3 1,2 5,3 5,2 5,1 0,2 5,0 3,1 5,4 5,5 4,5",
+          "releaseDecision": null
+        },
+        "distribution": {
+          "minBuffer34Pct": 31.6,
+          "maxBuffer34Pct": 31.6,
+          "spreadPp": 0,
+          "lowPressureRoute": {
+            "source": "baseline",
+            "midBuffer34Pct": 31.6,
+            "significantReleaseCount": 2,
+            "firstDivergence": null,
+            "choiceContrast": {
+              "status": "no_divergence"
+            }
+          },
+          "note": "低压力路线可能代表聪明解法，不自动判为关卡缺陷；明显性仍需玩家模型/真人判断。"
+        },
+        "error": null
+      },
+      "player": {
+        "first": 0,
+        "learned": 0,
+        "look": 0
+      },
+      "qReasons": [
+        "学会后0%<55%（学不会）",
+        "前瞻0%<40%（偏黑）",
+        "T未测",
+        "R后悔0pp<15（没岔路）"
+      ],
+      "qGateReasons": [],
+      "capacity": {
+        "cars": 34,
+        "minCap": 25,
+        "maxCap": 45,
+        "boxSizeMin": 31,
+        "boxSizeMax": 45,
+        "belowMin": 11,
+        "aboveMax": 0,
+        "conserved": true,
+        "boardFloorPass": true
+      },
+      "board": {
+        "rows": 6,
+        "cols": 6
+      },
+      "hash": "65bb60c1d00771df2a5a4f3a8f10d9c3feb81f9fcd4d4ff038b06f7aaacd439a"
+    },
+    {
+      "image": "recommend",
+      "file": "实验关/已知不可救/推荐_35x35_碎块_20261023.txt",
+      "seed": 1002,
+      "preflight": {
+        "status": "review",
+        "warnings": [
+          "opening_free_supply"
+        ],
+        "free": 11,
+        "band": [
+          13,
+          13
+        ]
+      },
+      "wallMs": 64762,
+      "overrunMs": 4762,
+      "rounds": 4,
+      "stop": "goalTimeUp",
+      "valid": true,
+      "struct": false,
+      "pass": false,
+      "acceptedByVerifiedRoute": false,
+      "experience": {
+        "pass": false,
+        "status": "fail",
+        "reasons": [
+          "buffer34_below_50",
+          "release_decision_unknown_within_budget"
+        ],
+        "metrics": {
+          "midSteps": 51,
+          "midBuffer34Pct": 29.4,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 1,
+          "oscillationCount": 1,
+          "lateHighPressurePct": 0,
+          "maxBuffer": 3,
+          "distance": 45.6
+        },
+        "release": {
+          "status": "unknown_within_budget",
+          "unknown": 6,
+          "alternatives": 6
+        }
+      },
+      "route": {
+        "pass": false,
+        "count": 1,
+        "limited": true,
+        "multi": {
+          "status": "budget_exhausted",
+          "routes": 0,
+          "distinctRoutes": 0,
+          "nodes": 4000,
+          "budgetExhausted": true,
+          "elapsedMs": 1821
+        },
+        "bestVerified": {
+          "source": "baseline",
+          "metrics": {
+            "midSteps": 51,
+            "midBuffer34Pct": 29.4,
+            "midBuffer5Pct": 0,
+            "maxBuffer5Run": 0,
+            "significantReleaseCount": 1,
+            "oscillationCount": 1,
+            "lateHighPressurePct": 0,
+            "maxBuffer": 3,
+            "distance": 20.6
+          },
+          "signature": "0,1 0,6 0,5 0,7 1,5 2,5 2,4 2,6 3,6 0,8 1,8 2,8 3,8 4,8 5,8 5,9 6,9 6,8 4,6 5,6 5,5 7,8 7,7 8,7 6,6 7,6 7,9 5,7 8,9 8,6 0,3 1,3 0,9 1,1 1,0 6,5 6,4 7,4 0,2 8,4 8,3 8,2 1,2 1,4 1,7 2,0 1,6 2,1 3,5 6,3 1,9 3,0 2,7 3,1 4,1 5,1 3,2 3,3 4,9 3,3 3,3 3,3 6,3 6,3 6,3 6,7 0,4 8,8 6,1 4,3 4,4 7,2 6,0 7,0 2,9 4,0 7,1 7,3 2,3 4,2",
+          "releaseDecision": null
+        },
+        "distribution": {
+          "minBuffer34Pct": 29.4,
+          "maxBuffer34Pct": 29.4,
+          "spreadPp": 0,
+          "lowPressureRoute": {
+            "source": "baseline",
+            "midBuffer34Pct": 29.4,
+            "significantReleaseCount": 1,
+            "firstDivergence": null,
+            "choiceContrast": {
+              "status": "no_divergence"
+            }
+          },
+          "note": "低压力路线可能代表聪明解法，不自动判为关卡缺陷；明显性仍需玩家模型/真人判断。"
+        },
+        "error": null
+      },
+      "player": {
+        "first": 40,
+        "learned": 60,
+        "look": 0
+      },
+      "qReasons": [
+        "前瞻0%<40%（偏黑）",
+        "吃满中位9>2（太白给）",
+        "T陷阱3%<10%（没压力）",
+        "免费步78%>50%",
+        "最长免费连38步>5"
+      ],
+      "qGateReasons": [
+        "吃满中位 9>3",
+        "freeLow 61%>30%",
+        "最长免费连 38>6"
+      ],
+      "capacity": {
+        "cars": 85,
+        "minCap": 10,
+        "maxCap": 19,
+        "boxSizeMin": 13,
+        "boxSizeMax": 19,
+        "belowMin": 21,
+        "aboveMax": 0,
+        "conserved": true,
+        "boardFloorPass": true
+      },
+      "board": {
+        "rows": 9,
+        "cols": 10
+      },
+      "hash": "77dfd514370e68a5d59859cd89e4c3b9834f03d9adb135700ded72ab993a6786"
+    },
+    {
+      "image": "good",
+      "file": "实验关/已知冲突/好图_35x35_碎块_20261023.txt",
+      "seed": 1002,
+      "preflight": {
+        "status": "review",
+        "warnings": [
+          "opening_free_supply"
+        ],
+        "free": 8,
+        "band": [
+          40,
+          40
+        ]
+      },
+      "wallMs": 70243,
+      "overrunMs": 10243,
+      "rounds": 3,
+      "stop": "pass_verified_route",
+      "valid": true,
+      "struct": true,
+      "pass": true,
+      "acceptedByVerifiedRoute": true,
+      "experience": {
+        "pass": false,
+        "status": "unknown",
+        "reasons": [
+          "release_decision_unknown_within_budget"
+        ],
+        "metrics": {
+          "midSteps": 18,
+          "midBuffer34Pct": 88.9,
+          "midBuffer5Pct": 5.6,
+          "maxBuffer5Run": 1,
+          "significantReleaseCount": 1,
+          "oscillationCount": 1,
+          "lateHighPressurePct": 40,
+          "maxBuffer": 5,
+          "distance": 25
+        },
+        "release": {
+          "status": "unknown_within_budget",
+          "unknown": 4,
+          "alternatives": 6
+        }
+      },
+      "route": {
+        "pass": true,
+        "count": 5,
+        "limited": true,
+        "multi": {
+          "status": "solved",
+          "routes": 4,
+          "distinctRoutes": 4,
+          "nodes": 2659,
+          "budgetExhausted": false,
+          "elapsedMs": 1692
+        },
+        "bestVerified": {
+          "source": "beam",
+          "metrics": {
+            "midSteps": 19,
+            "midBuffer34Pct": 73.7,
+            "midBuffer5Pct": 0,
+            "maxBuffer5Run": 0,
+            "significantReleaseCount": 2,
+            "oscillationCount": 2,
+            "lateHighPressurePct": 20,
+            "maxBuffer": 4,
+            "distance": 0
+          },
+          "signature": "0,1 0,2 0,5 1,2 1,1 0,4 1,4 2,4 2,2 2,3 3,4 0,3 4,3 2,2 2,5 2,1 2,2 5,3 5,4 5,5 4,5 5,2 5,1 5,0 3,1 1,0 2,0 2,2",
+          "releaseDecision": {
+            "status": "found",
+            "found": true,
+            "decisionsTried": 2,
+            "alternativesTried": 4,
+            "solvedNoRelease": 0,
+            "unknownAlternatives": 3,
+            "highPressureStates": 2,
+            "searchLimited": true,
+            "evidence": {
+              "referenceStep": 9,
+              "progress": 0.305,
+              "beforeBuffer": 4,
+              "action": {
+                "r": 2,
+                "c": 2,
+                "color": 31
+              },
+              "minBufferWithinWindow": 3,
+              "releaseAmplitude": 1,
+              "releaseWindow": 4,
+              "finalReplayValid": true,
+              "routeActions": 19,
+              "source": "reference_action",
+              "choiceContrast": null
+            },
+            "elapsedMs": 1092
+          }
+        },
+        "distribution": {
+          "minBuffer34Pct": 73.7,
+          "maxBuffer34Pct": 88.9,
+          "spreadPp": 15.2,
+          "lowPressureRoute": {
+            "source": "beam",
+            "midBuffer34Pct": 73.7,
+            "significantReleaseCount": 2,
+            "firstDivergence": {
+              "step": 1,
+              "from": "0,5",
+              "to": "0,1"
+            },
+            "choiceContrast": {
+              "status": "compared",
+              "step": 1,
+              "progress": 0,
+              "parentBuffer": 0,
+              "baselineAction": {
+                "legal": true,
+                "r": 0,
+                "c": 5,
+                "color": 30,
+                "count": 43,
+                "canConsume": true,
+                "q": false,
+                "numice": 0,
+                "chain": 0,
+                "immediateEliminated": 43,
+                "bufferBefore": 0,
+                "bufferAfter": 0,
+                "overflow": false
+              },
+              "lowAction": {
+                "legal": true,
+                "r": 0,
+                "c": 1,
+                "color": 5,
+                "count": 34,
+                "canConsume": true,
+                "q": false,
+                "numice": 0,
+                "chain": 4,
+                "immediateEliminated": 65,
+                "bufferBefore": 0,
+                "bufferAfter": 0,
+                "overflow": false
+              },
+              "pressureDropPp": 15.2,
+              "immediateYieldRelation": "higher_short_term",
+              "planningLikeCandidate": false,
+              "obviousBypassCandidate": false,
+              "note": "仅描述分岔证据；planningLike/obviousBypass都需玩家模型或真人复核。"
+            }
+          },
+          "note": "低压力路线可能代表聪明解法，不自动判为关卡缺陷；明显性仍需玩家模型/真人判断。"
+        },
+        "error": null
+      },
+      "player": {
+        "first": 0,
+        "learned": 0,
+        "look": 0
+      },
+      "qReasons": [
+        "学会后0%<55%（学不会）",
+        "前瞻0%<40%（偏黑）",
+        "T未测",
+        "R后悔1pp<15（没岔路）"
+      ],
+      "qGateReasons": [],
+      "capacity": {
+        "cars": 34,
+        "minCap": 29,
+        "maxCap": 46,
+        "boxSizeMin": 40,
+        "boxSizeMax": 46,
+        "belowMin": 27,
+        "aboveMax": 0,
+        "conserved": true,
+        "boardFloorPass": true
+      },
+      "board": {
+        "rows": 6,
+        "cols": 6
+      },
+      "hash": "2a19087cb4ec6f63712df145333330fa8c61cd9b84dc04a739fbe73c4487d6bf"
+    }
+  ]
+}

@@ -99,13 +99,15 @@ function _goalRound() {
   var cfg = {};
   for (var k in g.config) cfg[k] = g.config[k];
   cfg.goalMode = false;
+  var reviewExpose = g.config.reviewMix === true && (g.rounds % 2 === 1);
+  if (reviewExpose) { cfg.cutMode = 'exposeCut'; cfg.boardLayout = 'rowMajor'; }
   // 【v438】ABC 三个基底：逻辑并行，单 worker 先顺序执行；每个基底各自跑 A1~A4
   var _goalK = Math.max(1, Math.min(3, parseInt(g.config.goalBases, 10) || 3));
   cfg.portfolioK = _goalK;
   // 【v513】goalBases是本轮内的候选数，不再把20秒放大成60秒；容量臂也共享这份预算。
   cfg.timeBudgetMs = roundBudgetMs;
   cfg.capBudgetShared = g.config.goalSharedBudget !== false;
-  cfg.seed = (g.baseSeed + g.rounds * 7919) >>> 0;
+  cfg.seed = (g.baseSeed + (g.config.reviewMix === true ? Math.floor(g.rounds / 2) : g.rounds) * 7919) >>> 0;
   cfg._trace = [];
   self.postMessage({ type: 'flow', index: g.index, round: g.rounds + 1,
     text: '目标第' + (g.rounds + 1) + '轮开始 · seed ' + cfg.seed });
