@@ -623,6 +623,9 @@ AntSolver.Generator = (function() {
       //    关闭开关时回退旧的“贪心可达最多色”序(solverGuidedBoxes)。盒的 elimSeq=消除顺序下标。
       //    bottomOnly 时改走底部依赖流分支(baseFillBoxesBottom)——D2：旧流程一并对齐。
       var boxes = pickBoxSplit(blocks, curCfg);
+      if (curCfg.roleSchedule && !curCfg._demandCurve) {
+        try { curCfg._demandCurve = demandCurveOf(blocks); } catch (e) { curCfg._demandCurve = null; }
+      }
       // 2) 确定棋盘骨架(尺寸+障碍/墙/管道) → 基础填球按消除顺序顺序填入 → 再执行后续铺盒扰动
       GENPERF.boardBuilds++;                       // 埋点：建盘次数(含每次重试)
       var _tb = Date.now();
@@ -1381,6 +1384,18 @@ AntSolver.Generator = (function() {
     return best;
   }
 
+  function applyRoleSchedule(list, config, rows, cols, timing) {
+    if (!config || config.roleSchedule !== true || !AntSolver.CarSequencer) return list;
+    // 与其他指定摆位算法互斥，避免角色排程后又被覆盖。
+    if (config.boardLayout === 'rowMajor' || config.rowMajorMix || config.layerFill || config.sandwich) {
+      if (timing) timing.roleSchedule = { applied: false, reason: 'conflicting-layout' };
+      return list;
+    }
+    var scheduled = AntSolver.CarSequencer.schedule(list, config, cols);
+    if (timing) timing.roleSchedule = scheduled.plan;
+    return scheduled.cars;
+  }
+
   function buildBoard(boxes, config) {
     // 【v350·用户裁决】行优先摆盘（配合 cutMode='exposeCut'）：车单顺序 = 自上而下。
     if (config && config.boardLayout === 'rowMajor') {
@@ -1577,6 +1592,7 @@ AntSolver.Generator = (function() {
       //       同时优于「并行 P=5 不交错」（簇 2.00 / 对 2 / 65.0% / 35.0%）。W=3 不够，W=6/9/12 等效 → 取 6。
       // 管道入队不参与交错：管道队列不构成棋盘表面相邻，故那支仍按队列顺序取。
       list.sort(function (a, b) { return a._seq - b._seq; });
+      list = applyRoleSchedule(list, config, rows, cols, null);
       var ilW = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
       // 从 list 的 [fi, fi+W) 窗口里挑一个与左邻/上邻不同色的盒，返回其下标（挑不到返回 fi）。
       // 命中后调用方把它 splice 到 fi 位置再正常前进，从而只做局部换位、不改变整体顺序。
@@ -3713,6 +3729,7 @@ AntSolver.Generator = (function() {
       }
     }
 
+    list = applyRoleSchedule(list, config, rows, cols, timing);
     // 单扫填球：空格→普通盒；管道本体→入队 1 个
     //
     // ===== 局部交错摆放（v114，任务 ANT-GEN-FILL-INTERLEAVE-20260827）=====
@@ -7914,9 +7931,37 @@ AntSolver.Generator = (function() {
    * 严格卡点门(config.requireHardPass，默认false)：true 时【简单合格(趋势符合，无实际卡点)】不算数、不早停，
    *   继续搜索直到拿到【困难合格(真实卡点)】或超时兜底——供批量生产按比例分配"简单/困难"关卡用。
    */
+  function auditRoleCandidate(cand) {
+    if (!cand || !cand.level || !AntSolver.CarSequencer) return null;
+    try {
+      var cfg = Object.assign({}, cand.config);
+      if (!cfg._demandCurve) cfg._demandCurve = demandCurveOf(cand.level.blocks);
+      cand.carRoleAudit = AntSolver.CarSequencer.auditBoard(cand.level.board, cfg);
+    } catch (e) { cand.carRoleAuditError = String((e && e.message) || e); }
+    return cand.carRoleAudit;
+  }
+  function roleCompareSummary(cand) {
+    var fc = cand && cand.goodV3 && cand.goodV3.fillCurve || {};
+    return { valid: !!(cand && cand.valid), gate: goalStructPass(cand),
+      freeLow: fc.freeLowPct != null ? fc.freeLowPct : null,
+      freeRun: fc.freeRunMax != null ? fc.freeRunMax : null,
+      row0: cand && cand.carRoleAudit ? cand.carRoleAudit.row0 : null };
+  }
+  function produceRoleCompare(blocks, config) {
+    var t0 = Date.now();
+    var base = produce(blocks, Object.assign({}, config, { roleSchedule: false }));
+    var role = produce(blocks, Object.assign({}, config, { roleSchedule: true }));
+    auditRoleCandidate(base); auditRoleCandidate(role);
+    var useRole = candBetter(role, base, config), out = useRole ? role : base;
+    out.roleCompare = { chosen: useRole ? 'role' : 'base', elapsedMs: Date.now() - t0,
+      base: roleCompareSummary(base), role: roleCompareSummary(role) };
+    return out;
+  }
+
   function produce(blocks, config) {
     seedRng(config && config.seed);
     config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
+    if (config.roleSchedule === 'compare') return produceRoleCompare(blocks, config);
     // 【v334】生成轨迹：每次评估一条，供界面"生成过程"面板回放
     if (config.trace !== false) { if (!config._trace) config._trace = []; }
     var K = Math.max(1, config.candidateCount || 1);
@@ -10258,6 +10303,14 @@ AntSolver.Generator = (function() {
 
     try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(cand.level, cand.config || {}); }
     catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
+    if (cand.config && cand.config.roleSchedule && AntSolver.CarSequencer) {
+      try {
+        var _roleCfg = Object.assign({}, cand.config);
+        if (!_roleCfg._demandCurve) _roleCfg._demandCurve = demandCurveOf(cand.level.blocks);
+        cand.carRoleAudit = AntSolver.CarSequencer.auditBoard(cand.level.board, _roleCfg);
+      }
+      catch (e) { cand.carRoleAuditError = String((e && e.message) || e); }
+    }
     return cand;
   }
 

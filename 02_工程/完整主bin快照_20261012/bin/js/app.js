@@ -6240,6 +6240,7 @@ AntSolver.App = (function() {
       cutInfo: (result.config && result.config._cutAuto) || null,
       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
       capacityAudit: result.capacityAudit || null,
+      carRoleAudit: result.carRoleAudit || null,
       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
       qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
       fullTime: !!(result.config && result.config.fullTime),

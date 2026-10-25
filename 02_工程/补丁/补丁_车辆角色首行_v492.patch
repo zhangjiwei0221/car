@@ -1,0 +1,266 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index f88f3b5..caded1c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v491 · 容量与棋盘合同</title>
+-  <link rel="stylesheet" href="css/style.css?v=491">
++  <title>车接小人 v492 · 车辆角色与首行排程</title>
++  <link rel="stylesheet" href="css/style.css?v=492">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v491</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v492</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,23 +769,24 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=491"></script>
+-  <script src="js/utils.js?v=491"></script>
++  <script src="js/zip.js?v=492"></script>
++  <script src="js/utils.js?v=492"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=491"></script>
+-  <script src="js/simulator.js?v=491"></script>
++  <script src="js/color-libs.js?v=492"></script>
++  <script src="js/simulator.js?v=492"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=491"></script>
+-  <script src="js/solver-strategy.js?v=491"></script>
+-  <script src="js/solver.js?v=491"></script>
+-  <script src="js/playersim.js?v=491"></script>
++  <script src="js/anchor-cut.js?v=492"></script>
++  <script src="js/solver-strategy.js?v=492"></script>
++  <script src="js/solver.js?v=492"></script>
++  <script src="js/playersim.js?v=492"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=491"></script>
+-  <script src="js/generator.js?v=491"></script>
+-  <script src="js/analysis.js?v=491"></script>
++  <script src="js/solver-analysis.js?v=492"></script>
++  <script src="js/car-sequencer.js?v=492"></script>
++  <script src="js/generator.js?v=492"></script>
++  <script src="js/analysis.js?v=492"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=491"></script>
+-  <script src="js/app.js?v=491"></script>
++  <script src="js/level-editor.js?v=492"></script>
++  <script src="js/app.js?v=492"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index f9b57e1..a19912b 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -6240,6 +6240,7 @@ AntSolver.App = (function() {
+       cutInfo: (result.config && result.config._cutAuto) || null,
+       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
+       capacityAudit: result.capacityAudit || null,
++      carRoleAudit: result.carRoleAudit || null,
+       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+       qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
+       fullTime: !!(result.config && result.config.fullTime),
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
+new file mode 100644
+index 0000000..e4fdd71
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
+@@ -0,0 +1,87 @@
++/** v492 · 车辆角色与首行排程（可选 roleSchedule） */
++var AntSolver = AntSolver || {};
++AntSolver.CarSequencer = (function () {
++  function exposed(config) {
++    var dc = config && config._demandCurve;
++    return dc && dc.startExposed || {};
++  }
++  function roleOf(car, config) {
++    var microMax = config && config.microCarMax != null ? +config.microCarMax : 2;
++    if ((car.count || 0) <= microMax) return 'microCar';
++    var start = exposed(config)[car.color] || 0;
++    return (car.count || 0) <= start ? 'freeSupply' : 'debtCar';
++  }
++  function assignRoles(cars, config) {
++    return (cars || []).map(function (car, index) {
++      var start = exposed(config)[car.color] || 0, role = roleOf(car, config);
++      return { car: car, index: index, role: role,
++        deficit: role === 'debtCar' ? Math.max(0, car.count - start) : 0,
++        startExposed: start };
++    });
++  }
++  function schedule(cars, config, cols) {
++    var n = Math.min(Math.max(0, cols || 0), (cars || []).length);
++    if (!n) return { cars: (cars || []).slice(), plan: null };
++    var roles = assignRoles(cars, config), selected = [], used = {}, colorCount = {};
++    var maxSame = Math.max(1, parseInt(config.row0ColorMax, 10) || 2);
++    var freeMax = Math.max(0, parseInt(config.row0FreeMax, 10));
++    if (isNaN(freeMax)) freeMax = 1;
++    var relaxed = 0;
++    function take(pool, reason) {
++      var chosen = null;
++      for (var i = 0; i < pool.length; i++) {
++        var item = pool[i];
++        if (used[item.index]) continue;
++        if ((colorCount[item.car.color] || 0) >= maxSame) continue;
++        chosen = item; break;
++      }
++      if (!chosen) {
++        for (var j = 0; j < pool.length; j++) if (!used[pool[j].index]) { chosen = pool[j]; relaxed++; break; }
++      }
++      if (!chosen) return false;
++      used[chosen.index] = true; selected.push({ item: chosen, reason: reason });
++      colorCount[chosen.car.color] = (colorCount[chosen.car.color] || 0) + 1;
++      return true;
++    }
++    function bySeq(a, b) { return (a.car._seq != null ? a.car._seq : a.index) - (b.car._seq != null ? b.car._seq : b.index); }
++    var free = roles.filter(function (x) { return x.role === 'freeSupply'; }).sort(bySeq);
++    var debt = roles.filter(function (x) { return x.role === 'debtCar'; }).sort(function (a, b) { return a.deficit - b.deficit || bySeq(a, b); });
++    var micro = roles.filter(function (x) { return x.role === 'microCar'; }).sort(bySeq);
++    var freeTarget = Math.min(freeMax, free.length, n);
++    for (var f = 0; f < freeTarget; f++) take(free, 'freeSupply');
++    var pool = debt.concat(free).concat(micro);
++    while (selected.length < n && pool.some(function (x) { return !used[x.index]; })) take(pool, 'menu');
++    // 极端情况下颜色/角色池不足，仍按原序补齐，不能丢车。
++    if (selected.length < n) for (var k = 0; k < roles.length && selected.length < n; k++) take(roles, 'fallback');
++    var first = selected.map(function (x) { return x.item.car; });
++    var rest = [];
++    for (var i = 0; i < cars.length; i++) if (!used[i]) rest.push(cars[i]);
++    var out = first.concat(rest);
++    out._rolePlan = {
++      schema: 'car-role-plan-v1', row0Cars: first.length, freeTarget: freeTarget,
++      selected: selected.map(function (x) { return { index: x.item.index, role: x.item.role, reason: x.reason,
++        color: x.item.car.color, count: x.item.car.count, deficit: x.item.deficit }; }),
++      relaxedColorLimit: relaxed, remainder: 'preserve-original-order'
++    };
++    return { cars: out, plan: out._rolePlan };
++  }
++  function auditBoard(board, config) {
++    var cells = board && board.cells || [], all = [], row0 = [];
++    for (var r = 0; r < (board && board.rows || 0); r++) for (var c = 0; c < (board && board.cols || 0); c++) {
++      var cell = cells[r] && cells[r][c];
++      if (cell && cell.t === 'box') { all.push(cell); if (r === 0) row0.push(cell); }
++    }
++    function countRole(list) {
++      var roles = assignRoles(list, config), out = { freeSupply: 0, debtCar: 0, microCar: 0, deficits: [] };
++      for (var i = 0; i < roles.length; i++) {
++        out[roles[i].role]++; if (roles[i].role === 'debtCar') out.deficits.push(roles[i].deficit);
++      }
++      return out;
++    }
++    var colors = {}, maxSame = 0;
++    for (var i = 0; i < row0.length; i++) { colors[row0[i].color] = (colors[row0[i].color] || 0) + 1; maxSame = Math.max(maxSame, colors[row0[i].color]); }
++    return { schema: 'car-role-audit-v1', all: countRole(all), row0: countRole(row0),
++      row0Cars: row0.length, row0Colors: Object.keys(colors).length, row0MaxSameColor: maxSame };
++  }
++  return { roleOf: roleOf, assignRoles: assignRoles, schedule: schedule, auditBoard: auditBoard };
++})();
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 8a7472c..192174e 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -623,6 +623,9 @@ AntSolver.Generator = (function() {
+       //    关闭开关时回退旧的“贪心可达最多色”序(solverGuidedBoxes)。盒的 elimSeq=消除顺序下标。
+       //    bottomOnly 时改走底部依赖流分支(baseFillBoxesBottom)——D2：旧流程一并对齐。
+       var boxes = pickBoxSplit(blocks, curCfg);
++      if (curCfg.roleSchedule && !curCfg._demandCurve) {
++        try { curCfg._demandCurve = demandCurveOf(blocks); } catch (e) { curCfg._demandCurve = null; }
++      }
+       // 2) 确定棋盘骨架(尺寸+障碍/墙/管道) → 基础填球按消除顺序顺序填入 → 再执行后续铺盒扰动
+       GENPERF.boardBuilds++;                       // 埋点：建盘次数(含每次重试)
+       var _tb = Date.now();
+@@ -1381,6 +1384,18 @@ AntSolver.Generator = (function() {
+     return best;
+   }
+ 
++  function applyRoleSchedule(list, config, rows, cols, timing) {
++    if (!config || config.roleSchedule !== true || !AntSolver.CarSequencer) return list;
++    // 与其他指定摆位算法互斥，避免角色排程后又被覆盖。
++    if (config.boardLayout === 'rowMajor' || config.rowMajorMix || config.layerFill || config.sandwich) {
++      if (timing) timing.roleSchedule = { applied: false, reason: 'conflicting-layout' };
++      return list;
++    }
++    var scheduled = AntSolver.CarSequencer.schedule(list, config, cols);
++    if (timing) timing.roleSchedule = scheduled.plan;
++    return scheduled.cars;
++  }
++
+   function buildBoard(boxes, config) {
+     // 【v350·用户裁决】行优先摆盘（配合 cutMode='exposeCut'）：车单顺序 = 自上而下。
+     if (config && config.boardLayout === 'rowMajor') {
+@@ -1577,6 +1592,7 @@ AntSolver.Generator = (function() {
+       //       同时优于「并行 P=5 不交错」（簇 2.00 / 对 2 / 65.0% / 35.0%）。W=3 不够，W=6/9/12 等效 → 取 6。
+       // 管道入队不参与交错：管道队列不构成棋盘表面相邻，故那支仍按队列顺序取。
+       list.sort(function (a, b) { return a._seq - b._seq; });
++      list = applyRoleSchedule(list, config, rows, cols, null);
+       var ilW = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
+       // 从 list 的 [fi, fi+W) 窗口里挑一个与左邻/上邻不同色的盒，返回其下标（挑不到返回 fi）。
+       // 命中后调用方把它 splice 到 fi 位置再正常前进，从而只做局部换位、不改变整体顺序。
+@@ -3713,6 +3729,7 @@ AntSolver.Generator = (function() {
+       }
+     }
+ 
++    list = applyRoleSchedule(list, config, rows, cols, timing);
+     // 单扫填球：空格→普通盒；管道本体→入队 1 个
+     //
+     // ===== 局部交错摆放（v114，任务 ANT-GEN-FILL-INTERLEAVE-20260827）=====
+@@ -7914,9 +7931,37 @@ AntSolver.Generator = (function() {
+    * 严格卡点门(config.requireHardPass，默认false)：true 时【简单合格(趋势符合，无实际卡点)】不算数、不早停，
+    *   继续搜索直到拿到【困难合格(真实卡点)】或超时兜底——供批量生产按比例分配"简单/困难"关卡用。
+    */
++  function auditRoleCandidate(cand) {
++    if (!cand || !cand.level || !AntSolver.CarSequencer) return null;
++    try {
++      var cfg = Object.assign({}, cand.config);
++      if (!cfg._demandCurve) cfg._demandCurve = demandCurveOf(cand.level.blocks);
++      cand.carRoleAudit = AntSolver.CarSequencer.auditBoard(cand.level.board, cfg);
++    } catch (e) { cand.carRoleAuditError = String((e && e.message) || e); }
++    return cand.carRoleAudit;
++  }
++  function roleCompareSummary(cand) {
++    var fc = cand && cand.goodV3 && cand.goodV3.fillCurve || {};
++    return { valid: !!(cand && cand.valid), gate: goalStructPass(cand),
++      freeLow: fc.freeLowPct != null ? fc.freeLowPct : null,
++      freeRun: fc.freeRunMax != null ? fc.freeRunMax : null,
++      row0: cand && cand.carRoleAudit ? cand.carRoleAudit.row0 : null };
++  }
++  function produceRoleCompare(blocks, config) {
++    var t0 = Date.now();
++    var base = produce(blocks, Object.assign({}, config, { roleSchedule: false }));
++    var role = produce(blocks, Object.assign({}, config, { roleSchedule: true }));
++    auditRoleCandidate(base); auditRoleCandidate(role);
++    var useRole = candBetter(role, base, config), out = useRole ? role : base;
++    out.roleCompare = { chosen: useRole ? 'role' : 'base', elapsedMs: Date.now() - t0,
++      base: roleCompareSummary(base), role: roleCompareSummary(role) };
++    return out;
++  }
++
+   function produce(blocks, config) {
+     seedRng(config && config.seed);
+     config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
++    if (config.roleSchedule === 'compare') return produceRoleCompare(blocks, config);
+     // 【v334】生成轨迹：每次评估一条，供界面"生成过程"面板回放
+     if (config.trace !== false) { if (!config._trace) config._trace = []; }
+     var K = Math.max(1, config.candidateCount || 1);
+@@ -10258,6 +10303,14 @@ AntSolver.Generator = (function() {
+ 
+     try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(cand.level, cand.config || {}); }
+     catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
++    if (cand.config && cand.config.roleSchedule && AntSolver.CarSequencer) {
++      try {
++        var _roleCfg = Object.assign({}, cand.config);
++        if (!_roleCfg._demandCurve) _roleCfg._demandCurve = demandCurveOf(cand.level.blocks);
++        cand.carRoleAudit = AntSolver.CarSequencer.auditBoard(cand.level.board, _roleCfg);
++      }
++      catch (e) { cand.carRoleAuditError = String((e && e.message) || e); }
++    }
+     return cand;
+   }
+ 
