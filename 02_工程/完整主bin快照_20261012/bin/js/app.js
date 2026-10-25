@@ -496,18 +496,22 @@ AntSolver.App = (function() {
     var _smPlan = document.getElementById('gen-search-plan');
     var syncSearchPlan = function () {
       var m = parseInt(_smEl && _smEl.value, 10) || 3;
+      var goal = !!((document.getElementById('gen-mode') || {}).value === 'goal');
       var per = 45, pk = Math.max(2, Math.min(12, Math.round(m * 60 / per)));
-      if (_smPlan) _smPlan.textContent = '≈ ' + pk + ' 轮 × ' + per + ' 秒（合格早停）';
+      if (_smPlan) _smPlan.textContent = goal
+        ? '目标总预算 ' + m + ' 分钟；单轮约20秒（达标早停）'
+        : '≈ ' + pk + ' 轮 × ' + per + ' 秒（合格早停）';
     };
     if (_smEl) { _smEl.addEventListener('change', syncSearchPlan); syncSearchPlan(); }
-    // 【2026-10-22·用户裁决】生成模式：时间模式用到「每图搜索时间」；目标模式不用（每轮 20s 自动重试）。
+    // 【v512·真实UI复核】两种模式共用「每图搜索时间」；目标模式把它作为总预算，不再禁用。
     var _mdEl = document.getElementById('gen-mode');
     var _mdHint = document.getElementById('gen-mode-hint');
     var syncGenMode = function () {
       var goal = !!(_mdEl && _mdEl.value === 'goal');
       if (_mdHint) _mdHint.textContent = goal ? '总预算内达标即停；到点输出当前最好' : '到点输出最好';
-      if (_smEl) _smEl.disabled = goal;
-      if (_smPlan) _smPlan.style.opacity = goal ? '0.4' : '1';
+      if (_smEl) _smEl.disabled = false;
+      if (_smPlan) _smPlan.style.opacity = '1';
+      syncSearchPlan();
     };
     if (_mdEl) { _mdEl.addEventListener('change', syncGenMode); syncGenMode(); }
     // 【v153】自动档：切到手动档时把「关卡时长」那行收起来（避免误以为它还有效）
@@ -6766,7 +6770,7 @@ AntSolver.App = (function() {
 
     var config = getGenConfig();
     // 【2026-10-22·用户裁决】两种出关模式：
-    //   time = 按时间（到点输出最好）；goal = 按目标（没达标一直重试，点结束输出当前最好）。
+    //   time = 按时间（到点输出最好）；goal = 按目标（总预算内达标即停，到点/手动结束输出当前最好）。
     var modeEl = document.getElementById('gen-mode');
     var genMode = (modeEl && modeEl.value === 'goal') ? 'goal' : 'time';
     config.genMode = genMode;   // 写进批次配置，便于回看“这批是按时间还是按目标跑的”
@@ -7307,8 +7311,12 @@ AntSolver.App = (function() {
       if (slot) genPool.push(slot);
     }
     if (!genPool.length) return false;
-    genLog('已启动 ' + genPool.length + ' 个后台线程并发生产（单关预算仍为每关各自 ' +
-      (((genBatch.config && genBatch.config.timeBudgetMs) || 300000) / 1000) + 's，不因并发缩短）。', 'gen-log-ok');
+    var poolMode = (genBatch.config && genBatch.config.genMode === 'goal') ? 'goal' : 'time';
+    var poolBudgetMs = poolMode === 'goal' ? genGoalBudgetMs() :
+      (((genBatch.config && genBatch.config.timeBudgetMs) || 300000));
+    genLog('已启动 ' + genPool.length + ' 个后台线程并发生产（' +
+      (poolMode === 'goal' ? '目标总预算' : '单关预算') + '为每关各自 ' +
+      (poolBudgetMs / 1000) + 's，不因并发缩短；长轮在轮间停止）。', 'gen-log-ok');
     return true;
   }
 
