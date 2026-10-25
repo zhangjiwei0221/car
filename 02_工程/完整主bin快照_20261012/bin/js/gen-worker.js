@@ -74,6 +74,11 @@ function _goalFinish(stopReason) {
   }
   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
   if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
+  best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: g.maxMs, perRoundMs: g.perMs,
+    sharedCapBudget: g.config.goalSharedBudget !== false, rounds: g.rounds, stopReason: best.goalStopReason || null,
+    searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - g.t0,
+    overrunMs: g.maxMs ? Math.max(0, Date.now() - g.t0 - g.maxMs) : null,
+    note: '预算在候选/轮次边界检查；单次求解与最终路线报告可短时超出。' };
   self.postMessage({ type: 'result', index: g.index, result: best });
 }
 function _goalRound() {
@@ -82,7 +87,9 @@ function _goalRound() {
   g.timer = null;
   if (g.stop) { _goalFinish('stopped'); return; }
   var perMs = g.perMs;
-  if (g.maxMs && (Date.now() - g.t0) >= g.maxMs) { _goalFinish('goalTimeUp'); return; }
+  var elapsedMs = Date.now() - g.t0;
+  if (g.maxMs && elapsedMs >= g.maxMs) { _goalFinish('goalTimeUp'); return; }
+  var roundBudgetMs = g.maxMs ? Math.max(1000, Math.min(perMs, g.maxMs - elapsedMs)) : perMs;
   if (g.maxRounds && g.rounds >= g.maxRounds) { _goalFinish('goalMaxRounds'); return; }
   var cfg = {};
   for (var k in g.config) cfg[k] = g.config[k];
@@ -90,26 +97,35 @@ function _goalRound() {
   // 【v438】ABC 三个基底：逻辑并行，单 worker 先顺序执行；每个基底各自跑 A1~A4
   var _goalK = Math.max(1, Math.min(3, parseInt(g.config.goalBases, 10) || 3));
   cfg.portfolioK = _goalK;
-  cfg.timeBudgetMs = perMs * _goalK;
+  // 【v513】goalBases是本轮内的候选数，不再把20秒放大成60秒；容量臂也共享这份预算。
+  cfg.timeBudgetMs = roundBudgetMs;
+  cfg.capBudgetShared = g.config.goalSharedBudget !== false;
   cfg.seed = (g.baseSeed + g.rounds * 7919) >>> 0;
   cfg._trace = [];
   self.postMessage({ type: 'flow', index: g.index, round: g.rounds + 1,
     text: '目标第' + (g.rounds + 1) + '轮开始 · seed ' + cfg.seed });
-  var r = null;
+  var r = null, roundT0 = Date.now();
+  function roundLeft() {
+    return Math.min(g.maxMs ? g.maxMs - (Date.now() - g.t0) : roundBudgetMs,
+      roundBudgetMs - (Date.now() - roundT0));
+  }
   try {
     r = AntSolver.Generator.produce(g.blocks, cfg);
   } catch (err) {
     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
   }
   // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
-  if (cfg.experienceGoal === true && r && r.level && r.valid) {
+  var tuneLeft = roundLeft();
+  if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
+    cfg.capacityTuneMs = Math.max(100, Math.min(parseInt(cfg.capacityTuneMs, 10) || 5000, tuneLeft));
     try { r = AntSolver.Generator.tuneExperienceCandidate(r, cfg); } catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
   }
   // 【v439】目标模式：先在同一基底上继续修，修不动再换 seed
   if (r && r.level && !_goalPassed(r)) {
     var _repCur = r, _repSteps = 0;
-    for (var _rr = 0; _rr < 3; _rr++) {
+    for (var _rr = 0; _rr < 3 && roundLeft() > 2000; _rr++) {
       var _rep = null;
+      cfg._repairDeadline = Date.now() + roundLeft();
       try { _rep = AntSolver.Generator.p7RepairLevel(_repCur.level, cfg); } catch (e) { _rep = null; }
       if (!_rep || !_rep.level || !_rep.valid || !_rep.p7 || !_rep.p7.accepted) break;
       _repCur = {

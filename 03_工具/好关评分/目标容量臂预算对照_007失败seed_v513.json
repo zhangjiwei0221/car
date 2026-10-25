@@ -1,0 +1,123 @@
+{
+  "schema": "goal-cap-budget-shared-ab-v1",
+  "config": {
+    "budgetMs": 60000,
+    "roundMs": 20000,
+    "seed": 1952511079,
+    "images": [
+      "007"
+    ],
+    "candidatePath": "/tmp/generator_v513_candidate.js"
+  },
+  "note": "A/B同总预算同初始seed；shared是实验候选，不是生产默认。墙钟包含最终路线证据，goalElapsed不含。",
+  "summary": {
+    "runs": 2,
+    "pass": {
+      "legacy_per_arm": 1,
+      "shared": 1
+    },
+    "struct": {
+      "legacy_per_arm": 1,
+      "shared": 1
+    },
+    "wallTotalMs": {
+      "legacy_per_arm": 77372,
+      "shared": 55918
+    },
+    "overrunTotalMs": {
+      "legacy_per_arm": 17372,
+      "shared": 0
+    }
+  },
+  "pairs": [
+    {
+      "image": "007",
+      "pass": [
+        true,
+        true
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        77372,
+        55918
+      ],
+      "overrunMs": [
+        17372,
+        0
+      ],
+      "rounds": [
+        2,
+        2
+      ],
+      "distance": [
+        0,
+        0
+      ],
+      "midBuffer34Pct": [
+        78.9,
+        78.9
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "image": "007",
+      "arm": "legacy_per_arm",
+      "seed": 1952511079,
+      "budgetMs": 60000,
+      "roundMs": 20000,
+      "wallMs": 77372,
+      "overrunMs": 17372,
+      "rounds": 2,
+      "goalElapsedMs": 75273,
+      "stop": "pass",
+      "valid": true,
+      "struct": true,
+      "pass": true,
+      "distance": 0,
+      "midBuffer34Pct": 78.9,
+      "release": null,
+      "tune": {
+        "applied": true,
+        "tested": 10,
+        "skipped": null
+      },
+      "board": {
+        "rows": 6,
+        "cols": 6
+      },
+      "hash": "85081f48c7aec4c4e24706362b62713ae58570097c0fa4b33673a867801aa1c8"
+    },
+    {
+      "image": "007",
+      "arm": "shared",
+      "seed": 1952511079,
+      "budgetMs": 60000,
+      "roundMs": 20000,
+      "wallMs": 55918,
+      "overrunMs": 0,
+      "rounds": 2,
+      "goalElapsedMs": 53829,
+      "stop": "pass",
+      "valid": true,
+      "struct": true,
+      "pass": true,
+      "distance": 0,
+      "midBuffer34Pct": 78.9,
+      "release": null,
+      "tune": {
+        "applied": true,
+        "tested": 10,
+        "skipped": null
+      },
+      "board": {
+        "rows": 6,
+        "cols": 6
+      },
+      "hash": "85081f48c7aec4c4e24706362b62713ae58570097c0fa4b33673a867801aa1c8"
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "schema": "goal-cap-budget-shared-ab-v1",
+  "config": {
+    "budgetMs": 60000,
+    "roundMs": 20000,
+    "seed": 1952510899,
+    "images": [
+      "006"
+    ],
+    "candidatePath": "02_工程/完整主bin快照_20261012/bin/js/generator.js"
+  },
+  "note": "A/B同总预算同初始seed；shared是实验候选，不是生产默认。墙钟包含最终路线证据，goalElapsed不含。",
+  "summary": {
+    "runs": 2,
+    "pass": {
+      "legacy_per_arm": 0,
+      "shared": 0
+    },
+    "struct": {
+      "legacy_per_arm": 1,
+      "shared": 1
+    },
+    "wallTotalMs": {
+      "legacy_per_arm": 66828,
+      "shared": 68490
+    },
+    "overrunTotalMs": {
+      "legacy_per_arm": 6828,
+      "shared": 8490
+    }
+  },
+  "pairs": [
+    {
+      "image": "006",
+      "pass": [
+        false,
+        false
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        66828,
+        68490
+      ],
+      "overrunMs": [
+        6828,
+        8490
+      ],
+      "rounds": [
+        3,
+        4
+      ],
+      "distance": [
+        44.4,
+        0
+      ],
+      "midBuffer34Pct": [
+        5.6,
+        68.2
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "image": "006",
+      "arm": "legacy_per_arm",
+      "seed": 1952510899,
+      "budgetMs": 60000,
+      "roundMs": 20000,
+      "wallMs": 66828,
+      "overrunMs": 6828,
+      "rounds": 3,
+      "goalElapsedMs": 64801,
+      "stop": "goalTimeUp",
+      "valid": true,
+      "struct": true,
+      "pass": false,
+      "distance": 44.4,
+      "midBuffer34Pct": 5.6,
+      "release": null,
+      "tune": {
+        "applied": false,
+        "tested": 0,
+        "skipped": "far_from_target"
+      },
+      "board": {
+        "rows": 6,
+        "cols": 6
+      },
+      "hash": "1ed412d31778ed15fa9ac597ac60e78a858295aa65c24814bff2e6d352e289aa"
+    },
+    {
+      "image": "006",
+      "arm": "shared",
+      "seed": 1952510899,
+      "budgetMs": 60000,
+      "roundMs": 20000,
+      "wallMs": 68490,
+      "overrunMs": 8490,
+      "rounds": 4,
+      "goalElapsedMs": 64156,
+      "stop": "goalTimeUp",
+      "valid": true,
+      "struct": true,
+      "pass": false,
+      "distance": 0,
+      "midBuffer34Pct": 68.2,
+      "release": null,
+      "tune": null,
+      "board": {
+        "rows": 6,
+        "cols": 6
+      },
+      "hash": "c10e0a7604516aa35e3da7698217268ee1ae80bc7335054159ccf2ec5ce9672b"
+    }
+  ]
+}

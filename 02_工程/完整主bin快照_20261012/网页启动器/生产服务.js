@@ -258,6 +258,14 @@ function classify(rec) {
   const a = rec.audit || {};
   const tier = a.tier || '';
   const omniWon = !!(rec.omniWon), playerWon = !!(rec.playerWon);
+  // 【v513】目标模式的交付口径是体验目标，不得把“仅结构合格”的到时最好记成合格。
+  const goalMiss = rec.goalMode === true && rec.experienceGoal === true &&
+    !(rec.experienceEvidence && rec.experienceEvidence.pass === true);
+  if (goalMiss) {
+    const reason = rec.qGatePass === false ? '结构门未过' :
+      (rec.fallback === true ? (rec.fallbackType === 'timeout' ? '超时兜底' : (rec.fallbackType === 'exhausted' ? '遍历兜底' : '兜底')) : '到时最好');
+    return { kind: rec.fallback === true ? 'fallback' : 'unqualified', label: '目标未达·' + reason };
+  }
   // 【v464】结构门 qGate 是交付口径；旧 audit/playerWon 只报告。
   //   qGatePass=true → qualified（不看 playerWon / audit.tier）
   //   qGatePass=false → unqualified（结构门未过）
@@ -411,6 +419,7 @@ function persistResult(b, payload) {
     体验目标: rec.experienceEvidence || null,
     路线分岔证据: rec.experienceRouteEvidence || null,
     容量精调: rec.capacityTune || null,
+    目标预算证据: rec.goalBudgetEvidence || null,
     P7耗时ms: rec.p7Ms != null ? rec.p7Ms : null,
     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
     fallbackType: rec.fallbackType || null, fallbackReason: rec.fallbackReason || null,

@@ -14876,6 +14876,7 @@ AntSolver.Generator = (function() {
     // v503：目标模式默认使用用户确认的压力体验门；experienceGoal=false 仅用于旧口径回归。
     // 时间模式仍走 produce，不受此默认值影响。
     if (config.experienceGoal == null) config.experienceGoal = true;
+    if (config.goalSharedBudget == null) config.goalSharedBudget = true;
     var t0 = Date.now();
     var perMs = parseInt(config.goalPerRoundMs, 10);
     if (!(perMs > 0)) perMs = 20000;
@@ -14892,10 +14893,13 @@ AntSolver.Generator = (function() {
       if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
       if (maxRounds && rounds >= maxRounds) break;
       if (maxMs && (Date.now() - t0) >= maxMs) break;
+      var roundBudgetMs = maxMs ? Math.max(1000, Math.min(perMs, maxMs - (Date.now() - t0))) : perMs;
+      var roundT0 = Date.now();
       var cfg = Object.assign({}, config, {
         goalMode: false,
         portfolioK: 1,
-        timeBudgetMs: perMs,
+        timeBudgetMs: roundBudgetMs,
+        capBudgetShared: config.goalSharedBudget !== false,
         seed: (baseSeed + rounds * 7919) >>> 0,
         _trace: []
       });
@@ -14905,8 +14909,13 @@ AntSolver.Generator = (function() {
       }
       rounds++;
       if (r) r.goalRound = rounds;
-      if (config.experienceGoal === true && r && r.level && r.valid) {
-        try { r = tuneExperienceCandidate(r, config); r.goalRound = rounds; }
+      var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+        roundBudgetMs - (Date.now() - roundT0));
+      if (config.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
+        var tuneCfg = Object.assign({}, cfg, {
+          capacityTuneMs: Math.max(100, Math.min(parseInt(config.capacityTuneMs, 10) || 5000, tuneLeft))
+        });
+        try { r = tuneExperienceCandidate(r, tuneCfg); r.goalRound = rounds; }
         catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
       }
       var rt = portfolioTuple(r);
@@ -14921,6 +14930,11 @@ AntSolver.Generator = (function() {
       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
     }
     if (best && best.level) attachExperienceRouteEvidence(best, config);
+    if (best) best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: perMs,
+      sharedCapBudget: config.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
+      searchElapsedMs: best.goalElapsedMs, wallElapsedMs: Date.now() - t0,
+      overrunMs: maxMs ? Math.max(0, Date.now() - t0 - maxMs) : null,
+      note: '预算在候选/轮次边界检查；单次求解与最终路线报告可短时超出。' };
     return best;
   }
 
@@ -14937,9 +14951,18 @@ AntSolver.Generator = (function() {
     if (!_plan || !_plan.length) return produceDispatchCore(blocks, config, opts);
     var _capMax0 = parseInt(config.boxSizeMax, 10) || 0;
     var _best = null, _bestT = null, _last = null;
+    var _capShared = !!(config && config.capBudgetShared === true);
+    var _capT0 = Date.now();
+    var _capBudget = _capShared ? Math.max(0, parseInt(config.timeBudgetMs, 10) || 0) : 0;
     for (var _si = 0; _si < _plan.length; _si++) {
       var _sc = _plan[_si];
       var _cfg2 = Object.assign({}, config, { capScalePlan: null, _capScale: _sc, _userCapMin: null, _userCapMax: null });
+      if (_capShared && _capBudget > 0) {
+        var _capLeft = _capBudget - (Date.now() - _capT0);
+        if (_capLeft < 1000) break;
+        // 【v513】目标模式的容量臂共享本轮预算；时间模式不传此开关，逐字节走原路径。
+        _cfg2.timeBudgetMs = Math.max(1000, Math.floor(_capLeft / (_plan.length - _si)));
+      }
       if (_capMax0 > 0 && _sc > 0) _cfg2.boxSizeMax = Math.max(1, Math.round(_capMax0 * _sc));
       var _r = null;
       try { _r = produceDispatchCore(blocks, _cfg2, opts); } catch (e) { _r = null; }
@@ -15266,9 +15289,11 @@ AntSolver.Generator = (function() {
         } catch (e) { }
         if (config._trace) { try { config._trace.push({ t: 'round', round: _pi + 1, mix: _cfg._mixTag || '-', cap: [_cfg.boxSizeMin, _cfg.boxSizeMax], ok: !!(_o && _o.level) }); } catch (e) { } }
         // 【v405】ABC 三个基底各自修复：前 p7BaseCount 轮在比较前先跑 A1→A2→A3→A4
-        if (_o && _o.level && config && config.p7Repair && _pi < (parseInt(config.p7BaseCount, 10) || 3)) {
+        if (_o && _o.level && config && config.p7Repair && _pi < (parseInt(config.p7BaseCount, 10) || 3) &&
+            (!config.capBudgetShared || _pdLeft() > 2000)) {
           try {
-            var _p7b = p7RepairLevel(_o.level, config);
+            var _p7Cfg = config.capBudgetShared ? Object.assign({}, config, { _repairDeadline: Date.now() + _pdLeft() }) : config;
+            var _p7b = p7RepairLevel(_o.level, _p7Cfg);
             if (_p7b && _p7b.level && _p7b.valid) {
               _o.level = _p7b.level; _o.solveResult = _p7b.solveResult; _o.audit = _p7b.audit;
               _o.goodV3 = _p7b.goodV3; _o.valid = true; _o.p7 = _p7b.p7;
@@ -15286,11 +15311,16 @@ AntSolver.Generator = (function() {
       out = _best;
       if (out) out.portfolio = { K: _pk, tried: _tried, passes: _passes, tuple: _bestT };
       // 【v242】带外纠偏一次（只在这里触发，不在每个候选里跑，避免 ×8 的成本）
-      if (out) { try { out = bandFixOnce(out, blocks, config); } catch (e) {} }
+      if (out && (!config.capBudgetShared || _pdLeft() > 2000)) {
+        try {
+          var _bandCfg = config.capBudgetShared ? Object.assign({}, config, { timeBudgetMs: Math.min(config.timeBudgetMs, _pdLeft()) }) : config;
+          out = bandFixOnce(out, blocks, _bandCfg);
+        } catch (e) {}
+      }
       // 【v250·保底】全灭时再试一档"宽松盘"：用户明确「黑块不是不许存在，可以配合管道」。
       //   宽松档 = 填满率 0.80（留 20% 给墙+管道）+ 管道最多 2 条/深度 6 + 只要求可解。
       //   目的不是出好关，是"至少有一关可玩"，避免整张图白跑。
-      if (!out || !out.level) {
+      if ((!out || !out.level) && (!config.capBudgetShared || _pdLeft() > 2000)) {
         try {
           var _fr2 = 0.80;
           var _rr2 = parseInt(config.boardRowsMax, 10) || 7;
@@ -15314,7 +15344,7 @@ AntSolver.Generator = (function() {
             portfolioK: 1, candidateCount: 1, difficultyRounds: 1,
             acceptMode: 'solvable', goodV3: false, requireHardPass: false,
             designSweep: false, designDebt: false, targetSweep: false,
-            timeBudgetMs: Math.min(20000, (config.timeBudgetMs || 25000))
+            timeBudgetMs: config.capBudgetShared ? Math.min(20000, config.timeBudgetMs, _pdLeft()) : Math.min(20000, (config.timeBudgetMs || 25000))
           });
           var safe = null;
           try { safe = runFlowOnce(blocks, safeCfg, {}); } catch (e) { safe = null; }   // 【v314】兜底也走当前产线

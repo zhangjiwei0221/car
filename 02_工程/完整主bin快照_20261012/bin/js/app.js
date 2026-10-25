@@ -5908,8 +5908,11 @@ AntSolver.App = (function() {
         ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
         ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
       row('路线与分岔', rec.experienceRouteEvidence && rec.experienceRouteEvidence.routeDistribution ? (function () { var d = rec.experienceRouteEvidence.routeDistribution, low = d.lowPressureRoute, cc = low && low.choiceContrast;
+        var shortYield = cc && cc.baselineAction && cc.lowAction
+          ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated
+          : (cc && cc.status === 'no_divergence' ? '无分岔' : '-');
         return '高/低3/4 ' + d.maxBuffer34Pct + '%/' + d.minBuffer34Pct + '% · 首次分岔 ' + (low && low.firstDivergence ? '第' + low.firstDivergence.step + '步' : '-') +
-          ' · 短期收益 ' + (cc ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated : '-') + ' · ' + (cc && cc.planningLikeCandidate ? '规划候选' : '待判断'); })() : '未测') +
+          ' · 短期收益 ' + shortYield + ' · ' + (cc && cc.planningLikeCandidate ? '规划候选' : '待判断'); })() : '未测') +
       row('容量策略', ap.capacityProfile || 'auto') +
       row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
       row('切法策略', ap.cutPolicy || 'auto') +
@@ -5981,8 +5984,9 @@ AntSolver.App = (function() {
     var hard = 0, easy = 0, fallback = 0, fail = 0;
     results.forEach(function (r) {
       if (!r.valid) { fail++; return; }
-      if (r.fallback) { fallback++; return; }
-      // 【v465】进度条与落库口径统一：结构门 qGate 通过 = 合格
+      var goalMiss = r.goalMode && r.experienceGoal && !(r.experienceEvidence && r.experienceEvidence.pass === true);
+      if (r.fallback || goalMiss) { fallback++; return; }
+      // 【v513】目标模式先看体验门；时间模式/旧目标仍按结构门 qGate 统计
       if (r.qGatePass === true) {
         hard++;
         if (!r.qPass) easy++;   // 子集：结构合格但质量项未全过
@@ -6176,6 +6180,7 @@ AntSolver.App = (function() {
         entryMode: (result && result.entryMode) || 'fourSide',
         audit: null, difficulty: 0, grade: '-', fallback: false,
         goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped), goalStopReason: (result && result.goalStopReason) || null,
+        goalBudgetEvidence: (result && result.goalBudgetEvidence) || null,
         perf: (result && result.perf) || null, sourcePreflight: sourcePreflight
       };
     }
@@ -6356,6 +6361,7 @@ AntSolver.App = (function() {
       fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
+      goalBudgetEvidence: result.goalBudgetEvidence || null,
       // 【v368】搜索为什么停：pass_early_stop / budget_timeout / exhausted / no_candidate
       perfStop: result.perf ? { reason: result.perf.stopReason || null, totalMs: result.perf.totalMs || null } : null,
       workerBuild: result._workerBuild || null,   // 【v369】生成线程的 build（确认跑的是新 generator）
@@ -6418,9 +6424,12 @@ AntSolver.App = (function() {
       qGateReasons: rec.qGateReasons || null, qLabel: rec.qLabel || null, qPass: rec.qPass === true,
       qReasons: rec.qReasons || null, p7Ms: rec.p7 ? rec.p7.ms : null, p7: rec.p7 || null,
       sourcePreflight: rec.sourcePreflight || null,
+      goalMode: !!rec.goalMode, experienceGoal: !!rec.experienceGoal,
+      goalStopReason: rec.goalStopReason || null, goalTargetMiss: !!rec.goalTargetMiss,
       experienceEvidence: rec.experienceEvidence || null,
       experienceRouteEvidence: rec.experienceRouteEvidence || null,
       capacityTune: rec.capacityTune || null,
+      goalBudgetEvidence: rec.goalBudgetEvidence || null,
       entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
@@ -6554,6 +6563,7 @@ AntSolver.App = (function() {
           status: 'GATE_SKIPPED', gateReason: rec.gateReason, gateReasonCN: rec.gateReasonCN,
           error: rec.gateReasonCN + '：' + rec.gateDetail,
           fragmentGate: rec.fragmentGate, entryMode: rec.entryMode,
+          goalBudgetEvidence: rec.goalBudgetEvidence || null,
           elapsedMs: ms, finishedAt: new Date().toISOString()
         }, next);
       } else if (typeof next === 'function') next();
@@ -6584,6 +6594,12 @@ AntSolver.App = (function() {
         } catch (e) { genOnError(entry, '不合格结果落库装配失败：' + ((e && e.message) || e), inputIndex, next); }
       } else if (typeof next === 'function') next();
       return;
+    }
+    // 【v513】结构合格不等于体验目标达标；目标未达的当前最好只作兜底，不进入合格统计。
+    rec.goalTargetMiss = !!(rec.goalMode && rec.experienceGoal && !(rec.experienceEvidence && rec.experienceEvidence.pass === true));
+    if (rec.goalTargetMiss) {
+      rec.qualityFallback = true;
+      genLog(entry.name + '  体验目标未达（' + (rec.goalStopReason || '未通过') + '），按目标未达结果落库；结构合格不计为目标合格。', 'gen-log-warn');
     }
     // 【v395·用户裁决】qPass 改为软门：未达标也输出/落库，只标“未达标”。
     //   qPass 后续可能还要改，不能因为它暂时为 false 就把关丢掉（时间到了没结果更糟）。
@@ -6643,8 +6659,9 @@ AntSolver.App = (function() {
     genLogPlayBatch(rec.level);    // 【v177】同一关玩 16 遍：波动区间 + 结束位置分布
     window.__lastGenRec = rec;     // 【v335】给"导出制作过程"按钮用
     genShowResultBanner(rec);      // 【v326】把结果直接显示到目标图上方
-    genRenderReport(rec);          // 【v362】体检报告面板（右栏“5. 体检报告”）
-    genRenderTrace(rec);           // 【v334】生成过程列表
+    // 【v513】展示层异常不能阻断落库/批次收尾；无分岔等证据形态由报告自身兼容。
+    try { genRenderReport(rec); } catch (e) { genLog('体检报告渲染失败（不影响落库）：' + ((e && e.message) || e), 'gen-log-err'); }
+    try { genRenderTrace(rec); } catch (e) { genLog('生成过程渲染失败（不影响落库）：' + ((e && e.message) || e), 'gen-log-err'); }
     genLogGoodV3(result);          // 【v184】好关判据 v3（六条全过？）
     if (result.portfolio) genLog('　　一图多产　试了 ' + result.portfolio.tried + ' 次（全过 ' + result.portfolio.passes + ' 次，取最优）', 'gen-log-ok');
     // 【v320·用户裁决】把搜索规模打在日志里：「候选 6」只是其中一层，真正要看的是造了多少盘、精算了几个。
@@ -7353,21 +7370,31 @@ AntSolver.App = (function() {
       best.goalStopReason = why || null;
       best.goalElapsedMs = Date.now() - t0;
       if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, baseCfg); } catch (e) {} }
+      best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: per,
+        sharedCapBudget: baseCfg.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
+        searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - t0,
+        overrunMs: maxMs ? Math.max(0, Date.now() - t0 - maxMs) : null,
+        note: '预算在候选/轮次边界检查；单次求解与最终路线报告可短时超出。' };
       genOnResult(entry, best, idx, afterOne);
     }
     function round() {
       if (!genBatchRunning) return;
       if (maxMs && Date.now() - t0 >= maxMs) return done('goalTimeUp');
       if (genBatchAborted) return done('stopped');
+      var roundBudgetMs = maxMs ? Math.max(1000, Math.min(per, maxMs - (Date.now() - t0))) : per;
       var cfg = Object.assign({}, baseCfg, {
-        goalMode: false, portfolioK: 3, timeBudgetMs: per * 3,
+        goalMode: false, portfolioK: 3, timeBudgetMs: roundBudgetMs,
+        capBudgetShared: baseCfg.goalSharedBudget !== false,
         seed: (baseSeed + rounds * 7919) >>> 0, _trace: []
       });
-      var r = null;
+      var r = null, roundT0 = Date.now();
       try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
       }
-      if (cfg.experienceGoal === true && r && r.level && r.valid) {
+      var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+        roundBudgetMs - (Date.now() - roundT0));
+      if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
+        cfg.capacityTuneMs = Math.max(100, Math.min(parseInt(cfg.capacityTuneMs, 10) || 5000, tuneLeft));
         try { r = AntSolver.Generator.tuneExperienceCandidate(r, cfg); } catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
       }
       rounds++;
