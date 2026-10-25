@@ -73,6 +73,7 @@ function _goalFinish(stopReason) {
     best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };
   }
   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
+  if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
   self.postMessage({ type: 'result', index: g.index, result: best });
 }
 function _goalRound() {

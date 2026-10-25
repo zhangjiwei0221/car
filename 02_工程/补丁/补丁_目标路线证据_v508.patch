@@ -1,0 +1,272 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 3d866e5..a90825c 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -19675,3 +19675,37 @@ v506发现同关可有0~60pp路线压力差，需要判断低压力路线是玩
+ 1. planningLike 仍是候选，不代表玩家能发现，也不等于好关；需要真人/玩家模型验证可学习性。
+ 2. 成功与失败关都有该结构，不能把它单独加入硬门。
+ 3. 下一步需把高压经历、短期分岔代价和最终释放合并报告，再决定生产质量门如何表达。
++
++### 499. 【2026-10-26】v508：最终目标关附多路线与分岔报告，时间模式不增加成本
++
++#### 499.1 问题（原话）
++
++```
++根据我们刚才的计划清单，不断靠近目标。遇到边界以及卡住的地方要记录。
++```
++
++需要把高压经历、首次分岔短期代价和最终释放放进同一目标报告，而不是只存在只读工具中；同时不能给每个候选增加多路线开销。
++
++#### 499.2 证据
++
++- `evaluateRoutes` 每关约2~4秒，如果接在每个容量变体上会抵消精调收益；因此只能在最终返回关计算。
++- 010完整目标：+1px后53.8%，最低路线7.7%，分岔短期收益52→0，能同时说明高压经历与规划候选。
++
++#### 499.3 改动
++
++- 新 `attachExperienceRouteEvidence`：默认最多 baseline+4 beam、2秒搜索，附摘要而非完整路线。
++- headless `produceGoal`、worker `_goalFinish`、主线程 `done` 均调用并缓存；时间模式 `produce` 不调用。
++- `experienceGoal=false` 或 `experienceRouteEvidence=false` 可关闭，旧目标不增加成本。
++- UI报告新增“路线与分岔”，生产JSONL新增 `路线分岔证据`；版本升v508。
++
++#### 499.4 验证（改前后数字）
++
++- 010一轮+1px达标：最终5条路线，53.8% vs 7.7%，短期52→0，规划候选；路线证据耗时1.98s，总8.48s。
++- 显式 `experienceRouteEvidence=false`：无该字段，总6.51s；旧目标 `experienceGoal=false` 同样不附证据，约5.17s且保留旧行为。
++- `node --check`：generator/app/gen-worker/playersim/生产服务通过。
++
++#### 499.5 遗留
++
++1. 真实UI批量点击、落库和停止行为尚未验收，当前验证以headless与代码路径为主。
++2. 多路线证据仍非全局覆盖，planningLike不是硬门，也不替代真人校准。
++3. 下一步S4目标图预检，并把路线证据用于目标图风险说明。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index e19f8a9..0c69fab 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v507 路线分岔决策证据）　|　当前版本：**v507**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v508 目标模式最终路线证据）　|　当前版本：**v508**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~492。默认生产仍未开启 experienceGoal。**
+ >
+@@ -1112,3 +1112,12 @@ M0 固定基准 + 统一评价与候选口径
+ - `planningLikeCandidate`：压力下降≥20pp，低压力动作立即收益不优且非隐藏；`obviousBypassCandidate`：低压力动作立即更免费/收益更高。两者都只是候选语义，需真人复核。
+ - 8关最低压力路线全部 planningLike、0 obviousBypass；低压力动作全部 canConsume=false。成功006：baseline立即吃27，低压力动作吃0并暂存1，后续3/4从60%→0%。
+ - 这说明“先承担小债务换取后续释放”在成功与失败关中都可能存在；不能仅凭有分岔就判好关。生产门不变。
++
++
++### 17.35 v508：多路线分岔进入最终目标报告
++
++- `attachExperienceRouteEvidence` 只对目标模式最终返回关计算，不给每个候选增加深度搜索；默认最多 baseline+4条beam路线、2秒搜索。
++- 摘要含高/低3/4占比、最低压力路线、首次分岔、双方立即收益和 planningLike 候选；不附完整大路线包。
++- headless/worker/主线程均接入；UI报告与生产JSONL新增路线分岔证据。时间模式 `produce` 不调用，`experienceGoal=false` 或 `experienceRouteEvidence=false` 可关闭。
++- 010完整目标实测：一轮+1px达标，最终路线证据5条，3/4为53.8% vs 7.7%，分岔短期收益52→0；额外约2.0s，总8.48s。显式关闭证据后约6.51s。
++- 该证据用于解释“高压经历 vs 聪明释放”，目前不新增质量硬门；真实UI批量点击仍待验收。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index ddf55f1..6304019 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -120,3 +120,10 @@
+ - 8关最低压力路线都表现为短期不优、长期降压，未出现“立即更免费”的最低压力绕过。
+ - 这支持用户的体验模型：玩家可以先承担债务，再靠思考释放，而不是只能被动承受。
+ - 但成功/失败关都有这种分岔，所以它不是独立质量门；下一步需把高压经历、分岔短期代价和最终释放放进同一报告。
++
++
++## 14. 最终目标报告接入（v508）
++
++- 多路线分岔不再是孤立工具：目标模式最终关会附路线压力范围与首次分岔短期代价。
++- 深度搜索只在最终一关执行，避免每个候选增加成本；时间模式不执行。
++- 当前只报告，不把 planningLike 单独当硬门。下一步做真实UI批量验收和目标图预检。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 70913f9..166a7a4 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,8 +6,8 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v507 · 路线分岔决策</title>
+-  <link rel="stylesheet" href="css/style.css?v=507">
++  <title>车接小人 v508 · 目标路线证据</title>
++  <link rel="stylesheet" href="css/style.css?v=508">
+ </head>
+ <body>
+   <header>
+@@ -773,26 +773,26 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=507"></script>
+-  <script src="js/utils.js?v=507"></script>
++  <script src="js/zip.js?v=508"></script>
++  <script src="js/utils.js?v=508"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=507"></script>
+-  <script src="js/simulator.js?v=507"></script>
++  <script src="js/color-libs.js?v=508"></script>
++  <script src="js/simulator.js?v=508"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=507"></script>
+-  <script src="js/solver-strategy.js?v=507"></script>
+-  <script src="js/solver.js?v=507"></script>
+-  <script src="js/playersim.js?v=507"></script>
++  <script src="js/anchor-cut.js?v=508"></script>
++  <script src="js/solver-strategy.js?v=508"></script>
++  <script src="js/solver.js?v=508"></script>
++  <script src="js/playersim.js?v=508"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=507"></script>
+-  <script src="js/car-sequencer.js?v=507"></script>
+-  <script src="js/experience-goal.js?v=507"></script>
+-  <script src="js/capacity-tuner.js?v=507"></script>
+-  <script src="js/generator.js?v=507"></script>
+-  <script src="js/analysis.js?v=507"></script>
++  <script src="js/solver-analysis.js?v=508"></script>
++  <script src="js/car-sequencer.js?v=508"></script>
++  <script src="js/experience-goal.js?v=508"></script>
++  <script src="js/capacity-tuner.js?v=508"></script>
++  <script src="js/generator.js?v=508"></script>
++  <script src="js/analysis.js?v=508"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=507"></script>
+-  <script src="js/app.js?v=507"></script>
++  <script src="js/level-editor.js?v=508"></script>
++  <script src="js/app.js?v=508"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 3dd9e0d..107189d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -5899,6 +5899,9 @@ AntSolver.App = (function() {
+       row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
+         ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
+         ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
++      row('路线与分岔', rec.experienceRouteEvidence && rec.experienceRouteEvidence.routeDistribution ? (function () { var d = rec.experienceRouteEvidence.routeDistribution, low = d.lowPressureRoute, cc = low && low.choiceContrast;
++        return '高/低3/4 ' + d.maxBuffer34Pct + '%/' + d.minBuffer34Pct + '% · 首次分岔 ' + (low && low.firstDivergence ? '第' + low.firstDivergence.step + '步' : '-') +
++          ' · 短期收益 ' + (cc ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated : '-') + ' · ' + (cc && cc.planningLikeCandidate ? '规划候选' : '待判断'); })() : '未测') +
+       row('容量策略', ap.capacityProfile || 'auto') +
+       row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
+       row('切法策略', ap.cutPolicy || 'auto') +
+@@ -6264,6 +6267,7 @@ AntSolver.App = (function() {
+         reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
+         diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
+         releaseDecision: result._experienceFull.releaseDecision } : null,
++      experienceRouteEvidence: result.experienceRouteEvidence || null,
+       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
+         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
+         stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
+@@ -7287,6 +7291,7 @@ AntSolver.App = (function() {
+       best.goalStopped = (why === 'stopped');
+       best.goalStopReason = why || null;
+       best.goalElapsedMs = Date.now() - t0;
++      if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, baseCfg); } catch (e) {} }
+       genOnResult(entry, best, idx, afterOne);
+     }
+     function round() {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index bc1f108..980b61a 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -73,6 +73,7 @@ function _goalFinish(stopReason) {
+     best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };
+   }
+   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
++  if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
+   self.postMessage({ type: 'result', index: g.index, result: best });
+ }
+ function _goalRound() {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 94f2794..f8a1f27 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14846,6 +14846,30 @@ AntSolver.Generator = (function() {
+     return cand; // 未完整达标：不把局部最好冒充目标通过，也不污染原候选。
+   }
+ 
++  /** v508：只给最终目标关附多路线/分岔摘要，不给每个候选增加深度搜索成本。 */
++  function attachExperienceRouteEvidence(cand, config) {
++    if (!cand || !cand.level || !cand.valid || !AntSolver.ExperienceGoal || !AntSolver.ExperienceGoal.evaluateRoutes) return cand;
++    if (config && (config.experienceGoal === false || config.experienceRouteEvidence === false)) return cand;
++    if (cand.experienceRouteEvidence) return cand;
++    var t0 = Date.now();
++    try {
++      var r = AntSolver.ExperienceGoal.evaluateRoutes(cand.level, {
++        solveResult: cand.solveResult, multiTimeMs: (config && config.experienceRouteMs) || 2000,
++        multiNodes: (config && config.experienceRouteNodes) || 4000, maxRoutes: 4,
++        bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain)
++      });
++      var best = r.bestVerified;
++      cand.experienceRouteEvidence = { schema: 'goal-route-evidence-v1', pass: r.pass,
++        routeCount: r.routeCount, multi: r.multi, routeDistribution: r.routeDistribution,
++        bestVerified: best ? { source: best.source,
++          metrics: best.full ? best.full.metrics : best.quick.metrics,
++          releaseDecision: best.full ? best.full.releaseDecision : null } : null,
++        searchLimited: true, isProvenGlobalBest: false, elapsedMs: Date.now() - t0 };
++    } catch (e) { cand.experienceRouteEvidence = { schema: 'goal-route-evidence-v1', pass: null,
++      error: String((e && e.message) || e), elapsedMs: Date.now() - t0 }; }
++    return cand;
++  }
++
+   function produceGoal(blocks, config, opts) {
+     opts = opts || {};
+     config = Object.assign({}, DEFAULT_CONFIG, config || {});
+@@ -14896,6 +14920,7 @@ AntSolver.Generator = (function() {
+       best.goalStopped = stopped;
+       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
+     }
++    if (best && best.level) attachExperienceRouteEvidence(best, config);
+     return best;
+   }
+ 
+@@ -16663,7 +16688,7 @@ AntSolver.Generator = (function() {
+     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
+     isCurveScore: isCurveScore,
+     choiceCurveScore: choiceCurveScore,
+-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
++    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+     exposedBlobByColor: exposedBlobByColor,
+     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
+     sampleCarCount: sampleCarCount,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+index d0e63aa..0f77af9 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+@@ -408,6 +408,7 @@ function persistResult(b, payload) {
+     债务证据: rec.debtEvidence || null,
+     时间线证据: rec.timelineEvidence || null,
+     体验目标: rec.experienceEvidence || null,
++    路线分岔证据: rec.experienceRouteEvidence || null,
+     容量精调: rec.capacityTune || null,
+     P7耗时ms: rec.p7Ms != null ? rec.p7Ms : null,
+     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 97f97eb..50fb061 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -34,6 +34,7 @@
+ | v505 释放修复 | 缺显著释放能否专项修复 | ❌ 85变体0通过；同步被donor抵消，供给改善释放但3/4崩；不投产 | `释放同步精调.js` / `释放供给精调.js` | §496 |
+ | v506 多路线目标 | 单路线是否漏掉目标解 | 8关56路线通过结论不变；压力跨度0~60pp，低压力路线需单独解释 | `多路线目标评价.js` | §497 |
+ | v507 分岔决策 | 低压力路线是聪明解还是免费绕过 | 8关均短期不优→长期降压，0立即免费绕过；仍非独立质量门 | `routeChoiceContrast` / `多路线目标评价.js` | §498 |
++| v508 最终路线报告 | 分岔证据能否进入目标结果 | ✅ 仅最终关计算；010为53.8% vs 7.7%、短期52→0，附加约2s；时间模式不跑 | `attachExperienceRouteEvidence` | §499 |
+ 
+ ## 当前权威产物
+ 
+diff --git a/README.md b/README.md
+index ef4f7b8..aa9cc7e 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v507**（路线分岔决策证据；生产仍v504策略）。
++> 当前版本 **v508**（目标模式最终路线证据；时间模式不变）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 

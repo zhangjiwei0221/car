@@ -5899,6 +5899,9 @@ AntSolver.App = (function() {
       row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
         ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
         ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
+      row('路线与分岔', rec.experienceRouteEvidence && rec.experienceRouteEvidence.routeDistribution ? (function () { var d = rec.experienceRouteEvidence.routeDistribution, low = d.lowPressureRoute, cc = low && low.choiceContrast;
+        return '高/低3/4 ' + d.maxBuffer34Pct + '%/' + d.minBuffer34Pct + '% · 首次分岔 ' + (low && low.firstDivergence ? '第' + low.firstDivergence.step + '步' : '-') +
+          ' · 短期收益 ' + (cc ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated : '-') + ' · ' + (cc && cc.planningLikeCandidate ? '规划候选' : '待判断'); })() : '未测') +
       row('容量策略', ap.capacityProfile || 'auto') +
       row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
       row('切法策略', ap.cutPolicy || 'auto') +
@@ -6264,6 +6267,7 @@ AntSolver.App = (function() {
         reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
         diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
         releaseDecision: result._experienceFull.releaseDecision } : null,
+      experienceRouteEvidence: result.experienceRouteEvidence || null,
       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
         stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
@@ -7287,6 +7291,7 @@ AntSolver.App = (function() {
       best.goalStopped = (why === 'stopped');
       best.goalStopReason = why || null;
       best.goalElapsedMs = Date.now() - t0;
+      if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, baseCfg); } catch (e) {} }
       genOnResult(entry, best, idx, afterOne);
     }
     function round() {

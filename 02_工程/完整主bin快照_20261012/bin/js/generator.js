@@ -14846,6 +14846,30 @@ AntSolver.Generator = (function() {
     return cand; // 未完整达标：不把局部最好冒充目标通过，也不污染原候选。
   }
 
+  /** v508：只给最终目标关附多路线/分岔摘要，不给每个候选增加深度搜索成本。 */
+  function attachExperienceRouteEvidence(cand, config) {
+    if (!cand || !cand.level || !cand.valid || !AntSolver.ExperienceGoal || !AntSolver.ExperienceGoal.evaluateRoutes) return cand;
+    if (config && (config.experienceGoal === false || config.experienceRouteEvidence === false)) return cand;
+    if (cand.experienceRouteEvidence) return cand;
+    var t0 = Date.now();
+    try {
+      var r = AntSolver.ExperienceGoal.evaluateRoutes(cand.level, {
+        solveResult: cand.solveResult, multiTimeMs: (config && config.experienceRouteMs) || 2000,
+        multiNodes: (config && config.experienceRouteNodes) || 4000, maxRoutes: 4,
+        bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain)
+      });
+      var best = r.bestVerified;
+      cand.experienceRouteEvidence = { schema: 'goal-route-evidence-v1', pass: r.pass,
+        routeCount: r.routeCount, multi: r.multi, routeDistribution: r.routeDistribution,
+        bestVerified: best ? { source: best.source,
+          metrics: best.full ? best.full.metrics : best.quick.metrics,
+          releaseDecision: best.full ? best.full.releaseDecision : null } : null,
+        searchLimited: true, isProvenGlobalBest: false, elapsedMs: Date.now() - t0 };
+    } catch (e) { cand.experienceRouteEvidence = { schema: 'goal-route-evidence-v1', pass: null,
+      error: String((e && e.message) || e), elapsedMs: Date.now() - t0 }; }
+    return cand;
+  }
+
   function produceGoal(blocks, config, opts) {
     opts = opts || {};
     config = Object.assign({}, DEFAULT_CONFIG, config || {});
@@ -14896,6 +14920,7 @@ AntSolver.Generator = (function() {
       best.goalStopped = stopped;
       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
     }
+    if (best && best.level) attachExperienceRouteEvidence(best, config);
     return best;
   }
 
@@ -16663,7 +16688,7 @@ AntSolver.Generator = (function() {
     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
     isCurveScore: isCurveScore,
     choiceCurveScore: choiceCurveScore,
-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
     exposedBlobByColor: exposedBlobByColor,
     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
     sampleCarCount: sampleCarCount,

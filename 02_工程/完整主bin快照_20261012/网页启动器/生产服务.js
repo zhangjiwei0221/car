@@ -408,6 +408,7 @@ function persistResult(b, payload) {
     债务证据: rec.debtEvidence || null,
     时间线证据: rec.timelineEvidence || null,
     体验目标: rec.experienceEvidence || null,
+    路线分岔证据: rec.experienceRouteEvidence || null,
     容量精调: rec.capacityTune || null,
     P7耗时ms: rec.p7Ms != null ? rec.p7Ms : null,
     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
