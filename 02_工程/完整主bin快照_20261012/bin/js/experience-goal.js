@@ -131,6 +131,73 @@ AntSolver.ExperienceGoal = (function () {
       nearMiss: !!replayed.completed && (curve.midBuffer34Pct || 0) >= Math.max(0, o.minBuffer34Pct - 20),
       elapsedMs: Date.now() - t0 };
   }
+  /** v506：baseline + 有界多路线；bestVerified 不是全局最优，未找到不证明不存在。 */
+  function evaluateRoutes(level, opts) {
+    opts = opts || {}; var lv = parsed(level), t0 = Date.now();
+    var baseline = opts.solveResult || AntSolver.Solver.solve(lv, { timeBudgetMs: opts.solveTimeMs || 3000,
+      bottomOnly: !!opts.bottomOnly, instantChain: !!opts.instantChain });
+    var routes = [], seen = {};
+    function add(route, source) {
+      if (!route) return;
+      var actions = SA.normalizeActions(route); if (!actions.length) return;
+      var sig = actions.map(function (a) { return a.r + ',' + a.c; }).join(' ');
+      if (seen[sig]) return; seen[sig] = true;
+      routes.push({ route: Object.assign({}, route, { completed: true, actions: actions, pickOrder: actions }), source: source, signature: sig });
+    }
+    if (baseline && baseline.completed) add(baseline, 'baseline');
+    var multi = null;
+    if (opts.multi !== false) {
+      multi = SA.findRoutes(lv, { timeBudgetMs: opts.multiTimeMs || 4000, maxNodes: opts.multiNodes || 6000,
+        beamWidth: opts.beamWidth || 24, branchWidth: opts.branchWidth || 8, maxRoutes: opts.maxRoutes || 6 });
+      for (var i = 0; i < multi.routes.length; i++) if (multi.routes[i].replayValid) add(multi.routes[i], 'beam');
+    }
+    var evaluations = [], best = null;
+    for (var ri = 0; ri < routes.length; ri++) {
+      var item = routes[ri], quick = evaluate(lv, Object.assign({}, opts, { solveResult: item.route, decision: false }));
+      var rec = { source: item.source, signature: item.signature, quick: quick, full: null };
+      if (quick.curvePass) {
+        rec.full = evaluate(lv, Object.assign({}, opts, { solveResult: item.route, decision: true }));
+        if (rec.full.pass && (!best || !best.full || !best.full.pass)) best = rec;
+      }
+      if (!best) {
+        if (!best || (quick.metrics && quick.metrics.distance < best.quick.metrics.distance)) best = rec;
+      } else if (!best.full || !best.full.pass) {
+        var currentScore = best.full && best.full.curvePass ? 1 : 0;
+        if ((quick.curvePass ? 1 : 0) > currentScore) best = rec;
+      }
+      evaluations.push(rec);
+    }
+    if (!best && evaluations.length) best = evaluations[0];
+    var pcts = evaluations.map(function (x) { return x.quick && x.quick.metrics && x.quick.metrics.midBuffer34Pct; })
+      .filter(function (x) { return typeof x === 'number'; });
+    var minPct = pcts.length ? Math.min.apply(null, pcts) : null, maxPct = pcts.length ? Math.max.apply(null, pcts) : null;
+    var lowRoute = null, baselineEval = evaluations.length ? evaluations[0] : null;
+    for (var di = 0; di < evaluations.length; di++) {
+      var cand = evaluations[di], pct = cand.quick && cand.quick.metrics && cand.quick.metrics.midBuffer34Pct;
+      if (pct != null && (!lowRoute || pct < lowRoute.quick.metrics.midBuffer34Pct)) lowRoute = cand;
+    }
+    function divergence(other) {
+      if (!baselineEval || !other) return null;
+      var aa = baselineEval.signature.split(' '), bb = other.signature.split(' '), n = Math.min(aa.length, bb.length);
+      for (var j = 0; j < n; j++) if (aa[j] !== bb[j]) return { step: j + 1, from: aa[j], to: bb[j] };
+      return null;
+    }
+    var distribution = { minBuffer34Pct: minPct, maxBuffer34Pct: maxPct,
+      spreadPp: minPct != null && maxPct != null ? +(maxPct - minPct).toFixed(1) : null,
+      lowPressureRoute: lowRoute ? { source: lowRoute.source, midBuffer34Pct: lowRoute.quick.metrics.midBuffer34Pct,
+        significantReleaseCount: lowRoute.quick.metrics.significantReleaseCount,
+        firstDivergence: divergence(lowRoute) } : null,
+      note: '低压力路线可能代表聪明解法，不自动判为关卡缺陷；明显性仍需玩家模型/真人判断。' };
+    return { schema: 'experience-routes-v1', pass: !!(best && best.full && best.full.pass),
+      routeDistribution: distribution,
+      status: best && best.full && best.full.pass ? 'pass' : (routes.length ? 'not_passed_within_budget' : 'no_verified_route'),
+      bestVerified: best, routes: evaluations, routeCount: routes.length,
+      multi: multi ? { status: multi.status, routes: multi.routes.length, distinctRoutes: multi.distinctRoutes,
+        nodes: multi.nodes, budgetExhausted: multi.budgetExhausted, elapsedMs: multi.elapsedMs } : null,
+      searchLimited: true, isProvenGlobalBest: false, elapsedMs: Date.now() - t0,
+      note: 'bestVerified仅当前已验证路线最佳；预算内未通过不证明所有路线均不满足。' };
+  }
+
   function diagnose(ev, structuralPass) {
     if (!ev || ev.status === 'no_verified_solution') return { primary: 'no_verified_solution', action: 'repair_structure', flags: [] };
     var m = ev.metrics || {}, flags = [], target = ev.target && ev.target.minBuffer34Pct != null ? ev.target.minBuffer34Pct : 50;
@@ -151,5 +218,5 @@ AntSolver.ExperienceGoal = (function () {
     else { out.primary = ev.pass ? 'pass' : 'inspect_remaining_target'; out.action = ev.pass ? 'done' : 'inspect_target'; }
     return out;
   }
-  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, curveFromTrace: curveFromTrace, diagnose: diagnose };
+  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, evaluateRoutes: evaluateRoutes, curveFromTrace: curveFromTrace, diagnose: diagnose };
 })();
