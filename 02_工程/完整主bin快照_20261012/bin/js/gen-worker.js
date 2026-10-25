@@ -23,7 +23,9 @@ var _goal = null;     // 目标模式的运行态：{blocks, config, index, best
 try {
   importScripts(
     'utils.js' + _v, 'simulator.js' + _v, 'solver-strategy.js' + _v,
-    'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v, 'generator.js' + _v
+    'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
+    'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
+    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'generator.js' + _v
   );
   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
 } catch (e) {
@@ -36,7 +38,7 @@ if (_loaded && AntSolver.Generator.setProgressHook) {
 }
 
 function _goalPassed(r) {
-  try { return AntSolver.Generator.goalStructPass(r); } catch (e) { return false; }
+  try { return AntSolver.Generator.goalAcceptPass(r, _goal && _goal.config); } catch (e) { return false; }
 }
 function _goalScore(r) {
   if (!r || !r.level) return -1e15;
@@ -96,6 +98,10 @@ function _goalRound() {
     r = AntSolver.Generator.produce(g.blocks, cfg);
   } catch (err) {
     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
+  }
+  // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
+  if (cfg.experienceGoal === true && r && r.level && r.valid) {
+    try { r = AntSolver.Generator.tuneExperienceCandidate(r, cfg); } catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
   }
   // 【v439】目标模式：先在同一基底上继续修，修不动再换 seed
   if (r && r.level && !_goalPassed(r)) {

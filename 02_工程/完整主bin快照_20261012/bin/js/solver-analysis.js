@@ -536,5 +536,5 @@ AntSolver.SolverAnalysis = (function () {
 
   return { analyze: analyze, findRoutes: findRoutes, findRoutesAdaptive: findRoutesAdaptive, counterfactual: counterfactual,
     pressureProfile: pressureProfile, pressureFromSeries: pressureFromSeries, summarizePressure: summarizePressure,
-    replay: replay, replayFromState: replayFromState, stateKey: stateKey, normalizeActions: normalizeActions };
+    replay: replay, replayFromState: replayFromState, searchFromState: searchFromState, stateKey: stateKey, normalizeActions: normalizeActions };
 })();

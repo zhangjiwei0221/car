@@ -7199,7 +7199,7 @@ AntSolver.App = (function() {
           st.results.push(r);
           if (!st.best || _branchScore(r) > _branchScore(st.best)) st.best = r;
           var passed = false;
-          try { passed = AntSolver.Generator.goalStructPass(r); } catch (e) {}
+          try { passed = AntSolver.Generator.goalAcceptPass(r, cfg); } catch (e) {}
           if (passed && !st.passed) {
             st.passed = r;
             genLog('[branch] ' + rec.tag + ' 达标，终止另外两支', 'gen-log-ok');
@@ -7243,7 +7243,7 @@ AntSolver.App = (function() {
     var per = 20000, best = null, rounds = 0, t0 = Date.now();
     var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
     function passed(r) {
-      try { return AntSolver.Generator.goalStructPass(r); } catch (e) { return false; }
+      try { return AntSolver.Generator.goalAcceptPass(r, baseCfg); } catch (e) { return false; }
     }
     function score(r) {
       if (!r || !r.level) return -1e15;
@@ -7276,6 +7276,9 @@ AntSolver.App = (function() {
       var r = null;
       try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
+      }
+      if (cfg.experienceGoal === true && r && r.level && r.valid) {
+        try { r = AntSolver.Generator.tuneExperienceCandidate(r, cfg); } catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
       }
       rounds++;
       if (r) r.goalRound = rounds;

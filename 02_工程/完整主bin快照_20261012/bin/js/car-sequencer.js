@@ -106,12 +106,18 @@ AntSolver.CarSequencer.debtTimeline = function (level, route, opts) {
     var a = actions[step];
     if (!Sim.isPickable(s, a.r, a.c)) return { completed: false, reason: 'illegal_pick@' + step, items: Object.keys(items).map(function (k) { return items[k]; }) };
     Sim.applyPick(s, a.r, a.c);
-    var ops = s.capOps || [];
+    var ops = s.capOps || [], sourceUsed = {};
     for (var oi = 0; oi < ops.length; oi++) {
       var op = ops[oi];
       if (op.t === 'add') {
+        var source = null, pickedNow = (s.lastPick && s.lastPick.picked) || [];
+        for (var spi = 0; spi < pickedNow.length; spi++) {
+          if (!sourceUsed[spi] && pickedNow[spi].color === op.color && pickedNow[spi].count === op.need) {
+            source = { r: pickedNow[spi].r, c: pickedNow[spi].c }; sourceUsed[spi] = true; break;
+          }
+        }
         items[op.key] = { key: op.key, color: op.color, need: op.need, link: op.link || 0,
-          enterStep: s.steps, progress: 0, initialDebt: 0, doneStep: null, status: 'open' };
+          start: op.start || null, source: source, enterStep: s.steps, progress: 0, initialDebt: 0, doneStep: null, status: 'open' };
         active[op.key] = true;
       } else if (op.t === 'eat') {
         if (items[op.key]) items[op.key].progress += (op.cells || []).length;

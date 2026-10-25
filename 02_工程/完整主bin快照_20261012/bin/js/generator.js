@@ -14770,6 +14770,80 @@ AntSolver.Generator = (function() {
     return !!(q && q.gatePass);
   }
 
+  /** v502：实验目标门。默认仍走 goalStructPass；experienceGoal=true 才启用。 */
+  function experienceEvalOfCand(cand, config, decision) {
+    if (!cand || !cand.level || !cand.valid || !cand.solveResult || !AntSolver.ExperienceGoal) return null;
+    var cacheKey = decision ? '_experienceFull' : '_experienceQuick';
+    if (cand[cacheKey]) return cand[cacheKey];
+    var ev = AntSolver.ExperienceGoal.evaluate(cand.level, Object.assign({}, config || {}, {
+      solveResult: cand.solveResult, decision: !!decision,
+      bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain)
+    }));
+    cand[cacheKey] = ev; return ev;
+  }
+  function experienceCapacityOk(cand, config) {
+    var ca = cand && cand.capacityAudit;
+    if (!ca && cand && cand.level && AntSolver.Quality) {
+      try { ca = AntSolver.Quality.capacityEvidence(cand.level, cand.config || config || {}); cand.capacityAudit = ca; } catch (e) { return false; }
+    }
+    return !!(ca && ca.conserved && ca.boardFloorPass && ca.aboveMax === 0);
+  }
+  function goalExperiencePass(cand, config) {
+    if (!cand || !cand.valid || !goalStructPass(cand) || !experienceCapacityOk(cand, config)) return false;
+    var ev = experienceEvalOfCand(cand, config, true);
+    return !!(ev && ev.pass);
+  }
+  function goalAcceptPass(cand, config) {
+    return config && config.experienceGoal === true ? goalExperiencePass(cand, config) : goalStructPass(cand);
+  }
+
+  /** 近目标才做局部容量；只接受完整目标通过的变体，否则保留原候选。 */
+  function tuneExperienceCandidate(cand, config) {
+    var t0 = Date.now(), report = { schema: 'capacity-tune-run-v1', applied: false, tested: 0,
+      curveCandidates: 0, skipped: null, attempts: [] };
+    if (!cand || !cand.level || !cand.valid || !AntSolver.CapacityTuner) { report.skipped = 'invalid_candidate'; return cand; }
+    if (goalExperiencePass(cand, config)) { report.skipped = 'already_pass'; cand.capacityTune = report; return cand; }
+    if (!goalStructPass(cand)) { report.skipped = 'structure_gate_failed'; cand.capacityTune = report; return cand; }
+    var baseEv = experienceEvalOfCand(cand, config, false);
+    if (!baseEv || !baseEv.nearMiss) { report.skipped = 'far_from_target'; cand.capacityTune = report; return cand; }
+    var cfg = cand.config || config || {}, ca = cand.capacityAudit || {};
+    var capMin = ca.boxSizeMin || cfg._userCapMin || cfg.boxSizeMin || (config && config._userCapMin) || (config && config.boxSizeMin);
+    var capMax = ca.boxSizeMax || cfg._userCapMax || cfg.boxSizeMax || (config && config._userCapMax) || (config && config.boxSizeMax);
+    if (!(capMin > 0 && capMax >= capMin)) { report.skipped = 'capacity_range_missing'; cand.capacityTune = report; return cand; }
+    var budgetMs = Math.max(100, parseInt(config && config.capacityTuneMs, 10) || 5000);
+    var made = null;
+    try { made = AntSolver.CapacityTuner.variants(cand.level, cand.solveResult, {
+      capMin: capMin, capMax: capMax, maxCars: Math.max(1, parseInt(config && config.capacityTuneCars, 10) || 8),
+      maxVariants: Math.max(1, parseInt(config && config.capacityTuneVariants, 10) || 48)
+    }); } catch (e) { report.skipped = 'variant_error:' + String((e && e.message) || e); cand.capacityTune = report; return cand; }
+    for (var i = 0; i < made.variants.length; i++) {
+      if (Date.now() - t0 >= budgetMs) { report.stopped = 'budget_exhausted'; break; }
+      var v = made.variants[i], vc = null;
+      try {
+        // 先廉价求解+目标曲线；曲线不达标绝不跑完整玩家/结构评价。
+        var quickParsed = AntSolver.parseLevel(v.level);
+        var quickSr = AntSolver.Solver.solve(quickParsed, { bottomOnly: !!cfg.bottomOnly, instantChain: !!cfg.instantChain });
+        report.tested++;
+        var quick = AntSolver.ExperienceGoal.evaluate(v.level, Object.assign({}, cfg, { solveResult: quickSr, decision: false }));
+        report.attempts.push({ meta: v.meta, midBuffer34Pct: quick && quick.metrics && quick.metrics.midBuffer34Pct,
+          curvePass: quick && quick.curvePass });
+        if (!quick || !quick.curvePass) continue;
+        report.curveCandidates++;
+        vc = evaluateTimelineLevel(v.level, Object.assign({}, cfg, { roleSchedule: false }));
+        if (!vc.valid || !goalStructPass(vc) || !experienceCapacityOk(vc, cfg)) continue;
+        if (vc.capacityAudit && ca && vc.capacityAudit.belowMin > ca.belowMin) continue;
+        if (goalExperiencePass(vc, cfg)) {
+          vc.capacityTuned = true;
+          report.applied = true; report.elapsedMs = Date.now() - t0;
+          report.base = baseEv.metrics; report.after = vc._experienceFull.metrics;
+          vc.capacityTune = report; return vc;
+        }
+      } catch (e) { report.attempts.push({ meta: v.meta, error: String((e && e.message) || e) }); }
+    }
+    report.elapsedMs = Date.now() - t0; cand.capacityTune = report;
+    return cand; // 未完整达标：不把局部最好冒充目标通过，也不污染原候选。
+  }
+
   function produceGoal(blocks, config, opts) {
     opts = opts || {};
     config = Object.assign({}, DEFAULT_CONFIG, config || {});
@@ -14781,7 +14855,7 @@ AntSolver.Generator = (function() {
     var maxRounds = parseInt(config.goalMaxRounds, 10);
     if (!(maxRounds > 0)) maxRounds = 0;
     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
-    function passed(r) { return goalStructPass(r); }
+    function passed(r) { return goalAcceptPass(r, config); }
     var best = null, bestT = null, rounds = 0, stopped = false;
     while (true) {
       if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
@@ -14800,6 +14874,10 @@ AntSolver.Generator = (function() {
       }
       rounds++;
       if (r) r.goalRound = rounds;
+      if (config.experienceGoal === true && r && r.level && r.valid) {
+        try { r = tuneExperienceCandidate(r, config); r.goalRound = rounds; }
+        catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
+      }
       var rt = portfolioTuple(r);
       if (!best || portfolioBetter(rt, bestT)) { best = r; bestT = rt; }
       if (passed(r)) break;
@@ -16577,7 +16655,7 @@ AntSolver.Generator = (function() {
     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
     isCurveScore: isCurveScore,
     choiceCurveScore: choiceCurveScore,
-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
     exposedBlobByColor: exposedBlobByColor,
     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
     sampleCarCount: sampleCarCount,
