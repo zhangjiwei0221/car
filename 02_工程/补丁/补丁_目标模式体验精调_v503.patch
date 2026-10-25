@@ -1,0 +1,1905 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+index f60f43b..dc78d04 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+@@ -4,7 +4,7 @@
+ > 本文件只描述**当前状态、做过什么、哪些路已证否、下一步**；细节按节号去查工作日志。
+ > 上层文档仍以 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md) 与 [`工程说明.md`](工程说明.md) 为准。
+ >
+-> **后续更新（2026-10-26）**：当前已到 v502；目标体验与±1px容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~492。本文件保留 v495~v500 历史基线。
++> **后续更新（2026-10-26）**：当前已到 v503；目标体验与±1px容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~492。本文件保留 v495~v500 历史基线。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index b192cc7..d55fe05 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -7,7 +7,7 @@
+ > 本文档由 Kimi 整理。文中严格区分 **[用户要求]、[已验证]、[Kimi建议]、[待校准]**。
+ >
+ > 2026-10-26 新实施卡：[`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md)。小色可按解锁贡献承担关键债务，不按面积排除。
+-> 当前结果：v502 已完成S1，4个未达标基底以±1px转化2个；默认生产未开启，下一步S2同预算对照。
++> 当前结果：v502 S1转化2/4；v503同预算精调5/6 vs 纯seed 4/6，目标模式默认启用，时间模式不变；下一步S3失败诊断。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 96cc5c2..88d5e2a 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -19483,3 +19483,48 @@ v502的2/4转化只证明存在成功案例；纯换seed本身也可能找到目
+ 
+ 1. 初始只有一个seed起点/三图，结果是控制器smoke，后续要扩独立seed。
+ 2. 参考路线释放动作仍不是完整玩家选择对比，不能借控制器结果宣称真人质量完成。
++
++### 494. 【2026-10-26】v503：同预算精调5/6胜4/6；目标模式默认体验门并增加总时限
++
++#### 494.1 问题（原话）
++
++```
++根据我们刚才的计划清单，不断靠近目标。遇到边界以及卡住的地方要记录。
++```
++
++需要回答局部精调是否比纯换seed节省时间，并把有效策略接入真正的目标模式；同时避免原目标模式不限时造成数小时搜索。
++
++#### 494.2 证据
++
++- 首轮45s/臂：006/007两臂首轮过；010纯seed 5轮51.68s未过，精调首轮6.77s过。
++- 独立seed1003：006/010两臂均第2轮过，007两臂均预算内未过。说明精调不是普遍加速，但部分近目标关收益很大。
++- 原 `goalMaxMs=0` 允许无限重试，不符合“不能数小时”的用户边界；原结果横幅也可能把预算返回的当前最好写成达标。
++
++#### 494.3 改动
++
++- 新增 `目标搜索同预算对照.js`：同图、同seed序列、同轮预算，A纯换seed、B近目标精调后换seed；保存逐轮时间与停止原因。
++- v503目标模式默认 `experienceGoal=true`，近目标自动小容量精调；UI复选框可关闭回旧结构门。时间模式不启用。
++- headless `produceGoal` 同样默认新门，显式false回旧口径；generator/app/worker路径一致。
++- 默认单关总预算5分钟；UI以当前每图搜索时间为目标总预算，显式 `goalMaxMs=0` 才不限时。主线程、worker、branch都接预算和 `goalStopReason`。
++- UI横幅区分体验达标/未达标当前最好；报告与生产JSONL增加体验目标、容量精调和停止原因。版本升v503。
++
++#### 494.4 验证（改前后数字）
++
++| 两个seed起点合计 | 纯换seed | 局部精调+换seed |
++|---|---:|---:|
++| 目标通过 | 4/6 | **5/6** |
++| 总耗时 | 207.95s | **164.40s（-20.9%）** |
++
++- 主要收益：010 seed1001从51.68s/5轮未达变为6.77s/1轮达标，少44.91s。
++- 其他5对近似持平；独立007两臂都失败，证明存在共同边界，不能继续靠加容量预算宣称可解。
++- 45秒是轮间控制预算，实际整轮结束约51秒，已记录，不能冒充硬实时。
++- v503省略experienceGoal跑010：1轮目标通过，+1px，6.49s；显式false保留旧hash `ef88…66d`，新目标hash `78a8…afb5`。
++- 停止原因 smoke：010 seed1002一轮未达，保留base并标 `goalMaxRounds`，不冒充达标。
++- `node --check`：generator/app/playersim/gen-worker/生产服务/对照工具通过。
++
++#### 494.5 遗留
++
++1. 两组6对仍是小样本，收益主要来自一例；需后续扩图与独立seed，不能宣称普遍节省20.9%。
++2. 释放仍是参考路线动作，choiceContrast未完成；多路线与真人校准未做。
++3. 独立007两臂共同失败，下一步进入S3失败分类，不继续增加局部容量预算。
++4. 总预算是轮间控制，单轮不可瞬时中断，实际可略超；UI硬实时与批量性能仍需实测。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index d5625de..939fa54 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v502 目标体验与容量精调实验）　|　当前版本：**v502**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v503 目标模式体验精调）　|　当前版本：**v503**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~492。默认生产仍未开启 experienceGoal。**
+ >
+@@ -1071,3 +1071,12 @@ M0 固定基准 + 统一评价与候选口径
+ - 生成器 `tuneExperienceCandidate` 只对 nearMiss 基底运行；先求解+曲线快筛，再对少量曲线通过者跑完整评价。局部未全过则保留原关，不拿局部最好冒充达标。app/worker/headless 都有实验入口，UI 默认不开启。
+ - 3图×2seed：原结构门6/6，目标体验2/6；4个未达标中2个经±1px转化。006 36.8%→60%（36→35，10变体约1.3s），010 46.2%→53.8%（39→40，13变体约1.3s）；均过结构、守恒、棋盘和上限检查。最终4/6。
+ - 默认生产回归6/6 hash全同。释放证据目前是一条参考路线上的可通关释压动作，choiceContrast 尚未证明，不等于完成真人/多路线校准。下一步同预算换seed对照后再决定是否默认开启。
++
++
++### 17.30 v503：目标模式默认体验门、同预算证据与总时限
++
++- 两组同预算A/B（3图×两个初始seed起点）：纯换seed目标4/6，局部精调+换seed 5/6；总耗时207.95s→164.40s（-20.9%）。收益主要来自010 seed1001：51.68s/5轮未达→6.77s/1轮达标；其余样本收益很小，独立007两臂均失败。
++- 目标模式现默认 `experienceGoal=true`，近目标自动运行小容量精调；复选框可关闭回旧结构门。时间模式 `produce` 不启用，行为不变。headless `produceGoal` 也默认新门，显式false可回旧口径。
++- 单关默认总预算5分钟；UI使用当前“每图搜索时间”作为目标总预算，显式 `goalMaxMs=0` 才不限时。预算/轮数到点输出当前最好并记录 `goalStopReason`，不再把未达标写成达标。
++- UI结果与生产JSONL增加中段3/4、释放、容量精调命中/未中及停止原因。默认旧目标回归010 hash保持 `ef88…66d`，新目标同基底+1px得 `78a8…afb5`。
++- 仍属初版目标策略：释放为参考路线证据，非完整选择对比；45s是轮间控制预算，整轮收尾实际约51s，不能当硬实时保证。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 50cd6df..2c7b703 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -28,7 +28,7 @@
+ 
+ **预登记通过条件**：至少证明局部精调能在可接受评估成本内把一个未达标关变为目标达标，且没有靠破坏守恒/容量/可解性；若只改善曲线但找不到释放决策，不宣称完整达标。
+ 
+-### S2（下一阶段）目标模式接入与同预算对照
++### S2（v503 已接入）目标模式接入与同预算对照
+ 
+ - `experienceGoalPass` 与 app/worker 共用；目标模式全过才停，时间模式标未达项。
+ - 同总时长比较纯换 seed vs 近目标局部精调 + 换 seed。
+@@ -83,3 +83,11 @@
+ - 唯一变量：B臂在每轮近目标候选上运行 `tuneExperienceCandidate`，A臂只换seed。
+ - 目标指标：是否完整目标通过、达标墙钟时间、轮数；保护指标：有效、结构、守恒、棋盘、容量上限。
+ - 产物：逐轮JSON、汇总、停止原因。样本是控制器smoke，不用于伪造P95；后续再扩独立seed。
++
++
++## 9. S2 首轮结果与 v503 接入
++
++- 两组对照合计：纯换seed 4/6、精调5/6；总耗时207.95s→164.40s（-20.9%）。收益主要来自010 seed1001，其他样本近似持平，独立007两臂均失败。
++- 结论：局部精调在部分近目标关显著省时，但不是普遍加速；默认开启的代价是其他关增加小幅评价开销。
++- v503目标模式默认启用体验门和局部精调，复选框可回旧目标；时间模式不变。单关默认总预算5分钟/UI每图搜索时间，显式0才不限时。
++- 下一步S3：扩展失败诊断（远失败、无释放、顶格、末段强堵），并研究共同失败的007，而不是继续加局部容量预算。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 3f8dda0..a393b21 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v502 · 目标体验与容量精调</title>
+-  <link rel="stylesheet" href="css/style.css?v=502">
++  <title>车接小人 v503 · 目标模式体验精调</title>
++  <link rel="stylesheet" href="css/style.css?v=503">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v502</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v503</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -385,6 +385,10 @@
+         <label><input type="checkbox" id="gen-full-time" checked> 跑满时间（不早停）</label>
+         <span class="gen-hint">关闭时合格/候选耗尽会提前停</span>
+       </div>
++      <div class="gen-row" style="margin-top:6px" title="仅目标模式：中段暂存3/4占比、显著释放和可通关释压动作全部达标才停止；近目标关尝试±1/±2/±4px同色守恒精调。关闭则回旧结构门。">
++        <label><input type="checkbox" id="gen-experience-goal" checked> 目标体验（3/4＋释放＋容量精调）</label>
++        <span class="gen-hint">仅目标模式；局部最多5秒，关闭=旧目标</span>
++      </div>
+       <div class="gen-row" style="margin-top:6px" title="生成完后对最终关做局部交换/同色偏斜，最多 20 个变异；命中才替换，约 +20~40 秒。">
+         <label><input type="checkbox" id="gen-trap-post" checked> 生成后陷阱后处理</label>
+         <span class="gen-hint">首通 20~80% 才跑；命中才替换</span>
+@@ -769,26 +773,26 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=502"></script>
+-  <script src="js/utils.js?v=502"></script>
++  <script src="js/zip.js?v=503"></script>
++  <script src="js/utils.js?v=503"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=502"></script>
+-  <script src="js/simulator.js?v=502"></script>
++  <script src="js/color-libs.js?v=503"></script>
++  <script src="js/simulator.js?v=503"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=502"></script>
+-  <script src="js/solver-strategy.js?v=502"></script>
+-  <script src="js/solver.js?v=502"></script>
+-  <script src="js/playersim.js?v=502"></script>
++  <script src="js/anchor-cut.js?v=503"></script>
++  <script src="js/solver-strategy.js?v=503"></script>
++  <script src="js/solver.js?v=503"></script>
++  <script src="js/playersim.js?v=503"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=502"></script>
+-  <script src="js/car-sequencer.js?v=502"></script>
+-  <script src="js/experience-goal.js?v=502"></script>
+-  <script src="js/capacity-tuner.js?v=502"></script>
+-  <script src="js/generator.js?v=502"></script>
+-  <script src="js/analysis.js?v=502"></script>
++  <script src="js/solver-analysis.js?v=503"></script>
++  <script src="js/car-sequencer.js?v=503"></script>
++  <script src="js/experience-goal.js?v=503"></script>
++  <script src="js/capacity-tuner.js?v=503"></script>
++  <script src="js/generator.js?v=503"></script>
++  <script src="js/analysis.js?v=503"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=502"></script>
+-  <script src="js/app.js?v=502"></script>
++  <script src="js/level-editor.js?v=503"></script>
++  <script src="js/app.js?v=503"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index c479b82..42ea9d7 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -5705,11 +5705,12 @@ AntSolver.App = (function() {
+       chip('白给车≈', freeTxt, freeTxt !== '-' && freeTxt > 2) +
+       chip('类型', rec.type || '-', false) +
+       (rec.goalMode ? chip('目标轮', rec.goalRounds || 1, false) : '') +
++      (rec.experienceEvidence && rec.experienceEvidence.metrics ? chip('3/4暂存', rec.experienceEvidence.metrics.midBuffer34Pct + '%', !rec.experienceEvidence.pass) : '') +
+       chip('难度', rec.difficulty || '-', false) +
+       chip('用时', ((rec._elapsedMs || 0) / 1000).toFixed(0) + 's', false);
+     var fails = (rec.goodV3Fails || []).join('、');
+     if (fails) html += '<span class="grb-note">' + fails + '</span>';
+-    if (rec.goalMode) html += '<span class="grb-note">' + (rec.goalPreview ? '目标预览（未达标，继续跑）' : ('目标模式：' + (rec.goalStopped ? '点结束时输出当前最好' : '已达标'))) + '（第 ' + (rec.goalRounds || 1) + ' 轮）</span>';
++    if (rec.goalMode) html += '<span class="grb-note">' + (rec.goalPreview ? '目标预览（未达标，继续跑）' : ('目标模式：' + (rec.goalStopped ? '手动结束，输出当前最好' : (rec.experienceGoal ? (rec.experienceEvidence && rec.experienceEvidence.pass ? '体验目标已达标' : '未达体验目标，输出当前最好') : (rec.goalStopReason === 'goalTimeUp' ? '总预算到点，输出当前最好' : '已达标'))))) + '（第 ' + (rec.goalRounds || 1) + ' 轮）</span>';
+     el.className = 'gen-result-banner ' + cls;
+     el.innerHTML = html;
+   }
+@@ -5895,6 +5896,9 @@ AntSolver.App = (function() {
+       sec('生成参数（本次选择）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
++      row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
++        ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
++        ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
+       row('容量策略', ap.capacityProfile || 'auto') +
+       row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
+       row('切法策略', ap.cutPolicy || 'auto') +
+@@ -6159,7 +6163,7 @@ AntSolver.App = (function() {
+         bottomEntryFeasibility: (result && result.bottomEntryFeasibility) || null,
+         entryMode: (result && result.entryMode) || 'fourSide',
+         audit: null, difficulty: 0, grade: '-', fallback: false,
+-        goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped),
++        goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped), goalStopReason: (result && result.goalStopReason) || null,
+         perf: (result && result.perf) || null
+       };
+     }
+@@ -6255,6 +6259,14 @@ AntSolver.App = (function() {
+       // 【v500·P3】只读质量证据：债务生命周期 + 双时间线（参考解）。没有完成解时为 null。
+       debtEvidence: result.debtEvidence || null,
+       timelineEvidence: result.timelineEvidence || null,
++      experienceGoal: !!(result.config && result.config.experienceGoal),
++      experienceEvidence: result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
++        reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
++        releaseDecision: result._experienceFull.releaseDecision } : null,
++      capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
++        curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
++        stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
++        base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
+       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+       qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
+       fullTime: !!(result.config && result.config.fullTime),
+@@ -6328,7 +6340,7 @@ AntSolver.App = (function() {
+       fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
+       fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
+       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
+-      goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped,
++      goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
+       // 【v368】搜索为什么停：pass_early_stop / budget_timeout / exhausted / no_candidate
+       perfStop: result.perf ? { reason: result.perf.stopReason || null, totalMs: result.perf.totalMs || null } : null,
+       workerBuild: result._workerBuild || null,   // 【v369】生成线程的 build（确认跑的是新 generator）
+@@ -7011,6 +7023,11 @@ AntSolver.App = (function() {
+     });
+   }
+ 
++  function genExperienceGoalEnabled() {
++    var el = document.getElementById('gen-experience-goal');
++    return el ? !!el.checked : true;
++  }
++
+   /** 槽位领取下一关。没有可领的就置空闲，并检查整批是否该收尾。 */
+   function genSlotDispatch(slot) {
+     if (genBatchAborted || !genBatchRunning || !slot.w || !slot.ready) return;
+@@ -7041,8 +7058,10 @@ AntSolver.App = (function() {
+       taskCfg.goalPerRoundMs = 20000;
+       taskCfg.goalBases = 3;   // 【v438】每轮 3 个基底，各自 A1~A4
+       taskCfg.timeBudgetMs = 20000;
+-      taskCfg.goalMaxMs = 0;      // 【v416·用户裁决】目标模式不设上限：不达目标不放弃，手动停止才收
++      taskCfg.goalMaxMs = Math.max(60000, +b.config.timeBudgetMs || 300000); // v503：用每图搜索时间作总预算，避免无限小时
+       taskCfg.goalMaxRounds = 0;
++      taskCfg.experienceGoal = genExperienceGoalEnabled();
++      taskCfg.capacityTuneMs = 5000; taskCfg.capacityTuneCars = 8; taskCfg.capacityTuneVariants = 48;
+     }
+     taskCfg._build = APP_BUILD;
+     slot.w.postMessage({
+@@ -7163,6 +7182,8 @@ AntSolver.App = (function() {
+     var entry = levelList[0];
+     var idx = 0;
+     var base = genApplyFixed(genBatch.config, entry.blocks, entry.name);
++    base.experienceGoal = genExperienceGoalEnabled();
++    base.capacityTuneMs = 5000; base.capacityTuneCars = 8; base.capacityTuneVariants = 48;
+     var recipes = [
+       { tag: 'A', over: {} },
+       { tag: 'B', over: { cutMode: 'exposeCut', maxPipes: 1, iceForceSteps: 4 } },
+@@ -7180,7 +7201,7 @@ AntSolver.App = (function() {
+       if (!w) return;
+       st.ws.push(w);
+       var cfg = Object.assign({}, base, rec.over, {
+-        goalPerRoundMs: 20000, goalMaxMs: 0, goalMaxRounds: 0,
++        goalPerRoundMs: 20000, goalMaxMs: Math.max(60000, +genBatch.config.timeBudgetMs || 300000), goalMaxRounds: 0,
+         goalBases: 1, portfolioK: 1, p7BaseCount: 1,
+         timeBudgetMs: 20000, seed: (baseSeed + bi * 7919) >>> 0,
+         _build: APP_BUILD
+@@ -7240,7 +7261,7 @@ AntSolver.App = (function() {
+    * 不能直接调同步的 Generator.produceGoal —— 主线程被它占满时，点「结束」也处理不了。
+    */
+   function genRunGoalSync(entry, baseCfg, idx, afterOne) {
+-    var per = 20000, best = null, rounds = 0, t0 = Date.now();
++    var per = 20000, best = null, rounds = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
+     var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
+     function passed(r) {
+       try { return AntSolver.Generator.goalAcceptPass(r, baseCfg); } catch (e) { return false; }
+@@ -7263,11 +7284,13 @@ AntSolver.App = (function() {
+       if (!best) best = { level: null, valid: false, lastFailReason: 'goalNoRound' };
+       best.goalMode = true; best.goalRounds = rounds;
+       best.goalStopped = (why === 'stopped');
++      best.goalStopReason = why || null;
+       best.goalElapsedMs = Date.now() - t0;
+       genOnResult(entry, best, idx, afterOne);
+     }
+     function round() {
+       if (!genBatchRunning) return;
++      if (maxMs && Date.now() - t0 >= maxMs) return done('goalTimeUp');
+       if (genBatchAborted) return done('stopped');
+       var cfg = Object.assign({}, baseCfg, {
+         goalMode: false, portfolioK: 3, timeBudgetMs: per * 3,
+@@ -7329,6 +7352,9 @@ AntSolver.App = (function() {
+           });
+           cfg._build = APP_BUILD;
+           if (b.mode === 'goal') {
++            cfg.experienceGoal = genExperienceGoalEnabled();
++            cfg.goalMaxMs = Math.max(60000, +b.config.timeBudgetMs || 300000);
++            cfg.capacityTuneMs = 5000; cfg.capacityTuneCars = 8; cfg.capacityTuneVariants = 48;
+             // 【2026-10-22】主线程回退也走"一轮一让出"，否则点结束处理不了。
+             genRunGoalSync(entry, cfg, curIdx, afterOne);
+             return;
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index fcaabca..bc1f108 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -67,6 +67,7 @@ function _goalFinish(stopReason) {
+     best.goalMode = true;
+     best.goalRounds = g.rounds;
+     best.goalStopped = !!g.stop;
++    best.goalStopReason = stopReason || null;
+     best.goalElapsedMs = Date.now() - g.t0;
+   } else {
+     best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index c15b3ab..45bd955 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14847,11 +14847,16 @@ AntSolver.Generator = (function() {
+   function produceGoal(blocks, config, opts) {
+     opts = opts || {};
+     config = Object.assign({}, DEFAULT_CONFIG, config || {});
++    // v503：目标模式默认使用用户确认的压力体验门；experienceGoal=false 仅用于旧口径回归。
++    // 时间模式仍走 produce，不受此默认值影响。
++    if (config.experienceGoal == null) config.experienceGoal = true;
+     var t0 = Date.now();
+     var perMs = parseInt(config.goalPerRoundMs, 10);
+     if (!(perMs > 0)) perMs = 20000;
+     var maxMs = parseInt(config.goalMaxMs, 10);
+-    if (!(maxMs > 0)) maxMs = 0;
++    // v503：默认单关总预算5分钟；显式 goalMaxMs=0 才允许不限时，避免目标模式无意义地跑数小时。
++    if (config.goalMaxMs == null) maxMs = 300000;
++    else if (!(maxMs > 0)) maxMs = 0;
+     var maxRounds = parseInt(config.goalMaxRounds, 10);
+     if (!(maxRounds > 0)) maxRounds = 0;
+     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
+@@ -14887,6 +14892,7 @@ AntSolver.Generator = (function() {
+       best.goalRounds = rounds;
+       best.goalElapsedMs = Date.now() - t0;
+       best.goalStopped = stopped;
++      best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
+     }
+     return best;
+   }
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+index cfcb2f7..d0e63aa 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+@@ -407,6 +407,8 @@ function persistResult(b, payload) {
+     //   没有完成解时为 null；不把"未测"写成 0。
+     债务证据: rec.debtEvidence || null,
+     时间线证据: rec.timelineEvidence || null,
++    体验目标: rec.experienceEvidence || null,
++    容量精调: rec.capacityTune || null,
+     P7耗时ms: rec.p7Ms != null ? rec.p7Ms : null,
+     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
+     fallbackType: rec.fallbackType || null, fallbackReason: rec.fallbackReason || null,
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 442ccdf..1a9c477 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -29,15 +29,16 @@
+ | P5 车数规划 | 先定车数能否消黑块 | ➖ 车数能定；结构层不接受满盘（17~26%） | `P5_车数规划.js` | §485 |
+ | 小图复测 | 019 还能产吗 | ✅ 6×6、3/3 过、黑块 36% | `产线对比.js` | §483 |
+ | v502 目标体验+容量精调 | ±几px能否低成本命中暂存3/4目标 | ✅ 未达标4关中转化2关，均±1px且过结构/守恒/回放；默认6/6 hash不变；未默认投产 | `目标体验与容量精调.js` | §491~492 |
++| v503 同预算目标搜索 | 局部精调是否比纯换seed省时 | ✅ 5/6 vs 4/6、总时-20.9%，收益主要1例；独立007共同失败；目标模式接入、时间模式不变 | `目标搜索同预算对照.js` | §493~494 |
+ 
+ ## 当前权威产物
+ 
+ | 用途 | 文件 |
+ |---|---|
+ | 生产现状 | `01_交接文档/交接摘要_v500_20261025.md` |
+-| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（当前S2） |
++| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（当前S3） |
+ | 手册/参数 | `01_交接文档/工程说明.md` |
+ | 历史决策 | `01_交接文档/工作日志_20261012.md`（按节号查） |
+ | 结论摘要 | 本目录 `归因_v495.md`、`E5_结果.md`、`E6a_结果.md`、`E6b_结果.md`、`E6c_*.md`、`P4_枚举.md` |
+-| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v502.patch` |
++| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v503.patch` |
+ | 历史版本 | `git log --oneline`（删除项都在 git 历史里） |
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\346\261\207\346\200\273_v503.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\346\261\207\346\200\273_v503.json"
+new file mode 100644
+index 0000000..5cd9053
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\346\261\207\346\200\273_v503.json"
+@@ -0,0 +1,103 @@
++{
++  "schema": "experience-search-budget-combined-v1",
++  "summary": {
++    "runs": 12,
++    "seedPass": 4,
++    "tunePass": 5,
++    "seedTotalMs": 207952,
++    "tuneTotalMs": 164403,
++    "deltaMs": -43549,
++    "deltaPct": -20.9
++  },
++  "pairs": [
++    {
++      "image": "006",
++      "seed": {
++        "pass": true,
++        "ms": 16195,
++        "rounds": 1
++      },
++      "tune": {
++        "pass": true,
++        "ms": 17115,
++        "rounds": 1
++      },
++      "deltaMs": 920
++    },
++    {
++      "image": "010",
++      "seed": {
++        "pass": false,
++        "ms": 51677,
++        "rounds": 5
++      },
++      "tune": {
++        "pass": true,
++        "ms": 6765,
++        "rounds": 1
++      },
++      "deltaMs": -44912
++    },
++    {
++      "image": "007",
++      "seed": {
++        "pass": true,
++        "ms": 18449,
++        "rounds": 1
++      },
++      "tune": {
++        "pass": true,
++        "ms": 18330,
++        "rounds": 1
++      },
++      "deltaMs": -119
++    },
++    {
++      "image": "006",
++      "seed": {
++        "pass": true,
++        "ms": 41288,
++        "rounds": 2
++      },
++      "tune": {
++        "pass": true,
++        "ms": 41996,
++        "rounds": 2
++      },
++      "deltaMs": 708
++    },
++    {
++      "image": "010",
++      "seed": {
++        "pass": true,
++        "ms": 29073,
++        "rounds": 2
++      },
++      "tune": {
++        "pass": true,
++        "ms": 29223,
++        "rounds": 2
++      },
++      "deltaMs": 150
++    },
++    {
++      "image": "007",
++      "seed": {
++        "pass": false,
++        "ms": 51270,
++        "rounds": 3
++      },
++      "tune": {
++        "pass": false,
++        "ms": 50974,
++        "rounds": 3
++      },
++      "deltaMs": -296
++    }
++  ],
++  "boundaries": [
++    "独立007两臂均未达标",
++    "45秒是轮间预算，实际整轮结束可到约51秒",
++    "收益主要来自010 seed1001，不能外推所有图"
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\347\213\254\347\253\213seed_v503.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\347\213\254\347\253\213seed_v503.json"
+new file mode 100644
+index 0000000..5e14522
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\347\213\254\347\253\213seed_v503.json"
+@@ -0,0 +1,730 @@
++{
++  "schema": "experience-search-budget-ab-v1",
++  "config": {
++    "budgetMs": 45000,
++    "perArmMs": 10000,
++    "tuneMs": 5000,
++    "initialSeed": 1003
++  },
++  "summary": {
++    "runs": 6,
++    "seedPass": 2,
++    "tunePass": 2,
++    "seedTotalMs": 121631,
++    "tuneTotalMs": 122193
++  },
++  "pairs": [
++    {
++      "image": "006",
++      "seed": {
++        "pass": true,
++        "ms": 41288,
++        "rounds": 2
++      },
++      "tune": {
++        "pass": true,
++        "ms": 41996,
++        "rounds": 2
++      },
++      "deltaMs": 708
++    },
++    {
++      "image": "010",
++      "seed": {
++        "pass": true,
++        "ms": 29073,
++        "rounds": 2
++      },
++      "tune": {
++        "pass": true,
++        "ms": 29223,
++        "rounds": 2
++      },
++      "deltaMs": 150
++    },
++    {
++      "image": "007",
++      "seed": {
++        "pass": false,
++        "ms": 51270,
++        "rounds": 3
++      },
++      "tune": {
++        "pass": false,
++        "ms": 50974,
++        "rounds": 3
++      },
++      "deltaMs": -296
++    }
++  ],
++  "rows": [
++    {
++      "image": "006",
++      "mode": "seed",
++      "budgetMs": 45000,
++      "elapsedMs": 41288,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1003,
++          "generateMs": 16758,
++          "tuneMs": 0,
++          "totalMs": 16873,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 18,
++            "midBuffer34Pct": 38.9,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 11.1
++          },
++          "after": {
++            "midSteps": 18,
++            "midBuffer34Pct": 38.9,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 11.1
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "d8be1dc81ae3b9df4187fb790863240b6f586c00252b6fa371e1309fa9692674"
++        },
++        {
++          "round": 2,
++          "seed": 8922,
++          "generateMs": 22038,
++          "tuneMs": 0,
++          "totalMs": 24415,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 16,
++            "midBuffer34Pct": 62.5,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 40,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 16,
++            "midBuffer34Pct": 62.5,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 40,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "fdd443a00d5d8e302273c2a285f559f2692edf9e2d7e80f9a794b8aed0ca9ab3"
++        }
++      ],
++      "final": {
++        "hash": "fdd443a00d5d8e302273c2a285f559f2692edf9e2d7e80f9a794b8aed0ca9ab3",
++        "metrics": {
++          "midSteps": 16,
++          "midBuffer34Pct": 62.5,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 1,
++          "oscillationCount": 3,
++          "lateHighPressurePct": 40,
++          "maxBuffer": 4,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "006",
++      "mode": "tune",
++      "budgetMs": 45000,
++      "elapsedMs": 41996,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1003,
++          "generateMs": 14928,
++          "tuneMs": 2508,
++          "totalMs": 17501,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 18,
++            "midBuffer34Pct": 38.9,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 11.1
++          },
++          "after": {
++            "midSteps": 18,
++            "midBuffer34Pct": 38.9,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 11.1
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 28,
++            "skipped": null
++          },
++          "hash": "d8be1dc81ae3b9df4187fb790863240b6f586c00252b6fa371e1309fa9692674"
++        },
++        {
++          "round": 2,
++          "seed": 8922,
++          "generateMs": 22121,
++          "tuneMs": 1179,
++          "totalMs": 24494,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 16,
++            "midBuffer34Pct": 62.5,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 40,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 16,
++            "midBuffer34Pct": 62.5,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 40,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 0,
++            "skipped": "already_pass"
++          },
++          "hash": "fdd443a00d5d8e302273c2a285f559f2692edf9e2d7e80f9a794b8aed0ca9ab3"
++        }
++      ],
++      "final": {
++        "hash": "fdd443a00d5d8e302273c2a285f559f2692edf9e2d7e80f9a794b8aed0ca9ab3",
++        "metrics": {
++          "midSteps": 16,
++          "midBuffer34Pct": 62.5,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 1,
++          "oscillationCount": 3,
++          "lateHighPressurePct": 40,
++          "maxBuffer": 4,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "010",
++      "mode": "seed",
++      "budgetMs": 45000,
++      "elapsedMs": 29073,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1003,
++          "generateMs": 14080,
++          "tuneMs": 0,
++          "totalMs": 14139,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 12,
++            "midBuffer34Pct": 25,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 25
++          },
++          "after": {
++            "midSteps": 12,
++            "midBuffer34Pct": 25,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 25
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "21cc23524ba9f5a75d5647c03bd6df5158a13cdde779c2abb6f2ff0838ed9bd9"
++        },
++        {
++          "round": 2,
++          "seed": 8922,
++          "generateMs": 14857,
++          "tuneMs": 0,
++          "totalMs": 14934,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 12,
++            "midBuffer34Pct": 50,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 12,
++            "midBuffer34Pct": 50,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "6dd34c76bbc548b5d8481929c725e982271f2f376426c23f1dda7c022450c206"
++        }
++      ],
++      "final": {
++        "hash": "6dd34c76bbc548b5d8481929c725e982271f2f376426c23f1dda7c022450c206",
++        "metrics": {
++          "midSteps": 12,
++          "midBuffer34Pct": 50,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 2,
++          "oscillationCount": 2,
++          "lateHighPressurePct": 0,
++          "maxBuffer": 4,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "010",
++      "mode": "tune",
++      "budgetMs": 45000,
++      "elapsedMs": 29223,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1003,
++          "generateMs": 14098,
++          "tuneMs": 36,
++          "totalMs": 14169,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 12,
++            "midBuffer34Pct": 25,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 25
++          },
++          "after": {
++            "midSteps": 12,
++            "midBuffer34Pct": 25,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 25
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 0,
++            "skipped": "far_from_target"
++          },
++          "hash": "21cc23524ba9f5a75d5647c03bd6df5158a13cdde779c2abb6f2ff0838ed9bd9"
++        },
++        {
++          "round": 2,
++          "seed": 8922,
++          "generateMs": 14978,
++          "tuneMs": 31,
++          "totalMs": 15054,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 12,
++            "midBuffer34Pct": 50,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 12,
++            "midBuffer34Pct": 50,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 0,
++            "skipped": "already_pass"
++          },
++          "hash": "6dd34c76bbc548b5d8481929c725e982271f2f376426c23f1dda7c022450c206"
++        }
++      ],
++      "final": {
++        "hash": "6dd34c76bbc548b5d8481929c725e982271f2f376426c23f1dda7c022450c206",
++        "metrics": {
++          "midSteps": 12,
++          "midBuffer34Pct": 50,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 2,
++          "oscillationCount": 2,
++          "lateHighPressurePct": 0,
++          "maxBuffer": 4,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "007",
++      "mode": "seed",
++      "budgetMs": 45000,
++      "elapsedMs": 51270,
++      "pass": false,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1003,
++          "generateMs": 18824,
++          "tuneMs": 0,
++          "totalMs": 18931,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 25,
++            "midBuffer34Pct": 32,
++            "midBuffer5Pct": 4,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 18
++          },
++          "after": {
++            "midSteps": 25,
++            "midBuffer34Pct": 32,
++            "midBuffer5Pct": 4,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 18
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "7e9c345ff7dc458b5cab75a5cc87ed1750cf1e4866e64edde647a866ca98a719"
++        },
++        {
++          "round": 2,
++          "seed": 8922,
++          "generateMs": 22723,
++          "tuneMs": 0,
++          "totalMs": 22780,
++          "valid": true,
++          "struct": false,
++          "pass": false,
++          "before": {
++            "midSteps": 19,
++            "midBuffer34Pct": 21.1,
++            "midBuffer5Pct": 5.3,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 28.9
++          },
++          "after": {
++            "midSteps": 19,
++            "midBuffer34Pct": 21.1,
++            "midBuffer5Pct": 5.3,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 28.9
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "d23c63b6d59375ab40e85543ec1b054a4417da70710b6a32a0252930bf0207f6"
++        },
++        {
++          "round": 3,
++          "seed": 16841,
++          "generateMs": 9484,
++          "tuneMs": 0,
++          "totalMs": 9558,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 20,
++            "midBuffer34Pct": 10,
++            "midBuffer5Pct": 10,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 40
++          },
++          "after": {
++            "midSteps": 20,
++            "midBuffer34Pct": 10,
++            "midBuffer5Pct": 10,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 40
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "ba27c12cfdec54af6ffe5b2f3d66802faecb2027719374e3a40e75a8ba761114"
++        }
++      ],
++      "final": {
++        "hash": "ba27c12cfdec54af6ffe5b2f3d66802faecb2027719374e3a40e75a8ba761114",
++        "metrics": {
++          "midSteps": 20,
++          "midBuffer34Pct": 10,
++          "midBuffer5Pct": 10,
++          "maxBuffer5Run": 2,
++          "significantReleaseCount": 1,
++          "oscillationCount": 1,
++          "lateHighPressurePct": 0,
++          "maxBuffer": 5,
++          "distance": 40
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "007",
++      "mode": "tune",
++      "budgetMs": 45000,
++      "elapsedMs": 50974,
++      "pass": false,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1003,
++          "generateMs": 18848,
++          "tuneMs": 1642,
++          "totalMs": 20553,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 25,
++            "midBuffer34Pct": 32,
++            "midBuffer5Pct": 4,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 18
++          },
++          "after": {
++            "midSteps": 25,
++            "midBuffer34Pct": 32,
++            "midBuffer5Pct": 4,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 2,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 18
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 15,
++            "skipped": null
++          },
++          "hash": "7e9c345ff7dc458b5cab75a5cc87ed1750cf1e4866e64edde647a866ca98a719"
++        },
++        {
++          "round": 2,
++          "seed": 8922,
++          "generateMs": 22729,
++          "tuneMs": 0,
++          "totalMs": 22785,
++          "valid": true,
++          "struct": false,
++          "pass": false,
++          "before": {
++            "midSteps": 19,
++            "midBuffer34Pct": 21.1,
++            "midBuffer5Pct": 5.3,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 28.9
++          },
++          "after": {
++            "midSteps": 19,
++            "midBuffer34Pct": 21.1,
++            "midBuffer5Pct": 5.3,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 28.9
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 0,
++            "skipped": "structure_gate_failed"
++          },
++          "hash": "d23c63b6d59375ab40e85543ec1b054a4417da70710b6a32a0252930bf0207f6"
++        },
++        {
++          "round": 3,
++          "seed": 16841,
++          "generateMs": 7547,
++          "tuneMs": 44,
++          "totalMs": 7634,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 20,
++            "midBuffer34Pct": 10,
++            "midBuffer5Pct": 10,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 40
++          },
++          "after": {
++            "midSteps": 20,
++            "midBuffer34Pct": 10,
++            "midBuffer5Pct": 10,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 40
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 0,
++            "skipped": "far_from_target"
++          },
++          "hash": "ba27c12cfdec54af6ffe5b2f3d66802faecb2027719374e3a40e75a8ba761114"
++        }
++      ],
++      "final": {
++        "hash": "ba27c12cfdec54af6ffe5b2f3d66802faecb2027719374e3a40e75a8ba761114",
++        "metrics": {
++          "midSteps": 20,
++          "midBuffer34Pct": 10,
++          "midBuffer5Pct": 10,
++          "maxBuffer5Run": 2,
++          "significantReleaseCount": 1,
++          "oscillationCount": 1,
++          "lateHighPressurePct": 0,
++          "maxBuffer": 5,
++          "distance": 40
++        },
++        "struct": true,
++        "valid": true
++      }
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\351\246\226\350\275\256_v503.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\351\246\226\350\275\256_v503.json"
+new file mode 100644
+index 0000000..3eca62e
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227_\351\246\226\350\275\256_v503.json"
+@@ -0,0 +1,574 @@
++{
++  "schema": "experience-search-budget-ab-v1",
++  "config": {
++    "budgetMs": 45000,
++    "perArmMs": 10000,
++    "tuneMs": 5000,
++    "initialSeed": 1001
++  },
++  "summary": {
++    "runs": 6,
++    "seedPass": 2,
++    "tunePass": 3,
++    "seedTotalMs": 86321,
++    "tuneTotalMs": 42210
++  },
++  "pairs": [
++    {
++      "image": "006",
++      "seed": {
++        "pass": true,
++        "ms": 16195,
++        "rounds": 1
++      },
++      "tune": {
++        "pass": true,
++        "ms": 17115,
++        "rounds": 1
++      },
++      "deltaMs": 920
++    },
++    {
++      "image": "010",
++      "seed": {
++        "pass": false,
++        "ms": 51677,
++        "rounds": 5
++      },
++      "tune": {
++        "pass": true,
++        "ms": 6765,
++        "rounds": 1
++      },
++      "deltaMs": -44912
++    },
++    {
++      "image": "007",
++      "seed": {
++        "pass": true,
++        "ms": 18449,
++        "rounds": 1
++      },
++      "tune": {
++        "pass": true,
++        "ms": 18330,
++        "rounds": 1
++      },
++      "deltaMs": -119
++    }
++  ],
++  "rows": [
++    {
++      "image": "006",
++      "mode": "seed",
++      "budgetMs": 45000,
++      "elapsedMs": 16195,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1001,
++          "generateMs": 16028,
++          "tuneMs": 0,
++          "totalMs": 16193,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 17,
++            "midBuffer34Pct": 64.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 75,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 17,
++            "midBuffer34Pct": 64.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 75,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "1b05679474223e3338b0f34a39d2d375cf222e468ac8790367c99865d0cee702"
++        }
++      ],
++      "final": {
++        "hash": "1b05679474223e3338b0f34a39d2d375cf222e468ac8790367c99865d0cee702",
++        "metrics": {
++          "midSteps": 17,
++          "midBuffer34Pct": 64.7,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 2,
++          "oscillationCount": 5,
++          "lateHighPressurePct": 75,
++          "maxBuffer": 4,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "006",
++      "mode": "tune",
++      "budgetMs": 45000,
++      "elapsedMs": 17115,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1001,
++          "generateMs": 16967,
++          "tuneMs": 60,
++          "totalMs": 17115,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 17,
++            "midBuffer34Pct": 64.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 75,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 17,
++            "midBuffer34Pct": 64.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 75,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 0,
++            "skipped": "already_pass"
++          },
++          "hash": "1b05679474223e3338b0f34a39d2d375cf222e468ac8790367c99865d0cee702"
++        }
++      ],
++      "final": {
++        "hash": "1b05679474223e3338b0f34a39d2d375cf222e468ac8790367c99865d0cee702",
++        "metrics": {
++          "midSteps": 17,
++          "midBuffer34Pct": 64.7,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 2,
++          "oscillationCount": 5,
++          "lateHighPressurePct": 75,
++          "maxBuffer": 4,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "010",
++      "mode": "seed",
++      "budgetMs": 45000,
++      "elapsedMs": 51677,
++      "pass": false,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1001,
++          "generateMs": 5305,
++          "tuneMs": 0,
++          "totalMs": 5403,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 13,
++            "midBuffer34Pct": 46.2,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 3.8
++          },
++          "after": {
++            "midSteps": 13,
++            "midBuffer34Pct": 46.2,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 3.8
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "ef88eac4cef1f004d6f11cf8ac8a8c4442c7cf7123d85c3a82539fe95154266d"
++        },
++        {
++          "round": 2,
++          "seed": 8920,
++          "generateMs": 12556,
++          "tuneMs": 0,
++          "totalMs": 12626,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 14,
++            "midBuffer34Pct": 21.4,
++            "midBuffer5Pct": 7.1,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 28.6
++          },
++          "after": {
++            "midSteps": 14,
++            "midBuffer34Pct": 21.4,
++            "midBuffer5Pct": 7.1,
++            "maxBuffer5Run": 1,
++            "significantReleaseCount": 1,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 28.6
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "5f071a5d73ac7cf3dcaefa4ed263bb0f04ca9617ca0d3ccdee37746635a77d19"
++        },
++        {
++          "round": 3,
++          "seed": 16839,
++          "generateMs": 7740,
++          "tuneMs": 0,
++          "totalMs": 7801,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 15,
++            "midBuffer34Pct": 6.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 3,
++            "distance": 43.3
++          },
++          "after": {
++            "midSteps": 15,
++            "midBuffer34Pct": 6.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 3,
++            "distance": 43.3
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "bb543febaa7254a6875a468b7d56d63775b20bc6e0c8edf582bf5e07ec521aa3"
++        },
++        {
++          "round": 4,
++          "seed": 24758,
++          "generateMs": 11770,
++          "tuneMs": 0,
++          "totalMs": 11855,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 14,
++            "midBuffer34Pct": 14.3,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 3,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 35.7
++          },
++          "after": {
++            "midSteps": 14,
++            "midBuffer34Pct": 14.3,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 3,
++            "oscillationCount": 3,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 35.7
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "158ca4809a4297ac00b146c4289f5766b3d1eed5d8199293d5857b609a122cd3"
++        },
++        {
++          "round": 5,
++          "seed": 32677,
++          "generateMs": 13930,
++          "tuneMs": 0,
++          "totalMs": 13992,
++          "valid": true,
++          "struct": true,
++          "pass": false,
++          "before": {
++            "midSteps": 14,
++            "midBuffer34Pct": 35.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 0,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 28.6,
++            "maxBuffer": 3,
++            "distance": 39.3
++          },
++          "after": {
++            "midSteps": 14,
++            "midBuffer34Pct": 35.7,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 0,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 28.6,
++            "maxBuffer": 3,
++            "distance": 39.3
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "1b5b51b8dd7577ae826d8982fa89b1e991dc1f7164287770bca7bea418b66a46"
++        }
++      ],
++      "final": {
++        "hash": "1b5b51b8dd7577ae826d8982fa89b1e991dc1f7164287770bca7bea418b66a46",
++        "metrics": {
++          "midSteps": 14,
++          "midBuffer34Pct": 35.7,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 0,
++          "oscillationCount": 2,
++          "lateHighPressurePct": 28.6,
++          "maxBuffer": 3,
++          "distance": 39.3
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "010",
++      "mode": "tune",
++      "budgetMs": 45000,
++      "elapsedMs": 6765,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1001,
++          "generateMs": 5320,
++          "tuneMs": 1386,
++          "totalMs": 6765,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 13,
++            "midBuffer34Pct": 46.2,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 3.8
++          },
++          "after": {
++            "midSteps": 13,
++            "midBuffer34Pct": 53.8,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 2,
++            "oscillationCount": 2,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": {
++            "applied": true,
++            "tested": 13,
++            "skipped": null
++          },
++          "hash": "78a8e018619d9cffe9dd5fa94928bc1db68f0c856b4c83c1fddfac954884afb5"
++        }
++      ],
++      "final": {
++        "hash": "78a8e018619d9cffe9dd5fa94928bc1db68f0c856b4c83c1fddfac954884afb5",
++        "metrics": {
++          "midSteps": 13,
++          "midBuffer34Pct": 53.8,
++          "midBuffer5Pct": 0,
++          "maxBuffer5Run": 0,
++          "significantReleaseCount": 2,
++          "oscillationCount": 2,
++          "lateHighPressurePct": 0,
++          "maxBuffer": 4,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "007",
++      "mode": "seed",
++      "budgetMs": 45000,
++      "elapsedMs": 18449,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1001,
++          "generateMs": 18274,
++          "tuneMs": 0,
++          "totalMs": 18449,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 21,
++            "midBuffer34Pct": 76.2,
++            "midBuffer5Pct": 9.5,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 3,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 44.4,
++            "maxBuffer": 5,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 21,
++            "midBuffer34Pct": 76.2,
++            "midBuffer5Pct": 9.5,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 3,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 44.4,
++            "maxBuffer": 5,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": null,
++          "hash": "d33ff0a3cce4c35658097b60c5cf42458f1fcbc550643a2505749d2e1c6da540"
++        }
++      ],
++      "final": {
++        "hash": "d33ff0a3cce4c35658097b60c5cf42458f1fcbc550643a2505749d2e1c6da540",
++        "metrics": {
++          "midSteps": 21,
++          "midBuffer34Pct": 76.2,
++          "midBuffer5Pct": 9.5,
++          "maxBuffer5Run": 2,
++          "significantReleaseCount": 3,
++          "oscillationCount": 5,
++          "lateHighPressurePct": 44.4,
++          "maxBuffer": 5,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    },
++    {
++      "image": "007",
++      "mode": "tune",
++      "budgetMs": 45000,
++      "elapsedMs": 18330,
++      "pass": true,
++      "rounds": [
++        {
++          "round": 1,
++          "seed": 1001,
++          "generateMs": 18154,
++          "tuneMs": 71,
++          "totalMs": 18330,
++          "valid": true,
++          "struct": true,
++          "pass": true,
++          "before": {
++            "midSteps": 21,
++            "midBuffer34Pct": 76.2,
++            "midBuffer5Pct": 9.5,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 3,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 44.4,
++            "maxBuffer": 5,
++            "distance": 0
++          },
++          "after": {
++            "midSteps": 21,
++            "midBuffer34Pct": 76.2,
++            "midBuffer5Pct": 9.5,
++            "maxBuffer5Run": 2,
++            "significantReleaseCount": 3,
++            "oscillationCount": 5,
++            "lateHighPressurePct": 44.4,
++            "maxBuffer": 5,
++            "distance": 0
++          },
++          "release": "found",
++          "tune": {
++            "applied": false,
++            "tested": 0,
++            "skipped": "already_pass"
++          },
++          "hash": "d33ff0a3cce4c35658097b60c5cf42458f1fcbc550643a2505749d2e1c6da540"
++        }
++      ],
++      "final": {
++        "hash": "d33ff0a3cce4c35658097b60c5cf42458f1fcbc550643a2505749d2e1c6da540",
++        "metrics": {
++          "midSteps": 21,
++          "midBuffer34Pct": 76.2,
++          "midBuffer5Pct": 9.5,
++          "maxBuffer5Run": 2,
++          "significantReleaseCount": 3,
++          "oscillationCount": 5,
++          "lateHighPressurePct": 44.4,
++          "maxBuffer": 5,
++          "distance": 0
++        },
++        "struct": true,
++        "valid": true
++      }
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227\345\257\271\347\205\247.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227\345\257\271\347\205\247.js"
+new file mode 100755
+index 0000000..d40f03c
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\346\220\234\347\264\242\345\220\214\351\242\204\347\256\227\345\257\271\347\205\247.js"
+@@ -0,0 +1,42 @@
++#!/usr/bin/env node
++/** v502 S2：同图同seed序列同墙钟预算，A纯换seed vs B局部容量+换seed。 */
++'use strict';
++const fs=require('fs'),path=require('path'),vm=require('vm'),crypto=require('crypto');
++const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
++const FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','generator.js'];
++const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON,setTimeout,clearTimeout,Infinity};vm.createContext(sb);for(const f of FILES)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver,G=A.Generator;
++function strOpt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?process.argv[i+1]:d;}function numOpt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?+process.argv[i+1]:d;}
++const budgetMs=numOpt('budget',45000),perArmMs=numOpt('round',10000),tuneMs=numOpt('tune',5000),initialSeed=numOpt('seed',1001),outFile=strOpt('out',''),dumpDir=strOpt('dump-dir','');
++const images=[{id:'006',file:'蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt'},{id:'010',file:'蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_010.txt'},{id:'007',file:'蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt'}];
++function hash(x){return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');}
++function run(img,mode){
++ const blocks=G.blocksFromTXT(fs.readFileSync(path.join(ROOT,img.file),'utf8')),band=G.deriveCapacityBand(blocks),t0=Date.now(),rounds=[];
++ let best=null,bestEv=null,pass=false;
++ while(Date.now()-t0<budgetMs&&!pass){
++  const round=rounds.length,remaining=budgetMs-(Date.now()-t0),cfg={seed:(initialSeed+round*7919)>>>0,generatorFlow:'new_fixed',experienceGoal:true,
++   boxSizeMin:band.band[0],boxSizeMax:band.band[1],capScalePlan:[1.45,1.15],cutMode:'layerCut2',candidateCount:3,timeBudgetMs:Math.max(1000,Math.min(perArmMs,remaining)),fullTime:true,portfolioK:1,
++   acceptMode:'target',targetPeakMin:3.2,targetPeakMax:4.8,targetSteadyMin:0,targetSteadyMax:100,targetBand3Min:0,targetBand4Min:0,targetPlayerPassMin:.25,
++   boardAllowSquare:true,boardRowsMin:4,boardRowsMax:6,boardColsMin:6,boardColsMax:8,boardHardRange:true,boardAuto:false,capacityTuneMs:Math.min(tuneMs,remaining),capacityTuneCars:8,capacityTuneVariants:48};
++  const rt=Date.now();let r=null;try{r=G.produce(blocks,cfg);}catch(e){r={level:null,valid:false,lastFailReason:String(e&&e.message||e)};}
++  const generateMs=Date.now()-rt,before=r&&r.level?A.ExperienceGoal.evaluate(r.level,{solveResult:r.solveResult,decision:false}):null;
++  let tune=null;
++  if(mode==='tune'&&r&&r.level&&r.valid){const tt=Date.now();try{r=G.tuneExperienceCandidate(r,cfg);}catch(e){r.capacityTune={applied:false,error:String(e&&e.message||e)};}tune={ms:Date.now()-tt,report:r.capacityTune||null};}
++  const ev=r&&r.level?A.ExperienceGoal.evaluate(r.level,{solveResult:r.solveResult,decision:true}):null;
++  const passed=!!(r&&r.level&&G.goalExperiencePass(r,cfg)),struct=!!(r&&r.level&&G.goalStructPass(r));
++  const rec={round:round+1,seed:cfg.seed,generateMs,tuneMs:tune?tune.ms:0,totalMs:Date.now()-rt,valid:!!(r&&r.valid),struct,pass:passed,
++   before:before&&before.metrics,after:ev&&ev.metrics,release:ev&&ev.releaseDecision&&ev.releaseDecision.status,
++   tune:tune&&{applied:!!(tune.report&&tune.report.applied),tested:tune.report&&tune.report.tested,stopped:tune.report&&tune.report.stopped,skipped:tune.report&&tune.report.skipped},hash:r&&r.level?hash(r.level):null};
++  rounds.push(rec);
++  function better(x,xev,y,yev){if(!y)return true;if(!!x.pass!==!!y.pass)return x.pass;if(!!x.struct!==!!y.struct)return x.struct;return (xev&&xev.metrics?xev.metrics.distance:1e9)<(yev&&yev.metrics?yev.metrics.distance:1e9);}
++  if(r&&r.level&&better(rec,ev,best,bestEv)){best=r;bestEv=ev;}
++  if(passed){pass=true;best=r;bestEv=ev;break;}
++ }
++ const result={image:img.id,mode,budgetMs,elapsedMs:Date.now()-t0,pass,rounds,final:best&&best.level?{hash:hash(best.level),metrics:bestEv.metrics,struct:G.goalStructPass(best),valid:best.valid}:null};
++ if(pass&&dumpDir){fs.mkdirSync(dumpDir,{recursive:true});fs.writeFileSync(path.join(dumpDir,img.id+'_'+mode+'.json'),JSON.stringify(best.level,null,2)+'\n');}
++ console.log(JSON.stringify({image:img.id,mode,pass,elapsedMs:result.elapsedMs,rounds:rounds.length,final:result.final&&result.final.metrics}));return result;
++}
++const rows=[];for(const img of images){rows.push(run(img,'seed'));rows.push(run(img,'tune'));}
++const pairs=images.map(img=>{const a=rows.find(x=>x.image===img.id&&x.mode==='seed'),b=rows.find(x=>x.image===img.id&&x.mode==='tune');return {image:img.id,seed:{pass:a.pass,ms:a.elapsedMs,rounds:a.rounds.length},tune:{pass:b.pass,ms:b.elapsedMs,rounds:b.rounds.length},deltaMs:b.elapsedMs-a.elapsedMs};});
++const summary={runs:rows.length,seedPass:rows.filter(x=>x.mode==='seed'&&x.pass).length,tunePass:rows.filter(x=>x.mode==='tune'&&x.pass).length,
++ seedTotalMs:rows.filter(x=>x.mode==='seed').reduce((n,x)=>n+x.elapsedMs,0),tuneTotalMs:rows.filter(x=>x.mode==='tune').reduce((n,x)=>n+x.elapsedMs,0)};
++const report={schema:'experience-search-budget-ab-v1',config:{budgetMs,perArmMs,tuneMs,initialSeed},summary,pairs,rows};if(outFile)fs.writeFileSync(outFile,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({summary,pairs},null,2));
+diff --git a/README.md b/README.md
+index 49f27cd..2db9d22 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v502**（目标体验与小容量精调实验；默认生产未开启 experienceGoal）。
++> 当前版本 **v503**（目标模式默认体验门与小容量精调；时间模式不变）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 

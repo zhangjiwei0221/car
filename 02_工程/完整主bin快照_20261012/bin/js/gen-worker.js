@@ -67,6 +67,7 @@ function _goalFinish(stopReason) {
     best.goalMode = true;
     best.goalRounds = g.rounds;
     best.goalStopped = !!g.stop;
+    best.goalStopReason = stopReason || null;
     best.goalElapsedMs = Date.now() - g.t0;
   } else {
     best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };

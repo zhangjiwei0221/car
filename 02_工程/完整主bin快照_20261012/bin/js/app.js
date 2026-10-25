@@ -5705,11 +5705,12 @@ AntSolver.App = (function() {
       chip('白给车≈', freeTxt, freeTxt !== '-' && freeTxt > 2) +
       chip('类型', rec.type || '-', false) +
       (rec.goalMode ? chip('目标轮', rec.goalRounds || 1, false) : '') +
+      (rec.experienceEvidence && rec.experienceEvidence.metrics ? chip('3/4暂存', rec.experienceEvidence.metrics.midBuffer34Pct + '%', !rec.experienceEvidence.pass) : '') +
       chip('难度', rec.difficulty || '-', false) +
       chip('用时', ((rec._elapsedMs || 0) / 1000).toFixed(0) + 's', false);
     var fails = (rec.goodV3Fails || []).join('、');
     if (fails) html += '<span class="grb-note">' + fails + '</span>';
-    if (rec.goalMode) html += '<span class="grb-note">' + (rec.goalPreview ? '目标预览（未达标，继续跑）' : ('目标模式：' + (rec.goalStopped ? '点结束时输出当前最好' : '已达标'))) + '（第 ' + (rec.goalRounds || 1) + ' 轮）</span>';
+    if (rec.goalMode) html += '<span class="grb-note">' + (rec.goalPreview ? '目标预览（未达标，继续跑）' : ('目标模式：' + (rec.goalStopped ? '手动结束，输出当前最好' : (rec.experienceGoal ? (rec.experienceEvidence && rec.experienceEvidence.pass ? '体验目标已达标' : '未达体验目标，输出当前最好') : (rec.goalStopReason === 'goalTimeUp' ? '总预算到点，输出当前最好' : '已达标'))))) + '（第 ' + (rec.goalRounds || 1) + ' 轮）</span>';
     el.className = 'gen-result-banner ' + cls;
     el.innerHTML = html;
   }
@@ -5895,6 +5896,9 @@ AntSolver.App = (function() {
       sec('生成参数（本次选择）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
+      row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
+        ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
+        ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
       row('容量策略', ap.capacityProfile || 'auto') +
       row('容量 / 切法', (ap.capMin != null ? ap.capMin + '~' + ap.capMax : '-') + ' / ' + (ci && ci.mode ? ci.mode : (ap.cutMode || '自动'))) +
       row('切法策略', ap.cutPolicy || 'auto') +
@@ -6159,7 +6163,7 @@ AntSolver.App = (function() {
         bottomEntryFeasibility: (result && result.bottomEntryFeasibility) || null,
         entryMode: (result && result.entryMode) || 'fourSide',
         audit: null, difficulty: 0, grade: '-', fallback: false,
-        goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped),
+        goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped), goalStopReason: (result && result.goalStopReason) || null,
         perf: (result && result.perf) || null
       };
     }
@@ -6255,6 +6259,14 @@ AntSolver.App = (function() {
       // 【v500·P3】只读质量证据：债务生命周期 + 双时间线（参考解）。没有完成解时为 null。
       debtEvidence: result.debtEvidence || null,
       timelineEvidence: result.timelineEvidence || null,
+      experienceGoal: !!(result.config && result.config.experienceGoal),
+      experienceEvidence: result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
+        reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
+        releaseDecision: result._experienceFull.releaseDecision } : null,
+      capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
+        curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
+        stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
+        base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
       qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
       fullTime: !!(result.config && result.config.fullTime),
@@ -6328,7 +6340,7 @@ AntSolver.App = (function() {
       fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
       fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
-      goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped,
+      goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
       // 【v368】搜索为什么停：pass_early_stop / budget_timeout / exhausted / no_candidate
       perfStop: result.perf ? { reason: result.perf.stopReason || null, totalMs: result.perf.totalMs || null } : null,
       workerBuild: result._workerBuild || null,   // 【v369】生成线程的 build（确认跑的是新 generator）
@@ -7011,6 +7023,11 @@ AntSolver.App = (function() {
     });
   }
 
+  function genExperienceGoalEnabled() {
+    var el = document.getElementById('gen-experience-goal');
+    return el ? !!el.checked : true;
+  }
+
   /** 槽位领取下一关。没有可领的就置空闲，并检查整批是否该收尾。 */
   function genSlotDispatch(slot) {
     if (genBatchAborted || !genBatchRunning || !slot.w || !slot.ready) return;
@@ -7041,8 +7058,10 @@ AntSolver.App = (function() {
       taskCfg.goalPerRoundMs = 20000;
       taskCfg.goalBases = 3;   // 【v438】每轮 3 个基底，各自 A1~A4
       taskCfg.timeBudgetMs = 20000;
-      taskCfg.goalMaxMs = 0;      // 【v416·用户裁决】目标模式不设上限：不达目标不放弃，手动停止才收
+      taskCfg.goalMaxMs = Math.max(60000, +b.config.timeBudgetMs || 300000); // v503：用每图搜索时间作总预算，避免无限小时
       taskCfg.goalMaxRounds = 0;
+      taskCfg.experienceGoal = genExperienceGoalEnabled();
+      taskCfg.capacityTuneMs = 5000; taskCfg.capacityTuneCars = 8; taskCfg.capacityTuneVariants = 48;
     }
     taskCfg._build = APP_BUILD;
     slot.w.postMessage({
@@ -7163,6 +7182,8 @@ AntSolver.App = (function() {
     var entry = levelList[0];
     var idx = 0;
     var base = genApplyFixed(genBatch.config, entry.blocks, entry.name);
+    base.experienceGoal = genExperienceGoalEnabled();
+    base.capacityTuneMs = 5000; base.capacityTuneCars = 8; base.capacityTuneVariants = 48;
     var recipes = [
       { tag: 'A', over: {} },
       { tag: 'B', over: { cutMode: 'exposeCut', maxPipes: 1, iceForceSteps: 4 } },
@@ -7180,7 +7201,7 @@ AntSolver.App = (function() {
       if (!w) return;
       st.ws.push(w);
       var cfg = Object.assign({}, base, rec.over, {
-        goalPerRoundMs: 20000, goalMaxMs: 0, goalMaxRounds: 0,
+        goalPerRoundMs: 20000, goalMaxMs: Math.max(60000, +genBatch.config.timeBudgetMs || 300000), goalMaxRounds: 0,
         goalBases: 1, portfolioK: 1, p7BaseCount: 1,
         timeBudgetMs: 20000, seed: (baseSeed + bi * 7919) >>> 0,
         _build: APP_BUILD
@@ -7240,7 +7261,7 @@ AntSolver.App = (function() {
    * 不能直接调同步的 Generator.produceGoal —— 主线程被它占满时，点「结束」也处理不了。
    */
   function genRunGoalSync(entry, baseCfg, idx, afterOne) {
-    var per = 20000, best = null, rounds = 0, t0 = Date.now();
+    var per = 20000, best = null, rounds = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
     var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
     function passed(r) {
       try { return AntSolver.Generator.goalAcceptPass(r, baseCfg); } catch (e) { return false; }
@@ -7263,11 +7284,13 @@ AntSolver.App = (function() {
       if (!best) best = { level: null, valid: false, lastFailReason: 'goalNoRound' };
       best.goalMode = true; best.goalRounds = rounds;
       best.goalStopped = (why === 'stopped');
+      best.goalStopReason = why || null;
       best.goalElapsedMs = Date.now() - t0;
       genOnResult(entry, best, idx, afterOne);
     }
     function round() {
       if (!genBatchRunning) return;
+      if (maxMs && Date.now() - t0 >= maxMs) return done('goalTimeUp');
       if (genBatchAborted) return done('stopped');
       var cfg = Object.assign({}, baseCfg, {
         goalMode: false, portfolioK: 3, timeBudgetMs: per * 3,
@@ -7329,6 +7352,9 @@ AntSolver.App = (function() {
           });
           cfg._build = APP_BUILD;
           if (b.mode === 'goal') {
+            cfg.experienceGoal = genExperienceGoalEnabled();
+            cfg.goalMaxMs = Math.max(60000, +b.config.timeBudgetMs || 300000);
+            cfg.capacityTuneMs = 5000; cfg.capacityTuneCars = 8; cfg.capacityTuneVariants = 48;
             // 【2026-10-22】主线程回退也走"一轮一让出"，否则点结束处理不了。
             genRunGoalSync(entry, cfg, curIdx, afterOne);
             return;

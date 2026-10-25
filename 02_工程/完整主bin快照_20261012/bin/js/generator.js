@@ -14847,11 +14847,16 @@ AntSolver.Generator = (function() {
   function produceGoal(blocks, config, opts) {
     opts = opts || {};
     config = Object.assign({}, DEFAULT_CONFIG, config || {});
+    // v503：目标模式默认使用用户确认的压力体验门；experienceGoal=false 仅用于旧口径回归。
+    // 时间模式仍走 produce，不受此默认值影响。
+    if (config.experienceGoal == null) config.experienceGoal = true;
     var t0 = Date.now();
     var perMs = parseInt(config.goalPerRoundMs, 10);
     if (!(perMs > 0)) perMs = 20000;
     var maxMs = parseInt(config.goalMaxMs, 10);
-    if (!(maxMs > 0)) maxMs = 0;
+    // v503：默认单关总预算5分钟；显式 goalMaxMs=0 才允许不限时，避免目标模式无意义地跑数小时。
+    if (config.goalMaxMs == null) maxMs = 300000;
+    else if (!(maxMs > 0)) maxMs = 0;
     var maxRounds = parseInt(config.goalMaxRounds, 10);
     if (!(maxRounds > 0)) maxRounds = 0;
     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
@@ -14887,6 +14892,7 @@ AntSolver.Generator = (function() {
       best.goalRounds = rounds;
       best.goalElapsedMs = Date.now() - t0;
       best.goalStopped = stopped;
+      best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
     }
     return best;
   }
