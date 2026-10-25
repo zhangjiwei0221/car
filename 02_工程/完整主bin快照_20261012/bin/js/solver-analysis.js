@@ -515,11 +515,16 @@ AntSolver.SolverAnalysis = (function () {
       } catch (e) { pressureProfiles.push({ replayValid: false, source: verifiedRoutes[pi].source, error: String((e && e.message) || e) }); }
     }
     var pressureSummary = summarizePressure(pressureProfiles);
+    var debtTimeline = null;
+    if (chosen && AntSolver.CarSequencer && AntSolver.CarSequencer.debtTimeline) {
+      try { debtTimeline = AntSolver.CarSequencer.debtTimeline(lv, chosen, opts); }
+      catch (e) { debtTimeline = { completed: false, error: String((e && e.message) || e) }; }
+    }
     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
-    var report = { schema: 'solver-analysis-v4', baseline: baseline, multi: multi,
+    var report = { schema: 'solver-analysis-v5', baseline: baseline, multi: multi,
       verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
       pressureProfiles: pressureProfiles, pressureSummary: pressureSummary,
-      counterfactual: cf, elapsedMs: Date.now() - t,
+      debtTimeline: debtTimeline, counterfactual: cf, elapsedMs: Date.now() - t,
       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
     // v489：只读证据向量；budget/null 明示，不参与 qGate/qPass 或生产候选。
     if (AntSolver.Quality && AntSolver.Quality.fromSolverAnalysis) {

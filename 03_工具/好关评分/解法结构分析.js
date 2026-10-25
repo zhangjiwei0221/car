@@ -8,7 +8,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const BIN = path.join(__dirname, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'solver-analysis.js'];
+const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js'];
 const sandbox = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set,
   setTimeout, clearTimeout, Infinity, Math, JSON, Date };
 vm.createContext(sandbox);
@@ -43,4 +43,5 @@ console.log(JSON.stringify({ file, out: out || null, elapsedMs: report.elapsedMs
     resolvedPct: report.qualityEvidence.counterfactualEvidence.resolvedPct,
     recoverablePctOfResolved: report.qualityEvidence.counterfactualEvidence.recoverablePctOfResolved },
   pressureEvidence: report.qualityEvidence && report.qualityEvidence.pressureEvidence,
+  debtEvidence: report.qualityEvidence && report.qualityEvidence.debtEvidence,
   counterfactual: { decisions: report.counterfactual.decisions.length, alternatives: alts, solved, dead } }, null, 2));

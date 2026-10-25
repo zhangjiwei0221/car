@@ -85,3 +85,80 @@ AntSolver.CarSequencer = (function () {
   }
   return { roleOf: roleOf, assignRoles: assignRoles, schedule: schedule, auditBoard: auditBoard };
 })();
+
+/** v493 · 只读债务生命周期：add/eat/done 真事件，不用容量差猜偿还。 */
+AntSolver.CarSequencer.debtTimeline = function (level, route, opts) {
+  opts = opts || {};
+  var Sim = AntSolver.Simulator, lv = level.rows && level.totalPixels != null ? level : AntSolver.parseLevel(level);
+  var actions = route.actions || route.pickOrder || route || [], seenStep = {};
+  actions = actions.filter(function (a) {
+    if (!a || a.r == null || a.c == null) return false;
+    if (a.chainIndex != null && a.chainIndex !== 0) return false;
+    if (a.chainSize > 1 && a.step != null) { if (seenStep[a.step]) return false; seenStep[a.step] = true; }
+    return true;
+  }).map(function (a) { return { r: a.r, c: a.c }; });
+  var s = Sim.createState(lv, { useSlotStart: true, bottomOnly: !!opts.bottomOnly, instantChain: !!opts.instantChain });
+  s.capture = true;
+  var items = {}, active = {}, series = [], maxActive = 0, maxDebtPixels = 0;
+  for (var step = 0; step < actions.length; step++) {
+    if (s.gameWon || s.gameOver) break;
+    s.capOps = [];
+    var a = actions[step];
+    if (!Sim.isPickable(s, a.r, a.c)) return { completed: false, reason: 'illegal_pick@' + step, items: Object.keys(items).map(function (k) { return items[k]; }) };
+    Sim.applyPick(s, a.r, a.c);
+    var ops = s.capOps || [];
+    for (var oi = 0; oi < ops.length; oi++) {
+      var op = ops[oi];
+      if (op.t === 'add') {
+        items[op.key] = { key: op.key, color: op.color, need: op.need, link: op.link || 0,
+          enterStep: s.steps, progress: 0, initialDebt: 0, doneStep: null, status: 'open' };
+        active[op.key] = true;
+      } else if (op.t === 'eat') {
+        if (items[op.key]) items[op.key].progress += (op.cells || []).length;
+      } else if (op.t === 'done') {
+        for (var dk = 0; dk < (op.keys || []).length; dk++) {
+          var key = op.keys[dk];
+          if (items[key]) { items[key].doneStep = s.steps; items[key].status = 'done'; delete active[key]; }
+        }
+      }
+    }
+    var activeDebt = 0, debtPixels = 0;
+    for (var key in items) {
+      var item = items[key];
+      if (item.initialDebt === 0 && item.progress < item.need) {
+        item.initialDebt = item.need - item.progress;
+        item.debtStartStep = item.enterStep;
+        item.status = item.doneStep != null ? 'repaidSameStep' : 'open';
+      }
+      if (active[key] && item.progress < item.need) { activeDebt++; debtPixels += item.need - item.progress; }
+    }
+    maxActive = Math.max(maxActive, activeDebt); maxDebtPixels = Math.max(maxDebtPixels, debtPixels);
+    series.push({ step: s.steps, activeDebt: activeDebt, debtPixels: debtPixels, buffer: s.buffer.length, eliminated: s.eliminatedPixels });
+    if (s.eliminatedPixels >= s.totalPixels) { s.gameWon = true; s.gameOver = true; }
+  }
+  var list = Object.keys(items).map(function (k) { return items[k]; });
+  var debtCars = list.filter(function (x) { return x.initialDebt > 0; });
+  for (var i = 0; i < debtCars.length; i++) {
+    var d = debtCars[i];
+    if (d.doneStep == null) d.status = 'unrepaid';
+    else if (d.doneStep === d.debtStartStep) d.status = 'repaidSameStep';
+    else { d.status = 'repaidLater'; d.waitSteps = d.doneStep - d.debtStartStep; }
+  }
+  function median(xs) { if (!xs.length) return null; xs = xs.slice().sort(function (a, b) { return a - b; }); var m = Math.floor(xs.length / 2); return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2; }
+  var later = debtCars.filter(function (x) { return x.status === 'repaidLater'; });
+  var same = debtCars.filter(function (x) { return x.status === 'repaidSameStep'; });
+  var un = debtCars.filter(function (x) { return x.status === 'unrepaid'; });
+  var micro = debtCars.filter(function (x) { return x.need <= (opts.microCarMax == null ? 2 : opts.microCarMax); });
+  var waits = later.map(function (x) { return x.waitSteps; });
+  return {
+    schema: 'debt-timeline-v1', completed: !!s.gameWon, steps: s.steps,
+    summary: {
+      debtCars: debtCars.length, repaidLater: later.length, repaidSameStep: same.length,
+      unrepaid: un.length, microDebtCars: micro.length,
+      repaidLaterPct: debtCars.length ? +(later.length / debtCars.length * 100).toFixed(1) : null,
+      medianWaitSteps: median(waits), maxWaitSteps: waits.length ? Math.max.apply(null, waits) : null,
+      maxActiveDebtCars: maxActive, maxDebtPixels: maxDebtPixels
+    },
+    items: list, series: series
+  };
+};

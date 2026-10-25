@@ -1,0 +1,242 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index caded1c..6f8f11e 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v492 · 车辆角色与首行排程</title>
+-  <link rel="stylesheet" href="css/style.css?v=492">
++  <title>车接小人 v493 · 债务生命周期</title>
++  <link rel="stylesheet" href="css/style.css?v=493">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v492</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v493</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,24 +769,24 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=492"></script>
+-  <script src="js/utils.js?v=492"></script>
++  <script src="js/zip.js?v=493"></script>
++  <script src="js/utils.js?v=493"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=492"></script>
+-  <script src="js/simulator.js?v=492"></script>
++  <script src="js/color-libs.js?v=493"></script>
++  <script src="js/simulator.js?v=493"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=492"></script>
+-  <script src="js/solver-strategy.js?v=492"></script>
+-  <script src="js/solver.js?v=492"></script>
+-  <script src="js/playersim.js?v=492"></script>
++  <script src="js/anchor-cut.js?v=493"></script>
++  <script src="js/solver-strategy.js?v=493"></script>
++  <script src="js/solver.js?v=493"></script>
++  <script src="js/playersim.js?v=493"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=492"></script>
+-  <script src="js/car-sequencer.js?v=492"></script>
+-  <script src="js/generator.js?v=492"></script>
+-  <script src="js/analysis.js?v=492"></script>
++  <script src="js/solver-analysis.js?v=493"></script>
++  <script src="js/car-sequencer.js?v=493"></script>
++  <script src="js/generator.js?v=493"></script>
++  <script src="js/analysis.js?v=493"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=492"></script>
+-  <script src="js/app.js?v=492"></script>
++  <script src="js/level-editor.js?v=493"></script>
++  <script src="js/app.js?v=493"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
+index e4fdd71..0b7cf54 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/car-sequencer.js"
+@@ -85,3 +85,80 @@ AntSolver.CarSequencer = (function () {
+   }
+   return { roleOf: roleOf, assignRoles: assignRoles, schedule: schedule, auditBoard: auditBoard };
+ })();
++
++/** v493 · 只读债务生命周期：add/eat/done 真事件，不用容量差猜偿还。 */
++AntSolver.CarSequencer.debtTimeline = function (level, route, opts) {
++  opts = opts || {};
++  var Sim = AntSolver.Simulator, lv = level.rows && level.totalPixels != null ? level : AntSolver.parseLevel(level);
++  var actions = route.actions || route.pickOrder || route || [], seenStep = {};
++  actions = actions.filter(function (a) {
++    if (!a || a.r == null || a.c == null) return false;
++    if (a.chainIndex != null && a.chainIndex !== 0) return false;
++    if (a.chainSize > 1 && a.step != null) { if (seenStep[a.step]) return false; seenStep[a.step] = true; }
++    return true;
++  }).map(function (a) { return { r: a.r, c: a.c }; });
++  var s = Sim.createState(lv, { useSlotStart: true, bottomOnly: !!opts.bottomOnly, instantChain: !!opts.instantChain });
++  s.capture = true;
++  var items = {}, active = {}, series = [], maxActive = 0, maxDebtPixels = 0;
++  for (var step = 0; step < actions.length; step++) {
++    if (s.gameWon || s.gameOver) break;
++    s.capOps = [];
++    var a = actions[step];
++    if (!Sim.isPickable(s, a.r, a.c)) return { completed: false, reason: 'illegal_pick@' + step, items: Object.keys(items).map(function (k) { return items[k]; }) };
++    Sim.applyPick(s, a.r, a.c);
++    var ops = s.capOps || [];
++    for (var oi = 0; oi < ops.length; oi++) {
++      var op = ops[oi];
++      if (op.t === 'add') {
++        items[op.key] = { key: op.key, color: op.color, need: op.need, link: op.link || 0,
++          enterStep: s.steps, progress: 0, initialDebt: 0, doneStep: null, status: 'open' };
++        active[op.key] = true;
++      } else if (op.t === 'eat') {
++        if (items[op.key]) items[op.key].progress += (op.cells || []).length;
++      } else if (op.t === 'done') {
++        for (var dk = 0; dk < (op.keys || []).length; dk++) {
++          var key = op.keys[dk];
++          if (items[key]) { items[key].doneStep = s.steps; items[key].status = 'done'; delete active[key]; }
++        }
++      }
++    }
++    var activeDebt = 0, debtPixels = 0;
++    for (var key in items) {
++      var item = items[key];
++      if (item.initialDebt === 0 && item.progress < item.need) {
++        item.initialDebt = item.need - item.progress;
++        item.debtStartStep = item.enterStep;
++        item.status = item.doneStep != null ? 'repaidSameStep' : 'open';
++      }
++      if (active[key] && item.progress < item.need) { activeDebt++; debtPixels += item.need - item.progress; }
++    }
++    maxActive = Math.max(maxActive, activeDebt); maxDebtPixels = Math.max(maxDebtPixels, debtPixels);
++    series.push({ step: s.steps, activeDebt: activeDebt, debtPixels: debtPixels, buffer: s.buffer.length, eliminated: s.eliminatedPixels });
++    if (s.eliminatedPixels >= s.totalPixels) { s.gameWon = true; s.gameOver = true; }
++  }
++  var list = Object.keys(items).map(function (k) { return items[k]; });
++  var debtCars = list.filter(function (x) { return x.initialDebt > 0; });
++  for (var i = 0; i < debtCars.length; i++) {
++    var d = debtCars[i];
++    if (d.doneStep == null) d.status = 'unrepaid';
++    else if (d.doneStep === d.debtStartStep) d.status = 'repaidSameStep';
++    else { d.status = 'repaidLater'; d.waitSteps = d.doneStep - d.debtStartStep; }
++  }
++  function median(xs) { if (!xs.length) return null; xs = xs.slice().sort(function (a, b) { return a - b; }); var m = Math.floor(xs.length / 2); return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2; }
++  var later = debtCars.filter(function (x) { return x.status === 'repaidLater'; });
++  var same = debtCars.filter(function (x) { return x.status === 'repaidSameStep'; });
++  var un = debtCars.filter(function (x) { return x.status === 'unrepaid'; });
++  var micro = debtCars.filter(function (x) { return x.need <= (opts.microCarMax == null ? 2 : opts.microCarMax); });
++  var waits = later.map(function (x) { return x.waitSteps; });
++  return {
++    schema: 'debt-timeline-v1', completed: !!s.gameWon, steps: s.steps,
++    summary: {
++      debtCars: debtCars.length, repaidLater: later.length, repaidSameStep: same.length,
++      unrepaid: un.length, microDebtCars: micro.length,
++      repaidLaterPct: debtCars.length ? +(later.length / debtCars.length * 100).toFixed(1) : null,
++      medianWaitSteps: median(waits), maxWaitSteps: waits.length ? Math.max.apply(null, waits) : null,
++      maxActiveDebtCars: maxActive, maxDebtPixels: maxDebtPixels
++    },
++    items: list, series: series
++  };
++};
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+index f39d897..784ba84 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+@@ -515,11 +515,16 @@ AntSolver.SolverAnalysis = (function () {
+       } catch (e) { pressureProfiles.push({ replayValid: false, source: verifiedRoutes[pi].source, error: String((e && e.message) || e) }); }
+     }
+     var pressureSummary = summarizePressure(pressureProfiles);
++    var debtTimeline = null;
++    if (chosen && AntSolver.CarSequencer && AntSolver.CarSequencer.debtTimeline) {
++      try { debtTimeline = AntSolver.CarSequencer.debtTimeline(lv, chosen, opts); }
++      catch (e) { debtTimeline = { completed: false, error: String((e && e.message) || e) }; }
++    }
+     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
+-    var report = { schema: 'solver-analysis-v4', baseline: baseline, multi: multi,
++    var report = { schema: 'solver-analysis-v5', baseline: baseline, multi: multi,
+       verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
+       pressureProfiles: pressureProfiles, pressureSummary: pressureSummary,
+-      counterfactual: cf, elapsedMs: Date.now() - t,
++      debtTimeline: debtTimeline, counterfactual: cf, elapsedMs: Date.now() - t,
+       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
+     // v489：只读证据向量；budget/null 明示，不参与 qGate/qPass 或生产候选。
+     if (AntSolver.Quality && AntSolver.Quality.fromSolverAnalysis) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+index a2be4ae..ff6b6a9 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+@@ -935,10 +935,11 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
+   if (!decisions.length) missing.push('无反事实决策');
+   if (!alternatives.length) missing.push('无替代动作');
+   if (verified.length && !(ps.profiledRoutes > 0)) missing.push('无压力曲线');
++  if (verified.length && !r.debtTimeline) missing.push('无债务时间线');
+   if (replayErrors) missing.push('存在回放失败');
+ 
+   return {
+-    schema: 'quality-evidence-v2',
++    schema: 'quality-evidence-v3',
+     gateEligible: false,
+     gateReason: '采样证据仅供只读分析，尚未校准为交付质量门',
+     routeEvidence: {
+@@ -977,6 +978,15 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
+       decisionReasons: decisionReasons,
+       alternativeReasons: alternativeReasons
+     },
++    debtEvidence: (function () {
++      var d = r.debtTimeline && r.debtTimeline.summary;
++      if (!d) return { debtCars: null, repaidLaterPct: null, medianWaitSteps: null, maxWaitSteps: null,
++        maxActiveDebtCars: null, maxDebtPixels: null, reason: '无可回放债务时间线' };
++      return { debtCars: d.debtCars, repaidLater: d.repaidLater, repaidSameStep: d.repaidSameStep,
++        unrepaid: d.unrepaid, microDebtCars: d.microDebtCars, repaidLaterPct: d.repaidLaterPct,
++        medianWaitSteps: d.medianWaitSteps, maxWaitSteps: d.maxWaitSteps,
++        maxActiveDebtCars: d.maxActiveDebtCars, maxDebtPixels: d.maxDebtPixels, reason: null };
++    })(),
+     pressureEvidence: {
+       bestKnownMaxBuffer: r.bestKnown ? r.bestKnown.maxBuffer : null,
+       profiledRoutes: ps.profiledRoutes || 0,
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\346\227\266\351\227\264\347\272\277.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\346\227\266\351\227\264\347\272\277.js"
+new file mode 100644
+index 0000000..81f0550
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\346\227\266\351\227\264\347\272\277.js"
+@@ -0,0 +1,16 @@
++#!/usr/bin/env node
++/* 只读债务生命周期：node 03_工具/好关评分/债务时间线.js <关卡.json> [--out 报告.json] */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const BIN = path.join(__dirname, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'solver-analysis.js', 'car-sequencer.js'];
++const sandbox = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON };
++vm.createContext(sandbox); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sandbox, { filename: f });
++const A = sandbox.AntSolver, file = process.argv[2]; if (!file) throw new Error('需要关卡 JSON');
++const out = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : '';
++const raw = JSON.parse(fs.readFileSync(file, 'utf8')), level = A.parseLevel(raw.spools ? A.fromGameFormat(raw) : raw);
++const solved = A.Solver.solve(level, { timeBudgetMs: 10000 });
++const result = A.CarSequencer.debtTimeline(level, solved);
++result.input = path.resolve(file); result.solverCompleted = !!solved.completed;
++if (out) fs.writeFileSync(out, JSON.stringify(result, null, 2) + '\n');
++console.log(JSON.stringify({ file, solverCompleted: result.solverCompleted, replayCompleted: result.completed, summary: result.summary }, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
+index a5e2eae..08fd42d 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
+@@ -8,7 +8,7 @@
+ 'use strict';
+ const fs = require('fs'), path = require('path'), vm = require('vm');
+ const BIN = path.join(__dirname, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+-const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'solver-analysis.js'];
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js'];
+ const sandbox = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set,
+   setTimeout, clearTimeout, Infinity, Math, JSON, Date };
+ vm.createContext(sandbox);
+@@ -43,4 +43,5 @@ console.log(JSON.stringify({ file, out: out || null, elapsedMs: report.elapsedMs
+     resolvedPct: report.qualityEvidence.counterfactualEvidence.resolvedPct,
+     recoverablePctOfResolved: report.qualityEvidence.counterfactualEvidence.recoverablePctOfResolved },
+   pressureEvidence: report.qualityEvidence && report.qualityEvidence.pressureEvidence,
++  debtEvidence: report.qualityEvidence && report.qualityEvidence.debtEvidence,
+   counterfactual: { decisions: report.counterfactual.decisions.length, alternatives: alts, solved, dead } }, null, 2));

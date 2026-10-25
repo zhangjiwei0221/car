@@ -935,10 +935,11 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
   if (!decisions.length) missing.push('无反事实决策');
   if (!alternatives.length) missing.push('无替代动作');
   if (verified.length && !(ps.profiledRoutes > 0)) missing.push('无压力曲线');
+  if (verified.length && !r.debtTimeline) missing.push('无债务时间线');
   if (replayErrors) missing.push('存在回放失败');
 
   return {
-    schema: 'quality-evidence-v2',
+    schema: 'quality-evidence-v3',
     gateEligible: false,
     gateReason: '采样证据仅供只读分析，尚未校准为交付质量门',
     routeEvidence: {
@@ -977,6 +978,15 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
       decisionReasons: decisionReasons,
       alternativeReasons: alternativeReasons
     },
+    debtEvidence: (function () {
+      var d = r.debtTimeline && r.debtTimeline.summary;
+      if (!d) return { debtCars: null, repaidLaterPct: null, medianWaitSteps: null, maxWaitSteps: null,
+        maxActiveDebtCars: null, maxDebtPixels: null, reason: '无可回放债务时间线' };
+      return { debtCars: d.debtCars, repaidLater: d.repaidLater, repaidSameStep: d.repaidSameStep,
+        unrepaid: d.unrepaid, microDebtCars: d.microDebtCars, repaidLaterPct: d.repaidLaterPct,
+        medianWaitSteps: d.medianWaitSteps, maxWaitSteps: d.maxWaitSteps,
+        maxActiveDebtCars: d.maxActiveDebtCars, maxDebtPixels: d.maxDebtPixels, reason: null };
+    })(),
     pressureEvidence: {
       bestKnownMaxBuffer: r.bestKnown ? r.bestKnown.maxBuffer : null,
       profiledRoutes: ps.profiledRoutes || 0,
