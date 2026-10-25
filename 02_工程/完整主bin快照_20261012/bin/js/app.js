@@ -5896,6 +5896,8 @@ AntSolver.App = (function() {
       sec('生成参数（本次选择）') +
       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
+      row('目标图预检', rec.sourcePreflight ? (rec.sourcePreflight.status + ' · 风险 ' + (rec.sourcePreflight.warnings && rec.sourcePreflight.warnings.length ? rec.sourcePreflight.warnings.join('/') : '无') +
+        ' · ' + (rec.sourcePreflight.searchAdvice || '') + (rec.sourcePreflight.demand && rec.sourcePreflight.demand.smallCriticalColors && rec.sourcePreflight.demand.smallCriticalColors.length ? ' · 小色可关键' : '')) : '未测') +
       row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
         ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
         ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
@@ -6152,6 +6154,7 @@ AntSolver.App = (function() {
   }
 
   function genBuildRec(entry, result) {
+    var sourcePreflight = genSourcePreflight(entry);
     if (!result || !result.level) {
       var why = (result && result.lastFailReason) || 'noCandidate';
       var detail = (result && result.structural && result.structural.reason) || '';
@@ -6167,7 +6170,7 @@ AntSolver.App = (function() {
         entryMode: (result && result.entryMode) || 'fourSide',
         audit: null, difficulty: 0, grade: '-', fallback: false,
         goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped), goalStopReason: (result && result.goalStopReason) || null,
-        perf: (result && result.perf) || null
+        perf: (result && result.perf) || null, sourcePreflight: sourcePreflight
       };
     }
     var parsed = AntSolver.parseLevel(result.level);
@@ -6267,6 +6270,7 @@ AntSolver.App = (function() {
         reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
         diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
         releaseDecision: result._experienceFull.releaseDecision } : null,
+      sourcePreflight: sourcePreflight,
       experienceRouteEvidence: result.experienceRouteEvidence || null,
       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
@@ -7028,6 +7032,25 @@ AntSolver.App = (function() {
     });
   }
 
+  function genSourcePreflight(entry) {
+    if (!entry) return null;
+    if (entry._sourcePreflight) return entry._sourcePreflight;
+    if (!AntSolver.SourcePreflight || !entry.blocks) return null;
+    try { entry._sourcePreflight = AntSolver.SourcePreflight.analyze(entry.blocks); }
+    catch (e) { entry._sourcePreflight = { status: 'error', error: String((e && e.message) || e) }; }
+    return entry._sourcePreflight;
+  }
+  function genLogPreflightOnce(entry) {
+    var pf = genSourcePreflight(entry);
+    if (!pf || entry._preflightLogged) return pf;
+    entry._preflightLogged = true;
+    genLog('目标图预检：' + (pf.status === 'ready' ? '可常规生成' : '先短预算探针') +
+      ' · 解锁事件 ' + (pf.demand ? pf.demand.unlockEvents : '-') +
+      ' · 风险 ' + (pf.warnings && pf.warnings.length ? pf.warnings.join('/') : '无') +
+      (pf.demand && pf.demand.smallCriticalColors && pf.demand.smallCriticalColors.length ? ' · 小色关键贡献 ' + pf.demand.smallCriticalColors.map(function (x) { return x.color; }).join('/') : ''), pf.warnings && pf.warnings.length ? 'gen-log-warn' : 'gen-log-ok');
+    return pf;
+  }
+
   function genExperienceGoalEnabled() {
     var el = document.getElementById('gen-experience-goal');
     return el ? !!el.checked : true;
@@ -7051,6 +7074,7 @@ AntSolver.App = (function() {
     genInFlightT0[idx] = Date.now();
     genPoolProgressText();
     var taskMode = (b.mode === 'goal') ? 'goal' : 'time';
+    genLogPreflightOnce(entry);
     var taskCfg = Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
       mapSize: entry.blocks.length, requireHardPass: !isEasy,
       isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
@@ -7349,6 +7373,7 @@ AntSolver.App = (function() {
           // 【v153】主线程路径也接进度钩子（同一套显示；跑完清掉，避免影响后面的求解/模拟）
           if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: curIdx, no: 0 }, p); });
           var usePlan = cutPlanParams && cutUseChecked;   // 【v153】主线程串行路径同样逐图现算车单直通
+          genLogPreflightOnce(entry);
           var cfgAuto = genApplyFixed(b.config, entry.blocks, entry.name);   // 【v153】自动档
           var cfg = Object.assign({}, cfgAuto, {
             mapSize: entry.blocks.length, requireHardPass: !isEasy,

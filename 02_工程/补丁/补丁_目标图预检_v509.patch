@@ -1,0 +1,984 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index a90825c..a1f404b 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -19709,3 +19709,37 @@ v506发现同关可有0~60pp路线压力差，需要判断低压力路线是玩
+ 1. 真实UI批量点击、落库和停止行为尚未验收，当前验证以headless与代码路径为主。
+ 2. 多路线证据仍非全局覆盖，planningLike不是硬门，也不替代真人校准。
+ 3. 下一步S4目标图预检，并把路线证据用于目标图风险说明。
++
++### 500. 【2026-10-26】v509：目标图预检接入批量，区分常规生成与短探针
++
++#### 500.1 问题（原话）
++
++```
++根据我们刚才的计划清单，不断靠近目标。遇到边界以及卡住的地方要记录。
++```
++
++S4需要在长时间生成前知道TXT有哪些容量、开局供给、解锁和末段风险；小色可以关键，不能按面积排除，也不能静态武断禁产。
++
++#### 500.2 证据
++
++- 五图只读预检：006/010开局白给估计均2，可常规生成；007为6、推荐11、好图8，应先短预算探针。
++- 容量带不可精确拆在多数图普遍存在，若作为warning会全部报警，掩盖主要风险，因此降为notes。
++- 010色14总量32、下游解锁3，说明小色也可有实际关键贡献；预检明确保留。
++
++#### 500.3 改动
++
++- 新 `source-preflight.js`：颜色总量、容量带/余量、开局暴露、需求事件、末段新增色、解锁贡献、车数/黑块估计与策划建议。
++- `ready` 仅表示可常规生成，`review` 表示先短预算探针，均不证明/否定最终可生成；不改TXT、不自动禁产。
++- 新 `目标图预检.js`；app派发前只记录一次预检日志，UI报告和生产JSONL附完整结果，worker同步模块。版本升v509。
++
++#### 500.4 验证（改前后数字）
++
++- 5图：ready 2、review 3；007/推荐/好图均 `opening_free_supply`。
++- 006需求事件30、01020、00722、推荐46、好图24；没有因事件少而静态否决推荐图，体现静态指标不能单独定论。
++- 生成逻辑和参数未改；`node --check`：source-preflight/app/gen-worker/generator/playersim/生产服务/工具通过。
++
++#### 500.5 遗留
++
++1. 预检未经过真实UI批量点击与落库验证，下一步必须做。
++2. ready/review是搜索建议，不是目标成功率；需要继续对照实际命中和耗时校准。
++3. 末段单色、车数估计等风险尚未在样本中触发，需更多图验证。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 0c69fab..10a1675 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v508 目标模式最终路线证据）　|　当前版本：**v508**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v509 目标图预检）　|　当前版本：**v509**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~492。默认生产仍未开启 experienceGoal。**
+ >
+@@ -1121,3 +1121,11 @@ M0 固定基准 + 统一评价与候选口径
+ - headless/worker/主线程均接入；UI报告与生产JSONL新增路线分岔证据。时间模式 `produce` 不调用，`experienceGoal=false` 或 `experienceRouteEvidence=false` 可关闭。
+ - 010完整目标实测：一轮+1px达标，最终路线证据5条，3/4为53.8% vs 7.7%，分岔短期收益52→0；额外约2.0s，总8.48s。显式关闭证据后约6.51s。
+ - 该证据用于解释“高压经历 vs 聪明释放”，目前不新增质量硬门；真实UI批量点击仍待验收。
++
++
++### 17.36 v509：TXT目标图预检进入批量报告
++
++- `SourcePreflight` 只读分析颜色总量、容量带/余量、开局暴露与白给估计、需求解锁事件、末段新增色、下游解锁贡献和车数/6×6黑块估计。静态结果只给风险与建议，不证明能/不能生成。
++- 小色按解锁贡献可标为关键，不按面积否决。容量余量降为 notes，避免所有图都报警；`ready` 可常规生成，`review` 建议先短预算探针，仍不禁止生成。
++- 五图：006/010 ready；007/推荐/好图 review，均有 opening_free_supply。010色14总量32、解锁3，标为小但关键。
++- app在派发前记录预检日志，UI报告和生产JSONL附目标图预检；worker同步加载模块。生成参数与目标门不变。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 6304019..7f7ca86 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -127,3 +127,10 @@
+ - 多路线分岔不再是孤立工具：目标模式最终关会附路线压力范围与首次分岔短期代价。
+ - 深度搜索只在最终一关执行，避免每个候选增加成本；时间模式不执行。
+ - 当前只报告，不把 planningLike 单独当硬门。下一步做真实UI批量验收和目标图预检。
++
++
++## 15. S4 目标图预检（v509）
++
++- 五图预检已能区分常规生成与先短预算探针；不再把容量余量当普遍风险。
++- 小色按下游解锁贡献可成为关键债务，符合用户纠正。
++- 预检不静默改图、不禁止生成；下一步真实UI批量验收，并检查预检建议是否能指导减少无效长搜索。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 166a7a4..b96960f 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,8 +6,8 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v508 · 目标路线证据</title>
+-  <link rel="stylesheet" href="css/style.css?v=508">
++  <title>车接小人 v509 · 目标图预检</title>
++  <link rel="stylesheet" href="css/style.css?v=509">
+ </head>
+ <body>
+   <header>
+@@ -773,26 +773,27 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=508"></script>
+-  <script src="js/utils.js?v=508"></script>
++  <script src="js/zip.js?v=509"></script>
++  <script src="js/utils.js?v=509"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=508"></script>
+-  <script src="js/simulator.js?v=508"></script>
++  <script src="js/color-libs.js?v=509"></script>
++  <script src="js/simulator.js?v=509"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=508"></script>
+-  <script src="js/solver-strategy.js?v=508"></script>
+-  <script src="js/solver.js?v=508"></script>
+-  <script src="js/playersim.js?v=508"></script>
++  <script src="js/anchor-cut.js?v=509"></script>
++  <script src="js/solver-strategy.js?v=509"></script>
++  <script src="js/solver.js?v=509"></script>
++  <script src="js/playersim.js?v=509"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=508"></script>
+-  <script src="js/car-sequencer.js?v=508"></script>
+-  <script src="js/experience-goal.js?v=508"></script>
+-  <script src="js/capacity-tuner.js?v=508"></script>
+-  <script src="js/generator.js?v=508"></script>
+-  <script src="js/analysis.js?v=508"></script>
++  <script src="js/solver-analysis.js?v=509"></script>
++  <script src="js/car-sequencer.js?v=509"></script>
++  <script src="js/experience-goal.js?v=509"></script>
++  <script src="js/capacity-tuner.js?v=509"></script>
++  <script src="js/generator.js?v=509"></script>
++  <script src="js/source-preflight.js?v=509"></script>
++  <script src="js/analysis.js?v=509"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=508"></script>
+-  <script src="js/app.js?v=508"></script>
++  <script src="js/level-editor.js?v=509"></script>
++  <script src="js/app.js?v=509"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 107189d..dc80556 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -5896,6 +5896,8 @@ AntSolver.App = (function() {
+       sec('生成参数（本次选择）') +
+       '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
++      row('目标图预检', rec.sourcePreflight ? (rec.sourcePreflight.status + ' · 风险 ' + (rec.sourcePreflight.warnings && rec.sourcePreflight.warnings.length ? rec.sourcePreflight.warnings.join('/') : '无') +
++        ' · ' + (rec.sourcePreflight.searchAdvice || '') + (rec.sourcePreflight.demand && rec.sourcePreflight.demand.smallCriticalColors && rec.sourcePreflight.demand.smallCriticalColors.length ? ' · 小色可关键' : '')) : '未测') +
+       row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
+         ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
+         ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
+@@ -6152,6 +6154,7 @@ AntSolver.App = (function() {
+   }
+ 
+   function genBuildRec(entry, result) {
++    var sourcePreflight = genSourcePreflight(entry);
+     if (!result || !result.level) {
+       var why = (result && result.lastFailReason) || 'noCandidate';
+       var detail = (result && result.structural && result.structural.reason) || '';
+@@ -6167,7 +6170,7 @@ AntSolver.App = (function() {
+         entryMode: (result && result.entryMode) || 'fourSide',
+         audit: null, difficulty: 0, grade: '-', fallback: false,
+         goalMode: !!(result && result.goalMode), goalRounds: (result && result.goalRounds) || null, goalStopped: !!(result && result.goalStopped), goalStopReason: (result && result.goalStopReason) || null,
+-        perf: (result && result.perf) || null
++        perf: (result && result.perf) || null, sourcePreflight: sourcePreflight
+       };
+     }
+     var parsed = AntSolver.parseLevel(result.level);
+@@ -6267,6 +6270,7 @@ AntSolver.App = (function() {
+         reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
+         diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
+         releaseDecision: result._experienceFull.releaseDecision } : null,
++      sourcePreflight: sourcePreflight,
+       experienceRouteEvidence: result.experienceRouteEvidence || null,
+       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
+         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
+@@ -7028,6 +7032,25 @@ AntSolver.App = (function() {
+     });
+   }
+ 
++  function genSourcePreflight(entry) {
++    if (!entry) return null;
++    if (entry._sourcePreflight) return entry._sourcePreflight;
++    if (!AntSolver.SourcePreflight || !entry.blocks) return null;
++    try { entry._sourcePreflight = AntSolver.SourcePreflight.analyze(entry.blocks); }
++    catch (e) { entry._sourcePreflight = { status: 'error', error: String((e && e.message) || e) }; }
++    return entry._sourcePreflight;
++  }
++  function genLogPreflightOnce(entry) {
++    var pf = genSourcePreflight(entry);
++    if (!pf || entry._preflightLogged) return pf;
++    entry._preflightLogged = true;
++    genLog('目标图预检：' + (pf.status === 'ready' ? '可常规生成' : '先短预算探针') +
++      ' · 解锁事件 ' + (pf.demand ? pf.demand.unlockEvents : '-') +
++      ' · 风险 ' + (pf.warnings && pf.warnings.length ? pf.warnings.join('/') : '无') +
++      (pf.demand && pf.demand.smallCriticalColors && pf.demand.smallCriticalColors.length ? ' · 小色关键贡献 ' + pf.demand.smallCriticalColors.map(function (x) { return x.color; }).join('/') : ''), pf.warnings && pf.warnings.length ? 'gen-log-warn' : 'gen-log-ok');
++    return pf;
++  }
++
+   function genExperienceGoalEnabled() {
+     var el = document.getElementById('gen-experience-goal');
+     return el ? !!el.checked : true;
+@@ -7051,6 +7074,7 @@ AntSolver.App = (function() {
+     genInFlightT0[idx] = Date.now();
+     genPoolProgressText();
+     var taskMode = (b.mode === 'goal') ? 'goal' : 'time';
++    genLogPreflightOnce(entry);
+     var taskCfg = Object.assign({}, genApplyFixed(b.config, entry.blocks, entry.name), {   // 【v153】自动档逐图现算
+       mapSize: entry.blocks.length, requireHardPass: !isEasy,
+       isBossSlot: !!(b.bossSlot && b.bossSlot[idx]),    // BOSS 规格逐关透传（卡点类型配额用）
+@@ -7349,6 +7373,7 @@ AntSolver.App = (function() {
+           // 【v153】主线程路径也接进度钩子（同一套显示；跑完清掉，避免影响后面的求解/模拟）
+           if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: curIdx, no: 0 }, p); });
+           var usePlan = cutPlanParams && cutUseChecked;   // 【v153】主线程串行路径同样逐图现算车单直通
++          genLogPreflightOnce(entry);
+           var cfgAuto = genApplyFixed(b.config, entry.blocks, entry.name);   // 【v153】自动档
+           var cfg = Object.assign({}, cfgAuto, {
+             mapSize: entry.blocks.length, requireHardPass: !isEasy,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index 980b61a..f97fc62 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -25,7 +25,7 @@ try {
+     'utils.js' + _v, 'simulator.js' + _v, 'solver-strategy.js' + _v,
+     'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
+     'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
+-    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'generator.js' + _v
++    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'generator.js' + _v, 'source-preflight.js' + _v
+   );
+   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
+ } catch (e) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/source-preflight.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/source-preflight.js"
+new file mode 100644
+index 0000000..e5166ef
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/source-preflight.js"
+@@ -0,0 +1,91 @@
++/** v509 · TXT目标图只读预检：静态风险提示，不武断判不可生成，不改图。 */
++var AntSolver = AntSolver || {};
++AntSolver.SourcePreflight = (function () {
++  function demandAnalysis(blocks) {
++    var rows = blocks.length, cols = blocks[0].length, total = 0, byColor = {}, consumed = {}, contribution = {};
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var color = blocks[r][c]; if (color > 0) { total++; byColor[color] = (byColor[color] || 0) + 1; contribution[color] = 0; }
++    }
++    var s = AntSolver.Simulator.createState({ blocks: blocks, rows: rows, cols: cols, totalPixels: total,
++      totalBoxes: 0, bufferLimit: 5, board: { rows: 0, cols: 0, cells: [] } }, {});
++    var previous = {}, events = [], done = 0, guard = 0, initial = null;
++    function available() {
++      var pv = AntSolver.Simulator.previewNextEliminationOrder(s), out = {};
++      for (var col in byColor) out[col] = (consumed[col] || 0) + ((pv.byColor[col] && pv.byColor[col].reachable) || 0);
++      return { values: out, preview: pv };
++    }
++    while (done < total && guard++ < 400) {
++      var av = available(), best = -1, bestN = 0;
++      if (!initial) initial = av.values;
++      for (var col in byColor) {
++        var n = av.preview.byColor[col] && av.preview.byColor[col].reachable || 0;
++        if (n > bestN) { bestN = n; best = +col; }
++      }
++      if (best < 0) break;
++      var got = AntSolver.Simulator.elimDispatch(s, best, Infinity);
++      if (!(got > 0)) break;
++      consumed[best] = (consumed[best] || 0) + got; done += got;
++      var after = available(), added = {};
++      for (var cc in byColor) {
++        var delta = Math.max(0, (after.values[cc] || 0) - (av.values[cc] || 0));
++        if (delta > 0) { added[cc] = delta; if (+cc !== best) contribution[best] = (contribution[best] || 0) + delta; }
++      }
++      events.push({ step: guard, progress: total ? done / total : 0, unlockerColor: best, added: added });
++    }
++    return { total: total, byColor: byColor, initialExposed: initial || {}, events: events,
++      unlockContribution: contribution, completed: done >= total, donePixels: done };
++  }
++  function analyze(blocks, opts) {
++    opts = opts || {};
++    if (!blocks || !blocks.length || !blocks[0] || !blocks[0].length) return { status: 'invalid', reasons: ['empty_or_invalid_blocks'] };
++    var d = demandAnalysis(blocks), band = AntSolver.Generator ? AntSolver.Generator.deriveCapacityBand(blocks) : null;
++    var lo = band && band.band[0] || null, hi = band && band.band[1] || null, chosen = band && band.chosen || null;
++    var openingColors = Object.keys(d.initialExposed).filter(function (c) { return d.initialExposed[c] > 0; });
++    var lateMap = {};
++    for (var i = 0; i < d.events.length; i++) if (d.events[i].progress >= 0.8) {
++      for (var col in d.events[i].added) if (d.events[i].added[col] > 0) lateMap[col] = true;
++    }
++    var lateColors = Object.keys(lateMap).map(Number), smallCritical = [];
++    for (var c in d.byColor) if (lo != null && d.byColor[c] < lo && d.unlockContribution[c] > 0) {
++      smallCritical.push({ color: +c, total: d.byColor[c], unlockPixels: d.unlockContribution[c],
++        note: '小色也可承担关键债务，不因面积排除。' });
++    }
++    var estimatedCars = chosen ? Math.max(1, Math.round(d.total / chosen)) : null;
++    var boardCells = 36, estimatedBlackPct = estimatedCars ? Math.max(0, Math.round((boardCells - estimatedCars) / boardCells * 100)) : null;
++    var warnings = [], suggestions = [], notes = [];
++    if (band && (!band.feasible || (band.free != null && band.free > 2))) {
++      warnings.push('opening_free_supply');
++      suggestions.push('开局按当前容量估计白给车较多：可减少开局暴露色/面积，或增加分层依赖；先用短预算探针。');
++    }
++    if (band && band.bandExactFeasible === false) {
++      notes.push('capacity_remainder');
++      suggestions.push('部分颜色无法在容量带内精确拆完：检查余量车，不为追求全在区间而破坏守恒。');
++    }
++    if (d.events.length < 3) {
++      warnings.push('flat_demand');
++      suggestions.push('需求解锁层次较少：若目标为持续3/4，建议增加分层或分支解锁，而非继续加障碍。');
++    }
++    if (lateColors.length === 1) {
++      warnings.push('late_single_color');
++      suggestions.push('末段只有一个新增供给色：容易形成末段强堵，建议保留第二推进色或提前安排偿还。');
++    }
++    if (estimatedBlackPct != null && estimatedBlackPct > 25) {
++      warnings.push('car_board_conflict');
++      suggestions.push('按容量中值估计车数偏少、6×6补位黑块可能较多：需要联合调整车数/容量/棋盘，而非单纯压黑块。');
++    }
++    if (!d.completed) { warnings.push('demand_analysis_incomplete'); suggestions.push('静态需求分析未走完，先检查目标图可达结构；不把未知当不可解。'); }
++    if (smallCritical.length) suggestions.push('存在小但关键的颜色：可围绕其解锁贡献设计关键债务，不要按面积删除。');
++    var status = warnings.length ? 'review' : 'ready';
++    return { schema: 'source-preflight-v1', status: status, warnings: warnings, notes: notes, suggestions: suggestions,
++      totalPixels: d.total, colorCount: Object.keys(d.byColor).length, colorTotals: d.byColor,
++      capacity: band ? { m: band.m, band: band.band, chosen: chosen, free: band.free, feasible: band.feasible,
++        exactFeasible: band.bandExactFeasible, infeasibleColors: band.bandInfeasibleColors } : null,
++      opening: { colors: openingColors.map(Number), exposed: d.initialExposed },
++      demand: { completed: d.completed, unlockEvents: d.events.length, lateColors: lateColors,
++        unlockContribution: d.unlockContribution, smallCriticalColors: smallCritical },
++      estimate: { carsAtChosenCapacity: estimatedCars, boardCellsForBlackEstimate: boardCells, blackPctEstimate: estimatedBlackPct },
++      searchAdvice: warnings.length ? '先短预算探针并复核，不建议直接长时间搜索' : '可进入常规生成',
++      note: '静态预检只提示风险，不证明能/不能生成目标关；小色关键性由解锁贡献判断。' };
++  }
++  return { analyze: analyze, demandAnalysis: demandAnalysis };
++})();
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+index 0f77af9..89f93ad 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+@@ -407,6 +407,7 @@ function persistResult(b, payload) {
+     //   没有完成解时为 null；不把"未测"写成 0。
+     债务证据: rec.debtEvidence || null,
+     时间线证据: rec.timelineEvidence || null,
++    目标图预检: rec.sourcePreflight || null,
+     体验目标: rec.experienceEvidence || null,
+     路线分岔证据: rec.experienceRouteEvidence || null,
+     容量精调: rec.capacityTune || null,
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 50fb061..dea2edb 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -35,6 +35,7 @@
+ | v506 多路线目标 | 单路线是否漏掉目标解 | 8关56路线通过结论不变；压力跨度0~60pp，低压力路线需单独解释 | `多路线目标评价.js` | §497 |
+ | v507 分岔决策 | 低压力路线是聪明解还是免费绕过 | 8关均短期不优→长期降压，0立即免费绕过；仍非独立质量门 | `routeChoiceContrast` / `多路线目标评价.js` | §498 |
+ | v508 最终路线报告 | 分岔证据能否进入目标结果 | ✅ 仅最终关计算；010为53.8% vs 7.7%、短期52→0，附加约2s；时间模式不跑 | `attachExperienceRouteEvidence` | §499 |
++| v509 目标图预检 | 能否提前提示图型风险并保留小色关键性 | 006/010 ready；007/推荐/好图 review；小色按解锁贡献，不静态禁产 | `目标图预检.js` | §500 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\233\276\351\242\204\346\243\200.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\233\276\351\242\204\346\243\200.js"
+new file mode 100755
+index 0000000..9bb142b
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\233\276\351\242\204\346\243\200.js"
+@@ -0,0 +1,6 @@
++#!/usr/bin/env node
++'use strict';
++const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
++const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','generator.js','source-preflight.js'];const sb={console:{log(){},warn(){},error(){}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
++const args=process.argv.slice(2),inputs=args.filter((x,i)=>!x.startsWith('--')&&(i===0||args[i-1]!=='--out')),oi=args.indexOf('--out'),out=oi>=0?args[oi+1]:'';if(!inputs.length)throw new Error('需要TXT');
++const rows=inputs.map(file=>{const blocks=A.Generator.blocksFromTXT(fs.readFileSync(file,'utf8')),result=A.SourcePreflight.analyze(blocks);console.log(JSON.stringify({file,status:result.status,warnings:result.warnings,capacity:result.capacity,demand:result.demand,estimate:result.estimate,suggestions:result.suggestions}));return {file,result};});if(out)fs.writeFileSync(out,JSON.stringify({schema:'source-preflight-batch-v1',rows},null,2)+'\n');
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\233\276\351\242\204\346\243\200_\344\272\224\345\233\276_v509.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\233\276\351\242\204\346\243\200_\344\272\224\345\233\276_v509.json"
+new file mode 100644
+index 0000000..a807b0b
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\233\276\351\242\204\346\243\200_\344\272\224\345\233\276_v509.json"
+@@ -0,0 +1,598 @@
++{
++  "schema": "source-preflight-batch-v1",
++  "rows": [
++    {
++      "file": "蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt",
++      "result": {
++        "schema": "source-preflight-v1",
++        "status": "ready",
++        "warnings": [],
++        "notes": [
++          "capacity_remainder"
++        ],
++        "suggestions": [
++          "部分颜色无法在容量带内精确拆完：检查余量车，不为追求全在区间而破坏守恒。"
++        ],
++        "totalPixels": 1225,
++        "colorCount": 13,
++        "colorTotals": {
++          "4": 61,
++          "5": 103,
++          "13": 55,
++          "14": 89,
++          "15": 171,
++          "17": 76,
++          "21": 36,
++          "22": 35,
++          "28": 69,
++          "30": 135,
++          "31": 304,
++          "33": 41,
++          "34": 50
++        },
++        "capacity": {
++          "m": 9,
++          "band": [
++            31,
++            40
++          ],
++          "chosen": 36,
++          "free": 2,
++          "feasible": true,
++          "exactFeasible": false,
++          "infeasibleColors": [
++            4,
++            13,
++            14,
++            33,
++            34
++          ]
++        },
++        "opening": {
++          "colors": [
++            5,
++            30,
++            31
++          ],
++          "exposed": {
++            "4": 0,
++            "5": 30,
++            "13": 0,
++            "14": 0,
++            "15": 0,
++            "17": 0,
++            "21": 0,
++            "22": 0,
++            "28": 0,
++            "30": 30,
++            "31": 76,
++            "33": 0,
++            "34": 0
++          }
++        },
++        "demand": {
++          "completed": true,
++          "unlockEvents": 30,
++          "lateColors": [
++            13,
++            14,
++            15,
++            22,
++            30,
++            31
++          ],
++          "unlockContribution": {
++            "4": 30,
++            "5": 36,
++            "13": 18,
++            "14": 18,
++            "15": 189,
++            "17": 122,
++            "21": 0,
++            "22": 6,
++            "28": 38,
++            "30": 210,
++            "31": 305,
++            "33": 49,
++            "34": 68
++          },
++          "smallCriticalColors": []
++        },
++        "estimate": {
++          "carsAtChosenCapacity": 34,
++          "boardCellsForBlackEstimate": 36,
++          "blackPctEstimate": 6
++        },
++        "searchAdvice": "可进入常规生成",
++        "note": "静态预检只提示风险，不证明能/不能生成目标关；小色关键性由解锁贡献判断。"
++      }
++    },
++    {
++      "file": "蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_010.txt",
++      "result": {
++        "schema": "source-preflight-v1",
++        "status": "ready",
++        "warnings": [],
++        "notes": [
++          "capacity_remainder"
++        ],
++        "suggestions": [
++          "部分颜色无法在容量带内精确拆完：检查余量车，不为追求全在区间而破坏守恒。",
++          "存在小但关键的颜色：可围绕其解锁贡献设计关键债务，不要按面积删除。"
++        ],
++        "totalPixels": 1225,
++        "colorCount": 12,
++        "colorTotals": {
++          "1": 82,
++          "2": 42,
++          "3": 104,
++          "5": 236,
++          "14": 32,
++          "24": 91,
++          "25": 35,
++          "26": 38,
++          "30": 107,
++          "32": 199,
++          "33": 181,
++          "34": 78
++        },
++        "capacity": {
++          "m": 12,
++          "band": [
++            35,
++            54
++          ],
++          "chosen": 45,
++          "free": 2,
++          "feasible": true,
++          "exactFeasible": false,
++          "infeasibleColors": [
++            14
++          ]
++        },
++        "opening": {
++          "colors": [
++            3,
++            14,
++            24,
++            33,
++            34
++          ],
++          "exposed": {
++            "1": 0,
++            "2": 0,
++            "3": 104,
++            "5": 0,
++            "14": 5,
++            "24": 5,
++            "25": 0,
++            "26": 0,
++            "30": 0,
++            "32": 0,
++            "33": 28,
++            "34": 8
++          }
++        },
++        "demand": {
++          "completed": true,
++          "unlockEvents": 20,
++          "lateColors": [
++            2,
++            14,
++            24,
++            26,
++            33,
++            34
++          ],
++          "unlockContribution": {
++            "1": 7,
++            "2": 13,
++            "3": 204,
++            "5": 86,
++            "14": 3,
++            "24": 98,
++            "25": 0,
++            "26": 6,
++            "30": 55,
++            "32": 293,
++            "33": 241,
++            "34": 69
++          },
++          "smallCriticalColors": [
++            {
++              "color": 14,
++              "total": 32,
++              "unlockPixels": 3,
++              "note": "小色也可承担关键债务，不因面积排除。"
++            }
++          ]
++        },
++        "estimate": {
++          "carsAtChosenCapacity": 27,
++          "boardCellsForBlackEstimate": 36,
++          "blackPctEstimate": 25
++        },
++        "searchAdvice": "可进入常规生成",
++        "note": "静态预检只提示风险，不证明能/不能生成目标关；小色关键性由解锁贡献判断。"
++      }
++    },
++    {
++      "file": "蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt",
++      "result": {
++        "schema": "source-preflight-v1",
++        "status": "review",
++        "warnings": [
++          "opening_free_supply"
++        ],
++        "notes": [
++          "capacity_remainder"
++        ],
++        "suggestions": [
++          "开局按当前容量估计白给车较多：可减少开局暴露色/面积，或增加分层依赖；先用短预算探针。",
++          "部分颜色无法在容量带内精确拆完：检查余量车，不为追求全在区间而破坏守恒。",
++          "存在小但关键的颜色：可围绕其解锁贡献设计关键债务，不要按面积删除。"
++        ],
++        "totalPixels": 1225,
++        "colorCount": 13,
++        "colorTotals": {
++          "1": 52,
++          "5": 30,
++          "13": 37,
++          "14": 33,
++          "15": 52,
++          "16": 70,
++          "19": 434,
++          "28": 53,
++          "30": 35,
++          "31": 58,
++          "32": 39,
++          "33": 50,
++          "34": 282
++        },
++        "capacity": {
++          "m": 7,
++          "band": [
++            31,
++            31
++          ],
++          "chosen": 31,
++          "free": 6,
++          "feasible": false,
++          "exactFeasible": false,
++          "infeasibleColors": [
++            1,
++            5,
++            13,
++            14,
++            15,
++            16,
++            28,
++            30,
++            31,
++            32,
++            33,
++            34
++          ]
++        },
++        "opening": {
++          "colors": [
++            34
++          ],
++          "exposed": {
++            "1": 0,
++            "5": 0,
++            "13": 0,
++            "14": 0,
++            "15": 0,
++            "16": 0,
++            "19": 0,
++            "28": 0,
++            "30": 0,
++            "31": 0,
++            "32": 0,
++            "33": 0,
++            "34": 200
++          }
++        },
++        "demand": {
++          "completed": true,
++          "unlockEvents": 22,
++          "lateColors": [
++            5,
++            13,
++            16,
++            28,
++            30,
++            31
++          ],
++          "unlockContribution": {
++            "1": 25,
++            "5": 1,
++            "13": 4,
++            "14": 5,
++            "15": 89,
++            "16": 67,
++            "19": 151,
++            "28": 29,
++            "30": 8,
++            "31": 40,
++            "32": 88,
++            "33": 60,
++            "34": 458
++          },
++          "smallCriticalColors": [
++            {
++              "color": 5,
++              "total": 30,
++              "unlockPixels": 1,
++              "note": "小色也可承担关键债务，不因面积排除。"
++            }
++          ]
++        },
++        "estimate": {
++          "carsAtChosenCapacity": 40,
++          "boardCellsForBlackEstimate": 36,
++          "blackPctEstimate": 0
++        },
++        "searchAdvice": "先短预算探针并复核，不建议直接长时间搜索",
++        "note": "静态预检只提示风险，不证明能/不能生成目标关；小色关键性由解锁贡献判断。"
++      }
++    },
++    {
++      "file": "实验关/已知不可救/推荐_35x35_碎块_20261023.txt",
++      "result": {
++        "schema": "source-preflight-v1",
++        "status": "review",
++        "warnings": [
++          "opening_free_supply"
++        ],
++        "notes": [
++          "capacity_remainder"
++        ],
++        "suggestions": [
++          "开局按当前容量估计白给车较多：可减少开局暴露色/面积，或增加分层依赖；先用短预算探针。",
++          "部分颜色无法在容量带内精确拆完：检查余量车，不为追求全在区间而破坏守恒。"
++        ],
++        "totalPixels": 1225,
++        "colorCount": 13,
++        "colorTotals": {
++          "1": 104,
++          "5": 83,
++          "13": 106,
++          "14": 111,
++          "15": 95,
++          "19": 104,
++          "26": 92,
++          "27": 89,
++          "28": 83,
++          "30": 90,
++          "31": 94,
++          "32": 71,
++          "33": 103
++        },
++        "capacity": {
++          "m": 3,
++          "band": [
++            13,
++            13
++          ],
++          "chosen": 13,
++          "free": 11,
++          "feasible": false,
++          "exactFeasible": false,
++          "infeasibleColors": [
++            5,
++            13,
++            14,
++            15,
++            26,
++            27,
++            28,
++            30,
++            31,
++            32,
++            33
++          ]
++        },
++        "opening": {
++          "colors": [
++            1,
++            5,
++            13,
++            14,
++            15,
++            19,
++            26,
++            27,
++            28,
++            30,
++            31,
++            32,
++            33
++          ],
++          "exposed": {
++            "1": 15,
++            "5": 22,
++            "13": 18,
++            "14": 25,
++            "15": 17,
++            "19": 23,
++            "26": 27,
++            "27": 11,
++            "28": 12,
++            "30": 9,
++            "31": 17,
++            "32": 23,
++            "33": 22
++          }
++        },
++        "demand": {
++          "completed": true,
++          "unlockEvents": 46,
++          "lateColors": [
++            1,
++            5,
++            13,
++            14,
++            15,
++            19,
++            26,
++            27,
++            28,
++            31,
++            32
++          ],
++          "unlockContribution": {
++            "1": 92,
++            "5": 58,
++            "13": 96,
++            "14": 128,
++            "15": 57,
++            "19": 131,
++            "26": 67,
++            "27": 59,
++            "28": 44,
++            "30": 61,
++            "31": 72,
++            "32": 40,
++            "33": 79
++          },
++          "smallCriticalColors": []
++        },
++        "estimate": {
++          "carsAtChosenCapacity": 94,
++          "boardCellsForBlackEstimate": 36,
++          "blackPctEstimate": 0
++        },
++        "searchAdvice": "先短预算探针并复核，不建议直接长时间搜索",
++        "note": "静态预检只提示风险，不证明能/不能生成目标关；小色关键性由解锁贡献判断。"
++      }
++    },
++    {
++      "file": "实验关/已知冲突/好图_35x35_碎块_20261023.txt",
++      "result": {
++        "schema": "source-preflight-v1",
++        "status": "review",
++        "warnings": [
++          "opening_free_supply"
++        ],
++        "notes": [
++          "capacity_remainder"
++        ],
++        "suggestions": [
++          "开局按当前容量估计白给车较多：可减少开局暴露色/面积，或增加分层依赖；先用短预算探针。",
++          "部分颜色无法在容量带内精确拆完：检查余量车，不为追求全在区间而破坏守恒。"
++        ],
++        "totalPixels": 1225,
++        "colorCount": 13,
++        "colorTotals": {
++          "1": 114,
++          "5": 100,
++          "13": 101,
++          "14": 104,
++          "15": 86,
++          "19": 61,
++          "26": 76,
++          "27": 110,
++          "28": 101,
++          "30": 85,
++          "31": 99,
++          "32": 100,
++          "33": 88
++        },
++        "capacity": {
++          "m": 9,
++          "band": [
++            40,
++            40
++          ],
++          "chosen": 40,
++          "free": 8,
++          "feasible": false,
++          "exactFeasible": false,
++          "infeasibleColors": [
++            1,
++            5,
++            13,
++            14,
++            15,
++            19,
++            26,
++            27,
++            28,
++            30,
++            31,
++            32,
++            33
++          ]
++        },
++        "opening": {
++          "colors": [
++            1,
++            5,
++            13,
++            14,
++            15,
++            19,
++            27,
++            28,
++            30,
++            31,
++            32,
++            33
++          ],
++          "exposed": {
++            "1": 35,
++            "5": 41,
++            "13": 81,
++            "14": 9,
++            "15": 30,
++            "19": 54,
++            "26": 0,
++            "27": 56,
++            "28": 59,
++            "30": 60,
++            "31": 9,
++            "32": 30,
++            "33": 57
++          }
++        },
++        "demand": {
++          "completed": true,
++          "unlockEvents": 24,
++          "lateColors": [
++            1,
++            5,
++            14,
++            30,
++            31,
++            33
++          ],
++          "unlockContribution": {
++            "1": 85,
++            "5": 42,
++            "13": 140,
++            "14": 123,
++            "15": 35,
++            "19": 2,
++            "26": 22,
++            "27": 105,
++            "28": 46,
++            "30": 12,
++            "31": 39,
++            "32": 49,
++            "33": 4
++          },
++          "smallCriticalColors": []
++        },
++        "estimate": {
++          "carsAtChosenCapacity": 31,
++          "boardCellsForBlackEstimate": 36,
++          "blackPctEstimate": 14
++        },
++        "searchAdvice": "先短预算探针并复核，不建议直接长时间搜索",
++        "note": "静态预检只提示风险，不证明能/不能生成目标关；小色关键性由解锁贡献判断。"
++      }
++    }
++  ]
++}
+diff --git a/README.md b/README.md
+index aa9cc7e..acac904 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v508**（目标模式最终路线证据；时间模式不变）。
++> 当前版本 **v509**（目标图预检；目标模式路线证据，时间模式不变）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 

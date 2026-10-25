@@ -407,6 +407,7 @@ function persistResult(b, payload) {
     //   没有完成解时为 null；不把"未测"写成 0。
     债务证据: rec.debtEvidence || null,
     时间线证据: rec.timelineEvidence || null,
+    目标图预检: rec.sourcePreflight || null,
     体验目标: rec.experienceEvidence || null,
     路线分岔证据: rec.experienceRouteEvidence || null,
     容量精调: rec.capacityTune || null,

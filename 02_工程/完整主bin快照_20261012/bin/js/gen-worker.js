@@ -25,7 +25,7 @@ try {
     'utils.js' + _v, 'simulator.js' + _v, 'solver-strategy.js' + _v,
     'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
     'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
-    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'generator.js' + _v
+    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'generator.js' + _v, 'source-preflight.js' + _v
   );
   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
 } catch (e) {
