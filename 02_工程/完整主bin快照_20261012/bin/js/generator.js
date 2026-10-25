@@ -662,9 +662,17 @@ AntSolver.Generator = (function() {
       while (maxPipeDepth(board) > pipeDepthOf(pbCfg) && pbTry < 5) {
         pbTry++;
         GENPERF.pipeRebuilds++;                    // 埋点：管道深度超限触发的重铺次数
-        if (pbTry >= 2) pbCfg = Object.assign({}, pbCfg, {
-          boxSizeMin: (pbCfg.boxSizeMin || 40) + 3, boxSizeMax: (pbCfg.boxSizeMax || 56) + 3
-        });
+        if (pbTry >= 2) {
+          var _pMin = (pbCfg.boxSizeMin || 40) + 3, _pMax = (pbCfg.boxSizeMax || 56) + 3;
+          // 【v495·第2步】管道深度补救的“加 3”同样不许越过用户上限。
+          var _uMn6 = pbCfg._userCapMin || 0, _uMx6 = pbCfg._userCapMax || 0;
+          if (_uMn6 > 0 && _uMx6 >= _uMn6) {
+            _pMin = Math.max(_uMn6, Math.min(_pMin, _uMx6));
+            _pMax = Math.min(_uMx6, Math.max(_pMax, _uMn6));
+            if (_pMax < _pMin) { _pMin = _uMn6; _pMax = _uMx6; }
+          }
+          pbCfg = Object.assign({}, pbCfg, { boxSizeMin: _pMin, boxSizeMax: _pMax });
+        }
         var boxesR = pickBoxSplit(blocks, pbCfg);
         board = buildBoard(boxesR, pbCfg);
       }
@@ -6292,9 +6300,18 @@ AntSolver.Generator = (function() {
         if (res.reason === 'pipeCapacity' && !config._structScale) {
           var _sMin0 = parseInt(config.boxSizeMin, 10) || 30;
           var _sMax0 = parseInt(config.boxSizeMax, 10) || 40;
+          var _nMin5 = Math.round(_sMin0 * 1.12), _nMax5 = Math.round(_sMax0 * 1.12);
+          // 【v495·第2步】溢出救援只许在用户容量带内放大：原来 20~40 会被放大成 22~45，
+          //   45 > 用户上限 40；现在夹回带内，放不动就让候选失败，不交越界关卡。
+          var _uMn5 = config._userCapMin || 0, _uMx5 = config._userCapMax || 0;
+          if (_uMn5 > 0 && _uMx5 >= _uMn5) {
+            _nMin5 = Math.max(_uMn5, Math.min(_nMin5, _uMx5));
+            _nMax5 = Math.min(_uMx5, Math.max(_nMax5, _uMn5));
+            if (_nMax5 < _nMin5) { _nMin5 = _uMn5; _nMax5 = _uMx5; }
+          }
           config = Object.assign({}, config, {
-            boxSizeMin: Math.round(_sMin0 * 1.12),
-            boxSizeMax: Math.round(_sMax0 * 1.12),
+            boxSizeMin: _nMin5,
+            boxSizeMax: _nMax5,
             _structScale: 1.12
           });
         }
@@ -14637,8 +14654,19 @@ AntSolver.Generator = (function() {
     var feasible = feas.length > 0;
     var chosen = feasible ? feas[Math.floor(feas.length / 2)] : hi;
     var band = feasible ? [feas[0], feas[feas.length - 1]] : [hi, hi];
+    // 【v495·诊断·不是改行为】把“这条带每色能否精确拆”显式算出来挂到结果上，供报告与实验引用：
+    //   颜色 c 的 N_c 能拆成 n 辆 ⇔ ceil(N_c/cmax) ≤ floor(N_c/cmin)。
+    //   证据（2026-10-25，3图×3seed×2产线）：18/18 次 bandExactFeasible=false，说明“区间外的车”首先是
+    //   容量带本身不可精确满足。曾试过把 cmin 往下放（006 31→20、好图 40→28、推荐 13→11）让带变可行，
+    //   结果 belowMin 确实降到 0，但整盘车变小、结构门 6/9→3/9 退化 → 已回退，只保留本诊断字段。
+    var bandInfeasible = [];
+    for (var cc0 in byColor) {
+      var _N0 = byColor[cc0];
+      if (Math.ceil(_N0 / band[1]) > Math.floor(_N0 / band[0])) bandInfeasible.push(+cc0);
+    }
     var out = { m: m, lo: lo, hi: hi, band: band, chosen: chosen, feasible: feasible,
-      free: freeAt(chosen), freeHi: freeAt(hi), cars: carsAt(chosen), frontier: frontier };
+      free: freeAt(chosen), freeHi: freeAt(hi), cars: carsAt(chosen), frontier: frontier,
+      bandExactFeasible: bandInfeasible.length === 0, bandInfeasibleColors: bandInfeasible };
     try { blocks._capBand = out; } catch (e) {}
     return out;
   }
@@ -14710,6 +14738,13 @@ AntSolver.Generator = (function() {
   }
 
   function produceDispatch(blocks, config, opts) {
+    // 【v495·第2步】容量上限合同：把用户最初输入的容量区间钉成快照，后续所有“按棋盘反推 / 溢出救援 /
+    //   管道深度补救”的容量缩放都读这个快照，不许越过用户上限（踩过：v238 反推、管道 +12%、管道 +3）。
+    config = (config && typeof config === 'object') ? config : {};
+    if (config._userCapMin == null) {
+      var _ucMn = parseInt(config.boxSizeMin, 10) || 0, _ucMx = parseInt(config.boxSizeMax, 10) || 0;
+      if (_ucMn > 0 && _ucMx >= _ucMn) config = Object.assign({}, config, { _userCapMin: _ucMn, _userCapMax: _ucMx });
+    }
     var _pdT0 = Date.now();
     var _pdBudget = parseInt(config && config.timeBudgetMs, 10) || 180000;
     var _pdReserve = Math.min(30000, Math.max(5000, Math.round(_pdBudget * 0.2)));
@@ -14914,8 +14949,18 @@ AntSolver.Generator = (function() {
             for (var _c238 = 0; _c238 < blocks[_r238].length; _c238++) if (blocks[_r238][_c238] > 0) _px238++;
           if (_px238 > 0 && _cfg.targetCarCount > 0) {
             var _cap238 = Math.max(12, Math.min(96, Math.round(_px238 / _cfg.targetCarCount)));
-            _cfg.boxSizeMin = Math.max(33, Math.round(_cap238 * 0.88));   // 【v238】下限 33：小图压低容量会切碎（35×35 实测 30~38 全灭）
-            _cfg.boxSizeMax = Math.max(_cfg.boxSizeMin + 6, Math.round(_cap238 * 1.12));
+            var _bMin238 = Math.max(33, Math.round(_cap238 * 0.88));   // 【v238】下限 33：小图压低容量会切碎（35×35 实测 30~38 全灭）
+            var _bMax238 = Math.max(_bMin238 + 6, Math.round(_cap238 * 1.12));
+            // 【v495·第2步】按棋盘反推的容量也要夹回用户带内：v238 原来会算出 [33,45] 这种越过上限 40 的区间，
+            //   归一化看到 45 再对半拆，整盘就没有合规大车了。用户填的区间是输入，不是建议值。
+            var _uMn238 = parseInt(config.boxSizeMin, 10) || 0, _uMx238 = parseInt(config.boxSizeMax, 10) || 0;
+            if (_uMn238 > 0 && _uMx238 >= _uMn238) {
+              _bMin238 = Math.max(_bMin238, _uMn238);
+              _bMax238 = Math.min(_bMax238, _uMx238);
+              if (_bMax238 < _bMin238) { _bMin238 = _uMn238; _bMax238 = _uMx238; }
+            }
+            _cfg.boxSizeMin = _bMin238;
+            _cfg.boxSizeMax = _bMax238;
           }
         }
         // 【v247】固定行列（不勾自适应）时也要按像素密度定填满率 ——

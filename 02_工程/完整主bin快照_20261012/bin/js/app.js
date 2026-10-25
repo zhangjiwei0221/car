@@ -5004,11 +5004,14 @@ AntSolver.App = (function() {
     }
     // 【v223】棋盘与目标车数 + 冰锁最大供给色 + 管道≤2
     // 【v301】旧流程（原工程）有自己的一套参数，这一块不能再覆盖它
-    // 【v315·修 bug】原来 _legacyFlow 在 4676 行读 out.generatorFlow，而 generatorFlow:'old'
-    //   是在**下面这个 Object.assign 里**才写进去的 → _legacyFlow 永远 false，
+    // 【v315·修 bug】原来 _legacyParams 在 4676 行读 out.generatorFlow，而 generatorFlow:'old'
+    //   是在**下面这个 Object.assign 里**才写进去的 → _legacyParams 永远 false，
     //   于是旧流程的所有专属参数（棋盘范围、targetCarCount=0、禁止正方形、管道数）全部没生效。
     //   现在先落值再判断。
-    out.generatorFlow = 'old';
+    // 【v495·用户裁决】生产产线切到 new_fixed（produceFixed）。本次**只改“算法”一个因素**：
+    //   下面这组参数继续沿用原生产口径（_legacyParams 保持 true），否则棋盘范围 / 管道数 / 目标车数
+    //   会跟着一起变，没法把改前后差异归因到产线。参数随产线重调留给下一个单变量实验。
+    out.generatorFlow = 'new_fixed';
     // 【v316·用户裁决】上限放宽到 6 行 × 8 列：原来写死 5×7，车一多就只能往管道里塞。
     //   具体挑哪个尺寸仍由「可用率配额 + 装得下优先」决定，不会无脑选最大的。
     // 【v338·用户裁决】范围下探到 4 行 / 6 列：原来大图最小只能 5×7=35 格，
@@ -5016,16 +5019,17 @@ AntSolver.App = (function() {
     //   现在允许 5×6=30、4×6=24 这类更贴合的尺寸（形态仍守 列−行 ≤ 2）。
     out.boardRowsMin = (_pxAll < 1300) ? 4 : 4; out.boardRowsMax = (_pxAll < 1300) ? 6 : 7;
     out.boardColsMin = (_pxAll < 1300) ? 6 : 6; out.boardColsMax = (_pxAll < 1300) ? 8 : 9;
-    var _legacyFlow = (out.generatorFlow === 'old');
+    // 【v495】参数口径不再跟产线名绑定：产线已切 new_fixed，但参数仍走原生产口径。
+    var _legacyParams = true;
     out = Object.assign(out, {
       // 【v237】只有勾了"棋盘自适应"才覆盖行列；否则严格用用户填的范围
       // 【v301】旧流程：范围由上面按像素数给（5~6×7~8），这里不再改
-      boardRowsMin: _legacyFlow ? out.boardRowsMin : (_boardAuto ? 6 : _norm.rowsMin),
-      boardRowsMax: _legacyFlow ? out.boardRowsMax : (_boardAuto ? 7 : _norm.rowsMax),
-      boardColsMin: _legacyFlow ? out.boardColsMin : (_boardAuto ? 7 : _norm.colsMin),
-      boardColsMax: _legacyFlow ? out.boardColsMax : (_boardAuto ? 8 : _norm.colsMax),
+      boardRowsMin: _legacyParams ? out.boardRowsMin : (_boardAuto ? 6 : _norm.rowsMin),
+      boardRowsMax: _legacyParams ? out.boardRowsMax : (_boardAuto ? 7 : _norm.rowsMax),
+      boardColsMin: _legacyParams ? out.boardColsMin : (_boardAuto ? 7 : _norm.colsMin),
+      boardColsMax: _legacyParams ? out.boardColsMax : (_boardAuto ? 8 : _norm.colsMax),
       // 【v305·用户裁决】棋盘尺寸由球数决定后，不允许正方形（保持 列−行 ∈ {1,2}）
-      boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: !_legacyFlow,
+      boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: !_legacyParams,
       boardExpandOnOverflow: true, boardFirst: true,
       p7Repair: true, p7BaseCount: 3,
       semanticObstacles: (function () {
@@ -5039,18 +5043,18 @@ AntSolver.App = (function() {
       // 【v238】目标车数也随棋盘走
       // 【v313·用户裁决】旧流程不按"目标车数"拆车：它的棋盘是由盒数反推的（chooseBoardDimsFixed），
       //   再把车拆到 _targetCars0（= 行列上限 9×10×0.86 = 77 辆）只会把 30~50 的车对半劈成 12~25。
-      targetCarCount: _legacyFlow ? 0 : (_boardAuto ? 36 : _targetCars0),
+      targetCarCount: _legacyParams ? 0 : (_boardAuto ? 36 : _targetCars0),
       // 【v254】阀门补冰关掉：它是"没有绑定能力时硬凑压力"的老补丁，会在排程之外
       //   再往第 0 行塞 1~2 块冰（实测 6 个格子 4 块冰就是这么来的）。排程已能定点施压。
       valvePlan: false, valveMode: 'largest', valveIceSteps: 10,
       // 【v301】旧流程保留原工程的管道参数（2 条 / 深度 6），不被 v228 的"只留 1 条"覆盖
-      maxPipes: _legacyFlow ? 2 : 1,
+      maxPipes: _legacyParams ? 2 : 1,
       // 【v316·用户裁决】不再强制「至少一条管道」：盘面装得下就全放盘上，
       //   装不下才用管道（原来是 2 条，于是永远有车被塞进管道）。
       minPipes: 0,
-      pipeFloorCount: _legacyFlow ? 2 : 1,
-      pipeFallbackCount: _legacyFlow ? 2 : 1,
-      pipeMinFill: _legacyFlow ? 4 : (out.pipeMinFill != null ? out.pipeMinFill : 2),
+      pipeFloorCount: _legacyParams ? 2 : 1,
+      pipeFallbackCount: _legacyParams ? 2 : 1,
+      pipeMinFill: _legacyParams ? 4 : (out.pipeMinFill != null ? out.pipeMinFill : 2),
       // 【v248】管道深度 2 → 6：实测 35×35（1225 px）在 6×7 盘上切出 34~37 盒，
       //   而 42 格 - 配额墙 5 格 = 37 个位置，经常差 3~5 盒装不下；管道深度只有 2 → pipeCapacity 10/10 全灭。
       //   深度 6 后同样 5 个 seed：全灭 5/5 → 出关 5/5（3 个合格）。
