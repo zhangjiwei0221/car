@@ -1,0 +1,217 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 139b582..b5a5b74 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v488 · 反事实平衡覆盖</title>
+-  <link rel="stylesheet" href="css/style.css?v=488">
++  <title>车接小人 v489 · 只读质量证据向量</title>
++  <link rel="stylesheet" href="css/style.css?v=489">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v488</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v489</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,23 +769,23 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=488"></script>
+-  <script src="js/utils.js?v=488"></script>
++  <script src="js/zip.js?v=489"></script>
++  <script src="js/utils.js?v=489"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=488"></script>
+-  <script src="js/simulator.js?v=488"></script>
++  <script src="js/color-libs.js?v=489"></script>
++  <script src="js/simulator.js?v=489"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=488"></script>
+-  <script src="js/solver-strategy.js?v=488"></script>
+-  <script src="js/solver.js?v=488"></script>
+-  <script src="js/playersim.js?v=488"></script>
++  <script src="js/anchor-cut.js?v=489"></script>
++  <script src="js/solver-strategy.js?v=489"></script>
++  <script src="js/solver.js?v=489"></script>
++  <script src="js/playersim.js?v=489"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=488"></script>
+-  <script src="js/generator.js?v=488"></script>
+-  <script src="js/analysis.js?v=488"></script>
++  <script src="js/solver-analysis.js?v=489"></script>
++  <script src="js/generator.js?v=489"></script>
++  <script src="js/analysis.js?v=489"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=488"></script>
+-  <script src="js/app.js?v=488"></script>
++  <script src="js/level-editor.js?v=489"></script>
++  <script src="js/app.js?v=489"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+index 9d9a50d..b91daff 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+@@ -443,10 +443,16 @@ AntSolver.SolverAnalysis = (function () {
+     var bestKnown = chosen ? { maxBuffer: chosen.maxBuffer, source: chosen.source,
+       verifiedRoutes: verifiedRoutes.length, isProvenMinimum: false } : null;
+     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
+-    return { schema: 'solver-analysis-v3', baseline: baseline, multi: multi,
++    var report = { schema: 'solver-analysis-v3', baseline: baseline, multi: multi,
+       verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
+       counterfactual: cf, elapsedMs: Date.now() - t,
+       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
++    // v489：只读证据向量；budget/null 明示，不参与 qGate/qPass 或生产候选。
++    if (AntSolver.Quality && AntSolver.Quality.fromSolverAnalysis) {
++      try { report.qualityEvidence = AntSolver.Quality.fromSolverAnalysis(report); }
++      catch (e) { report.qualityEvidenceError = String((e && e.message) || e); }
++    }
++    return report;
+   }
+ 
+   return { analyze: analyze, findRoutes: findRoutes, findRoutesAdaptive: findRoutesAdaptive, counterfactual: counterfactual,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+index 17943b7..0ee71d8 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/utils.js"
+@@ -880,3 +880,117 @@ AntSolver.Quality = (function () {
+ 
+   return { schema: SCHEMA, verdict: verdict, gateDistance: gateDistance, fromGeneration: fromGeneration };
+ })();
++
++// ==================== 求解证据质量向量（v489，只读） ====================
++/**
++ * 把 SolverAnalysis 报告转换成“证据向量”，不是新的 qGate/qPass。
++ * 原则：覆盖率、预算与回放先出数；T/R/学习/压力起伏没有足够证据时保持 null。
++ */
++AntSolver.Quality.fromSolverAnalysis = function (report) {
++  var r = report || {}, multi = r.multi || {}, cf = r.counterfactual || {};
++  var verified = r.verifiedRoutes || [], decisions = cf.decisions || [];
++  var alternatives = [], decisionReasons = {}, alternativeReasons = {}, outcomes = {};
++  var mixed = 0, partial = 0, highBuffer = 0;
++  for (var i = 0; i < decisions.length; i++) {
++    var d = decisions[i], f = d.features || {};
++    if (f.mixed || (f.fullCount > 0 && f.partialCount > 0)) mixed++;
++    if (f.partialCount > 0) partial++;
++    if ((f.bufferPct || 0) >= 0.6) highBuffer++;
++    var dr = d.selectionReason || 'unspecified';
++    decisionReasons[dr] = (decisionReasons[dr] || 0) + 1;
++    for (var j = 0; j < (d.alternatives || []).length; j++) {
++      var a = d.alternatives[j]; alternatives.push(a);
++      outcomes[a.outcome] = (outcomes[a.outcome] || 0) + 1;
++      var ar = a.selectionReason || 'unspecified';
++      alternativeReasons[ar] = (alternativeReasons[ar] || 0) + 1;
++    }
++  }
++  function pct(n, d) { return d > 0 ? Math.round(n / d * 1000) / 10 : null; }
++  function median(values) {
++    if (!values.length) return null;
++    values = values.slice().sort(function (a, b) { return a - b; });
++    var m = Math.floor(values.length / 2);
++    return values.length % 2 ? values[m] : (values[m - 1] + values[m]) / 2;
++  }
++  var solved = outcomes.solved || 0, dead = outcomes.dead || 0;
++  var budget = outcomes.budget_exhausted || 0, notFound = outcomes.not_found_within_budget || 0;
++  var replayFailed = outcomes.replay_failed || 0, resolved = solved + dead;
++  var routeReplayErrors = 0, replayValidRoutes = 0;
++  for (var v = 0; v < verified.length; v++) {
++    if (verified[v].replayValid) replayValidRoutes++;
++    else routeReplayErrors++;
++  }
++  var replayErrors = replayFailed + routeReplayErrors;
++  if (r.baseline && r.baseline.completed && !r.baseline.replayValid) replayErrors++;
++  var peaks = verified.map(function (x) { return x.maxBuffer; }).filter(function (x) { return typeof x === 'number'; });
++  var candidateDecisions = cf.candidateDecisionPoints || 0;
++  var searchLimited = !!multi.budgetExhausted || multi.status === 'budget_exhausted' || budget > 0 || notFound > 0;
++  var missing = [];
++  if (!verified.length) missing.push('无可回放路线');
++  if (!decisions.length) missing.push('无反事实决策');
++  if (!alternatives.length) missing.push('无替代动作');
++  if (replayErrors) missing.push('存在回放失败');
++
++  return {
++    schema: 'quality-evidence-v1',
++    gateEligible: false,
++    gateReason: '采样证据仅供只读分析，尚未校准为交付质量门',
++    routeEvidence: {
++      baselineCompleted: !!(r.baseline && r.baseline.completed),
++      baselineReplayValid: !!(r.baseline && r.baseline.replayValid),
++      verifiedRoutes: verified.length,
++      replayValidRoutes: replayValidRoutes,
++      multiStatus: multi.status || null,
++      multiRoutes: multi.routes ? multi.routes.length : 0,
++      bestKnownMaxBuffer: r.bestKnown ? r.bestKnown.maxBuffer : null,
++      bestKnownSource: r.bestKnown ? r.bestKnown.source : null,
++      isProvenMinimum: false,
++      routePeakMin: peaks.length ? Math.min.apply(null, peaks) : null,
++      routePeakMedian: median(peaks),
++      routePeakMax: peaks.length ? Math.max.apply(null, peaks) : null
++    },
++    counterfactualEvidence: {
++      policy: cf.policy || null,
++      candidateDecisions: candidateDecisions,
++      sampledDecisions: decisions.length,
++      decisionCoveragePct: pct(decisions.length, candidateDecisions),
++      alternatives: alternatives.length,
++      resolved: resolved,
++      resolvedPct: pct(resolved, alternatives.length),
++      solvedAlternatives: solved,
++      solvedPct: pct(solved, alternatives.length),
++      recoverablePctOfResolved: pct(solved, resolved),
++      directDeathAlternatives: dead,
++      directDeathPctOfResolved: pct(dead, resolved),
++      budgetExhausted: budget,
++      notFoundWithinBudget: notFound,
++      replayFailed: replayFailed,
++      mixedDecisions: mixed,
++      partialDecisions: partial,
++      highBufferDecisions: highBuffer,
++      decisionReasons: decisionReasons,
++      alternativeReasons: alternativeReasons
++    },
++    pressureEvidence: {
++      bestKnownMaxBuffer: r.bestKnown ? r.bestKnown.maxBuffer : null,
++      sustainedHighPressurePct: null,
++      releaseAmplitude: null,
++      oscillationCount: null,
++      reason: '当前只有路线峰值，尚未计算多路线压力过程'
++    },
++    quality: {
++      trapRate: null,
++      regretRate: null,
++      learnability: null,
++      fairness: null,
++      reason: '采样反事实不等于完整 T/R；玩家学习与信息公平需要独立证据'
++    },
++    dataQuality: {
++      searchLimited: searchLimited,
++      replayErrors: replayErrors,
++      missing: missing,
++      sufficientForReadonlyResearch: verified.length > 0 && alternatives.length > 0 && replayErrors === 0,
++      sufficientForQualityGate: false
++    }
++  };
++};
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
+index a33f0ef..8829f9d 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
+@@ -36,4 +36,10 @@ console.log(JSON.stringify({ file, out: out || null, elapsedMs: report.elapsedMs
+   multi: { status: report.multi.status, routes: report.multi.routes.length, distinctRoutes: report.multi.distinctRoutes,
+     replayValid: report.multi.routes.filter(r => r.replayValid).length, nodes: report.multi.nodes, elapsedMs: report.multi.elapsedMs },
+   bestKnown: report.bestKnown,
++  qualityEvidence: report.qualityEvidence && { schema: report.qualityEvidence.schema,
++    gateEligible: report.qualityEvidence.gateEligible, searchLimited: report.qualityEvidence.dataQuality.searchLimited,
++    replayErrors: report.qualityEvidence.dataQuality.replayErrors,
++    decisionCoveragePct: report.qualityEvidence.counterfactualEvidence.decisionCoveragePct,
++    resolvedPct: report.qualityEvidence.counterfactualEvidence.resolvedPct,
++    recoverablePctOfResolved: report.qualityEvidence.counterfactualEvidence.recoverablePctOfResolved },
+   counterfactual: { decisions: report.counterfactual.decisions.length, alternatives: alts, solved, dead } }, null, 2));

@@ -443,10 +443,16 @@ AntSolver.SolverAnalysis = (function () {
     var bestKnown = chosen ? { maxBuffer: chosen.maxBuffer, source: chosen.source,
       verifiedRoutes: verifiedRoutes.length, isProvenMinimum: false } : null;
     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
-    return { schema: 'solver-analysis-v3', baseline: baseline, multi: multi,
+    var report = { schema: 'solver-analysis-v3', baseline: baseline, multi: multi,
       verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
       counterfactual: cf, elapsedMs: Date.now() - t,
       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
+    // v489：只读证据向量；budget/null 明示，不参与 qGate/qPass 或生产候选。
+    if (AntSolver.Quality && AntSolver.Quality.fromSolverAnalysis) {
+      try { report.qualityEvidence = AntSolver.Quality.fromSolverAnalysis(report); }
+      catch (e) { report.qualityEvidenceError = String((e && e.message) || e); }
+    }
+    return report;
   }
 
   return { analyze: analyze, findRoutes: findRoutes, findRoutesAdaptive: findRoutesAdaptive, counterfactual: counterfactual,

@@ -36,4 +36,10 @@ console.log(JSON.stringify({ file, out: out || null, elapsedMs: report.elapsedMs
   multi: { status: report.multi.status, routes: report.multi.routes.length, distinctRoutes: report.multi.distinctRoutes,
     replayValid: report.multi.routes.filter(r => r.replayValid).length, nodes: report.multi.nodes, elapsedMs: report.multi.elapsedMs },
   bestKnown: report.bestKnown,
+  qualityEvidence: report.qualityEvidence && { schema: report.qualityEvidence.schema,
+    gateEligible: report.qualityEvidence.gateEligible, searchLimited: report.qualityEvidence.dataQuality.searchLimited,
+    replayErrors: report.qualityEvidence.dataQuality.replayErrors,
+    decisionCoveragePct: report.qualityEvidence.counterfactualEvidence.decisionCoveragePct,
+    resolvedPct: report.qualityEvidence.counterfactualEvidence.resolvedPct,
+    recoverablePctOfResolved: report.qualityEvidence.counterfactualEvidence.recoverablePctOfResolved },
   counterfactual: { decisions: report.counterfactual.decisions.length, alternatives: alts, solved, dead } }, null, 2));

@@ -880,3 +880,117 @@ AntSolver.Quality = (function () {
 
   return { schema: SCHEMA, verdict: verdict, gateDistance: gateDistance, fromGeneration: fromGeneration };
 })();
+
+// ==================== 求解证据质量向量（v489，只读） ====================
+/**
+ * 把 SolverAnalysis 报告转换成“证据向量”，不是新的 qGate/qPass。
+ * 原则：覆盖率、预算与回放先出数；T/R/学习/压力起伏没有足够证据时保持 null。
+ */
+AntSolver.Quality.fromSolverAnalysis = function (report) {
+  var r = report || {}, multi = r.multi || {}, cf = r.counterfactual || {};
+  var verified = r.verifiedRoutes || [], decisions = cf.decisions || [];
+  var alternatives = [], decisionReasons = {}, alternativeReasons = {}, outcomes = {};
+  var mixed = 0, partial = 0, highBuffer = 0;
+  for (var i = 0; i < decisions.length; i++) {
+    var d = decisions[i], f = d.features || {};
+    if (f.mixed || (f.fullCount > 0 && f.partialCount > 0)) mixed++;
+    if (f.partialCount > 0) partial++;
+    if ((f.bufferPct || 0) >= 0.6) highBuffer++;
+    var dr = d.selectionReason || 'unspecified';
+    decisionReasons[dr] = (decisionReasons[dr] || 0) + 1;
+    for (var j = 0; j < (d.alternatives || []).length; j++) {
+      var a = d.alternatives[j]; alternatives.push(a);
+      outcomes[a.outcome] = (outcomes[a.outcome] || 0) + 1;
+      var ar = a.selectionReason || 'unspecified';
+      alternativeReasons[ar] = (alternativeReasons[ar] || 0) + 1;
+    }
+  }
+  function pct(n, d) { return d > 0 ? Math.round(n / d * 1000) / 10 : null; }
+  function median(values) {
+    if (!values.length) return null;
+    values = values.slice().sort(function (a, b) { return a - b; });
+    var m = Math.floor(values.length / 2);
+    return values.length % 2 ? values[m] : (values[m - 1] + values[m]) / 2;
+  }
+  var solved = outcomes.solved || 0, dead = outcomes.dead || 0;
+  var budget = outcomes.budget_exhausted || 0, notFound = outcomes.not_found_within_budget || 0;
+  var replayFailed = outcomes.replay_failed || 0, resolved = solved + dead;
+  var routeReplayErrors = 0, replayValidRoutes = 0;
+  for (var v = 0; v < verified.length; v++) {
+    if (verified[v].replayValid) replayValidRoutes++;
+    else routeReplayErrors++;
+  }
+  var replayErrors = replayFailed + routeReplayErrors;
+  if (r.baseline && r.baseline.completed && !r.baseline.replayValid) replayErrors++;
+  var peaks = verified.map(function (x) { return x.maxBuffer; }).filter(function (x) { return typeof x === 'number'; });
+  var candidateDecisions = cf.candidateDecisionPoints || 0;
+  var searchLimited = !!multi.budgetExhausted || multi.status === 'budget_exhausted' || budget > 0 || notFound > 0;
+  var missing = [];
+  if (!verified.length) missing.push('无可回放路线');
+  if (!decisions.length) missing.push('无反事实决策');
+  if (!alternatives.length) missing.push('无替代动作');
+  if (replayErrors) missing.push('存在回放失败');
+
+  return {
+    schema: 'quality-evidence-v1',
+    gateEligible: false,
+    gateReason: '采样证据仅供只读分析，尚未校准为交付质量门',
+    routeEvidence: {
+      baselineCompleted: !!(r.baseline && r.baseline.completed),
+      baselineReplayValid: !!(r.baseline && r.baseline.replayValid),
+      verifiedRoutes: verified.length,
+      replayValidRoutes: replayValidRoutes,
+      multiStatus: multi.status || null,
+      multiRoutes: multi.routes ? multi.routes.length : 0,
+      bestKnownMaxBuffer: r.bestKnown ? r.bestKnown.maxBuffer : null,
+      bestKnownSource: r.bestKnown ? r.bestKnown.source : null,
+      isProvenMinimum: false,
+      routePeakMin: peaks.length ? Math.min.apply(null, peaks) : null,
+      routePeakMedian: median(peaks),
+      routePeakMax: peaks.length ? Math.max.apply(null, peaks) : null
+    },
+    counterfactualEvidence: {
+      policy: cf.policy || null,
+      candidateDecisions: candidateDecisions,
+      sampledDecisions: decisions.length,
+      decisionCoveragePct: pct(decisions.length, candidateDecisions),
+      alternatives: alternatives.length,
+      resolved: resolved,
+      resolvedPct: pct(resolved, alternatives.length),
+      solvedAlternatives: solved,
+      solvedPct: pct(solved, alternatives.length),
+      recoverablePctOfResolved: pct(solved, resolved),
+      directDeathAlternatives: dead,
+      directDeathPctOfResolved: pct(dead, resolved),
+      budgetExhausted: budget,
+      notFoundWithinBudget: notFound,
+      replayFailed: replayFailed,
+      mixedDecisions: mixed,
+      partialDecisions: partial,
+      highBufferDecisions: highBuffer,
+      decisionReasons: decisionReasons,
+      alternativeReasons: alternativeReasons
+    },
+    pressureEvidence: {
+      bestKnownMaxBuffer: r.bestKnown ? r.bestKnown.maxBuffer : null,
+      sustainedHighPressurePct: null,
+      releaseAmplitude: null,
+      oscillationCount: null,
+      reason: '当前只有路线峰值，尚未计算多路线压力过程'
+    },
+    quality: {
+      trapRate: null,
+      regretRate: null,
+      learnability: null,
+      fairness: null,
+      reason: '采样反事实不等于完整 T/R；玩家学习与信息公平需要独立证据'
+    },
+    dataQuality: {
+      searchLimited: searchLimited,
+      replayErrors: replayErrors,
+      missing: missing,
+      sufficientForReadonlyResearch: verified.length > 0 && alternatives.length > 0 && replayErrors === 0,
+      sufficientForQualityGate: false
+    }
+  };
+};
