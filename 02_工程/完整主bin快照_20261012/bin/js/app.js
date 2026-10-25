@@ -505,7 +505,7 @@ AntSolver.App = (function() {
     var _mdHint = document.getElementById('gen-mode-hint');
     var syncGenMode = function () {
       var goal = !!(_mdEl && _mdEl.value === 'goal');
-      if (_mdHint) _mdHint.textContent = goal ? '不达标一直做；点「结束」输出当前最好' : '到点输出最好';
+      if (_mdHint) _mdHint.textContent = goal ? '总预算内达标即停；到点输出当前最好' : '到点输出最好';
       if (_smEl) _smEl.disabled = goal;
       if (_smPlan) _smPlan.style.opacity = goal ? '0.4' : '1';
     };
@@ -5211,6 +5211,8 @@ AntSolver.App = (function() {
       chainCompose: false
     });
     // 【2026-10-22·用户裁决】把“自动选了什么”写进日志，结果条也会显示。
+    // 【v509·真实UI复核】必须在最终参数日志之前钉回 new_fixed，旧预设内含 generatorFlow:'old'。
+    out.generatorFlow = 'new_fixed';
     try {
       genLog('切法策略 ' + _cutPolicy + '：' + (_cutMode === 'exposeCut' ? '暴露序+行优先' : '按依赖层') +
         '（前沿 ' + (_frontAvg == null ? '?' : _frontAvg) + '）· 容量 ' + out.boxSizeMin + '~' + out.boxSizeMax +
@@ -6411,6 +6413,10 @@ AntSolver.App = (function() {
       qGatePass: rec.qGatePass === true ? true : (rec.qGatePass === false ? false : null),
       qGateReasons: rec.qGateReasons || null, qLabel: rec.qLabel || null, qPass: rec.qPass === true,
       qReasons: rec.qReasons || null, p7Ms: rec.p7 ? rec.p7.ms : null, p7: rec.p7 || null,
+      sourcePreflight: rec.sourcePreflight || null,
+      experienceEvidence: rec.experienceEvidence || null,
+      experienceRouteEvidence: rec.experienceRouteEvidence || null,
+      capacityTune: rec.capacityTune || null,
       entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
@@ -6564,8 +6570,15 @@ AntSolver.App = (function() {
       try { genRenderReport(rec); } catch (e) {}
       // 【v414】未达标也要把“最接近的一关”映射到棋盘，方便直接试玩/看盘
       try { genMaybeAutoMap(rec); } catch (e) {}
-      genLog(entry.name + '  结构门未过，不交付（结果可见，已映射棋盘）：' + _gw, 'gen-log-warn');
-      if (typeof next === 'function') next();
+      genLog(entry.name + '  结构门未过，按不合格结果落库并映射棋盘：' + _gw, 'gen-log-warn');
+      if (genPersist.enabled) {
+        try {
+          genLog('不合格落库装配：' + entry.name + ' · 开始', 'gen-log-warn');
+          var _rejectPayload = genPersistPayload(entry, rec, result);
+          genLog('不合格落库装配完成：发送result', 'gen-log-ok');
+          genPersistOne('result', inputIndex, _rejectPayload, next);
+        } catch (e) { genOnError(entry, '不合格结果落库装配失败：' + ((e && e.message) || e), inputIndex, next); }
+      } else if (typeof next === 'function') next();
       return;
     }
     // 【v395·用户裁决】qPass 改为软门：未达标也输出/落库，只标“未达标”。
@@ -6573,7 +6586,7 @@ AntSolver.App = (function() {
     if (rec.qPass === false) {
       rec.qualityFallback = true;
       var _why = (rec.qReasons && rec.qReasons.length) ? rec.qReasons.join('；') : 'qPass=false';
-      genLog(entry.name + '  未达 qPass，作为未达标结果输出：' + _why, 'gen-log-warn');
+      genLog(entry.name + ((rec.goalMode && rec.experienceEvidence && rec.experienceEvidence.pass) ? '  体验目标已达标；qPass未过，按结构合格输出：' : '  未达 qPass，作为质量未达结果输出：') + _why, 'gen-log-warn');
       // 不 return：继续走正常的结果表/报告/落库/ZIP 路径。
     }
     genBatchResults.push(rec); genResultHistory.push(rec);   // 【v153】同记录进跨批次历史
@@ -6678,7 +6691,15 @@ AntSolver.App = (function() {
         af.to.rowsMin + '×' + af.to.colsMin + ' 起（不再整关淘汰）', 'gen-log-warn');
     }
     if (genPersist.enabled) {
-      genPersistOne('result', inputIndex, genPersistPayload(entry, rec, result), next);
+      try {
+        genLog('落库装配：' + entry.name + ' · batch ' + genPersist.batchId + ' · 开始', 'gen-log-ok');
+        var _persistPayload = genPersistPayload(entry, rec, result);
+        genLog('落库装配完成：' + entry.name + ' · 发送result', 'gen-log-ok');
+        genPersistOne('result', inputIndex, _persistPayload, next);
+      } catch (e) {
+        genLog('落库装配失败：' + entry.name + ' · ' + ((e && e.message) || e), 'gen-log-err');
+        genOnError(entry, '落库装配失败：' + ((e && e.message) || e), inputIndex, next);
+      }
     } else if (typeof next === 'function') next();
   }
 
@@ -6832,7 +6853,7 @@ AntSolver.App = (function() {
     };
     genLog('开始批量生产，共 ' + levelList.length + ' 张源图，并发 ' + genPoolSize + ' 线程' +
       (genPoolSize < (isNaN(poolInput) ? 6 : poolInput) ? '（已按本机 ' + hw + ' 核上限收窄）' : '') +
-      ' · 模式：' + (genMode === 'goal' ? '按目标（没达标自动重试；点「结束」输出当前最好）' : '按时间（到点输出最好）') + '。');
+      ' · 模式：' + (genMode === 'goal' ? '按目标（总预算内达标即停；到点输出当前最好）' : '按时间（到点输出最好）') + '。');
 
     // 先探测本地生产服务：可用 → 开批次(逐关落库，正式路径)；不可用 → 回退旧内存+ZIP模式并明确告知
     genPersist = { enabled: false, batchId: null, batchToken: null, relDir: '', dirName: '', persistedCount: 0, pendingPayloads: {}, failed: false };
@@ -7051,6 +7072,13 @@ AntSolver.App = (function() {
     return pf;
   }
 
+  function genGoalBudgetMs() {
+    var el = document.getElementById('gen-search-min'), minutes = el ? parseInt(el.value, 10) : 0;
+    // 与现有“每图搜索时间”同一口径；不能读隐藏的旧 timeBudgetMs 默认值。
+    if (minutes > 0) return Math.max(60000, minutes * 60000);
+    return Math.max(60000, +(genBatch && genBatch.config && genBatch.config.timeBudgetMs) || 300000);
+  }
+
   function genExperienceGoalEnabled() {
     var el = document.getElementById('gen-experience-goal');
     return el ? !!el.checked : true;
@@ -7087,7 +7115,7 @@ AntSolver.App = (function() {
       taskCfg.goalPerRoundMs = 20000;
       taskCfg.goalBases = 3;   // 【v438】每轮 3 个基底，各自 A1~A4
       taskCfg.timeBudgetMs = 20000;
-      taskCfg.goalMaxMs = Math.max(60000, +b.config.timeBudgetMs || 300000); // v503：用每图搜索时间作总预算，避免无限小时
+      taskCfg.goalMaxMs = genGoalBudgetMs(); // v510：与页面每图搜索时间一致
       taskCfg.goalMaxRounds = 0;
       taskCfg.experienceGoal = genExperienceGoalEnabled();
       taskCfg.capacityTuneMs = 5000; taskCfg.capacityTuneCars = 8; taskCfg.capacityTuneVariants = 48;
@@ -7099,7 +7127,7 @@ AntSolver.App = (function() {
     });
     genLog('▶ 线程' + (slot.no + 1) + ' 接单：' + entry.name + '（车单' + (wantPlan ? '=' + cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars.length + '辆' : '自动') +
       ' · 候选' + (b.config.candidateCount || 1) + ' × 轮' + (b.config.difficultyRounds || 1) +
-      (taskMode === 'goal' ? ' · 目标模式（没达标自动重试）' : '') + '）', '');
+      (taskMode === 'goal' ? ' · 目标模式（预算内达标即停）' : '') + '）', '');
     // 单关看门狗：超过【单关预算 + 2 分钟余量】仍无返回 → 判定该关卡死，跳过并只重启这一个槽（预算=0/不限时则不设）
     clearTimeout(slot.watchdog);
     // 【2026-10-22】目标模式不设看门狗：它本来就要一直跑，看门狗会把它误杀。
@@ -7210,6 +7238,7 @@ AntSolver.App = (function() {
   function genStartGoalBranches() {
     var entry = levelList[0];
     var idx = 0;
+    genLogPreflightOnce(entry);
     var base = genApplyFixed(genBatch.config, entry.blocks, entry.name);
     base.experienceGoal = genExperienceGoalEnabled();
     base.capacityTuneMs = 5000; base.capacityTuneCars = 8; base.capacityTuneVariants = 48;
@@ -7230,7 +7259,7 @@ AntSolver.App = (function() {
       if (!w) return;
       st.ws.push(w);
       var cfg = Object.assign({}, base, rec.over, {
-        goalPerRoundMs: 20000, goalMaxMs: Math.max(60000, +genBatch.config.timeBudgetMs || 300000), goalMaxRounds: 0,
+        goalPerRoundMs: 20000, goalMaxMs: genGoalBudgetMs(), goalMaxRounds: 0,
         goalBases: 1, portfolioK: 1, p7BaseCount: 1,
         timeBudgetMs: 20000, seed: (baseSeed + bi * 7919) >>> 0,
         _build: APP_BUILD
@@ -7384,7 +7413,7 @@ AntSolver.App = (function() {
           cfg._build = APP_BUILD;
           if (b.mode === 'goal') {
             cfg.experienceGoal = genExperienceGoalEnabled();
-            cfg.goalMaxMs = Math.max(60000, +b.config.timeBudgetMs || 300000);
+            cfg.goalMaxMs = genGoalBudgetMs();
             cfg.capacityTuneMs = 5000; cfg.capacityTuneCars = 8; cfg.capacityTuneVariants = 48;
             // 【2026-10-22】主线程回退也走"一轮一让出"，否则点结束处理不了。
             genRunGoalSync(entry, cfg, curIdx, afterOne);
