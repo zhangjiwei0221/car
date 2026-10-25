@@ -10389,6 +10389,26 @@ AntSolver.Generator = (function() {
 
     try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(cand.level, cand.config || {}); }
     catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
+    // 【v500·P3】质量证据接入生产：只对最终这一关算，只读，不改关卡本体。
+    //   债务生命周期 + 双时间线（沿参考解）。没有完成解时记 null，绝不冒充 0。
+    //   成本：一次回放 + 一次时间线统计（实测 <0.5s/关）；不参与任何生成决策。
+    try {
+      if (AntSolver.CarSequencer && cand.level && cand.solveResult && cand.solveResult.completed) {
+        var _lvEv = cand.level;
+        try { _lvEv = _lvEv.totalPixels != null ? _lvEv : AntSolver.parseLevel(_lvEv); } catch (eLv) { }
+        try {
+          var _dtEv = AntSolver.CarSequencer.debtTimeline(_lvEv, cand.solveResult);
+          cand.debtEvidence = (_dtEv && _dtEv.summary) ? _dtEv.summary : null;
+        } catch (eDt) { cand.debtEvidence = null; cand.debtEvidenceError = String((eDt && eDt.message) || eDt); }
+        try {
+          var _tlEv = AntSolver.CarSequencer.dualTimeline(_lvEv, cand.solveResult);
+          cand.timelineEvidence = (_tlEv && _tlEv.summary) ? _tlEv.summary : null;
+        } catch (eTl) { cand.timelineEvidence = null; cand.timelineEvidenceError = String((eTl && eTl.message) || eTl); }
+      } else {
+        cand.debtEvidence = null;
+        cand.timelineEvidence = null;
+      }
+    } catch (e) { cand.debtEvidence = null; cand.timelineEvidence = null; }
     if (cand.config && cand.config.roleSchedule && AntSolver.CarSequencer) {
       try {
         var _roleCfg = Object.assign({}, cand.config);

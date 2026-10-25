@@ -388,6 +388,23 @@ function persistResult(b, payload) {
     结构门: rec.qGatePass === true ? '通过' : (rec.qGatePass === false ? '未过' : null),
     质量标签: rec.qLabel || null,
     质量未过项: rec.qReasons || null,
+    // 【v500·P3】质量向量：把报告里已有的 T/R/U、学会后/前瞻/首通、免费段指标一起落库。
+    //   以前这些只在内存里算、只在界面显示；落库后才能做跨批次对照与真人标签对齐。
+    质量向量: (rec.tPct != null || rec.rPct != null || rec.uPct != null || rec.learnedPassPct != null) ? {
+      T: rec.tPct == null ? null : rec.tPct,
+      R: rec.rPct == null ? null : rec.rPct,
+      U: rec.uPct == null ? null : rec.uPct,
+      学会后: rec.learnedPassPct == null ? null : rec.learnedPassPct,
+      前瞻: rec.lookaheadPassPct == null ? null : rec.lookaheadPassPct,
+      首通: rec.playerPassPct == null ? null : rec.playerPassPct,
+      freeLowPct: rec.freeLowPct == null ? null : rec.freeLowPct,
+      最长免费连: rec.freeRunMax == null ? null : rec.freeRunMax,
+      可选中位: rec.selectMed == null ? null : rec.selectMed
+    } : null,
+    // 【v500·P3】债务生命周期证据（参考解上的形成/等待/偿还）与双时间线证据。
+    //   没有完成解时为 null；不把"未测"写成 0。
+    债务证据: rec.debtEvidence || null,
+    时间线证据: rec.timelineEvidence || null,
     P7耗时ms: rec.p7Ms != null ? rec.p7Ms : null,
     fallback: !!rec.fallback, fallbackTier: rec.fallbackTier != null ? rec.fallbackTier : null,
     fallbackType: rec.fallbackType || null, fallbackReason: rec.fallbackReason || null,

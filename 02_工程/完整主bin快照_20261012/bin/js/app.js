@@ -6250,6 +6250,9 @@ AntSolver.App = (function() {
       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
       capacityAudit: result.capacityAudit || null,
       carRoleAudit: result.carRoleAudit || null,
+      // 【v500·P3】只读质量证据：债务生命周期 + 双时间线（参考解）。没有完成解时为 null。
+      debtEvidence: result.debtEvidence || null,
+      timelineEvidence: result.timelineEvidence || null,
       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
       qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
       fullTime: !!(result.config && result.config.fullTime),
