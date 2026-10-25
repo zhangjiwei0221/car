@@ -29,10 +29,12 @@ vm.createContext(sandbox);
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BASE, 'bin/js', f), 'utf8'), sandbox, { filename: f });
 const A = sandbox.AntSolver, G = A.Generator;
 
+// 生产图集（2026-10-25 起）：推荐图（m=3）与好图（15% 黑块下白给≥15）已移出，见日志 §465/§478。
+//   实验需要它们时用 --images 显式指定 实验关/已知不可救/ 与 实验关/已知冲突/ 下的路径。
 const DEFAULT_IMAGES = [
   { id: '006', file: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt' },
-  { id: '好图', file: '实验关/好图_35x35_碎块_20261023.txt' },
-  { id: '推荐', file: '实验关/推荐_35x35_碎块_20261023.txt' }
+  { id: '010', file: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_010.txt' },
+  { id: '007', file: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt' }
 ];
 // --images "id:相对路径,id2:路径" 可替换图集（默认上面三张，用于回看基准）
 const IMAGES = (function () {
