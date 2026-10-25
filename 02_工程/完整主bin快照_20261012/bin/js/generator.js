@@ -10387,6 +10387,31 @@ AntSolver.Generator = (function() {
       ensureCandidateQuality(cand);
     }
 
+    // 【v501·黑块拆解】把"黑块总数"拆成：结构目标墙 / 管道占格 / 车少补位（surplus）。
+    //   用户 2026-10-25：「为什么一个图必须有这么多黑块」——不拆类就无法回答。
+    //   只读统计，不改关卡。目标墙按 config.blackPercent（后段可能被 ×0.85）与 25% 上限算。
+    try {
+      var _bd = cand.level && cand.level.board;
+      if (_bd) {
+        var _cells = (_bd.rows || 0) * (_bd.cols || 0), _cars = 0, _pipes = 0, _blacks = 0, _empties = 0;
+        for (var _r = 0; _r < _bd.rows; _r++) for (var _c = 0; _c < _bd.cols; _c++) {
+          var _cell = _bd.cells[_r] && _bd.cells[_r][_c];
+          if (!_cell) _empties++;
+          else if (_cell.t === 'box') _cars++;
+          else if (_cell.t === 'pipe') _pipes++;
+          else if (_cell.t === 'black') _blacks++;
+        }
+        var _bp = (cand.sampledConfig && cand.sampledConfig.blackPercent != null) ? cand.sampledConfig.blackPercent
+          : ((cand.config && cand.config.blackPercent) || 0);
+        var _bt = Math.floor(_cells * Math.min(0.25, _bp / 100));
+        cand.blackBreakdown = {
+          cells: _cells, cars: _cars, pipes: _pipes, black: _blacks, empty: _empties,
+          blackPercentCfg: _bp, structuralTarget: _bt,
+          surplus: Math.max(0, _blacks - _bt),
+          blackPct: _cells ? Math.round(_blacks / _cells * 100) : null
+        };
+      }
+    } catch (e) { cand.blackBreakdown = null; }
     try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(cand.level, cand.config || {}); }
     catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
     // 【v500·P3】质量证据接入生产：只对最终这一关算，只读，不改关卡本体。

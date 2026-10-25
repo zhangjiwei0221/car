@@ -383,6 +383,8 @@ function persistResult(b, payload) {
     //   同时带上配额层记录的 quotaUsable/quotaBlackTarget/quotaBreachLevel/quotaRealUsable，
     //   两者不一致本身就是有价值的信号（例如「余格补黑」会让实际墙数超过配额目标）。
     棋盘结构: rec.boardStat || null,
+    // 【v501】黑块拆解：结构墙 / 管道 / 车少补位，回答"为什么黑块这么多"
+    黑块拆解: rec.blackBreakdown || null,
     结果分类: cls.label, 状态: rec.status || (cleanLevel ? 'OK' : 'ERROR'),
     合格档: rec.qGatePass === true ? (rec.qLabel || '合格') : (a.tier || null),
     结构门: rec.qGatePass === true ? '通过' : (rec.qGatePass === false ? '未过' : null),

@@ -6249,6 +6249,8 @@ AntSolver.App = (function() {
       cutInfo: (result.config && result.config._cutAuto) || null,
       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
       capacityAudit: result.capacityAudit || null,
+      // 【v501】黑块拆解：结构目标墙 / 管道格 / 车少补位
+      blackBreakdown: result.blackBreakdown || null,
       carRoleAudit: result.carRoleAudit || null,
       // 【v500·P3】只读质量证据：债务生命周期 + 双时间线（参考解）。没有完成解时为 null。
       debtEvidence: result.debtEvidence || null,
