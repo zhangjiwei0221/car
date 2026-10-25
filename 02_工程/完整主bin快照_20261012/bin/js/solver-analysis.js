@@ -256,33 +256,88 @@ AntSolver.SolverAnalysis = (function () {
     }
     return out;
   }
+  function decisionFeatures(point) {
+    var full = 0, partial = 0, blocked = 0;
+    for (var i = 0; i < point.moves.length; i++) {
+      var m = point.moves[i];
+      if (m.blocked) blocked++;
+      if (m.canConsume) full++; else partial++;
+    }
+    var progress = point.state.totalPixels ? point.state.eliminatedPixels / point.state.totalPixels : 0;
+    var bufferPct = point.state.bufferLimit ? point.state.buffer.length / point.state.bufferLimit : 0;
+    var mixed = full > 0 && partial > 0;
+    var score = bufferPct * 4 + Math.min(point.moves.length, 6) * 0.25;
+    if (progress >= 0.2 && progress <= 0.85) score += 2;
+    else if (progress < 0.08 || progress > 0.96) score -= 1;
+    if (mixed) score += 4; else if (partial > 0) score += 2;
+    if (full === 0) score += 1;
+    return { progress: progress, buffer: point.state.buffer.length, bufferPct: bufferPct,
+      fullCount: full, partialCount: partial, blockedCount: blocked, mixed: mixed, valueScore: score };
+  }
+  function alternativeValue(move, chosenMove, decisionScore) {
+    var score = decisionScore;
+    if (chosenMove && !!move.canConsume !== !!chosenMove.canConsume) score += 4;
+    score += move.canConsume ? 1 : 2;
+    if ((move.groupSize || 1) > 1) score += 1;
+    if (move.blocked) score -= 3;
+    return score;
+  }
+  function valueBudget(value, opts) {
+    var baseMs = opts.timePerAlternativeMs || 1000, baseNodes = opts.maxNodesPerAlternative || 2200;
+    var factor = 0.45 + value * 0.07;
+    return { timeBudgetMs: Math.round(Math.max(baseMs * 0.4, Math.min(baseMs * 1.8, baseMs * factor))),
+      maxNodes: Math.round(Math.max(baseNodes * 0.35, Math.min(baseNodes * 2, baseNodes * (0.45 + value * 0.08)))) };
+  }
+
   function counterfactualFromState(start, actions, opts) {
     opts = opts || {};
     var maxDecisions = Math.max(1, opts.maxDecisionPoints || 4), maxAlts = Math.max(1, opts.maxAlternatives || 2);
+    var policy = opts.decisionPolicy === 'value' ? 'value' : 'uniform';
     var parent = Clone(start), decisions = [], candidates = [], prefixMax = parent.buffer.length;
     for (var i = 0; i < actions.length; i++) {
       if (won(parent) || dead(parent)) break;
       var moves = Sim.listMoves(parent);
-      if (moves.length >= 2) candidates.push({ index: i, moves: moves, state: Clone(parent), prefixMax: prefixMax });
+      if (moves.length >= 2) {
+        var point = { index: i, moves: moves, state: Clone(parent), prefixMax: prefixMax };
+        point.features = decisionFeatures(point);
+        candidates.push(point);
+      }
       Sim.applyPick(parent, actions[i].r, actions[i].c);
       finishFlags(parent);
       prefixMax = Math.max(prefixMax, parent.buffer.length);
     }
-    var selected = sampleIndices(candidates.map(function (_, i) { return i; }), maxDecisions);
+    var selected;
+    if (policy === 'value') {
+      selected = candidates.map(function (_, i) { return i; });
+      selected.sort(function (a, b) {
+        var d = candidates[b].features.valueScore - candidates[a].features.valueScore;
+        return d || candidates[a].index - candidates[b].index;
+      });
+      selected = selected.slice(0, maxDecisions).sort(function (a, b) { return candidates[a].index - candidates[b].index; });
+    } else selected = sampleIndices(candidates.map(function (_, i) { return i; }), maxDecisions);
     for (var si = 0; si < selected.length; si++) {
       var point = candidates[selected[si]], chosen = actions[point.index];
+      var chosenMove = null;
+      for (var cm = 0; cm < point.moves.length; cm++) if (point.moves[cm].r === chosen.r && point.moves[cm].c === chosen.c) { chosenMove = point.moves[cm]; break; }
       var alternatives = point.moves.filter(function (m) { return !(m.r === chosen.r && m.c === chosen.c); });
       alternatives.sort(function (a, b) {
-        if (!!a.canConsume !== !!b.canConsume) return a.canConsume ? -1 : 1;
+        if (policy === 'value') {
+          var vd = alternativeValue(b, chosenMove, point.features.valueScore) - alternativeValue(a, chosenMove, point.features.valueScore);
+          if (vd) return vd;
+        } else if (!!a.canConsume !== !!b.canConsume) return a.canConsume ? -1 : 1;
         if (a.r !== b.r) return a.r - b.r;
         return a.c - b.c;
       });
       var record = { step: point.index + 1, progress: +(point.state.eliminatedPixels / point.state.totalPixels).toFixed(4),
-        moves: point.moves.length, chosen: chosen, alternatives: [] };
+        moves: point.moves.length, chosen: chosen, features: point.features, alternatives: [] };
       for (var ai = 0; ai < alternatives.length && record.alternatives.length < maxAlts; ai++) {
         var m = alternatives[ai], alt = actionOf(m), next = Clone(point.state);
         Sim.applyPick(next, alt.r, alt.c); finishFlags(next);
-        var item = { action: alt, canConsume: !!m.canConsume, immediateBuffer: next.buffer.length };
+        var altValue = alternativeValue(m, chosenMove, point.features.valueScore);
+        var budget = policy === 'value' ? valueBudget(altValue, opts) : null;
+        var item = { action: alt, canConsume: !!m.canConsume, immediateBuffer: next.buffer.length,
+          valueScore: policy === 'value' ? altValue : null, budgetMs: budget ? budget.timeBudgetMs : (opts.timePerAlternativeMs || 600),
+          budgetNodes: budget ? budget.maxNodes : (opts.maxNodesPerAlternative || 1200) };
         if (won(next)) {
           item.outcome = 'solved'; item.steps = 1; item.replayValid = true; item.maxBuffer = Math.max(point.prefixMax, next.buffer.length);
         } else if (dead(next)) {
@@ -291,8 +346,8 @@ AntSolver.SolverAnalysis = (function () {
           var searchStartMs = Date.now();
           var searched = searchFromState(next, {
             beamWidth: opts.beamWidth || 12, branchWidth: opts.branchWidth || 6,
-            maxNodes: opts.maxNodesPerAlternative || 1200, maxRoutes: 1,
-            maxDepth: opts.maxDepth, timeBudgetMs: opts.timePerAlternativeMs || 600
+            maxNodes: budget ? budget.maxNodes : (opts.maxNodesPerAlternative || 1200), maxRoutes: 1,
+            maxDepth: opts.maxDepth, timeBudgetMs: budget ? budget.timeBudgetMs : (opts.timePerAlternativeMs || 600)
           });
           item.outcome = searched.routes.length ? 'solved' : searched.status;
           item.nodes = searched.nodes; item.elapsedMs = Date.now() - searchStartMs;
@@ -308,7 +363,7 @@ AntSolver.SolverAnalysis = (function () {
       }
       decisions.push(record);
     }
-    return { decisions: decisions, candidateDecisionPoints: candidates.length, sampledDecisionPoints: decisions.length };
+    return { policy: policy, decisions: decisions, candidateDecisionPoints: candidates.length, sampledDecisionPoints: decisions.length };
   }
   function counterfactual(level, route, opts) {
     var lv = parsed(level), start = create(lv, opts || {});

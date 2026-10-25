@@ -3,7 +3,7 @@
  * 多路线与关键状态反事实（只读，不改生产）：
  * node 03_工具/好关评分/解法结构分析.js <关卡.json> [--out 报告.json]
  *   [--time 2500] [--nodes 4000] [--width 16] [--routes 6]
- *   [--decisions 4] [--alternatives 2] [--alt-time 600]
+ *   [--decisions 4] [--alternatives 2] [--alt-time 600] [--policy uniform|value]
  */
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -22,7 +22,7 @@ const level = raw.spools ? sandbox.AntSolver.fromGameFormat(raw) : raw;
 const report = sandbox.AntSolver.SolverAnalysis.analyze(level, {
   timeBudgetMs: opt('time', 2500), maxNodes: opt('nodes', 4000), beamWidth: opt('width', 16),
   maxRoutes: opt('routes', 6), branchWidth: opt('branch', 8), maxDecisionPoints: opt('decisions', 4),
-  maxAlternatives: opt('alternatives', 2), timePerAlternativeMs: opt('alt-time', 600),
+  maxAlternatives: opt('alternatives', 2), decisionPolicy: strOpt('policy', 'uniform'), timePerAlternativeMs: opt('alt-time', 600),
   maxNodesPerAlternative: opt('alt-nodes', 1200)
 });
 report.input = path.resolve(file);
