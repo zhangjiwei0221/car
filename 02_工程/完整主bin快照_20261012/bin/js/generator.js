@@ -14527,6 +14527,19 @@ AntSolver.Generator = (function() {
     return fill;
   }
 
+  // 【v497】黑块占比（补位墙）——观感指标：cells 里 t==='black' 的比例。
+  //   用户 2026-10-25：「怎么有机关这么多黑块…太多而且成片」；26 车配 6×7=42 格时补 16 块（38%）。
+  function blackPctOfBoard(board) {
+    if (!board || !board.cells) return 99;
+    var rows = board.rows || 0, cols = board.cols || 0, total = rows * cols, n = 0;
+    if (!total) return 99;
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      var cell = board.cells[r] && board.cells[r][c];
+      if (cell && cell.t === 'black') n++;
+    }
+    return Math.round(n / total * 100);
+  }
+
   function portfolioTuple(out) {
     var g = out && out.goodV3, fc = g && g.fillCurve, ps = g && g.persist;
     var q = AntSolver.Quality && AntSolver.Quality.fromGeneration(out);
@@ -14539,18 +14552,25 @@ AntSolver.Generator = (function() {
       qv: q && q.reasons ? q.reasons.length : 99,
       // 现行压力代理仍保留作同结构、同质量违规数时的比较项；后续由压力曲线 v2 替换。
       ps: fc ? ((fc.pressurePct3 || 0) * 2 + (fc.pressurePeak || 0) * 10 - (fc.freeLowPct || 0)) : 0,
-      pn: fc && fc.pressureN ? 1 : 0
+      pn: fc && fc.pressureN ? 1 : 0,
+      // 【v497】黑块占比：结构门通过后，先按"黑块 ≤30%"分两档，再比距离/质量；都不合格时才退回全局最优。
+      bk: blackPctOfBoard(out && out.level && out.level.board)
     };
+    t.bk30 = (t.bk != null && t.bk <= 30) ? 1 : 0;
     return t;
   }
   function portfolioBetter(x, y) {
     if (!y) return true;
     if (!!x.ok !== !!y.ok) return !!x.ok;
     if ((x.qg || 0) !== (y.qg || 0)) return (x.qg || 0) > (y.qg || 0);
+    // 【v497】过了结构门之后，黑块 ≤30% 的候选优先（用户：38% 成片黑块不合理）
+    if ((x.bk30 || 0) !== (y.bk30 || 0)) return (x.bk30 || 0) > (y.bk30 || 0);
     if ((x.gc == null ? 99 : x.gc) !== (y.gc == null ? 99 : y.gc)) return (x.gc == null ? 99 : x.gc) < (y.gc == null ? 99 : y.gc);
     if ((x.gv == null ? 1e9 : x.gv) !== (y.gv == null ? 1e9 : y.gv)) return (x.gv == null ? 1e9 : x.gv) < (y.gv == null ? 1e9 : y.gv);
     // qPass 不是交付硬门；只比较未过项数量，避免旧覆盖率/targetScore 改写质量目标。
     if ((x.qv == null ? 99 : x.qv) !== (y.qv == null ? 99 : y.qv)) return (x.qv == null ? 99 : x.qv) < (y.qv == null ? 99 : y.qv);
+    // 【v497】结构/质量打平时，黑块少的优先（差 5 个百分点才换，避免噪声抢位）
+    if (Math.abs((x.bk == null ? 99 : x.bk) - (y.bk == null ? 99 : y.bk)) >= 5) return (x.bk == null ? 99 : x.bk) < (y.bk == null ? 99 : y.bk);
     if (Math.abs((x.ps || 0) - (y.ps || 0)) >= 15) return (x.ps || 0) > (y.ps || 0);
     if ((x.pn || 0) !== (y.pn || 0)) return (x.pn || 0) > (y.pn || 0);
     if ((x.ps || 0) !== (y.ps || 0)) return (x.ps || 0) > (y.ps || 0);

@@ -112,7 +112,13 @@ function configOf(env, flow, seed) {
     candidateCount: 3, timeBudgetMs: 20000, fullTime: true, portfolioK: 1,
     acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4.8,
     targetSteadyMin: 0, targetSteadyMax: 100,
-    targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0.25
+    targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0.25,
+    // v497 生产口径（与 app.js genApplyFixed 在 35×35 图上的取值一致）：
+    //   棋盘范围 4~6 行 × 6~8 列、硬范围不许缩、允许 6×6 方盘。
+    //   之前工具用的是 DEFAULT_CONFIG（6~9 × 7~10），6×6 根本不在候选里，所以测不出方盘效果。
+    boardAllowSquare: true,
+    boardRowsMin: 4, boardRowsMax: 6, boardColsMin: 6, boardColsMax: 8,
+    boardHardRange: true, boardAuto: false
   };
   // D1 实验开关：不传 --row0-free-max 时与 v495 完全一致（不接 limitRow0Free）
   if (ROW0_FREE_MAX != null) { cfg.row0FreeMax = ROW0_FREE_MAX; cfg.row0FreeIce = ROW0_FREE_ICE; }
@@ -128,6 +134,12 @@ function recordOf(env, img, flow, seed, r, ms) {
   const p = (r.goodV3 && r.goodV3.persist) || {};
   const ce = r.capacityAudit || null;
   const b = (r.level && r.level.board) || {};
+  // 黑块占比（补位墙）：cells 里 t==='black' 的比例。观感指标，v497 起纳入报告。
+  let blackCells = 0, cellTotal = (b.rows || 0) * (b.cols || 0);
+  for (let rr = 0; rr < (b.rows || 0); rr++) for (let cc = 0; cc < (b.cols || 0); cc++) {
+    const cell = b.cells && b.cells[rr] && b.cells[rr][cc];
+    if (cell && cell.t === 'black') blackCells++;
+  }
   return {
     image: img.id, flow: flow, seed: seed,
     valid: !!r.valid,
@@ -135,6 +147,7 @@ function recordOf(env, img, flow, seed, r, ms) {
     outFlow: r.flow || flow,
     board: { rows: b.rows, cols: b.cols },
     boardFloorPass: ce ? ce.boardFloorPass : null,
+    black: cellTotal ? { cells: blackCells, total: cellTotal, pct: Math.round(blackCells / cellTotal * 100) } : null,
     capacity: ce ? {
       cars: ce.cars, sum: ce.capacitySum, pixels: ce.pixels, conserved: ce.conserved,
       minCap: ce.minCap, maxCap: ce.maxCap, belowMin: ce.belowMin, aboveMax: ce.aboveMax,
@@ -182,6 +195,8 @@ function summarize(rows) {
       capacityInRange: rs.filter(x => x.capacity && x.capacity.belowMin === 0 && x.capacity.aboveMax === 0).length,
       capacityOutOfRangeRuns: rs.filter(x => x.capacity && (x.capacity.belowMin > 0 || x.capacity.aboveMax > 0)).length,
       boards: rs.map(x => (x.board && x.board.rows != null) ? (x.board.rows + 'x' + x.board.cols) : null),
+      blackMedianPct: median(rs.map(x => x.black ? x.black.pct : null)),
+      blackMaxPct: Math.max.apply(null, rs.map(x => x.black ? x.black.pct : null).filter(x => x != null)),
       freeLowMedian: median(rs.map(x => x.quality.freeLowPct)),
       freeRunMedian: median(rs.map(x => x.quality.freeRunMax)),
       firstPassMedian: median(rs.map(x => x.quality.playerPassPct)),

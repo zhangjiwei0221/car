@@ -5029,7 +5029,9 @@ AntSolver.App = (function() {
       boardColsMin: _legacyParams ? out.boardColsMin : (_boardAuto ? 7 : _norm.colsMin),
       boardColsMax: _legacyParams ? out.boardColsMax : (_boardAuto ? 8 : _norm.colsMax),
       // 【v305·用户裁决】棋盘尺寸由球数决定后，不允许正方形（保持 列−行 ∈ {1,2}）
-      boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: !_legacyParams,
+      // 【v497·用户裁决】运行时允许 6×6 方盘：放开正方形后，车少时可以用 36 格替 42 格，
+      //   少 6 个补位黑块（26 车：6×7=16 黑/38% → 6×6=10 黑/28%）。形态仍守 列−行 ∈ [0,2]。
+      boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: true,
       boardExpandOnOverflow: true, boardFirst: true,
       p7Repair: true, p7BaseCount: 3,
       semanticObstacles: (function () {
