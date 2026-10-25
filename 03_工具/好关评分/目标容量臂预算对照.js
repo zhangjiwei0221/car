@@ -17,7 +17,7 @@ function txt(id){return path.join(ROOT,'蚂蚁图库','拼接图','拼接图图�
 function hash(x){return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');}
 function run(A,id,arm){const G=A.Generator,blocks=G.blocksFromTXT(fs.readFileSync(txt(id),'utf8')),band=G.deriveCapacityBand(blocks),t0=Date.now();
  const cfg={seed,goalPerRoundMs:roundMs,goalMaxMs:budgetMs,goalMaxRounds:0,goalSharedBudget:arm==='shared',experienceGoal:true,
-  generatorFlow:'new_fixed',boxSizeMin:band.band[0],boxSizeMax:band.band[1],capScalePlan:[1.45,1.15],cutMode:'layerCut2',candidateCount:3,fullTime:true,portfolioK:1,
+  generatorFlow:'new_fixed',boxSizeMin:band.band[0],boxSizeMax:band.band[1],capNormMin:band.band[0],capNormMax:band.band[1],capScalePlan:[1.45,1.15],cutMode:'layerCut2',candidateCount:3,fullTime:true,portfolioK:1,
   acceptMode:'target',targetPeakMin:3.2,targetPeakMax:4.8,targetSteadyMin:0,targetSteadyMax:100,targetBand3Min:0,targetBand4Min:0,targetPlayerPassMin:.25,
   boardAllowSquare:true,boardRowsMin:6,boardRowsMax:9,boardColsMin:6,boardColsMax:11,boardHardRange:true,boardAuto:false,capacityTuneMs:5000,capacityTuneCars:8,capacityTuneVariants:48};
  let r;try{r=G.produceGoal(blocks,cfg);}catch(e){r={level:null,valid:false,error:String(e&&e.message||e)};}
@@ -25,7 +25,8 @@ function run(A,id,arm){const G=A.Generator,blocks=G.blocksFromTXT(fs.readFileSyn
  const rec={image:id,arm,seed,budgetMs,roundMs,wallMs,overrunMs:Math.max(0,wallMs-budgetMs),rounds:r&&r.goalRounds||0,goalElapsedMs:r&&r.goalElapsedMs||null,stop:r&&r.goalStopReason||null,
   valid:!!(r&&r.valid),struct:!!(r&&r.level&&G.goalStructPass(r)),pass:!!(r&&r.level&&G.goalExperiencePass(r,cfg)),distance:ev&&ev.metrics?ev.metrics.distance:null,midBuffer34Pct:ev&&ev.metrics?ev.metrics.midBuffer34Pct:null,
   release:ev&&ev.releaseDecision?ev.releaseDecision.status:null,tune:r&&r.capacityTune?{applied:!!r.capacityTune.applied,tested:r.capacityTune.tested,skipped:r.capacityTune.skipped}:null,
-  board:r&&r.level&&r.level.board?{rows:r.level.board.rows,cols:r.level.board.cols}:null,hash:r&&r.level?hash(r.level):null};
+  board:r&&r.level&&r.level.board?{rows:r.level.board.rows,cols:r.level.board.cols}:null,
+  capacity:r&&r.level?A.Quality.capacityEvidence(r.level,r.config||cfg):null,hash:r&&r.level?hash(r.level):null};
  console.log(JSON.stringify(rec));return rec;
 }
 const rows=[];for(const id of ids){rows.push(run(oldA,id,'legacy_per_arm'));rows.push(run(newA,id,'shared'));}

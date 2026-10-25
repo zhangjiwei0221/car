@@ -6185,6 +6185,19 @@ AntSolver.App = (function() {
       };
     }
     var parsed = AntSolver.parseLevel(result.level);
+    // 【v514】最终best可能来自较早轮次，尚未附完整体验评价；只在此处补一次，报告/分类共用同一证据。
+    if (result.goalMode && result.valid && result.config && result.config.experienceGoal === true && !result._experienceFull && AntSolver.ExperienceGoal) {
+      try {
+        result._experienceFull = AntSolver.ExperienceGoal.evaluate(result.level, {
+          solveResult: result.solveResult, decision: true,
+          bottomOnly: !!result.config.bottomOnly, instantChain: !!result.config.instantChain
+        });
+        result._experienceFull.diagnosis = AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result));
+      } catch (e) { result.experienceFinalError = String((e && e.message) || e); }
+    }
+    if (!result.capacityAudit && AntSolver.Quality && AntSolver.Quality.capacityEvidence) {
+      try { result.capacityAudit = AntSolver.Quality.capacityEvidence(result.level, result.config || {}); } catch (e) {}
+    }
     var sr = result.solveResult || {};
     var samples = sr.pressureSamples || [];
     var pm = pmFromSamples(samples, parsed.totalBoxes, !!sr.completed);
@@ -6255,6 +6268,8 @@ AntSolver.App = (function() {
       appliedParams: result.config ? {
         capMin: result.config.boxSizeMin, capMax: result.config.boxSizeMax,
         capNormMin: result.config.capNormMin, capNormMax: result.config.capNormMax,
+        userCapMin: result.config._userCapMin, userCapMax: result.config._userCapMax,
+        capScale: result.capScale != null ? result.capScale : (result.config._capScale != null ? result.config._capScale : null),
         targetCarCount: result.config.targetCarCount,
         rows: result.config.boardRowsMin + '~' + result.config.boardRowsMax,
         cols: result.config.boardColsMin + '~' + result.config.boardColsMax,
@@ -6362,6 +6377,7 @@ AntSolver.App = (function() {
       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
       goalBudgetEvidence: result.goalBudgetEvidence || null,
+      experienceFinalError: result.experienceFinalError || null,
       // 【v368】搜索为什么停：pass_early_stop / budget_timeout / exhausted / no_candidate
       perfStop: result.perf ? { reason: result.perf.stopReason || null, totalMs: result.perf.totalMs || null } : null,
       workerBuild: result._workerBuild || null,   // 【v369】生成线程的 build（确认跑的是新 generator）
@@ -6429,6 +6445,8 @@ AntSolver.App = (function() {
       experienceEvidence: rec.experienceEvidence || null,
       experienceRouteEvidence: rec.experienceRouteEvidence || null,
       capacityTune: rec.capacityTune || null,
+      capacityAudit: rec.capacityAudit || null, appliedParams: rec.appliedParams || null,
+      experienceFinalError: rec.experienceFinalError || null,
       goalBudgetEvidence: rec.goalBudgetEvidence || null,
       entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位

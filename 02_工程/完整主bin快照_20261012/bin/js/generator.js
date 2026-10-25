@@ -14964,6 +14964,9 @@ AntSolver.Generator = (function() {
         _cfg2.timeBudgetMs = Math.max(1000, Math.floor(_capLeft / (_plan.length - _si)));
       }
       if (_capMax0 > 0 && _sc > 0) _cfg2.boxSizeMax = Math.max(1, Math.round(_capMax0 * _sc));
+      // 【v514】同一容量臂的归一化上限必须同步；否则box已到45，归一化仍停31，制造整盘belowMin小车。
+      var _capNormMax0 = parseInt(config.capNormMax, 10) || 0;
+      if (_capNormMax0 > 0 && _sc > 0) _cfg2.capNormMax = Math.max(1, Math.round(_capNormMax0 * _sc));
       var _r = null;
       try { _r = produceDispatchCore(blocks, _cfg2, opts); } catch (e) { _r = null; }
       if (!_r) continue;
