@@ -90,6 +90,11 @@ const ROW0_FREE_ICE = (function () {
   const i = process.argv.indexOf('--row0-free-ice');
   return i > 0 ? parseInt(process.argv[i + 1], 10) : 0;
 })();
+// --cap-max-scale 1.35：只把容量带上沿乘以系数（下沿不动），用于验证“车更大→freeLow 更低”
+const CAP_MAX_SCALE = (function () {
+  const i = process.argv.indexOf('--cap-max-scale');
+  return i > 0 ? parseFloat(process.argv[i + 1]) : null;
+})();
 
 function configOf(env, flow, seed) {
   const cfg = {
@@ -104,6 +109,7 @@ function configOf(env, flow, seed) {
   };
   // D1 实验开关：不传 --row0-free-max 时与 v495 完全一致（不接 limitRow0Free）
   if (ROW0_FREE_MAX != null) { cfg.row0FreeMax = ROW0_FREE_MAX; cfg.row0FreeIce = ROW0_FREE_ICE; }
+  if (CAP_MAX_SCALE != null && cfg.boxSizeMax != null) cfg.boxSizeMax = Math.round(cfg.boxSizeMax * CAP_MAX_SCALE);
   return cfg;
 }
 
