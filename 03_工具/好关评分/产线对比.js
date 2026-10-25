@@ -98,6 +98,15 @@ const CAP_MAX_SCALE = (function () {
   return i > 0 ? parseFloat(process.argv[i + 1]) : null;
 })();
 // --cap-scale-plan 1.45,1.15：交给生成器的容量上沿候选臂（与生产 app 配置同口径）
+// --cap-min/--cap-max：直接指定容量区间（用于验证 P4 枚举出的前沿组合，不走缩放臂）
+const CAP_MIN_FIX = (function () {
+  const i = process.argv.indexOf('--cap-min');
+  return i > 0 ? parseInt(process.argv[i + 1], 10) : null;
+})();
+const CAP_MAX_FIX = (function () {
+  const i = process.argv.indexOf('--cap-max');
+  return i > 0 ? parseInt(process.argv[i + 1], 10) : null;
+})();
 const CAP_SCALE_PLAN = (function () {
   const i = process.argv.indexOf('--cap-scale-plan');
   return i > 0 ? process.argv[i + 1].split(',').map(Number).filter(x => x > 0) : null;
@@ -124,6 +133,8 @@ function configOf(env, flow, seed) {
   if (ROW0_FREE_MAX != null) { cfg.row0FreeMax = ROW0_FREE_MAX; cfg.row0FreeIce = ROW0_FREE_ICE; }
   if (CAP_MAX_SCALE != null && cfg.boxSizeMax != null) cfg.boxSizeMax = Math.round(cfg.boxSizeMax * CAP_MAX_SCALE);
   if (CAP_SCALE_PLAN != null) cfg.capScalePlan = CAP_SCALE_PLAN;
+  if (CAP_MIN_FIX != null) cfg.boxSizeMin = CAP_MIN_FIX;
+  if (CAP_MAX_FIX != null) cfg.boxSizeMax = CAP_MAX_FIX;
   return cfg;
 }
 
