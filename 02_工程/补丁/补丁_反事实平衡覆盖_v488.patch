@@ -1,0 +1,186 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index d74ade3..139b582 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v487 · 反事实价值预算</title>
+-  <link rel="stylesheet" href="css/style.css?v=487">
++  <title>车接小人 v488 · 反事实平衡覆盖</title>
++  <link rel="stylesheet" href="css/style.css?v=488">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v487</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v488</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,23 +769,23 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=487"></script>
+-  <script src="js/utils.js?v=487"></script>
++  <script src="js/zip.js?v=488"></script>
++  <script src="js/utils.js?v=488"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=487"></script>
+-  <script src="js/simulator.js?v=487"></script>
++  <script src="js/color-libs.js?v=488"></script>
++  <script src="js/simulator.js?v=488"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=487"></script>
+-  <script src="js/solver-strategy.js?v=487"></script>
+-  <script src="js/solver.js?v=487"></script>
+-  <script src="js/playersim.js?v=487"></script>
++  <script src="js/anchor-cut.js?v=488"></script>
++  <script src="js/solver-strategy.js?v=488"></script>
++  <script src="js/solver.js?v=488"></script>
++  <script src="js/playersim.js?v=488"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=487"></script>
+-  <script src="js/generator.js?v=487"></script>
+-  <script src="js/analysis.js?v=487"></script>
++  <script src="js/solver-analysis.js?v=488"></script>
++  <script src="js/generator.js?v=488"></script>
++  <script src="js/analysis.js?v=488"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=487"></script>
+-  <script src="js/app.js?v=487"></script>
++  <script src="js/level-editor.js?v=488"></script>
++  <script src="js/app.js?v=488"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+index efc6be7..9d9a50d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+@@ -292,7 +292,7 @@ AntSolver.SolverAnalysis = (function () {
+   function counterfactualFromState(start, actions, opts) {
+     opts = opts || {};
+     var maxDecisions = Math.max(1, opts.maxDecisionPoints || 4), maxAlts = Math.max(1, opts.maxAlternatives || 2);
+-    var policy = opts.decisionPolicy === 'value' ? 'value' : 'uniform';
++    var policy = opts.decisionPolicy === 'uniform' ? 'uniform' : (opts.decisionPolicy === 'value' ? 'value' : 'balanced');
+     var parent = Clone(start), decisions = [], candidates = [], prefixMax = parent.buffer.length;
+     for (var i = 0; i < actions.length; i++) {
+       if (won(parent) || dead(parent)) break;
+@@ -307,13 +307,24 @@ AntSolver.SolverAnalysis = (function () {
+       prefixMax = Math.max(prefixMax, parent.buffer.length);
+     }
+     var selected;
+-    if (policy === 'value') {
++    if (policy === 'value' || policy === 'balanced') {
+       selected = candidates.map(function (_, i) { return i; });
+       selected.sort(function (a, b) {
+         var d = candidates[b].features.valueScore - candidates[a].features.valueScore;
+         return d || candidates[a].index - candidates[b].index;
+       });
+-      selected = selected.slice(0, maxDecisions).sort(function (a, b) { return candidates[a].index - candidates[b].index; });
++      selected = selected.slice(0, maxDecisions);
++      var riskPoint = -1, riskScore = 0;
++      if (policy === 'balanced' && selected.length) {
++        for (var ri = 0; ri < candidates.length; ri++) {
++          var rf = candidates[ri].features;
++          if (!rf.blockedCount && rf.bufferPct < 0.6) continue;
++          var rs = rf.blockedCount * 5 + rf.bufferPct * 3 + (rf.partialCount > 0 ? 1 : 0) + (rf.fullCount === 0 ? 1 : 0);
++          if (rs > riskScore) { riskScore = rs; riskPoint = ri; }
++        }
++        if (riskPoint >= 0 && selected.indexOf(riskPoint) < 0) selected[selected.length - 1] = riskPoint;
++      }
++      selected = selected.sort(function (a, b) { return candidates[a].index - candidates[b].index; });
+     } else selected = sampleIndices(candidates.map(function (_, i) { return i; }), maxDecisions);
+     for (var si = 0; si < selected.length; si++) {
+       var point = candidates[selected[si]], chosen = actions[point.index];
+@@ -328,15 +339,40 @@ AntSolver.SolverAnalysis = (function () {
+         if (a.r !== b.r) return a.r - b.r;
+         return a.c - b.c;
+       });
++      var altReasons = {};
++      if (policy === 'balanced' && alternatives.length) {
++        var ordered = [], usedAlt = {};
++        function addAlt(m, reason) {
++          if (!m) return;
++          var key = m.r + ',' + m.c;
++          if (usedAlt[key]) return;
++          usedAlt[key] = true; altReasons[key] = reason; ordered.push(m);
++        }
++        addAlt(alternatives[0], 'value');
++        var riskAlt = null;
++        for (var ar = 0; ar < alternatives.length; ar++) if (alternatives[ar].blocked) {
++          if (!riskAlt || alternativeValue(alternatives[ar], chosenMove, point.features.valueScore) > alternativeValue(riskAlt, chosenMove, point.features.valueScore)) riskAlt = alternatives[ar];
++        }
++        if (riskAlt) addAlt(riskAlt, 'risk');
++        if (ordered.length < maxAlts) {
++          for (var at = 0; at < alternatives.length; at++) {
++            if (!!alternatives[at].canConsume !== !!ordered[0].canConsume) { addAlt(alternatives[at], 'type'); break; }
++          }
++        }
++        for (var ao = 0; ao < alternatives.length; ao++) addAlt(alternatives[ao], 'value');
++        alternatives = ordered;
++      }
+       var record = { step: point.index + 1, progress: +(point.state.eliminatedPixels / point.state.totalPixels).toFixed(4),
+-        moves: point.moves.length, chosen: chosen, features: point.features, alternatives: [] };
++        moves: point.moves.length, chosen: chosen, features: point.features,
++        selectionReason: policy === 'balanced' ? (point.index === (candidates[riskPoint] && candidates[riskPoint].index) ? 'risk' : 'value') : policy,
++        alternatives: [] };
+       for (var ai = 0; ai < alternatives.length && record.alternatives.length < maxAlts; ai++) {
+         var m = alternatives[ai], alt = actionOf(m), next = Clone(point.state);
+         Sim.applyPick(next, alt.r, alt.c); finishFlags(next);
+         var altValue = alternativeValue(m, chosenMove, point.features.valueScore);
+-        var budget = policy === 'value' ? valueBudget(altValue, opts) : null;
++        var budget = policy !== 'uniform' ? valueBudget(altValue, opts) : null;
+         var item = { action: alt, canConsume: !!m.canConsume, immediateBuffer: next.buffer.length,
+-          valueScore: policy === 'value' ? altValue : null, budgetMs: budget ? budget.timeBudgetMs : (opts.timePerAlternativeMs || 600),
++          valueScore: policy !== 'uniform' ? altValue : null, selectionReason: altReasons[m.r + ',' + m.c] || policy, budgetMs: budget ? budget.timeBudgetMs : (opts.timePerAlternativeMs || 600),
+           budgetNodes: budget ? budget.maxNodes : (opts.maxNodesPerAlternative || 1200) };
+         if (won(next)) {
+           item.outcome = 'solved'; item.steps = 1; item.replayValid = true; item.maxBuffer = Math.max(point.prefixMax, next.buffer.length);
+@@ -407,7 +443,7 @@ AntSolver.SolverAnalysis = (function () {
+     var bestKnown = chosen ? { maxBuffer: chosen.maxBuffer, source: chosen.source,
+       verifiedRoutes: verifiedRoutes.length, isProvenMinimum: false } : null;
+     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
+-    return { schema: 'solver-analysis-v2', baseline: baseline, multi: multi,
++    return { schema: 'solver-analysis-v3', baseline: baseline, multi: multi,
+       verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
+       counterfactual: cf, elapsedMs: Date.now() - t,
+       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\215\344\272\213\345\256\236\351\242\204\347\256\227\346\211\271\350\267\221.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\215\344\272\213\345\256\236\351\242\204\347\256\227\346\211\271\350\267\221.js"
+index c4d3329..8c032ed 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\215\344\272\213\345\256\236\351\242\204\347\256\227\346\211\271\350\267\221.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\215\344\272\213\345\256\236\351\242\204\347\256\227\346\211\271\350\267\221.js"
+@@ -14,7 +14,7 @@ vm.createContext(sandbox);
+ for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sandbox, { filename: f });
+ const A = sandbox.AntSolver, args = process.argv.slice(2);
+ function opt(name, fallback) { const i = args.indexOf('--' + name); return i >= 0 && args[i + 1] ? args[i + 1] : fallback; }
+-const policy = opt('policy', 'uniform'), outPath = opt('out', ''), only = opt('only', '').split(',').filter(Boolean);
++const policy = opt('policy', 'balanced'), outPath = opt('out', ''), only = opt('only', '').split(',').filter(Boolean);
+ const manifest = JSON.parse(fs.readFileSync(opt('manifest', path.join(__dirname, '求解题库_v1.json')), 'utf8'));
+ const routeRows = fs.readFileSync(opt('routes', path.join(__dirname, '求解题库分支对照_v486.jsonl')), 'utf8').trim().split(/\n/).map(JSON.parse).filter(r => r.tier === 'deep_b8');
+ const routeById = {}; for (const r of routeRows) routeById[r.id] = r;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
+index 3d555ba..a33f0ef 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\345\210\206\346\236\220.js"
+@@ -3,7 +3,7 @@
+  * 多路线与关键状态反事实（只读，不改生产）：
+  * node 03_工具/好关评分/解法结构分析.js <关卡.json> [--out 报告.json]
+  *   [--time 2500] [--nodes 4000] [--width 16] [--routes 6]
+- *   [--decisions 4] [--alternatives 2] [--alt-time 600] [--policy uniform|value]
++ *   [--decisions 4] [--alternatives 2] [--alt-time 600] [--policy uniform|value|balanced]
+  */
+ 'use strict';
+ const fs = require('fs'), path = require('path'), vm = require('vm');
+@@ -22,7 +22,7 @@ const level = raw.spools ? sandbox.AntSolver.fromGameFormat(raw) : raw;
+ const report = sandbox.AntSolver.SolverAnalysis.analyze(level, {
+   timeBudgetMs: opt('time', 2500), maxNodes: opt('nodes', 4000), beamWidth: opt('width', 16),
+   maxRoutes: opt('routes', 6), branchWidth: opt('branch', 8), maxDecisionPoints: opt('decisions', 4),
+-  maxAlternatives: opt('alternatives', 2), decisionPolicy: strOpt('policy', 'uniform'), timePerAlternativeMs: opt('alt-time', 600),
++  maxAlternatives: opt('alternatives', 2), decisionPolicy: strOpt('policy', 'balanced'), timePerAlternativeMs: opt('alt-time', 600),
+   maxNodesPerAlternative: opt('alt-nodes', 1200)
+ });
+ report.input = path.resolve(file);

@@ -14,7 +14,7 @@ vm.createContext(sandbox);
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sandbox, { filename: f });
 const A = sandbox.AntSolver, args = process.argv.slice(2);
 function opt(name, fallback) { const i = args.indexOf('--' + name); return i >= 0 && args[i + 1] ? args[i + 1] : fallback; }
-const policy = opt('policy', 'uniform'), outPath = opt('out', ''), only = opt('only', '').split(',').filter(Boolean);
+const policy = opt('policy', 'balanced'), outPath = opt('out', ''), only = opt('only', '').split(',').filter(Boolean);
 const manifest = JSON.parse(fs.readFileSync(opt('manifest', path.join(__dirname, '求解题库_v1.json')), 'utf8'));
 const routeRows = fs.readFileSync(opt('routes', path.join(__dirname, '求解题库分支对照_v486.jsonl')), 'utf8').trim().split(/\n/).map(JSON.parse).filter(r => r.tier === 'deep_b8');
 const routeById = {}; for (const r of routeRows) routeById[r.id] = r;

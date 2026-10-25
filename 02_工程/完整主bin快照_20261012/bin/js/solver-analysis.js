@@ -292,7 +292,7 @@ AntSolver.SolverAnalysis = (function () {
   function counterfactualFromState(start, actions, opts) {
     opts = opts || {};
     var maxDecisions = Math.max(1, opts.maxDecisionPoints || 4), maxAlts = Math.max(1, opts.maxAlternatives || 2);
-    var policy = opts.decisionPolicy === 'value' ? 'value' : 'uniform';
+    var policy = opts.decisionPolicy === 'uniform' ? 'uniform' : (opts.decisionPolicy === 'value' ? 'value' : 'balanced');
     var parent = Clone(start), decisions = [], candidates = [], prefixMax = parent.buffer.length;
     for (var i = 0; i < actions.length; i++) {
       if (won(parent) || dead(parent)) break;
@@ -307,13 +307,24 @@ AntSolver.SolverAnalysis = (function () {
       prefixMax = Math.max(prefixMax, parent.buffer.length);
     }
     var selected;
-    if (policy === 'value') {
+    if (policy === 'value' || policy === 'balanced') {
       selected = candidates.map(function (_, i) { return i; });
       selected.sort(function (a, b) {
         var d = candidates[b].features.valueScore - candidates[a].features.valueScore;
         return d || candidates[a].index - candidates[b].index;
       });
-      selected = selected.slice(0, maxDecisions).sort(function (a, b) { return candidates[a].index - candidates[b].index; });
+      selected = selected.slice(0, maxDecisions);
+      var riskPoint = -1, riskScore = 0;
+      if (policy === 'balanced' && selected.length) {
+        for (var ri = 0; ri < candidates.length; ri++) {
+          var rf = candidates[ri].features;
+          if (!rf.blockedCount && rf.bufferPct < 0.6) continue;
+          var rs = rf.blockedCount * 5 + rf.bufferPct * 3 + (rf.partialCount > 0 ? 1 : 0) + (rf.fullCount === 0 ? 1 : 0);
+          if (rs > riskScore) { riskScore = rs; riskPoint = ri; }
+        }
+        if (riskPoint >= 0 && selected.indexOf(riskPoint) < 0) selected[selected.length - 1] = riskPoint;
+      }
+      selected = selected.sort(function (a, b) { return candidates[a].index - candidates[b].index; });
     } else selected = sampleIndices(candidates.map(function (_, i) { return i; }), maxDecisions);
     for (var si = 0; si < selected.length; si++) {
       var point = candidates[selected[si]], chosen = actions[point.index];
@@ -328,15 +339,40 @@ AntSolver.SolverAnalysis = (function () {
         if (a.r !== b.r) return a.r - b.r;
         return a.c - b.c;
       });
+      var altReasons = {};
+      if (policy === 'balanced' && alternatives.length) {
+        var ordered = [], usedAlt = {};
+        function addAlt(m, reason) {
+          if (!m) return;
+          var key = m.r + ',' + m.c;
+          if (usedAlt[key]) return;
+          usedAlt[key] = true; altReasons[key] = reason; ordered.push(m);
+        }
+        addAlt(alternatives[0], 'value');
+        var riskAlt = null;
+        for (var ar = 0; ar < alternatives.length; ar++) if (alternatives[ar].blocked) {
+          if (!riskAlt || alternativeValue(alternatives[ar], chosenMove, point.features.valueScore) > alternativeValue(riskAlt, chosenMove, point.features.valueScore)) riskAlt = alternatives[ar];
+        }
+        if (riskAlt) addAlt(riskAlt, 'risk');
+        if (ordered.length < maxAlts) {
+          for (var at = 0; at < alternatives.length; at++) {
+            if (!!alternatives[at].canConsume !== !!ordered[0].canConsume) { addAlt(alternatives[at], 'type'); break; }
+          }
+        }
+        for (var ao = 0; ao < alternatives.length; ao++) addAlt(alternatives[ao], 'value');
+        alternatives = ordered;
+      }
       var record = { step: point.index + 1, progress: +(point.state.eliminatedPixels / point.state.totalPixels).toFixed(4),
-        moves: point.moves.length, chosen: chosen, features: point.features, alternatives: [] };
+        moves: point.moves.length, chosen: chosen, features: point.features,
+        selectionReason: policy === 'balanced' ? (point.index === (candidates[riskPoint] && candidates[riskPoint].index) ? 'risk' : 'value') : policy,
+        alternatives: [] };
       for (var ai = 0; ai < alternatives.length && record.alternatives.length < maxAlts; ai++) {
         var m = alternatives[ai], alt = actionOf(m), next = Clone(point.state);
         Sim.applyPick(next, alt.r, alt.c); finishFlags(next);
         var altValue = alternativeValue(m, chosenMove, point.features.valueScore);
-        var budget = policy === 'value' ? valueBudget(altValue, opts) : null;
+        var budget = policy !== 'uniform' ? valueBudget(altValue, opts) : null;
         var item = { action: alt, canConsume: !!m.canConsume, immediateBuffer: next.buffer.length,
-          valueScore: policy === 'value' ? altValue : null, budgetMs: budget ? budget.timeBudgetMs : (opts.timePerAlternativeMs || 600),
+          valueScore: policy !== 'uniform' ? altValue : null, selectionReason: altReasons[m.r + ',' + m.c] || policy, budgetMs: budget ? budget.timeBudgetMs : (opts.timePerAlternativeMs || 600),
           budgetNodes: budget ? budget.maxNodes : (opts.maxNodesPerAlternative || 1200) };
         if (won(next)) {
           item.outcome = 'solved'; item.steps = 1; item.replayValid = true; item.maxBuffer = Math.max(point.prefixMax, next.buffer.length);
@@ -407,7 +443,7 @@ AntSolver.SolverAnalysis = (function () {
     var bestKnown = chosen ? { maxBuffer: chosen.maxBuffer, source: chosen.source,
       verifiedRoutes: verifiedRoutes.length, isProvenMinimum: false } : null;
     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
-    return { schema: 'solver-analysis-v2', baseline: baseline, multi: multi,
+    return { schema: 'solver-analysis-v3', baseline: baseline, multi: multi,
       verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
       counterfactual: cf, elapsedMs: Date.now() - t,
       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
