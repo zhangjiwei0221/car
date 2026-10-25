@@ -61,6 +61,8 @@ const DUMP_DIR = (function () {
   const i = process.argv.indexOf('--dump-levels');
   return i > 0 ? path.resolve(process.argv[i + 1]) : '';
 })();
+// --dump-all：连通过结构门的关卡一起导出（P10 候选关需要“能过的不只是失败的”）
+const DUMP_ALL = process.argv.includes('--dump-all');
 const JSONL = OUT_PREFIX + '.jsonl';
 const SUMMARY = path.join(path.dirname(OUT_PREFIX), '产线对比汇总_' + path.basename(OUT_PREFIX).replace(/^产线对比_/, '') + '.json');
 
@@ -212,7 +214,7 @@ function main() {
         const ms = Date.now() - t0;
         const rec = err ? { image: img.id, flow: flow, seed: seed, error: err, elapsedMs: ms }
           : recordOf(envs[img.id], img, flow, seed, r, ms);
-        if (DUMP_DIR && rec.gatePass === false && r && r.level) {
+        if (DUMP_DIR && (DUMP_ALL || rec.gatePass === false) && r && r.level) {
           try {
             fs.mkdirSync(DUMP_DIR, { recursive: true });
             const cf = A.toGameFormat(r.level);
