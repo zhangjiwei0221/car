@@ -8682,9 +8682,27 @@ AntSolver.Generator = (function() {
     var b = c && c.generationEval && c.generationEval.buried;
     return (b && b.lateMax != null) ? b.lateMax : null;
   }
+  // v482：内部候选比较发生在 finalizeProduce 之前，原始候选通常还没有 goodV3。
+  // 必须先物化并缓存质量数据，否则 qGate/qPass/压力全在比较空值，退化为保留先到候选。
+  function ensureCandidateQuality(c) {
+    if (!c || !c.level || !c.valid || !c.solveResult) return c && c.goodV3;
+    if (!c.goodV3) {
+      try {
+        var g = goodV3Of(c);
+        if (g) {
+          c.goodV3 = g;
+          if (c.generationEval) c.generationEval.goodV3 = g;
+        }
+      } catch (e) { c.goodV3Error = String((e && e.message) || e); }
+    }
+    return c.goodV3;
+  }
+
   function candBetter(b, a, cfg) {
     // 【v481】produce/produceFixed 与外层 portfolio 共用同一候选顺序。
     // 旧审核档、覆盖率、chokeV2 和 targetScore 不再决定候选胜负。
+    ensureCandidateQuality(b);
+    ensureCandidateQuality(a);
     if (a == null) return true;
     return portfolioBetter(portfolioTuple(b), portfolioTuple(a));
   }
@@ -10108,7 +10126,14 @@ AntSolver.Generator = (function() {
     cand.treeEvaluated = evaluated;
     // 死亡边界救援必须在算档次与改写 audit.pass 之前——救援会替换 level/solveResult/audit，
     // 之后的分档与结论都应基于救援后的关卡。默认关闭，原两种模式不受影响。
-    try { rescueDeathEdge(cand); } catch (e) { if (cand) cand.rescue = { applied: false, error: String(e && e.message || e) }; }
+    try {
+      var _rescued = rescueDeathEdge(cand);
+      if (_rescued && _rescued.applied) {
+        cand.goodV3 = null;
+        if (cand.generationEval) cand.generationEval.goodV3 = null;
+      }
+    } catch (e) { if (cand) cand.rescue = { applied: false, error: String(e && e.message || e) }; }
+    ensureCandidateQuality(cand);
     // 必须在改写 audit.pass 之前算档次——candTier() 读的是【原始】audit.pass(是否真困难合格)，
     // finalizeProduce 稍后会把 audit.pass 覆写成"整体合格"，届时语义已变，不能再用来分档。
     // 【v471】结构门优先：qGate 过 → 不因旧 candTier 掉进 fallback
@@ -10189,11 +10214,7 @@ AntSolver.Generator = (function() {
     // 【v184】好关判据 v3 收尾标记：只记录，不影响选择与合格判定
     if (cand && cand.level && cand.solveResult && (!cand.config || cand.config.goodV3 !== false)) {
       try {
-        var _gv3 = goodV3Of(cand);
-        if (_gv3) {
-          cand.goodV3 = _gv3;
-          if (cand.generationEval) cand.generationEval.goodV3 = _gv3;
-        }
+        ensureCandidateQuality(cand);
       } catch (e) { cand.goodV3Error = String((e && e.message) || e); }
     }
 
@@ -10209,14 +10230,20 @@ AntSolver.Generator = (function() {
     }
 
     // 【v240】第 0 行不硬禁功能块，只在"整行锁死"时解冻一辆保开局（见 ensureRow0Opening 注释）
+    var _finalQualityDirty = false;
     try {
       var _iceCut = capRow0Ice(cand && cand.level, cand && cand.config ? cand.config.row0IceMax : 1);
-      if (_iceCut > 0) cand.row0IceCapped = _iceCut;
+      if (_iceCut > 0) { cand.row0IceCapped = _iceCut; _finalQualityDirty = true; }
     } catch (e) { cand.row0IceCapError = String((e && e.message) || e); }
     try {
       var _open = ensureRow0Opening(cand && cand.level);
-      if (_open) cand.row0OpeningFix = _open;
+      if (_open) { cand.row0OpeningFix = _open; _finalQualityDirty = true; }
     } catch (e) { cand.row0OpeningError = String((e && e.message) || e); }
+    if (_finalQualityDirty) {
+      cand.goodV3 = null;
+      if (cand.generationEval) cand.generationEval.goodV3 = null;
+      ensureCandidateQuality(cand);
+    }
 
     return cand;
   }
