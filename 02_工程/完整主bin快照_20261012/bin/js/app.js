@@ -6292,10 +6292,20 @@ AntSolver.App = (function() {
       debtEvidence: result.debtEvidence || null,
       timelineEvidence: result.timelineEvidence || null,
       experienceGoal: !!(result.config && result.config.experienceGoal),
-      experienceEvidence: result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
-        reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
-        diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
-        releaseDecision: result._experienceFull.releaseDecision } : null,
+      experienceEvidence: (function () {
+        var rt = result.experienceRouteEvidence, rb = rt && rt.bestVerified;
+        if (result.acceptedByVerifiedRoute && rt && rt.pass === true && rb && rb.releaseDecision && rb.releaseDecision.status === 'found' &&
+            rb.releaseDecision.evidence && rb.releaseDecision.evidence.finalReplayValid === true) {
+          return { pass: true, status: 'pass', reasons: [], metrics: rb.metrics, releaseDecision: rb.releaseDecision,
+            source: 'verified_alternate_route', routeSource: rb.source, signature: rb.signature || null,
+            diagnosis: { primary: 'pass', action: 'done', flags: [] } };
+        }
+        return result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
+          reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
+          diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
+          releaseDecision: result._experienceFull.releaseDecision } : null;
+      })(),
+      acceptedByVerifiedRoute: !!result.acceptedByVerifiedRoute,
       sourcePreflight: sourcePreflight,
       experienceRouteEvidence: result.experienceRouteEvidence || null,
       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
@@ -6442,6 +6452,7 @@ AntSolver.App = (function() {
       sourcePreflight: rec.sourcePreflight || null,
       goalMode: !!rec.goalMode, experienceGoal: !!rec.experienceGoal,
       goalStopReason: rec.goalStopReason || null, goalTargetMiss: !!rec.goalTargetMiss,
+      acceptedByVerifiedRoute: !!rec.acceptedByVerifiedRoute,
       experienceEvidence: rec.experienceEvidence || null,
       experienceRouteEvidence: rec.experienceRouteEvidence || null,
       capacityTune: rec.capacityTune || null,
@@ -7392,6 +7403,7 @@ AntSolver.App = (function() {
       best.goalStopReason = why || null;
       best.goalElapsedMs = Date.now() - t0;
       if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, baseCfg); } catch (e) {} }
+      try { AntSolver.Generator.markVerifiedRouteAccept(best, baseCfg); } catch (e) {}
       best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: per,
         sharedCapBudget: baseCfg.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
         searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - t0,

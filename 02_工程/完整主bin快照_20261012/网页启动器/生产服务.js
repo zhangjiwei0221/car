@@ -417,6 +417,7 @@ function persistResult(b, payload) {
     时间线证据: rec.timelineEvidence || null,
     目标图预检: rec.sourcePreflight || null,
     体验目标: rec.experienceEvidence || null,
+    替代路线验收: !!rec.acceptedByVerifiedRoute,
     路线分岔证据: rec.experienceRouteEvidence || null,
     容量精调: rec.capacityTune || null,
     容量审计: rec.capacityAudit || null,

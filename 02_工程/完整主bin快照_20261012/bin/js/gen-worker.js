@@ -78,6 +78,7 @@ function _goalFinish(stopReason) {
   }
   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
   if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
+  try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
   best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: g.maxMs, perRoundMs: g.perMs,
     sharedCapBudget: g.config.goalSharedBudget !== false, rounds: g.rounds, stopReason: best.goalStopReason || null,
     searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - g.t0,

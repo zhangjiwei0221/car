@@ -1,0 +1,354 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+index f4ee838..19dd4c5 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+@@ -4,7 +4,7 @@
+ > 本文件只描述**当前状态、做过什么、哪些路已证否、下一步**；细节按节号去查工作日志。
+ > 上层文档仍以 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md) 与 [`工程说明.md`](工程说明.md) 为准。
+ >
+-> **后续更新（2026-10-26）**：当前已到 v515；目标体验与±1px容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~492。本文件保留 v495~v500 历史基线。
++> **后续更新（2026-10-26）**：当前已到 v516；目标体验与±1px容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~492。本文件保留 v495~v500 历史基线。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index ee9381c..4e8dc9c 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -7,7 +7,7 @@
+ > 本文档由 Kimi 整理。文中严格区分 **[用户要求]、[已验证]、[Kimi建议]、[待校准]**。
+ >
+ > 2026-10-26 新实施卡：[`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md)。小色可按解锁贡献承担关键债务，不按面积排除。
+-> 当前结果：已到v515。容量精调、目标模式、失败诊断、多路线、目标图预检和真实UI落库均已落地；最新验收批次目标pass且COMPLETED。v514已修复容量臂box/capNorm上限不一致，真实UI 006/007均体验达标；P7后修复20次0转化已否决。v515已统一完整体验距离选优且quick-only否决；下一步扩独立图/seed、释放与真人校准，障碍目标化仍未完成。
++> 当前结果：已到v516。容量精调、目标模式、失败诊断、多路线、目标图预检和真实UI落库均已落地；最新验收批次目标pass且COMPLETED。v514已修复容量臂box/capNorm上限不一致，真实UI 006/007均体验达标；P7后修复20次0转化已否决。v515已统一完整体验距离选优且quick-only否决；v516独立回归ready 3/4、review 1/6，已验证替代路线可救回参考unknown；下一步预检策略、结构近失与PlayerSim校准，障碍目标化仍未完成。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index d7bccde..e093b4c 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -19926,3 +19926,37 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. UI批次15只有1/2达标，选优不是命中率保证；需更多独立图/seed。
+ 2. 释放unknown与PlayerSim 0%/偏黑仍需校准；完整计算选优不等于真人能学会。
+ 3. 目标化障碍、预检review策略化、真人盲评未完成；七点不能标全完成。
++
++### 506. 【2026-10-26】v516：独立图/seed回归与已验证替代路线验收
++
++#### 506.1 问题（原话）
++
++- “玩家卡住的同时，又能通过思考释放暂存区的压力，最后获得胜利。”
++- “遇到边界以及卡住的地方要记录。”
++
++#### 506.2 证据
++
++- 五图两seed独立回归：目标4/10、结构8/10；ready 3/4、review 1/6。006/010在32677转为通过，007两个seed均未达；推荐图32677已到49%但结构失败。
++- 好图1002参考路线release unknown，但beam路线3/4=73.7%、显著释放2、release found、finalReplayValid=true，动作签名完整。只认参考路线会误杀这种关。
++- 所有4个目标通过样本均有PlayerSim 0%项，不能据此宣称真人好关。
++- 单图UI批次16远超预算且页面无响应，已终止本轮失控渲染并STOPPED、0落库；双worker批次17正常COMPLETED。直接多路线复核还触发过ringMaskOf异常。
++
++#### 506.3 改动
++
++- Kimi新增 `goalResultExperiencePass` 与 `markVerifiedRouteAccept`：最终报告阶段，只有完整路线pass、release found、最终回放有效、结构/容量全过才接受替代路线；保存best signature。
++- 参考路线本身已通过时不标acceptedByVerifiedRoute；其他unknown不自动放行。worker/headless/main接标记，app/服务保存替代验收证据。
++- 新增 `目标独立回归.js`，覆盖006/007/010/推荐/好图；版本升v516，保存逐关、路线、UI失控与双worker证据。
++
++#### 506.4 验证（改前后数字）
++
++- 独立汇总：目标4/10，ready 3/4、review 1/6；好图1002由未达转为 `pass_verified_route`，其余失败不因此改变。
++- 好图best：3/4=73.7%、maxBuffer=4、显著释放2、回放19动作，容量aboveMax=0且守恒。
++- 双worker批次17：006在24.217s体验通过，好图未达，均落库COMPLETED；未把单图失控写成生成失败或通过。
++- `node --check`：generator/app/playersim/gen-worker/生产服务通过；`git diff --check`通过。
++
++#### 506.5 遗留
++
++1. 预检review仍只提示，需实验短探针与分派策略；ready也不是通过保证。
++2. 推荐图49%但结构失败可作结构容量精调候选；两个seed不足以判“不可救”。
++3. 所有独立通过样本仍有PlayerSim 0%项；需玩家模型/真人校准。
++4. 多路线ringMaskOf异常与单图UI资源失控需后续稳定性处理；searchLimited不等于全局证明。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 772aa9c..724630d 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v515 完整体验距离选优）　|　当前版本：**v515**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v516 已验证替代路线验收与独立回归）　|　当前版本：**v516**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~502。目标模式已默认开启 experienceGoal 与近目标容量精调；时间模式不变。v512 多图实测0/2达标，目标总预算仍存在长轮超时，不能宣称泛化完成。**
+ >
+@@ -1170,3 +1170,11 @@ M0 固定基准 + 统一评价与候选口径
+ - 5组对照：目标4/5→4/5、结构5/5→5/5；4个已通过样本哈希不变，总时167.388→166.875s。
+ - 真实UI `unnamed-10-26-15`：006在119.636s体验pass（3/4=60%、显著释放2、release found）；007未达，123.477s落库，批次COMPLETED、合格1/2。
+ - 边界：选优改善当前best，不保证每个seed必达；PlayerSim/真人校准与更多图seed仍是后续。
++
++### 17.42 v516：独立图/seed回归与已验证替代路线验收
++
++- 五图两seed：目标4/10、结构8/10；ready 3/4、review 1/6。006/010困难seed已能达标，007两seed未达；推荐图32677压力49%但结构失败。
++- 好图1002参考路线release unknown，但beam路线3/4=73.7%、释放found、finalReplayValid=true。`goalResultExperiencePass`/`markVerifiedRouteAccept`只在完整路线、释放回放、结构与容量全过时接受，保存动作signature；参考路线本身已通过时不冒充替代救回。
++- 多路线只在最终报告阶段使用，searchLimited保留，不宣称全局最优或玩家必然找到。
++- 单图UI批次16失控，已STOPPED、0落库；双worker批次17 COMPLETED，006在24.217s通过，好图未达。直接多路线复核曾触发ringMaskOf异常，需后续稳定性修复，不能隐瞒。
++- 所有4个独立目标通过样本均有PlayerSim 0%项；真人好关仍未证明。下一步预检review策略、推荐图结构近失与PlayerSim校准。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 1b9da3d..8ce85c0 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -65,7 +65,7 @@
+ 
+ | 讨论点 | 本计划位置 | 当前状态 |
+ |---|---|---|
+-| 1. 真正的目标体验验收器 | S1 `experience-goal.js` | 参考路线＋多路线/分岔已接入最终报告；v515最终best按完整体验距离选优；PlayerSim/真人校准未完成 |
++| 1. 真正的目标体验验收器 | S1 `experience-goal.js` | 参考＋多路线/分岔已接入；v516已验证替代路线可最终验收；PlayerSim/真人校准未完成 |
+ | 2. 目标模式达标才停、时间模式如实给最好 | S2 共用 `goalAcceptPass` | 目标模式默认开启、总预算可调、未达标落库且不误计合格；时间模式未改；v513轮边界预算已收口，非硬实时 |
+ | 3. 失败原因驱动，而非统一换seed | S2 nearMiss + S3 分类诊断 | 已分结构/远近压力/释放；P7结构后修20次0转化否决；容量臂归一化根因已修；释放修复仍未完成 |
+ | 4. 关键车小容量精调与局部预算 | S1/S2 `capacity-tuner.js` | ±1px转化和同预算对照已完成；v514修复容量臂归一化上限不一致；仍非所有seed必达 |
+@@ -174,3 +174,11 @@
+ - 5组对照目标4/5→4/5、结构5/5→5/5；4个成功样本哈希不变，总时-0.3%。006失败best distance 44.4→21.4，仍未达。
+ - 真实UI批次15：006体验pass，007未达，合格1/2且均落库COMPLETED；不宣称全seed泛化。
+ - 后续优先：扩独立图/seed，分析释放unknown与PlayerSim 0%的口径，目标化障碍仍需单独实验，不能把当前成功当全部七点完成。
++
++## 21. v516：独立回归与替代路线验收
++
++- 五图两seed目标4/10、结构8/10；ready 3/4、review 1/6。预检有区分度但不能当通过保证。
++- 好图1002参考unknown、beam路线73.7%+release found+回放有效；最终验收允许此类已验证替代路线，保存signature，容量/结构仍硬门。
++- 非替代通过不标acceptedByVerifiedRoute；其他release unknown不自动放行。
++- 单图UI失控记STOPPED；双worker稳定。直接多路线ringMaskOf异常为稳定性遗留。
++- 下一步：预检review短探针/策略分派；推荐图49%但结构失败的容量精调；PlayerSim偏黑与真人校准。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index d3ab614..fc8b13c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v515 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=515">
++  <title>车接小人 v516 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=516">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v515</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v516</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,27 +773,27 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=515"></script>
+-  <script src="js/utils.js?v=515"></script>
++  <script src="js/zip.js?v=516"></script>
++  <script src="js/utils.js?v=516"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=515"></script>
+-  <script src="js/simulator.js?v=515"></script>
++  <script src="js/color-libs.js?v=516"></script>
++  <script src="js/simulator.js?v=516"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=515"></script>
+-  <script src="js/solver-strategy.js?v=515"></script>
+-  <script src="js/solver.js?v=515"></script>
+-  <script src="js/playersim.js?v=515"></script>
++  <script src="js/anchor-cut.js?v=516"></script>
++  <script src="js/solver-strategy.js?v=516"></script>
++  <script src="js/solver.js?v=516"></script>
++  <script src="js/playersim.js?v=516"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=515"></script>
+-  <script src="js/car-sequencer.js?v=515"></script>
+-  <script src="js/experience-goal.js?v=515"></script>
+-  <script src="js/capacity-tuner.js?v=515"></script>
+-  <script src="js/generator.js?v=515"></script>
+-  <script src="js/source-preflight.js?v=515"></script>
+-  <script src="js/analysis.js?v=515"></script>
++  <script src="js/solver-analysis.js?v=516"></script>
++  <script src="js/car-sequencer.js?v=516"></script>
++  <script src="js/experience-goal.js?v=516"></script>
++  <script src="js/capacity-tuner.js?v=516"></script>
++  <script src="js/generator.js?v=516"></script>
++  <script src="js/source-preflight.js?v=516"></script>
++  <script src="js/analysis.js?v=516"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=515"></script>
+-  <script src="js/app.js?v=515"></script>
++  <script src="js/level-editor.js?v=516"></script>
++  <script src="js/app.js?v=516"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 3acdbb7..b196e79 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -6292,10 +6292,20 @@ AntSolver.App = (function() {
+       debtEvidence: result.debtEvidence || null,
+       timelineEvidence: result.timelineEvidence || null,
+       experienceGoal: !!(result.config && result.config.experienceGoal),
+-      experienceEvidence: result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
+-        reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
+-        diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
+-        releaseDecision: result._experienceFull.releaseDecision } : null,
++      experienceEvidence: (function () {
++        var rt = result.experienceRouteEvidence, rb = rt && rt.bestVerified;
++        if (result.acceptedByVerifiedRoute && rt && rt.pass === true && rb && rb.releaseDecision && rb.releaseDecision.status === 'found' &&
++            rb.releaseDecision.evidence && rb.releaseDecision.evidence.finalReplayValid === true) {
++          return { pass: true, status: 'pass', reasons: [], metrics: rb.metrics, releaseDecision: rb.releaseDecision,
++            source: 'verified_alternate_route', routeSource: rb.source, signature: rb.signature || null,
++            diagnosis: { primary: 'pass', action: 'done', flags: [] } };
++        }
++        return result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
++          reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
++          diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
++          releaseDecision: result._experienceFull.releaseDecision } : null;
++      })(),
++      acceptedByVerifiedRoute: !!result.acceptedByVerifiedRoute,
+       sourcePreflight: sourcePreflight,
+       experienceRouteEvidence: result.experienceRouteEvidence || null,
+       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
+@@ -6442,6 +6452,7 @@ AntSolver.App = (function() {
+       sourcePreflight: rec.sourcePreflight || null,
+       goalMode: !!rec.goalMode, experienceGoal: !!rec.experienceGoal,
+       goalStopReason: rec.goalStopReason || null, goalTargetMiss: !!rec.goalTargetMiss,
++      acceptedByVerifiedRoute: !!rec.acceptedByVerifiedRoute,
+       experienceEvidence: rec.experienceEvidence || null,
+       experienceRouteEvidence: rec.experienceRouteEvidence || null,
+       capacityTune: rec.capacityTune || null,
+@@ -7392,6 +7403,7 @@ AntSolver.App = (function() {
+       best.goalStopReason = why || null;
+       best.goalElapsedMs = Date.now() - t0;
+       if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, baseCfg); } catch (e) {} }
++      try { AntSolver.Generator.markVerifiedRouteAccept(best, baseCfg); } catch (e) {}
+       best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: per,
+         sharedCapBudget: baseCfg.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
+         searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - t0,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index 3cf54ef..f8af0ee 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -78,6 +78,7 @@ function _goalFinish(stopReason) {
+   }
+   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
+   if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
++  try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
+   best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: g.maxMs, perRoundMs: g.perMs,
+     sharedCapBudget: g.config.goalSharedBudget !== false, rounds: g.rounds, stopReason: best.goalStopReason || null,
+     searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - g.t0,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 65fbf3d..e5c594b 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14797,6 +14797,25 @@ AntSolver.Generator = (function() {
+   function goalAcceptPass(cand, config) {
+     return config && config.experienceGoal === true ? goalExperiencePass(cand, config) : goalStructPass(cand);
+   }
++  function verifiedRouteAccept(cand) {
++    var rt = cand && cand.experienceRouteEvidence, best = rt && rt.bestVerified, rd = best && best.releaseDecision;
++    return !!(rt && rt.pass === true && best && best.metrics && rd && rd.status === 'found' &&
++      rd.evidence && rd.evidence.finalReplayValid === true);
++  }
++  /** v516：只接受最终报告中已完整验证的替代路线；unknown/searchLimited绝不自动算通过。 */
++  function goalResultExperiencePass(cand, config) {
++    if (!cand || !cand.level || !cand.valid || !goalStructPass(cand) || !experienceCapacityOk(cand, config)) return false;
++    if (config && config.experienceGoal === false) return goalStructPass(cand);
++    if (goalExperiencePass(cand, config)) return true;
++    return verifiedRouteAccept(cand);
++  }
++  function markVerifiedRouteAccept(cand, config) {
++    if (!cand || !verifiedRouteAccept(cand) || !goalStructPass(cand) || !experienceCapacityOk(cand, config)) return false;
++    if (goalExperiencePass(cand, config)) return false; // 参考路线本身已过，不冒充“替代路线救回”
++    if (cand.goalStopReason !== 'pass') cand.goalStopReason = 'pass_verified_route';
++    cand.acceptedByVerifiedRoute = true;
++    return true;
++  }
+ 
+   /** 【v515】有效/结构门优先，完整体验距离其次，原结构portfolio最后；与通过判定共享完整评价缓存。 */
+   function goalCandidateBetter(cand, reference, config) {
+@@ -14881,6 +14900,7 @@ AntSolver.Generator = (function() {
+         routeCount: r.routeCount, multi: r.multi, routeDistribution: r.routeDistribution,
+         bestVerified: best ? { source: best.source,
+           metrics: best.full ? best.full.metrics : best.quick.metrics,
++          signature: best.signature || null,
+           releaseDecision: best.full ? best.full.releaseDecision : null } : null,
+         searchLimited: true, isProvenGlobalBest: false, elapsedMs: Date.now() - t0 };
+     } catch (e) { cand.experienceRouteEvidence = { schema: 'goal-route-evidence-v1', pass: null,
+@@ -14947,6 +14967,7 @@ AntSolver.Generator = (function() {
+       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
+     }
+     if (best && best.level) attachExperienceRouteEvidence(best, config);
++    if (best) markVerifiedRouteAccept(best, config);
+     if (best) best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: perMs,
+       sharedCapBudget: config.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
+       searchElapsedMs: best.goalElapsedMs, wallElapsedMs: Date.now() - t0,
+@@ -16738,7 +16759,7 @@ AntSolver.Generator = (function() {
+     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
+     isCurveScore: isCurveScore,
+     choiceCurveScore: choiceCurveScore,
+-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
++    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+     exposedBlobByColor: exposedBlobByColor,
+     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
+     sampleCarCount: sampleCarCount,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+index e1c9bdc..28c6b8d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+@@ -417,6 +417,7 @@ function persistResult(b, payload) {
+     时间线证据: rec.timelineEvidence || null,
+     目标图预检: rec.sourcePreflight || null,
+     体验目标: rec.experienceEvidence || null,
++    替代路线验收: !!rec.acceptedByVerifiedRoute,
+     路线分岔证据: rec.experienceRouteEvidence || null,
+     容量精调: rec.capacityTune || null,
+     容量审计: rec.capacityAudit || null,
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 2bdabef..19f7258 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -42,15 +42,17 @@
+ | v514 P7结构后修 | 现有P7部件能否修真实结构失败 | ❌ 5失败基底20次0结构转化/0目标通过；否决默认接入 | `结构修复部件对照.js` + `结构修复部件汇总_v514.json` | §504 |
+ | v514 容量臂归一化 | boxMax与capNormMax不同步是否制造小车 | ✅ 同步后5组目标1/5→4/5、总时-50.3%；真实UI006/007约50s双达标 | `目标容量臂预算对照.js` + `容量臂归一化_汇总_v514.json` | §504 |
+ | v515 完整体验选优 | best能否按真实目标而非结构启发式选择 | quick-only否决；full后5组通过无回退、4组hash不变，006失败distance 44.4→21.4；UI 1/2 | `体验选优_汇总_v515.json` | §505 |
++| v516 独立图/seed | 当前生成器能否泛化到五图与困难seed | 目标4/10；ready 3/4、review 1/6；所有目标通过样本仍有PlayerSim 0%项 | `目标独立回归.js` + `独立图种子汇总_v516.json` | §506 |
++| v516 替代路线验收 | 参考unknown但另一路线完整达标是否被误杀 | 好图1002由beam 73.7%+释放回放验收，保存signature；不放宽其他unknown | `多路线最终验收_预登记_v516.md` + `好图1002_替代路线验收_v516.json` | §506 |
+ 
+ ## 当前权威产物
+ 
+ | 用途 | 文件 |
+ |---|---|
+ | 生产现状 | `01_交接文档/交接摘要_v500_20261025.md` |
+-| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（体验选优已接，下一项独立图/释放与真人校准） |
++| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（独立回归已做，下一项预检策略/结构近失/真人校准） |
+ | 手册/参数 | `01_交接文档/工程说明.md` |
+ | 历史决策 | `01_交接文档/工作日志_20261012.md`（按节号查） |
+ | 结论摘要 | 本目录 `归因_v495.md`、`E5_结果.md`、`E6a_结果.md`、`E6b_结果.md`、`E6c_*.md`、`P4_枚举.md` |
+-| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v515.patch` |
++| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v516.patch` |
+ | 历史版本 | `git log --oneline`（删除项都在 git 历史里） |
+diff --git a/README.md b/README.md
+index 28537d4..925868a 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v515**（完整体验距离选优与多轮最佳候选）。
++> 当前版本 **v516**（独立图回归与已验证替代路线验收）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看框架图** | [`01_交接文档/框架图_生成流程_动画版.html`](01_交接文档/框架图_生成流程_动画版.html)（五阶段播放 + 详细流程图） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施（v502~v515）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施（v502~v516）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **查某天为什么这么改** | [`01_交接文档/工作日志_20261012.md`](01_交接文档/工作日志_20261012.md)（401 节，**按主题索引查，别整份读**） |

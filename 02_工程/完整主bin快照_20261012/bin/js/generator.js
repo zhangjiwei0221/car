@@ -14797,6 +14797,25 @@ AntSolver.Generator = (function() {
   function goalAcceptPass(cand, config) {
     return config && config.experienceGoal === true ? goalExperiencePass(cand, config) : goalStructPass(cand);
   }
+  function verifiedRouteAccept(cand) {
+    var rt = cand && cand.experienceRouteEvidence, best = rt && rt.bestVerified, rd = best && best.releaseDecision;
+    return !!(rt && rt.pass === true && best && best.metrics && rd && rd.status === 'found' &&
+      rd.evidence && rd.evidence.finalReplayValid === true);
+  }
+  /** v516：只接受最终报告中已完整验证的替代路线；unknown/searchLimited绝不自动算通过。 */
+  function goalResultExperiencePass(cand, config) {
+    if (!cand || !cand.level || !cand.valid || !goalStructPass(cand) || !experienceCapacityOk(cand, config)) return false;
+    if (config && config.experienceGoal === false) return goalStructPass(cand);
+    if (goalExperiencePass(cand, config)) return true;
+    return verifiedRouteAccept(cand);
+  }
+  function markVerifiedRouteAccept(cand, config) {
+    if (!cand || !verifiedRouteAccept(cand) || !goalStructPass(cand) || !experienceCapacityOk(cand, config)) return false;
+    if (goalExperiencePass(cand, config)) return false; // 参考路线本身已过，不冒充“替代路线救回”
+    if (cand.goalStopReason !== 'pass') cand.goalStopReason = 'pass_verified_route';
+    cand.acceptedByVerifiedRoute = true;
+    return true;
+  }
 
   /** 【v515】有效/结构门优先，完整体验距离其次，原结构portfolio最后；与通过判定共享完整评价缓存。 */
   function goalCandidateBetter(cand, reference, config) {
@@ -14881,6 +14900,7 @@ AntSolver.Generator = (function() {
         routeCount: r.routeCount, multi: r.multi, routeDistribution: r.routeDistribution,
         bestVerified: best ? { source: best.source,
           metrics: best.full ? best.full.metrics : best.quick.metrics,
+          signature: best.signature || null,
           releaseDecision: best.full ? best.full.releaseDecision : null } : null,
         searchLimited: true, isProvenGlobalBest: false, elapsedMs: Date.now() - t0 };
     } catch (e) { cand.experienceRouteEvidence = { schema: 'goal-route-evidence-v1', pass: null,
@@ -14947,6 +14967,7 @@ AntSolver.Generator = (function() {
       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
     }
     if (best && best.level) attachExperienceRouteEvidence(best, config);
+    if (best) markVerifiedRouteAccept(best, config);
     if (best) best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: perMs,
       sharedCapBudget: config.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
       searchElapsedMs: best.goalElapsedMs, wallElapsedMs: Date.now() - t0,
@@ -16738,7 +16759,7 @@ AntSolver.Generator = (function() {
     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
     isCurveScore: isCurveScore,
     choiceCurveScore: choiceCurveScore,
-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
     exposedBlobByColor: exposedBlobByColor,
     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
     sampleCarCount: sampleCarCount,
