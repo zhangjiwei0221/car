@@ -82,8 +82,17 @@ function loadImage(img) {
   return { blocks, band, bandLo: bandArr[0], bandHi: bandArr[1], cutMode, frontierAvg: avg };
 }
 
+const ROW0_FREE_MAX = (function () {
+  const i = process.argv.indexOf('--row0-free-max');
+  return i > 0 ? parseInt(process.argv[i + 1], 10) : null;
+})();
+const ROW0_FREE_ICE = (function () {
+  const i = process.argv.indexOf('--row0-free-ice');
+  return i > 0 ? parseInt(process.argv[i + 1], 10) : 0;
+})();
+
 function configOf(env, flow, seed) {
-  return {
+  const cfg = {
     seed: seed,
     generatorFlow: flow,
     boxSizeMin: env.bandLo, boxSizeMax: env.bandHi,
@@ -93,6 +102,9 @@ function configOf(env, flow, seed) {
     targetSteadyMin: 0, targetSteadyMax: 100,
     targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0.25
   };
+  // D1 实验开关：不传 --row0-free-max 时与 v495 完全一致（不接 limitRow0Free）
+  if (ROW0_FREE_MAX != null) { cfg.row0FreeMax = ROW0_FREE_MAX; cfg.row0FreeIce = ROW0_FREE_ICE; }
+  return cfg;
 }
 
 function recordOf(env, img, flow, seed, r, ms) {
