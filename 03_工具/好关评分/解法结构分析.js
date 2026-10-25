@@ -21,7 +21,7 @@ const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
 const level = raw.spools ? sandbox.AntSolver.fromGameFormat(raw) : raw;
 const report = sandbox.AntSolver.SolverAnalysis.analyze(level, {
   timeBudgetMs: opt('time', 2500), maxNodes: opt('nodes', 4000), beamWidth: opt('width', 16),
-  maxRoutes: opt('routes', 6), maxDecisionPoints: opt('decisions', 4),
+  maxRoutes: opt('routes', 6), branchWidth: opt('branch', 8), maxDecisionPoints: opt('decisions', 4),
   maxAlternatives: opt('alternatives', 2), timePerAlternativeMs: opt('alt-time', 600),
   maxNodesPerAlternative: opt('alt-nodes', 1200)
 });
@@ -35,4 +35,5 @@ console.log(JSON.stringify({ file, out: out || null, elapsedMs: report.elapsedMs
   baseline: report.baseline && { completed: report.baseline.completed, replayValid: report.baseline.replayValid, maxBuffer: report.baseline.maxBuffer },
   multi: { status: report.multi.status, routes: report.multi.routes.length, distinctRoutes: report.multi.distinctRoutes,
     replayValid: report.multi.routes.filter(r => r.replayValid).length, nodes: report.multi.nodes, elapsedMs: report.multi.elapsedMs },
+  bestKnown: report.bestKnown,
   counterfactual: { decisions: report.counterfactual.decisions.length, alternatives: alts, solved, dead } }, null, 2));

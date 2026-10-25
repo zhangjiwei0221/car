@@ -274,11 +274,37 @@ AntSolver.SolverAnalysis = (function () {
       baseline = { completed: !!sr.completed, retryRound: sr.retryRound, replayValid: !!br.completed,
         steps: br.steps, maxBuffer: br.maxBuffer, avgBuffer: br.avgBuffer, pickOrder: sr.pickOrder || [] };
     }
-    var multi = findRoutes(lv, opts), chosen = multi.routes.length ? multi.routes[0] : (baseline && baseline.replayValid ? baseline : null);
+    var multi = findRoutes(lv, opts);
+    // v484：beam 单档最低峰值可能高于旧 Solver，必须合并所有已验证路线再选 bestKnown。
+    var verifiedRoutes = [], seenRoutes = {};
+    function addRoute(route, source, replayed) {
+      if (!route) return;
+      var actions = normalizeActions(route);
+      if (!actions.length) return;
+      var sig = actions.map(function (a) { return a.r + ',' + a.c; }).join(' ');
+      if (seenRoutes[sig]) return;
+      seenRoutes[sig] = true;
+      verifiedRoutes.push({ source: source, actions: actions, steps: actions.length,
+        maxBuffer: route.maxBuffer, avgBuffer: route.avgBuffer,
+        replayValid: source === 'baseline' ? !!(replayed && replayed.completed) : !!route.replayValid,
+        signature: sig });
+    }
+    if (baseline && baseline.replayValid) addRoute(baseline, 'baseline', br);
+    for (var ri = 0; ri < multi.routes.length; ri++) addRoute(multi.routes[ri], 'beam');
+    verifiedRoutes = verifiedRoutes.filter(function (r) { return r.replayValid && r.maxBuffer != null; });
+    verifiedRoutes.sort(function (a, b) {
+      if (a.maxBuffer !== b.maxBuffer) return a.maxBuffer - b.maxBuffer;
+      if (a.steps !== b.steps) return a.steps - b.steps;
+      return a.source === 'baseline' ? -1 : 1;
+    });
+    var chosen = verifiedRoutes.length ? verifiedRoutes[0] : null;
+    var bestKnown = chosen ? { maxBuffer: chosen.maxBuffer, source: chosen.source,
+      verifiedRoutes: verifiedRoutes.length, isProvenMinimum: false } : null;
     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
-    return { schema: 'solver-analysis-v1', baseline: baseline, multi: multi, counterfactual: cf,
-      elapsedMs: Date.now() - t,
-      note: '只读有界搜索；未找到不等于无解，dead 仅用于可直接确认的死局。' };
+    return { schema: 'solver-analysis-v2', baseline: baseline, multi: multi,
+      verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
+      counterfactual: cf, elapsedMs: Date.now() - t,
+      note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
   }
 
   return { analyze: analyze, findRoutes: findRoutes, counterfactual: counterfactual,
