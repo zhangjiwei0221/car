@@ -1,0 +1,792 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 88d5e2a..de3cdaa 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -19528,3 +19528,38 @@ v502的2/4转化只证明存在成功案例；纯换seed本身也可能找到目
+ 2. 释放仍是参考路线动作，choiceContrast未完成；多路线与真人校准未做。
+ 3. 独立007两臂共同失败，下一步进入S3失败分类，不继续增加局部容量预算。
+ 4. 总预算是轮间控制，单轮不可瞬时中断，实际可略超；UI硬实时与批量性能仍需实测。
++
++### 495. 【2026-10-26】v504：S3失败分类落地，007不是单一根因
++
++#### 495.1 问题（原话）
++
++```
++根据我们刚才的计划清单，不断靠近目标。遇到边界以及卡住的地方要记录。
++```
++
++S2后需要知道未达标分别该局部精调、换基底还是修释放/结构，不能所有失败都继续加容量预算。
++
++#### 495.2 证据
++
++- 两轮A/B含同seed重复观察，必须先按 image+seed+round 去重：15条失败观察对应10个唯一失败基底。
++- 去重后：近压力不足3、远压力不足5、显著释放缺失1、结构门失败1；顶格4、临界连续1。
++- 007三轮分别近32%（精调未中）、结构门失败、远10%；不是同一个问题。010另有35.7%但显著释放0，和单纯压力不足不同。
++
++#### 495.3 改动
++
++- `ExperienceGoal.diagnose` 输出 primary/action/flags：近→tune_capacity，远→regenerate_base，缺释放→repair_release_supply，结构失败→repair_structure，释放未知→增加证据预算。
++- 顶格、临界连续、末段风险独立记录，不把“3/4低”与“5槽过多”混为一谈。
++- `capacityTune` 和UI/JSONL体验证据附诊断；新增 `目标失败归因.js` 与去重报告。
++- 版本升v504。当前只把已有近/远/结构分流显式化，未实现偿还供给专项变体，未改默认生成结果。
++
++#### 495.4 验证（改前后数字）
++
++- 归因报告：uniqueFailedBases=10；tune_capacity3、regenerate_base5、repair_release_supply1、repair_structure1。
++- 007：near/structure/far各1，证明“共同失败”不能归成单一容量问题。
++- 快速回归：旧目标010仍返回原关，新目标仍13变体+1px达标；语法检查通过。
++
++#### 495.5 遗留
++
++1. `repair_release_supply` 目前只是诊断路由，尚未有专门修复器；下一步需针对“压力接近但显著释放0”做车序/解锁供给实验。
++2. 诊断基于一条参考路线，末段风险不是自动判死，顶格也不必然等于坏关。
++3. 失败样本仍小，需每轮持续累积，不把分类比例当全图分布。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 939fa54..976d001 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v503 目标模式体验精调）　|　当前版本：**v503**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v504 目标失败诊断）　|　当前版本：**v504**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~492。默认生产仍未开启 experienceGoal。**
+ >
+@@ -1080,3 +1080,11 @@ M0 固定基准 + 统一评价与候选口径
+ - 单关默认总预算5分钟；UI使用当前“每图搜索时间”作为目标总预算，显式 `goalMaxMs=0` 才不限时。预算/轮数到点输出当前最好并记录 `goalStopReason`，不再把未达标写成达标。
+ - UI结果与生产JSONL增加中段3/4、释放、容量精调命中/未中及停止原因。默认旧目标回归010 hash保持 `ef88…66d`，新目标同基底+1px得 `78a8…afb5`。
+ - 仍属初版目标策略：释放为参考路线证据，非完整选择对比；45s是轮间控制预算，整轮收尾实际约51s，不能当硬实时保证。
++
++
++### 17.31 v504：目标失败诊断与修复路由
++
++- `ExperienceGoal.diagnose` 将失败分为：结构门失败、远压力不足（低于目标20pp以上）、近压力不足、显著释放缺失、释放决策缺失/未知；顶格、临界连续与末段风险单独作 flags，不混成单一原因。
++- 修复路由：近压力不足→小容量；远压力不足→换基底；释放曲线缺失→偿还供给；结构失败→修结构；释放未知→增加证据预算。当前只自动执行已有的近/远/结构分流，偿还供给专项修复尚未实现。
++- 两轮A/B去重后10个失败基底：近3、远5、释放曲线缺失1、结构失败1。007三轮分别为近/结构/远，不是同一根因。
++- 新 `目标失败归因.js` 和报告；`capacityTune` 附 diagnosis。默认目标/时间生成逻辑不变，仅诊断与报告增加。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 2c7b703..da74cee 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -91,3 +91,10 @@
+ - 结论：局部精调在部分近目标关显著省时，但不是普遍加速；默认开启的代价是其他关增加小幅评价开销。
+ - v503目标模式默认启用体验门和局部精调，复选框可回旧目标；时间模式不变。单关默认总预算5分钟/UI每图搜索时间，显式0才不限时。
+ - 下一步S3：扩展失败诊断（远失败、无释放、顶格、末段强堵），并研究共同失败的007，而不是继续加局部容量预算。
++
++
++## 10. S3 起步：失败分类（v504）
++
++- 已把结构失败、远/近压力不足、显著释放缺失、释放未知分开；顶格和末段作为独立风险。
++- 10个去重失败基底：近3、远5、释放曲线缺失1、结构失败1。007不是单根因。
++- 当前控制器已有近→局部、远→换基底、结构→不精调；下一步专做 `repair_release_supply`，不再让释放缺失只依赖容量碰巧修复。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index a393b21..3e1af05 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,8 +6,8 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v503 · 目标模式体验精调</title>
+-  <link rel="stylesheet" href="css/style.css?v=503">
++  <title>车接小人 v504 · 目标失败诊断</title>
++  <link rel="stylesheet" href="css/style.css?v=504">
+ </head>
+ <body>
+   <header>
+@@ -773,26 +773,26 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=503"></script>
+-  <script src="js/utils.js?v=503"></script>
++  <script src="js/zip.js?v=504"></script>
++  <script src="js/utils.js?v=504"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=503"></script>
+-  <script src="js/simulator.js?v=503"></script>
++  <script src="js/color-libs.js?v=504"></script>
++  <script src="js/simulator.js?v=504"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=503"></script>
+-  <script src="js/solver-strategy.js?v=503"></script>
+-  <script src="js/solver.js?v=503"></script>
+-  <script src="js/playersim.js?v=503"></script>
++  <script src="js/anchor-cut.js?v=504"></script>
++  <script src="js/solver-strategy.js?v=504"></script>
++  <script src="js/solver.js?v=504"></script>
++  <script src="js/playersim.js?v=504"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=503"></script>
+-  <script src="js/car-sequencer.js?v=503"></script>
+-  <script src="js/experience-goal.js?v=503"></script>
+-  <script src="js/capacity-tuner.js?v=503"></script>
+-  <script src="js/generator.js?v=503"></script>
+-  <script src="js/analysis.js?v=503"></script>
++  <script src="js/solver-analysis.js?v=504"></script>
++  <script src="js/car-sequencer.js?v=504"></script>
++  <script src="js/experience-goal.js?v=504"></script>
++  <script src="js/capacity-tuner.js?v=504"></script>
++  <script src="js/generator.js?v=504"></script>
++  <script src="js/analysis.js?v=504"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=503"></script>
+-  <script src="js/app.js?v=503"></script>
++  <script src="js/level-editor.js?v=504"></script>
++  <script src="js/app.js?v=504"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 42ea9d7..3dd9e0d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -6262,6 +6262,7 @@ AntSolver.App = (function() {
+       experienceGoal: !!(result.config && result.config.experienceGoal),
+       experienceEvidence: result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
+         reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
++        diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
+         releaseDecision: result._experienceFull.releaseDecision } : null,
+       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
+         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/experience-goal.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/experience-goal.js"
+index d31d62f..22dd8c7 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/experience-goal.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/experience-goal.js"
+@@ -131,5 +131,25 @@ AntSolver.ExperienceGoal = (function () {
+       nearMiss: !!replayed.completed && (curve.midBuffer34Pct || 0) >= Math.max(0, o.minBuffer34Pct - 20),
+       elapsedMs: Date.now() - t0 };
+   }
+-  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, curveFromTrace: curveFromTrace };
++  function diagnose(ev, structuralPass) {
++    if (!ev || ev.status === 'no_verified_solution') return { primary: 'no_verified_solution', action: 'repair_structure', flags: [] };
++    var m = ev.metrics || {}, flags = [], target = ev.target && ev.target.minBuffer34Pct != null ? ev.target.minBuffer34Pct : 50;
++    if (m.maxBuffer >= 5 || (m.midBuffer5Pct || 0) > 0) flags.push('top_pressure');
++    if ((m.lateHighPressurePct || 0) >= 50) flags.push('late_pressure_risk');
++    if ((m.maxBuffer5Run || 0) >= 2) flags.push('critical_run');
++    var releaseStatus = ev.releaseDecision && ev.releaseDecision.status;
++    var out = { primary: null, action: null, flags: flags,
++      pressureDeficit: Math.max(0, target - (m.midBuffer34Pct || 0)),
++      releaseCurveMissing: (m.significantReleaseCount || 0) < 1,
++      releaseDecisionStatus: releaseStatus || 'not_evaluated' };
++    if (structuralPass === false) { out.primary = 'structure_gate_failed'; out.action = 'repair_structure'; }
++    else if ((m.midBuffer34Pct || 0) < Math.max(0, target - 20)) { out.primary = 'far_pressure_deficit'; out.action = 'regenerate_base'; }
++    else if (out.releaseCurveMissing) { out.primary = 'release_curve_missing'; out.action = 'repair_release_supply'; }
++    else if ((m.midBuffer34Pct || 0) < target) { out.primary = 'near_pressure_deficit'; out.action = 'tune_capacity'; }
++    else if (releaseStatus === 'unknown_within_budget') { out.primary = 'release_unknown'; out.action = 'increase_release_budget'; }
++    else if (releaseStatus !== 'found') { out.primary = 'release_decision_missing'; out.action = 'repair_release_choice'; }
++    else { out.primary = ev.pass ? 'pass' : 'inspect_remaining_target'; out.action = ev.pass ? 'done' : 'inspect_target'; }
++    return out;
++  }
++  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, curveFromTrace: curveFromTrace, diagnose: diagnose };
+ })();
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 45bd955..94f2794 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -14779,6 +14779,7 @@ AntSolver.Generator = (function() {
+       solveResult: cand.solveResult, decision: !!decision,
+       bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain)
+     }));
++    ev.diagnosis = AntSolver.ExperienceGoal.diagnose(ev, goalStructPass(cand));
+     cand[cacheKey] = ev; return ev;
+   }
+   function experienceCapacityOk(cand, config) {
+@@ -14805,6 +14806,7 @@ AntSolver.Generator = (function() {
+     if (goalExperiencePass(cand, config)) { report.skipped = 'already_pass'; cand.capacityTune = report; return cand; }
+     if (!goalStructPass(cand)) { report.skipped = 'structure_gate_failed'; cand.capacityTune = report; return cand; }
+     var baseEv = experienceEvalOfCand(cand, config, false);
++    report.diagnosis = baseEv && baseEv.diagnosis || null;
+     if (!baseEv || !baseEv.nearMiss) { report.skipped = 'far_from_target'; cand.capacityTune = report; return cand; }
+     var cfg = cand.config || config || {}, ca = cand.capacityAudit || {};
+     var capMin = ca.boxSizeMin || cfg._userCapMin || cfg.boxSizeMin || (config && config._userCapMin) || (config && config.boxSizeMin);
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 1a9c477..a5362eb 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -30,6 +30,7 @@
+ | 小图复测 | 019 还能产吗 | ✅ 6×6、3/3 过、黑块 36% | `产线对比.js` | §483 |
+ | v502 目标体验+容量精调 | ±几px能否低成本命中暂存3/4目标 | ✅ 未达标4关中转化2关，均±1px且过结构/守恒/回放；默认6/6 hash不变；未默认投产 | `目标体验与容量精调.js` | §491~492 |
+ | v503 同预算目标搜索 | 局部精调是否比纯换seed省时 | ✅ 5/6 vs 4/6、总时-20.9%，收益主要1例；独立007共同失败；目标模式接入、时间模式不变 | `目标搜索同预算对照.js` | §493~494 |
++| v504 目标失败诊断 | 失败是否同一原因 | 去重10基底：近3/远5/缺释放1/结构1；007三类都有，不能统一加容量预算 | `目标失败归因.js` | §495 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\244\261\350\264\245\345\275\222\345\233\240.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\244\261\350\264\245\345\275\222\345\233\240.js"
+new file mode 100755
+index 0000000..ee35f20
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\244\261\350\264\245\345\275\222\345\233\240.js"
+@@ -0,0 +1,21 @@
++#!/usr/bin/env node
++/** v504：读取目标搜索A/B JSON，按结构/远近/释放/顶格/末段分类，不重跑生成。 */
++'use strict';
++const fs=require('fs'),path=require('path'),vm=require('vm');
++const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
++const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js'];
++const sb={console:{log(){},warn(){},error(){}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
++const args=process.argv.slice(2),oi=args.indexOf('--out'),outFile=oi>=0?args[oi+1]:'';
++const inputs=args.filter((x,i)=>!x.startsWith('--')&&(i===0||args[i-1]!=='--out'));if(!inputs.length)throw new Error('需要目标搜索JSON');
++const rows=[];
++for(const input of inputs){const report=JSON.parse(fs.readFileSync(input,'utf8'));for(const run of report.rows||[])for(const q of run.rounds||[]){if(q.pass)continue;
++ const ev={pass:false,metrics:q.after||{},releaseDecision:{status:q.release||'not_evaluated'},target:{minBuffer34Pct:50}};
++ const diagnosis=A.ExperienceGoal.diagnose(ev,q.struct);rows.push({image:run.image,mode:run.mode,seed:q.seed,round:q.round,struct:q.struct,metrics:q.after,release:q.release,tune:q.tune,diagnosis});
++}}
++const uniqueMap={};for(const r of rows){const k=r.image+'/'+r.seed+'/r'+r.round;if(!uniqueMap[k])uniqueMap[k]=r;}
++const unique=Object.keys(uniqueMap).map(k=>uniqueMap[k]);
++function counts(key){const out={};for(const r of unique){const k=r.diagnosis[key];out[k]=(out[k]||0)+1;}return out;}
++const flags={};for(const r of unique)for(const f of r.diagnosis.flags)flags[f]=(flags[f]||0)+1;
++const byImage={};for(const r of unique){const x=byImage[r.image]||(byImage[r.image]={failedBases:0,primary:{},actions:{}});x.failedBases++;x.primary[r.diagnosis.primary]=(x.primary[r.diagnosis.primary]||0)+1;x.actions[r.diagnosis.action]=(x.actions[r.diagnosis.action]||0)+1;}
++const report={schema:'experience-failure-diagnosis-v1',summary:{failedRoundObservations:rows.length,uniqueFailedBases:unique.length,primary:counts('primary'),actions:counts('action'),flags,byImage},rows,uniqueKeys:Object.keys(uniqueMap)};
++if(outFile)fs.writeFileSync(outFile,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report.summary,null,2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\244\261\350\264\245\345\275\222\345\233\240_v504.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\244\261\350\264\245\345\275\222\345\233\240_v504.json"
+new file mode 100644
+index 0000000..42bd822
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\233\256\346\240\207\345\244\261\350\264\245\345\275\222\345\233\240_v504.json"
+@@ -0,0 +1,530 @@
++{
++  "schema": "experience-failure-diagnosis-v1",
++  "summary": {
++    "failedRoundObservations": 15,
++    "uniqueFailedBases": 10,
++    "primary": {
++      "near_pressure_deficit": 3,
++      "far_pressure_deficit": 5,
++      "release_curve_missing": 1,
++      "structure_gate_failed": 1
++    },
++    "actions": {
++      "tune_capacity": 3,
++      "regenerate_base": 5,
++      "repair_release_supply": 1,
++      "repair_structure": 1
++    },
++    "flags": {
++      "top_pressure": 4,
++      "critical_run": 1
++    },
++    "byImage": {
++      "010": {
++        "failedBases": 6,
++        "primary": {
++          "near_pressure_deficit": 1,
++          "far_pressure_deficit": 4,
++          "release_curve_missing": 1
++        },
++        "actions": {
++          "tune_capacity": 1,
++          "regenerate_base": 4,
++          "repair_release_supply": 1
++        }
++      },
++      "006": {
++        "failedBases": 1,
++        "primary": {
++          "near_pressure_deficit": 1
++        },
++        "actions": {
++          "tune_capacity": 1
++        }
++      },
++      "007": {
++        "failedBases": 3,
++        "primary": {
++          "near_pressure_deficit": 1,
++          "structure_gate_failed": 1,
++          "far_pressure_deficit": 1
++        },
++        "actions": {
++          "tune_capacity": 1,
++          "repair_structure": 1,
++          "regenerate_base": 1
++        }
++      }
++    }
++  },
++  "rows": [
++    {
++      "image": "010",
++      "mode": "seed",
++      "seed": 1001,
++      "round": 1,
++      "struct": true,
++      "metrics": {
++        "midSteps": 13,
++        "midBuffer34Pct": 46.2,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 2,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 3.8
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "near_pressure_deficit",
++        "action": "tune_capacity",
++        "flags": [],
++        "pressureDeficit": 3.799999999999997,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "010",
++      "mode": "seed",
++      "seed": 8920,
++      "round": 2,
++      "struct": true,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 21.4,
++        "midBuffer5Pct": 7.1,
++        "maxBuffer5Run": 1,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 5,
++        "distance": 28.6
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "far_pressure_deficit",
++        "action": "regenerate_base",
++        "flags": [
++          "top_pressure"
++        ],
++        "pressureDeficit": 28.6,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "010",
++      "mode": "seed",
++      "seed": 16839,
++      "round": 3,
++      "struct": true,
++      "metrics": {
++        "midSteps": 15,
++        "midBuffer34Pct": 6.7,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 2,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 3,
++        "distance": 43.3
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "far_pressure_deficit",
++        "action": "regenerate_base",
++        "flags": [],
++        "pressureDeficit": 43.3,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "010",
++      "mode": "seed",
++      "seed": 24758,
++      "round": 4,
++      "struct": true,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 14.3,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 3,
++        "oscillationCount": 3,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 35.7
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "far_pressure_deficit",
++        "action": "regenerate_base",
++        "flags": [],
++        "pressureDeficit": 35.7,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "010",
++      "mode": "seed",
++      "seed": 32677,
++      "round": 5,
++      "struct": true,
++      "metrics": {
++        "midSteps": 14,
++        "midBuffer34Pct": 35.7,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 0,
++        "oscillationCount": 2,
++        "lateHighPressurePct": 28.6,
++        "maxBuffer": 3,
++        "distance": 39.3
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "release_curve_missing",
++        "action": "repair_release_supply",
++        "flags": [],
++        "pressureDeficit": 14.299999999999997,
++        "releaseCurveMissing": true,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "006",
++      "mode": "seed",
++      "seed": 1003,
++      "round": 1,
++      "struct": true,
++      "metrics": {
++        "midSteps": 18,
++        "midBuffer34Pct": 38.9,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 2,
++        "oscillationCount": 3,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 11.1
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "near_pressure_deficit",
++        "action": "tune_capacity",
++        "flags": [],
++        "pressureDeficit": 11.100000000000001,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "006",
++      "mode": "tune",
++      "seed": 1003,
++      "round": 1,
++      "struct": true,
++      "metrics": {
++        "midSteps": 18,
++        "midBuffer34Pct": 38.9,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 2,
++        "oscillationCount": 3,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 11.1
++      },
++      "release": "found",
++      "tune": {
++        "applied": false,
++        "tested": 28,
++        "skipped": null
++      },
++      "diagnosis": {
++        "primary": "near_pressure_deficit",
++        "action": "tune_capacity",
++        "flags": [],
++        "pressureDeficit": 11.100000000000001,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "010",
++      "mode": "seed",
++      "seed": 1003,
++      "round": 1,
++      "struct": true,
++      "metrics": {
++        "midSteps": 12,
++        "midBuffer34Pct": 25,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 25
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "far_pressure_deficit",
++        "action": "regenerate_base",
++        "flags": [],
++        "pressureDeficit": 25,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "010",
++      "mode": "tune",
++      "seed": 1003,
++      "round": 1,
++      "struct": true,
++      "metrics": {
++        "midSteps": 12,
++        "midBuffer34Pct": 25,
++        "midBuffer5Pct": 0,
++        "maxBuffer5Run": 0,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 4,
++        "distance": 25
++      },
++      "release": "found",
++      "tune": {
++        "applied": false,
++        "tested": 0,
++        "skipped": "far_from_target"
++      },
++      "diagnosis": {
++        "primary": "far_pressure_deficit",
++        "action": "regenerate_base",
++        "flags": [],
++        "pressureDeficit": 25,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "007",
++      "mode": "seed",
++      "seed": 1003,
++      "round": 1,
++      "struct": true,
++      "metrics": {
++        "midSteps": 25,
++        "midBuffer34Pct": 32,
++        "midBuffer5Pct": 4,
++        "maxBuffer5Run": 1,
++        "significantReleaseCount": 2,
++        "oscillationCount": 3,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 5,
++        "distance": 18
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "near_pressure_deficit",
++        "action": "tune_capacity",
++        "flags": [
++          "top_pressure"
++        ],
++        "pressureDeficit": 18,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "007",
++      "mode": "seed",
++      "seed": 8922,
++      "round": 2,
++      "struct": false,
++      "metrics": {
++        "midSteps": 19,
++        "midBuffer34Pct": 21.1,
++        "midBuffer5Pct": 5.3,
++        "maxBuffer5Run": 1,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 5,
++        "distance": 28.9
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "structure_gate_failed",
++        "action": "repair_structure",
++        "flags": [
++          "top_pressure"
++        ],
++        "pressureDeficit": 28.9,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "007",
++      "mode": "seed",
++      "seed": 16841,
++      "round": 3,
++      "struct": true,
++      "metrics": {
++        "midSteps": 20,
++        "midBuffer34Pct": 10,
++        "midBuffer5Pct": 10,
++        "maxBuffer5Run": 2,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 5,
++        "distance": 40
++      },
++      "release": "found",
++      "tune": null,
++      "diagnosis": {
++        "primary": "far_pressure_deficit",
++        "action": "regenerate_base",
++        "flags": [
++          "top_pressure",
++          "critical_run"
++        ],
++        "pressureDeficit": 40,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "007",
++      "mode": "tune",
++      "seed": 1003,
++      "round": 1,
++      "struct": true,
++      "metrics": {
++        "midSteps": 25,
++        "midBuffer34Pct": 32,
++        "midBuffer5Pct": 4,
++        "maxBuffer5Run": 1,
++        "significantReleaseCount": 2,
++        "oscillationCount": 3,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 5,
++        "distance": 18
++      },
++      "release": "found",
++      "tune": {
++        "applied": false,
++        "tested": 15,
++        "skipped": null
++      },
++      "diagnosis": {
++        "primary": "near_pressure_deficit",
++        "action": "tune_capacity",
++        "flags": [
++          "top_pressure"
++        ],
++        "pressureDeficit": 18,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "007",
++      "mode": "tune",
++      "seed": 8922,
++      "round": 2,
++      "struct": false,
++      "metrics": {
++        "midSteps": 19,
++        "midBuffer34Pct": 21.1,
++        "midBuffer5Pct": 5.3,
++        "maxBuffer5Run": 1,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 5,
++        "distance": 28.9
++      },
++      "release": "found",
++      "tune": {
++        "applied": false,
++        "tested": 0,
++        "skipped": "structure_gate_failed"
++      },
++      "diagnosis": {
++        "primary": "structure_gate_failed",
++        "action": "repair_structure",
++        "flags": [
++          "top_pressure"
++        ],
++        "pressureDeficit": 28.9,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    },
++    {
++      "image": "007",
++      "mode": "tune",
++      "seed": 16841,
++      "round": 3,
++      "struct": true,
++      "metrics": {
++        "midSteps": 20,
++        "midBuffer34Pct": 10,
++        "midBuffer5Pct": 10,
++        "maxBuffer5Run": 2,
++        "significantReleaseCount": 1,
++        "oscillationCount": 1,
++        "lateHighPressurePct": 0,
++        "maxBuffer": 5,
++        "distance": 40
++      },
++      "release": "found",
++      "tune": {
++        "applied": false,
++        "tested": 0,
++        "skipped": "far_from_target"
++      },
++      "diagnosis": {
++        "primary": "far_pressure_deficit",
++        "action": "regenerate_base",
++        "flags": [
++          "top_pressure",
++          "critical_run"
++        ],
++        "pressureDeficit": 40,
++        "releaseCurveMissing": false,
++        "releaseDecisionStatus": "found"
++      }
++    }
++  ],
++  "uniqueKeys": [
++    "010/1001/r1",
++    "010/8920/r2",
++    "010/16839/r3",
++    "010/24758/r4",
++    "010/32677/r5",
++    "006/1003/r1",
++    "010/1003/r1",
++    "007/1003/r1",
++    "007/8922/r2",
++    "007/16841/r3"
++  ]
++}
+diff --git a/README.md b/README.md
+index 2db9d22..d06b5e5 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v503**（目标模式默认体验门与小容量精调；时间模式不变）。
++> 当前版本 **v504**（目标失败诊断；目标模式体验精调，时间模式不变）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 

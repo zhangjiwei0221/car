@@ -1,0 +1,530 @@
+{
+  "schema": "experience-failure-diagnosis-v1",
+  "summary": {
+    "failedRoundObservations": 15,
+    "uniqueFailedBases": 10,
+    "primary": {
+      "near_pressure_deficit": 3,
+      "far_pressure_deficit": 5,
+      "release_curve_missing": 1,
+      "structure_gate_failed": 1
+    },
+    "actions": {
+      "tune_capacity": 3,
+      "regenerate_base": 5,
+      "repair_release_supply": 1,
+      "repair_structure": 1
+    },
+    "flags": {
+      "top_pressure": 4,
+      "critical_run": 1
+    },
+    "byImage": {
+      "010": {
+        "failedBases": 6,
+        "primary": {
+          "near_pressure_deficit": 1,
+          "far_pressure_deficit": 4,
+          "release_curve_missing": 1
+        },
+        "actions": {
+          "tune_capacity": 1,
+          "regenerate_base": 4,
+          "repair_release_supply": 1
+        }
+      },
+      "006": {
+        "failedBases": 1,
+        "primary": {
+          "near_pressure_deficit": 1
+        },
+        "actions": {
+          "tune_capacity": 1
+        }
+      },
+      "007": {
+        "failedBases": 3,
+        "primary": {
+          "near_pressure_deficit": 1,
+          "structure_gate_failed": 1,
+          "far_pressure_deficit": 1
+        },
+        "actions": {
+          "tune_capacity": 1,
+          "repair_structure": 1,
+          "regenerate_base": 1
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "image": "010",
+      "mode": "seed",
+      "seed": 1001,
+      "round": 1,
+      "struct": true,
+      "metrics": {
+        "midSteps": 13,
+        "midBuffer34Pct": 46.2,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 2,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 3.8
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "near_pressure_deficit",
+        "action": "tune_capacity",
+        "flags": [],
+        "pressureDeficit": 3.799999999999997,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "010",
+      "mode": "seed",
+      "seed": 8920,
+      "round": 2,
+      "struct": true,
+      "metrics": {
+        "midSteps": 14,
+        "midBuffer34Pct": 21.4,
+        "midBuffer5Pct": 7.1,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 28.6
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [
+          "top_pressure"
+        ],
+        "pressureDeficit": 28.6,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "010",
+      "mode": "seed",
+      "seed": 16839,
+      "round": 3,
+      "struct": true,
+      "metrics": {
+        "midSteps": 15,
+        "midBuffer34Pct": 6.7,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 2,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 3,
+        "distance": 43.3
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [],
+        "pressureDeficit": 43.3,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "010",
+      "mode": "seed",
+      "seed": 24758,
+      "round": 4,
+      "struct": true,
+      "metrics": {
+        "midSteps": 14,
+        "midBuffer34Pct": 14.3,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 3,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 35.7
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [],
+        "pressureDeficit": 35.7,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "010",
+      "mode": "seed",
+      "seed": 32677,
+      "round": 5,
+      "struct": true,
+      "metrics": {
+        "midSteps": 14,
+        "midBuffer34Pct": 35.7,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 0,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 28.6,
+        "maxBuffer": 3,
+        "distance": 39.3
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "release_curve_missing",
+        "action": "repair_release_supply",
+        "flags": [],
+        "pressureDeficit": 14.299999999999997,
+        "releaseCurveMissing": true,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "006",
+      "mode": "seed",
+      "seed": 1003,
+      "round": 1,
+      "struct": true,
+      "metrics": {
+        "midSteps": 18,
+        "midBuffer34Pct": 38.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 2,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 11.1
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "near_pressure_deficit",
+        "action": "tune_capacity",
+        "flags": [],
+        "pressureDeficit": 11.100000000000001,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "006",
+      "mode": "tune",
+      "seed": 1003,
+      "round": 1,
+      "struct": true,
+      "metrics": {
+        "midSteps": 18,
+        "midBuffer34Pct": 38.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 2,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 11.1
+      },
+      "release": "found",
+      "tune": {
+        "applied": false,
+        "tested": 28,
+        "skipped": null
+      },
+      "diagnosis": {
+        "primary": "near_pressure_deficit",
+        "action": "tune_capacity",
+        "flags": [],
+        "pressureDeficit": 11.100000000000001,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "010",
+      "mode": "seed",
+      "seed": 1003,
+      "round": 1,
+      "struct": true,
+      "metrics": {
+        "midSteps": 12,
+        "midBuffer34Pct": 25,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 25
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [],
+        "pressureDeficit": 25,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "010",
+      "mode": "tune",
+      "seed": 1003,
+      "round": 1,
+      "struct": true,
+      "metrics": {
+        "midSteps": 12,
+        "midBuffer34Pct": 25,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 25
+      },
+      "release": "found",
+      "tune": {
+        "applied": false,
+        "tested": 0,
+        "skipped": "far_from_target"
+      },
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [],
+        "pressureDeficit": 25,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "007",
+      "mode": "seed",
+      "seed": 1003,
+      "round": 1,
+      "struct": true,
+      "metrics": {
+        "midSteps": 25,
+        "midBuffer34Pct": 32,
+        "midBuffer5Pct": 4,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 2,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 18
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "near_pressure_deficit",
+        "action": "tune_capacity",
+        "flags": [
+          "top_pressure"
+        ],
+        "pressureDeficit": 18,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "007",
+      "mode": "seed",
+      "seed": 8922,
+      "round": 2,
+      "struct": false,
+      "metrics": {
+        "midSteps": 19,
+        "midBuffer34Pct": 21.1,
+        "midBuffer5Pct": 5.3,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 28.9
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "structure_gate_failed",
+        "action": "repair_structure",
+        "flags": [
+          "top_pressure"
+        ],
+        "pressureDeficit": 28.9,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "007",
+      "mode": "seed",
+      "seed": 16841,
+      "round": 3,
+      "struct": true,
+      "metrics": {
+        "midSteps": 20,
+        "midBuffer34Pct": 10,
+        "midBuffer5Pct": 10,
+        "maxBuffer5Run": 2,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 40
+      },
+      "release": "found",
+      "tune": null,
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [
+          "top_pressure",
+          "critical_run"
+        ],
+        "pressureDeficit": 40,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "007",
+      "mode": "tune",
+      "seed": 1003,
+      "round": 1,
+      "struct": true,
+      "metrics": {
+        "midSteps": 25,
+        "midBuffer34Pct": 32,
+        "midBuffer5Pct": 4,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 2,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 18
+      },
+      "release": "found",
+      "tune": {
+        "applied": false,
+        "tested": 15,
+        "skipped": null
+      },
+      "diagnosis": {
+        "primary": "near_pressure_deficit",
+        "action": "tune_capacity",
+        "flags": [
+          "top_pressure"
+        ],
+        "pressureDeficit": 18,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "007",
+      "mode": "tune",
+      "seed": 8922,
+      "round": 2,
+      "struct": false,
+      "metrics": {
+        "midSteps": 19,
+        "midBuffer34Pct": 21.1,
+        "midBuffer5Pct": 5.3,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 28.9
+      },
+      "release": "found",
+      "tune": {
+        "applied": false,
+        "tested": 0,
+        "skipped": "structure_gate_failed"
+      },
+      "diagnosis": {
+        "primary": "structure_gate_failed",
+        "action": "repair_structure",
+        "flags": [
+          "top_pressure"
+        ],
+        "pressureDeficit": 28.9,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    },
+    {
+      "image": "007",
+      "mode": "tune",
+      "seed": 16841,
+      "round": 3,
+      "struct": true,
+      "metrics": {
+        "midSteps": 20,
+        "midBuffer34Pct": 10,
+        "midBuffer5Pct": 10,
+        "maxBuffer5Run": 2,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 40
+      },
+      "release": "found",
+      "tune": {
+        "applied": false,
+        "tested": 0,
+        "skipped": "far_from_target"
+      },
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [
+          "top_pressure",
+          "critical_run"
+        ],
+        "pressureDeficit": 40,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "found"
+      }
+    }
+  ],
+  "uniqueKeys": [
+    "010/1001/r1",
+    "010/8920/r2",
+    "010/16839/r3",
+    "010/24758/r4",
+    "010/32677/r5",
+    "006/1003/r1",
+    "010/1003/r1",
+    "007/1003/r1",
+    "007/8922/r2",
+    "007/16841/r3"
+  ]
+}

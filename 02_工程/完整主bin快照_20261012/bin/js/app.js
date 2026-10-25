@@ -6262,6 +6262,7 @@ AntSolver.App = (function() {
       experienceGoal: !!(result.config && result.config.experienceGoal),
       experienceEvidence: result._experienceFull ? { pass: result._experienceFull.pass, status: result._experienceFull.status,
         reasons: result._experienceFull.reasons, metrics: result._experienceFull.metrics,
+        diagnosis: result._experienceFull.diagnosis || (AntSolver.ExperienceGoal ? AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result)) : null),
         releaseDecision: result._experienceFull.releaseDecision } : null,
       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,

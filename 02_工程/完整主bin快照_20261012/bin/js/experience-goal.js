@@ -131,5 +131,25 @@ AntSolver.ExperienceGoal = (function () {
       nearMiss: !!replayed.completed && (curve.midBuffer34Pct || 0) >= Math.max(0, o.minBuffer34Pct - 20),
       elapsedMs: Date.now() - t0 };
   }
-  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, curveFromTrace: curveFromTrace };
+  function diagnose(ev, structuralPass) {
+    if (!ev || ev.status === 'no_verified_solution') return { primary: 'no_verified_solution', action: 'repair_structure', flags: [] };
+    var m = ev.metrics || {}, flags = [], target = ev.target && ev.target.minBuffer34Pct != null ? ev.target.minBuffer34Pct : 50;
+    if (m.maxBuffer >= 5 || (m.midBuffer5Pct || 0) > 0) flags.push('top_pressure');
+    if ((m.lateHighPressurePct || 0) >= 50) flags.push('late_pressure_risk');
+    if ((m.maxBuffer5Run || 0) >= 2) flags.push('critical_run');
+    var releaseStatus = ev.releaseDecision && ev.releaseDecision.status;
+    var out = { primary: null, action: null, flags: flags,
+      pressureDeficit: Math.max(0, target - (m.midBuffer34Pct || 0)),
+      releaseCurveMissing: (m.significantReleaseCount || 0) < 1,
+      releaseDecisionStatus: releaseStatus || 'not_evaluated' };
+    if (structuralPass === false) { out.primary = 'structure_gate_failed'; out.action = 'repair_structure'; }
+    else if ((m.midBuffer34Pct || 0) < Math.max(0, target - 20)) { out.primary = 'far_pressure_deficit'; out.action = 'regenerate_base'; }
+    else if (out.releaseCurveMissing) { out.primary = 'release_curve_missing'; out.action = 'repair_release_supply'; }
+    else if ((m.midBuffer34Pct || 0) < target) { out.primary = 'near_pressure_deficit'; out.action = 'tune_capacity'; }
+    else if (releaseStatus === 'unknown_within_budget') { out.primary = 'release_unknown'; out.action = 'increase_release_budget'; }
+    else if (releaseStatus !== 'found') { out.primary = 'release_decision_missing'; out.action = 'repair_release_choice'; }
+    else { out.primary = ev.pass ? 'pass' : 'inspect_remaining_target'; out.action = ev.pass ? 'done' : 'inspect_target'; }
+    return out;
+  }
+  return { DEFAULTS: DEFAULTS, evaluate: evaluate, releaseDecision: releaseDecision, curveFromTrace: curveFromTrace, diagnose: diagnose };
 })();

@@ -14779,6 +14779,7 @@ AntSolver.Generator = (function() {
       solveResult: cand.solveResult, decision: !!decision,
       bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain)
     }));
+    ev.diagnosis = AntSolver.ExperienceGoal.diagnose(ev, goalStructPass(cand));
     cand[cacheKey] = ev; return ev;
   }
   function experienceCapacityOk(cand, config) {
@@ -14805,6 +14806,7 @@ AntSolver.Generator = (function() {
     if (goalExperiencePass(cand, config)) { report.skipped = 'already_pass'; cand.capacityTune = report; return cand; }
     if (!goalStructPass(cand)) { report.skipped = 'structure_gate_failed'; cand.capacityTune = report; return cand; }
     var baseEv = experienceEvalOfCand(cand, config, false);
+    report.diagnosis = baseEv && baseEv.diagnosis || null;
     if (!baseEv || !baseEv.nearMiss) { report.skipped = 'far_from_target'; cand.capacityTune = report; return cand; }
     var cfg = cand.config || config || {}, ca = cand.capacityAudit || {};
     var capMin = ca.boxSizeMin || cfg._userCapMin || cfg.boxSizeMin || (config && config._userCapMin) || (config && config.boxSizeMin);
