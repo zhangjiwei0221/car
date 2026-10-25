@@ -196,6 +196,52 @@ AntSolver.SolverAnalysis = (function () {
     return result;
   }
 
+  // v485：预算自适应实验。coverage 少升档；pressure 为更低压力积极升档。
+  // 默认不接 analyze，先与固定 standard/deep 做全题库对照，避免“自适应”名义下更贵或丢解。
+  function findRoutesAdaptive(level, opts) {
+    opts = opts || {};
+    var profile = opts.profile === 'pressure' ? 'pressure' : 'coverage';
+    var targetRoutes = Math.max(1, opts.targetRoutes || 4), pressureFloor = opts.pressureFloor == null ? 1 : opts.pressureFloor;
+    var tiers = opts.tiers || [
+      { name: 'standard', timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
+      { name: 'deep', timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 }
+    ];
+    var allRoutes = [], seen = {}, attempts = [], totalNodes = 0, t0 = Date.now(), finalStatus = 'not_found_within_budget';
+    for (var ti = 0; ti < tiers.length; ti++) {
+      var tier = tiers[ti], r = findRoutes(level, tier), best = null;
+      totalNodes += r.nodes; finalStatus = r.status;
+      for (var ri = 0; ri < r.routes.length; ri++) {
+        var route = r.routes[ri], sig = route.signature || route.actions.map(function (a) { return a.r + ',' + a.c; }).join(' ');
+        if (!seen[sig]) { seen[sig] = true; route.sourceTier = tier.name; allRoutes.push(route); }
+        if (route.replayValid && (best == null || route.maxBuffer < best)) best = route.maxBuffer;
+      }
+      attempts.push({ tier: tier.name, status: r.status, routes: r.routes.length, newRoutes: allRoutes.length,
+        bestMaxBuffer: best, nodes: r.nodes, elapsedMs: r.elapsedMs });
+      var enough = allRoutes.length >= targetRoutes, last = ti === tiers.length - 1;
+      if (last) break;
+      var escalate;
+      if (profile === 'coverage') {
+        // 覆盖优先：已有足够路线就停；接受可能漏掉更低压力解，报告必须保留这一边界。
+        escalate = !enough;
+      } else {
+        // 压力优先：路线不足、达到单档路线上限且仍有压力空间，或当前最好没有明显优于 baseline 时升档。
+        var hitCap = r.routes.length >= (tier.maxRoutes || 6);
+        var base = opts.baselineMaxBuffer;
+        var noClearImprovement = base != null && (best == null || base - best <= 1);
+        escalate = !enough || (hitCap && (best == null || best > pressureFloor)) || noClearImprovement;
+        if (best != null && best <= pressureFloor && enough) escalate = false;
+      }
+      if (!escalate) break;
+    }
+    var bestKnown = null;
+    for (var i = 0; i < allRoutes.length; i++) if (allRoutes[i].replayValid && (bestKnown == null || allRoutes[i].maxBuffer < bestKnown)) bestKnown = allRoutes[i].maxBuffer;
+    return { status: allRoutes.length ? 'solved' : finalStatus, routes: allRoutes,
+      distinctRoutes: Object.keys(seen).length, bestMaxBuffer: bestKnown,
+      nodes: totalNodes, elapsedMs: Date.now() - t0, attempts: attempts,
+      config: { adaptive: true, profile: profile, targetRoutes: targetRoutes, pressureFloor: pressureFloor },
+      budgetExhausted: finalStatus === 'budget_exhausted', rejectedRoutes: [] };
+  }
+
   function sampleIndices(indices, limit) {
     if (indices.length <= limit) return indices;
     var out = [];
@@ -307,6 +353,6 @@ AntSolver.SolverAnalysis = (function () {
       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
   }
 
-  return { analyze: analyze, findRoutes: findRoutes, counterfactual: counterfactual,
+  return { analyze: analyze, findRoutes: findRoutes, findRoutesAdaptive: findRoutesAdaptive, counterfactual: counterfactual,
     replay: replay, replayFromState: replayFromState, stateKey: stateKey, normalizeActions: normalizeActions };
 })();

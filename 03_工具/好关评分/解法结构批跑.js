@@ -22,7 +22,9 @@ const tierNames = opt('tiers', 'quick,standard,deep').split(',').filter(Boolean)
 const TIERS = {
   quick: { timeBudgetMs: 1000, maxNodes: 1500, beamWidth: 12, branchWidth: 6, maxRoutes: 4 },
   standard: { timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
-  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 }
+  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 },
+  adaptive_coverage: { adaptive: true, profile: 'coverage' },
+  adaptive_pressure: { adaptive: true, profile: 'pressure' }
 };
 if (outPath) fs.writeFileSync(outPath, '');
 for (const item of manifest.levels) {
@@ -36,13 +38,13 @@ for (const item of manifest.levels) {
     steps: replay.steps, maxBuffer: replay.completed ? replay.maxBuffer : null, solveMs: Date.now() - t0 };
   for (const name of tierNames) {
     const cfg = TIERS[name]; if (!cfg) throw new Error('未知预算档：' + name);
-    const r = A.SolverAnalysis.findRoutes(level, cfg);
+    const r = cfg.adaptive ? A.SolverAnalysis.findRoutesAdaptive(level, { profile: cfg.profile, baselineMaxBuffer: baseline.replayValid ? baseline.maxBuffer : null }) : A.SolverAnalysis.findRoutes(level, cfg);
     const routes = r.routes.map(x => ({ steps: x.steps, maxBuffer: x.maxBuffer, avgBuffer: x.avgBuffer,
       replayValid: x.replayValid, signature: x.signature }));
     const valid = routes.filter(x => x.replayValid);
     const row = { id: item.id, group: item.group, path: item.path, contentHash, tier: name, config: cfg, baseline,
       status: r.status, budgetExhausted: r.budgetExhausted, nodes: r.nodes, elapsedMs: r.elapsedMs,
-      routes: routes.length, distinctRoutes: r.distinctRoutes, replayValid: valid.length,
+      routes: routes.length, distinctRoutes: r.distinctRoutes, replayValid: valid.length, attempts: r.attempts || null,
       bestMaxBuffer: valid.length ? Math.min.apply(null, valid.map(x => x.maxBuffer)) : null,
       worstMaxBuffer: valid.length ? Math.max.apply(null, valid.map(x => x.maxBuffer)) : null,
       routeSummaries: routes };

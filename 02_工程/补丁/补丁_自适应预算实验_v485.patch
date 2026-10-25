@@ -1,0 +1,154 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 0d4fa25..b10dde0 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v484 · 已验证路线合并</title>
+-  <link rel="stylesheet" href="css/style.css?v=484">
++  <title>车接小人 v485 · 自适应预算实验</title>
++  <link rel="stylesheet" href="css/style.css?v=485">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v484</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v485</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -769,23 +769,23 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=484"></script>
+-  <script src="js/utils.js?v=484"></script>
++  <script src="js/zip.js?v=485"></script>
++  <script src="js/utils.js?v=485"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=484"></script>
+-  <script src="js/simulator.js?v=484"></script>
++  <script src="js/color-libs.js?v=485"></script>
++  <script src="js/simulator.js?v=485"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=484"></script>
+-  <script src="js/solver-strategy.js?v=484"></script>
+-  <script src="js/solver.js?v=484"></script>
+-  <script src="js/playersim.js?v=484"></script>
++  <script src="js/anchor-cut.js?v=485"></script>
++  <script src="js/solver-strategy.js?v=485"></script>
++  <script src="js/solver.js?v=485"></script>
++  <script src="js/playersim.js?v=485"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=484"></script>
+-  <script src="js/generator.js?v=484"></script>
+-  <script src="js/analysis.js?v=484"></script>
++  <script src="js/solver-analysis.js?v=485"></script>
++  <script src="js/generator.js?v=485"></script>
++  <script src="js/analysis.js?v=485"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=484"></script>
+-  <script src="js/app.js?v=484"></script>
++  <script src="js/level-editor.js?v=485"></script>
++  <script src="js/app.js?v=485"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+index f42ee20..c637863 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/solver-analysis.js"
+@@ -196,6 +196,52 @@ AntSolver.SolverAnalysis = (function () {
+     return result;
+   }
+ 
++  // v485：预算自适应实验。coverage 少升档；pressure 为更低压力积极升档。
++  // 默认不接 analyze，先与固定 standard/deep 做全题库对照，避免“自适应”名义下更贵或丢解。
++  function findRoutesAdaptive(level, opts) {
++    opts = opts || {};
++    var profile = opts.profile === 'pressure' ? 'pressure' : 'coverage';
++    var targetRoutes = Math.max(1, opts.targetRoutes || 4), pressureFloor = opts.pressureFloor == null ? 1 : opts.pressureFloor;
++    var tiers = opts.tiers || [
++      { name: 'standard', timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
++      { name: 'deep', timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 }
++    ];
++    var allRoutes = [], seen = {}, attempts = [], totalNodes = 0, t0 = Date.now(), finalStatus = 'not_found_within_budget';
++    for (var ti = 0; ti < tiers.length; ti++) {
++      var tier = tiers[ti], r = findRoutes(level, tier), best = null;
++      totalNodes += r.nodes; finalStatus = r.status;
++      for (var ri = 0; ri < r.routes.length; ri++) {
++        var route = r.routes[ri], sig = route.signature || route.actions.map(function (a) { return a.r + ',' + a.c; }).join(' ');
++        if (!seen[sig]) { seen[sig] = true; route.sourceTier = tier.name; allRoutes.push(route); }
++        if (route.replayValid && (best == null || route.maxBuffer < best)) best = route.maxBuffer;
++      }
++      attempts.push({ tier: tier.name, status: r.status, routes: r.routes.length, newRoutes: allRoutes.length,
++        bestMaxBuffer: best, nodes: r.nodes, elapsedMs: r.elapsedMs });
++      var enough = allRoutes.length >= targetRoutes, last = ti === tiers.length - 1;
++      if (last) break;
++      var escalate;
++      if (profile === 'coverage') {
++        // 覆盖优先：已有足够路线就停；接受可能漏掉更低压力解，报告必须保留这一边界。
++        escalate = !enough;
++      } else {
++        // 压力优先：路线不足、达到单档路线上限且仍有压力空间，或当前最好没有明显优于 baseline 时升档。
++        var hitCap = r.routes.length >= (tier.maxRoutes || 6);
++        var base = opts.baselineMaxBuffer;
++        var noClearImprovement = base != null && (best == null || base - best <= 1);
++        escalate = !enough || (hitCap && (best == null || best > pressureFloor)) || noClearImprovement;
++        if (best != null && best <= pressureFloor && enough) escalate = false;
++      }
++      if (!escalate) break;
++    }
++    var bestKnown = null;
++    for (var i = 0; i < allRoutes.length; i++) if (allRoutes[i].replayValid && (bestKnown == null || allRoutes[i].maxBuffer < bestKnown)) bestKnown = allRoutes[i].maxBuffer;
++    return { status: allRoutes.length ? 'solved' : finalStatus, routes: allRoutes,
++      distinctRoutes: Object.keys(seen).length, bestMaxBuffer: bestKnown,
++      nodes: totalNodes, elapsedMs: Date.now() - t0, attempts: attempts,
++      config: { adaptive: true, profile: profile, targetRoutes: targetRoutes, pressureFloor: pressureFloor },
++      budgetExhausted: finalStatus === 'budget_exhausted', rejectedRoutes: [] };
++  }
++
+   function sampleIndices(indices, limit) {
+     if (indices.length <= limit) return indices;
+     var out = [];
+@@ -307,6 +353,6 @@ AntSolver.SolverAnalysis = (function () {
+       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
+   }
+ 
+-  return { analyze: analyze, findRoutes: findRoutes, counterfactual: counterfactual,
++  return { analyze: analyze, findRoutes: findRoutes, findRoutesAdaptive: findRoutesAdaptive, counterfactual: counterfactual,
+     replay: replay, replayFromState: replayFromState, stateKey: stateKey, normalizeActions: normalizeActions };
+ })();
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js"
+index e4a1f9c..59bd2bd 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\350\247\243\346\263\225\347\273\223\346\236\204\346\211\271\350\267\221.js"
+@@ -22,7 +22,9 @@ const tierNames = opt('tiers', 'quick,standard,deep').split(',').filter(Boolean)
+ const TIERS = {
+   quick: { timeBudgetMs: 1000, maxNodes: 1500, beamWidth: 12, branchWidth: 6, maxRoutes: 4 },
+   standard: { timeBudgetMs: 3000, maxNodes: 6000, beamWidth: 16, branchWidth: 8, maxRoutes: 6 },
+-  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 }
++  deep: { timeBudgetMs: 8000, maxNodes: 15000, beamWidth: 24, branchWidth: 10, maxRoutes: 8 },
++  adaptive_coverage: { adaptive: true, profile: 'coverage' },
++  adaptive_pressure: { adaptive: true, profile: 'pressure' }
+ };
+ if (outPath) fs.writeFileSync(outPath, '');
+ for (const item of manifest.levels) {
+@@ -36,13 +38,13 @@ for (const item of manifest.levels) {
+     steps: replay.steps, maxBuffer: replay.completed ? replay.maxBuffer : null, solveMs: Date.now() - t0 };
+   for (const name of tierNames) {
+     const cfg = TIERS[name]; if (!cfg) throw new Error('未知预算档：' + name);
+-    const r = A.SolverAnalysis.findRoutes(level, cfg);
++    const r = cfg.adaptive ? A.SolverAnalysis.findRoutesAdaptive(level, { profile: cfg.profile, baselineMaxBuffer: baseline.replayValid ? baseline.maxBuffer : null }) : A.SolverAnalysis.findRoutes(level, cfg);
+     const routes = r.routes.map(x => ({ steps: x.steps, maxBuffer: x.maxBuffer, avgBuffer: x.avgBuffer,
+       replayValid: x.replayValid, signature: x.signature }));
+     const valid = routes.filter(x => x.replayValid);
+     const row = { id: item.id, group: item.group, path: item.path, contentHash, tier: name, config: cfg, baseline,
+       status: r.status, budgetExhausted: r.budgetExhausted, nodes: r.nodes, elapsedMs: r.elapsedMs,
+-      routes: routes.length, distinctRoutes: r.distinctRoutes, replayValid: valid.length,
++      routes: routes.length, distinctRoutes: r.distinctRoutes, replayValid: valid.length, attempts: r.attempts || null,
+       bestMaxBuffer: valid.length ? Math.min.apply(null, valid.map(x => x.maxBuffer)) : null,
+       worstMaxBuffer: valid.length ? Math.max.apply(null, valid.map(x => x.maxBuffer)) : null,
+       routeSummaries: routes };
