@@ -201,6 +201,70 @@ AntSolver.SolverAnalysis = (function () {
     return result;
   }
 
+  // v490：逐动作结算后的暂存曲线。高压=N-2，临界=N-1；中段=20%~85%。
+  function pressureFromSeries(series, bufferLimit) {
+    var N = bufferLimit || 5, high = Math.max(1, N - 2), critical = Math.max(high, N - 1);
+    var points = series || [], n = points.length, mid = [], early = [], late = [];
+    var episodes = [], releases = [], current = null, maxBuffer = 0, sumBuffer = 0;
+    for (var i = 0; i < n; i++) {
+      var p = points[i], b = p.buffer || 0, prog = p.progress != null ? p.progress : (n > 1 ? i / (n - 1) : 0);
+      maxBuffer = Math.max(maxBuffer, b); sumBuffer += b;
+      if (prog >= 0.2 && prog <= 0.85) mid.push(b);
+      if (prog < 0.2) early.push(b);
+      if (prog >= 0.8) late.push(b);
+      if (b >= high) {
+        if (!current) current = { startStep: i + 1, peak: b, length: 0 };
+        current.length++; current.peak = Math.max(current.peak, b);
+      } else if (current) {
+        var prev = points[i - 1].buffer || 0, amplitude = Math.max(0, prev - b);
+        current.endStep = i; current.releaseAmplitude = amplitude;
+        episodes.push(current); releases.push({ step: i + 1, from: prev, to: b, amplitude: amplitude });
+        current = null;
+      }
+    }
+    if (current) { current.endStep = n; current.releaseAmplitude = null; episodes.push(current); }
+    function countAtLeast(xs, threshold) { var n0 = 0; for (var j = 0; j < xs.length; j++) if (xs[j] >= threshold) n0++; return n0; }
+    function pct0(a, b) { return b ? +(a / b * 100).toFixed(1) : null; }
+    var longest = 0; for (var e = 0; e < episodes.length; e++) longest = Math.max(longest, episodes[e].length);
+    var amplitudes = releases.map(function (r) { return r.amplitude; });
+    return { bufferLimit: N, highThreshold: high, criticalThreshold: critical,
+      steps: n, maxBuffer: maxBuffer, avgBuffer: n ? +(sumBuffer / n).toFixed(3) : null,
+      sustainedHighPressurePct: pct0(countAtLeast(mid, high), mid.length),
+      criticalPressurePct: pct0(countAtLeast(points.map(function (p) { return p.buffer || 0; }), critical), n),
+      earlyZeroBufferPct: pct0(early.filter(function (b) { return b === 0; }).length, early.length),
+      lateHighPressurePct: pct0(countAtLeast(late, high), late.length),
+      longestHighRun: longest, highEpisodes: episodes,
+      oscillationCount: releases.length, // 一次完整“高压→退出高压”记1次
+      releaseEvents: releases, releaseAmplitudes: amplitudes,
+      significantReleaseCount: amplitudes.filter(function (x) { return x >= 2; }).length };
+  }
+  function pressureProfile(level, route, opts) {
+    var replayed = replay(level, route, opts || {}), trace = replayed.trace || [];
+    var series = trace.map(function (t) {
+      return { buffer: t.buffer, progress: replayed.totalPixels ? t.eliminated / replayed.totalPixels : 0 };
+    });
+    var out = pressureFromSeries(series, replayed.state ? replayed.state.bufferLimit : 5);
+    out.replayValid = !!replayed.completed;
+    out.maxBuffer = replayed.maxBuffer;
+    out.avgBuffer = replayed.avgBuffer;
+    return out;
+  }
+  function summarizePressure(profiles) {
+    var valid = (profiles || []).filter(function (p) { return p && p.replayValid; });
+    function vals(key) { return valid.map(function (p) { return p[key]; }).filter(function (x) { return typeof x === 'number'; }); }
+    function med(xs) { if (!xs.length) return null; xs = xs.slice().sort(function (a, b) { return a - b; }); var m = Math.floor(xs.length / 2); return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2; }
+    function range(xs) { return xs.length ? [Math.min.apply(null, xs), Math.max.apply(null, xs)] : null; }
+    var allAmplitudes = [];
+    for (var i = 0; i < valid.length; i++) allAmplitudes = allAmplitudes.concat(valid[i].releaseAmplitudes || []);
+    var high = vals('sustainedHighPressurePct'), cycles = vals('oscillationCount');
+    return { profiledRoutes: valid.length,
+      sustainedHighPressurePct: med(high), sustainedHighPressureRange: range(high),
+      releaseAmplitude: med(allAmplitudes), releaseAmplitudeMax: allAmplitudes.length ? Math.max.apply(null, allAmplitudes) : null,
+      releaseCount: allAmplitudes.length,
+      oscillationCount: med(cycles), oscillationRange: range(cycles),
+      longestHighRun: med(vals('longestHighRun')), lateHighPressurePct: med(vals('lateHighPressurePct')) };
+  }
+
   // v485：预算自适应实验。coverage 少升档；pressure 为更低压力积极升档。
   // 默认不接 analyze，先与固定 standard/deep 做全题库对照，避免“自适应”名义下更贵或丢解。
   function findRoutesAdaptive(level, opts) {
@@ -442,9 +506,19 @@ AntSolver.SolverAnalysis = (function () {
     var chosen = verifiedRoutes.length ? verifiedRoutes[0] : null;
     var bestKnown = chosen ? { maxBuffer: chosen.maxBuffer, source: chosen.source,
       verifiedRoutes: verifiedRoutes.length, isProvenMinimum: false } : null;
+    var pressureProfiles = [];
+    for (var pi = 0; pi < verifiedRoutes.length; pi++) {
+      try {
+        var pp = pressureProfile(lv, verifiedRoutes[pi], opts);
+        pp.source = verifiedRoutes[pi].source; pp.signature = verifiedRoutes[pi].signature;
+        pressureProfiles.push(pp);
+      } catch (e) { pressureProfiles.push({ replayValid: false, source: verifiedRoutes[pi].source, error: String((e && e.message) || e) }); }
+    }
+    var pressureSummary = summarizePressure(pressureProfiles);
     var cf = chosen ? counterfactual(lv, chosen, opts) : { decisions: [], reason: 'no_verified_route' };
-    var report = { schema: 'solver-analysis-v3', baseline: baseline, multi: multi,
+    var report = { schema: 'solver-analysis-v4', baseline: baseline, multi: multi,
       verifiedRoutes: verifiedRoutes, bestKnown: bestKnown, counterfactualRoute: chosen ? { source: chosen.source, maxBuffer: chosen.maxBuffer, signature: chosen.signature } : null,
+      pressureProfiles: pressureProfiles, pressureSummary: pressureSummary,
       counterfactual: cf, elapsedMs: Date.now() - t,
       note: 'bestKnown 仅是当前已验证路线的最好，不证明全局最低；未找到不等于无解。' };
     // v489：只读证据向量；budget/null 明示，不参与 qGate/qPass 或生产候选。
@@ -456,5 +530,6 @@ AntSolver.SolverAnalysis = (function () {
   }
 
   return { analyze: analyze, findRoutes: findRoutes, findRoutesAdaptive: findRoutesAdaptive, counterfactual: counterfactual,
+    pressureProfile: pressureProfile, pressureFromSeries: pressureFromSeries, summarizePressure: summarizePressure,
     replay: replay, replayFromState: replayFromState, stateKey: stateKey, normalizeActions: normalizeActions };
 })();

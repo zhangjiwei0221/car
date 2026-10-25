@@ -881,13 +881,14 @@ AntSolver.Quality = (function () {
   return { schema: SCHEMA, verdict: verdict, gateDistance: gateDistance, fromGeneration: fromGeneration };
 })();
 
-// ==================== 求解证据质量向量（v489，只读） ====================
+// ==================== 求解证据质量向量（v489~v490，只读） ====================
 /**
  * 把 SolverAnalysis 报告转换成“证据向量”，不是新的 qGate/qPass。
  * 原则：覆盖率、预算与回放先出数；T/R/学习/压力起伏没有足够证据时保持 null。
  */
 AntSolver.Quality.fromSolverAnalysis = function (report) {
-  var r = report || {}, multi = r.multi || {}, cf = r.counterfactual || {};
+  var r = report || {}, multi = r.multi || {}, cf = r.counterfactual || {}, ps = r.pressureSummary || {};
+  var pressureProfiles = r.pressureProfiles || [];
   var verified = r.verifiedRoutes || [], decisions = cf.decisions || [];
   var alternatives = [], decisionReasons = {}, alternativeReasons = {}, outcomes = {};
   var mixed = 0, partial = 0, highBuffer = 0;
@@ -929,10 +930,11 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
   if (!verified.length) missing.push('无可回放路线');
   if (!decisions.length) missing.push('无反事实决策');
   if (!alternatives.length) missing.push('无替代动作');
+  if (verified.length && !(ps.profiledRoutes > 0)) missing.push('无压力曲线');
   if (replayErrors) missing.push('存在回放失败');
 
   return {
-    schema: 'quality-evidence-v1',
+    schema: 'quality-evidence-v2',
     gateEligible: false,
     gateReason: '采样证据仅供只读分析，尚未校准为交付质量门',
     routeEvidence: {
@@ -973,10 +975,21 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
     },
     pressureEvidence: {
       bestKnownMaxBuffer: r.bestKnown ? r.bestKnown.maxBuffer : null,
-      sustainedHighPressurePct: null,
-      releaseAmplitude: null,
-      oscillationCount: null,
-      reason: '当前只有路线峰值，尚未计算多路线压力过程'
+      profiledRoutes: ps.profiledRoutes || 0,
+      routeCoveragePct: pct(ps.profiledRoutes || 0, verified.length),
+      highThreshold: pressureProfiles.length ? pressureProfiles[0].highThreshold : null,
+      criticalThreshold: pressureProfiles.length ? pressureProfiles[0].criticalThreshold : null,
+      midWindow: [0.2, 0.85],
+      sustainedHighPressurePct: ps.sustainedHighPressurePct != null ? ps.sustainedHighPressurePct : null,
+      sustainedHighPressureRange: ps.sustainedHighPressureRange || null,
+      longestHighRun: ps.longestHighRun != null ? ps.longestHighRun : null,
+      lateHighPressurePct: ps.lateHighPressurePct != null ? ps.lateHighPressurePct : null,
+      releaseAmplitude: ps.releaseAmplitude != null ? ps.releaseAmplitude : null,
+      releaseAmplitudeMax: ps.releaseAmplitudeMax != null ? ps.releaseAmplitudeMax : null,
+      releaseCount: ps.releaseCount || 0,
+      oscillationCount: ps.oscillationCount != null ? ps.oscillationCount : null,
+      oscillationRange: ps.oscillationRange || null,
+      reason: (ps.profiledRoutes || 0) > 0 ? null : '无可回放压力曲线'
     },
     quality: {
       trapRate: null,
@@ -987,6 +1000,7 @@ AntSolver.Quality.fromSolverAnalysis = function (report) {
     },
     dataQuality: {
       searchLimited: searchLimited,
+      pressureLimited: verified.length > 0 && (ps.profiledRoutes || 0) < verified.length,
       replayErrors: replayErrors,
       missing: missing,
       sufficientForReadonlyResearch: verified.length > 0 && alternatives.length > 0 && replayErrors === 0,

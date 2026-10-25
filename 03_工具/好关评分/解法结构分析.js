@@ -42,4 +42,5 @@ console.log(JSON.stringify({ file, out: out || null, elapsedMs: report.elapsedMs
     decisionCoveragePct: report.qualityEvidence.counterfactualEvidence.decisionCoveragePct,
     resolvedPct: report.qualityEvidence.counterfactualEvidence.resolvedPct,
     recoverablePctOfResolved: report.qualityEvidence.counterfactualEvidence.recoverablePctOfResolved },
+  pressureEvidence: report.qualityEvidence && report.qualityEvidence.pressureEvidence,
   counterfactual: { decisions: report.counterfactual.decisions.length, alternatives: alts, solved, dead } }, null, 2));
