@@ -36,96 +36,37 @@ function median(a) {
   return a[Math.floor(a.length / 2)];
 }
 
-function exposedBlobByColor(eliminated, blocks, rows, cols) {
-  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-  const vis = {}, out = [], q = [];
-  for (let r0 = 0; r0 < rows; r0++) for (let c0 = 0; c0 < cols; c0++) {
-    if (eliminated[r0][c0]) continue;
-    const col = blocks[r0][c0];
-    if (col <= 0) continue;
-    const id0 = r0 * cols + c0;
-    if (vis[id0]) continue;
-    let reach = r0 === 0 || r0 === rows - 1 || c0 === 0 || c0 === cols - 1;
-    if (!reach) for (const d of dirs) {
-      const nr = r0 + d[0], nc = c0 + d[1];
-      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || eliminated[nr][nc]) {
-        reach = true;
-        break;
-      }
-    }
-    if (!reach) continue;
-    let n = 0;
-    q.length = 0;
-    q.push(id0);
-    vis[id0] = 1;
-    while (q.length) {
-      const id = q.pop();
-      n++;
-      const r = (id / cols) | 0, c = id % cols;
-      for (const d of dirs) {
-        const nr = r + d[0], nc = c + d[1];
-        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-        const id2 = nr * cols + nc;
-        if (vis[id2] || eliminated[nr][nc] || blocks[nr][nc] !== col) continue;
-        vis[id2] = 1;
-        q.push(id2);
-      }
-    }
-    out[col] = (out[col] || 0) + n;
-  }
-  return out;
-}
-
 function curve(parsed, route, instantChain) {
   const Sim = A.Simulator;
-  const actions = A.SolverAnalysis.normalizeActions(route);
-  const state = Sim.createState(parsed, { useSlotStart: true, instantChain: !!instantChain });
-  const steps = [];
-  for (let i = 0; i < actions.length; i++) {
-    const a = actions[i];
-    if (!Sim.isPickable(state, a.r, a.c)) break;
-    const moves = Sim.listMoves(state).filter(m => !m.blocked);
-    const blob = exposedBlobByColor(state.eliminated, state.blocks, state.rows, state.cols);
-    const full = moves.filter(m => {
-      const color = m.antBox ? m.antBox.color : (m.color || (state.cells[m.r] && state.cells[m.r][m.c] || {}).color);
-      const count = m.antBox ? m.antBox.count : (m.count || (state.cells[m.r] && state.cells[m.r][m.c] || {}).count);
-      return (blob[color] || 0) >= count;
-    }).length;
-    const free = state.bufferLimit - state.buffer.length;
-    steps.push({
-      index: i,
-      step: i + 1,
-      progress: state.totalBoxes ? +(state.completedBoxes / state.totalBoxes).toFixed(4) : 0,
-      full,
-      free,
-      pick: { r: a.r, c: a.c, color: a.color, count: a.count },
-      moves: moves.map(m => ({
-        r: m.r,
-        c: m.c,
-        color: m.antBox ? m.antBox.color : null,
-        count: m.antBox ? m.antBox.count : null,
-        full: !!m.full
-      }))
-    });
-    Sim.applyPick(state, a.r, a.c);
-    if (state.gameOver) break;
+  const original = Sim.createState;
+  let forcedOpts = [];
+  Sim.createState = function(level, opts) {
+    const next = Object.assign({}, opts || {}, { instantChain: !!instantChain });
+    forcedOpts.push(next.instantChain);
+    return original(level, next);
+  };
+  let curveObj = null;
+  try {
+    curveObj = A.Generator.choiceCurve(parsed, { completed: true, pickOrder: route });
+  } finally {
+    Sim.createState = original;
   }
-  const n = steps.length;
-  let freeRun = 0, freeRunMax = 0, freeLow = 0, fulls = [], sels = [], forced = 0, partial = 0, runs = [], run = null;
-  for (let i = 0; i < n; i++) {
-    const s = steps[i];
-    const isFree = s.full >= 2 && s.free >= 3;
-    if (s.full >= 2 && s.free >= 4) freeLow++;
-    fulls.push(s.full);
-    sels.push(s.moves.length);
-    if (s.moves.length <= 1) forced++;
-    if (s.moves.length - s.full >= 1) partial++;
-    if (isFree) {
-      freeRun++;
-      if (freeRun > freeRunMax) freeRunMax = freeRun;
+  if (!curveObj) return { completed: false, steps: 0, metrics: null, gatePass: false, gateReasons: ['choice_curve_null'] };
+  const q = A.Quality.fromGeneration({
+    level: parsed,
+    valid: curveObj.n > 0,
+    config: { boxSizeMin: 1, boxSizeMax: 999 },
+    goodV3: { fillCurve: curveObj, persist: {} }
+  });
+  const runs = [];
+  let run = null;
+  for (let i = 0; i <= curveObj.steps.length; i++) {
+    const s = curveObj.steps[i];
+    const yes = s && s.full >= 2 && s.free >= 3;
+    if (yes) {
       if (!run) run = { start: i, end: i, steps: [] };
       run.end = i;
-      run.steps.push({ step: s.step, progress: s.progress, full: s.full, free: s.free,
+      run.steps.push({ step: i + 1, progress: s.prog, full: s.full, free: s.free,
         color: s.pick.color, count: s.pick.count });
     } else if (run) {
       runs.push(run);
@@ -133,28 +74,19 @@ function curve(parsed, route, instantChain) {
     }
   }
   if (run) runs.push(run);
-  const curveObj = {
-    steps,
-    n,
-    freeLowPct: n ? Math.round(freeLow / n * 100) : null,
-    freeRunMax,
-    fullMedian2: median(fulls),
-    selectMedian: median(sels),
-    forcedPct: n ? Math.round(forced / n * 100) : null,
-    partialStepPct: n ? Math.round(partial / n * 100) : null,
-    freeRuns: runs.sort((a, b) => b.steps.length - a.steps.length)
-  };
-  const q = A.Quality.fromGeneration({
-    level: parsed,
-    valid: n > 0,
-    config: { boxSizeMin: 1, boxSizeMax: 999 },
-    goodV3: { fillCurve: curveObj, persist: {} }
-  });
   return {
-    completed: !!state.gameWon,
-    steps: n,
-    maxBuffer: Math.max(0, ...steps.map(s => parsed.bufferLimit - s.free)),
-    metrics: curveObj,
+    completed: curveObj.n > 0,
+    steps: curveObj.n,
+    forcedInstantStateCalls: forcedOpts.filter(Boolean).length,
+    metrics: {
+      freeLowPct: curveObj.freeLowPct,
+      freeRunMax: curveObj.freeRunMax,
+      fullMedian2: curveObj.fullMedian2,
+      selectMedian: curveObj.selectMedian,
+      forcedPct: curveObj.forcedPct,
+      partialStepPct: curveObj.partialStepPct,
+      freeRuns: runs.sort((a, b) => b.steps.length - a.steps.length)
+    },
     gatePass: !!q.gatePass,
     gateReasons: q.gateReasons || []
   };
