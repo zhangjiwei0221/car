@@ -3715,7 +3715,25 @@ AntSolver.Generator = (function() {
     // 【v528】瞬时计划车单是生成依据：摆盘不得再按需求曲线/角色/交错改序。
     var _preserveInstantOrder = !!(config && config._instantPlanStrict && config._instantPlayoutStat && config._instantPlayoutStat.ok);
     /** v528：按真实棋盘激活顺序排列所有可放车格；BFS 的每个子格都与已访问格相邻。 */
+    function instantSingleEntryPath(rows0, cols0, n) {
+      var path = [], dir = 1;
+      if (!(rows0 > 0 && cols0 > 0)) return path;
+      // 唯一第0行入口；之后隔行铺满，奇数行只保留一个连接格，避免相邻行形成旁路。
+      path.push([0, 0]);
+      for (var rr = 1; rr < rows0 && path.length < n; rr += 2) {
+        if (dir > 0) for (var cc = 0; cc < cols0 && path.length < n; cc++) path.push([rr, cc]);
+        else for (var cc2 = cols0 - 1; cc2 >= 0 && path.length < n; cc2--) path.push([rr, cc2]);
+        if (rr + 1 < rows0 && path.length < n) {
+          path.push([rr + 1, dir > 0 ? cols0 - 1 : 0]);
+        }
+        dir = -dir;
+      }
+      return path;
+    }
     function instantPlanCellOrder(cells0, rows0, cols0) {
+      if (config && config.instantPlanSingleEntry === true) {
+        return instantSingleEntryPath(rows0, cols0, boxes.length).map(function (p, i) { return [p[0], p[1], i]; });
+      }
       var seen = {}, q = [], out = [], dirs = [[-1,0],[1,0],[0,-1],[0,1]];
       for (var c0 = 0; c0 < cols0; c0++) {
         if (cells0[0][c0] == null) { seen['0,' + c0] = 1; q.push([0, c0]); }
@@ -3746,6 +3764,22 @@ AntSolver.Generator = (function() {
         _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi)
       });
     list.sort(function (a, b) { return a._seq - b._seq; });
+    // v529实验：单入口路径用于验证“低压绕路”是否由可替代出口造成；默认关，成功后再放开合理分支。
+    if (_preserveInstantOrder && config.instantPlanSingleEntry === true) {
+      var _singlePath = instantSingleEntryPath(rows, cols, boxes.length);
+      if (_singlePath.length >= boxes.length) {
+        for (var ar = 0; ar < rows; ar++) for (var ac = 0; ac < cols; ac++) cells[ar][ac] = { t: 'black' };
+        for (var pi = 0; pi < boxes.length; pi++) {
+          var pp = _singlePath[pi]; cells[pp[0]][pp[1]] = null;
+        }
+        if (pipeList) pipeList.length = 0;
+        if (struct.pipeList) struct.pipeList.length = 0;
+        struct.iceSlots = [];
+        struct.questionSlots = [];
+        struct.chainGroups = [];
+        timing.instantSingleEntry = { mode: 'snake-path', cells: boxes.length };
+      }
+    }
     // 【v239】再按【需求进度】重排：早熟的放浅位、晚熟的放深位。
     //   同需求进度时保留切序（消除序列），保证打法还是"由外向内"。
     var _dc = config && config._demandCurve;

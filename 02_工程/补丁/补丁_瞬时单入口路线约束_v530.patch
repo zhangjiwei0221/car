@@ -1,0 +1,1687 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index c9db37f..b8621ad 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -14,6 +14,7 @@
+ > v527：每色容量计划首版完成，007最小车2→16px、micro=0；006/010/007仍全覆盖、无死锁、aboveMax=0且结构出关。belowMin因区间数学不可分仍存在，下一步验证临界容量候选和整关体验。
+ > v528：瞬时计划车单已逐格落盘并可回放通关（006/010/007的37/27/46车均全过）；参考路线maxBuffer仅1/1/2，说明“按实机顺序造出来”已成立，但“造出好压力”尚未成立。下一步完整体验筛选和债务/释放规划。
+ > v529：`targetBuffer=4`债务策略让三图计划路线全过体验（52.2/75/78.6%，maxBuffer均4，release found）；但求解器最佳路线仍0/3，下一步约束实际可选路线/多路线压力底线。
++> v530：单入口隔行走廊可让plan/solver三图全过，但黑块43.8~53.8%，只作为路线约束上界证据，不接默认；下一步有限分支迷宫，兼顾高压与观感。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 7361f36..d25afa5 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20404,3 +20404,34 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. 下一步做棋盘路线约束/多路线压力底线：让计划高压路线成为显眼或必要路线，同时保留合理分支和释放选择。
+ 2. 不能用简单封死所有备选路线制造假难度；需比较首次分岔、路线压力分布和玩家可选性。
+ 3. target4策略尚未接默认；P4障碍仍应在路线压力问题解决后再做。
++
++### 520. 【2026-10-26】v530：单入口隔行走廊可强制高压，但黑块过高，拒绝采用
++
++#### 520.1 问题（原话）
++
++- “下一步。”
++- “不通过简单封死所有备选路线制造假难度。”
++
++#### 520.2 证据
++
++- target4计划路线三图全过，但普通棋盘每关约10条路线，只有计划路线高压，其余0~7%中段3/4。
++- 为验证路线约束的收益，实验把第0行压成1个入口、其余按隔行走廊连通：plan/solver均3/3通过，006/010/007为52.2/75/78.6%和4/4/4 maxBuffer。
++- 代价：黑块43.8~53.8%，且盘面8×10、6×8、9×11；不满足用户观感目标，不能采用。
++
++#### 520.3 改动
++
++- Kimi在严格瞬时计划路径增加可选`instantPlanSingleEntry`实验开关和`instantSingleEntryPath`；默认关，不影响四边或普通瞬时路径。
++- 新增`瞬时单入口约束_v530.js`，记录路线隔离、plan/solver体验、黑块、盘面与容量。
++- 不把单入口接入默认生产；保留为路线约束上界证据。
++
++#### 520.4 验证（改前后数字）
++
++- plan/solver：三图均完整pass，中段3/4=52.2/75/78.6%，maxBuffer=4，release found。
++- 观感保护：黑块43.8/53.8/53.5%，盘面6×8~9×11，明确判定不采用。
++- 容量守恒、aboveMax=0、计划格可回放仍保持；`node --check`与`git diff --check`通过。
++
++#### 520.5 遗留
++
++1. 实现有限分支迷宫：目标保留1~3条可解释分支，各分支压力不低于目标下限，同时黑块回到可接受范围。
++2. 优先用少量黑墙/空位形成瓶颈，不用末段冰链；后续障碍只做功能补充。
++3. 在多路线报告里加入“低压路线”最低压力，不再只接受一条高压参考路线。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 8baebdb..cc92ee1 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v529 瞬时目标债务策略）　|　当前版本：**v529**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v530 瞬时路线约束上界）　|　当前版本：**v530**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~519。v529用target4债务策略让三图计划路线全部通过体验（52.2/75/78.6%，maxBuffer均4，release found）；但求解器仍能走低压路线，solver pass=0/3，下一步约束实际可选路线。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~520。v530单入口约束证明三条路线隔离可让plan/solver全过，但黑块43.8~53.8%，不接默认；下一步做有限分支迷宫，在保留高压路线同时压回黑块。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index eaa8d18..6e90d0e 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -83,11 +83,13 @@
+ - **v529结果**：纯supply计划路线中段3/4为0/0/0；`targetBuffer=4 + maxDebt24/40`后计划路线达到52.2%/75%/78.6%，maxBuffer均4，release found。
+ - 边界：同一棋盘的求解器最佳路线仍走低压路线，solver pass=0/3；计划路线通过不等于玩家实际容易走进压力路线。
+ 
+-### 第6步：失败驱动修复（首轮参数已找到，路线约束下一项）
++### 第6步：失败驱动修复（债务参数已找到；有限分支路线约束下一项）
+ 
+ - 按压差/释放/结构/容量/摆盘分类路由。
+ - 一次只改一个因素；每次候选重新回放、求解、评价。
+ - 目标模式有总预算；连续快速无候选必须退避并记录真实原因。
++- **v529~v530边界**：target4债务计划路线三图全过，但普通盘面存在低压绕路；单入口隔行走廊可让plan/solver三图全过，代价是黑块43.8~53.8%、盘面偏大，不能接受。
++- 下一项不是继续单入口，而是保留1~3条有限高压力分支；以路线压力下限和黑块/盘面两个保护指标筛选。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 4e7bb81..bb9409d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v529 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=529">
++  <title>车接小人 v530 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=530">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v529</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v530</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,28 +773,28 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=529"></script>
+-  <script src="js/utils.js?v=529"></script>
++  <script src="js/zip.js?v=530"></script>
++  <script src="js/utils.js?v=530"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=529"></script>
+-  <script src="js/simulator.js?v=529"></script>
++  <script src="js/color-libs.js?v=530"></script>
++  <script src="js/simulator.js?v=530"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=529"></script>
+-  <script src="js/solver-strategy.js?v=529"></script>
+-  <script src="js/solver.js?v=529"></script>
+-  <script src="js/playersim.js?v=529"></script>
++  <script src="js/anchor-cut.js?v=530"></script>
++  <script src="js/solver-strategy.js?v=530"></script>
++  <script src="js/solver.js?v=530"></script>
++  <script src="js/playersim.js?v=530"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=529"></script>
+-  <script src="js/car-sequencer.js?v=529"></script>
+-  <script src="js/experience-goal.js?v=529"></script>
+-  <script src="js/capacity-tuner.js?v=529"></script>
+-  <script src="js/instant-playout.js?v=529"></script>
+-  <script src="js/generator.js?v=529"></script>
+-  <script src="js/source-preflight.js?v=529"></script>
+-  <script src="js/analysis.js?v=529"></script>
++  <script src="js/solver-analysis.js?v=530"></script>
++  <script src="js/car-sequencer.js?v=530"></script>
++  <script src="js/experience-goal.js?v=530"></script>
++  <script src="js/capacity-tuner.js?v=530"></script>
++  <script src="js/instant-playout.js?v=530"></script>
++  <script src="js/generator.js?v=530"></script>
++  <script src="js/source-preflight.js?v=530"></script>
++  <script src="js/analysis.js?v=530"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=529"></script>
+-  <script src="js/app.js?v=529"></script>
++  <script src="js/level-editor.js?v=530"></script>
++  <script src="js/app.js?v=530"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 7ddecc8..0d22a1a 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -3715,7 +3715,25 @@ AntSolver.Generator = (function() {
+     // 【v528】瞬时计划车单是生成依据：摆盘不得再按需求曲线/角色/交错改序。
+     var _preserveInstantOrder = !!(config && config._instantPlanStrict && config._instantPlayoutStat && config._instantPlayoutStat.ok);
+     /** v528：按真实棋盘激活顺序排列所有可放车格；BFS 的每个子格都与已访问格相邻。 */
++    function instantSingleEntryPath(rows0, cols0, n) {
++      var path = [], dir = 1;
++      if (!(rows0 > 0 && cols0 > 0)) return path;
++      // 唯一第0行入口；之后隔行铺满，奇数行只保留一个连接格，避免相邻行形成旁路。
++      path.push([0, 0]);
++      for (var rr = 1; rr < rows0 && path.length < n; rr += 2) {
++        if (dir > 0) for (var cc = 0; cc < cols0 && path.length < n; cc++) path.push([rr, cc]);
++        else for (var cc2 = cols0 - 1; cc2 >= 0 && path.length < n; cc2--) path.push([rr, cc2]);
++        if (rr + 1 < rows0 && path.length < n) {
++          path.push([rr + 1, dir > 0 ? cols0 - 1 : 0]);
++        }
++        dir = -dir;
++      }
++      return path;
++    }
+     function instantPlanCellOrder(cells0, rows0, cols0) {
++      if (config && config.instantPlanSingleEntry === true) {
++        return instantSingleEntryPath(rows0, cols0, boxes.length).map(function (p, i) { return [p[0], p[1], i]; });
++      }
+       var seen = {}, q = [], out = [], dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+       for (var c0 = 0; c0 < cols0; c0++) {
+         if (cells0[0][c0] == null) { seen['0,' + c0] = 1; q.push([0, c0]); }
+@@ -3746,6 +3764,22 @@ AntSolver.Generator = (function() {
+         _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi)
+       });
+     list.sort(function (a, b) { return a._seq - b._seq; });
++    // v529实验：单入口路径用于验证“低压绕路”是否由可替代出口造成；默认关，成功后再放开合理分支。
++    if (_preserveInstantOrder && config.instantPlanSingleEntry === true) {
++      var _singlePath = instantSingleEntryPath(rows, cols, boxes.length);
++      if (_singlePath.length >= boxes.length) {
++        for (var ar = 0; ar < rows; ar++) for (var ac = 0; ac < cols; ac++) cells[ar][ac] = { t: 'black' };
++        for (var pi = 0; pi < boxes.length; pi++) {
++          var pp = _singlePath[pi]; cells[pp[0]][pp[1]] = null;
++        }
++        if (pipeList) pipeList.length = 0;
++        if (struct.pipeList) struct.pipeList.length = 0;
++        struct.iceSlots = [];
++        struct.questionSlots = [];
++        struct.chainGroups = [];
++        timing.instantSingleEntry = { mode: 'snake-path', cells: boxes.length };
++      }
++    }
+     // 【v239】再按【需求进度】重排：早熟的放浅位、晚熟的放深位。
+     //   同需求进度时保留切序（消除序列），保证打法还是"由外向内"。
+     var _dc = config && config._demandCurve;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index eff9abc..e3e2204 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -64,6 +64,7 @@
+ | v527 每色容量计划 | 能否消掉2px并保持容量上界 | ✅ 007最小2→16px且micro=0；3图守恒/无死锁/aboveMax=0/结构过；belowMin 6/1/27为区间不可分 | `容量计划_v527.js` + JSON | §517 |
+ | v528 计划可回放落位 | 最终棋盘能否重演plan主车序 | ✅ 3图计划格逐项匹配、计划路线37/27/46步全部通关；maxBuffer仅1/1/2，转体验筛选 | `瞬时计划回放一致性_v528.js` + JSON | §518 |
+ | v529 瞬时债务策略 | 计划路线能否达到中段3/4并释放 | ✅ target4+debt24/40让3图计划路线全过（52.2/75/78.6%，max4，release found）；solver最佳路线仍0/3 | `瞬时债务策略_v529.js` + JSON | §519 |
++| v530 单入口路线隔离 | 封死替代路线能否让solver也高压 | ✅ plan/solver 3/3全过；但黑块43.8~53.8%、盘面偏大，拒绝默认，转有限分支 | `瞬时单入口约束_v530.js` + JSON | §520 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\345\215\225\345\205\245\345\217\243\347\272\246\346\235\237_v530.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\345\215\225\345\205\245\345\217\243\347\272\246\346\235\237_v530.js"
+new file mode 100644
+index 0000000..ed4be2f
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\345\215\225\345\205\245\345\217\243\347\272\246\346\235\237_v530.js"
+@@ -0,0 +1,35 @@
++#!/usr/bin/env node
++/** v530：单入口隔行走廊上界实验；只验证路线隔离效果，不作为默认生产。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator;
++function routeOf(level) { return level.board.instantPlanCells.map((p, i) => ({ r: p.r, c: p.c, color: p.color, count: p.count, step: i, chainIndex: 0 })); }
++function ev(level, route) { return A.ExperienceGoal.evaluate(level, { solveResult: { pickOrder: route, completed: true }, decision: true, instantChain: true }); }
++const out = { schema: 'instant-single-entry-bound-v1', date: '2026-10-26', rows: [] };
++for (const s of [{ id: '006', debt: 24, rows: 8, cols: 10 }, { id: '010', debt: 40, rows: 6, cols: 8 }, { id: '007', debt: 40, rows: 9, cols: 11 }]) {
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_' + s.id + '.txt'), 'utf8'));
++  const band = G.deriveCapacityBand(blocks), cfg = { seed: 1001, candidateCount: 1, rounds: 0, timeBudgetMs: 12000, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1], capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: s.rows, boardRowsMax: s.rows, boardColsMin: s.cols, boardColsMax: s.cols, boardHardRange: true, boardAuto: false, boardAllowSquare: true,
++    boardFitGuard: 'warn', p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4, instantPlanMaxDebt: s.debt, instantPlanSingleEntry: true };
++  const t = Date.now(), r = G.produceFixed(blocks, cfg), route = r && r.level ? routeOf(r.level) : [];
++  const planEv = r && r.level ? ev(r.level, route) : null, solverEv = r && r.level ? ev(r.level, r.solveResult.pickOrder) : null;
++  const cells = r && r.level ? [].concat.apply([], r.level.board.cells) : [], black = cells.filter(x => x && x.t === 'black').length;
++  out.rows.push({ image: s.id, ms: Date.now() - t, level: !!(r && r.level), board: r && r.level ? { rows: r.level.board.rows, cols: r.level.board.cols } : null,
++    black, blackPct: r && r.level ? +(black / (r.level.board.rows * r.level.board.cols) * 100).toFixed(1) : null,
++    planPass: !!(planEv && planEv.pass), solverPass: !!(solverEv && solverEv.pass),
++    plan: planEv && { mid: planEv.metrics.midBuffer34Pct, max: planEv.metrics.maxBuffer, release: planEv.releaseDecision && planEv.releaseDecision.status },
++    solver: solverEv && { mid: solverEv.metrics.midBuffer34Pct, max: solverEv.metrics.maxBuffer, release: solverEv.releaseDecision && solverEv.releaseDecision.status },
++    capacity: r && r.level ? A.Quality.capacityEvidence(r.level, r.config || cfg) : null });
++  console.log(JSON.stringify(out.rows[out.rows.length - 1]));
++}
++out.summary = { rows: out.rows.length, planPass: out.rows.filter(x => x.planPass).length, solverPass: out.rows.filter(x => x.solverPass).length,
++  maxBlackPct: Math.max.apply(null, out.rows.map(x => x.blackPct || 0)), acceptedAsDefault: false,
++  decision: '路线隔离有效，但黑块43.8~53.8%且盘面偏大，不接默认；下一步改为有限分支迷宫。' };
++fs.writeFileSync(path.join(__dirname, '瞬时单入口约束_v530.json'), JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify(out.summary, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\345\215\225\345\205\245\345\217\243\347\272\246\346\235\237_v530.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\345\215\225\345\205\245\345\217\243\347\272\246\346\235\237_v530.json"
+new file mode 100644
+index 0000000..815933a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\345\215\225\345\205\245\345\217\243\347\272\246\346\235\237_v530.json"
+@@ -0,0 +1,233 @@
++{
++  "schema": "instant-single-entry-bound-v1",
++  "date": "2026-10-26",
++  "rows": [
++    {
++      "image": "006",
++      "ms": 1182,
++      "level": true,
++      "board": {
++        "rows": 8,
++        "cols": 10
++      },
++      "black": 43,
++      "blackPct": 53.8,
++      "planPass": true,
++      "solverPass": true,
++      "plan": {
++        "mid": 52.2,
++        "max": 4,
++        "release": "found"
++      },
++      "solver": {
++        "mid": 52.2,
++        "max": 4,
++        "release": "found"
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 8,
++        "cols": 10,
++        "boardFloorPass": true,
++        "cars": 37,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 19,
++        "maxCap": 38,
++        "boxSizeMin": 31,
++        "boxSizeMax": 40,
++        "belowMin": 6,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 4,
++            "total": 61
++          },
++          {
++            "color": 13,
++            "total": 55
++          },
++          {
++            "color": 14,
++            "total": 89
++          },
++          {
++            "color": 33,
++            "total": 41
++          },
++          {
++            "color": 34,
++            "total": 50
++          }
++        ],
++        "row0Cars": 1,
++        "row0Colors": 1,
++        "row0MaxSameColor": 1,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      }
++    },
++    {
++      "image": "010",
++      "ms": 844,
++      "level": true,
++      "board": {
++        "rows": 6,
++        "cols": 8
++      },
++      "black": 21,
++      "blackPct": 43.8,
++      "planPass": true,
++      "solverPass": true,
++      "plan": {
++        "mid": 75,
++        "max": 4,
++        "release": "found"
++      },
++      "solver": {
++        "mid": 75,
++        "max": 4,
++        "release": "found"
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 8,
++        "boardFloorPass": true,
++        "cars": 27,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 32,
++        "maxCap": 54,
++        "boxSizeMin": 35,
++        "boxSizeMax": 54,
++        "belowMin": 1,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 14,
++            "total": 32
++          }
++        ],
++        "row0Cars": 1,
++        "row0Colors": 1,
++        "row0MaxSameColor": 1,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      }
++    },
++    {
++      "image": "007",
++      "ms": 859,
++      "level": true,
++      "board": {
++        "rows": 9,
++        "cols": 11
++      },
++      "black": 53,
++      "blackPct": 53.5,
++      "planPass": true,
++      "solverPass": true,
++      "plan": {
++        "mid": 78.6,
++        "max": 4,
++        "release": "found"
++      },
++      "solver": {
++        "mid": 78.6,
++        "max": 4,
++        "release": "found"
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 9,
++        "cols": 11,
++        "boardFloorPass": true,
++        "cars": 46,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 16,
++        "maxCap": 31,
++        "boxSizeMin": 31,
++        "boxSizeMax": 31,
++        "belowMin": 27,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 1,
++            "total": 52
++          },
++          {
++            "color": 5,
++            "total": 30
++          },
++          {
++            "color": 13,
++            "total": 37
++          },
++          {
++            "color": 14,
++            "total": 33
++          },
++          {
++            "color": 15,
++            "total": 52
++          },
++          {
++            "color": 16,
++            "total": 70
++          },
++          {
++            "color": 28,
++            "total": 53
++          },
++          {
++            "color": 30,
++            "total": 35
++          },
++          {
++            "color": 31,
++            "total": 58
++          },
++          {
++            "color": 32,
++            "total": 39
++          },
++          {
++            "color": 33,
++            "total": 50
++          },
++          {
++            "color": 34,
++            "total": 282
++          }
++        ],
++        "row0Cars": 1,
++        "row0Colors": 1,
++        "row0MaxSameColor": 1,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      }
++    }
++  ],
++  "summary": {
++    "rows": 3,
++    "planPass": 3,
++    "solverPass": 3,
++    "maxBlackPct": 53.8,
++    "acceptedAsDefault": false,
++    "decision": "路线隔离有效，但黑块43.8~53.8%且盘面偏大，不接默认；下一步改为有限分支迷宫。"
++  }
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\256\241\345\210\222\345\233\236\346\224\276\344\270\200\350\207\264\346\200\247_v528.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\256\241\345\210\222\345\233\236\346\224\276\344\270\200\350\207\264\346\200\247_v528.json"
+index 0012fcd..f17e1b7 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\256\241\345\210\222\345\233\236\346\224\276\344\270\200\350\207\264\346\200\247_v528.json"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\256\241\345\210\222\345\233\236\346\224\276\344\270\200\350\207\264\346\200\247_v528.json"
+@@ -3,7 +3,7 @@
+   "date": "2026-10-26",
+   "images": {
+     "006": {
+-      "ms": 703,
++      "ms": 807,
+       "level": true,
+       "valid": true,
+       "planCars": 37,
+@@ -346,7 +346,7 @@
+       }
+     },
+     "010": {
+-      "ms": 467,
++      "ms": 621,
+       "level": true,
+       "valid": true,
+       "planCars": 27,
+@@ -689,7 +689,7 @@
+       }
+     },
+     "007": {
+-      "ms": 809,
++      "ms": 847,
+       "level": true,
+       "valid": true,
+       "planCars": 46,
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\267\257\347\272\277\345\210\206\345\270\203_v530.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\267\257\347\272\277\345\210\206\345\270\203_v530.js"
+new file mode 100644
+index 0000000..83943d9
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\267\257\347\272\277\345\210\206\345\270\203_v530.js"
+@@ -0,0 +1,43 @@
++#!/usr/bin/env node
++/** v530：target4计划关卡的路线分布与压力对比，先只读不约束。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator;
++function routeOf(planCells) { return planCells.map((p, i) => ({ r: p.r, c: p.c, color: p.color, count: p.count, step: i, chainIndex: 0 })); }
++function slim(ev) { return ev && { pass: ev.pass, status: ev.status, reasons: ev.reasons, metrics: ev.metrics,
++  release: ev.releaseDecision && { status: ev.releaseDecision.status, found: ev.releaseDecision.found, evidence: ev.releaseDecision.evidence } }; }
++const out = { schema: 'instant-route-distribution-v1', date: '2026-10-26', rows: [] };
++const specs = [{ id: '006', debt: 24 }, { id: '010', debt: 40 }, { id: '007', debt: 40 }];
++for (const s of specs) {
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_' + s.id + '.txt'), 'utf8'));
++  const band = G.deriveCapacityBand(blocks), cfg = { seed: 1001, candidateCount: 1, rounds: 0, timeBudgetMs: 12000, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1], capNormMin: band.band[0], capNormMax: band.band[1], boardRowsMin: 6, boardRowsMax: 9, boardColsMin: 6, boardColsMax: 11,
++    boardHardRange: true, boardAllowSquare: true, p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4, instantPlanMaxDebt: s.debt };
++  const t = Date.now(), r = G.produceFixed(blocks, cfg), planCells = r && r.level && r.level.board.instantPlanCells || [];
++  const planRoute = routeOf(planCells), planEv = r && r.level ? A.ExperienceGoal.evaluate(r.level, { solveResult: { pickOrder: planRoute, completed: true }, decision: true, instantChain: true }) : null;
++  const multi = r && r.level ? A.SolverAnalysis.findRoutes(r.level, { instantChain: true, timeBudgetMs: 2500, maxNodes: 8000, beamWidth: 24, branchWidth: 8, maxRoutes: 8 }) : null;
++  const routes = [];
++  if (r && r.level) routes.push({ source: 'plan', sig: planRoute.map(x => x.r + ',' + x.c).join(' '), ev: slim(planEv) });
++  if (r && r.level && r.solveResult) {
++    const ev = A.ExperienceGoal.evaluate(r.level, { solveResult: r.solveResult, decision: true, instantChain: true });
++    routes.push({ source: 'solver-best', sig: (r.solveResult.pickOrder || []).map(x => x.r + ',' + x.c).join(' '), ev: slim(ev) });
++  }
++  for (const q of (multi && multi.routes || [])) {
++    if (routes.some(x => x.sig === (q.signature || (q.actions || []).map(a => a.r + ',' + a.c).join(' ')))) continue;
++    const ev = A.ExperienceGoal.evaluate(r.level, { solveResult: { pickOrder: q.actions || q.pickOrder || [], completed: true }, decision: true, instantChain: true });
++    routes.push({ source: 'beam', sig: q.signature || '', ev: slim(ev) });
++  }
++  const row = { image: s.id, debt: s.debt, ms: Date.now() - t, level: !!(r && r.level), planMaxBuffer: r && r.config && r.config._instantPlayoutStat && r.config._instantPlayoutStat.maxBuffer,
++    routeCount: routes.length, planPass: !!(planEv && planEv.pass), solverPass: !!(routes.find(x => x.source === 'solver-best') && routes.find(x => x.source === 'solver-best').ev.pass),
++    minRouteMid: Math.min(...routes.map(x => x.ev && x.ev.metrics && x.ev.metrics.midBuffer34Pct != null ? x.ev.metrics.midBuffer34Pct : 0)),
++    maxRouteMid: Math.max(...routes.map(x => x.ev && x.ev.metrics && x.ev.metrics.midBuffer34Pct || 0)), routes };
++  out.rows.push(row); console.log(JSON.stringify({ image: s.id, routeCount: row.routeCount, planMid: planEv && planEv.metrics.midBuffer34Pct,
++    solverMid: routes.find(x => x.source === 'solver-best') && routes.find(x => x.source === 'solver-best').ev.metrics.midBuffer34Pct,
++    minRouteMid: row.minRouteMid, maxRouteMid: row.maxRouteMid, sources: routes.map(x => ({ source: x.source, pass: x.ev.pass, mid: x.ev.metrics && x.ev.metrics.midBuffer34Pct, max: x.ev.metrics && x.ev.metrics.maxBuffer, rel: x.ev.release && x.ev.release.status })) }));
++}
++fs.writeFileSync(path.join(__dirname, '瞬时路线分布_v530.json'), JSON.stringify(out, null, 2) + '\n');
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\267\257\347\272\277\345\210\206\345\270\203_v530.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\267\257\347\272\277\345\210\206\345\270\203_v530.json"
+new file mode 100644
+index 0000000..d6869d7
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\350\267\257\347\272\277\345\210\206\345\270\203_v530.json"
+@@ -0,0 +1,1089 @@
++{
++  "schema": "instant-route-distribution-v1",
++  "date": "2026-10-26",
++  "rows": [
++    {
++      "image": "006",
++      "debt": 24,
++      "ms": 3219,
++      "level": true,
++      "planMaxBuffer": 5,
++      "routeCount": 10,
++      "planPass": true,
++      "solverPass": false,
++      "minRouteMid": 4.2,
++      "maxRouteMid": 52.2,
++      "routes": [
++        {
++          "source": "plan",
++          "sig": "0,0 0,1 0,2 0,3 0,4 0,5 0,6 0,7 1,0 1,1 1,2 1,3 1,4 1,5 1,6 1,7 2,0 2,1 2,2 2,3 2,4 2,5 2,6 2,7 3,0 3,1 3,2 3,3 3,6 4,1 4,3 4,6 5,1 4,4 5,6 4,5 4,7",
++          "ev": {
++            "pass": true,
++            "status": "pass",
++            "reasons": [],
++            "metrics": {
++              "midSteps": 23,
++              "midBuffer34Pct": 52.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 2,
++              "oscillationCount": 4,
++              "lateHighPressurePct": 25,
++              "maxBuffer": 4,
++              "distance": 0
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 13,
++                "progress": 0.324,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 1,
++                  "c": 4,
++                  "color": 30
++                },
++                "minBufferWithinWindow": 0,
++                "releaseAmplitude": 3,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 24,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "solver-best",
++          "sig": "0,0 0,2 0,3 0,1 0,4 1,1 0,7 2,1 1,2 1,0 2,2 1,4 3,2 3,3 1,5 0,5 4,3 0,6 3,1 1,3 2,3 1,6 4,4 4,1 2,0 4,5 2,4 2,6 1,7 2,7 3,6 2,5 4,6 5,6 3,0 5,1 4,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 12.5,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 31,
++                "progress": 0.823,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 3,
++                  "c": 6,
++                  "color": 4
++                },
++                "minBufferWithinWindow": 0,
++                "releaseAmplitude": 3,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 6,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 3,3 2,0 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 4,5 0,7 2,4 2,5 2,7 4,6 5,6 3,6 3,0 5,1 1,7 4,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 0,
++                "releaseAmplitude": 3,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 3,3 2,0 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 4,5 0,7 2,4 2,5 2,7 4,6 5,6 3,6 3,0 5,1 4,7 1,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 0,
++                "releaseAmplitude": 3,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 2,0 3,3 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 4,5 0,7 2,4 2,5 2,7 4,6 5,6 3,6 3,0 5,1 4,7 1,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 0,
++                "releaseAmplitude": 3,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 3,3 2,0 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 4,5 0,7 2,4 2,5 2,7 4,6 5,6 3,6 5,1 1,7 4,7 3,0",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 0,
++                "releaseAmplitude": 3,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 3,3 2,0 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 4,5 0,7 2,4 2,5 2,7 4,6 3,6 3,0 5,1 1,7 4,7 5,6",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 1,
++                "releaseAmplitude": 2,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 3,3 2,0 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 0,7 4,5 2,4 2,5 2,7 4,6 3,6 3,0 5,1 1,7 4,7 5,6",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 1,
++                "releaseAmplitude": 2,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 3,3 2,0 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 4,5 2,4 0,7 2,5 2,7 4,6 3,6 3,0 5,1 1,7 4,7 5,6",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 1,
++                "releaseAmplitude": 2,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,2 0,4 1,4 1,2 1,1 2,1 1,5 2,2 1,6 2,6 0,3 0,1 3,2 0,0 2,0 3,3 0,5 4,3 3,1 4,1 4,4 1,3 2,3 1,0 0,6 4,5 0,7 2,4 2,5 2,7 4,6 3,6 3,0 5,1 1,7 4,7 5,6",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing"
++            ],
++            "metrics": {
++              "midSteps": 24,
++              "midBuffer34Pct": 4.2,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 11.1,
++              "maxBuffer": 3,
++              "distance": 70.8
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 30,
++                "progress": 0.805,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 2,
++                  "c": 7,
++                  "color": 15
++                },
++                "minBufferWithinWindow": 1,
++                "releaseAmplitude": 2,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 7,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        }
++      ]
++    },
++    {
++      "image": "010",
++      "debt": 40,
++      "ms": 1869,
++      "level": true,
++      "planMaxBuffer": 5,
++      "routeCount": 10,
++      "planPass": true,
++      "solverPass": false,
++      "minRouteMid": 0,
++      "maxRouteMid": 75,
++      "routes": [
++        {
++          "source": "plan",
++          "sig": "0,0 0,1 0,2 0,3 0,4 0,5 0,6 1,0 1,1 1,2 1,3 1,4 1,5 1,6 2,0 2,1 2,2 2,3 2,5 2,6 3,1 3,3 3,5 4,1 3,4 4,5 4,6",
++          "ev": {
++            "pass": true,
++            "status": "pass",
++            "reasons": [],
++            "metrics": {
++              "midSteps": 16,
++              "midBuffer34Pct": 75,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 2,
++              "lateHighPressurePct": 50,
++              "maxBuffer": 4,
++              "distance": 0
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 10,
++                "progress": 0.278,
++                "beforeBuffer": 3,
++                "action": {
++                  "r": 1,
++                  "c": 2,
++                  "color": 5
++                },
++                "minBufferWithinWindow": 1,
++                "releaseAmplitude": 2,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 17,
++                "source": "reference_action_resolved",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "solver-best",
++          "sig": "0,0 0,1 0,2 0,3 1,2 1,3 2,3 1,4 2,2 2,1 3,1 3,3 3,4 3,5 0,4 1,1 4,1 0,6 1,6 2,0 4,5 4,6 1,5 2,6 2,5 1,0 0,5",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 3,1 3,3 3,4 3,5 0,1 1,1 1,3 0,6 4,1 1,6 2,0 4,5 4,6 2,6 2,5 1,0 1,5 0,5",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 3,1 3,3 3,4 3,5 0,1 1,1 1,3 0,6 4,1 1,6 2,0 4,5 4,6 2,6 1,5 2,5 0,5 1,0",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 3,1 3,3 3,4 3,5 1,3 0,1 1,1 0,6 4,1 1,6 2,0 4,5 4,6 2,6 1,5 2,5 0,5 1,0",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 3,1 3,3 3,4 3,5 0,1 1,1 1,3 1,0 4,1 2,5 2,0 4,5 4,6 2,6 1,5 1,6 0,5 0,6",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 3,1 3,3 3,4 3,5 0,1 1,1 1,3 4,1 0,6 1,6 2,0 4,5 4,6 2,6 1,5 2,5 0,5 1,0",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 1,3 3,1 3,3 3,4 3,5 0,1 1,1 0,6 4,1 1,6 2,0 4,5 4,6 2,6 1,5 2,5 0,5 1,0",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 3,1 3,3 3,4 3,5 0,1 1,1 1,3 4,1 1,0 2,5 2,0 4,5 4,6 2,6 1,5 1,6 0,5 0,6",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,0 0,2 0,4 1,2 0,3 1,4 2,2 2,1 2,3 3,1 3,3 3,4 3,5 0,1 1,3 1,1 0,6 4,1 1,6 2,0 4,5 4,6 2,6 1,5 2,5 0,5 1,0",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 18,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        }
++      ]
++    },
++    {
++      "image": "007",
++      "debt": 40,
++      "ms": 4026,
++      "level": true,
++      "planMaxBuffer": 5,
++      "routeCount": 10,
++      "planPass": true,
++      "solverPass": false,
++      "minRouteMid": 0,
++      "maxRouteMid": 78.6,
++      "routes": [
++        {
++          "source": "plan",
++          "sig": "0,0 0,1 0,2 0,3 0,4 0,5 0,6 0,7 1,0 1,1 1,2 1,3 1,4 1,5 1,6 1,7 2,0 2,1 2,2 2,3 2,4 2,5 2,6 2,7 3,0 3,1 3,2 3,3 3,6 4,1 4,3 4,6 5,1 5,3 4,4 5,6 4,5 4,7 5,0 5,2 5,4 6,6 5,5 5,7 6,5 6,7",
++          "ev": {
++            "pass": true,
++            "status": "pass",
++            "reasons": [],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 78.6,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 1,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 0
++            },
++            "release": {
++              "status": "found",
++              "found": true,
++              "evidence": {
++                "referenceStep": 13,
++                "progress": 0.222,
++                "beforeBuffer": 4,
++                "action": {
++                  "r": 1,
++                  "c": 4,
++                  "color": 19
++                },
++                "minBufferWithinWindow": 3,
++                "releaseAmplitude": 1,
++                "releaseWindow": 4,
++                "finalReplayValid": true,
++                "routeActions": 33,
++                "source": "reference_action",
++                "choiceContrast": null
++              }
++            }
++          }
++        },
++        {
++          "source": "solver-best",
++          "sig": "0,0 0,2 0,3 0,1 0,5 0,4 1,4 2,4 0,6 1,0 0,7 1,6 2,6 2,0 2,1 2,3 3,0 3,6 2,5 2,7 3,1 1,1 3,3 4,3 5,3 1,7 1,3 4,6 4,7 3,2 1,5 4,4 5,2 5,1 5,4 4,1 5,6 6,6 4,5 5,5 5,7 2,2 1,2 6,5 5,0 6,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 29,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 2,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,4 5,6 6,6 4,5 4,4 6,5 0,7 5,2 6,7 5,5 5,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,4 5,6 6,6 4,5 4,4 6,5 0,7 5,2 6,7 5,7 5,5",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,6 5,4 6,6 4,5 4,4 6,5 0,7 5,2 6,7 5,7 5,5",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,4 5,6 6,6 0,7 5,2 5,7 4,4 6,5 6,7 5,5 4,5",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,4 5,6 6,6 4,5 4,4 6,5 0,7 5,2 5,5 5,7 6,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,4 5,6 6,6 0,7 4,4 5,2 4,5 5,5 5,7 6,5 6,7",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,4 5,6 6,6 4,5 4,4 6,5 0,7 6,7 5,5 5,7 5,2",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        },
++        {
++          "source": "beam",
++          "sig": "0,6 1,6 2,6 2,5 2,4 2,3 3,3 0,0 0,1 3,2 3,6 3,1 0,2 2,1 0,3 4,1 4,3 1,5 0,5 1,4 5,3 2,0 2,7 0,4 1,7 4,6 4,7 1,1 5,1 1,3 1,0 3,0 5,0 1,2 2,2 5,4 5,6 6,6 0,7 5,2 4,5 6,7 6,5 5,5 5,7 4,4",
++          "ev": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "buffer34_below_50",
++              "significant_release_missing",
++              "release_decision_no_high_pressure_state"
++            ],
++            "metrics": {
++              "midSteps": 28,
++              "midBuffer34Pct": 0,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 0,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 1,
++              "distance": 100
++            },
++            "release": {
++              "status": "no_high_pressure_state",
++              "found": false,
++              "evidence": null
++            }
++          }
++        }
++      ]
++    }
++  ]
++}
+diff --git a/README.md b/README.md
+index 58e70ca..1cd0779 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v529**（瞬时目标债务策略已找到计划路线正结果；路线约束继续）。
++> 当前版本 **v530**（瞬时路线约束上界已验证；有限分支迷宫继续）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
