@@ -308,7 +308,7 @@ AntSolver.Generator = (function() {
     baseFillByElimOrder: true,   // 确定棋盘骨架后，基础填球按【目标图底→顶趋势=消除顺序】自顶向下顺序填入(先消除的盒放顶部先可达)；关=旧交错随机铺盒
     elimOrderScatterPercent: 5,  // 基础顺序填入【之后】的单色交错扰动比例：随机把富余色少量盒与远处盒【换位】(守恒,只换位置)制造暂存压力；0=纯顺序不打散
     // ===== 目标图消除入口模式（ANT-GEN-BOTTOM-ONLY-20260729）=====
-    // false(默认)：四边入口——v95 既有行为，本字段引入前后完全一致。旧方案 JSON 无此字段时也按 false。
+    // false：四边入口（显式对照）。缺省模式已改为四方向瞬时连锁，见下方 instantChain。
     // true ：仅底部入口——目标图上/左/右三边视作封闭，只能从底边开始向内消除。
     //   开启后本关【全链路同一口径】：底部依赖盒切分(baseFillBoxesBottom) → 候选筛选(1遍基础+3遍噪声)
     //   → 卡点分支重求解 → 三步前瞻可达 → 暂存自动释放 → 锁链滞留 → 管道推出后消除
@@ -317,14 +317,14 @@ AntSolver.Generator = (function() {
     //   生产前会先跑 checkBottomEntryFeasibility 判源图在该规则下是否全图可达，不可达直接不进候选。
     bottomOnly: false,
     // ===== 第三种玩法模式：四方向瞬时连锁消除（需求 08.03，用户 2026-08-03 批准）=====
-    // false(默认)：走原有两种模式，行为与本字段引入前完全一致；旧方案 JSON 无此字段时也按 false。
-    // true ：四方向瞬时连锁消除。与 bottomOnly 互斥（本模式固定四方向可达，不接受底部单入口）。
+    // true(默认)：四方向瞬时连锁消除，与实机规则一致。与 bottomOnly 互斥。
+    // false：显式回退四边入口或底部入口，用于历史复现/对照。
     //   开启后本关【全链路同一口径】：四方向盒切分 → 候选筛选(1遍基础+3遍噪声) → 卡点分支重求解
     //   → 三步前瞻 → 暂存自动释放(严格先进先得) → 全知求解 → 玩家模拟 → 审核与难度。
     //   结算差异只在「怎么选像素」：每轮快照当前可达同色全集，按离该订单暂存起点的距离近优先，
     //   消到订单剩余容量为止，目标图整体刷新后再重扫下一轮（详见 simulator.instantChainEliminate）。
-    instantChain: false,
-    elimOrder: 'ring',      // 生成侧分析序：由 ruleMode 派生；instantChain 固定 instant
+    instantChain: true,
+    elimOrder: 'instant',   // 生成侧分析序：由 ruleMode 派生；缺省按瞬时连锁
     // ===== 生产前置碎色闸门（任务 ANT-GEN-FRAGMENT-GATE-20260824，用户 2026-08-24 批准）=====
     // fragmentMaxRate：目标图碎色率上限。**0 = 关闭**（默认，行为与本参数引入前完全一致）。
     //   >0 时在 produceFixed 生成候选【之前】判定：碎色率超过该值 → 直接跳过该源图，
@@ -6666,7 +6666,9 @@ AntSolver.Generator = (function() {
     var mode = o.ruleMode;
     if (mode === 'fourSideInstantChain' || mode === 'instantChain') mode = 'instantChain';
     if (mode !== 'fourSide' && mode !== 'bottomOnly' && mode !== 'instantChain') {
-      mode = o.instantChain ? 'instantChain' : (o.bottomOnly ? 'bottomOnly' : 'fourSide');
+      if (o.bottomOnly === true) mode = 'bottomOnly';
+      else if (o.instantChain === false) mode = 'fourSide';
+      else mode = 'instantChain';
     }
     o.ruleMode = mode;
     o.instantChain = mode === 'instantChain';

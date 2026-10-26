@@ -19,14 +19,15 @@ AntSolver.App = (function() {
   // 【v120】当前关卡的卡点类型信息与位置（仅本次在页面上生成的关卡才有；导入的关卡本体不含这些）。
   //   { plan, marks, dropped, pos } —— 供 renderLevelInfo 在「关卡信息」面板显示「什么卡点、在哪、参数多少」。
   var currentChokeInfo = null;
-  // 当前单关的【目标图入口模式】：'fourSide'|'bottomOnly'。生成时按当次配置记下，导入/换关时清回默认。
+  // 当前单关的【目标图入口模式】：'fourSide'|'bottomOnly'|'fourSideInstantChain'。
+  // 生成时按当次配置记下；导入/换关时按实机默认回到四方向瞬时连锁。
   // 只用于单关导出记录与显示；关卡 JSON 本体不含该字段（用户决定 D1）。
-  var currentEntryMode = 'fourSide';
+  var currentEntryMode = 'fourSideInstantChain';
   // v99：三种玩法模式互斥，统一从 config 推导 entryMode，避免各处各写一遍三元表达式导致漏改。
   function entryModeOf(cfg) {
     if (cfg && cfg.instantChain) return 'fourSideInstantChain';
     if (cfg && cfg.bottomOnly) return 'bottomOnly';
-    return 'fourSide';
+    return (cfg && cfg.instantChain === false) ? 'fourSide' : 'fourSideInstantChain';
   }
   // ===== v121·任务AK① 入口模式（玩法）识别的三个转换工具 =====
   // 工程里同一个概念有三套命名，混用过一次就会静默按错玩法加载，故集中在这里显式转换：
@@ -1756,10 +1757,8 @@ AntSolver.App = (function() {
       currentImportedSolve = entry.solve || null;   // 有求解数据→模拟图表复用、免重算
       currentGenerationEval = entry.generationEval || null;
       // ===== v121·任务AK① 按导入数据里记录的玩法加载 =====
-      // loadLevel 会把 currentEntryMode 复位成 'fourSide'（它无从得知本关玩法），故必须在其后设置。
-      // 识别不到时**如实回落四边入口并标注「未知玩法」**，不靠棋盘结构去猜（猜错会让整关的
-      // 求解/玩家模拟/难度全部按错规则跑，而页面上看不出任何异常）。
-      currentEntryMode = entry.entryMode || 'fourSide';
+      // loadLevel 会把 currentEntryMode 复位成实机默认瞬时连锁；导入数据有明确玩法时覆盖它。
+      currentEntryMode = entry.entryMode || 'fourSideInstantChain';
       // 同步手点消除模式下拉：enterSimulation / doReset 都按下拉取值套用模式，
       // 这里不同步的话，进入模拟后手点消除仍按四边入口走。
       syncElimModeSelect(elimModeOfEntry(currentEntryMode));
@@ -1847,7 +1846,7 @@ AntSolver.App = (function() {
 
   function getGenConfig() {
     var _ruleSel = (document.getElementById('gen-bottom-only') || {}).value;
-    var _ruleMode = _ruleSel === '2' ? 'instantChain' : (_ruleSel === '1' ? 'bottomOnly' : 'fourSide');
+    var _ruleMode = _ruleSel === '1' ? 'bottomOnly' : (_ruleSel === '0' ? 'fourSide' : 'instantChain');
     return {
       // 目标图消除入口模式（三态单选，整批统一）：
       //   '1' = 仅底部入口（上/左/右封闭）
@@ -2109,8 +2108,8 @@ AntSolver.App = (function() {
     currentImportedSolve = null;   // 默认无导入求解数据（生成/TXT关卡→需要时重新求解）
     currentGenerationEval = null;
     currentChokeInfo = null;      // v120：换关先清空卡点信息，避免把上一关的卡点显示到这一关上
-    // 入口模式回默认：导入的关卡本体不含该字段，无从得知；生成路径会在 loadLevel 之后按本次配置重设。
-    currentEntryMode = 'fourSide';
+    // 入口模式回实机默认；生成路径会在 loadLevel 之后按本次配置重设。
+    currentEntryMode = 'fourSideInstantChain';
     currentLevel = AntSolver.parseLevel(json);
     document.getElementById('btn-simulate').disabled = false;
     document.getElementById('btn-export').disabled = false;
@@ -3725,8 +3724,8 @@ AntSolver.App = (function() {
   }
   function elimModeSelected() {
     var el = document.getElementById('sim-elim-mode');
-    var v = el ? el.value : 'fourSide';
-    return (v === 'bottomOnly' || v === 'instantChain') ? v : 'fourSide';
+    var v = el ? el.value : 'instantChain';
+    return v === 'bottomOnly' ? 'bottomOnly' : (v === 'fourSide' ? 'fourSide' : 'instantChain');
   }
   // 【2026-10-14】「圈」多久重算一次：frozen（整盒冻结，默认）| layer（每层重算）| pixel（每人重算）
   function pickLayerLabel(v) {
@@ -6490,7 +6489,7 @@ AntSolver.App = (function() {
       capacityAudit: rec.capacityAudit || null, appliedParams: rec.appliedParams || null,
       experienceFinalError: rec.experienceFinalError || null,
       goalBudgetEvidence: rec.goalBudgetEvidence || null,
-      entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
+      entryMode: rec.entryMode || 'fourSideInstantChain',   // 目标图入口模式（落库记录用；关卡本体不含）
       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
       chokeCount: rec.chokeCount || 0, isBossSlot: !!rec.isBossSlot, chokeStat: rec.chokeStat || null,
@@ -6516,7 +6515,7 @@ AntSolver.App = (function() {
         name: entry.name, valid: !!rec.valid, difficulty: rec.difficulty, grade: rec.grade,
         // 多轮难度标定口径(任务 ANT-DIFF-MULTIROUND-PROD-20260901)：轮数/单轮对照/稳定性
         difficultyCalibration: rec.difficultyCalibration || null, difficultySingle: rec.difficultySingle != null ? rec.difficultySingle : null,
-        entryMode: rec.entryMode || 'fourSide',
+        entryMode: rec.entryMode || 'fourSideInstantChain',
         bufferLimit: rec.level ? rec.level.bufferLimit : null,
         blocks: rec.level ? rec.level.blocks : null, board: rec.level ? rec.level.board : null,
         audit: rec.audit || null, generationEval: rec.generationEval || null, solve: rec.solve || null,
@@ -8064,9 +8063,9 @@ AntSolver.App = (function() {
     if (!lv || !lv.board || !lv.board.rows) return false;
 
     if (enterSim) { stopAutoPlay(); stopAnim(); stopFlash(); stopLive(); }
-    // loadLevel 会把三项生成侧缓存清空、并把入口模式复位成四边 —— 所以赋值必须【在它之后】。
+    // loadLevel 会清空生成侧缓存并复位为瞬时默认，所以玩法赋值必须【在它之后】。
     loadLevel(lv);
-    currentEntryMode = rec.entryMode || 'fourSide';
+    currentEntryMode = rec.entryMode || 'fourSideInstantChain';
     syncElimModeSelect(elimModeOfEntry(currentEntryMode));
     currentGenerationEval = rec.generationEval || null;
     currentImportedSolve = (rec.solve && rec.solve.pressureSamples && rec.solve.pressureSamples.length) ? {

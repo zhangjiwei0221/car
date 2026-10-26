@@ -6,13 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>车接小人 v556 · 目标生产全链路</title>
-  <link rel="stylesheet" href="css/style.css?v=556">
+  <title>车接小人 v557 · 目标生产全链路</title>
+  <link rel="stylesheet" href="css/style.css?v=557">
 </head>
 <body>
   <header>
     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v556</span></h1>
+    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v557</span></h1>
     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
          退出模拟就自动回到生成器的参数面板。 -->
@@ -228,10 +228,10 @@
              求解路线下拉默认「跟随当前」，因此会自动与这里保持一致。 -->
         <div class="ctl-row">
           <label>消除模式</label>
-          <select id="sim-elim-mode" title="手点模拟按哪种规则消除。四边入口=现有默认玩法；仅底部入口=只能从底边向内消除；四方向瞬时连锁=每次取盒后一次性快照批量结算。切换会重置本局进度">
-            <option value="fourSide" selected>四边入口(默认)</option>
+          <select id="sim-elim-mode" title="手点模拟按哪种规则消除。四方向瞬时连锁=实机默认；四边入口和仅底部入口保留作对照。切换会重置本局进度">
+            <option value="fourSide">四边入口（对照）</option>
             <option value="bottomOnly">仅底部入口</option>
-            <option value="instantChain">四方向瞬时连锁</option>
+            <option value="instantChain" selected>四方向瞬时连锁（实机，默认）</option>
           </select>
           <span style="font-size:10px;color:#8a7358;margin-left:6px">全知/玩家压力图同步此模式</span>
         </div>
@@ -253,10 +253,10 @@
         </div>
         <div class="ctl-group">
           <span class="ctl-title">自动求解</span>
-          <button id="btn-omni" title="全知求解器：瞬时最优、逐步回放(棋盘/暂存同步)">⏩ 全知版</button>
+          <button id="btn-omni" title="四边入口全知对照：按四边入口规则求解并逐步回放">⏩ 全知·四边</button>
           <button id="btn-omni-bottom" title="底部专用求解：只能从底部拿块(上/左/右封闭)，自底向上挖，逐步回放">⏩ 底部版</button>
           <!-- v99 第三种玩法：四方向瞬时连锁消除。每次取盒后一次性快照批量结算，与上面两种是不同规则。 -->
-          <button id="btn-omni-chain" title="四方向瞬时连锁：每轮快照当前可达同色全集，按离订单起点距离近优先，一次消到订单容量为止，目标图整体刷新后再重扫；多订单严格先进先得">⏩ 瞬时连锁版</button>
+          <button id="btn-omni-chain" title="四方向瞬时连锁：每轮快照当前可达同色全集，按离订单起点距离近优先，一次消到订单容量为止，目标图整体刷新后再重扫；多订单严格先进先得">⏩ 全知·瞬时（默认）</button>
           <button id="btn-player-demo" title="玩家模拟：多球并发消除、起点最短距离、暂存流水线(会误判)">⏩ 玩家版</button>
         </div>
         <!-- 显示求解路线：把全知求解的取盒顺序叠加在棋盘上，只做可视化、不影响模拟 -->
@@ -370,12 +370,12 @@
         </select>
         <span class="gen-hint" id="gen-mode-hint">到点输出最好</span>
       </div>
-      <div class="gen-row" style="margin-top:8px" title="整批生产统一使用的消除规则。四边入口=现有默认；仅底部入口=上/左/右封闭；四方向瞬时连锁=每次取盒后整批结算，按车辆暂存起点到小人的曼哈顿距离消除。">
+      <div class="gen-row" style="margin-top:8px" title="整批生产统一使用的消除规则。四方向瞬时连锁=实机默认；四边入口和仅底部入口保留作对照。">
         <label>消除模式</label>
         <select id="gen-bottom-only" style="width:190px">
-          <option value="0" selected>四边入口（默认）</option>
+          <option value="0">四边入口（对照）</option>
           <option value="1">仅底部入口</option>
-          <option value="2">四方向瞬时连锁（实机）</option>
+          <option value="2" selected>四方向瞬时连锁（实机，默认）</option>
         </select>
       </div>
       <div class="gen-row" style="margin-top:8px" title="每张图允许搜索多久。时间越长，尝试的候选越多、覆盖率达标的机会越大；合格会提前停。">
@@ -772,29 +772,29 @@
     </div>
   </div>
 
-  <script src="js/zip.js?v=556"></script>
-  <script src="js/utils.js?v=556"></script>
+  <script src="js/zip.js?v=557"></script>
+  <script src="js/utils.js?v=557"></script>
   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
-  <script src="js/color-libs.js?v=556"></script>
-  <script src="js/simulator.js?v=556"></script>
+  <script src="js/color-libs.js?v=557"></script>
+  <script src="js/simulator.js?v=557"></script>
   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
-  <script src="js/anchor-cut.js?v=556"></script>
-  <script src="js/solver-strategy.js?v=556"></script>
-  <script src="js/solver.js?v=556"></script>
-  <script src="js/playersim.js?v=556"></script>
+  <script src="js/anchor-cut.js?v=557"></script>
+  <script src="js/solver-strategy.js?v=557"></script>
+  <script src="js/solver.js?v=557"></script>
+  <script src="js/playersim.js?v=557"></script>
   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
-  <script src="js/solver-analysis.js?v=556"></script>
-  <script src="js/car-sequencer.js?v=556"></script>
-  <script src="js/experience-goal.js?v=556"></script>
-  <script src="js/release-route-constructor.js?v=556"></script>
-  <script src="js/capacity-tuner.js?v=556"></script>
-  <script src="js/instant-playout.js?v=556"></script>
-  <script src="js/generator.js?v=556"></script>
-  <script src="js/source-preflight.js?v=556"></script>
-  <script src="js/analysis.js?v=556"></script>
+  <script src="js/solver-analysis.js?v=557"></script>
+  <script src="js/car-sequencer.js?v=557"></script>
+  <script src="js/experience-goal.js?v=557"></script>
+  <script src="js/release-route-constructor.js?v=557"></script>
+  <script src="js/capacity-tuner.js?v=557"></script>
+  <script src="js/instant-playout.js?v=557"></script>
+  <script src="js/generator.js?v=557"></script>
+  <script src="js/source-preflight.js?v=557"></script>
+  <script src="js/analysis.js?v=557"></script>
   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
-  <script src="js/level-editor.js?v=556"></script>
-  <script src="js/app.js?v=556"></script>
+  <script src="js/level-editor.js?v=557"></script>
+  <script src="js/app.js?v=557"></script>
   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
     体检报告已生成
     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>

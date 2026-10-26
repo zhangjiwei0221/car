@@ -1,0 +1,253 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 3969cac..7a533f3 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v556 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=556">
++  <title>车接小人 v557 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=557">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v556</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v557</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -228,10 +228,10 @@
+              求解路线下拉默认「跟随当前」，因此会自动与这里保持一致。 -->
+         <div class="ctl-row">
+           <label>消除模式</label>
+-          <select id="sim-elim-mode" title="手点模拟按哪种规则消除。四边入口=现有默认玩法；仅底部入口=只能从底边向内消除；四方向瞬时连锁=每次取盒后一次性快照批量结算。切换会重置本局进度">
+-            <option value="fourSide" selected>四边入口(默认)</option>
++          <select id="sim-elim-mode" title="手点模拟按哪种规则消除。四方向瞬时连锁=实机默认；四边入口和仅底部入口保留作对照。切换会重置本局进度">
++            <option value="fourSide">四边入口（对照）</option>
+             <option value="bottomOnly">仅底部入口</option>
+-            <option value="instantChain">四方向瞬时连锁</option>
++            <option value="instantChain" selected>四方向瞬时连锁（实机，默认）</option>
+           </select>
+           <span style="font-size:10px;color:#8a7358;margin-left:6px">全知/玩家压力图同步此模式</span>
+         </div>
+@@ -253,10 +253,10 @@
+         </div>
+         <div class="ctl-group">
+           <span class="ctl-title">自动求解</span>
+-          <button id="btn-omni" title="全知求解器：瞬时最优、逐步回放(棋盘/暂存同步)">⏩ 全知版</button>
++          <button id="btn-omni" title="四边入口全知对照：按四边入口规则求解并逐步回放">⏩ 全知·四边</button>
+           <button id="btn-omni-bottom" title="底部专用求解：只能从底部拿块(上/左/右封闭)，自底向上挖，逐步回放">⏩ 底部版</button>
+           <!-- v99 第三种玩法：四方向瞬时连锁消除。每次取盒后一次性快照批量结算，与上面两种是不同规则。 -->
+-          <button id="btn-omni-chain" title="四方向瞬时连锁：每轮快照当前可达同色全集，按离订单起点距离近优先，一次消到订单容量为止，目标图整体刷新后再重扫；多订单严格先进先得">⏩ 瞬时连锁版</button>
++          <button id="btn-omni-chain" title="四方向瞬时连锁：每轮快照当前可达同色全集，按离订单起点距离近优先，一次消到订单容量为止，目标图整体刷新后再重扫；多订单严格先进先得">⏩ 全知·瞬时（默认）</button>
+           <button id="btn-player-demo" title="玩家模拟：多球并发消除、起点最短距离、暂存流水线(会误判)">⏩ 玩家版</button>
+         </div>
+         <!-- 显示求解路线：把全知求解的取盒顺序叠加在棋盘上，只做可视化、不影响模拟 -->
+@@ -370,12 +370,12 @@
+         </select>
+         <span class="gen-hint" id="gen-mode-hint">到点输出最好</span>
+       </div>
+-      <div class="gen-row" style="margin-top:8px" title="整批生产统一使用的消除规则。四边入口=现有默认；仅底部入口=上/左/右封闭；四方向瞬时连锁=每次取盒后整批结算，按车辆暂存起点到小人的曼哈顿距离消除。">
++      <div class="gen-row" style="margin-top:8px" title="整批生产统一使用的消除规则。四方向瞬时连锁=实机默认；四边入口和仅底部入口保留作对照。">
+         <label>消除模式</label>
+         <select id="gen-bottom-only" style="width:190px">
+-          <option value="0" selected>四边入口（默认）</option>
++          <option value="0">四边入口（对照）</option>
+           <option value="1">仅底部入口</option>
+-          <option value="2">四方向瞬时连锁（实机）</option>
++          <option value="2" selected>四方向瞬时连锁（实机，默认）</option>
+         </select>
+       </div>
+       <div class="gen-row" style="margin-top:8px" title="每张图允许搜索多久。时间越长，尝试的候选越多、覆盖率达标的机会越大；合格会提前停。">
+@@ -772,29 +772,29 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=556"></script>
+-  <script src="js/utils.js?v=556"></script>
++  <script src="js/zip.js?v=557"></script>
++  <script src="js/utils.js?v=557"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=556"></script>
+-  <script src="js/simulator.js?v=556"></script>
++  <script src="js/color-libs.js?v=557"></script>
++  <script src="js/simulator.js?v=557"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=556"></script>
+-  <script src="js/solver-strategy.js?v=556"></script>
+-  <script src="js/solver.js?v=556"></script>
+-  <script src="js/playersim.js?v=556"></script>
++  <script src="js/anchor-cut.js?v=557"></script>
++  <script src="js/solver-strategy.js?v=557"></script>
++  <script src="js/solver.js?v=557"></script>
++  <script src="js/playersim.js?v=557"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=556"></script>
+-  <script src="js/car-sequencer.js?v=556"></script>
+-  <script src="js/experience-goal.js?v=556"></script>
+-  <script src="js/release-route-constructor.js?v=556"></script>
+-  <script src="js/capacity-tuner.js?v=556"></script>
+-  <script src="js/instant-playout.js?v=556"></script>
+-  <script src="js/generator.js?v=556"></script>
+-  <script src="js/source-preflight.js?v=556"></script>
+-  <script src="js/analysis.js?v=556"></script>
++  <script src="js/solver-analysis.js?v=557"></script>
++  <script src="js/car-sequencer.js?v=557"></script>
++  <script src="js/experience-goal.js?v=557"></script>
++  <script src="js/release-route-constructor.js?v=557"></script>
++  <script src="js/capacity-tuner.js?v=557"></script>
++  <script src="js/instant-playout.js?v=557"></script>
++  <script src="js/generator.js?v=557"></script>
++  <script src="js/source-preflight.js?v=557"></script>
++  <script src="js/analysis.js?v=557"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=556"></script>
+-  <script src="js/app.js?v=556"></script>
++  <script src="js/level-editor.js?v=557"></script>
++  <script src="js/app.js?v=557"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 807dc17..5e5ca39 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -19,14 +19,15 @@ AntSolver.App = (function() {
+   // 【v120】当前关卡的卡点类型信息与位置（仅本次在页面上生成的关卡才有；导入的关卡本体不含这些）。
+   //   { plan, marks, dropped, pos } —— 供 renderLevelInfo 在「关卡信息」面板显示「什么卡点、在哪、参数多少」。
+   var currentChokeInfo = null;
+-  // 当前单关的【目标图入口模式】：'fourSide'|'bottomOnly'。生成时按当次配置记下，导入/换关时清回默认。
++  // 当前单关的【目标图入口模式】：'fourSide'|'bottomOnly'|'fourSideInstantChain'。
++  // 生成时按当次配置记下；导入/换关时按实机默认回到四方向瞬时连锁。
+   // 只用于单关导出记录与显示；关卡 JSON 本体不含该字段（用户决定 D1）。
+-  var currentEntryMode = 'fourSide';
++  var currentEntryMode = 'fourSideInstantChain';
+   // v99：三种玩法模式互斥，统一从 config 推导 entryMode，避免各处各写一遍三元表达式导致漏改。
+   function entryModeOf(cfg) {
+     if (cfg && cfg.instantChain) return 'fourSideInstantChain';
+     if (cfg && cfg.bottomOnly) return 'bottomOnly';
+-    return 'fourSide';
++    return (cfg && cfg.instantChain === false) ? 'fourSide' : 'fourSideInstantChain';
+   }
+   // ===== v121·任务AK① 入口模式（玩法）识别的三个转换工具 =====
+   // 工程里同一个概念有三套命名，混用过一次就会静默按错玩法加载，故集中在这里显式转换：
+@@ -1756,10 +1757,8 @@ AntSolver.App = (function() {
+       currentImportedSolve = entry.solve || null;   // 有求解数据→模拟图表复用、免重算
+       currentGenerationEval = entry.generationEval || null;
+       // ===== v121·任务AK① 按导入数据里记录的玩法加载 =====
+-      // loadLevel 会把 currentEntryMode 复位成 'fourSide'（它无从得知本关玩法），故必须在其后设置。
+-      // 识别不到时**如实回落四边入口并标注「未知玩法」**，不靠棋盘结构去猜（猜错会让整关的
+-      // 求解/玩家模拟/难度全部按错规则跑，而页面上看不出任何异常）。
+-      currentEntryMode = entry.entryMode || 'fourSide';
++      // loadLevel 会把 currentEntryMode 复位成实机默认瞬时连锁；导入数据有明确玩法时覆盖它。
++      currentEntryMode = entry.entryMode || 'fourSideInstantChain';
+       // 同步手点消除模式下拉：enterSimulation / doReset 都按下拉取值套用模式，
+       // 这里不同步的话，进入模拟后手点消除仍按四边入口走。
+       syncElimModeSelect(elimModeOfEntry(currentEntryMode));
+@@ -1847,7 +1846,7 @@ AntSolver.App = (function() {
+ 
+   function getGenConfig() {
+     var _ruleSel = (document.getElementById('gen-bottom-only') || {}).value;
+-    var _ruleMode = _ruleSel === '2' ? 'instantChain' : (_ruleSel === '1' ? 'bottomOnly' : 'fourSide');
++    var _ruleMode = _ruleSel === '1' ? 'bottomOnly' : (_ruleSel === '0' ? 'fourSide' : 'instantChain');
+     return {
+       // 目标图消除入口模式（三态单选，整批统一）：
+       //   '1' = 仅底部入口（上/左/右封闭）
+@@ -2109,8 +2108,8 @@ AntSolver.App = (function() {
+     currentImportedSolve = null;   // 默认无导入求解数据（生成/TXT关卡→需要时重新求解）
+     currentGenerationEval = null;
+     currentChokeInfo = null;      // v120：换关先清空卡点信息，避免把上一关的卡点显示到这一关上
+-    // 入口模式回默认：导入的关卡本体不含该字段，无从得知；生成路径会在 loadLevel 之后按本次配置重设。
+-    currentEntryMode = 'fourSide';
++    // 入口模式回实机默认；生成路径会在 loadLevel 之后按本次配置重设。
++    currentEntryMode = 'fourSideInstantChain';
+     currentLevel = AntSolver.parseLevel(json);
+     document.getElementById('btn-simulate').disabled = false;
+     document.getElementById('btn-export').disabled = false;
+@@ -3725,8 +3724,8 @@ AntSolver.App = (function() {
+   }
+   function elimModeSelected() {
+     var el = document.getElementById('sim-elim-mode');
+-    var v = el ? el.value : 'fourSide';
+-    return (v === 'bottomOnly' || v === 'instantChain') ? v : 'fourSide';
++    var v = el ? el.value : 'instantChain';
++    return v === 'bottomOnly' ? 'bottomOnly' : (v === 'fourSide' ? 'fourSide' : 'instantChain');
+   }
+   // 【2026-10-14】「圈」多久重算一次：frozen（整盒冻结，默认）| layer（每层重算）| pixel（每人重算）
+   function pickLayerLabel(v) {
+@@ -6490,7 +6489,7 @@ AntSolver.App = (function() {
+       capacityAudit: rec.capacityAudit || null, appliedParams: rec.appliedParams || null,
+       experienceFinalError: rec.experienceFinalError || null,
+       goalBudgetEvidence: rec.goalBudgetEvidence || null,
+-      entryMode: rec.entryMode || 'fourSide',   // 目标图入口模式（落库记录用；关卡本体不含）
++      entryMode: rec.entryMode || 'fourSideInstantChain',   // 目标图入口模式（落库记录用；关卡本体不含）
+       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
+       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
+       chokeCount: rec.chokeCount || 0, isBossSlot: !!rec.isBossSlot, chokeStat: rec.chokeStat || null,
+@@ -6516,7 +6515,7 @@ AntSolver.App = (function() {
+         name: entry.name, valid: !!rec.valid, difficulty: rec.difficulty, grade: rec.grade,
+         // 多轮难度标定口径(任务 ANT-DIFF-MULTIROUND-PROD-20260901)：轮数/单轮对照/稳定性
+         difficultyCalibration: rec.difficultyCalibration || null, difficultySingle: rec.difficultySingle != null ? rec.difficultySingle : null,
+-        entryMode: rec.entryMode || 'fourSide',
++        entryMode: rec.entryMode || 'fourSideInstantChain',
+         bufferLimit: rec.level ? rec.level.bufferLimit : null,
+         blocks: rec.level ? rec.level.blocks : null, board: rec.level ? rec.level.board : null,
+         audit: rec.audit || null, generationEval: rec.generationEval || null, solve: rec.solve || null,
+@@ -8064,9 +8063,9 @@ AntSolver.App = (function() {
+     if (!lv || !lv.board || !lv.board.rows) return false;
+ 
+     if (enterSim) { stopAutoPlay(); stopAnim(); stopFlash(); stopLive(); }
+-    // loadLevel 会把三项生成侧缓存清空、并把入口模式复位成四边 —— 所以赋值必须【在它之后】。
++    // loadLevel 会清空生成侧缓存并复位为瞬时默认，所以玩法赋值必须【在它之后】。
+     loadLevel(lv);
+-    currentEntryMode = rec.entryMode || 'fourSide';
++    currentEntryMode = rec.entryMode || 'fourSideInstantChain';
+     syncElimModeSelect(elimModeOfEntry(currentEntryMode));
+     currentGenerationEval = rec.generationEval || null;
+     currentImportedSolve = (rec.solve && rec.solve.pressureSamples && rec.solve.pressureSamples.length) ? {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 10ac919..f8210f2 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -308,7 +308,7 @@ AntSolver.Generator = (function() {
+     baseFillByElimOrder: true,   // 确定棋盘骨架后，基础填球按【目标图底→顶趋势=消除顺序】自顶向下顺序填入(先消除的盒放顶部先可达)；关=旧交错随机铺盒
+     elimOrderScatterPercent: 5,  // 基础顺序填入【之后】的单色交错扰动比例：随机把富余色少量盒与远处盒【换位】(守恒,只换位置)制造暂存压力；0=纯顺序不打散
+     // ===== 目标图消除入口模式（ANT-GEN-BOTTOM-ONLY-20260729）=====
+-    // false(默认)：四边入口——v95 既有行为，本字段引入前后完全一致。旧方案 JSON 无此字段时也按 false。
++    // false：四边入口（显式对照）。缺省模式已改为四方向瞬时连锁，见下方 instantChain。
+     // true ：仅底部入口——目标图上/左/右三边视作封闭，只能从底边开始向内消除。
+     //   开启后本关【全链路同一口径】：底部依赖盒切分(baseFillBoxesBottom) → 候选筛选(1遍基础+3遍噪声)
+     //   → 卡点分支重求解 → 三步前瞻可达 → 暂存自动释放 → 锁链滞留 → 管道推出后消除
+@@ -317,14 +317,14 @@ AntSolver.Generator = (function() {
+     //   生产前会先跑 checkBottomEntryFeasibility 判源图在该规则下是否全图可达，不可达直接不进候选。
+     bottomOnly: false,
+     // ===== 第三种玩法模式：四方向瞬时连锁消除（需求 08.03，用户 2026-08-03 批准）=====
+-    // false(默认)：走原有两种模式，行为与本字段引入前完全一致；旧方案 JSON 无此字段时也按 false。
+-    // true ：四方向瞬时连锁消除。与 bottomOnly 互斥（本模式固定四方向可达，不接受底部单入口）。
++    // true(默认)：四方向瞬时连锁消除，与实机规则一致。与 bottomOnly 互斥。
++    // false：显式回退四边入口或底部入口，用于历史复现/对照。
+     //   开启后本关【全链路同一口径】：四方向盒切分 → 候选筛选(1遍基础+3遍噪声) → 卡点分支重求解
+     //   → 三步前瞻 → 暂存自动释放(严格先进先得) → 全知求解 → 玩家模拟 → 审核与难度。
+     //   结算差异只在「怎么选像素」：每轮快照当前可达同色全集，按离该订单暂存起点的距离近优先，
+     //   消到订单剩余容量为止，目标图整体刷新后再重扫下一轮（详见 simulator.instantChainEliminate）。
+-    instantChain: false,
+-    elimOrder: 'ring',      // 生成侧分析序：由 ruleMode 派生；instantChain 固定 instant
++    instantChain: true,
++    elimOrder: 'instant',   // 生成侧分析序：由 ruleMode 派生；缺省按瞬时连锁
+     // ===== 生产前置碎色闸门（任务 ANT-GEN-FRAGMENT-GATE-20260824，用户 2026-08-24 批准）=====
+     // fragmentMaxRate：目标图碎色率上限。**0 = 关闭**（默认，行为与本参数引入前完全一致）。
+     //   >0 时在 produceFixed 生成候选【之前】判定：碎色率超过该值 → 直接跳过该源图，
+@@ -6666,7 +6666,9 @@ AntSolver.Generator = (function() {
+     var mode = o.ruleMode;
+     if (mode === 'fourSideInstantChain' || mode === 'instantChain') mode = 'instantChain';
+     if (mode !== 'fourSide' && mode !== 'bottomOnly' && mode !== 'instantChain') {
+-      mode = o.instantChain ? 'instantChain' : (o.bottomOnly ? 'bottomOnly' : 'fourSide');
++      if (o.bottomOnly === true) mode = 'bottomOnly';
++      else if (o.instantChain === false) mode = 'fourSide';
++      else mode = 'instantChain';
+     }
+     o.ruleMode = mode;
+     o.instantChain = mode === 'instantChain';
