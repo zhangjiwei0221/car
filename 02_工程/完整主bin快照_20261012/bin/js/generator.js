@@ -3729,6 +3729,102 @@ AntSolver.Generator = (function() {
   }
 
   /**
+   * v571：最终棋盘障碍实测。所有卡点报告和“计划是否落地”判断必须以这里为准。
+   * 与 scanBoardActual 分开：后者服务容量守恒，这里只回答冰、链、问号、管道在最终棋盘上是否真的存在。
+   */
+  function scanActualObstacles(board) {
+    var rows = board && board.rows || 0, cols = board && board.cols || 0;
+    var cells = board && board.cells || [];
+    var iceCells = [], questionCells = [], chainMembers = [], pipeCells = [], blackCells = [];
+    var chainGroupsMap = {};
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      var x = cells[r] && cells[r][c];
+      if (!x) continue;
+      if (x.t === 'black') { blackCells.push({ r: r, c: c }); continue; }
+      if (x.t === 'pipe') {
+        pipeCells.push({ r: r, c: c, dir: x.dir, queueLen: x.queue ? x.queue.length : 0 });
+        continue;
+      }
+      if (x.t !== 'box') continue;
+      if (x.numice > 0) iceCells.push({ r: r, c: c, numice: x.numice, color: x.color, count: x.count });
+      if (x.q) questionCells.push({ r: r, c: c, color: x.color, count: x.count });
+      if (x.chain > 0) {
+        var member = { r: r, c: c, group: x.chain, color: x.color, count: x.count };
+        chainMembers.push(member);
+        (chainGroupsMap[x.chain] = chainGroupsMap[x.chain] || []).push(member);
+      }
+    }
+    var chainGroups = Object.keys(chainGroupsMap).map(function (g) {
+      var members = chainGroupsMap[g];
+      return { group: +g, size: members.length, members: members };
+    });
+    return {
+      schema: 'actual-obstacles-v1',
+      rows: rows, cols: cols,
+      iceCount: iceCells.length, questionCount: questionCells.length,
+      chainMemberCount: chainMembers.length, chainGroupCount: chainGroups.length,
+      pipeCount: pipeCells.length, blackCount: blackCells.length,
+      functionalCount: iceCells.length + questionCells.length + chainGroups.length + pipeCells.length,
+      iceCells: iceCells, questionCells: questionCells,
+      chainMembers: chainMembers, chainGroups: chainGroups,
+      pipeCells: pipeCells, blackCells: blackCells
+    };
+  }
+
+  /** 把计划卡点标记与最终棋盘对齐；没有真实落地的手段不得继续出现在报告里。 */
+  function reconcileActualChokeMarks(board, plannedMarks, actual) {
+    var marks = [];
+    function cellAt(r, c) {
+      return board && board.cells && board.cells[r] && board.cells[r][c];
+    }
+    function plannedStillActual(m) {
+      var x = cellAt(m.r, m.c);
+      if (!x) return false;
+      var t = String(m.type || '');
+      if (t === 'narrowPath') return x.t === 'black';
+      if (t.indexOf('pipe') >= 0) return x.t === 'pipe';
+      if (t.indexOf('question') >= 0) return x.t === 'box' && !!x.q;
+      if (t.indexOf('Ice') >= 0 || t.indexOf('ice') >= 0) return x.t === 'box' && x.numice > 0;
+      if (t.indexOf('Chain') >= 0 || t.indexOf('chain') >= 0) return x.t === 'box' && x.chain > 0;
+      // bigBox/rareColorKey/swap/inflate 等结构改造没有独立格属性；格子仍在则保留计划说明。
+      return x.t === 'box';
+    }
+    var seenIce = {}, seenQuestion = {}, seenChain = {}, seenPipe = {};
+    for (var i = 0; i < (plannedMarks || []).length; i++) {
+      var m = plannedMarks[i];
+      if (plannedStillActual(m)) {
+        marks.push(m);
+        var k = m.r + ',' + m.c;
+        if (String(m.type || '').indexOf('Question') >= 0 || String(m.type || '').indexOf('question') >= 0) seenQuestion[k] = 1;
+        else if (String(m.type || '').indexOf('Chain') >= 0 || String(m.type || '').indexOf('chain') >= 0) seenChain[k] = 1;
+        else if (String(m.type || '').indexOf('pipe') >= 0) seenPipe[k] = 1;
+        else seenIce[k] = 1;
+      }
+    }
+    for (var ii = 0; ii < actual.iceCells.length; ii++) {
+      var ic = actual.iceCells[ii], ik = ic.r + ',' + ic.c;
+      if (!seenIce[ik]) marks.push({ type: 'ice', cn: '数字冰', r: ic.r, c: ic.c,
+        detail: { numice: ic.numice, color: ic.color, count: ic.count, source: 'actual' } });
+    }
+    for (var qi = 0; qi < actual.questionCells.length; qi++) {
+      var qc = actual.questionCells[qi], qk = qc.r + ',' + qc.c;
+      if (!seenQuestion[qk]) marks.push({ type: 'question', cn: '问号', r: qc.r, c: qc.c,
+        detail: { color: qc.color, count: qc.count, source: 'actual' } });
+    }
+    for (var ci = 0; ci < actual.chainGroups.length; ci++) {
+      var cg = actual.chainGroups[ci], first = cg.members[0], ck = first.r + ',' + first.c;
+      if (!seenChain[ck]) marks.push({ type: 'chain', cn: '锁链', r: first.r, c: first.c,
+        detail: { group: cg.group, size: cg.size, source: 'actual' } });
+    }
+    for (var pi = 0; pi < actual.pipeCells.length; pi++) {
+      var pc = actual.pipeCells[pi], pk = pc.r + ',' + pc.c;
+      if (!seenPipe[pk]) marks.push({ type: 'pipe', cn: '管道', r: pc.r, c: pc.c,
+        detail: { dir: pc.dir, queueLen: pc.queueLen, source: 'actual' } });
+    }
+    return marks;
+  }
+
+  /**
    * R03：多点独立守恒比对。
    * 左侧全部来自 baseline(原始盒序列 + 目标图)，右侧全部来自 scanBoardActual(棋盘实测)，
    * 两侧数据来源完全独立，不存在"用 A=B+C 再验证 A=B+C"的恒等式。
@@ -4700,7 +4796,9 @@ AntSolver.Generator = (function() {
     }
     // 【v253】冰排程：冻住"开局免费车"，把取车顺序逼回需求序（在顶部封顶之前做，
     //   这样封顶仍会把前 2 行的过量障碍削掉，不会让排程把开局锁死）
-    try { bindStat.iceSchedule = _preserveInstantOrder ? null : applyIceSchedule(cells, rows, cols, config); } catch (e) { bindStat.iceSchedule = null; }
+    // v571：数字冰排程只写 numice，不重排盒车；瞬时计划也必须执行，否则 iceByReadyTime
+    // 会在规划期跳过冰、这里又跳过补冰，最终必然 0 冰。
+    try { bindStat.iceSchedule = applyIceSchedule(cells, rows, cols, config); } catch (e) { bindStat.iceSchedule = { count: 0, error: String(e && e.message || e) }; }
     // 【v290】第 0 行同色限量的事后保证（在冰/链绑定之后做，避免动到被锁的格）
     // 【v291】卡点补救（前辈的 chokeSwap / chokeInflate，简化版）：只在本候选未合格时由上层调用
     try { bindStat.repairSwap = _preserveInstantOrder ? null : repairGatewaySwap(cells, rows, cols, blocks, config); } catch (e) { bindStat.repairSwap = null; }
@@ -4732,12 +4830,9 @@ AntSolver.Generator = (function() {
       if (db && db.t === 'box' && db.chain > 0 && chainCnt[db.chain] < 2) db.chain = 0;
     }
     // v528：严格瞬时计划保留“计划格 → 摆位序”只读证据，供回放验证；正式导出不含该字段。
+    // v571：这里不再清空冰/链/问号。旧逻辑会把已经绑定的实际障碍全部抹掉，却保留计划 chokeMarks，
+    // 导致“日志有冰、关卡没冰”。障碍是否可用由最终实测和计划落地校验决定。
     if (_preserveInstantOrder) {
-      // P4障碍目标化之前，先移除不属于playout模型的锁链/冰/问号，保证计划路线不被后置规则改序。
-      for (var zr = 0; zr < rows; zr++) for (var zc = 0; zc < cols; zc++) {
-        var zcell = cells[zr][zc];
-        if (zcell && zcell.t === 'box') { zcell.chain = 0; zcell.q = false; zcell.numice = 0; }
-      }
       var _planCells = [];
       for (var pr = 0; pr < rows; pr++) for (var pc = 0; pc < cols; pc++) {
         var pcell = cells[pr][pc];
@@ -4756,7 +4851,38 @@ AntSolver.Generator = (function() {
     conservation.push(cv4);
     if (!cv4.ok) return { ok: false, reason: 'conservation', stage: 'obstacleBind', conservation: conservation, bindStat: bindStat };
 
-    return { ok: true, board: board, bindStat: bindStat, conservation: conservation };
+    var actualObstacles = scanActualObstacles(board);
+    var scheduledIce = bindStat.iceSchedule && bindStat.iceSchedule.count || 0;
+    var expectedIce = _skipPlannedIce
+      ? Math.max(scheduledIce, Math.min(1, struct.iceSlots.length))
+      : (bindStat.ice.bound || 0) + scheduledIce;
+    var obstaclePlanStat = {
+      schema: 'planned-obstacles-v1',
+      ice: expectedIce, icePlanned: struct.iceSlots.length, iceScheduled: scheduledIce,
+      question: bindStat.question.bound || 0,
+      chainGroups: bindStat.chain.bound || 0,
+      pipe: struct.pipeList ? struct.pipeList.length : 0,
+      functional: expectedIce + (bindStat.question.bound || 0) + (bindStat.chain.bound || 0) +
+        (struct.pipeList ? struct.pipeList.length : 0)
+    };
+    var missing = [];
+    if (expectedIce > 0 && actualObstacles.iceCount < expectedIce) missing.push('数字冰' + actualObstacles.iceCount + '/' + expectedIce);
+    if (obstaclePlanStat.question > 0 && actualObstacles.questionCount < obstaclePlanStat.question) missing.push('问号' + actualObstacles.questionCount + '/' + obstaclePlanStat.question);
+    if (obstaclePlanStat.chainGroups > 0 && actualObstacles.chainGroupCount < obstaclePlanStat.chainGroups) missing.push('锁链组' + actualObstacles.chainGroupCount + '/' + obstaclePlanStat.chainGroups);
+    if (obstaclePlanStat.pipe > 0 && actualObstacles.pipeCount < obstaclePlanStat.pipe) missing.push('管道' + actualObstacles.pipeCount + '/' + obstaclePlanStat.pipe);
+    var obstacleLanding = { schema: 'obstacle-landing-v1', ok: missing.length === 0, missing: missing,
+      planned: obstaclePlanStat, actual: actualObstacles };
+    board.obstaclePlanStat = obstaclePlanStat;
+    board.actualObstacleStat = actualObstacles;
+    board.obstacleLanding = obstacleLanding;
+    if (_preserveInstantOrder && !obstacleLanding.ok) {
+      return { ok: false, reason: 'obstacleLanding', stage: 'obstacleBind', detail: '计划障碍未落地：' + missing.join('；'),
+        bindStat: bindStat, obstaclePlanStat: obstaclePlanStat, actualObstacleStat: actualObstacles,
+        obstacleLanding: obstacleLanding, conservation: conservation };
+    }
+
+    return { ok: true, board: board, bindStat: bindStat, conservation: conservation,
+      obstaclePlanStat: obstaclePlanStat, actualObstacleStat: actualObstacles, obstacleLanding: obstacleLanding };
   }
 
   // ---- R04/R06：1 遍基础贪心 + 最多 3 遍噪声贪心，成功即停 ----
@@ -6278,6 +6404,38 @@ AntSolver.Generator = (function() {
       if (laStat) board.linkAdjStat = laStat;   // 只真修过才挂字段（未改动时不挂，保持"不动则本体一致"）
     } catch (e) { board.linkAdjStat = { error: String(e && e.message || e) }; }
 
+    // v571：所有障碍后处理结束后，以最终棋盘为准重新实测；陈旧计划标记不得进入报告。
+    var actualObstacleStat = scanActualObstacles(board);
+    var obstaclePlanStat = fill.obstaclePlanStat || {
+      schema: 'planned-obstacles-v1', ice: 0, question: 0, chainGroups: 0, pipe: 0, functional: 0
+    };
+    var finalMissing = [];
+    if (obstaclePlanStat.ice > 0 && actualObstacleStat.iceCount < obstaclePlanStat.ice) finalMissing.push('数字冰' + actualObstacleStat.iceCount + '/' + obstaclePlanStat.ice);
+    if (obstaclePlanStat.question > 0 && actualObstacleStat.questionCount < obstaclePlanStat.question) finalMissing.push('问号' + actualObstacleStat.questionCount + '/' + obstaclePlanStat.question);
+    if (obstaclePlanStat.chainGroups > 0 && actualObstacleStat.chainGroupCount < obstaclePlanStat.chainGroups) finalMissing.push('锁链组' + actualObstacleStat.chainGroupCount + '/' + obstaclePlanStat.chainGroups);
+    if (obstaclePlanStat.pipe > 0 && actualObstacleStat.pipeCount < obstaclePlanStat.pipe) finalMissing.push('管道' + actualObstacleStat.pipeCount + '/' + obstaclePlanStat.pipe);
+    var obstacleLanding = { schema: 'obstacle-landing-v1', ok: finalMissing.length === 0,
+      missing: finalMissing, planned: obstaclePlanStat, actual: actualObstacleStat };
+    var actualChokeMarks = reconcileActualChokeMarks(board, struct.chokeMarks, actualObstacleStat);
+    var actualChokeTypes = [], actualChokeTypesCN = [];
+    for (var acm = 0; acm < actualChokeMarks.length; acm++) {
+      var am = actualChokeMarks[acm];
+      if (actualChokeTypes.indexOf(am.type) < 0) { actualChokeTypes.push(am.type); actualChokeTypesCN.push(am.cn); }
+    }
+    board.actualObstacleStat = actualObstacleStat;
+    board.obstaclePlanStat = obstaclePlanStat;
+    board.obstacleLanding = obstacleLanding;
+    if (_preserveInstantOrder && !obstacleLanding.ok) {
+      return {
+        ok: false, reason: 'obstacleLanding', stage: 'finalObstacleAudit',
+        detail: '计划障碍未落地：' + finalMissing.join('；'),
+        timing: timing, boxCount: n,
+        blackStat: struct.blackStat, pipeStat: struct.pipeStat, bindStat: fill.bindStat,
+        obstaclePlanStat: obstaclePlanStat, actualObstacleStat: actualObstacleStat,
+        obstacleLanding: obstacleLanding, conservation: fill.conservation
+      };
+    }
+
     // ④ 结构性卡死检验（带球后的完整检查）
     var tSdc = Date.now();
     var sdc = structuralDeadlockCheck(board);
@@ -6385,8 +6543,14 @@ AntSolver.Generator = (function() {
       blackStat: struct.blackStat, pipeStat: struct.pipeStat, bindStat: fill.bindStat,
       obstacleSlots: { ice: struct.iceSlots, question: struct.questionSlots, chain: struct.chainGroups },
       // 卡点类型计划与实际落地统计（只进生产侧记录，不入关卡本体）
-      chokePlan: chokePlan, chokeStat: struct.chokeStat || null,
-      chokeMarks: struct.chokeMarks || null,                       // v120 卡点位置清单
+      chokePlan: chokePlan,
+      chokeStat: Object.assign({}, struct.chokeStat || {}, {
+        actual: actualObstacleStat, planned: obstaclePlanStat, landingOk: obstacleLanding.ok
+      }),
+      chokeMarks: actualChokeMarks,
+      actualChokeTypes: actualChokeTypes, actualChokeTypesCN: actualChokeTypesCN,
+      actualObstacleStat: actualObstacleStat, obstaclePlanStat: obstaclePlanStat,
+      obstacleLanding: obstacleLanding,
       timing: timing, boxCount: n
     };
   }
@@ -6528,7 +6692,12 @@ AntSolver.Generator = (function() {
         obstacleSlots: res.obstacleSlots,
         // 卡点类型计划与落地统计（只进生产侧记录，不入关卡本体）
         chokePlan: res.chokePlan || null, chokeStat: res.chokeStat || null,
-        chokeMarks: res.chokeMarks || null,                        // v120 卡点位置清单
+        chokeMarks: res.chokeMarks || null,                        // v120 卡点位置清单（v571 起只含实际落地项）
+        actualChokeTypes: res.actualChokeTypes || [],
+        actualChokeTypesCN: res.actualChokeTypesCN || [],
+        actualObstacleStat: res.actualObstacleStat || null,
+        obstaclePlanStat: res.obstaclePlanStat || null,
+        obstacleLanding: res.obstacleLanding || null,
         // 回退记录：哪些聚集类型因结构失败被摘掉（如实记录，便于统计"想开但开不起来"的类型）
         chokeFallback: chokeFallback.dropped.length ? chokeFallback : null
       };
@@ -6680,6 +6849,11 @@ AntSolver.Generator = (function() {
       chokePlan: parent.chokePlan || null, chokeStat: parent.chokeStat || null,
       // v120：卡点变体只改盒的 color/count，障碍位置不动，故父候选的卡点位置清单依然成立
       chokeMarks: parent.chokeMarks || null,
+      actualChokeTypes: parent.actualChokeTypes || [],
+      actualChokeTypesCN: parent.actualChokeTypesCN || [],
+      actualObstacleStat: parent.actualObstacleStat || null,
+      obstaclePlanStat: parent.obstaclePlanStat || null,
+      obstacleLanding: parent.obstacleLanding || null,
       // 【v115 同理透传本候选的区间采样值】卡点变体不重建棋盘结构（只 clone 后改盒的 color/count），
       // 用的还是父候选那一组采样参数。不带出来的后果：最终 board 有 36%~50% 来自变体，
       // 那些关的逐关记录就查不到「这关到底用了区间里的哪组值」，参数波动无从追溯。
@@ -9717,6 +9891,10 @@ AntSolver.Generator = (function() {
     var dc = config && config._demandCurve;
     if (!config || !config.iceSchedule || !dc || !dc.startExposed) return { count:0, debug:'missing', hasCfg:!!(config&&config.iceSchedule), hasDc:!!dc, hasSE:!!(dc&&dc.startExposed) };
     var N = Math.max(1, Math.min(8, parseInt(config.iceScheduleCount, 10) || 3));
+    var _instantSchedule = !!(config.instantChain || config.ruleMode === 'instantChain');
+    if (_instantSchedule && config.instantIceMax != null) {
+      N = Math.min(N, Math.max(1, parseInt(config.instantIceMax, 10) || 1));
+    }
     var delay = Math.max(0, Math.min(10, parseInt(config.iceScheduleDelay, 10) || 2));
     // 【v276·用户设计】冰不是随便落格，也不是只冻开局 ——
     //   它要"针对目标区在某个时刻的现状，改掉玩家的路线"：
@@ -9815,7 +9993,11 @@ AntSolver.Generator = (function() {
             chosen = _cand2[ii]; _usedPos[kk] = 1; _usedColor[chosen.cell.color] = 1; break;
           }
           if (!chosen) continue;
-          var capMax2 = Math.max(3, Math.min(18, Math.ceil(_total2 * ((config.iceCapRatio != null ? +config.iceCapRatio : 0.25) * 2))));
+          var _capRatio2 = (config.iceCapRatio != null ? +config.iceCapRatio : 0.25);
+          if (_instantSchedule && config.instantIceCapRatio != null) {
+            _capRatio2 = Math.min(_capRatio2, Math.max(0.02, +config.instantIceCapRatio));
+          }
+          var capMax2 = Math.max(3, Math.min(18, Math.ceil(_total2 * (_capRatio2 * 2))));
           // 【v301·修】原来没夹上限，r 大的车会算出 14~18 的冰值（实测 14/18/18），
           //   而"这块冰最多锁多久"应该和其它路径同一把尺子：夹在 [2, 12]。
           var val2 = Math.max(2, Math.min(12, Math.round(chosen.ready * _total2) + _force2));
@@ -15685,6 +15867,12 @@ AntSolver.Generator = (function() {
     // v503：目标模式默认使用用户确认的压力体验门；experienceGoal=false 仅用于旧口径回归。
     // 时间模式仍走 produce，不受此默认值影响。
     if (config.experienceGoal == null) config.experienceGoal = true;
+    // v571：瞬时目标模式的排冰必须真实存在；默认只放 1 块短冰，避免旧的多块长冰
+    // 在没有落地审计时被静默清零，恢复后又直接把 PlayerSim 锁死。
+    if (config.instantChain && config.experienceGoal === true) {
+      if (config.instantIceMax == null) config.instantIceMax = 1;
+      if (config.instantIceCapRatio == null) config.instantIceCapRatio = 0.08;
+    }
     if (config.goalSharedBudget == null) config.goalSharedBudget = true;
     var t0 = Date.now();
     var perMs = parseInt(config.goalPerRoundMs, 10);

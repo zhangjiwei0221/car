@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "570";
+var APP_BUILD = "571";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5507,6 +5507,8 @@ AntSolver.App = (function() {
   function chokeInfoOf(result) {
     if (!result) return null;
     var cp = result.chokePlan || null;
+    var _actualChokeTypes = Array.isArray(result.actualChokeTypes) ? result.actualChokeTypes : null;
+    var _actualChokeTypesCN = Array.isArray(result.actualChokeTypesCN) ? result.actualChokeTypesCN : null;
     var cs = result.chokeStat || null;
     return {
       plan: cp ? { count: cp.count, pool: cp.pool, expected: cp.expected, cn: cp.cn || [] } : null,
@@ -6278,9 +6280,14 @@ AntSolver.App = (function() {
     var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
     return {
       name: entry.name, txt: entry.txt || null, level: result.level, valid: result.valid,
-      chokeTypes: cp ? cp.types : null, chokeTypesCN: cp ? cp.cn : null,
-      chokeCount: cp ? cp.count : 0, isBossSlot: cp ? !!cp.isBoss : false,
+      chokeTypes: _actualChokeTypes != null ? _actualChokeTypes : (cp ? cp.types : null),
+      chokeTypesCN: _actualChokeTypesCN != null ? _actualChokeTypesCN : (cp ? cp.cn : null),
+      chokeCount: result.actualObstacleStat ? result.actualObstacleStat.functionalCount : (cp ? cp.count : 0),
+      isBossSlot: cp ? !!cp.isBoss : false,
       chokeStat: result.chokeStat || null,
+      obstaclePlanStat: result.obstaclePlanStat || null,
+      actualObstacleStat: result.actualObstacleStat || null,
+      obstacleLanding: result.obstacleLanding || null,
       // 【v120】卡点手段的落地位置清单（用户：报告与模拟游玩的关卡信息要显示卡点类型的信息和位置）。
       //   每条 {type,cn,r,c,detail}；detail 里带该类型的实际参数取值（簇大小/半径/端数/叠冰数…）。
       chokeMarks: result.chokeMarks || null,
@@ -6511,6 +6518,9 @@ AntSolver.App = (function() {
       // 卡点类型记录（ANT-GEN-CHOKE-TYPES-20260824）：供统计多样性与后续排序按 BOSS 规格放位
       chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
       chokeCount: rec.chokeCount || 0, isBossSlot: !!rec.isBossSlot, chokeStat: rec.chokeStat || null,
+      obstaclePlanStat: rec.obstaclePlanStat || null,
+      actualObstacleStat: rec.actualObstacleStat || null,
+      obstacleLanding: rec.obstacleLanding || null,
       chokeMarks: rec.chokeMarks || null,   // v120 卡点位置清单
       // v115：卡点概率机制的设定/实测/期望 + 本关候选采样到的区间参数（服务端落 JSONL 与 CSV）
       chokePlan: rec.chokePlan || null, sampledConfig: rec.sampledConfig || null,
@@ -6546,6 +6556,9 @@ AntSolver.App = (function() {
         sampledConfig: rec.sampledConfig || null, chokePlan: rec.chokePlan || null,
         boardStat: rec.boardStat || null,   // v116 棋盘结构实测
         chokeTypes: rec.chokeTypes || null, chokeTypesCN: rec.chokeTypesCN || null,
+        obstaclePlanStat: rec.obstaclePlanStat || null,
+        actualObstacleStat: rec.actualObstacleStat || null,
+        obstacleLanding: rec.obstacleLanding || null,
         chokeStat: rec.chokeStat || null, chokeMarks: rec.chokeMarks || null,   // v120 卡点位置与逐类落地
         perf: (result && result.perf) || null
       }
