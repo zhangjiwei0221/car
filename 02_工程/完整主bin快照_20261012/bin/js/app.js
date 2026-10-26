@@ -3572,7 +3572,8 @@ AntSolver.App = (function() {
         var a = opts.audit;
         auditTxt = a.pass ? ' · 审核✓合格' : (' · 审核✗ ' + (a.reasons[0] || '不合格'));
       }
-      cap.textContent = (won ? '通关' : '未通关') + ' · 峰值' + peak + '/' + N + chokeTxt + lockTxt + auditTxt + itemTxt;
+      var modeTxt = opts.ruleMode ? ' · ' + modeCN(opts.ruleMode) : '';
+      cap.textContent = (won ? '通关' : '未通关') + ' · 峰值' + peak + '/' + N + chokeTxt + lockTxt + auditTxt + itemTxt + modeTxt;
       cap.style.color = won ? '#8bc34a' : '#e0592c';
     }
   }
@@ -3588,46 +3589,51 @@ AntSolver.App = (function() {
     }
     var co = cur('omni'), cp = cur('player');
     drawPressureChart('chart-omni', c.omni.samples, c.limit, c.totalBoxes, 'chart-omni-cap', c.omni.won, c.omni.choke, c.omni.itemUses,
-      { audit: c.omni.audit, items: c.omni.items, preview: c.omni.preview, cursorProgress: co.p, cursorStep: co.step });
+      { audit: c.omni.audit, items: c.omni.items, preview: c.omni.preview, ruleMode: c.mode, cursorProgress: co.p, cursorStep: co.step });
     drawPressureChart('chart-player', c.player.samples, c.limit, c.totalBoxes, 'chart-player-cap', c.player.won, c.player.choke, c.player.itemUses,
-      { audit: c.player.audit, items: c.player.items, preview: c.player.preview, revives: c.player.reviveEvents || [], cursorProgress: cp.p, cursorStep: cp.step });
+      { audit: c.player.audit, items: c.player.items, preview: c.player.preview, revives: c.player.reviveEvents || [], ruleMode: c.mode, cursorProgress: cp.p, cursorStep: cp.step });
     drawStepChart('chart-steps', 'chart-steps-cap', c.steps);   // 【v147】逐次取盒 × 暂存
   }
 
   // 由本关实际入口模式（currentEntryMode）推出 PlayerSim 的模式开关（需求 §6.1）。
   // currentEntryMode 取值来自 entryModeOf()：'fourSide' | 'bottomOnly' | 'fourSideInstantChain'。
   // 注意与 currentSimMode() 的取值命名不同（后者用 'instantChain'），此处按前者判断，不要混用。
-  function playerModeOpts() {
+  function playerModeOpts(mode) {
+    var em = mode || currentEntryMode;
     return {
-      bottomOnly: currentEntryMode === 'bottomOnly',
-      instantChain: currentEntryMode === 'fourSideInstantChain'
+      bottomOnly: em === 'bottomOnly',
+      instantChain: em === 'fourSideInstantChain'
     };
   }
 
   function renderPressureCharts() {
     if (!currentLevel) return;
     var limit = currentLevel.bufferLimit || 5, totalBoxes = currentLevel.totalBoxes || 0;
+    var chartEntryMode = simulating ? elimModeOfEntry(elimModeSelected()) : currentEntryMode;
+    var canReuseModeData = chartEntryMode === currentEntryMode;
     function previewMetrics(samples) {
       return AntSolver.Analysis.dynamicPreviewMetrics
         ? AntSolver.Analysis.dynamicPreviewMetrics(samples, totalBoxes)
         : { sampleCount: 0, avgLockRatio: 0, maxLockRatio: 0, peakAt: null };
     }
-    chartCache = { limit: limit, totalBoxes: totalBoxes, omni: { samples: [], won: false, items: [], itemUses: 0 }, player: { samples: [], won: false, items: [], itemUses: 0, reviveEvents: [], trajectory: [] }, steps: null };
+    chartCache = { limit: limit, totalBoxes: totalBoxes, mode: chartEntryMode,
+      omni: { samples: [], won: false, items: [], itemUses: 0 },
+      player: { samples: [], won: false, items: [], itemUses: 0, reviveEvents: [], trajectory: [] }, steps: null };
     try {
       // 旧导入审核数据仍可复用；现场新算时显式采集动态封锁快照，才显示封锁热度带。
       var oSamples, oWon, oItems = [], oItemUses = 0, reused = false, oStepStats = null;   // 【v147】逐次取盒序列
-      if (currentGenerationEval && currentGenerationEval.omni && currentGenerationEval.omni.pressureSamples && currentGenerationEval.omni.pressureSamples.length) {
+      if (canReuseModeData && currentGenerationEval && currentGenerationEval.omni && currentGenerationEval.omni.pressureSamples && currentGenerationEval.omni.pressureSamples.length) {
         oSamples = currentGenerationEval.omni.pressureSamples;
         oWon = !!currentGenerationEval.omni.won; reused = true;
         oStepStats = currentGenerationEval.omni.stepStats || null;
-      } else if (currentImportedSolve && currentImportedSolve.pressureSamples && currentImportedSolve.pressureSamples.length) {
+      } else if (canReuseModeData && currentImportedSolve && currentImportedSolve.pressureSamples && currentImportedSolve.pressureSamples.length) {
         oSamples = currentImportedSolve.pressureSamples; oWon = !!currentImportedSolve.completed; reused = true;
         oStepStats = currentImportedSolve.stepStats || null;
       } else {
         // 【v121·任务AK①】全知压力曲线也必须按本关玩法跑。
         // 原实现写死 `bottomOnly=false` 且不传 instantChain → 底部/瞬时连锁关卡的全知压力图
         // 是用四边入口规则算出来的，与该关实际玩法不符（玩家图早就按 playerModeOpts 走对了，两幅图口径不一致）。
-        var pmo = playerModeOpts();
+        var pmo = playerModeOpts(chartEntryMode);
         var omni = AntSolver.Solver.runSolver(currentLevel, 0, 1, true, pmo.bottomOnly,
           { capturePreviewStats: true, instantChain: pmo.instantChain });
         oSamples = omni.pressureSamples || []; oWon = omni.completed; oItems = omni.itemMarks || []; oItemUses = omni.itemUses || 0;
@@ -3649,7 +3655,7 @@ AntSolver.App = (function() {
     } catch (e) { }
     try {
       var pl = null;
-      if (currentGenerationEval && currentGenerationEval.player && currentGenerationEval.player.pressureSamples && currentGenerationEval.player.pressureSamples.length) {
+      if (canReuseModeData && currentGenerationEval && currentGenerationEval.player && currentGenerationEval.player.pressureSamples && currentGenerationEval.player.pressureSamples.length) {
         var gp = currentGenerationEval.player;
         // 复用生成诊断的玩家结果时，把 v4 新增的复活事件与逐 tick 轨迹一并带过来（generator 已在
         // generationEval.player 上保留）。老数据没有这两项时退化为空数组，图上不画复活标记而非报错。
@@ -3664,7 +3670,7 @@ AntSolver.App = (function() {
         //   现改为跟随正式验证的默认值（关）。复活机制保留（reviveCap 默认 2），不受此项影响。
         pl = AntSolver.PlayerSim ? AntSolver.PlayerSim.run(currentLevel, Object.assign({
           seed: 7, capturePreviewStats: true
-        }, playerModeOpts())) : null;
+        }, playerModeOpts(chartEntryMode))) : null;
       }
       if (pl) chartCache.player = {
         samples: pl.pressureSamples, won: pl.won,
@@ -3753,6 +3759,7 @@ AntSolver.App = (function() {
     liveMode = false;
     removeGameMsg();
     refreshSimUI();
+    renderPressureCharts();
     // 路线若正在显示且设为「跟随当前」，重算以保持与消除逻辑一致
     if (routeOverlay.active) {
       var sel = document.getElementById('route-mode');
@@ -4318,6 +4325,7 @@ AntSolver.App = (function() {
     if (st0) { st0.instantChain = false; st0.bottomOnly = false; }
     syncElimModeSelect('fourSide');
     refreshSimUI();
+    renderPressureCharts();
     if (result.completed && result.pickOrder && result.pickOrder.length) {
       replaySolution(result.pickOrder);        // demoMode=replay, 逐步回放
     } else {
@@ -4344,6 +4352,7 @@ AntSolver.App = (function() {
     if (st) { st.instantChain = true; st.bottomOnly = false; }
     syncElimModeSelect('instantChain');   // 让消除模式下拉与实际状态一致，避免显示与行为不符
     refreshSimUI();
+    renderPressureCharts();
     if (result.completed && result.pickOrder && result.pickOrder.length) {
       replaySolution(result.pickOrder);
     } else {
@@ -4531,6 +4540,7 @@ AntSolver.App = (function() {
     }
     syncElimModeSelect('bottomOnly');
     refreshSimUI();
+    renderPressureCharts();
     if (result.completed && result.pickOrder && result.pickOrder.length) {
       replaySolution(result.pickOrder);
     } else {
