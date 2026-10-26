@@ -722,7 +722,7 @@ AntSolver.Generator = (function() {
   function applyGenerationRouteLock(level, config, sr) {
     if (!level || !sr || !sr.pickOrder || !sr.pickOrder.length) return { tries: [{ reason: 'no level/sr' }] };
     var parsed0 = AntSolver.parseLevel(level);
-    var cv0 = choiceCurve(parsed0, sr);
+    var cv0 = choiceCurve(parsed0, sr, config);
     if (!cv0 || !cv0.steps) return { tries: [{ reason: 'no cv' }] };
     var po = sr.pickOrder.slice().sort(function (a, b) { return (a.step || 0) - (b.step || 0); });
     function plain(r, c) {
@@ -778,7 +778,7 @@ AntSolver.Generator = (function() {
         try {
           p2 = AntSolver.parseLevel(lv);
           sr2 = AntSolver.Solver.solve(p2, { capturePreviewStats: true, bottomOnly: !!config.bottomOnly, instantChain: !!config.instantChain });
-          if (sr2 && sr2.completed) cv2 = choiceCurve(p2, sr2);
+          if (sr2 && sr2.completed) cv2 = choiceCurve(p2, sr2, config);
         } catch (e) { }
         if (!cv2) { tries.push({ step: si, mode: mode, pick: [st.pick.r, st.pick.c], deep: [d.r, d.c], alts: alts.length, locked: _altLocked, completed: false, reason: 'unsolved' }); continue; }
         var sc = (cv2.earlyPeak10 || 0) * 100 - (cv2.earlyFree10 || 0) * 10;
@@ -803,7 +803,7 @@ AntSolver.Generator = (function() {
             var _rl = applyGenerationRouteLock(level, curCfg, result);
             if (_rl && _rl.tries) { _rlTries = _rl.tries; level.board.routeLockTry = _rl.tries; }
             if (level.board.routeLockEntry) level.board.routeLockEntry.routeRan = true;
-            if (_rl && _rl.score > ((choiceCurve(parsed, result).earlyPeak10 || 0) * 100 - (choiceCurve(parsed, result).earlyFree10 || 0) * 10)) {
+            if (_rl && _rl.score > ((choiceCurve(parsed, result, curCfg).earlyPeak10 || 0) * 100 - (choiceCurve(parsed, result, curCfg).earlyFree10 || 0) * 10)) {
               level = _rl.level; parsed = _rl.parsed; result = _rl.sr;
               _rlInfo = _rl.info; level.board.routeLock = _rl.info;
             }
@@ -823,7 +823,7 @@ AntSolver.Generator = (function() {
                 _srE = AntSolver.Solver.solve(_pE, { capturePreviewStats: true, bottomOnly: !!curCfg.bottomOnly, instantChain: !!curCfg.instantChain });
               } catch (e2) { _srE = null; }
               if (!_srE || !_srE.completed) { _seTry.attempts.push({ which: _ew, reason: 're-solve failed' }); continue; }
-              var _cvE = choiceCurve(_pE, _srE);
+              var _cvE = choiceCurve(_pE, _srE, curCfg);
               var _ef = _cvE && _cvE.earlyFree10 != null ? _cvE.earlyFree10 : 99;
               var _ep = _cvE && _cvE.earlyPeak10 != null ? _cvE.earlyPeak10 : 0;
               var _sc = _ep * 100 - _ef * 10;
@@ -831,11 +831,11 @@ AntSolver.Generator = (function() {
               if (_sc > _bestScore) { _bestScore = _sc; _bestLv = _lvE; _bestP = _pE; _bestSr = _srE; }
             }
             if (_bestLv) {
-              var _cv0 = choiceCurve(parsed, result);
+              var _cv0 = choiceCurve(parsed, result, curCfg);
               var _ef0 = _cv0 && _cv0.earlyFree10 != null ? _cv0.earlyFree10 : 99;
               var _ep0 = _cv0 && _cv0.earlyPeak10 != null ? _cv0.earlyPeak10 : 0;
               _seTry.before = { free: _ef0, peak: _ep0 };
-              _seTry.after = { free: _cv0 && _bestP ? choiceCurve(_bestP, _bestSr).earlyFree10 : null, peak: _cv0 && _bestP ? choiceCurve(_bestP, _bestSr).earlyPeak10 : null };
+              _seTry.after = { free: _cv0 && _bestP ? choiceCurve(_bestP, _bestSr, curCfg).earlyFree10 : null, peak: _cv0 && _bestP ? choiceCurve(_bestP, _bestSr, curCfg).earlyPeak10 : null };
               if (_bestScore > _ep0 * 100 - _ef0 * 10) {
                 level = _bestLv; parsed = _bestP; result = _bestSr;
                 _seTry.applied = true; _seTry.reason = 'accepted improved';
@@ -6551,7 +6551,7 @@ AntSolver.Generator = (function() {
   function ensureCurve(c) {
     if (!c || !c.level || !c.solveResult) return null;
     if (c._choiceCurve === undefined) {
-      try { c._choiceCurve = choiceCurve(AntSolver.parseLevel(c.level), c.solveResult); }
+      try { c._choiceCurve = choiceCurve(AntSolver.parseLevel(c.level), c.solveResult, c.config); }
       catch (e) { c._choiceCurve = null; }
     }
     return c._choiceCurve;
@@ -8489,16 +8489,19 @@ AntSolver.Generator = (function() {
    * 沿【求解路线】回放一遍，逐步统计"能吃满的选项数"。
    * @returns {object|null} { steps, opening, medFull, forcedN, forcedMid, forcedAt, lowPct, low2Pct, spark }
    */
-  function choiceCurve(parsed, solveResult) {
+  function choiceCurve(parsed, solveResult, curveOpts) {
     if (!parsed || !solveResult || !solveResult.pickOrder || !solveResult.pickOrder.length) return null;
     var S = AntSolver.Simulator;
+    var co = curveOpts || {};
     if (!S || !S.enter || !S.listMoves) return null;
     var st;
     // 【v238】改用 createState 建独立状态：S.enter 会把全局模拟器的 state 换成这次回放，
     //   生产里每关算一次曲线就会打断用户正在界面上玩的局面。createState 口径相同（含激活/管道初始化），
     //   但不碰全局态。拿不到 createState 时退回旧路径。
     try {
-      st = (S.createState ? S.createState(parsed, { useSlotStart: true }) : S.enter(parsed, { useSlotStart: true }));
+      st = (S.createState ? S.createState(parsed, { useSlotStart: true,
+        bottomOnly: !!co.bottomOnly, instantChain: !!co.instantChain })
+        : S.enter(parsed, { useSlotStart: true, bottomOnly: !!co.bottomOnly, instantChain: !!co.instantChain }));
     } catch (e) { return null; }
     var rows = st.rows, cols = st.cols, limit = parsed.bufferLimit || 5;
     var order = solveResult.pickOrder.slice().sort(function (a, b) { return (a.step || 0) - (b.step || 0); });
@@ -8709,7 +8712,7 @@ AntSolver.Generator = (function() {
     // 【v151】叠一层"选择余地"分：同档候选里优先选"平时有得选、关键处被迫"的那种。
     if (c && c.level && c.solveResult && c._curveScore == null) {
       try {
-        var cur = choiceCurve(AntSolver.parseLevel(c.level), c.solveResult);
+        var cur = choiceCurve(AntSolver.parseLevel(c.level), c.solveResult, c.config);
         c._choiceCurve = cur;
         c._curveScore = cur ? choiceCurveScore(cur) : 0;
       } catch (e) { c._curveScore = 0; }
@@ -8795,7 +8798,7 @@ AntSolver.Generator = (function() {
     } catch (e) { _persist = null; }
     var _fill = null;
     try {
-      var _cv = choiceCurve(lv, sr);
+      var _cv = choiceCurve(lv, sr, cand.config);
       if (_cv) _fill = { medFull: _cv.medFull, lowPct: _cv.lowPct, low2Pct: _cv.low2Pct,
                          opening: _cv.opening, forcedMid: _cv.forcedMid, n: _cv.n, spark: _cv.spark, steps: _cv.steps, pressureN: _cv.pressureN, openingFree12: _cv.openingFree12, openingPressure12: _cv.openingPressure12,
                          freePct: _cv.freePct, pressurePct: _cv.pressurePct, freeRunMax: _cv.freeRunMax,
@@ -9040,7 +9043,7 @@ AntSolver.Generator = (function() {
   function midChokeOf(c) {
     if (!c) return 0;
     if (c._choiceCurve === undefined) {
-      try { c._choiceCurve = (c.level && c.solveResult) ? choiceCurve(AntSolver.parseLevel(c.level), c.solveResult) : null; }
+      try { c._choiceCurve = (c.level && c.solveResult) ? choiceCurve(AntSolver.parseLevel(c.level), c.solveResult, c.config) : null; }
       catch (e) { c._choiceCurve = null; }
     }
     return (c._choiceCurve && c._choiceCurve.forcedMid) ? c._choiceCurve.forcedMid : 0;
@@ -10517,7 +10520,7 @@ AntSolver.Generator = (function() {
     if (!cand) return cand;
     // 【v151】最终这一关的"选择余地"曲线（candScore 里已算过就复用）
     try {
-      if (!cand._choiceCurve && cand.level && cand.solveResult) cand._choiceCurve = choiceCurve(AntSolver.parseLevel(cand.level), cand.solveResult);
+      if (!cand._choiceCurve && cand.level && cand.solveResult) cand._choiceCurve = choiceCurve(AntSolver.parseLevel(cand.level), cand.solveResult, cand.config);
       cand.choiceCurve = cand._choiceCurve || null;
     } catch (e) { cand.choiceCurve = null; }
     cand.candidates = K;
@@ -15306,7 +15309,7 @@ AntSolver.Generator = (function() {
     if (!cand || !cand.level || !cand.level.board || !cand.solveResult || !cand.solveResult.pickOrder) return null;
     var curve = cand.goodV3 && cand.goodV3.fillCurve;
     if (!curve || !curve.steps) {
-      try { curve = choiceCurve(AntSolver.parseLevel(cand.level), cand.solveResult); } catch (e) { return null; }
+      try { curve = choiceCurve(AntSolver.parseLevel(cand.level), cand.solveResult, cand.config); } catch (e) { return null; }
     }
     if (!curve || !curve.steps) return null;
     var order = cand.solveResult.pickOrder.slice().filter(function(x) {
@@ -15469,7 +15472,7 @@ AntSolver.Generator = (function() {
       completedBoxes: replay.state ? replay.state.completedBoxes : null,
       totalBoxes: replay.state ? replay.state.totalBoxes : null
     });
-    var curve = choiceCurve(parsed, sr);
+    var curve = choiceCurve(parsed, sr, config);
     if (!curve) return { valid: false, replay: replay, capacity: cap, capacityOk: capacityOk, reason: 'choice_curve_missing' };
     var vc = Object.assign({}, cand, {
       level: level,
@@ -16363,7 +16366,7 @@ AntSolver.Generator = (function() {
     }
     var U = parsed.totalBoxes ? Math.max(0, Math.min(100, Math.round((1 - pickedN / parsed.totalBoxes) * 100))) : null;
     var fill = null;
-    try { fill = choiceCurve(parsed, sr); } catch (e) { }
+    try { fill = choiceCurve(parsed, sr, config); } catch (e) { }
     var dec = (fill && fill.steps) ? fill.steps.filter(function (x) { return x.full >= 2; }).length : 0;
     var traps = {};
     if (best && best.won) {

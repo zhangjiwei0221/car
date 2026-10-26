@@ -8,7 +8,6 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const LEVEL_DIR = path.join(__dirname, 'M7独立seed留出图_v568.levels');
 const OUT = path.join(__dirname, '结构门规则一致性_v568.json');
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
@@ -16,8 +15,10 @@ const FILES = [
   'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js',
   'source-preflight.js'
 ];
-const SEEDS = [41001, 41002, 41003, 41004];
-const IMAGES = ['008', '014'];
+const SOURCES = [
+  { id: 'heldout_B', dir: 'M7独立seed留出图_v568.levels' },
+  { id: 'branch_policy', dir: '目标分支策略矩阵_v566.levels' }
+];
 
 function load() {
   const sb = {
@@ -96,15 +97,21 @@ let A = null;
 function main() {
   A = load();
   const rows = [];
-  for (const image of IMAGES) {
-    for (const seed of SEEDS) {
-      const stem = image + '_' + seed;
-      const raw = JSON.parse(fs.readFileSync(path.join(LEVEL_DIR, stem + '.json'), 'utf8'));
-      const route = JSON.parse(fs.readFileSync(path.join(LEVEL_DIR, stem + '.route.json'), 'utf8'));
+  for (const source of SOURCES) {
+    const dir = path.join(__dirname, source.dir);
+    for (const file of fs.readdirSync(dir).filter(x => x.endsWith('.json') && !x.endsWith('.route.json')).sort()) {
+      const stem = file.replace(/\.json$/, '');
+      const match = stem.match(/^(006|008|010|014)_(\d+)/);
+      if (!match) continue;
+      const image = match[1], seed = +match[2];
+      const raw = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      const route = JSON.parse(fs.readFileSync(path.join(dir, stem + '.route.json'), 'utf8'));
       const parsed = A.parseLevel(raw);
       const legacy = curve(parsed, route, false);
       const instant = curve(parsed, route, true);
       rows.push({
+        source: source.id,
+        sample: stem,
         image,
         seed,
         board: parsed.board.rows + 'x' + parsed.board.cols,
@@ -139,7 +146,7 @@ function main() {
           }
         }
       });
-      console.log('[rule]', image, seed,
+      console.log('[rule]', source.id, stem,
         'legacyGate=' + legacy.gatePass,
         'instantGate=' + instant.gatePass,
         'legacyFree=' + legacy.metrics.freeRunMax,
@@ -154,6 +161,16 @@ function main() {
     instantCompleted: rows.filter(x => x.instant.completed).length,
     differentGate: rows.filter(x => x.legacy.gatePass !== x.instant.gatePass).length,
     differentFreeRun: rows.filter(x => x.legacy.metrics.freeRunMax !== x.instant.metrics.freeRunMax).length,
+    bySource: Object.fromEntries(SOURCES.map(source => {
+      const a = rows.filter(x => x.source === source.id);
+      return [source.id, {
+        runs: a.length,
+        legacyGatePass: a.filter(x => x.legacy.gatePass).length,
+        instantGatePass: a.filter(x => x.instant.gatePass).length,
+        differentGate: a.filter(x => x.legacy.gatePass !== x.instant.gatePass).length,
+        differentFreeRun: a.filter(x => x.legacy.metrics.freeRunMax !== x.instant.metrics.freeRunMax).length
+      }];
+    })),
     decision: rows.filter(x => x.legacy.gatePass !== x.instant.gatePass).length
       ? '结构门当前choiceCurve与instantChain口径存在实际差异，必须修正评测规则一致性。'
       : '当前样本未发现结构门规则差异。'

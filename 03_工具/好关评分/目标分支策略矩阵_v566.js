@@ -9,8 +9,13 @@ const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const OUT = path.join(__dirname, '目标分支策略矩阵_v566.json');
-const LEVEL_DIR = path.join(__dirname, '目标分支策略矩阵_v566.levels');
+function arg(name, def) {
+  const prefix = '--' + name + '=';
+  const hit = process.argv.find(x => x.indexOf(prefix) === 0);
+  return hit ? hit.slice(prefix.length) : def;
+}
+const OUT = path.join(__dirname, arg('out', '目标分支策略矩阵_v566.json'));
+const LEVEL_DIR = path.join(__dirname, arg('levels-dir', '目标分支策略矩阵_v566.levels'));
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
@@ -64,7 +69,7 @@ function cfgFor(blocks, seed, recipe, policy) {
     instantPlanBranchCount: 2,
     instantPlanBranchDebtRoots: true,
     instantPlanBranchPrefixDebts: 8,
-    capScalePlan: [1.45, 1.15],
+    capScalePlan: null,
     boxSizeMin: b[0],
     boxSizeMax: b[1],
     capNormMin: b[0],
