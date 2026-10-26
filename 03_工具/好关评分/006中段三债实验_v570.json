@@ -1,0 +1,392 @@
+{
+  "schema": "006-mid-band-debt-3-experiment-v570",
+  "date": "2026-10-26",
+  "preregistration": "006中段三债实验_v570.预登记.md",
+  "experiment": {
+    "policy": "midBandDebt3",
+    "sourcePatch": {
+      "applied": true,
+      "file": "instant-playout.js",
+      "originalHash": "25e3c6ce4df5d9d77b1d2c55486da3e6f95c9e74e99c4ceebab7d0c15aa102c3",
+      "patchedHash": "42baccb2e0e876230920e29f1ec7f3792721f52e72851f21a24e7cc72b89b410"
+    },
+    "memoryOnly": true,
+    "productionFilesModified": false,
+    "repeats": 2
+  },
+  "baseline": {
+    "shortDebt": {
+      "hash": "f91d8cf7c70d33aea424a63c1d5c27518b7f0a3f90115d9616418c3250877205",
+      "structure": {
+        "pass": true,
+        "reasons": [],
+        "qPass": false,
+        "qReasons": [
+          "学会后100%>85%（一学就会）",
+          "前瞻100%>85%（一眼看穿）",
+          "T陷阱0%<10%（没压力）",
+          "R后悔0pp<15（没岔路）"
+        ],
+        "label": "可玩·一学就会"
+      },
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "boardFloorPass": true,
+        "aboveMax": 0,
+        "belowMin": 6,
+        "minCap": 19,
+        "maxCap": 38,
+        "colorMismatches": []
+      },
+      "metrics": {
+        "midSteps": 23,
+        "midBuffer34Pct": 39.1,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 3,
+        "distance": 10.9
+      },
+      "releaseStatus": "found",
+      "player": {
+        "won": true,
+        "progress": 100,
+        "picks": 37,
+        "bufferPeak": 3,
+        "playerAvgBuffer": 1.7568,
+        "avgResidence": 1.7568,
+        "stalledAtEnd": 0,
+        "lastRefuse": null,
+        "lastBlocked": null
+      },
+      "plan": {
+        "policy": "shortDebt",
+        "ok": true,
+        "reason": null,
+        "cars": 37,
+        "debtCars": 18,
+        "maxBuffer": 5,
+        "bufferEvents": 34,
+        "medianEntryReach": 30,
+        "medianConsumed": 34,
+        "covered": 1225,
+        "total": 1225,
+        "deadlock": false,
+        "targetCars": null,
+        "capRange": [
+          31,
+          40
+        ]
+      },
+      "replay": {
+        "completed": true,
+        "steps": 37,
+        "reason": null,
+        "maxBuffer": 3,
+        "preMidMaxBuffer": 3,
+        "midSteps": 23,
+        "midDistribution": {
+          "0": 3,
+          "1": 3,
+          "2": 8,
+          "3": 9
+        },
+        "maxLowRun": 7,
+        "mid34": 9
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "midBandDebt3_r1",
+      "repeat": 1,
+      "patch": {
+        "applied": true,
+        "file": "instant-playout.js",
+        "originalHash": "25e3c6ce4df5d9d77b1d2c55486da3e6f95c9e74e99c4ceebab7d0c15aa102c3",
+        "patchedHash": "42baccb2e0e876230920e29f1ec7f3792721f52e72851f21a24e7cc72b89b410"
+      },
+      "valid": true,
+      "error": null,
+      "wallMs": 30586,
+      "levelHash": "ab8606b25436e4cfebdd87d088b51b178df0dea852de8af00653c995b893750d",
+      "board": "7x8",
+      "route": {
+        "completed": true,
+        "steps": 37,
+        "reason": null,
+        "maxBuffer": 4,
+        "preMidMaxBuffer": 4,
+        "midSteps": 23,
+        "midDistribution": {
+          "0": 7,
+          "1": 10,
+          "2": 5,
+          "3": 1
+        },
+        "maxLowRun": 13,
+        "mid34": 1
+      },
+      "structure": {
+        "pass": true,
+        "reasons": [],
+        "qPass": false,
+        "qReasons": [
+          "学会后0%<55%（学不会）",
+          "前瞻0%<40%（偏黑）",
+          "T未测",
+          "R后悔0pp<15（没岔路）"
+        ],
+        "label": "可玩·没岔路"
+      },
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "boardFloorPass": true,
+        "aboveMax": 0,
+        "belowMin": 6,
+        "colorMismatches": []
+      },
+      "experience": {
+        "pass": false,
+        "curvePass": false,
+        "status": "fail",
+        "reasons": [
+          "buffer34_below_50"
+        ],
+        "metrics": {
+          "midSteps": 23,
+          "midBuffer34Pct": 4.3,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 1,
+          "oscillationCount": 2,
+          "lateHighPressurePct": 0,
+          "maxBuffer": 4,
+          "distance": 45.7
+        },
+        "releaseStatus": "found",
+        "releaseEvidence": {
+          "referenceStep": 23,
+          "progress": 0.573,
+          "beforeBuffer": 3,
+          "action": {
+            "r": 2,
+            "c": 6,
+            "color": 13
+          },
+          "minBufferWithinWindow": 0,
+          "releaseAmplitude": 3,
+          "releaseWindow": 4,
+          "finalReplayValid": true,
+          "routeActions": 14,
+          "source": "reference_action",
+          "choiceContrast": null
+        }
+      },
+      "player": {
+        "won": false,
+        "progress": 68,
+        "picks": 26,
+        "bufferPeak": 4,
+        "playerAvgBuffer": 2.5385,
+        "avgResidence": 1.8636,
+        "stalledAtEnd": 4,
+        "lastRefuse": {
+          "reason": "highPressure",
+          "r": 3,
+          "c": 3,
+          "need": 1,
+          "free": 1,
+          "color": 4,
+          "chain": 0
+        }
+      },
+      "plan": {
+        "policy": "midBandDebt3",
+        "ok": true,
+        "cars": 37,
+        "debtCars": 13,
+        "maxBuffer": 5,
+        "bufferEvents": 29,
+        "medianEntryReach": 36
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalPass": false
+    },
+    {
+      "id": "midBandDebt3_r2",
+      "repeat": 2,
+      "patch": {
+        "applied": true,
+        "file": "instant-playout.js",
+        "originalHash": "25e3c6ce4df5d9d77b1d2c55486da3e6f95c9e74e99c4ceebab7d0c15aa102c3",
+        "patchedHash": "42baccb2e0e876230920e29f1ec7f3792721f52e72851f21a24e7cc72b89b410"
+      },
+      "valid": true,
+      "error": null,
+      "wallMs": 30905,
+      "levelHash": "ab8606b25436e4cfebdd87d088b51b178df0dea852de8af00653c995b893750d",
+      "board": "7x8",
+      "route": {
+        "completed": true,
+        "steps": 37,
+        "reason": null,
+        "maxBuffer": 4,
+        "preMidMaxBuffer": 4,
+        "midSteps": 23,
+        "midDistribution": {
+          "0": 7,
+          "1": 10,
+          "2": 5,
+          "3": 1
+        },
+        "maxLowRun": 13,
+        "mid34": 1
+      },
+      "structure": {
+        "pass": true,
+        "reasons": [],
+        "qPass": false,
+        "qReasons": [
+          "学会后0%<55%（学不会）",
+          "前瞻0%<40%（偏黑）",
+          "T未测",
+          "R后悔0pp<15（没岔路）"
+        ],
+        "label": "可玩·没岔路"
+      },
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "boardFloorPass": true,
+        "aboveMax": 0,
+        "belowMin": 6,
+        "colorMismatches": []
+      },
+      "experience": {
+        "pass": false,
+        "curvePass": false,
+        "status": "fail",
+        "reasons": [
+          "buffer34_below_50"
+        ],
+        "metrics": {
+          "midSteps": 23,
+          "midBuffer34Pct": 4.3,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 1,
+          "oscillationCount": 2,
+          "lateHighPressurePct": 0,
+          "maxBuffer": 4,
+          "distance": 45.7
+        },
+        "releaseStatus": "found",
+        "releaseEvidence": {
+          "referenceStep": 23,
+          "progress": 0.573,
+          "beforeBuffer": 3,
+          "action": {
+            "r": 2,
+            "c": 6,
+            "color": 13
+          },
+          "minBufferWithinWindow": 0,
+          "releaseAmplitude": 3,
+          "releaseWindow": 4,
+          "finalReplayValid": true,
+          "routeActions": 14,
+          "source": "reference_action",
+          "choiceContrast": null
+        }
+      },
+      "player": {
+        "won": false,
+        "progress": 68,
+        "picks": 26,
+        "bufferPeak": 4,
+        "playerAvgBuffer": 2.5385,
+        "avgResidence": 1.8636,
+        "stalledAtEnd": 4,
+        "lastRefuse": {
+          "reason": "highPressure",
+          "r": 3,
+          "c": 3,
+          "need": 1,
+          "free": 1,
+          "color": 4,
+          "chain": 0
+        }
+      },
+      "plan": {
+        "policy": "midBandDebt3",
+        "ok": true,
+        "cars": 37,
+        "debtCars": 13,
+        "maxBuffer": 5,
+        "bufferEvents": 29,
+        "medianEntryReach": 36
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalPass": false
+    }
+  ],
+  "summary": {
+    "runs": 2,
+    "valid": 2,
+    "routes": 2,
+    "structures": 2,
+    "capacities": 2,
+    "goals": 0,
+    "players": 0,
+    "midValues": [
+      4.3,
+      4.3
+    ],
+    "releaseValues": [
+      1,
+      1
+    ],
+    "earlyMaxValues": [
+      4,
+      4
+    ],
+    "latePressureValues": [
+      0,
+      0
+    ],
+    "maxLowRuns": [
+      13,
+      13
+    ],
+    "hashes": [
+      "ab8606b25436e4cfebdd87d088b51b178df0dea852de8af00653c995b893750d",
+      "ab8606b25436e4cfebdd87d088b51b178df0dea852de8af00653c995b893750d"
+    ],
+    "hashesStable": true
+  },
+  "checks": {
+    "patchApplied": true,
+    "bothValid": true,
+    "bothRoutesCompleted": true,
+    "bothStructuresPass": true,
+    "bothCapacitiesPass": true,
+    "bothGoalsPass": false,
+    "bothMidAtLeast50": false,
+    "bothSignificantRelease": true,
+    "bothReleaseReplay": true,
+    "bothPlayersWin": false,
+    "earlyPressureSafe": false,
+    "latePressureSafe": true,
+    "noLongLowRun": false,
+    "policyEffective": true,
+    "pass": false
+  },
+  "decision": "midBandDebt3未通过全部预登记门槛；不接生产，下一轮只改一个策略细节。"
+}
