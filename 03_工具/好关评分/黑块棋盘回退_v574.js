@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** v573：复现 32 盒/9×9/四行黑块，并验证缩小棋盘与黑块硬门。 */
+/** v574：复现 32 盒/9×9/四行黑块，并验证合规回退优先更大棋盘。 */
 'use strict';
 
 const fs = require('fs');
@@ -12,8 +12,8 @@ const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', '
 const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
 const OLD_DIR = path.join(ROOT, '02_工程', '完整主bin快照_20261012', '输出文件', 'unnamed-10-27-3', '生产文档', '关卡数据');
 const OLD_LEVEL = path.join(OLD_DIR, '关卡00199_原图039-056-023-038_分图3色_40x40.json');
-const OUT = path.join(__dirname, '黑块棋盘回退_v573.json');
-const LEVEL_DIR = path.join(__dirname, '黑块棋盘回退_v573.levels');
+const OUT = path.join(__dirname, '黑块棋盘回退_v574.json');
+const LEVEL_DIR = path.join(__dirname, '黑块棋盘回退_v574.levels');
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
@@ -219,7 +219,7 @@ function main() {
     gatePasses: rows.filter(x => x.quality && x.quality.gatePass).length
   };
   fs.writeFileSync(OUT, JSON.stringify({
-    schema: 'black-board-fallback-v573', date: '2026-10-27',
+    schema: 'black-board-fallback-v574', date: '2026-10-27',
     old, summary, rows
   }, null, 2) + '\n');
   console.log(JSON.stringify({ summary, old, out: path.relative(ROOT, OUT) }, null, 2));

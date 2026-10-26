@@ -2299,6 +2299,13 @@ AntSolver.Generator = (function() {
         };
       }
       function pickRandom(list) { return list[Math.floor(rnd() * list.length)]; }
+      function byPreferredBoard(a, b) {
+        var amin = Math.min(a.rows, a.cols), bmin = Math.min(b.rows, b.cols);
+        if (amin !== bmin) return bmin - amin;
+        var amax = Math.max(a.rows, a.cols), bmax = Math.max(b.rows, b.cols);
+        if (amax !== bmax) return bmax - amax;
+        return a.shrinkDist - b.shrinkDist;
+      }
 
       // 收集所有可行尺寸：方案范围内（缩小距离 0）+ 逐行向下缩小（缩小距离 = rMin−sr）。
       // 每个尺寸带 shrinkDist，供「最小缩小量」择优——不同盒数的图会缩到不同大小，天然保留多样性。
@@ -2341,9 +2348,15 @@ AntSolver.Generator = (function() {
         // 【v393】先 board 后 pipe 的硬顺序：先找 overflow≤0 的尺寸，不塞管道。
         // 范围本身能装下就先用；范围装不下才用 +1 行/列扩展盘；都没有才允许带管道。
         var _fitIn = allDims.filter(function (d) { return !d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0 && dimBlackOk(d); });
-        if (_fitIn.length) return emitUsable(pickRandom(_fitIn), false, allDims.length);
+        if (_fitIn.length) {
+          _fitIn.sort(byPreferredBoard);
+          return emitUsable(_fitIn[0], false, allDims.length);
+        }
         var _fitExp = allDims.filter(function (d) { return d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0 && dimBlackOk(d); });
-        if (_fitExp.length) return emitUsable(pickRandom(_fitExp), false, allDims.length);
+        if (_fitExp.length) {
+          _fitExp.sort(byPreferredBoard);
+          return emitUsable(_fitExp[0], false, allDims.length);
+        }
         // ① 优先「干净」尺寸（保管道 + 不突破墙上限），并取【缩小量最小】的那一级 → 只缩到刚好不突破，
         //    同一级内随机（保留尺寸多样性）。这直接实现用户「缩到不触发墙超限兜底为止」。
         var clean = allDims.filter(function (d) { return isClean(d) && dimBlackOk(d); });
@@ -2355,7 +2368,7 @@ AntSolver.Generator = (function() {
           //   现在只要存在 overflow≤0 的尺寸就只在其中随机；否则取溢出最少的那些。
           var _ov = function (d) { return (d.q && d.q.overflow || 0); };
           var fit = pool.filter(function (d) { return _ov(d) <= 0; });
-          if (fit.length) pool = fit;
+          if (fit.length) pool = fit.sort(byPreferredBoard);
           else {
             var minOv2 = Math.min.apply(null, pool.map(_ov));
             pool = pool.filter(function (d) { return _ov(d) === minOv2; });
@@ -2442,6 +2455,13 @@ AntSolver.Generator = (function() {
     // ---- 分档挑选 ----
     function byOvAsc(a, b) { return a.ov - b.ov; }
     function bySurplusAsc(a, b) { return a.surplus - b.surplus || a.ov - b.ov; }
+    function byBoardPreference(a, b) {
+      var amin = Math.min(a.rows, a.cols), bmin = Math.min(b.rows, b.cols);
+      if (amin !== bmin) return bmin - amin;
+      var amax = Math.max(a.rows, a.cols), bmax = Math.max(b.rows, b.cols);
+      if (amax !== bmax) return bmax - amax;
+      return bySurplusAsc(a, b);
+    }
     function pickFrom(list) {
       var blackSafe = list.filter(dimBlackOk);
       if (blackSafe.length) list = blackSafe;
@@ -2457,7 +2477,7 @@ AntSolver.Generator = (function() {
       }
       // 【v394】boardFirst：只要盘能装下（ov≤0），哪怕多 1~2 格，也优先于“溢出进管道”。
       if (config && config.boardFirst) {
-        var fitBoard = list.filter(function (x) { return x.ov <= 0; }).sort(bySurplusAsc);
+        var fitBoard = list.filter(function (x) { return x.ov <= 0; }).sort(byBoardPreference);
         if (fitBoard.length) return { e: fitBoard[0], tier: 'fitBoard' };
       }
       var good = list.filter(function (x) { return x.ov >= 0 && x.ov <= pipeRoom; }).sort(byOvAsc);
