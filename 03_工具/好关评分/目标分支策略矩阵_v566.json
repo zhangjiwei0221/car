@@ -1,0 +1,552 @@
+{
+  "schema": "goal-branch-policy-matrix-v566",
+  "date": "2026-10-26",
+  "preregistration": "目标分支策略矩阵_预登记_v566.md",
+  "recipes": [
+    {
+      "id": "A_base",
+      "cutMode": "layerCut2",
+      "maxPipes": 2,
+      "chainByDemand": 4,
+      "iceForceSteps": 0
+    },
+    {
+      "id": "B_expose",
+      "cutMode": "exposeCut",
+      "maxPipes": 1,
+      "chainByDemand": 4,
+      "iceForceSteps": 4
+    }
+  ],
+  "policies": [
+    "supply",
+    "shortDebt"
+  ],
+  "summary": {
+    "runs": 8,
+    "valid": 8,
+    "structurePass": 8,
+    "goalPass": 4,
+    "cover006": true,
+    "cover010": true,
+    "byCase": {
+      "006/1001": {
+        "winners": [
+          "A_base/shortDebt",
+          "B_expose/shortDebt"
+        ],
+        "valid": [
+          "A_base/supply",
+          "A_base/shortDebt",
+          "B_expose/supply",
+          "B_expose/shortDebt"
+        ],
+        "structure": [
+          "A_base/supply",
+          "A_base/shortDebt",
+          "B_expose/supply",
+          "B_expose/shortDebt"
+        ],
+        "bestMid": {
+          "image": "006",
+          "seed": 1001,
+          "recipe": "A_base",
+          "recipeOverrides": {
+            "id": "A_base",
+            "cutMode": "layerCut2",
+            "maxPipes": 2,
+            "chainByDemand": 4,
+            "iceForceSteps": 0
+          },
+          "policy": "shortDebt",
+          "valid": true,
+          "levelHash": "94fe9bb6b4f8853ad52a2e5f0a4ffd469f9065ae266bfda32e923629cc98ab1b",
+          "board": "9x9",
+          "structurePass": true,
+          "gateReasons": [],
+          "goalPass": true,
+          "metrics": {
+            "midSteps": 21,
+            "midBuffer34Pct": 61.9,
+            "midBuffer5Pct": 0,
+            "maxBuffer5Run": 0,
+            "significantReleaseCount": 1,
+            "oscillationCount": 2,
+            "lateHighPressurePct": 71.4,
+            "maxBuffer": 4,
+            "distance": 0
+          },
+          "releaseStatus": null,
+          "capacity": {
+            "conserved": true,
+            "perColorConserved": true,
+            "aboveMax": 0,
+            "belowMin": 3,
+            "boxSizeMin": 31,
+            "boxSizeMax": 46
+          },
+          "actualPlanPolicy": "shortDebt",
+          "planOk": true,
+          "planReason": null,
+          "goalRounds": 2,
+          "goalStopReason": "pass",
+          "wallMs": 13452
+        }
+      },
+      "010/1002": {
+        "winners": [
+          "A_base/supply",
+          "B_expose/supply"
+        ],
+        "valid": [
+          "A_base/supply",
+          "A_base/shortDebt",
+          "B_expose/supply",
+          "B_expose/shortDebt"
+        ],
+        "structure": [
+          "A_base/supply",
+          "A_base/shortDebt",
+          "B_expose/supply",
+          "B_expose/shortDebt"
+        ],
+        "bestMid": {
+          "image": "010",
+          "seed": 1002,
+          "recipe": "A_base",
+          "recipeOverrides": {
+            "id": "A_base",
+            "cutMode": "layerCut2",
+            "maxPipes": 2,
+            "chainByDemand": 4,
+            "iceForceSteps": 0
+          },
+          "policy": "supply",
+          "valid": true,
+          "levelHash": "a1f8abd8d8067075965b14a88346d26ee5e2e944748e8a821880179b507f7f60",
+          "board": "9x9",
+          "structurePass": true,
+          "gateReasons": [],
+          "goalPass": true,
+          "metrics": {
+            "midSteps": 18,
+            "midBuffer34Pct": 72.2,
+            "midBuffer5Pct": 5.6,
+            "maxBuffer5Run": 1,
+            "significantReleaseCount": 1,
+            "oscillationCount": 1,
+            "lateHighPressurePct": 50,
+            "maxBuffer": 5,
+            "distance": 0
+          },
+          "releaseStatus": null,
+          "capacity": {
+            "conserved": true,
+            "perColorConserved": true,
+            "aboveMax": 0,
+            "belowMin": 1,
+            "boxSizeMin": 35,
+            "boxSizeMax": 62
+          },
+          "actualPlanPolicy": "supply",
+          "planOk": true,
+          "planReason": null,
+          "goalRounds": 2,
+          "goalStopReason": "pass",
+          "wallMs": 19807
+        }
+      }
+    },
+    "aboveMax": 0,
+    "perColorFail": 0,
+    "byRecipePolicy": {
+      "A_base/supply": {
+        "runs": 2,
+        "valid": 2,
+        "structurePass": 2,
+        "goalPass": 1
+      },
+      "A_base/shortDebt": {
+        "runs": 2,
+        "valid": 2,
+        "structurePass": 2,
+        "goalPass": 1
+      },
+      "B_expose/supply": {
+        "runs": 2,
+        "valid": 2,
+        "structurePass": 2,
+        "goalPass": 1
+      },
+      "B_expose/shortDebt": {
+        "runs": 2,
+        "valid": 2,
+        "structurePass": 2,
+        "goalPass": 1
+      }
+    },
+    "decision": "A/B两分支内存在supply+shortDebt组合可覆盖两个代表样本；可进入生产分支配比修改。"
+  },
+  "rows": [
+    {
+      "image": "006",
+      "seed": 1001,
+      "recipe": "A_base",
+      "recipeOverrides": {
+        "id": "A_base",
+        "cutMode": "layerCut2",
+        "maxPipes": 2,
+        "chainByDemand": 4,
+        "iceForceSteps": 0
+      },
+      "policy": "supply",
+      "valid": true,
+      "levelHash": "6fbf1788cd3e341c76ea8786c53f164488008d317d1b1299df4414e35779db28",
+      "board": "8x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 17,
+        "midBuffer34Pct": 52.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 0,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 33.3,
+        "maxBuffer": 4,
+        "distance": 25
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "boxSizeMin": 31,
+        "boxSizeMax": 58
+      },
+      "actualPlanPolicy": "supply",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "wallMs": 33310
+    },
+    {
+      "image": "006",
+      "seed": 1001,
+      "recipe": "A_base",
+      "recipeOverrides": {
+        "id": "A_base",
+        "cutMode": "layerCut2",
+        "maxPipes": 2,
+        "chainByDemand": 4,
+        "iceForceSteps": 0
+      },
+      "policy": "shortDebt",
+      "valid": true,
+      "levelHash": "94fe9bb6b4f8853ad52a2e5f0a4ffd469f9065ae266bfda32e923629cc98ab1b",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": true,
+      "metrics": {
+        "midSteps": 21,
+        "midBuffer34Pct": 61.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 71.4,
+        "maxBuffer": 4,
+        "distance": 0
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 3,
+        "boxSizeMin": 31,
+        "boxSizeMax": 46
+      },
+      "actualPlanPolicy": "shortDebt",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "pass",
+      "wallMs": 13452
+    },
+    {
+      "image": "006",
+      "seed": 1001,
+      "recipe": "B_expose",
+      "recipeOverrides": {
+        "id": "B_expose",
+        "cutMode": "exposeCut",
+        "maxPipes": 1,
+        "chainByDemand": 4,
+        "iceForceSteps": 4
+      },
+      "policy": "supply",
+      "valid": true,
+      "levelHash": "6fbf1788cd3e341c76ea8786c53f164488008d317d1b1299df4414e35779db28",
+      "board": "8x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 17,
+        "midBuffer34Pct": 52.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 0,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 33.3,
+        "maxBuffer": 4,
+        "distance": 25
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "boxSizeMin": 31,
+        "boxSizeMax": 58
+      },
+      "actualPlanPolicy": "supply",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "wallMs": 33040
+    },
+    {
+      "image": "006",
+      "seed": 1001,
+      "recipe": "B_expose",
+      "recipeOverrides": {
+        "id": "B_expose",
+        "cutMode": "exposeCut",
+        "maxPipes": 1,
+        "chainByDemand": 4,
+        "iceForceSteps": 4
+      },
+      "policy": "shortDebt",
+      "valid": true,
+      "levelHash": "94fe9bb6b4f8853ad52a2e5f0a4ffd469f9065ae266bfda32e923629cc98ab1b",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": true,
+      "metrics": {
+        "midSteps": 21,
+        "midBuffer34Pct": 61.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 71.4,
+        "maxBuffer": 4,
+        "distance": 0
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 3,
+        "boxSizeMin": 31,
+        "boxSizeMax": 46
+      },
+      "actualPlanPolicy": "shortDebt",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "pass",
+      "wallMs": 13338
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "recipe": "A_base",
+      "recipeOverrides": {
+        "id": "A_base",
+        "cutMode": "layerCut2",
+        "maxPipes": 2,
+        "chainByDemand": 4,
+        "iceForceSteps": 0
+      },
+      "policy": "supply",
+      "valid": true,
+      "levelHash": "a1f8abd8d8067075965b14a88346d26ee5e2e944748e8a821880179b507f7f60",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": true,
+      "metrics": {
+        "midSteps": 18,
+        "midBuffer34Pct": 72.2,
+        "midBuffer5Pct": 5.6,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 50,
+        "maxBuffer": 5,
+        "distance": 0
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "boxSizeMin": 35,
+        "boxSizeMax": 62
+      },
+      "actualPlanPolicy": "supply",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "pass",
+      "wallMs": 19807
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "recipe": "A_base",
+      "recipeOverrides": {
+        "id": "A_base",
+        "cutMode": "layerCut2",
+        "maxPipes": 2,
+        "chainByDemand": 4,
+        "iceForceSteps": 0
+      },
+      "policy": "shortDebt",
+      "valid": true,
+      "levelHash": "b4ee08e2ea10589408547aea2798177352725f428e8bf8bdd384ea78747713e9",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 14,
+        "midBuffer34Pct": 28.6,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 21.4
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78
+      },
+      "actualPlanPolicy": "shortDebt",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "wallMs": 14544
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "recipe": "B_expose",
+      "recipeOverrides": {
+        "id": "B_expose",
+        "cutMode": "exposeCut",
+        "maxPipes": 1,
+        "chainByDemand": 4,
+        "iceForceSteps": 4
+      },
+      "policy": "supply",
+      "valid": true,
+      "levelHash": "a1f8abd8d8067075965b14a88346d26ee5e2e944748e8a821880179b507f7f60",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": true,
+      "metrics": {
+        "midSteps": 18,
+        "midBuffer34Pct": 72.2,
+        "midBuffer5Pct": 5.6,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 50,
+        "maxBuffer": 5,
+        "distance": 0
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "boxSizeMin": 35,
+        "boxSizeMax": 62
+      },
+      "actualPlanPolicy": "supply",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "pass",
+      "wallMs": 19780
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "recipe": "B_expose",
+      "recipeOverrides": {
+        "id": "B_expose",
+        "cutMode": "exposeCut",
+        "maxPipes": 1,
+        "chainByDemand": 4,
+        "iceForceSteps": 4
+      },
+      "policy": "shortDebt",
+      "valid": true,
+      "levelHash": "b4ee08e2ea10589408547aea2798177352725f428e8bf8bdd384ea78747713e9",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 14,
+        "midBuffer34Pct": 28.6,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 21.4
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78
+      },
+      "actualPlanPolicy": "shortDebt",
+      "planOk": true,
+      "planReason": null,
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "wallMs": 14571
+    }
+  ]
+}

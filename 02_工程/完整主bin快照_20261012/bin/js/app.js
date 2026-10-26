@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "565";
+var APP_BUILD = "567";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -7348,9 +7348,9 @@ AntSolver.App = (function() {
     base.experienceGoal = genExperienceGoalEnabled();
     base.capacityTuneMs = 5000; base.capacityTuneCars = 8; base.capacityTuneVariants = 48;
     var recipes = [
-      { tag: 'A', over: {} },
-      { tag: 'B', over: { cutMode: 'exposeCut', maxPipes: 1, iceForceSteps: 4 } },
-      { tag: 'C', over: { cutMode: 'layerCut2', maxPipes: 2, chainByDemand: 4, iceForceSteps: 0 } }
+      { tag: 'A', over: { instantPlanPolicy: 'supply' } },
+      { tag: 'B', over: { cutMode: 'exposeCut', maxPipes: 1, iceForceSteps: 4, instantPlanPolicy: 'shortDebt' } },
+      { tag: 'C', over: { cutMode: 'layerCut2', maxPipes: 2, chainByDemand: 4, iceForceSteps: 0, instantPlanPolicy: 'supply' } }
     ];
     var st = { idx: idx, entry: entry, ws: [], results: [], best: null, passed: null,
       done: 0, stopped: false, finished: false, timer: null };
@@ -7358,6 +7358,7 @@ AntSolver.App = (function() {
     genBatch.nextIdx = 1;   // 这张图由 branch 接管
     var baseSeed = (Date.now() & 0x7fffffff) >>> 0;
     genLog('[branch] 单图目标模式：A/B/C 三个分支并行（每支 A1→A2→A3→A4）', 'gen-log-ok');
+    genLog('[branch] 供给计划：A=supply · B=shortDebt · C=supply', 'gen-log-ok');
     recipes.forEach(function (rec, bi) {
       var w = null;
       try { w = new Worker('js/gen-worker.js' + genScriptVersion()); } catch (e) { w = null; }

@@ -112,6 +112,7 @@ function _goalRound() {
   cfg._trace = [];
   if (g.rounds === 0) {
     self.postMessage({ type: 'flow', index: g.index, round: 0, text: '目标配置诊断 · ' + JSON.stringify({
+      instantPlanPolicy: cfg.instantPlanPolicy || 'supply',
       cutMode: cfg.cutMode || null, boardLayout: cfg.boardLayout || null,
       rows: [cfg.boardRowsMin, cfg.boardRowsMax], cols: [cfg.boardColsMin, cfg.boardColsMax],
       cap: [cfg.boxSizeMin, cfg.boxSizeMax], capNorm: [cfg.capNormMin, cfg.capNormMax], capScalePlan: cfg.capScalePlan || null,
