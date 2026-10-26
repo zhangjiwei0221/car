@@ -1,0 +1,3124 @@
+{
+  "schema": "p2-p3-attribution-v566",
+  "date": "2026-10-26",
+  "preregistration": "P2P3归因_预登记_v566.md",
+  "summary": {
+    "cases": 3,
+    "audited": 3,
+    "hashMatches": 3,
+    "priorities": {
+      "inspect": 2,
+      "P2": 1
+    },
+    "dominantPriority": "inspect",
+    "decision": "三关hash全部复现；按容量可行性/首行/早期释放信号选择下一轮单因素，不直接改生产。",
+    "rows": [
+      {
+        "id": "006/1002",
+        "midBuffer34Pct": 16.7,
+        "maxBuffer": 4,
+        "significantReleaseCount": 2,
+        "infeasibleColors": [
+          4,
+          13,
+          14,
+          33,
+          34
+        ],
+        "belowMinCars": 6,
+        "row0LongestSame": 1,
+        "priority": "inspect",
+        "p2Score": 4,
+        "p3Score": 4
+      },
+      {
+        "id": "006/88001",
+        "midBuffer34Pct": 16.7,
+        "maxBuffer": 4,
+        "significantReleaseCount": 0,
+        "infeasibleColors": [
+          4,
+          13,
+          14,
+          33,
+          34
+        ],
+        "belowMinCars": 6,
+        "row0LongestSame": 1,
+        "priority": "P2",
+        "p2Score": 4,
+        "p3Score": 0
+      },
+      {
+        "id": "010/1002",
+        "midBuffer34Pct": 42.9,
+        "maxBuffer": 4,
+        "significantReleaseCount": 0,
+        "infeasibleColors": [
+          14
+        ],
+        "belowMinCars": 1,
+        "row0LongestSame": 1,
+        "priority": "inspect",
+        "p2Score": 2,
+        "p3Score": 2
+      }
+    ]
+  },
+  "rows": [
+    {
+      "image": "006",
+      "seed": 1002,
+      "expectedHash": "1ed22c11f389dcf496d6710b2449488eb1316fc119b5e5c6e6aa2b1c60384530",
+      "actualHash": "1ed22c11f389dcf496d6710b2449488eb1316fc119b5e5c6e6aa2b1c60384530",
+      "hashMatch": true,
+      "reproductionAttempt": 1,
+      "generationAttempts": [
+        {
+          "attempt": 1,
+          "hash": "1ed22c11f389dcf496d6710b2449488eb1316fc119b5e5c6e6aa2b1c60384530",
+          "hashMatch": true,
+          "board": "8x9",
+          "structurePass": true,
+          "gateReasons": [],
+          "goalPass": false,
+          "stopReason": "goalMaxRounds",
+          "wallMs": 6459
+        }
+      ],
+      "board": {
+        "rows": 8,
+        "cols": 9
+      },
+      "structure": {
+        "pass": true,
+        "reasons": [],
+        "fullMedian2": 1,
+        "freeRunMax": 4,
+        "freeLowPct": 27,
+        "partialStepPct": 84
+      },
+      "capacityAudit": {
+        "schema": "capacity-evidence-v1",
+        "rows": 8,
+        "cols": 9,
+        "boardFloorPass": true,
+        "cars": 37,
+        "capacitySum": 1225,
+        "pixels": 1225,
+        "conserved": true,
+        "perColorConserved": true,
+        "colorMismatches": [],
+        "minCap": 19,
+        "maxCap": 38,
+        "boxSizeMin": 31,
+        "boxSizeMax": 40,
+        "belowMin": 6,
+        "aboveMax": 0,
+        "microCarMax": 2,
+        "microCars": [],
+        "microCount": 0,
+        "rangeExactFeasible": false,
+        "infeasibleColors": [
+          {
+            "color": 4,
+            "total": 61
+          },
+          {
+            "color": 13,
+            "total": 55
+          },
+          {
+            "color": 14,
+            "total": 89
+          },
+          {
+            "color": 33,
+            "total": 41
+          },
+          {
+            "color": 34,
+            "total": 50
+          }
+        ],
+        "row0Cars": 2,
+        "row0Colors": 2,
+        "row0MaxSameColor": 1,
+        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+      },
+      "capacityPlan": {
+        "capMin": 31,
+        "capMax": 40,
+        "colors": [
+          {
+            "color": 4,
+            "pixels": 61,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              31,
+              30
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 1,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 61,
+            "conserved": true
+          },
+          {
+            "color": 5,
+            "pixels": 103,
+            "legalCarRange": [
+              3,
+              3
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 3,
+            "capacities": [
+              35,
+              34,
+              34
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 103,
+            "conserved": true
+          },
+          {
+            "color": 13,
+            "pixels": 55,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              31,
+              24
+            ],
+            "capacitySpread": 7,
+            "atCapMax": 0,
+            "atCapMin": 1,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 55,
+            "conserved": true
+          },
+          {
+            "color": 14,
+            "pixels": 89,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 3,
+            "capacities": [
+              31,
+              31,
+              27
+            ],
+            "capacitySpread": 4,
+            "atCapMax": 0,
+            "atCapMin": 2,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 89,
+            "conserved": true
+          },
+          {
+            "color": 15,
+            "pixels": 171,
+            "legalCarRange": [
+              5,
+              5
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 5,
+            "capacities": [
+              35,
+              34,
+              34,
+              34,
+              34
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 171,
+            "conserved": true
+          },
+          {
+            "color": 17,
+            "pixels": 76,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              38,
+              38
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 76,
+            "conserved": true
+          },
+          {
+            "color": 21,
+            "pixels": 36,
+            "legalCarRange": [
+              1,
+              1
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 1,
+            "capacities": [
+              36
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 36,
+            "conserved": true
+          },
+          {
+            "color": 22,
+            "pixels": 35,
+            "legalCarRange": [
+              1,
+              1
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 1,
+            "capacities": [
+              35
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 35,
+            "conserved": true
+          },
+          {
+            "color": 28,
+            "pixels": 69,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              35,
+              34
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 69,
+            "conserved": true
+          },
+          {
+            "color": 30,
+            "pixels": 135,
+            "legalCarRange": [
+              4,
+              4
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 4,
+            "capacities": [
+              34,
+              34,
+              34,
+              33
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 135,
+            "conserved": true
+          },
+          {
+            "color": 31,
+            "pixels": 304,
+            "legalCarRange": [
+              8,
+              9
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 8,
+            "capacities": [
+              38,
+              38,
+              38,
+              38,
+              38,
+              38,
+              38,
+              38
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 304,
+            "conserved": true
+          },
+          {
+            "color": 33,
+            "pixels": 41,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              21,
+              20
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 2,
+            "aboveMax": 0,
+            "sum": 41,
+            "conserved": true
+          },
+          {
+            "color": 34,
+            "pixels": 50,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              31,
+              19
+            ],
+            "capacitySpread": 12,
+            "atCapMax": 0,
+            "atCapMin": 1,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 50,
+            "conserved": true
+          }
+        ],
+        "infeasibleColors": [
+          4,
+          13,
+          14,
+          33,
+          34
+        ],
+        "belowMinCars": 6,
+        "aboveMaxCars": 0
+      },
+      "row0": {
+        "boxes": [
+          {
+            "c": 0,
+            "color": 15,
+            "count": 34
+          },
+          {
+            "c": 8,
+            "color": 34,
+            "count": 19
+          }
+        ],
+        "boxCount": 2,
+        "colorCount": 2,
+        "maxSameColorTotal": 1,
+        "longestSameColorRun": 1,
+        "byColor": {
+          "15": 1,
+          "34": 1
+        }
+      },
+      "route": {
+        "completed": true,
+        "steps": 37,
+        "rows": [
+          {
+            "actionIndex": 0,
+            "step": 1,
+            "r": 0,
+            "c": 0,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0,
+            "afterProgress": 0,
+            "beforeBuffer": 0,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 0
+          },
+          {
+            "actionIndex": 1,
+            "step": 2,
+            "r": 0,
+            "c": 8,
+            "color": 34,
+            "count": 19,
+            "beforeProgress": 0,
+            "afterProgress": 0,
+            "beforeBuffer": 1,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 0
+          },
+          {
+            "actionIndex": 2,
+            "step": 3,
+            "r": 1,
+            "c": 0,
+            "color": 14,
+            "count": 27,
+            "beforeProgress": 0,
+            "afterProgress": 0,
+            "beforeBuffer": 2,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 0
+          },
+          {
+            "actionIndex": 3,
+            "step": 4,
+            "r": 2,
+            "c": 0,
+            "color": 5,
+            "count": 34,
+            "beforeProgress": 0,
+            "afterProgress": 0.0245,
+            "beforeBuffer": 3,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 3,
+            "immediateEliminated": 30
+          },
+          {
+            "actionIndex": 4,
+            "step": 5,
+            "r": 2,
+            "c": 1,
+            "color": 30,
+            "count": 34,
+            "beforeProgress": 0.0245,
+            "afterProgress": 0.1176,
+            "beforeBuffer": 4,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 3,
+            "immediateEliminated": 114
+          },
+          {
+            "actionIndex": 5,
+            "step": 6,
+            "r": 1,
+            "c": 8,
+            "color": 14,
+            "count": 31,
+            "beforeProgress": 0.1176,
+            "afterProgress": 0.1412,
+            "beforeBuffer": 1,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 3,
+            "immediateEliminated": 29
+          },
+          {
+            "actionIndex": 6,
+            "step": 7,
+            "r": 2,
+            "c": 8,
+            "color": 17,
+            "count": 38,
+            "beforeProgress": 0.1412,
+            "afterProgress": 0.1543,
+            "beforeBuffer": 2,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 4,
+            "immediateEliminated": 16
+          },
+          {
+            "actionIndex": 7,
+            "step": 8,
+            "r": 3,
+            "c": 8,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.1543,
+            "afterProgress": 0.2016,
+            "beforeBuffer": 3,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 58
+          },
+          {
+            "actionIndex": 8,
+            "step": 9,
+            "r": 2,
+            "c": 7,
+            "color": 15,
+            "count": 35,
+            "beforeProgress": 0.2016,
+            "afterProgress": 0.2351,
+            "beforeBuffer": 2,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 41
+          },
+          {
+            "actionIndex": 9,
+            "step": 10,
+            "r": 3,
+            "c": 7,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.2351,
+            "afterProgress": 0.2678,
+            "beforeBuffer": 1,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 40
+          },
+          {
+            "actionIndex": 10,
+            "step": 11,
+            "r": 4,
+            "c": 7,
+            "color": 30,
+            "count": 34,
+            "beforeProgress": 0.2678,
+            "afterProgress": 0.2955,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 11,
+            "step": 12,
+            "r": 5,
+            "c": 7,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.2955,
+            "afterProgress": 0.3265,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 12,
+            "step": 13,
+            "r": 1,
+            "c": 7,
+            "color": 13,
+            "count": 24,
+            "beforeProgress": 0.3265,
+            "afterProgress": 0.3461,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 24
+          },
+          {
+            "actionIndex": 13,
+            "step": 14,
+            "r": 2,
+            "c": 6,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0.3461,
+            "afterProgress": 0.3722,
+            "beforeBuffer": 0,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 6,
+            "immediateEliminated": 32
+          },
+          {
+            "actionIndex": 14,
+            "step": 15,
+            "r": 2,
+            "c": 2,
+            "color": 30,
+            "count": 33,
+            "beforeProgress": 0.3722,
+            "afterProgress": 0.3959,
+            "beforeBuffer": 1,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 6,
+            "immediateEliminated": 29
+          },
+          {
+            "actionIndex": 15,
+            "step": 16,
+            "r": 1,
+            "c": 2,
+            "color": 21,
+            "count": 36,
+            "beforeProgress": 0.3959,
+            "afterProgress": 0.4261,
+            "beforeBuffer": 2,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 7,
+            "immediateEliminated": 37
+          },
+          {
+            "actionIndex": 16,
+            "step": 17,
+            "r": 1,
+            "c": 3,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.4261,
+            "afterProgress": 0.4604,
+            "beforeBuffer": 2,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 7,
+            "immediateEliminated": 42
+          },
+          {
+            "actionIndex": 17,
+            "step": 18,
+            "r": 1,
+            "c": 4,
+            "color": 5,
+            "count": 35,
+            "beforeProgress": 0.4604,
+            "afterProgress": 0.4792,
+            "beforeBuffer": 1,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 7,
+            "immediateEliminated": 23
+          },
+          {
+            "actionIndex": 18,
+            "step": 19,
+            "r": 1,
+            "c": 6,
+            "color": 4,
+            "count": 30,
+            "beforeProgress": 0.4792,
+            "afterProgress": 0.5127,
+            "beforeBuffer": 2,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 8,
+            "immediateEliminated": 41
+          },
+          {
+            "actionIndex": 19,
+            "step": 20,
+            "r": 1,
+            "c": 5,
+            "color": 17,
+            "count": 38,
+            "beforeProgress": 0.5127,
+            "afterProgress": 0.5437,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 7,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 20,
+            "step": 21,
+            "r": 3,
+            "c": 6,
+            "color": 33,
+            "count": 21,
+            "beforeProgress": 0.5437,
+            "afterProgress": 0.5608,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 21
+          },
+          {
+            "actionIndex": 21,
+            "step": 22,
+            "r": 2,
+            "c": 4,
+            "color": 28,
+            "count": 35,
+            "beforeProgress": 0.5608,
+            "afterProgress": 0.5894,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 35
+          },
+          {
+            "actionIndex": 22,
+            "step": 23,
+            "r": 2,
+            "c": 5,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0.5894,
+            "afterProgress": 0.6171,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 23,
+            "step": 24,
+            "r": 3,
+            "c": 4,
+            "color": 4,
+            "count": 31,
+            "beforeProgress": 0.6171,
+            "afterProgress": 0.6424,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 31
+          },
+          {
+            "actionIndex": 24,
+            "step": 25,
+            "r": 3,
+            "c": 5,
+            "color": 34,
+            "count": 31,
+            "beforeProgress": 0.6424,
+            "afterProgress": 0.6678,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 4,
+            "immediateEliminated": 31
+          },
+          {
+            "actionIndex": 25,
+            "step": 26,
+            "r": 2,
+            "c": 3,
+            "color": 14,
+            "count": 31,
+            "beforeProgress": 0.6678,
+            "afterProgress": 0.6865,
+            "beforeBuffer": 1,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 4,
+            "immediateEliminated": 23
+          },
+          {
+            "actionIndex": 26,
+            "step": 27,
+            "r": 6,
+            "c": 7,
+            "color": 22,
+            "count": 35,
+            "beforeProgress": 0.6865,
+            "afterProgress": 0.7061,
+            "beforeBuffer": 2,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 3,
+            "immediateEliminated": 24
+          },
+          {
+            "actionIndex": 27,
+            "step": 28,
+            "r": 4,
+            "c": 5,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0.7061,
+            "afterProgress": 0.7233,
+            "beforeBuffer": 3,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 21
+          },
+          {
+            "actionIndex": 28,
+            "step": 29,
+            "r": 5,
+            "c": 5,
+            "color": 13,
+            "count": 31,
+            "beforeProgress": 0.7233,
+            "afterProgress": 0.7502,
+            "beforeBuffer": 4,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 33
+          },
+          {
+            "actionIndex": 29,
+            "step": 30,
+            "r": 6,
+            "c": 5,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.7502,
+            "afterProgress": 0.7812,
+            "beforeBuffer": 3,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 30,
+            "step": 31,
+            "r": 6,
+            "c": 4,
+            "color": 28,
+            "count": 34,
+            "beforeProgress": 0.7812,
+            "afterProgress": 0.8335,
+            "beforeBuffer": 3,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 64
+          },
+          {
+            "actionIndex": 31,
+            "step": 32,
+            "r": 7,
+            "c": 4,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.8335,
+            "afterProgress": 0.8661,
+            "beforeBuffer": 1,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 40
+          },
+          {
+            "actionIndex": 32,
+            "step": 33,
+            "r": 1,
+            "c": 1,
+            "color": 33,
+            "count": 20,
+            "beforeProgress": 0.8661,
+            "afterProgress": 0.8824,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 20
+          },
+          {
+            "actionIndex": 33,
+            "step": 34,
+            "r": 7,
+            "c": 3,
+            "color": 30,
+            "count": 34,
+            "beforeProgress": 0.8824,
+            "afterProgress": 0.9102,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 34,
+            "step": 35,
+            "r": 7,
+            "c": 2,
+            "color": 5,
+            "count": 34,
+            "beforeProgress": 0.9102,
+            "afterProgress": 0.938,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 35,
+            "step": 36,
+            "r": 7,
+            "c": 1,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.938,
+            "afterProgress": 0.969,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 36,
+            "step": 37,
+            "r": 7,
+            "c": 0,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.969,
+            "afterProgress": 1,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 38
+          }
+        ]
+      },
+      "pressureWindows": [
+        {
+          "startActionIndex": 27,
+          "endActionIndex": 30,
+          "startStep": 28,
+          "endStep": 31,
+          "minBuffer": 3,
+          "maxBuffer": 4,
+          "actions": [
+            {
+              "step": 28,
+              "progress": 0.7061,
+              "buffer": 3,
+              "r": 4,
+              "c": 5,
+              "color": 15,
+              "count": 34
+            },
+            {
+              "step": 29,
+              "progress": 0.7233,
+              "buffer": 4,
+              "r": 5,
+              "c": 5,
+              "color": 13,
+              "count": 31
+            },
+            {
+              "step": 30,
+              "progress": 0.7502,
+              "buffer": 3,
+              "r": 6,
+              "c": 5,
+              "color": 31,
+              "count": 38
+            },
+            {
+              "step": 31,
+              "progress": 0.7812,
+              "buffer": 3,
+              "r": 6,
+              "c": 4,
+              "color": 28,
+              "count": 34
+            }
+          ]
+        }
+      ],
+      "experience": {
+        "pass": false,
+        "reasons": [
+          "buffer34_below_50"
+        ],
+        "metrics": {
+          "midSteps": 24,
+          "midBuffer34Pct": 16.7,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 2,
+          "oscillationCount": 3,
+          "lateHighPressurePct": 0,
+          "maxBuffer": 4,
+          "distance": 33.3
+        },
+        "releaseStatus": null,
+        "releaseEvidence": null
+      },
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [],
+        "pressureDeficit": 33.3,
+        "releaseCurveMissing": false,
+        "releaseDecisionStatus": "not_evaluated"
+      },
+      "classification": {
+        "flags": {
+          "capacityBandInfeasible": true,
+          "manyBelowMin": true,
+          "row0SameColor": false,
+          "startFullCars": false,
+          "earlyHigh": 3,
+          "earlyRelease": true,
+          "farPressureDeficit": true,
+          "nearPressureDeficit": false
+        },
+        "p2Score": 4,
+        "p3Score": 4,
+        "priority": "inspect",
+        "note": "启发式只用于排序，不能替代下一轮单因素重解。"
+      },
+      "status": "audited"
+    },
+    {
+      "image": "006",
+      "seed": 88001,
+      "expectedHash": "c7e87dda9b678f02aec28519e015274be79aeb1d6da17f2873ac8b295e607e7e",
+      "actualHash": "c7e87dda9b678f02aec28519e015274be79aeb1d6da17f2873ac8b295e607e7e",
+      "hashMatch": true,
+      "reproductionAttempt": 1,
+      "generationAttempts": [
+        {
+          "attempt": 1,
+          "hash": "c7e87dda9b678f02aec28519e015274be79aeb1d6da17f2873ac8b295e607e7e",
+          "hashMatch": true,
+          "board": "9x9",
+          "structurePass": true,
+          "gateReasons": [],
+          "goalPass": false,
+          "stopReason": "goalTimeUp",
+          "wallMs": 17918
+        }
+      ],
+      "board": {
+        "rows": 9,
+        "cols": 9
+      },
+      "structure": {
+        "pass": true,
+        "reasons": [],
+        "fullMedian2": 1,
+        "freeRunMax": 5,
+        "freeLowPct": 22,
+        "partialStepPct": 89
+      },
+      "capacityAudit": {
+        "schema": "capacity-evidence-v1",
+        "rows": 9,
+        "cols": 9,
+        "boardFloorPass": true,
+        "cars": 37,
+        "capacitySum": 1225,
+        "pixels": 1225,
+        "conserved": true,
+        "perColorConserved": true,
+        "colorMismatches": [],
+        "minCap": 19,
+        "maxCap": 38,
+        "boxSizeMin": 31,
+        "boxSizeMax": 40,
+        "belowMin": 6,
+        "aboveMax": 0,
+        "microCarMax": 2,
+        "microCars": [],
+        "microCount": 0,
+        "rangeExactFeasible": false,
+        "infeasibleColors": [
+          {
+            "color": 4,
+            "total": 61
+          },
+          {
+            "color": 13,
+            "total": 55
+          },
+          {
+            "color": 14,
+            "total": 89
+          },
+          {
+            "color": 33,
+            "total": 41
+          },
+          {
+            "color": 34,
+            "total": 50
+          }
+        ],
+        "row0Cars": 2,
+        "row0Colors": 2,
+        "row0MaxSameColor": 1,
+        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+      },
+      "capacityPlan": {
+        "capMin": 31,
+        "capMax": 40,
+        "colors": [
+          {
+            "color": 4,
+            "pixels": 61,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              31,
+              30
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 1,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 61,
+            "conserved": true
+          },
+          {
+            "color": 5,
+            "pixels": 103,
+            "legalCarRange": [
+              3,
+              3
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 3,
+            "capacities": [
+              35,
+              34,
+              34
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 103,
+            "conserved": true
+          },
+          {
+            "color": 13,
+            "pixels": 55,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              31,
+              24
+            ],
+            "capacitySpread": 7,
+            "atCapMax": 0,
+            "atCapMin": 1,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 55,
+            "conserved": true
+          },
+          {
+            "color": 14,
+            "pixels": 89,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 3,
+            "capacities": [
+              31,
+              31,
+              27
+            ],
+            "capacitySpread": 4,
+            "atCapMax": 0,
+            "atCapMin": 2,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 89,
+            "conserved": true
+          },
+          {
+            "color": 15,
+            "pixels": 171,
+            "legalCarRange": [
+              5,
+              5
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 5,
+            "capacities": [
+              35,
+              34,
+              34,
+              34,
+              34
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 171,
+            "conserved": true
+          },
+          {
+            "color": 17,
+            "pixels": 76,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              38,
+              38
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 76,
+            "conserved": true
+          },
+          {
+            "color": 21,
+            "pixels": 36,
+            "legalCarRange": [
+              1,
+              1
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 1,
+            "capacities": [
+              36
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 36,
+            "conserved": true
+          },
+          {
+            "color": 22,
+            "pixels": 35,
+            "legalCarRange": [
+              1,
+              1
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 1,
+            "capacities": [
+              35
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 35,
+            "conserved": true
+          },
+          {
+            "color": 28,
+            "pixels": 69,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              35,
+              34
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 69,
+            "conserved": true
+          },
+          {
+            "color": 30,
+            "pixels": 135,
+            "legalCarRange": [
+              4,
+              4
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 4,
+            "capacities": [
+              34,
+              34,
+              34,
+              33
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 135,
+            "conserved": true
+          },
+          {
+            "color": 31,
+            "pixels": 304,
+            "legalCarRange": [
+              8,
+              9
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 8,
+            "capacities": [
+              38,
+              38,
+              38,
+              38,
+              38,
+              38,
+              38,
+              38
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 304,
+            "conserved": true
+          },
+          {
+            "color": 33,
+            "pixels": 41,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              21,
+              20
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 2,
+            "aboveMax": 0,
+            "sum": 41,
+            "conserved": true
+          },
+          {
+            "color": 34,
+            "pixels": 50,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 2,
+            "capacities": [
+              31,
+              19
+            ],
+            "capacitySpread": 12,
+            "atCapMax": 0,
+            "atCapMin": 1,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 50,
+            "conserved": true
+          }
+        ],
+        "infeasibleColors": [
+          4,
+          13,
+          14,
+          33,
+          34
+        ],
+        "belowMinCars": 6,
+        "aboveMaxCars": 0
+      },
+      "row0": {
+        "boxes": [
+          {
+            "c": 0,
+            "color": 15,
+            "count": 34
+          },
+          {
+            "c": 8,
+            "color": 31,
+            "count": 38
+          }
+        ],
+        "boxCount": 2,
+        "colorCount": 2,
+        "maxSameColorTotal": 1,
+        "longestSameColorRun": 1,
+        "byColor": {
+          "15": 1,
+          "31": 1
+        }
+      },
+      "route": {
+        "completed": true,
+        "steps": 37,
+        "rows": [
+          {
+            "actionIndex": 0,
+            "step": 1,
+            "r": 0,
+            "c": 8,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0,
+            "afterProgress": 0.031,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 1,
+            "step": 2,
+            "r": 0,
+            "c": 0,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0.031,
+            "afterProgress": 0.031,
+            "beforeBuffer": 0,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 0
+          },
+          {
+            "actionIndex": 2,
+            "step": 3,
+            "r": 1,
+            "c": 0,
+            "color": 30,
+            "count": 34,
+            "beforeProgress": 0.031,
+            "afterProgress": 0.0865,
+            "beforeBuffer": 1,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 68
+          },
+          {
+            "actionIndex": 3,
+            "step": 4,
+            "r": 1,
+            "c": 8,
+            "color": 14,
+            "count": 31,
+            "beforeProgress": 0.0865,
+            "afterProgress": 0.1118,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 3,
+            "immediateEliminated": 31
+          },
+          {
+            "actionIndex": 4,
+            "step": 5,
+            "r": 1,
+            "c": 7,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.1118,
+            "afterProgress": 0.1429,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 4,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 5,
+            "step": 6,
+            "r": 2,
+            "c": 7,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.1429,
+            "afterProgress": 0.1739,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 6,
+            "step": 7,
+            "r": 2,
+            "c": 8,
+            "color": 17,
+            "count": 38,
+            "beforeProgress": 0.1739,
+            "afterProgress": 0.2049,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 7,
+            "step": 8,
+            "r": 1,
+            "c": 6,
+            "color": 15,
+            "count": 35,
+            "beforeProgress": 0.2049,
+            "afterProgress": 0.2335,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 35
+          },
+          {
+            "actionIndex": 8,
+            "step": 9,
+            "r": 1,
+            "c": 5,
+            "color": 5,
+            "count": 35,
+            "beforeProgress": 0.2335,
+            "afterProgress": 0.262,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 35
+          },
+          {
+            "actionIndex": 9,
+            "step": 10,
+            "r": 2,
+            "c": 5,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.262,
+            "afterProgress": 0.2931,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 10,
+            "step": 11,
+            "r": 2,
+            "c": 4,
+            "color": 14,
+            "count": 27,
+            "beforeProgress": 0.2931,
+            "afterProgress": 0.3151,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 7,
+            "immediateEliminated": 27
+          },
+          {
+            "actionIndex": 11,
+            "step": 12,
+            "r": 2,
+            "c": 3,
+            "color": 30,
+            "count": 34,
+            "beforeProgress": 0.3151,
+            "afterProgress": 0.3429,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 8,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 12,
+            "step": 13,
+            "r": 2,
+            "c": 2,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.3429,
+            "afterProgress": 0.3739,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 10,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 13,
+            "step": 14,
+            "r": 2,
+            "c": 1,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.3739,
+            "afterProgress": 0.4049,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 12,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 14,
+            "step": 15,
+            "r": 1,
+            "c": 2,
+            "color": 30,
+            "count": 34,
+            "beforeProgress": 0.4049,
+            "afterProgress": 0.4327,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 11,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 15,
+            "step": 16,
+            "r": 3,
+            "c": 2,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.4327,
+            "afterProgress": 0.4637,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 10,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 16,
+            "step": 17,
+            "r": 1,
+            "c": 4,
+            "color": 17,
+            "count": 38,
+            "beforeProgress": 0.4637,
+            "afterProgress": 0.4947,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 9,
+            "immediateEliminated": 38
+          },
+          {
+            "actionIndex": 17,
+            "step": 18,
+            "r": 2,
+            "c": 0,
+            "color": 33,
+            "count": 21,
+            "beforeProgress": 0.4947,
+            "afterProgress": 0.5118,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 8,
+            "immediateEliminated": 21
+          },
+          {
+            "actionIndex": 18,
+            "step": 19,
+            "r": 3,
+            "c": 3,
+            "color": 28,
+            "count": 35,
+            "beforeProgress": 0.5118,
+            "afterProgress": 0.5404,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 7,
+            "immediateEliminated": 35
+          },
+          {
+            "actionIndex": 19,
+            "step": 20,
+            "r": 2,
+            "c": 6,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0.5404,
+            "afterProgress": 0.5682,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 7,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 20,
+            "step": 21,
+            "r": 4,
+            "c": 3,
+            "color": 5,
+            "count": 34,
+            "beforeProgress": 0.5682,
+            "afterProgress": 0.5959,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 7,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 21,
+            "step": 22,
+            "r": 5,
+            "c": 3,
+            "color": 21,
+            "count": 36,
+            "beforeProgress": 0.5959,
+            "afterProgress": 0.6253,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 7,
+            "immediateEliminated": 36
+          },
+          {
+            "actionIndex": 22,
+            "step": 23,
+            "r": 1,
+            "c": 3,
+            "color": 14,
+            "count": 31,
+            "beforeProgress": 0.6253,
+            "afterProgress": 0.6465,
+            "beforeBuffer": 0,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 7,
+            "immediateEliminated": 26
+          },
+          {
+            "actionIndex": 23,
+            "step": 24,
+            "r": 3,
+            "c": 6,
+            "color": 31,
+            "count": 38,
+            "beforeProgress": 0.6465,
+            "afterProgress": 0.6751,
+            "beforeBuffer": 1,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 6,
+            "immediateEliminated": 35
+          },
+          {
+            "actionIndex": 24,
+            "step": 25,
+            "r": 1,
+            "c": 1,
+            "color": 33,
+            "count": 20,
+            "beforeProgress": 0.6751,
+            "afterProgress": 0.6914,
+            "beforeBuffer": 2,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 20
+          },
+          {
+            "actionIndex": 25,
+            "step": 26,
+            "r": 3,
+            "c": 4,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0.6914,
+            "afterProgress": 0.7118,
+            "beforeBuffer": 2,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 4,
+            "immediateEliminated": 25
+          },
+          {
+            "actionIndex": 26,
+            "step": 27,
+            "r": 3,
+            "c": 7,
+            "color": 22,
+            "count": 35,
+            "beforeProgress": 0.7118,
+            "afterProgress": 0.7306,
+            "beforeBuffer": 2,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 3,
+            "immediateEliminated": 23
+          },
+          {
+            "actionIndex": 27,
+            "step": 28,
+            "r": 4,
+            "c": 7,
+            "color": 30,
+            "count": 33,
+            "beforeProgress": 0.7306,
+            "afterProgress": 0.7429,
+            "beforeBuffer": 3,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 3,
+            "immediateEliminated": 15
+          },
+          {
+            "actionIndex": 28,
+            "step": 29,
+            "r": 5,
+            "c": 7,
+            "color": 34,
+            "count": 31,
+            "beforeProgress": 0.7429,
+            "afterProgress": 0.7788,
+            "beforeBuffer": 4,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 3,
+            "immediateEliminated": 44
+          },
+          {
+            "actionIndex": 29,
+            "step": 30,
+            "r": 3,
+            "c": 5,
+            "color": 4,
+            "count": 31,
+            "beforeProgress": 0.7788,
+            "afterProgress": 0.8204,
+            "beforeBuffer": 4,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 51
+          },
+          {
+            "actionIndex": 30,
+            "step": 31,
+            "r": 4,
+            "c": 5,
+            "color": 13,
+            "count": 31,
+            "beforeProgress": 0.8204,
+            "afterProgress": 0.8539,
+            "beforeBuffer": 3,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 41
+          },
+          {
+            "actionIndex": 31,
+            "step": 32,
+            "r": 6,
+            "c": 3,
+            "color": 4,
+            "count": 30,
+            "beforeProgress": 0.8539,
+            "afterProgress": 0.88,
+            "beforeBuffer": 2,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 32
+          },
+          {
+            "actionIndex": 32,
+            "step": 33,
+            "r": 5,
+            "c": 5,
+            "color": 28,
+            "count": 34,
+            "beforeProgress": 0.88,
+            "afterProgress": 0.9078,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 33,
+            "step": 34,
+            "r": 7,
+            "c": 3,
+            "color": 5,
+            "count": 34,
+            "beforeProgress": 0.9078,
+            "afterProgress": 0.9355,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 34
+          },
+          {
+            "actionIndex": 34,
+            "step": 35,
+            "r": 7,
+            "c": 2,
+            "color": 15,
+            "count": 34,
+            "beforeProgress": 0.9355,
+            "afterProgress": 0.9649,
+            "beforeBuffer": 1,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 36
+          },
+          {
+            "actionIndex": 35,
+            "step": 36,
+            "r": 7,
+            "c": 1,
+            "color": 13,
+            "count": 24,
+            "beforeProgress": 0.9649,
+            "afterProgress": 0.9845,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 24
+          },
+          {
+            "actionIndex": 36,
+            "step": 37,
+            "r": 7,
+            "c": 0,
+            "color": 34,
+            "count": 19,
+            "beforeProgress": 0.9845,
+            "afterProgress": 1,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 19
+          }
+        ]
+      },
+      "pressureWindows": [
+        {
+          "startActionIndex": 27,
+          "endActionIndex": 30,
+          "startStep": 28,
+          "endStep": 31,
+          "minBuffer": 3,
+          "maxBuffer": 4,
+          "actions": [
+            {
+              "step": 28,
+              "progress": 0.7306,
+              "buffer": 3,
+              "r": 4,
+              "c": 7,
+              "color": 30,
+              "count": 33
+            },
+            {
+              "step": 29,
+              "progress": 0.7429,
+              "buffer": 4,
+              "r": 5,
+              "c": 7,
+              "color": 34,
+              "count": 31
+            },
+            {
+              "step": 30,
+              "progress": 0.7788,
+              "buffer": 4,
+              "r": 3,
+              "c": 5,
+              "color": 4,
+              "count": 31
+            },
+            {
+              "step": 31,
+              "progress": 0.8204,
+              "buffer": 3,
+              "r": 4,
+              "c": 5,
+              "color": 13,
+              "count": 31
+            }
+          ]
+        }
+      ],
+      "experience": {
+        "pass": false,
+        "reasons": [
+          "buffer34_below_50",
+          "significant_release_missing"
+        ],
+        "metrics": {
+          "midSteps": 24,
+          "midBuffer34Pct": 16.7,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 0,
+          "oscillationCount": 1,
+          "lateHighPressurePct": 12.5,
+          "maxBuffer": 4,
+          "distance": 58.3
+        },
+        "releaseStatus": null,
+        "releaseEvidence": null
+      },
+      "diagnosis": {
+        "primary": "far_pressure_deficit",
+        "action": "regenerate_base",
+        "flags": [],
+        "pressureDeficit": 33.3,
+        "releaseCurveMissing": true,
+        "releaseDecisionStatus": "not_evaluated"
+      },
+      "classification": {
+        "flags": {
+          "capacityBandInfeasible": true,
+          "manyBelowMin": true,
+          "row0SameColor": false,
+          "startFullCars": false,
+          "earlyHigh": 0,
+          "earlyRelease": false,
+          "farPressureDeficit": true,
+          "nearPressureDeficit": false
+        },
+        "p2Score": 4,
+        "p3Score": 0,
+        "priority": "P2",
+        "note": "启发式只用于排序，不能替代下一轮单因素重解。"
+      },
+      "status": "audited"
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "expectedHash": "12c62fab4c850d0063d2b9d7c81499e623eef848efb454b8a4a750f8a3c907b1",
+      "actualHash": "12c62fab4c850d0063d2b9d7c81499e623eef848efb454b8a4a750f8a3c907b1",
+      "hashMatch": true,
+      "reproductionAttempt": 1,
+      "generationAttempts": [
+        {
+          "attempt": 1,
+          "hash": "12c62fab4c850d0063d2b9d7c81499e623eef848efb454b8a4a750f8a3c907b1",
+          "hashMatch": true,
+          "board": "8x9",
+          "structurePass": true,
+          "gateReasons": [],
+          "goalPass": false,
+          "stopReason": "goalMaxRounds",
+          "wallMs": 4334
+        }
+      ],
+      "board": {
+        "rows": 8,
+        "cols": 9
+      },
+      "structure": {
+        "pass": true,
+        "reasons": [],
+        "fullMedian2": 1,
+        "freeRunMax": 1,
+        "freeLowPct": 0,
+        "partialStepPct": 85
+      },
+      "capacityAudit": {
+        "schema": "capacity-evidence-v1",
+        "rows": 8,
+        "cols": 9,
+        "boardFloorPass": true,
+        "cars": 27,
+        "capacitySum": 1225,
+        "pixels": 1225,
+        "conserved": true,
+        "perColorConserved": true,
+        "colorMismatches": [],
+        "minCap": 32,
+        "maxCap": 54,
+        "boxSizeMin": 35,
+        "boxSizeMax": 54,
+        "belowMin": 1,
+        "aboveMax": 0,
+        "microCarMax": 2,
+        "microCars": [],
+        "microCount": 0,
+        "rangeExactFeasible": false,
+        "infeasibleColors": [
+          {
+            "color": 14,
+            "total": 32
+          }
+        ],
+        "row0Cars": 2,
+        "row0Colors": 2,
+        "row0MaxSameColor": 1,
+        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+      },
+      "capacityPlan": {
+        "capMin": 35,
+        "capMax": 54,
+        "colors": [
+          {
+            "color": 1,
+            "pixels": 82,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              41,
+              41
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 82,
+            "conserved": true
+          },
+          {
+            "color": 2,
+            "pixels": 42,
+            "legalCarRange": [
+              1,
+              1
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 1,
+            "capacities": [
+              42
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 42,
+            "conserved": true
+          },
+          {
+            "color": 3,
+            "pixels": 104,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              52,
+              52
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 104,
+            "conserved": true
+          },
+          {
+            "color": 5,
+            "pixels": 236,
+            "legalCarRange": [
+              5,
+              6
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 5,
+            "capacities": [
+              48,
+              47,
+              47,
+              47,
+              47
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 236,
+            "conserved": true
+          },
+          {
+            "color": 14,
+            "pixels": 32,
+            "legalCarRange": null,
+            "exactBandFeasible": false,
+            "observedCars": 1,
+            "capacities": [
+              32
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 1,
+            "aboveMax": 0,
+            "sum": 32,
+            "conserved": true
+          },
+          {
+            "color": 24,
+            "pixels": 91,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              46,
+              45
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 91,
+            "conserved": true
+          },
+          {
+            "color": 25,
+            "pixels": 35,
+            "legalCarRange": [
+              1,
+              1
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 1,
+            "capacities": [
+              35
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 1,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 35,
+            "conserved": true
+          },
+          {
+            "color": 26,
+            "pixels": 38,
+            "legalCarRange": [
+              1,
+              1
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 1,
+            "capacities": [
+              38
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 38,
+            "conserved": true
+          },
+          {
+            "color": 30,
+            "pixels": 107,
+            "legalCarRange": [
+              2,
+              3
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              54,
+              53
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 1,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 107,
+            "conserved": true
+          },
+          {
+            "color": 32,
+            "pixels": 199,
+            "legalCarRange": [
+              4,
+              5
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 4,
+            "capacities": [
+              50,
+              50,
+              50,
+              49
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 199,
+            "conserved": true
+          },
+          {
+            "color": 33,
+            "pixels": 181,
+            "legalCarRange": [
+              4,
+              5
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 4,
+            "capacities": [
+              46,
+              45,
+              45,
+              45
+            ],
+            "capacitySpread": 1,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 181,
+            "conserved": true
+          },
+          {
+            "color": 34,
+            "pixels": 78,
+            "legalCarRange": [
+              2,
+              2
+            ],
+            "exactBandFeasible": true,
+            "observedCars": 2,
+            "capacities": [
+              39,
+              39
+            ],
+            "capacitySpread": 0,
+            "atCapMax": 0,
+            "atCapMin": 0,
+            "belowMin": 0,
+            "aboveMax": 0,
+            "sum": 78,
+            "conserved": true
+          }
+        ],
+        "infeasibleColors": [
+          14
+        ],
+        "belowMinCars": 1,
+        "aboveMaxCars": 0
+      },
+      "row0": {
+        "boxes": [
+          {
+            "c": 0,
+            "color": 34,
+            "count": 39
+          },
+          {
+            "c": 8,
+            "color": 30,
+            "count": 53
+          }
+        ],
+        "boxCount": 2,
+        "colorCount": 2,
+        "maxSameColorTotal": 1,
+        "longestSameColorRun": 1,
+        "byColor": {
+          "30": 1,
+          "34": 1
+        }
+      },
+      "route": {
+        "completed": true,
+        "steps": 27,
+        "rows": [
+          {
+            "actionIndex": 0,
+            "step": 1,
+            "r": 0,
+            "c": 0,
+            "color": 34,
+            "count": 39,
+            "beforeProgress": 0,
+            "afterProgress": 0.0065,
+            "beforeBuffer": 0,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 8
+          },
+          {
+            "actionIndex": 1,
+            "step": 2,
+            "r": 1,
+            "c": 0,
+            "color": 32,
+            "count": 49,
+            "beforeProgress": 0.0065,
+            "afterProgress": 0.0637,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 70
+          },
+          {
+            "actionIndex": 2,
+            "step": 3,
+            "r": 0,
+            "c": 8,
+            "color": 30,
+            "count": 53,
+            "beforeProgress": 0.0637,
+            "afterProgress": 0.0637,
+            "beforeBuffer": 1,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 1,
+            "immediateEliminated": 0
+          },
+          {
+            "actionIndex": 3,
+            "step": 4,
+            "r": 1,
+            "c": 8,
+            "color": 2,
+            "count": 42,
+            "beforeProgress": 0.0637,
+            "afterProgress": 0.0637,
+            "beforeBuffer": 2,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 1,
+            "immediateEliminated": 0
+          },
+          {
+            "actionIndex": 4,
+            "step": 5,
+            "r": 1,
+            "c": 7,
+            "color": 25,
+            "count": 35,
+            "beforeProgress": 0.0637,
+            "afterProgress": 0.0637,
+            "beforeBuffer": 3,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 0
+          },
+          {
+            "actionIndex": 5,
+            "step": 6,
+            "r": 2,
+            "c": 7,
+            "color": 14,
+            "count": 32,
+            "beforeProgress": 0.0637,
+            "afterProgress": 0.08,
+            "beforeBuffer": 4,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 3,
+            "immediateEliminated": 20
+          },
+          {
+            "actionIndex": 6,
+            "step": 7,
+            "r": 3,
+            "c": 7,
+            "color": 3,
+            "count": 52,
+            "beforeProgress": 0.08,
+            "afterProgress": 0.1224,
+            "beforeBuffer": 4,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 4,
+            "immediateEliminated": 52
+          },
+          {
+            "actionIndex": 7,
+            "step": 8,
+            "r": 2,
+            "c": 6,
+            "color": 32,
+            "count": 50,
+            "beforeProgress": 0.1224,
+            "afterProgress": 0.1633,
+            "beforeBuffer": 4,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 4,
+            "immediateEliminated": 50
+          },
+          {
+            "actionIndex": 8,
+            "step": 9,
+            "r": 2,
+            "c": 5,
+            "color": 32,
+            "count": 50,
+            "beforeProgress": 0.1633,
+            "afterProgress": 0.2041,
+            "beforeBuffer": 4,
+            "afterBuffer": 4,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 4,
+            "immediateEliminated": 50
+          },
+          {
+            "actionIndex": 9,
+            "step": 10,
+            "r": 3,
+            "c": 5,
+            "color": 33,
+            "count": 46,
+            "beforeProgress": 0.2041,
+            "afterProgress": 0.3118,
+            "beforeBuffer": 4,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 132
+          },
+          {
+            "actionIndex": 10,
+            "step": 11,
+            "r": 4,
+            "c": 7,
+            "color": 5,
+            "count": 48,
+            "beforeProgress": 0.3118,
+            "afterProgress": 0.351,
+            "beforeBuffer": 3,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 48
+          },
+          {
+            "actionIndex": 11,
+            "step": 12,
+            "r": 4,
+            "c": 5,
+            "color": 5,
+            "count": 47,
+            "beforeProgress": 0.351,
+            "afterProgress": 0.3894,
+            "beforeBuffer": 3,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 47
+          },
+          {
+            "actionIndex": 12,
+            "step": 13,
+            "r": 5,
+            "c": 7,
+            "color": 5,
+            "count": 47,
+            "beforeProgress": 0.3894,
+            "afterProgress": 0.4278,
+            "beforeBuffer": 3,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 47
+          },
+          {
+            "actionIndex": 13,
+            "step": 14,
+            "r": 2,
+            "c": 4,
+            "color": 33,
+            "count": 45,
+            "beforeProgress": 0.4278,
+            "afterProgress": 0.4857,
+            "beforeBuffer": 3,
+            "afterBuffer": 3,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 71
+          },
+          {
+            "actionIndex": 14,
+            "step": 15,
+            "r": 6,
+            "c": 7,
+            "color": 30,
+            "count": 54,
+            "beforeProgress": 0.4857,
+            "afterProgress": 0.5543,
+            "beforeBuffer": 3,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 6,
+            "immediateEliminated": 84
+          },
+          {
+            "actionIndex": 15,
+            "step": 16,
+            "r": 1,
+            "c": 5,
+            "color": 32,
+            "count": 50,
+            "beforeProgress": 0.5543,
+            "afterProgress": 0.5951,
+            "beforeBuffer": 2,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 5,
+            "immediateEliminated": 50
+          },
+          {
+            "actionIndex": 16,
+            "step": 17,
+            "r": 1,
+            "c": 4,
+            "color": 5,
+            "count": 47,
+            "beforeProgress": 0.5951,
+            "afterProgress": 0.6335,
+            "beforeBuffer": 2,
+            "afterBuffer": 2,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 4,
+            "immediateEliminated": 47
+          },
+          {
+            "actionIndex": 17,
+            "step": 18,
+            "r": 1,
+            "c": 6,
+            "color": 34,
+            "count": 39,
+            "beforeProgress": 0.6335,
+            "afterProgress": 0.6661,
+            "beforeBuffer": 2,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 3,
+            "immediateEliminated": 40
+          },
+          {
+            "actionIndex": 18,
+            "step": 19,
+            "r": 5,
+            "c": 5,
+            "color": 33,
+            "count": 45,
+            "beforeProgress": 0.6661,
+            "afterProgress": 0.7053,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 48
+          },
+          {
+            "actionIndex": 19,
+            "step": 20,
+            "r": 6,
+            "c": 5,
+            "color": 24,
+            "count": 46,
+            "beforeProgress": 0.7053,
+            "afterProgress": 0.7429,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 46
+          },
+          {
+            "actionIndex": 20,
+            "step": 21,
+            "r": 6,
+            "c": 4,
+            "color": 1,
+            "count": 41,
+            "beforeProgress": 0.7429,
+            "afterProgress": 0.7763,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 41
+          },
+          {
+            "actionIndex": 21,
+            "step": 22,
+            "r": 7,
+            "c": 4,
+            "color": 3,
+            "count": 52,
+            "beforeProgress": 0.7763,
+            "afterProgress": 0.8188,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 52
+          },
+          {
+            "actionIndex": 22,
+            "step": 23,
+            "r": 7,
+            "c": 3,
+            "color": 5,
+            "count": 47,
+            "beforeProgress": 0.8188,
+            "afterProgress": 0.8571,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 47
+          },
+          {
+            "actionIndex": 23,
+            "step": 24,
+            "r": 7,
+            "c": 2,
+            "color": 33,
+            "count": 45,
+            "beforeProgress": 0.8571,
+            "afterProgress": 0.8939,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 2,
+            "immediateEliminated": 45
+          },
+          {
+            "actionIndex": 24,
+            "step": 25,
+            "r": 2,
+            "c": 8,
+            "color": 26,
+            "count": 38,
+            "beforeProgress": 0.8939,
+            "afterProgress": 0.929,
+            "beforeBuffer": 1,
+            "afterBuffer": 1,
+            "full": false,
+            "canConsume": false,
+            "legalMoves": 2,
+            "immediateEliminated": 43
+          },
+          {
+            "actionIndex": 25,
+            "step": 26,
+            "r": 7,
+            "c": 1,
+            "color": 1,
+            "count": 41,
+            "beforeProgress": 0.929,
+            "afterProgress": 0.9633,
+            "beforeBuffer": 1,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 42
+          },
+          {
+            "actionIndex": 26,
+            "step": 27,
+            "r": 7,
+            "c": 0,
+            "color": 24,
+            "count": 45,
+            "beforeProgress": 0.9633,
+            "afterProgress": 1,
+            "beforeBuffer": 0,
+            "afterBuffer": 0,
+            "full": false,
+            "canConsume": true,
+            "legalMoves": 1,
+            "immediateEliminated": 45
+          }
+        ]
+      },
+      "pressureWindows": [
+        {
+          "startActionIndex": 9,
+          "endActionIndex": 14,
+          "startStep": 10,
+          "endStep": 15,
+          "minBuffer": 3,
+          "maxBuffer": 4,
+          "actions": [
+            {
+              "step": 10,
+              "progress": 0.2041,
+              "buffer": 4,
+              "r": 3,
+              "c": 5,
+              "color": 33,
+              "count": 46
+            },
+            {
+              "step": 11,
+              "progress": 0.3118,
+              "buffer": 3,
+              "r": 4,
+              "c": 7,
+              "color": 5,
+              "count": 48
+            },
+            {
+              "step": 12,
+              "progress": 0.351,
+              "buffer": 3,
+              "r": 4,
+              "c": 5,
+              "color": 5,
+              "count": 47
+            },
+            {
+              "step": 13,
+              "progress": 0.3894,
+              "buffer": 3,
+              "r": 5,
+              "c": 7,
+              "color": 5,
+              "count": 47
+            },
+            {
+              "step": 14,
+              "progress": 0.4278,
+              "buffer": 3,
+              "r": 2,
+              "c": 4,
+              "color": 33,
+              "count": 45
+            },
+            {
+              "step": 15,
+              "progress": 0.4857,
+              "buffer": 3,
+              "r": 6,
+              "c": 7,
+              "color": 30,
+              "count": 54
+            }
+          ]
+        }
+      ],
+      "experience": {
+        "pass": false,
+        "reasons": [
+          "buffer34_below_50",
+          "significant_release_missing"
+        ],
+        "metrics": {
+          "midSteps": 14,
+          "midBuffer34Pct": 42.9,
+          "midBuffer5Pct": 0,
+          "maxBuffer5Run": 0,
+          "significantReleaseCount": 0,
+          "oscillationCount": 1,
+          "lateHighPressurePct": 0,
+          "maxBuffer": 4,
+          "distance": 32.1
+        },
+        "releaseStatus": null,
+        "releaseEvidence": null
+      },
+      "diagnosis": {
+        "primary": "release_curve_missing",
+        "action": "repair_release_supply",
+        "flags": [],
+        "pressureDeficit": 7.100000000000001,
+        "releaseCurveMissing": true,
+        "releaseDecisionStatus": "not_evaluated"
+      },
+      "classification": {
+        "flags": {
+          "capacityBandInfeasible": true,
+          "manyBelowMin": false,
+          "row0SameColor": false,
+          "startFullCars": false,
+          "earlyHigh": 5,
+          "earlyRelease": false,
+          "farPressureDeficit": false,
+          "nearPressureDeficit": true
+        },
+        "p2Score": 2,
+        "p3Score": 2,
+        "priority": "inspect",
+        "note": "启发式只用于排序，不能替代下一轮单因素重解。"
+      },
+      "status": "audited"
+    }
+  ]
+}
