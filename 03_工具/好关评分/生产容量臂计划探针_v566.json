@@ -1,0 +1,669 @@
+{
+  "schema": "production-cap-scale-instant-plan-probe-v566",
+  "date": "2026-10-26",
+  "note": "只验证InstantPlayout可行性；1.45/1.15是UI现有capeScalePlan实验臂，不是建议放宽用户容量。",
+  "summary": {
+    "rows": 18,
+    "ok": 17,
+    "byImageScale": {
+      "006": {
+        "1": {
+          "originalBand": [
+            31,
+            40
+          ],
+          "testedBand": [
+            31,
+            40
+          ],
+          "okPolicies": [
+            "supply",
+            "targetBuffer",
+            "shortDebt"
+          ],
+          "failures": [],
+          "target": {
+            "image": "006",
+            "originalBand": [
+              31,
+              40
+            ],
+            "scale": 1,
+            "testedBand": [
+              31,
+              40
+            ],
+            "policy": "targetBuffer",
+            "ok": true,
+            "reason": null,
+            "cars": 37,
+            "debtCars": 12,
+            "maxBuffer": 5,
+            "covered": 1225,
+            "total": 1225,
+            "aboveMax": 0,
+            "belowMin": 6,
+            "milliseconds": 12
+          }
+        },
+        "1.45": {
+          "originalBand": [
+            31,
+            40
+          ],
+          "testedBand": [
+            45,
+            58
+          ],
+          "okPolicies": [
+            "supply",
+            "shortDebt"
+          ],
+          "failures": [
+            {
+              "policy": "targetBuffer",
+              "reason": "no_reachable_color"
+            }
+          ],
+          "target": {
+            "image": "006",
+            "originalBand": [
+              31,
+              40
+            ],
+            "scale": 1.45,
+            "testedBand": [
+              45,
+              58
+            ],
+            "policy": "targetBuffer",
+            "ok": false,
+            "reason": "no_reachable_color",
+            "cars": 23,
+            "debtCars": 9,
+            "maxBuffer": 5,
+            "covered": 1039,
+            "total": 1225,
+            "aboveMax": 0,
+            "belowMin": 6,
+            "milliseconds": 9
+          }
+        },
+        "1.15": {
+          "originalBand": [
+            31,
+            40
+          ],
+          "testedBand": [
+            36,
+            46
+          ],
+          "okPolicies": [
+            "supply",
+            "targetBuffer",
+            "shortDebt"
+          ],
+          "failures": [],
+          "target": {
+            "image": "006",
+            "originalBand": [
+              31,
+              40
+            ],
+            "scale": 1.15,
+            "testedBand": [
+              36,
+              46
+            ],
+            "policy": "targetBuffer",
+            "ok": true,
+            "reason": null,
+            "cars": 32,
+            "debtCars": 9,
+            "maxBuffer": 5,
+            "covered": 1225,
+            "total": 1225,
+            "aboveMax": 0,
+            "belowMin": 7,
+            "milliseconds": 10
+          }
+        }
+      },
+      "010": {
+        "1": {
+          "originalBand": [
+            35,
+            54
+          ],
+          "testedBand": [
+            35,
+            54
+          ],
+          "okPolicies": [
+            "supply",
+            "targetBuffer",
+            "shortDebt"
+          ],
+          "failures": [],
+          "target": {
+            "image": "010",
+            "originalBand": [
+              35,
+              54
+            ],
+            "scale": 1,
+            "testedBand": [
+              35,
+              54
+            ],
+            "policy": "targetBuffer",
+            "ok": true,
+            "reason": null,
+            "cars": 27,
+            "debtCars": 9,
+            "maxBuffer": 5,
+            "covered": 1225,
+            "total": 1225,
+            "aboveMax": 0,
+            "belowMin": 1,
+            "milliseconds": 8
+          }
+        },
+        "1.45": {
+          "originalBand": [
+            35,
+            54
+          ],
+          "testedBand": [
+            51,
+            78
+          ],
+          "okPolicies": [
+            "supply",
+            "targetBuffer",
+            "shortDebt"
+          ],
+          "failures": [],
+          "target": {
+            "image": "010",
+            "originalBand": [
+              35,
+              54
+            ],
+            "scale": 1.45,
+            "testedBand": [
+              51,
+              78
+            ],
+            "policy": "targetBuffer",
+            "ok": true,
+            "reason": null,
+            "cars": 23,
+            "debtCars": 7,
+            "maxBuffer": 5,
+            "covered": 1225,
+            "total": 1225,
+            "aboveMax": 0,
+            "belowMin": 6,
+            "milliseconds": 6
+          }
+        },
+        "1.15": {
+          "originalBand": [
+            35,
+            54
+          ],
+          "testedBand": [
+            40,
+            62
+          ],
+          "okPolicies": [
+            "supply",
+            "targetBuffer",
+            "shortDebt"
+          ],
+          "failures": [],
+          "target": {
+            "image": "010",
+            "originalBand": [
+              35,
+              54
+            ],
+            "scale": 1.15,
+            "testedBand": [
+              40,
+              62
+            ],
+            "policy": "targetBuffer",
+            "ok": true,
+            "reason": null,
+            "cars": 25,
+            "debtCars": 9,
+            "maxBuffer": 5,
+            "covered": 1225,
+            "total": 1225,
+            "aboveMax": 0,
+            "belowMin": 4,
+            "milliseconds": 8
+          }
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1,
+      "testedBand": [
+        31,
+        40
+      ],
+      "policy": "supply",
+      "ok": true,
+      "reason": null,
+      "cars": 37,
+      "debtCars": 2,
+      "maxBuffer": 2,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 6,
+      "milliseconds": 17
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1,
+      "testedBand": [
+        31,
+        40
+      ],
+      "policy": "targetBuffer",
+      "ok": true,
+      "reason": null,
+      "cars": 37,
+      "debtCars": 12,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 6,
+      "milliseconds": 12
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1,
+      "testedBand": [
+        31,
+        40
+      ],
+      "policy": "shortDebt",
+      "ok": true,
+      "reason": null,
+      "cars": 37,
+      "debtCars": 18,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 6,
+      "milliseconds": 14
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1.45,
+      "testedBand": [
+        45,
+        58
+      ],
+      "policy": "supply",
+      "ok": true,
+      "reason": null,
+      "cars": 27,
+      "debtCars": 6,
+      "maxBuffer": 3,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 8,
+      "milliseconds": 9
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1.45,
+      "testedBand": [
+        45,
+        58
+      ],
+      "policy": "targetBuffer",
+      "ok": false,
+      "reason": "no_reachable_color",
+      "cars": 23,
+      "debtCars": 9,
+      "maxBuffer": 5,
+      "covered": 1039,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 6,
+      "milliseconds": 9
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1.45,
+      "testedBand": [
+        45,
+        58
+      ],
+      "policy": "shortDebt",
+      "ok": true,
+      "reason": null,
+      "cars": 27,
+      "debtCars": 14,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 8,
+      "milliseconds": 10
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1.15,
+      "testedBand": [
+        36,
+        46
+      ],
+      "policy": "supply",
+      "ok": true,
+      "reason": null,
+      "cars": 32,
+      "debtCars": 7,
+      "maxBuffer": 4,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 7,
+      "milliseconds": 11
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1.15,
+      "testedBand": [
+        36,
+        46
+      ],
+      "policy": "targetBuffer",
+      "ok": true,
+      "reason": null,
+      "cars": 32,
+      "debtCars": 9,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 7,
+      "milliseconds": 10
+    },
+    {
+      "image": "006",
+      "originalBand": [
+        31,
+        40
+      ],
+      "scale": 1.15,
+      "testedBand": [
+        36,
+        46
+      ],
+      "policy": "shortDebt",
+      "ok": true,
+      "reason": null,
+      "cars": 32,
+      "debtCars": 19,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 7,
+      "milliseconds": 12
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1,
+      "testedBand": [
+        35,
+        54
+      ],
+      "policy": "supply",
+      "ok": true,
+      "reason": null,
+      "cars": 27,
+      "debtCars": 4,
+      "maxBuffer": 2,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 1,
+      "milliseconds": 9
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1,
+      "testedBand": [
+        35,
+        54
+      ],
+      "policy": "targetBuffer",
+      "ok": true,
+      "reason": null,
+      "cars": 27,
+      "debtCars": 9,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 1,
+      "milliseconds": 8
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1,
+      "testedBand": [
+        35,
+        54
+      ],
+      "policy": "shortDebt",
+      "ok": true,
+      "reason": null,
+      "cars": 27,
+      "debtCars": 14,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 1,
+      "milliseconds": 11
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1.45,
+      "testedBand": [
+        51,
+        78
+      ],
+      "policy": "supply",
+      "ok": true,
+      "reason": null,
+      "cars": 23,
+      "debtCars": 5,
+      "maxBuffer": 3,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 6,
+      "milliseconds": 7
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1.45,
+      "testedBand": [
+        51,
+        78
+      ],
+      "policy": "targetBuffer",
+      "ok": true,
+      "reason": null,
+      "cars": 23,
+      "debtCars": 7,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 6,
+      "milliseconds": 6
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1.45,
+      "testedBand": [
+        51,
+        78
+      ],
+      "policy": "shortDebt",
+      "ok": true,
+      "reason": null,
+      "cars": 23,
+      "debtCars": 11,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 6,
+      "milliseconds": 8
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1.15,
+      "testedBand": [
+        40,
+        62
+      ],
+      "policy": "supply",
+      "ok": true,
+      "reason": null,
+      "cars": 25,
+      "debtCars": 6,
+      "maxBuffer": 3,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 4,
+      "milliseconds": 8
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1.15,
+      "testedBand": [
+        40,
+        62
+      ],
+      "policy": "targetBuffer",
+      "ok": true,
+      "reason": null,
+      "cars": 25,
+      "debtCars": 9,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 4,
+      "milliseconds": 8
+    },
+    {
+      "image": "010",
+      "originalBand": [
+        35,
+        54
+      ],
+      "scale": 1.15,
+      "testedBand": [
+        40,
+        62
+      ],
+      "policy": "shortDebt",
+      "ok": true,
+      "reason": null,
+      "cars": 25,
+      "debtCars": 11,
+      "maxBuffer": 5,
+      "covered": 1225,
+      "total": 1225,
+      "aboveMax": 0,
+      "belowMin": 4,
+      "milliseconds": 9
+    }
+  ]
+}

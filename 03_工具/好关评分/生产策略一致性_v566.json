@@ -1,0 +1,896 @@
+{
+  "schema": "production-plan-policy-consistency-v566",
+  "date": "2026-10-26",
+  "preregistration": "生产策略一致性_预登记_v566.md",
+  "fixed": {
+    "images": [
+      "006",
+      "010"
+    ],
+    "seeds": [
+      1001,
+      1002
+    ],
+    "goalPerRoundMs": 20000,
+    "goalMaxMs": 40000,
+    "goalMaxRounds": 2,
+    "policies": [
+      {
+        "id": "A_supply_ui_default"
+      },
+      {
+        "id": "B_target4_debt40",
+        "value": "targetBuffer"
+      },
+      {
+        "id": "C_short_debt",
+        "value": "shortDebt"
+      }
+    ]
+  },
+  "summary": {
+    "runs": 12,
+    "actualPolicyMismatch": true,
+    "byPolicy": {
+      "A_supply_ui_default": {
+        "runs": 4,
+        "valid": 4,
+        "structurePass": 4,
+        "goalPass": 1,
+        "aboveMax": 0,
+        "perColorFail": 0,
+        "midBuffer34Pct": [
+          52.9,
+          10.5,
+          12.5,
+          72.2
+        ],
+        "maxBuffer": [
+          4,
+          5,
+          3,
+          5
+        ],
+        "significantReleaseCount": [
+          0,
+          2,
+          1,
+          1
+        ],
+        "releaseStatus": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "actualPlanPolicies": [
+          "supply",
+          "supply",
+          "supply",
+          "supply"
+        ],
+        "rounds": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "stopReasons": [
+          "goalMaxRounds",
+          "goalMaxRounds",
+          "goalMaxRounds",
+          "pass"
+        ],
+        "wallMsMedian": 18414.5,
+        "wallMsMax": 22410
+      },
+      "B_target4_debt40": {
+        "runs": 4,
+        "valid": 2,
+        "structurePass": 2,
+        "goalPass": 0,
+        "aboveMax": 0,
+        "perColorFail": 0,
+        "midBuffer34Pct": [
+          null,
+          null,
+          45.5,
+          58.3
+        ],
+        "maxBuffer": [
+          null,
+          null,
+          5,
+          3
+        ],
+        "significantReleaseCount": [
+          null,
+          null,
+          0,
+          0
+        ],
+        "releaseStatus": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "actualPlanPolicies": [
+          null,
+          null,
+          "targetBuffer",
+          "targetBuffer"
+        ],
+        "rounds": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "stopReasons": [
+          "goalMaxRounds",
+          "goalMaxRounds",
+          "goalMaxRounds",
+          "goalMaxRounds"
+        ],
+        "wallMsMedian": 8220,
+        "wallMsMax": 15205
+      },
+      "C_short_debt": {
+        "runs": 4,
+        "valid": 4,
+        "structurePass": 4,
+        "goalPass": 1,
+        "aboveMax": 0,
+        "perColorFail": 0,
+        "midBuffer34Pct": [
+          61.9,
+          12.5,
+          58.3,
+          28.6
+        ],
+        "maxBuffer": [
+          4,
+          5,
+          4,
+          4
+        ],
+        "significantReleaseCount": [
+          1,
+          2,
+          0,
+          1
+        ],
+        "releaseStatus": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "actualPlanPolicies": [
+          "shortDebt",
+          "shortDebt",
+          "shortDebt",
+          "shortDebt"
+        ],
+        "rounds": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "stopReasons": [
+          "pass",
+          "goalMaxRounds",
+          "goalMaxRounds",
+          "goalMaxRounds"
+        ],
+        "wallMsMedian": 14486,
+        "wallMsMax": 15562
+      }
+    },
+    "byCase": {
+      "006/1001": {
+        "A_supply_ui_default": {
+          "actualPlanPolicy": "supply",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 52.9,
+          "maxBuffer": 4,
+          "significantReleaseCount": 0,
+          "releaseStatus": null,
+          "wallMs": 22410
+        },
+        "B_target4_debt40": {
+          "actualPlanPolicy": null,
+          "structurePass": false,
+          "goalPass": false,
+          "midBuffer34Pct": null,
+          "maxBuffer": null,
+          "significantReleaseCount": null,
+          "releaseStatus": null,
+          "wallMs": 3409
+        },
+        "C_short_debt": {
+          "actualPlanPolicy": "shortDebt",
+          "structurePass": true,
+          "goalPass": true,
+          "midBuffer34Pct": 61.9,
+          "maxBuffer": 4,
+          "significantReleaseCount": 1,
+          "releaseStatus": null,
+          "wallMs": 13433
+        }
+      },
+      "006/1002": {
+        "A_supply_ui_default": {
+          "actualPlanPolicy": "supply",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 10.5,
+          "maxBuffer": 5,
+          "significantReleaseCount": 2,
+          "releaseStatus": null,
+          "wallMs": 16631
+        },
+        "B_target4_debt40": {
+          "actualPlanPolicy": null,
+          "structurePass": false,
+          "goalPass": false,
+          "midBuffer34Pct": null,
+          "maxBuffer": null,
+          "significantReleaseCount": null,
+          "releaseStatus": null,
+          "wallMs": 3445
+        },
+        "C_short_debt": {
+          "actualPlanPolicy": "shortDebt",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 12.5,
+          "maxBuffer": 5,
+          "significantReleaseCount": 2,
+          "releaseStatus": null,
+          "wallMs": 15562
+        }
+      },
+      "010/1001": {
+        "A_supply_ui_default": {
+          "actualPlanPolicy": "supply",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 12.5,
+          "maxBuffer": 3,
+          "significantReleaseCount": 1,
+          "releaseStatus": null,
+          "wallMs": 15711
+        },
+        "B_target4_debt40": {
+          "actualPlanPolicy": "targetBuffer",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 45.5,
+          "maxBuffer": 5,
+          "significantReleaseCount": 0,
+          "releaseStatus": null,
+          "wallMs": 15205
+        },
+        "C_short_debt": {
+          "actualPlanPolicy": "shortDebt",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 58.3,
+          "maxBuffer": 4,
+          "significantReleaseCount": 0,
+          "releaseStatus": null,
+          "wallMs": 14307
+        }
+      },
+      "010/1002": {
+        "A_supply_ui_default": {
+          "actualPlanPolicy": "supply",
+          "structurePass": true,
+          "goalPass": true,
+          "midBuffer34Pct": 72.2,
+          "maxBuffer": 5,
+          "significantReleaseCount": 1,
+          "releaseStatus": null,
+          "wallMs": 20198
+        },
+        "B_target4_debt40": {
+          "actualPlanPolicy": "targetBuffer",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 58.3,
+          "maxBuffer": 3,
+          "significantReleaseCount": 0,
+          "releaseStatus": null,
+          "wallMs": 12995
+        },
+        "C_short_debt": {
+          "actualPlanPolicy": "shortDebt",
+          "structurePass": true,
+          "goalPass": false,
+          "midBuffer34Pct": 28.6,
+          "maxBuffer": 4,
+          "significantReleaseCount": 1,
+          "releaseStatus": null,
+          "wallMs": 14665
+        }
+      }
+    },
+    "medianMidByPolicy": {
+      "A": 32.7,
+      "B": 51.9,
+      "C": 43.45
+    },
+    "systematicDifference": false,
+    "decision": "本样本未见B/C对生产缺省supply的稳定结构优势；不得仅凭历史v529直接改生产。"
+  },
+  "rows": [
+    {
+      "image": "006",
+      "seed": 1001,
+      "policy": "A_supply_ui_default",
+      "requestedPolicy": "supply",
+      "actualPlanPolicy": "supply",
+      "valid": true,
+      "levelHash": "6fbf1788cd3e341c76ea8786c53f164488008d317d1b1299df4414e35779db28",
+      "board": "8x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 17,
+        "midBuffer34Pct": 52.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 0,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 33.3,
+        "maxBuffer": 4,
+        "distance": 25
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 30,
+        "maxCap": 57,
+        "boxSizeMin": 31,
+        "boxSizeMax": 58
+      },
+      "plan": {
+        "policy": "supply",
+        "ok": true,
+        "reason": null,
+        "cars": 27,
+        "debtCars": 6,
+        "maxBuffer": 3,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 12,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 20481,
+      "wallMs": 22410,
+      "error": null
+    },
+    {
+      "image": "006",
+      "seed": 1001,
+      "policy": "B_target4_debt40",
+      "requestedPolicy": "targetBuffer",
+      "actualPlanPolicy": null,
+      "valid": false,
+      "levelHash": null,
+      "board": null,
+      "structurePass": false,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": null,
+      "releaseStatus": null,
+      "capacity": null,
+      "plan": null,
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 3409,
+      "wallMs": 3409,
+      "error": null
+    },
+    {
+      "image": "006",
+      "seed": 1001,
+      "policy": "C_short_debt",
+      "requestedPolicy": "shortDebt",
+      "actualPlanPolicy": "shortDebt",
+      "valid": true,
+      "levelHash": "94fe9bb6b4f8853ad52a2e5f0a4ffd469f9065ae266bfda32e923629cc98ab1b",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": true,
+      "metrics": {
+        "midSteps": 21,
+        "midBuffer34Pct": 61.9,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 71.4,
+        "maxBuffer": 4,
+        "distance": 0
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 3,
+        "minCap": 19,
+        "maxCap": 45,
+        "boxSizeMin": 31,
+        "boxSizeMax": 46
+      },
+      "plan": {
+        "policy": "shortDebt",
+        "ok": true,
+        "reason": null,
+        "cars": 32,
+        "debtCars": 18,
+        "maxBuffer": 5,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 10,
+        "infeasibleCapacityColors": 3
+      },
+      "goalRounds": 2,
+      "goalStopReason": "pass",
+      "goalElapsedMs": 10956,
+      "wallMs": 13433,
+      "error": null
+    },
+    {
+      "image": "006",
+      "seed": 1002,
+      "policy": "A_supply_ui_default",
+      "requestedPolicy": "supply",
+      "actualPlanPolicy": "supply",
+      "valid": true,
+      "levelHash": "07e3872d29d1f670e8a457e043dfb4ca11a33180deda1e78afcfc82392d4cb13",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 19,
+        "midBuffer34Pct": 10.5,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 2,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 39.5
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 3,
+        "minCap": 19,
+        "maxCap": 45,
+        "boxSizeMin": 31,
+        "boxSizeMax": 46
+      },
+      "plan": {
+        "policy": "supply",
+        "ok": true,
+        "reason": null,
+        "cars": 32,
+        "debtCars": 8,
+        "maxBuffer": 4,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 10,
+        "infeasibleCapacityColors": 3
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 14619,
+      "wallMs": 16631,
+      "error": null
+    },
+    {
+      "image": "006",
+      "seed": 1002,
+      "policy": "B_target4_debt40",
+      "requestedPolicy": "targetBuffer",
+      "actualPlanPolicy": null,
+      "valid": false,
+      "levelHash": null,
+      "board": null,
+      "structurePass": false,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": null,
+      "releaseStatus": null,
+      "capacity": null,
+      "plan": null,
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 3445,
+      "wallMs": 3445,
+      "error": null
+    },
+    {
+      "image": "006",
+      "seed": 1002,
+      "policy": "C_short_debt",
+      "requestedPolicy": "shortDebt",
+      "actualPlanPolicy": "shortDebt",
+      "valid": true,
+      "levelHash": "70b7a821134b994520a3a697e25a097731fedc0d14e1776040f40a2df6c29111",
+      "board": "8x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 16,
+        "midBuffer34Pct": 12.5,
+        "midBuffer5Pct": 6.3,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 2,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 37.5
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 30,
+        "maxCap": 57,
+        "boxSizeMin": 31,
+        "boxSizeMax": 58
+      },
+      "plan": {
+        "policy": "shortDebt",
+        "ok": true,
+        "reason": null,
+        "cars": 27,
+        "debtCars": 14,
+        "maxBuffer": 5,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 12,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 13752,
+      "wallMs": 15562,
+      "error": null
+    },
+    {
+      "image": "010",
+      "seed": 1001,
+      "policy": "A_supply_ui_default",
+      "requestedPolicy": "supply",
+      "actualPlanPolicy": "supply",
+      "valid": true,
+      "levelHash": "334ac37d26c88a0ae9ab6b95991c000afa22c547d4757d0a48bddb64fd340d5b",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 16,
+        "midBuffer34Pct": 12.5,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 3,
+        "distance": 37.5
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 32,
+        "maxCap": 78,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78
+      },
+      "plan": {
+        "policy": "supply",
+        "ok": true,
+        "reason": null,
+        "cars": 23,
+        "debtCars": 5,
+        "maxBuffer": 2,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 11,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 14308,
+      "wallMs": 15711,
+      "error": null
+    },
+    {
+      "image": "010",
+      "seed": 1001,
+      "policy": "B_target4_debt40",
+      "requestedPolicy": "targetBuffer",
+      "actualPlanPolicy": "targetBuffer",
+      "valid": true,
+      "levelHash": "9f25effb767ea1f693b0bfbc0a43b885ef8323cccb3316270378adcfdd52b1b7",
+      "board": "8x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 11,
+        "midBuffer34Pct": 45.5,
+        "midBuffer5Pct": 27.3,
+        "maxBuffer5Run": 3,
+        "significantReleaseCount": 0,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 5,
+        "distance": 29.5
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 32,
+        "maxCap": 78,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78
+      },
+      "plan": {
+        "policy": "targetBuffer",
+        "ok": true,
+        "reason": null,
+        "cars": 23,
+        "debtCars": 8,
+        "maxBuffer": 5,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 11,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 13304,
+      "wallMs": 15205,
+      "error": null
+    },
+    {
+      "image": "010",
+      "seed": 1001,
+      "policy": "C_short_debt",
+      "requestedPolicy": "shortDebt",
+      "actualPlanPolicy": "shortDebt",
+      "valid": true,
+      "levelHash": "c100bf0f45e59f9ad64c579ee9cc30267a7a8dd70ff660002a49a8957d90b496",
+      "board": "8x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 12,
+        "midBuffer34Pct": 58.3,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 0,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 25
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 32,
+        "maxCap": 78,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78
+      },
+      "plan": {
+        "policy": "shortDebt",
+        "ok": true,
+        "reason": null,
+        "cars": 23,
+        "debtCars": 11,
+        "maxBuffer": 4,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 11,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 12534,
+      "wallMs": 14307,
+      "error": null
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "policy": "A_supply_ui_default",
+      "requestedPolicy": "supply",
+      "actualPlanPolicy": "supply",
+      "valid": true,
+      "levelHash": "a1f8abd8d8067075965b14a88346d26ee5e2e944748e8a821880179b507f7f60",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": true,
+      "metrics": {
+        "midSteps": 18,
+        "midBuffer34Pct": 72.2,
+        "midBuffer5Pct": 5.6,
+        "maxBuffer5Run": 1,
+        "significantReleaseCount": 1,
+        "oscillationCount": 1,
+        "lateHighPressurePct": 50,
+        "maxBuffer": 5,
+        "distance": 0
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 32,
+        "maxCap": 61,
+        "boxSizeMin": 35,
+        "boxSizeMax": 62
+      },
+      "plan": {
+        "policy": "supply",
+        "ok": true,
+        "reason": null,
+        "cars": 25,
+        "debtCars": 6,
+        "maxBuffer": 3,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 11,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "pass",
+      "goalElapsedMs": 16814,
+      "wallMs": 20198,
+      "error": null
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "policy": "B_target4_debt40",
+      "requestedPolicy": "targetBuffer",
+      "actualPlanPolicy": "targetBuffer",
+      "valid": true,
+      "levelHash": "17626dd7086007f632bf2b3395630f82c656d21f34d6ba48c896737c4fd6575f",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 12,
+        "midBuffer34Pct": 58.3,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 0,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 3,
+        "distance": 25
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 32,
+        "maxCap": 78,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78
+      },
+      "plan": {
+        "policy": "targetBuffer",
+        "ok": true,
+        "reason": null,
+        "cars": 23,
+        "debtCars": 8,
+        "maxBuffer": 5,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 11,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 10967,
+      "wallMs": 12995,
+      "error": null
+    },
+    {
+      "image": "010",
+      "seed": 1002,
+      "policy": "C_short_debt",
+      "requestedPolicy": "shortDebt",
+      "actualPlanPolicy": "shortDebt",
+      "valid": true,
+      "levelHash": "b4ee08e2ea10589408547aea2798177352725f428e8bf8bdd384ea78747713e9",
+      "board": "9x9",
+      "structurePass": true,
+      "gateReasons": [],
+      "goalPass": false,
+      "metrics": {
+        "midSteps": 14,
+        "midBuffer34Pct": 28.6,
+        "midBuffer5Pct": 0,
+        "maxBuffer5Run": 0,
+        "significantReleaseCount": 1,
+        "oscillationCount": 2,
+        "lateHighPressurePct": 0,
+        "maxBuffer": 4,
+        "distance": 21.4
+      },
+      "releaseStatus": null,
+      "capacity": {
+        "conserved": true,
+        "perColorConserved": true,
+        "aboveMax": 0,
+        "belowMin": 1,
+        "minCap": 32,
+        "maxCap": 78,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78
+      },
+      "plan": {
+        "policy": "shortDebt",
+        "ok": true,
+        "reason": null,
+        "cars": 23,
+        "debtCars": 11,
+        "maxBuffer": 4,
+        "covered": 1225,
+        "total": 1225,
+        "exactCapacityColors": 11,
+        "infeasibleCapacityColors": 1
+      },
+      "goalRounds": 2,
+      "goalStopReason": "goalMaxRounds",
+      "goalElapsedMs": 12660,
+      "wallMs": 14665,
+      "error": null
+    }
+  ]
+}
