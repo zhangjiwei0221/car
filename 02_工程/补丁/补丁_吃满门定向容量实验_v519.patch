@@ -1,0 +1,3089 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index f7a5b31..9245e2d 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20026,3 +20026,33 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. 吃满中位门需要按失败曲线反查具体车辆与最小越界px；通用关键车排序不足以修所有结构失败。
+ 2. 近失关74.5%体验不能绕过结构门，searchLimited也不能当全局证明。
+ 3. PlayerSim/真人校准、跨色容量组合和目标化障碍未完成，七点不能标全完成。
++
++### 509. 【2026-10-26】v519：吃满门定向容量0/4，发现全程中位与高压释压可能冲突
++
++#### 509.1 问题（原话）
++
++- “机器不知道，一点一点搞会不会太久。”
++- “遇到边界以及卡住的地方要记录。”
++
++#### 509.2 证据
++
++- v518近失关只剩吃满中位4>3；通用debt关键车并未定位该门。
++- 新诊断显示该关全局吃满中位4，但30~80%中段中位7；同时完整体验中段3/4为74.5%。全程吃满门可能把高压释放选项也当成白给。
++- 初版定向原型仅允许单donor，8项目标只实际评1项，证据不足；改为多donor后，4项可生成、4项因capMax/donor余量拒绝。
++
++#### 509.3 改动
++
++- Kimi新增只读 `吃满门定向容量精调.js`：逐步计算最小partial delta，按donor新增吃满风险逐px分配，支持多donor；不重写规则、不接生产。
++- 预登记20秒/32变体上限，实际候选耗尽即停止；保存完整诊断、拒绝原因和逐变体结果。
++
++#### 509.4 验证（改前后数字）
++
++- 4个合法变体全部真实重解，结构转化0/4、完整转化0/4；最佳仍吃满中位4，freeLow保持27%，其中一项免费连5→6。
++- 四项拒绝具体为两项donor可用3px<所需7px、两项目标会超capMax=19；不是搜索时间不足。
++- 所有已评变体可解、守恒、棋盘与容量上限保护通过，belowMin未增加。
++
++#### 509.5 遗留
++
++1. 不再增加容量预算；需先校准全程吃满中位是否误伤高压释压选择。
++2. 门槛校准必须用已有通过/失败关，不得仅因近失关体验好就直接放行。
++3. 若保留门槛，下一步是车序/状态联合优化，不是同一容量方法第三阶段。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 50fbb04..f5b25af 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -198,3 +198,11 @@
+ - 根因定位：现通用 `keyCars` 只看债务/解锁/等待，不看哪辆车推高吃满中位；donor只按余量选，可能在对侧抵消收益。下一实验从失败曲线反查目标车和最小越界px，并记录donor副作用，仍不默认投产。
+ - 同版修复内部level缺rows/cols导致的ring异常：正常10个真实独立关v517/v518求解签名10/10一致；缺尺寸推断、消除和大小图缓存交替回归通过。
+ - 七点一致性不变：本项属于第3点失败驱动和第4点小容量有界精调；没有完成第5点跨色组合规划，也没有把第7点障碍目标化冒充完成。
++
++## 24. v519：吃满门定向容量否决，转向门槛口径校准
++
++- 新诊断从参考路线计算 `deltaToPartial`，并按donor新增吃满风险逐px分配；不再用通用debt排序。
++- 8辆目标中4辆可生成合法变体，另4辆受用户capMax或同色donor余量限制；4个真实重解变体0结构转化，最佳仍吃满中位4，且一个变体免费连5→6。
++- 原型初版单donor只评1项，属于工具覆盖不足；改成与原transfer一致的多donor后才形成上述结论，未把首轮当否决证据。
++- 近失基底全局吃满中位4，但30~80%中段吃满中位7、体验3/4占比74.5%。高压下的吃满选项可能是释放路径，不应与低缓冲白给混为一谈。
++- 按预登记不再加容量预算。下一步只读比较“全程吃满中位”与“低压力吃满中位/高压释压选择”，用已有通过/失败关校准，不直接放宽门。
+diff --git "a/02_\345\267\245\347\250\213/\350\241\245\344\270\201/\350\241\245\344\270\201_\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\345\256\236\351\252\214_v519.patch" "b/02_\345\267\245\347\250\213/\350\241\245\344\270\201/\350\241\245\344\270\201_\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\345\256\236\351\252\214_v519.patch"
+new file mode 100644
+index 0000000..b97dd51
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\350\241\245\344\270\201/\350\241\245\344\270\201_\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\345\256\236\351\252\214_v519.patch"
+@@ -0,0 +1,1542 @@
++diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++index f7a5b31..9245e2d 100644
++--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++@@ -20026,3 +20026,33 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
++ 1. 吃满中位门需要按失败曲线反查具体车辆与最小越界px；通用关键车排序不足以修所有结构失败。
++ 2. 近失关74.5%体验不能绕过结构门，searchLimited也不能当全局证明。
++ 3. PlayerSim/真人校准、跨色容量组合和目标化障碍未完成，七点不能标全完成。
+++
+++### 509. 【2026-10-26】v519：吃满门定向容量0/4，发现全程中位与高压释压可能冲突
+++
+++#### 509.1 问题（原话）
+++
+++- “机器不知道，一点一点搞会不会太久。”
+++- “遇到边界以及卡住的地方要记录。”
+++
+++#### 509.2 证据
+++
+++- v518近失关只剩吃满中位4>3；通用debt关键车并未定位该门。
+++- 新诊断显示该关全局吃满中位4，但30~80%中段中位7；同时完整体验中段3/4为74.5%。全程吃满门可能把高压释放选项也当成白给。
+++- 初版定向原型仅允许单donor，8项目标只实际评1项，证据不足；改为多donor后，4项可生成、4项因capMax/donor余量拒绝。
+++
+++#### 509.3 改动
+++
+++- Kimi新增只读 `吃满门定向容量精调.js`：逐步计算最小partial delta，按donor新增吃满风险逐px分配，支持多donor；不重写规则、不接生产。
+++- 预登记20秒/32变体上限，实际候选耗尽即停止；保存完整诊断、拒绝原因和逐变体结果。
+++
+++#### 509.4 验证（改前后数字）
+++
+++- 4个合法变体全部真实重解，结构转化0/4、完整转化0/4；最佳仍吃满中位4，freeLow保持27%，其中一项免费连5→6。
+++- 四项拒绝具体为两项donor可用3px<所需7px、两项目标会超capMax=19；不是搜索时间不足。
+++- 所有已评变体可解、守恒、棋盘与容量上限保护通过，belowMin未增加。
+++
+++#### 509.5 遗留
+++
+++1. 不再增加容量预算；需先校准全程吃满中位是否误伤高压释压选择。
+++2. 门槛校准必须用已有通过/失败关，不得仅因近失关体验好就直接放行。
+++3. 若保留门槛，下一步是车序/状态联合优化，不是同一容量方法第三阶段。
++diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++index 50fbb04..f5b25af 100644
++--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++@@ -198,3 +198,11 @@
++ - 根因定位：现通用 `keyCars` 只看债务/解锁/等待，不看哪辆车推高吃满中位；donor只按余量选，可能在对侧抵消收益。下一实验从失败曲线反查目标车和最小越界px，并记录donor副作用，仍不默认投产。
++ - 同版修复内部level缺rows/cols导致的ring异常：正常10个真实独立关v517/v518求解签名10/10一致；缺尺寸推断、消除和大小图缓存交替回归通过。
++ - 七点一致性不变：本项属于第3点失败驱动和第4点小容量有界精调；没有完成第5点跨色组合规划，也没有把第7点障碍目标化冒充完成。
+++
+++## 24. v519：吃满门定向容量否决，转向门槛口径校准
+++
+++- 新诊断从参考路线计算 `deltaToPartial`，并按donor新增吃满风险逐px分配；不再用通用debt排序。
+++- 8辆目标中4辆可生成合法变体，另4辆受用户capMax或同色donor余量限制；4个真实重解变体0结构转化，最佳仍吃满中位4，且一个变体免费连5→6。
+++- 原型初版单donor只评1项，属于工具覆盖不足；改成与原transfer一致的多donor后才形成上述结论，未把首轮当否决证据。
+++- 近失基底全局吃满中位4，但30~80%中段吃满中位7、体验3/4占比74.5%。高压下的吃满选项可能是释放路径，不应与低缓冲白给混为一谈。
+++- 按预登记不再加容量预算。下一步只读比较“全程吃满中位”与“低压力吃满中位/高压释压选择”，用已有通过/失败关校准，不直接放宽门。
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203.js"
++new file mode 100644
++index 0000000..2f4df31
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203.js"
++@@ -0,0 +1,133 @@
+++#!/usr/bin/env node
+++/** v519只读实验：按高吃满步骤定位最小partialdelta，并估计donor新增吃满风险。 */
+++'use strict';
+++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
+++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js'];
+++function opt(n, d) { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; }
+++const budget = +opt('budget', '20000'), out = opt('out', ''), maxVariants = +opt('variants', '32');
+++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
+++vm.createContext(sb);
+++for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
+++let generatorSource = fs.readFileSync(path.join(BIN, 'generator.js'), 'utf8');
+++generatorSource = generatorSource.replace('evaluateLevel: evaluateLevel, trapPostProcess:', 'choiceCurve: choiceCurve, exposedBlobByColor: exposedBlobByColor, evaluateLevel: evaluateLevel, trapPostProcess:');
+++vm.runInContext(generatorSource, sb, { filename: 'generator-instrumented.js' });
+++const A = sb.AntSolver, G = A.Generator, S = A.Simulator;
+++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
+++function cand(level, ev, cfg) { return { level, valid: !!(ev && ev.valid), solveResult: ev && ev.solveResult, audit: ev && ev.audit, goodV3: ev && ev.goodV3, config: cfg }; }
+++function measure(level, ev, cfg) {
+++  const c = cand(level, ev, cfg), q = A.Quality.fromGeneration(c), fc = c.goodV3 && c.goodV3.fillCurve || {}, ca = A.Quality.capacityEvidence(level, cfg);
+++  return { valid: c.valid, struct: G.goalStructPass(c), gateReasons: q.gateReasons || [], gateDistance: q.gateDistance,
+++    freeLowPct: fc.freeLowPct, freeRunMax: fc.freeRunMax, selectMedian: fc.selectMedian, fullMedian2: fc.fullMedian2, pressurePct3: fc.pressurePct3,
+++    capacity: { conserved: ca.conserved, boardFloorPass: ca.boardFloorPass, aboveMax: ca.aboveMax, belowMin: ca.belowMin } };
+++}
+++function protectedOk(m, b) { return m.valid && m.capacity.conserved && m.capacity.boardFloorPass && m.capacity.aboveMax === 0 && m.capacity.belowMin <= b.capacity.belowMin; }
+++function better(a, b) {
+++  if (!b) return true;
+++  if (!!a.struct !== !!b.struct) return a.struct;
+++  if (a.gateReasons.length !== b.gateReasons.length) return a.gateReasons.length < b.gateReasons.length;
+++  return (a.gateDistance == null ? 1e9 : a.gateDistance) < (b.gateDistance == null ? 1e9 : b.gateDistance);
+++}
+++/** 与choiceCurve共用同一状态、同一exposedBlob函数，只增加反事实诊断，不改游戏规则。 */
+++function diagnose(level, route) {
+++  const st = S.createState(level, { useSlotStart: true }), order = route.pickOrder.slice().sort((a, b) => (a.step || 0) - (b.step || 0));
+++  const stats = {}, steps = [];
+++  function stat(m, exposed, full, stepIndex) {
+++    const key = m.r + ',' + m.c;
+++    if (!stats[key]) stats[key] = { r: m.r, c: m.c, color: m.color, count: m.count, highFullHits: 0, minDelta: Infinity, maxDelta: 0, donorRisk: {}, appearances: 0 };
+++    const x = stats[key]; x.appearances++;
+++    if (full) {
+++      const delta = Math.max(1, exposed - m.count + 1);
+++      if (steps[stepIndex].full >= 4) { x.highFullHits++; x.minDelta = Math.min(x.minDelta, delta); x.maxDelta = Math.max(x.maxDelta, delta); }
+++    } else {
+++      // 当前count>exposed；移出超过count-exposed-1才会重新成为full。
+++      const margin = m.count - exposed;
+++      for (let d = 1; d <= 4; d++) x.donorRisk[d] = (x.donorRisk[d] || 0) + Math.max(0, d - margin + 1);
+++    }
+++  }
+++  for (let i = 0; i < order.length; i++) {
+++    const p = order[i]; if (p.chainIndex > 0) continue;
+++    const blob = G.exposedBlobByColor(st.eliminated, st.blocks, st.rows, st.cols), moves = S.listMoves(st).filter(m => !m.blocked);
+++    const step = { index: steps.length, full: 0, moves: [] }; steps.push(step);
+++    for (const m of moves) {
+++      const cell = st.cells[m.r] && st.cells[m.r][m.c]; if (!cell) continue;
+++      const exposed = blob[cell.color] || 0, full = exposed >= cell.count;
+++      if (full) step.full++;
+++      step.moves.push({ r: m.r, c: m.c, color: cell.color, count: cell.count, exposed, full });
+++    }
+++    // stat需要看到本步full总数，因此先收集完整step再记贡献。
+++    for (const m of step.moves) stat(m, m.exposed, m.full, step.index);
+++    if (!S.applyPick(st, p.r, p.c) || st.gameOver) break;
+++  }
+++  const targets = Object.values(stats).filter(x => x.highFullHits > 0 && isFinite(x.minDelta)).map(x => ({
+++    r: x.r, c: x.c, color: x.color, count: x.count, highFullHits: x.highFullHits,
+++    delta: x.minDelta, maxDelta: x.maxDelta, appearances: x.appearances
+++  })).sort((a, b) => b.highFullHits - a.highFullHits || a.delta - b.delta || a.r - b.r || a.c - b.c);
+++  return { steps, stats, targets };
+++}
+++function makeVariants(level, route, capMin, capMax) {
+++  const d = diagnose(level, route), variants = [], rejected = [];
+++  for (const target of d.targets.slice(0, 8)) {
+++    const delta = target.delta;
+++    if (!(delta > 0 && delta <= 32)) { rejected.push({ target, reason: 'delta_outside_experiment_bound', delta }); continue; }
+++    const cell = level.board.cells[target.r][target.c];
+++    if (cell.count + delta > capMax) { rejected.push({ target, reason: 'target_above_user_max', delta }); continue; }
+++    const donors = [];
+++    for (let r = 0; r < level.board.rows; r++) for (let c = 0; c < level.board.cols; c++) {
+++      if (r === target.r && c === target.c) continue;
+++      const x = level.board.cells[r][c], key = r + ',' + c, ds = d.stats[key];
+++      if (!x || x.t !== 'box' || x.q || x.color !== cell.color) continue;
+++      const slack = x.count - capMin;
+++      if (slack > 0) donors.push({ r, c, slack, take: 0, appearances: ds && ds.appearances || 0,
+++        riskAt: function (n) { return n > 0 ? (ds && ds.donorRisk[n] || 0) : 0; } });
+++    }
+++    // 与原transfer一样允许多donor；区别仅是逐px选择新增吃满风险最低者。
+++    for (let moved = 0; moved < delta; moved++) {
+++      const available = donors.filter(d => d.take < d.slack);
+++      if (!available.length) break;
+++      available.sort((a, b) => (a.riskAt(a.take + 1) - a.riskAt(a.take)) - (b.riskAt(b.take + 1) - b.riskAt(b.take)) ||
+++        b.appearances - a.appearances || b.slack - a.slack || a.r - b.r || a.c - b.c);
+++      available[0].take++;
+++    }
+++    const moved = donors.reduce((n, d) => n + d.take, 0);
+++    if (moved !== delta) { rejected.push({ target, reason: 'insufficient_multi_donor_slack', delta, available: moved }); continue; }
+++    const lv = JSON.parse(JSON.stringify(level)), tc = lv.board.cells[target.r][target.c];
+++    tc.count += delta;
+++    const donorMeta = [];
+++    for (const d of donors) if (d.take > 0) {
+++      lv.board.cells[d.r][d.c].count -= d.take;
+++      donorMeta.push({ r: d.r, c: d.c, delta: -d.take, estimatedNewFullRisk: d.riskAt(d.take) });
+++    }
+++    const v = { level: lv, meta: { strategy: 'full-gate-directed-v1', target: { r: target.r, c: target.c, color: target.color, before: target.count, after: tc.count, delta },
+++      donors: donorMeta,
+++      diagnosis: { highFullHits: target.highFullHits, maxDeltaAtOtherSteps: target.maxDelta }, capRange: [capMin, capMax] } };
+++    if (hash(A.CapacityTuner.sumByColor(lv)) !== hash(A.CapacityTuner.sumByColor(level))) { rejected.push({ target, reason: 'conservation_check_failed' }); continue; }
+++    variants.push(v);
+++  }
+++  return { variants, rejected, targets: d.targets, steps: d.steps.map(s => ({ index: s.index, full: s.full })) };
+++}
+++const report = JSON.parse(fs.readFileSync(path.join(__dirname, '独立回归_32677_v516.json'), 'utf8')), rr = report.rows.find(x => x.image === 'recommend');
+++const level = A.parseLevel(JSON.parse(fs.readFileSync(path.join(__dirname, '推荐32677_近失变体_v518.json'), 'utf8')));
+++const cfg = Object.assign({}, G.DEFAULT_CONFIG, { trapEvalMs: 1500, boxSizeMin: rr.capacity.boxSizeMin, boxSizeMax: rr.capacity.boxSizeMax, capNormMin: rr.capacity.boxSizeMin, capNormMax: rr.capacity.boxSizeMax });
+++const t0 = Date.now(), sr = A.Solver.solve(level, { timeBudgetMs: 1500, capturePreviewStats: true }), ev0 = G.evaluateLevel(level, cfg), base = measure(level, ev0, cfg);
+++const made = makeVariants(level, sr, cfg.boxSizeMin, cfg.boxSizeMax), rec = { id: 'recommend_32677_near', baseHash: hash(level), capRange: [cfg.boxSizeMin, cfg.boxSizeMax], base,
+++  diagnosticTargets: made.targets, rejected: made.rejected, fullCurve: made.steps, tested: 0, protectedRejected: 0, variants: [], best: null };
+++for (const v of made.variants) {
+++  if (rec.tested >= maxVariants || Date.now() - t0 >= budget) { rec.stopped = rec.tested >= maxVariants ? 'variant_cap' : 'budget_exhausted'; break; }
+++  const t = Date.now(), ev = G.evaluateLevel(v.level, cfg), m = measure(v.level, ev, cfg), row = { meta: v.meta, ms: Date.now() - t, after: m, hash: hash(v.level) };
+++  rec.tested++; rec.variants.push(row);
+++  if (!protectedOk(m, base)) { rec.protectedRejected++; continue; }
+++  if (better(m, rec.best && rec.best.after)) rec.best = row;
+++  if (m.struct) {
+++    const full = A.ExperienceGoal.evaluate(v.level, { solveResult: ev.solveResult, decision: true });
+++    row.experienceFull = full && { pass: full.pass, status: full.status, reasons: full.reasons, metrics: full.metrics, release: full.releaseDecision && full.releaseDecision.status };
+++    const cc = cand(v.level, ev, cfg); G.attachExperienceRouteEvidence(cc, cfg); row.route = cc.experienceRouteEvidence;
+++    if (full && full.pass || cc.experienceRouteEvidence && cc.experienceRouteEvidence.pass) { row.converted = true; rec.converted = row; break; }
+++  }
+++}
+++rec.elapsedMs = Date.now() - t0;
+++const result = { schema: 'full-gate-directed-capacity-v1', date: '2026-10-26', baseCommit: '076629d', budgetMs: budget, maxVariants, summary: {
+++  tested: rec.tested, generated: made.variants.length, rejected: made.rejected.length, structPasses: rec.variants.filter(v => v.after.struct).length,
+++  conversions: rec.converted ? 1 : 0, protectedRejected: rec.protectedRejected, elapsedMs: rec.elapsedMs, stopped: rec.stopped || (rec.converted ? 'converted' : 'exhausted') }, rows: [rec] };
+++if (out) fs.writeFileSync(path.resolve(ROOT, out), JSON.stringify(result, null, 2) + '\n');
+++console.log(JSON.stringify({ summary: result.summary, base, targets: made.targets.slice(0, 8), best: rec.best && { meta: rec.best.meta, after: rec.best.after }, converted: rec.converted && { meta: rec.converted.meta, after: rec.converted.after, experience: rec.converted.experienceFull } }, null, 2));
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\350\277\221\345\244\261_v519.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\350\277\221\345\244\261_v519.json"
++new file mode 100644
++index 0000000..ec122b1
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\350\277\221\345\244\261_v519.json"
++@@ -0,0 +1,1301 @@
+++{
+++  "schema": "full-gate-directed-capacity-v1",
+++  "date": "2026-10-26",
+++  "baseCommit": "076629d",
+++  "budgetMs": 20000,
+++  "maxVariants": 32,
+++  "summary": {
+++    "tested": 4,
+++    "generated": 4,
+++    "rejected": 4,
+++    "structPasses": 0,
+++    "conversions": 0,
+++    "protectedRejected": 0,
+++    "elapsedMs": 4242,
+++    "stopped": "exhausted"
+++  },
+++  "rows": [
+++    {
+++      "id": "recommend_32677_near",
+++      "baseHash": "7b552187828ad2e23cd31130dbceaffdcbc301d3c360aedcbb99a0805fca0b94",
+++      "capRange": [
+++        13,
+++        19
+++      ],
+++      "base": {
+++        "valid": true,
+++        "struct": false,
+++        "gateReasons": [
+++          "吃满中位 4>3"
+++        ],
+++        "gateDistance": 10,
+++        "freeLowPct": 27,
+++        "freeRunMax": 5,
+++        "selectMedian": 8,
+++        "fullMedian2": 4,
+++        "pressurePct3": 58,
+++        "capacity": {
+++          "conserved": true,
+++          "boardFloorPass": true,
+++          "aboveMax": 0,
+++          "belowMin": 21
+++        }
+++      },
+++      "diagnosticTargets": [
+++        {
+++          "r": 7,
+++          "c": 2,
+++          "color": 30,
+++          "count": 10,
+++          "highFullHits": 34,
+++          "delta": 7,
+++          "maxDelta": 34,
+++          "appearances": 36
+++        },
+++        {
+++          "r": 6,
+++          "c": 2,
+++          "color": 32,
+++          "count": 11,
+++          "highFullHits": 29,
+++          "delta": 6,
+++          "maxDelta": 45,
+++          "appearances": 31
+++        },
+++        {
+++          "r": 7,
+++          "c": 4,
+++          "color": 30,
+++          "count": 10,
+++          "highFullHits": 28,
+++          "delta": 7,
+++          "maxDelta": 34,
+++          "appearances": 34
+++        },
+++        {
+++          "r": 7,
+++          "c": 0,
+++          "color": 28,
+++          "count": 12,
+++          "highFullHits": 25,
+++          "delta": 3,
+++          "maxDelta": 34,
+++          "appearances": 25
+++        },
+++        {
+++          "r": 8,
+++          "c": 7,
+++          "color": 30,
+++          "count": 11,
+++          "highFullHits": 21,
+++          "delta": 19,
+++          "maxDelta": 33,
+++          "appearances": 21
+++        },
+++        {
+++          "r": 6,
+++          "c": 4,
+++          "color": 32,
+++          "count": 11,
+++          "highFullHits": 17,
+++          "delta": 6,
+++          "maxDelta": 37,
+++          "appearances": 33
+++        },
+++        {
+++          "r": 4,
+++          "c": 6,
+++          "color": 1,
+++          "count": 10,
+++          "highFullHits": 15,
+++          "delta": 6,
+++          "maxDelta": 31,
+++          "appearances": 16
+++        },
+++        {
+++          "r": 3,
+++          "c": 7,
+++          "color": 26,
+++          "count": 11,
+++          "highFullHits": 9,
+++          "delta": 13,
+++          "maxDelta": 14,
+++          "appearances": 9
+++        },
+++        {
+++          "r": 6,
+++          "c": 8,
+++          "color": 28,
+++          "count": 12,
+++          "highFullHits": 8,
+++          "delta": 16,
+++          "maxDelta": 26,
+++          "appearances": 8
+++        },
+++        {
+++          "r": 0,
+++          "c": 9,
+++          "color": 5,
+++          "count": 14,
+++          "highFullHits": 5,
+++          "delta": 5,
+++          "maxDelta": 9,
+++          "appearances": 8
+++        },
+++        {
+++          "r": 0,
+++          "c": 4,
+++          "color": 19,
+++          "count": 11,
+++          "highFullHits": 5,
+++          "delta": 7,
+++          "maxDelta": 13,
+++          "appearances": 20
+++        },
+++        {
+++          "r": 6,
+++          "c": 6,
+++          "color": 32,
+++          "count": 13,
+++          "highFullHits": 5,
+++          "delta": 35,
+++          "maxDelta": 35,
+++          "appearances": 5
+++        },
+++        {
+++          "r": 2,
+++          "c": 4,
+++          "color": 19,
+++          "count": 15,
+++          "highFullHits": 4,
+++          "delta": 1,
+++          "maxDelta": 5,
+++          "appearances": 53
+++        },
+++        {
+++          "r": 7,
+++          "c": 7,
+++          "color": 27,
+++          "count": 15,
+++          "highFullHits": 4,
+++          "delta": 2,
+++          "maxDelta": 7,
+++          "appearances": 16
+++        },
+++        {
+++          "r": 7,
+++          "c": 5,
+++          "color": 27,
+++          "count": 16,
+++          "highFullHits": 4,
+++          "delta": 6,
+++          "maxDelta": 6,
+++          "appearances": 5
+++        },
+++        {
+++          "r": 1,
+++          "c": 6,
+++          "color": 5,
+++          "count": 13,
+++          "highFullHits": 3,
+++          "delta": 3,
+++          "maxDelta": 6,
+++          "appearances": 13
+++        },
+++        {
+++          "r": 1,
+++          "c": 5,
+++          "color": 19,
+++          "count": 13,
+++          "highFullHits": 3,
+++          "delta": 5,
+++          "maxDelta": 7,
+++          "appearances": 20
+++        },
+++        {
+++          "r": 3,
+++          "c": 9,
+++          "color": 14,
+++          "count": 12,
+++          "highFullHits": 3,
+++          "delta": 5,
+++          "maxDelta": 19,
+++          "appearances": 3
+++        },
+++        {
+++          "r": 0,
+++          "c": 5,
+++          "color": 5,
+++          "count": 14,
+++          "highFullHits": 3,
+++          "delta": 9,
+++          "maxDelta": 9,
+++          "appearances": 3
+++        },
+++        {
+++          "r": 0,
+++          "c": 8,
+++          "color": 14,
+++          "count": 14,
+++          "highFullHits": 3,
+++          "delta": 12,
+++          "maxDelta": 22,
+++          "appearances": 5
+++        },
+++        {
+++          "r": 0,
+++          "c": 7,
+++          "color": 14,
+++          "count": 13,
+++          "highFullHits": 3,
+++          "delta": 13,
+++          "maxDelta": 23,
+++          "appearances": 6
+++        },
+++        {
+++          "r": 8,
+++          "c": 2,
+++          "color": 27,
+++          "count": 14,
+++          "highFullHits": 3,
+++          "delta": 29,
+++          "maxDelta": 43,
+++          "appearances": 3
+++        },
+++        {
+++          "r": 7,
+++          "c": 9,
+++          "color": 28,
+++          "count": 15,
+++          "highFullHits": 2,
+++          "delta": 1,
+++          "maxDelta": 1,
+++          "appearances": 2
+++        },
+++        {
+++          "r": 0,
+++          "c": 6,
+++          "color": 26,
+++          "count": 14,
+++          "highFullHits": 2,
+++          "delta": 2,
+++          "maxDelta": 14,
+++          "appearances": 4
+++        },
+++        {
+++          "r": 3,
+++          "c": 3,
+++          "color": 19,
+++          "count": 16,
+++          "highFullHits": 2,
+++          "delta": 2,
+++          "maxDelta": 4,
+++          "appearances": 6
+++        },
+++        {
+++          "r": 1,
+++          "c": 3,
+++          "color": 19,
+++          "count": 15,
+++          "highFullHits": 2,
+++          "delta": 3,
+++          "maxDelta": 9,
+++          "appearances": 6
+++        },
+++        {
+++          "r": 2,
+++          "c": 2,
+++          "color": 33,
+++          "count": 16,
+++          "highFullHits": 2,
+++          "delta": 5,
+++          "maxDelta": 17,
+++          "appearances": 10
+++        },
+++        {
+++          "r": 4,
+++          "c": 9,
+++          "color": 15,
+++          "count": 15,
+++          "highFullHits": 2,
+++          "delta": 9,
+++          "maxDelta": 14,
+++          "appearances": 2
+++        },
+++        {
+++          "r": 2,
+++          "c": 8,
+++          "color": 14,
+++          "count": 14,
+++          "highFullHits": 2,
+++          "delta": 16,
+++          "maxDelta": 17,
+++          "appearances": 2
+++        },
+++        {
+++          "r": 8,
+++          "c": 1,
+++          "color": 28,
+++          "count": 15,
+++          "highFullHits": 2,
+++          "delta": 30,
+++          "maxDelta": 31,
+++          "appearances": 2
+++        },
+++        {
+++          "r": 8,
+++          "c": 0,
+++          "color": 27,
+++          "count": 14,
+++          "highFullHits": 2,
+++          "delta": 33,
+++          "maxDelta": 43,
+++          "appearances": 2
+++        },
+++        {
+++          "r": 1,
+++          "c": 0,
+++          "color": 19,
+++          "count": 15,
+++          "highFullHits": 1,
+++          "delta": 1,
+++          "maxDelta": 1,
+++          "appearances": 5
+++        },
+++        {
+++          "r": 2,
+++          "c": 9,
+++          "color": 33,
+++          "count": 13,
+++          "highFullHits": 1,
+++          "delta": 1,
+++          "maxDelta": 1,
+++          "appearances": 46
+++        },
+++        {
+++          "r": 7,
+++          "c": 3,
+++          "color": 31,
+++          "count": 19,
+++          "highFullHits": 1,
+++          "delta": 1,
+++          "maxDelta": 1,
+++          "appearances": 5
+++        },
+++        {
+++          "r": 7,
+++          "c": 8,
+++          "color": 27,
+++          "count": 15,
+++          "highFullHits": 1,
+++          "delta": 2,
+++          "maxDelta": 2,
+++          "appearances": 19
+++        },
+++        {
+++          "r": 5,
+++          "c": 9,
+++          "color": 31,
+++          "count": 16,
+++          "highFullHits": 1,
+++          "delta": 3,
+++          "maxDelta": 3,
+++          "appearances": 9
+++        },
+++        {
+++          "r": 0,
+++          "c": 1,
+++          "color": 33,
+++          "count": 19,
+++          "highFullHits": 1,
+++          "delta": 5,
+++          "maxDelta": 5,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 0,
+++          "c": 2,
+++          "color": 19,
+++          "count": 19,
+++          "highFullHits": 1,
+++          "delta": 5,
+++          "maxDelta": 5,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 1,
+++          "c": 4,
+++          "color": 5,
+++          "count": 13,
+++          "highFullHits": 1,
+++          "delta": 6,
+++          "maxDelta": 6,
+++          "appearances": 4
+++        },
+++        {
+++          "r": 2,
+++          "c": 3,
+++          "color": 14,
+++          "count": 12,
+++          "highFullHits": 1,
+++          "delta": 6,
+++          "maxDelta": 6,
+++          "appearances": 2
+++        },
+++        {
+++          "r": 5,
+++          "c": 6,
+++          "color": 31,
+++          "count": 11,
+++          "highFullHits": 1,
+++          "delta": 8,
+++          "maxDelta": 8,
+++          "appearances": 29
+++        },
+++        {
+++          "r": 6,
+++          "c": 7,
+++          "color": 13,
+++          "count": 17,
+++          "highFullHits": 1,
+++          "delta": 8,
+++          "maxDelta": 8,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 0,
+++          "c": 3,
+++          "color": 26,
+++          "count": 15,
+++          "highFullHits": 1,
+++          "delta": 13,
+++          "maxDelta": 13,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 5,
+++          "c": 3,
+++          "color": 15,
+++          "count": 16,
+++          "highFullHits": 1,
+++          "delta": 15,
+++          "maxDelta": 15,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 5,
+++          "c": 5,
+++          "color": 15,
+++          "count": 16,
+++          "highFullHits": 1,
+++          "delta": 15,
+++          "maxDelta": 15,
+++          "appearances": 9
+++        },
+++        {
+++          "r": 8,
+++          "c": 4,
+++          "color": 27,
+++          "count": 15,
+++          "highFullHits": 1,
+++          "delta": 15,
+++          "maxDelta": 15,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 8,
+++          "c": 5,
+++          "color": 28,
+++          "count": 14,
+++          "highFullHits": 1,
+++          "delta": 15,
+++          "maxDelta": 15,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 8,
+++          "c": 8,
+++          "color": 1,
+++          "count": 18,
+++          "highFullHits": 1,
+++          "delta": 16,
+++          "maxDelta": 16,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 5,
+++          "c": 7,
+++          "color": 32,
+++          "count": 18,
+++          "highFullHits": 1,
+++          "delta": 17,
+++          "maxDelta": 17,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 8,
+++          "c": 9,
+++          "color": 30,
+++          "count": 16,
+++          "highFullHits": 1,
+++          "delta": 17,
+++          "maxDelta": 17,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 4,
+++          "c": 7,
+++          "color": 15,
+++          "count": 17,
+++          "highFullHits": 1,
+++          "delta": 24,
+++          "maxDelta": 24,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 6,
+++          "c": 5,
+++          "color": 13,
+++          "count": 17,
+++          "highFullHits": 1,
+++          "delta": 25,
+++          "maxDelta": 25,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 3,
+++          "c": 8,
+++          "color": 1,
+++          "count": 15,
+++          "highFullHits": 1,
+++          "delta": 26,
+++          "maxDelta": 26,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 8,
+++          "c": 3,
+++          "color": 28,
+++          "count": 15,
+++          "highFullHits": 1,
+++          "delta": 29,
+++          "maxDelta": 29,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 6,
+++          "c": 0,
+++          "color": 32,
+++          "count": 18,
+++          "highFullHits": 1,
+++          "delta": 38,
+++          "maxDelta": 38,
+++          "appearances": 2
+++        },
+++        {
+++          "r": 4,
+++          "c": 8,
+++          "color": 1,
+++          "count": 10,
+++          "highFullHits": 1,
+++          "delta": 40,
+++          "maxDelta": 40,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 5,
+++          "c": 8,
+++          "color": 15,
+++          "count": 14,
+++          "highFullHits": 1,
+++          "delta": 41,
+++          "maxDelta": 41,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 6,
+++          "c": 3,
+++          "color": 13,
+++          "count": 17,
+++          "highFullHits": 1,
+++          "delta": 42,
+++          "maxDelta": 42,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 8,
+++          "c": 6,
+++          "color": 1,
+++          "count": 19,
+++          "highFullHits": 1,
+++          "delta": 43,
+++          "maxDelta": 43,
+++          "appearances": 1
+++        },
+++        {
+++          "r": 7,
+++          "c": 6,
+++          "color": 13,
+++          "count": 19,
+++          "highFullHits": 1,
+++          "delta": 58,
+++          "maxDelta": 58,
+++          "appearances": 1
+++        }
+++      ],
+++      "rejected": [
+++        {
+++          "target": {
+++            "r": 7,
+++            "c": 2,
+++            "color": 30,
+++            "count": 10,
+++            "highFullHits": 34,
+++            "delta": 7,
+++            "maxDelta": 34,
+++            "appearances": 36
+++          },
+++          "reason": "insufficient_multi_donor_slack",
+++          "delta": 7,
+++          "available": 3
+++        },
+++        {
+++          "target": {
+++            "r": 7,
+++            "c": 4,
+++            "color": 30,
+++            "count": 10,
+++            "highFullHits": 28,
+++            "delta": 7,
+++            "maxDelta": 34,
+++            "appearances": 34
+++          },
+++          "reason": "insufficient_multi_donor_slack",
+++          "delta": 7,
+++          "available": 3
+++        },
+++        {
+++          "target": {
+++            "r": 8,
+++            "c": 7,
+++            "color": 30,
+++            "count": 11,
+++            "highFullHits": 21,
+++            "delta": 19,
+++            "maxDelta": 33,
+++            "appearances": 21
+++          },
+++          "reason": "target_above_user_max",
+++          "delta": 19
+++        },
+++        {
+++          "target": {
+++            "r": 3,
+++            "c": 7,
+++            "color": 26,
+++            "count": 11,
+++            "highFullHits": 9,
+++            "delta": 13,
+++            "maxDelta": 14,
+++            "appearances": 9
+++          },
+++          "reason": "target_above_user_max",
+++          "delta": 13
+++        }
+++      ],
+++      "fullCurve": [
+++        {
+++          "index": 0,
+++          "full": 7
+++        },
+++        {
+++          "index": 1,
+++          "full": 8
+++        },
+++        {
+++          "index": 2,
+++          "full": 5
+++        },
+++        {
+++          "index": 3,
+++          "full": 3
+++        },
+++        {
+++          "index": 4,
+++          "full": 2
+++        },
+++        {
+++          "index": 5,
+++          "full": 1
+++        },
+++        {
+++          "index": 6,
+++          "full": 5
+++        },
+++        {
+++          "index": 7,
+++          "full": 4
+++        },
+++        {
+++          "index": 8,
+++          "full": 1
+++        },
+++        {
+++          "index": 9,
+++          "full": 3
+++        },
+++        {
+++          "index": 10,
+++          "full": 2
+++        },
+++        {
+++          "index": 11,
+++          "full": 0
+++        },
+++        {
+++          "index": 12,
+++          "full": 1
+++        },
+++        {
+++          "index": 13,
+++          "full": 5
+++        },
+++        {
+++          "index": 14,
+++          "full": 6
+++        },
+++        {
+++          "index": 15,
+++          "full": 3
+++        },
+++        {
+++          "index": 16,
+++          "full": 3
+++        },
+++        {
+++          "index": 17,
+++          "full": 2
+++        },
+++        {
+++          "index": 18,
+++          "full": 1
+++        },
+++        {
+++          "index": 19,
+++          "full": 0
+++        },
+++        {
+++          "index": 20,
+++          "full": 0
+++        },
+++        {
+++          "index": 21,
+++          "full": 0
+++        },
+++        {
+++          "index": 22,
+++          "full": 0
+++        },
+++        {
+++          "index": 23,
+++          "full": 0
+++        },
+++        {
+++          "index": 24,
+++          "full": 1
+++        },
+++        {
+++          "index": 25,
+++          "full": 1
+++        },
+++        {
+++          "index": 26,
+++          "full": 0
+++        },
+++        {
+++          "index": 27,
+++          "full": 1
+++        },
+++        {
+++          "index": 28,
+++          "full": 2
+++        },
+++        {
+++          "index": 29,
+++          "full": 2
+++        },
+++        {
+++          "index": 30,
+++          "full": 3
+++        },
+++        {
+++          "index": 31,
+++          "full": 5
+++        },
+++        {
+++          "index": 32,
+++          "full": 4
+++        },
+++        {
+++          "index": 33,
+++          "full": 7
+++        },
+++        {
+++          "index": 34,
+++          "full": 5
+++        },
+++        {
+++          "index": 35,
+++          "full": 4
+++        },
+++        {
+++          "index": 36,
+++          "full": 4
+++        },
+++        {
+++          "index": 37,
+++          "full": 4
+++        },
+++        {
+++          "index": 38,
+++          "full": 5
+++        },
+++        {
+++          "index": 39,
+++          "full": 5
+++        },
+++        {
+++          "index": 40,
+++          "full": 7
+++        },
+++        {
+++          "index": 41,
+++          "full": 9
+++        },
+++        {
+++          "index": 42,
+++          "full": 9
+++        },
+++        {
+++          "index": 43,
+++          "full": 9
+++        },
+++        {
+++          "index": 44,
+++          "full": 8
+++        },
+++        {
+++          "index": 45,
+++          "full": 7
+++        },
+++        {
+++          "index": 46,
+++          "full": 7
+++        },
+++        {
+++          "index": 47,
+++          "full": 8
+++        },
+++        {
+++          "index": 48,
+++          "full": 8
+++        },
+++        {
+++          "index": 49,
+++          "full": 9
+++        },
+++        {
+++          "index": 50,
+++          "full": 11
+++        },
+++        {
+++          "index": 51,
+++          "full": 12
+++        },
+++        {
+++          "index": 52,
+++          "full": 11
+++        },
+++        {
+++          "index": 53,
+++          "full": 10
+++        },
+++        {
+++          "index": 54,
+++          "full": 9
+++        },
+++        {
+++          "index": 55,
+++          "full": 8
+++        },
+++        {
+++          "index": 56,
+++          "full": 9
+++        },
+++        {
+++          "index": 57,
+++          "full": 9
+++        },
+++        {
+++          "index": 58,
+++          "full": 7
+++        },
+++        {
+++          "index": 59,
+++          "full": 6
+++        },
+++        {
+++          "index": 60,
+++          "full": 4
+++        },
+++        {
+++          "index": 61,
+++          "full": 4
+++        },
+++        {
+++          "index": 62,
+++          "full": 4
+++        },
+++        {
+++          "index": 63,
+++          "full": 5
+++        },
+++        {
+++          "index": 64,
+++          "full": 4
+++        },
+++        {
+++          "index": 65,
+++          "full": 3
+++        },
+++        {
+++          "index": 66,
+++          "full": 2
+++        },
+++        {
+++          "index": 67,
+++          "full": 2
+++        },
+++        {
+++          "index": 68,
+++          "full": 4
+++        },
+++        {
+++          "index": 69,
+++          "full": 3
+++        },
+++        {
+++          "index": 70,
+++          "full": 2
+++        },
+++        {
+++          "index": 71,
+++          "full": 1
+++        },
+++        {
+++          "index": 72,
+++          "full": 1
+++        },
+++        {
+++          "index": 73,
+++          "full": 0
+++        },
+++        {
+++          "index": 74,
+++          "full": 2
+++        },
+++        {
+++          "index": 75,
+++          "full": 1
+++        },
+++        {
+++          "index": 76,
+++          "full": 0
+++        },
+++        {
+++          "index": 77,
+++          "full": 1
+++        }
+++      ],
+++      "tested": 4,
+++      "protectedRejected": 0,
+++      "variants": [
+++        {
+++          "meta": {
+++            "strategy": "full-gate-directed-v1",
+++            "target": {
+++              "r": 6,
+++              "c": 2,
+++              "color": 32,
+++              "before": 11,
+++              "after": 17,
+++              "delta": 6
+++            },
+++            "donors": [
+++              {
+++                "r": 5,
+++                "c": 7,
+++                "delta": -1,
+++                "estimatedNewFullRisk": 0
+++              },
+++              {
+++                "r": 6,
+++                "c": 0,
+++                "delta": -5,
+++                "estimatedNewFullRisk": 0
+++              }
+++            ],
+++            "diagnosis": {
+++              "highFullHits": 29,
+++              "maxDeltaAtOtherSteps": 45
+++            },
+++            "capRange": [
+++              13,
+++              19
+++            ]
+++          },
+++          "ms": 736,
+++          "after": {
+++            "valid": true,
+++            "struct": false,
+++            "gateReasons": [
+++              "吃满中位 4>3"
+++            ],
+++            "gateDistance": 10,
+++            "freeLowPct": 27,
+++            "freeRunMax": 6,
+++            "selectMedian": 8,
+++            "fullMedian2": 4,
+++            "pressurePct3": 55,
+++            "capacity": {
+++              "conserved": true,
+++              "boardFloorPass": true,
+++              "aboveMax": 0,
+++              "belowMin": 20
+++            }
+++          },
+++          "hash": "f00eb7ee79b1dac0cf0a4b7e74ea8c05f14e07d6c5cfda4cc8d084fc8ecc9b17"
+++        },
+++        {
+++          "meta": {
+++            "strategy": "full-gate-directed-v1",
+++            "target": {
+++              "r": 7,
+++              "c": 0,
+++              "color": 28,
+++              "before": 12,
+++              "after": 15,
+++              "delta": 3
+++            },
+++            "donors": [
+++              {
+++                "r": 7,
+++                "c": 9,
+++                "delta": -2,
+++                "estimatedNewFullRisk": 0
+++              },
+++              {
+++                "r": 8,
+++                "c": 1,
+++                "delta": -1,
+++                "estimatedNewFullRisk": 0
+++              }
+++            ],
+++            "diagnosis": {
+++              "highFullHits": 25,
+++              "maxDeltaAtOtherSteps": 34
+++            },
+++            "capRange": [
+++              13,
+++              19
+++            ]
+++          },
+++          "ms": 786,
+++          "after": {
+++            "valid": true,
+++            "struct": false,
+++            "gateReasons": [
+++              "吃满中位 4>3"
+++            ],
+++            "gateDistance": 10,
+++            "freeLowPct": 27,
+++            "freeRunMax": 5,
+++            "selectMedian": 8,
+++            "fullMedian2": 4,
+++            "pressurePct3": 58,
+++            "capacity": {
+++              "conserved": true,
+++              "boardFloorPass": true,
+++              "aboveMax": 0,
+++              "belowMin": 20
+++            }
+++          },
+++          "hash": "862f19be4a713a25ca6782b03e15ca07b0f0a80c30078c1b64f481d175fa33b5"
+++        },
+++        {
+++          "meta": {
+++            "strategy": "full-gate-directed-v1",
+++            "target": {
+++              "r": 6,
+++              "c": 4,
+++              "color": 32,
+++              "before": 11,
+++              "after": 17,
+++              "delta": 6
+++            },
+++            "donors": [
+++              {
+++                "r": 5,
+++                "c": 7,
+++                "delta": -1,
+++                "estimatedNewFullRisk": 0
+++              },
+++              {
+++                "r": 6,
+++                "c": 0,
+++                "delta": -5,
+++                "estimatedNewFullRisk": 0
+++              }
+++            ],
+++            "diagnosis": {
+++              "highFullHits": 17,
+++              "maxDeltaAtOtherSteps": 37
+++            },
+++            "capRange": [
+++              13,
+++              19
+++            ]
+++          },
+++          "ms": 766,
+++          "after": {
+++            "valid": true,
+++            "struct": false,
+++            "gateReasons": [
+++              "吃满中位 4>3"
+++            ],
+++            "gateDistance": 10,
+++            "freeLowPct": 26,
+++            "freeRunMax": 5,
+++            "selectMedian": 8,
+++            "fullMedian2": 4,
+++            "pressurePct3": 59,
+++            "capacity": {
+++              "conserved": true,
+++              "boardFloorPass": true,
+++              "aboveMax": 0,
+++              "belowMin": 20
+++            }
+++          },
+++          "hash": "e3730293acc8dbc5b58f8cac349d22c987ba4e64b99bb7445d721d8048d6fe58"
+++        },
+++        {
+++          "meta": {
+++            "strategy": "full-gate-directed-v1",
+++            "target": {
+++              "r": 4,
+++              "c": 6,
+++              "color": 1,
+++              "before": 10,
+++              "after": 16,
+++              "delta": 6
+++            },
+++            "donors": [
+++              {
+++                "r": 8,
+++                "c": 6,
+++                "delta": -6,
+++                "estimatedNewFullRisk": 0
+++              }
+++            ],
+++            "diagnosis": {
+++              "highFullHits": 15,
+++              "maxDeltaAtOtherSteps": 31
+++            },
+++            "capRange": [
+++              13,
+++              19
+++            ]
+++          },
+++          "ms": 776,
+++          "after": {
+++            "valid": true,
+++            "struct": false,
+++            "gateReasons": [
+++              "吃满中位 4>3"
+++            ],
+++            "gateDistance": 10,
+++            "freeLowPct": 28,
+++            "freeRunMax": 5,
+++            "selectMedian": 8,
+++            "fullMedian2": 4,
+++            "pressurePct3": 56,
+++            "capacity": {
+++              "conserved": true,
+++              "boardFloorPass": true,
+++              "aboveMax": 0,
+++              "belowMin": 20
+++            }
+++          },
+++          "hash": "23bc8123d2e7ccbcffc6a6ad108d2902575850699f3ffe81c6155afd2c4b6414"
+++        }
+++      ],
+++      "best": {
+++        "meta": {
+++          "strategy": "full-gate-directed-v1",
+++          "target": {
+++            "r": 6,
+++            "c": 2,
+++            "color": 32,
+++            "before": 11,
+++            "after": 17,
+++            "delta": 6
+++          },
+++          "donors": [
+++            {
+++              "r": 5,
+++              "c": 7,
+++              "delta": -1,
+++              "estimatedNewFullRisk": 0
+++            },
+++            {
+++              "r": 6,
+++              "c": 0,
+++              "delta": -5,
+++              "estimatedNewFullRisk": 0
+++            }
+++          ],
+++          "diagnosis": {
+++            "highFullHits": 29,
+++            "maxDeltaAtOtherSteps": 45
+++          },
+++          "capRange": [
+++            13,
+++            19
+++          ]
+++        },
+++        "ms": 736,
+++        "after": {
+++          "valid": true,
+++          "struct": false,
+++          "gateReasons": [
+++            "吃满中位 4>3"
+++          ],
+++          "gateDistance": 10,
+++          "freeLowPct": 27,
+++          "freeRunMax": 6,
+++          "selectMedian": 8,
+++          "fullMedian2": 4,
+++          "pressurePct3": 55,
+++          "capacity": {
+++            "conserved": true,
+++            "boardFloorPass": true,
+++            "aboveMax": 0,
+++            "belowMin": 20
+++          }
+++        },
+++        "hash": "f00eb7ee79b1dac0cf0a4b7e74ea8c05f14e07d6c5cfda4cc8d084fc8ecc9b17"
+++      },
+++      "elapsedMs": 4242
+++    }
+++  ]
+++}
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\351\242\204\347\231\273\350\256\260_v519.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\351\242\204\347\231\273\350\256\260_v519.md"
++new file mode 100644
++index 0000000..5942679
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\351\242\204\347\231\273\350\256\260_v519.md"
++@@ -0,0 +1,24 @@
+++# 吃满门定向容量精调 · v519预登记
+++
+++> Kimi。基线：v518提交 `076629d`。本实验不接默认生产，不修改门槛，不继续通用debt排序的第三阶段。
+++
+++## 唯一变量与原理
+++
+++- 唯一变量：候选车的定位方式由通用债务/解锁评分，改为参考路线高吃满步骤的反事实定位；仍使用同色容量转移与原有±px守恒规则。
+++- 对当前可吃满车，`deltaToPartial = 当前可消同色像素 - 车容量 + 1`，即至少增加这些px才会变成部分装载。
+++- 对当前未吃满的同色donor，`newFullRisk = max(0, 移出px - (车容量 - 当前可消像素) + 1)`，估计它是否重新变成吃满车。
+++- 优先覆盖多个高吃满步骤、最小越界px和低donor反作用；每个候选仍完整重解，静态估计只负责排序，不代替验证。
+++
+++## 样本、预算与保护
+++
+++- 首要样本：v518推荐图32677近失变体，只吃满中位4>3，完整体验已通过。
+++- 单基底20秒、最多32个变体、最多8辆目标车；只试诊断计算出的最小正delta，不扫描无关±2/±4。
+++- 必须保持可解、每色守恒、障碍签名、棋盘≥6、aboveMax=0、belowMin不增加。
+++- 结构通过后再跑完整体验与多路线验收；结构或体验任一失败均不算转化。
+++
+++## 通过、否决与后续
+++
+++- 通过：至少1个变体同时结构pass、完整体验或已验证替代路线pass、保护全过，才允许在独立失败样本和保护样本复核。
+++- 否决：0转化则记录“吃满门不是当前容量转移可独立修复”，不再加时长；下一步分析车序/门槛口径，而非放宽门。
+++- 仅中位数下降、体验74.5%或单一静态delta正确均不算成功。
+++
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++index 3f4aaef..46374ed 100644
++--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++@@ -47,6 +47,7 @@
++ | v517 预检混合切法 | review该选layer还是expose | 单臂各1/6且成功互补；独立seed混合2/6，结构不变；expose不推荐默认 | `预检切法分派_预登记_v517.md` + `预检切法分派_汇总_v517.json` | §507 |
++ | v518 结构近失容量精调 | 通用关键车±px能否修推荐图结构门 | ❌ 两轮各21变体0结构转化；首个±1px修freeLow/免费连且体验74.5%，仍吃满中位4>3；不串第三阶段、不投产 | `结构容量精调_预登记_v518.md` + 两份结果JSON + 近失复核JSON | §508 |
++ | v518 模拟器尺寸容错 | 内部level缺rows/cols是否会污染ring | ✅ 修复createState/outsideReachSeed/ring/floodFill；正常关10/10同解，缺尺寸/交替缓存回归通过 | `模拟器尺寸回归_v518.js` + `模拟器正常关卡对照_v518.json` | §508 |
+++| v519 吃满门定向容量 | 按高吃满步骤和donor风险能否修最后结构门 | ❌ 可行4变体0转化；另4项受capMax/donor余量拒绝；minDelta跨状态不足，停止容量搜索，转门槛口径校准 | `吃满门定向容量精调_预登记_v519.md` + `吃满门定向容量精调_近失_v519.json` | §509 |
++ 
++ ## 当前权威产物
++ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203.js"
+new file mode 100644
+index 0000000..2f4df31
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203.js"
+@@ -0,0 +1,133 @@
++#!/usr/bin/env node
++/** v519只读实验：按高吃满步骤定位最小partialdelta，并估计donor新增吃满风险。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js'];
++function opt(n, d) { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; }
++const budget = +opt('budget', '20000'), out = opt('out', ''), maxVariants = +opt('variants', '32');
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb);
++for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++let generatorSource = fs.readFileSync(path.join(BIN, 'generator.js'), 'utf8');
++generatorSource = generatorSource.replace('evaluateLevel: evaluateLevel, trapPostProcess:', 'choiceCurve: choiceCurve, exposedBlobByColor: exposedBlobByColor, evaluateLevel: evaluateLevel, trapPostProcess:');
++vm.runInContext(generatorSource, sb, { filename: 'generator-instrumented.js' });
++const A = sb.AntSolver, G = A.Generator, S = A.Simulator;
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function cand(level, ev, cfg) { return { level, valid: !!(ev && ev.valid), solveResult: ev && ev.solveResult, audit: ev && ev.audit, goodV3: ev && ev.goodV3, config: cfg }; }
++function measure(level, ev, cfg) {
++  const c = cand(level, ev, cfg), q = A.Quality.fromGeneration(c), fc = c.goodV3 && c.goodV3.fillCurve || {}, ca = A.Quality.capacityEvidence(level, cfg);
++  return { valid: c.valid, struct: G.goalStructPass(c), gateReasons: q.gateReasons || [], gateDistance: q.gateDistance,
++    freeLowPct: fc.freeLowPct, freeRunMax: fc.freeRunMax, selectMedian: fc.selectMedian, fullMedian2: fc.fullMedian2, pressurePct3: fc.pressurePct3,
++    capacity: { conserved: ca.conserved, boardFloorPass: ca.boardFloorPass, aboveMax: ca.aboveMax, belowMin: ca.belowMin } };
++}
++function protectedOk(m, b) { return m.valid && m.capacity.conserved && m.capacity.boardFloorPass && m.capacity.aboveMax === 0 && m.capacity.belowMin <= b.capacity.belowMin; }
++function better(a, b) {
++  if (!b) return true;
++  if (!!a.struct !== !!b.struct) return a.struct;
++  if (a.gateReasons.length !== b.gateReasons.length) return a.gateReasons.length < b.gateReasons.length;
++  return (a.gateDistance == null ? 1e9 : a.gateDistance) < (b.gateDistance == null ? 1e9 : b.gateDistance);
++}
++/** 与choiceCurve共用同一状态、同一exposedBlob函数，只增加反事实诊断，不改游戏规则。 */
++function diagnose(level, route) {
++  const st = S.createState(level, { useSlotStart: true }), order = route.pickOrder.slice().sort((a, b) => (a.step || 0) - (b.step || 0));
++  const stats = {}, steps = [];
++  function stat(m, exposed, full, stepIndex) {
++    const key = m.r + ',' + m.c;
++    if (!stats[key]) stats[key] = { r: m.r, c: m.c, color: m.color, count: m.count, highFullHits: 0, minDelta: Infinity, maxDelta: 0, donorRisk: {}, appearances: 0 };
++    const x = stats[key]; x.appearances++;
++    if (full) {
++      const delta = Math.max(1, exposed - m.count + 1);
++      if (steps[stepIndex].full >= 4) { x.highFullHits++; x.minDelta = Math.min(x.minDelta, delta); x.maxDelta = Math.max(x.maxDelta, delta); }
++    } else {
++      // 当前count>exposed；移出超过count-exposed-1才会重新成为full。
++      const margin = m.count - exposed;
++      for (let d = 1; d <= 4; d++) x.donorRisk[d] = (x.donorRisk[d] || 0) + Math.max(0, d - margin + 1);
++    }
++  }
++  for (let i = 0; i < order.length; i++) {
++    const p = order[i]; if (p.chainIndex > 0) continue;
++    const blob = G.exposedBlobByColor(st.eliminated, st.blocks, st.rows, st.cols), moves = S.listMoves(st).filter(m => !m.blocked);
++    const step = { index: steps.length, full: 0, moves: [] }; steps.push(step);
++    for (const m of moves) {
++      const cell = st.cells[m.r] && st.cells[m.r][m.c]; if (!cell) continue;
++      const exposed = blob[cell.color] || 0, full = exposed >= cell.count;
++      if (full) step.full++;
++      step.moves.push({ r: m.r, c: m.c, color: cell.color, count: cell.count, exposed, full });
++    }
++    // stat需要看到本步full总数，因此先收集完整step再记贡献。
++    for (const m of step.moves) stat(m, m.exposed, m.full, step.index);
++    if (!S.applyPick(st, p.r, p.c) || st.gameOver) break;
++  }
++  const targets = Object.values(stats).filter(x => x.highFullHits > 0 && isFinite(x.minDelta)).map(x => ({
++    r: x.r, c: x.c, color: x.color, count: x.count, highFullHits: x.highFullHits,
++    delta: x.minDelta, maxDelta: x.maxDelta, appearances: x.appearances
++  })).sort((a, b) => b.highFullHits - a.highFullHits || a.delta - b.delta || a.r - b.r || a.c - b.c);
++  return { steps, stats, targets };
++}
++function makeVariants(level, route, capMin, capMax) {
++  const d = diagnose(level, route), variants = [], rejected = [];
++  for (const target of d.targets.slice(0, 8)) {
++    const delta = target.delta;
++    if (!(delta > 0 && delta <= 32)) { rejected.push({ target, reason: 'delta_outside_experiment_bound', delta }); continue; }
++    const cell = level.board.cells[target.r][target.c];
++    if (cell.count + delta > capMax) { rejected.push({ target, reason: 'target_above_user_max', delta }); continue; }
++    const donors = [];
++    for (let r = 0; r < level.board.rows; r++) for (let c = 0; c < level.board.cols; c++) {
++      if (r === target.r && c === target.c) continue;
++      const x = level.board.cells[r][c], key = r + ',' + c, ds = d.stats[key];
++      if (!x || x.t !== 'box' || x.q || x.color !== cell.color) continue;
++      const slack = x.count - capMin;
++      if (slack > 0) donors.push({ r, c, slack, take: 0, appearances: ds && ds.appearances || 0,
++        riskAt: function (n) { return n > 0 ? (ds && ds.donorRisk[n] || 0) : 0; } });
++    }
++    // 与原transfer一样允许多donor；区别仅是逐px选择新增吃满风险最低者。
++    for (let moved = 0; moved < delta; moved++) {
++      const available = donors.filter(d => d.take < d.slack);
++      if (!available.length) break;
++      available.sort((a, b) => (a.riskAt(a.take + 1) - a.riskAt(a.take)) - (b.riskAt(b.take + 1) - b.riskAt(b.take)) ||
++        b.appearances - a.appearances || b.slack - a.slack || a.r - b.r || a.c - b.c);
++      available[0].take++;
++    }
++    const moved = donors.reduce((n, d) => n + d.take, 0);
++    if (moved !== delta) { rejected.push({ target, reason: 'insufficient_multi_donor_slack', delta, available: moved }); continue; }
++    const lv = JSON.parse(JSON.stringify(level)), tc = lv.board.cells[target.r][target.c];
++    tc.count += delta;
++    const donorMeta = [];
++    for (const d of donors) if (d.take > 0) {
++      lv.board.cells[d.r][d.c].count -= d.take;
++      donorMeta.push({ r: d.r, c: d.c, delta: -d.take, estimatedNewFullRisk: d.riskAt(d.take) });
++    }
++    const v = { level: lv, meta: { strategy: 'full-gate-directed-v1', target: { r: target.r, c: target.c, color: target.color, before: target.count, after: tc.count, delta },
++      donors: donorMeta,
++      diagnosis: { highFullHits: target.highFullHits, maxDeltaAtOtherSteps: target.maxDelta }, capRange: [capMin, capMax] } };
++    if (hash(A.CapacityTuner.sumByColor(lv)) !== hash(A.CapacityTuner.sumByColor(level))) { rejected.push({ target, reason: 'conservation_check_failed' }); continue; }
++    variants.push(v);
++  }
++  return { variants, rejected, targets: d.targets, steps: d.steps.map(s => ({ index: s.index, full: s.full })) };
++}
++const report = JSON.parse(fs.readFileSync(path.join(__dirname, '独立回归_32677_v516.json'), 'utf8')), rr = report.rows.find(x => x.image === 'recommend');
++const level = A.parseLevel(JSON.parse(fs.readFileSync(path.join(__dirname, '推荐32677_近失变体_v518.json'), 'utf8')));
++const cfg = Object.assign({}, G.DEFAULT_CONFIG, { trapEvalMs: 1500, boxSizeMin: rr.capacity.boxSizeMin, boxSizeMax: rr.capacity.boxSizeMax, capNormMin: rr.capacity.boxSizeMin, capNormMax: rr.capacity.boxSizeMax });
++const t0 = Date.now(), sr = A.Solver.solve(level, { timeBudgetMs: 1500, capturePreviewStats: true }), ev0 = G.evaluateLevel(level, cfg), base = measure(level, ev0, cfg);
++const made = makeVariants(level, sr, cfg.boxSizeMin, cfg.boxSizeMax), rec = { id: 'recommend_32677_near', baseHash: hash(level), capRange: [cfg.boxSizeMin, cfg.boxSizeMax], base,
++  diagnosticTargets: made.targets, rejected: made.rejected, fullCurve: made.steps, tested: 0, protectedRejected: 0, variants: [], best: null };
++for (const v of made.variants) {
++  if (rec.tested >= maxVariants || Date.now() - t0 >= budget) { rec.stopped = rec.tested >= maxVariants ? 'variant_cap' : 'budget_exhausted'; break; }
++  const t = Date.now(), ev = G.evaluateLevel(v.level, cfg), m = measure(v.level, ev, cfg), row = { meta: v.meta, ms: Date.now() - t, after: m, hash: hash(v.level) };
++  rec.tested++; rec.variants.push(row);
++  if (!protectedOk(m, base)) { rec.protectedRejected++; continue; }
++  if (better(m, rec.best && rec.best.after)) rec.best = row;
++  if (m.struct) {
++    const full = A.ExperienceGoal.evaluate(v.level, { solveResult: ev.solveResult, decision: true });
++    row.experienceFull = full && { pass: full.pass, status: full.status, reasons: full.reasons, metrics: full.metrics, release: full.releaseDecision && full.releaseDecision.status };
++    const cc = cand(v.level, ev, cfg); G.attachExperienceRouteEvidence(cc, cfg); row.route = cc.experienceRouteEvidence;
++    if (full && full.pass || cc.experienceRouteEvidence && cc.experienceRouteEvidence.pass) { row.converted = true; rec.converted = row; break; }
++  }
++}
++rec.elapsedMs = Date.now() - t0;
++const result = { schema: 'full-gate-directed-capacity-v1', date: '2026-10-26', baseCommit: '076629d', budgetMs: budget, maxVariants, summary: {
++  tested: rec.tested, generated: made.variants.length, rejected: made.rejected.length, structPasses: rec.variants.filter(v => v.after.struct).length,
++  conversions: rec.converted ? 1 : 0, protectedRejected: rec.protectedRejected, elapsedMs: rec.elapsedMs, stopped: rec.stopped || (rec.converted ? 'converted' : 'exhausted') }, rows: [rec] };
++if (out) fs.writeFileSync(path.resolve(ROOT, out), JSON.stringify(result, null, 2) + '\n');
++console.log(JSON.stringify({ summary: result.summary, base, targets: made.targets.slice(0, 8), best: rec.best && { meta: rec.best.meta, after: rec.best.after }, converted: rec.converted && { meta: rec.converted.meta, after: rec.converted.after, experience: rec.converted.experienceFull } }, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\350\277\221\345\244\261_v519.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\350\277\221\345\244\261_v519.json"
+new file mode 100644
+index 0000000..ec122b1
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\350\277\221\345\244\261_v519.json"
+@@ -0,0 +1,1301 @@
++{
++  "schema": "full-gate-directed-capacity-v1",
++  "date": "2026-10-26",
++  "baseCommit": "076629d",
++  "budgetMs": 20000,
++  "maxVariants": 32,
++  "summary": {
++    "tested": 4,
++    "generated": 4,
++    "rejected": 4,
++    "structPasses": 0,
++    "conversions": 0,
++    "protectedRejected": 0,
++    "elapsedMs": 4242,
++    "stopped": "exhausted"
++  },
++  "rows": [
++    {
++      "id": "recommend_32677_near",
++      "baseHash": "7b552187828ad2e23cd31130dbceaffdcbc301d3c360aedcbb99a0805fca0b94",
++      "capRange": [
++        13,
++        19
++      ],
++      "base": {
++        "valid": true,
++        "struct": false,
++        "gateReasons": [
++          "吃满中位 4>3"
++        ],
++        "gateDistance": 10,
++        "freeLowPct": 27,
++        "freeRunMax": 5,
++        "selectMedian": 8,
++        "fullMedian2": 4,
++        "pressurePct3": 58,
++        "capacity": {
++          "conserved": true,
++          "boardFloorPass": true,
++          "aboveMax": 0,
++          "belowMin": 21
++        }
++      },
++      "diagnosticTargets": [
++        {
++          "r": 7,
++          "c": 2,
++          "color": 30,
++          "count": 10,
++          "highFullHits": 34,
++          "delta": 7,
++          "maxDelta": 34,
++          "appearances": 36
++        },
++        {
++          "r": 6,
++          "c": 2,
++          "color": 32,
++          "count": 11,
++          "highFullHits": 29,
++          "delta": 6,
++          "maxDelta": 45,
++          "appearances": 31
++        },
++        {
++          "r": 7,
++          "c": 4,
++          "color": 30,
++          "count": 10,
++          "highFullHits": 28,
++          "delta": 7,
++          "maxDelta": 34,
++          "appearances": 34
++        },
++        {
++          "r": 7,
++          "c": 0,
++          "color": 28,
++          "count": 12,
++          "highFullHits": 25,
++          "delta": 3,
++          "maxDelta": 34,
++          "appearances": 25
++        },
++        {
++          "r": 8,
++          "c": 7,
++          "color": 30,
++          "count": 11,
++          "highFullHits": 21,
++          "delta": 19,
++          "maxDelta": 33,
++          "appearances": 21
++        },
++        {
++          "r": 6,
++          "c": 4,
++          "color": 32,
++          "count": 11,
++          "highFullHits": 17,
++          "delta": 6,
++          "maxDelta": 37,
++          "appearances": 33
++        },
++        {
++          "r": 4,
++          "c": 6,
++          "color": 1,
++          "count": 10,
++          "highFullHits": 15,
++          "delta": 6,
++          "maxDelta": 31,
++          "appearances": 16
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "color": 26,
++          "count": 11,
++          "highFullHits": 9,
++          "delta": 13,
++          "maxDelta": 14,
++          "appearances": 9
++        },
++        {
++          "r": 6,
++          "c": 8,
++          "color": 28,
++          "count": 12,
++          "highFullHits": 8,
++          "delta": 16,
++          "maxDelta": 26,
++          "appearances": 8
++        },
++        {
++          "r": 0,
++          "c": 9,
++          "color": 5,
++          "count": 14,
++          "highFullHits": 5,
++          "delta": 5,
++          "maxDelta": 9,
++          "appearances": 8
++        },
++        {
++          "r": 0,
++          "c": 4,
++          "color": 19,
++          "count": 11,
++          "highFullHits": 5,
++          "delta": 7,
++          "maxDelta": 13,
++          "appearances": 20
++        },
++        {
++          "r": 6,
++          "c": 6,
++          "color": 32,
++          "count": 13,
++          "highFullHits": 5,
++          "delta": 35,
++          "maxDelta": 35,
++          "appearances": 5
++        },
++        {
++          "r": 2,
++          "c": 4,
++          "color": 19,
++          "count": 15,
++          "highFullHits": 4,
++          "delta": 1,
++          "maxDelta": 5,
++          "appearances": 53
++        },
++        {
++          "r": 7,
++          "c": 7,
++          "color": 27,
++          "count": 15,
++          "highFullHits": 4,
++          "delta": 2,
++          "maxDelta": 7,
++          "appearances": 16
++        },
++        {
++          "r": 7,
++          "c": 5,
++          "color": 27,
++          "count": 16,
++          "highFullHits": 4,
++          "delta": 6,
++          "maxDelta": 6,
++          "appearances": 5
++        },
++        {
++          "r": 1,
++          "c": 6,
++          "color": 5,
++          "count": 13,
++          "highFullHits": 3,
++          "delta": 3,
++          "maxDelta": 6,
++          "appearances": 13
++        },
++        {
++          "r": 1,
++          "c": 5,
++          "color": 19,
++          "count": 13,
++          "highFullHits": 3,
++          "delta": 5,
++          "maxDelta": 7,
++          "appearances": 20
++        },
++        {
++          "r": 3,
++          "c": 9,
++          "color": 14,
++          "count": 12,
++          "highFullHits": 3,
++          "delta": 5,
++          "maxDelta": 19,
++          "appearances": 3
++        },
++        {
++          "r": 0,
++          "c": 5,
++          "color": 5,
++          "count": 14,
++          "highFullHits": 3,
++          "delta": 9,
++          "maxDelta": 9,
++          "appearances": 3
++        },
++        {
++          "r": 0,
++          "c": 8,
++          "color": 14,
++          "count": 14,
++          "highFullHits": 3,
++          "delta": 12,
++          "maxDelta": 22,
++          "appearances": 5
++        },
++        {
++          "r": 0,
++          "c": 7,
++          "color": 14,
++          "count": 13,
++          "highFullHits": 3,
++          "delta": 13,
++          "maxDelta": 23,
++          "appearances": 6
++        },
++        {
++          "r": 8,
++          "c": 2,
++          "color": 27,
++          "count": 14,
++          "highFullHits": 3,
++          "delta": 29,
++          "maxDelta": 43,
++          "appearances": 3
++        },
++        {
++          "r": 7,
++          "c": 9,
++          "color": 28,
++          "count": 15,
++          "highFullHits": 2,
++          "delta": 1,
++          "maxDelta": 1,
++          "appearances": 2
++        },
++        {
++          "r": 0,
++          "c": 6,
++          "color": 26,
++          "count": 14,
++          "highFullHits": 2,
++          "delta": 2,
++          "maxDelta": 14,
++          "appearances": 4
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 19,
++          "count": 16,
++          "highFullHits": 2,
++          "delta": 2,
++          "maxDelta": 4,
++          "appearances": 6
++        },
++        {
++          "r": 1,
++          "c": 3,
++          "color": 19,
++          "count": 15,
++          "highFullHits": 2,
++          "delta": 3,
++          "maxDelta": 9,
++          "appearances": 6
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "color": 33,
++          "count": 16,
++          "highFullHits": 2,
++          "delta": 5,
++          "maxDelta": 17,
++          "appearances": 10
++        },
++        {
++          "r": 4,
++          "c": 9,
++          "color": 15,
++          "count": 15,
++          "highFullHits": 2,
++          "delta": 9,
++          "maxDelta": 14,
++          "appearances": 2
++        },
++        {
++          "r": 2,
++          "c": 8,
++          "color": 14,
++          "count": 14,
++          "highFullHits": 2,
++          "delta": 16,
++          "maxDelta": 17,
++          "appearances": 2
++        },
++        {
++          "r": 8,
++          "c": 1,
++          "color": 28,
++          "count": 15,
++          "highFullHits": 2,
++          "delta": 30,
++          "maxDelta": 31,
++          "appearances": 2
++        },
++        {
++          "r": 8,
++          "c": 0,
++          "color": 27,
++          "count": 14,
++          "highFullHits": 2,
++          "delta": 33,
++          "maxDelta": 43,
++          "appearances": 2
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "color": 19,
++          "count": 15,
++          "highFullHits": 1,
++          "delta": 1,
++          "maxDelta": 1,
++          "appearances": 5
++        },
++        {
++          "r": 2,
++          "c": 9,
++          "color": 33,
++          "count": 13,
++          "highFullHits": 1,
++          "delta": 1,
++          "maxDelta": 1,
++          "appearances": 46
++        },
++        {
++          "r": 7,
++          "c": 3,
++          "color": 31,
++          "count": 19,
++          "highFullHits": 1,
++          "delta": 1,
++          "maxDelta": 1,
++          "appearances": 5
++        },
++        {
++          "r": 7,
++          "c": 8,
++          "color": 27,
++          "count": 15,
++          "highFullHits": 1,
++          "delta": 2,
++          "maxDelta": 2,
++          "appearances": 19
++        },
++        {
++          "r": 5,
++          "c": 9,
++          "color": 31,
++          "count": 16,
++          "highFullHits": 1,
++          "delta": 3,
++          "maxDelta": 3,
++          "appearances": 9
++        },
++        {
++          "r": 0,
++          "c": 1,
++          "color": 33,
++          "count": 19,
++          "highFullHits": 1,
++          "delta": 5,
++          "maxDelta": 5,
++          "appearances": 1
++        },
++        {
++          "r": 0,
++          "c": 2,
++          "color": 19,
++          "count": 19,
++          "highFullHits": 1,
++          "delta": 5,
++          "maxDelta": 5,
++          "appearances": 1
++        },
++        {
++          "r": 1,
++          "c": 4,
++          "color": 5,
++          "count": 13,
++          "highFullHits": 1,
++          "delta": 6,
++          "maxDelta": 6,
++          "appearances": 4
++        },
++        {
++          "r": 2,
++          "c": 3,
++          "color": 14,
++          "count": 12,
++          "highFullHits": 1,
++          "delta": 6,
++          "maxDelta": 6,
++          "appearances": 2
++        },
++        {
++          "r": 5,
++          "c": 6,
++          "color": 31,
++          "count": 11,
++          "highFullHits": 1,
++          "delta": 8,
++          "maxDelta": 8,
++          "appearances": 29
++        },
++        {
++          "r": 6,
++          "c": 7,
++          "color": 13,
++          "count": 17,
++          "highFullHits": 1,
++          "delta": 8,
++          "maxDelta": 8,
++          "appearances": 1
++        },
++        {
++          "r": 0,
++          "c": 3,
++          "color": 26,
++          "count": 15,
++          "highFullHits": 1,
++          "delta": 13,
++          "maxDelta": 13,
++          "appearances": 1
++        },
++        {
++          "r": 5,
++          "c": 3,
++          "color": 15,
++          "count": 16,
++          "highFullHits": 1,
++          "delta": 15,
++          "maxDelta": 15,
++          "appearances": 1
++        },
++        {
++          "r": 5,
++          "c": 5,
++          "color": 15,
++          "count": 16,
++          "highFullHits": 1,
++          "delta": 15,
++          "maxDelta": 15,
++          "appearances": 9
++        },
++        {
++          "r": 8,
++          "c": 4,
++          "color": 27,
++          "count": 15,
++          "highFullHits": 1,
++          "delta": 15,
++          "maxDelta": 15,
++          "appearances": 1
++        },
++        {
++          "r": 8,
++          "c": 5,
++          "color": 28,
++          "count": 14,
++          "highFullHits": 1,
++          "delta": 15,
++          "maxDelta": 15,
++          "appearances": 1
++        },
++        {
++          "r": 8,
++          "c": 8,
++          "color": 1,
++          "count": 18,
++          "highFullHits": 1,
++          "delta": 16,
++          "maxDelta": 16,
++          "appearances": 1
++        },
++        {
++          "r": 5,
++          "c": 7,
++          "color": 32,
++          "count": 18,
++          "highFullHits": 1,
++          "delta": 17,
++          "maxDelta": 17,
++          "appearances": 1
++        },
++        {
++          "r": 8,
++          "c": 9,
++          "color": 30,
++          "count": 16,
++          "highFullHits": 1,
++          "delta": 17,
++          "maxDelta": 17,
++          "appearances": 1
++        },
++        {
++          "r": 4,
++          "c": 7,
++          "color": 15,
++          "count": 17,
++          "highFullHits": 1,
++          "delta": 24,
++          "maxDelta": 24,
++          "appearances": 1
++        },
++        {
++          "r": 6,
++          "c": 5,
++          "color": 13,
++          "count": 17,
++          "highFullHits": 1,
++          "delta": 25,
++          "maxDelta": 25,
++          "appearances": 1
++        },
++        {
++          "r": 3,
++          "c": 8,
++          "color": 1,
++          "count": 15,
++          "highFullHits": 1,
++          "delta": 26,
++          "maxDelta": 26,
++          "appearances": 1
++        },
++        {
++          "r": 8,
++          "c": 3,
++          "color": 28,
++          "count": 15,
++          "highFullHits": 1,
++          "delta": 29,
++          "maxDelta": 29,
++          "appearances": 1
++        },
++        {
++          "r": 6,
++          "c": 0,
++          "color": 32,
++          "count": 18,
++          "highFullHits": 1,
++          "delta": 38,
++          "maxDelta": 38,
++          "appearances": 2
++        },
++        {
++          "r": 4,
++          "c": 8,
++          "color": 1,
++          "count": 10,
++          "highFullHits": 1,
++          "delta": 40,
++          "maxDelta": 40,
++          "appearances": 1
++        },
++        {
++          "r": 5,
++          "c": 8,
++          "color": 15,
++          "count": 14,
++          "highFullHits": 1,
++          "delta": 41,
++          "maxDelta": 41,
++          "appearances": 1
++        },
++        {
++          "r": 6,
++          "c": 3,
++          "color": 13,
++          "count": 17,
++          "highFullHits": 1,
++          "delta": 42,
++          "maxDelta": 42,
++          "appearances": 1
++        },
++        {
++          "r": 8,
++          "c": 6,
++          "color": 1,
++          "count": 19,
++          "highFullHits": 1,
++          "delta": 43,
++          "maxDelta": 43,
++          "appearances": 1
++        },
++        {
++          "r": 7,
++          "c": 6,
++          "color": 13,
++          "count": 19,
++          "highFullHits": 1,
++          "delta": 58,
++          "maxDelta": 58,
++          "appearances": 1
++        }
++      ],
++      "rejected": [
++        {
++          "target": {
++            "r": 7,
++            "c": 2,
++            "color": 30,
++            "count": 10,
++            "highFullHits": 34,
++            "delta": 7,
++            "maxDelta": 34,
++            "appearances": 36
++          },
++          "reason": "insufficient_multi_donor_slack",
++          "delta": 7,
++          "available": 3
++        },
++        {
++          "target": {
++            "r": 7,
++            "c": 4,
++            "color": 30,
++            "count": 10,
++            "highFullHits": 28,
++            "delta": 7,
++            "maxDelta": 34,
++            "appearances": 34
++          },
++          "reason": "insufficient_multi_donor_slack",
++          "delta": 7,
++          "available": 3
++        },
++        {
++          "target": {
++            "r": 8,
++            "c": 7,
++            "color": 30,
++            "count": 11,
++            "highFullHits": 21,
++            "delta": 19,
++            "maxDelta": 33,
++            "appearances": 21
++          },
++          "reason": "target_above_user_max",
++          "delta": 19
++        },
++        {
++          "target": {
++            "r": 3,
++            "c": 7,
++            "color": 26,
++            "count": 11,
++            "highFullHits": 9,
++            "delta": 13,
++            "maxDelta": 14,
++            "appearances": 9
++          },
++          "reason": "target_above_user_max",
++          "delta": 13
++        }
++      ],
++      "fullCurve": [
++        {
++          "index": 0,
++          "full": 7
++        },
++        {
++          "index": 1,
++          "full": 8
++        },
++        {
++          "index": 2,
++          "full": 5
++        },
++        {
++          "index": 3,
++          "full": 3
++        },
++        {
++          "index": 4,
++          "full": 2
++        },
++        {
++          "index": 5,
++          "full": 1
++        },
++        {
++          "index": 6,
++          "full": 5
++        },
++        {
++          "index": 7,
++          "full": 4
++        },
++        {
++          "index": 8,
++          "full": 1
++        },
++        {
++          "index": 9,
++          "full": 3
++        },
++        {
++          "index": 10,
++          "full": 2
++        },
++        {
++          "index": 11,
++          "full": 0
++        },
++        {
++          "index": 12,
++          "full": 1
++        },
++        {
++          "index": 13,
++          "full": 5
++        },
++        {
++          "index": 14,
++          "full": 6
++        },
++        {
++          "index": 15,
++          "full": 3
++        },
++        {
++          "index": 16,
++          "full": 3
++        },
++        {
++          "index": 17,
++          "full": 2
++        },
++        {
++          "index": 18,
++          "full": 1
++        },
++        {
++          "index": 19,
++          "full": 0
++        },
++        {
++          "index": 20,
++          "full": 0
++        },
++        {
++          "index": 21,
++          "full": 0
++        },
++        {
++          "index": 22,
++          "full": 0
++        },
++        {
++          "index": 23,
++          "full": 0
++        },
++        {
++          "index": 24,
++          "full": 1
++        },
++        {
++          "index": 25,
++          "full": 1
++        },
++        {
++          "index": 26,
++          "full": 0
++        },
++        {
++          "index": 27,
++          "full": 1
++        },
++        {
++          "index": 28,
++          "full": 2
++        },
++        {
++          "index": 29,
++          "full": 2
++        },
++        {
++          "index": 30,
++          "full": 3
++        },
++        {
++          "index": 31,
++          "full": 5
++        },
++        {
++          "index": 32,
++          "full": 4
++        },
++        {
++          "index": 33,
++          "full": 7
++        },
++        {
++          "index": 34,
++          "full": 5
++        },
++        {
++          "index": 35,
++          "full": 4
++        },
++        {
++          "index": 36,
++          "full": 4
++        },
++        {
++          "index": 37,
++          "full": 4
++        },
++        {
++          "index": 38,
++          "full": 5
++        },
++        {
++          "index": 39,
++          "full": 5
++        },
++        {
++          "index": 40,
++          "full": 7
++        },
++        {
++          "index": 41,
++          "full": 9
++        },
++        {
++          "index": 42,
++          "full": 9
++        },
++        {
++          "index": 43,
++          "full": 9
++        },
++        {
++          "index": 44,
++          "full": 8
++        },
++        {
++          "index": 45,
++          "full": 7
++        },
++        {
++          "index": 46,
++          "full": 7
++        },
++        {
++          "index": 47,
++          "full": 8
++        },
++        {
++          "index": 48,
++          "full": 8
++        },
++        {
++          "index": 49,
++          "full": 9
++        },
++        {
++          "index": 50,
++          "full": 11
++        },
++        {
++          "index": 51,
++          "full": 12
++        },
++        {
++          "index": 52,
++          "full": 11
++        },
++        {
++          "index": 53,
++          "full": 10
++        },
++        {
++          "index": 54,
++          "full": 9
++        },
++        {
++          "index": 55,
++          "full": 8
++        },
++        {
++          "index": 56,
++          "full": 9
++        },
++        {
++          "index": 57,
++          "full": 9
++        },
++        {
++          "index": 58,
++          "full": 7
++        },
++        {
++          "index": 59,
++          "full": 6
++        },
++        {
++          "index": 60,
++          "full": 4
++        },
++        {
++          "index": 61,
++          "full": 4
++        },
++        {
++          "index": 62,
++          "full": 4
++        },
++        {
++          "index": 63,
++          "full": 5
++        },
++        {
++          "index": 64,
++          "full": 4
++        },
++        {
++          "index": 65,
++          "full": 3
++        },
++        {
++          "index": 66,
++          "full": 2
++        },
++        {
++          "index": 67,
++          "full": 2
++        },
++        {
++          "index": 68,
++          "full": 4
++        },
++        {
++          "index": 69,
++          "full": 3
++        },
++        {
++          "index": 70,
++          "full": 2
++        },
++        {
++          "index": 71,
++          "full": 1
++        },
++        {
++          "index": 72,
++          "full": 1
++        },
++        {
++          "index": 73,
++          "full": 0
++        },
++        {
++          "index": 74,
++          "full": 2
++        },
++        {
++          "index": 75,
++          "full": 1
++        },
++        {
++          "index": 76,
++          "full": 0
++        },
++        {
++          "index": 77,
++          "full": 1
++        }
++      ],
++      "tested": 4,
++      "protectedRejected": 0,
++      "variants": [
++        {
++          "meta": {
++            "strategy": "full-gate-directed-v1",
++            "target": {
++              "r": 6,
++              "c": 2,
++              "color": 32,
++              "before": 11,
++              "after": 17,
++              "delta": 6
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 7,
++                "delta": -1,
++                "estimatedNewFullRisk": 0
++              },
++              {
++                "r": 6,
++                "c": 0,
++                "delta": -5,
++                "estimatedNewFullRisk": 0
++              }
++            ],
++            "diagnosis": {
++              "highFullHits": 29,
++              "maxDeltaAtOtherSteps": 45
++            },
++            "capRange": [
++              13,
++              19
++            ]
++          },
++          "ms": 736,
++          "after": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "吃满中位 4>3"
++            ],
++            "gateDistance": 10,
++            "freeLowPct": 27,
++            "freeRunMax": 6,
++            "selectMedian": 8,
++            "fullMedian2": 4,
++            "pressurePct3": 55,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 20
++            }
++          },
++          "hash": "f00eb7ee79b1dac0cf0a4b7e74ea8c05f14e07d6c5cfda4cc8d084fc8ecc9b17"
++        },
++        {
++          "meta": {
++            "strategy": "full-gate-directed-v1",
++            "target": {
++              "r": 7,
++              "c": 0,
++              "color": 28,
++              "before": 12,
++              "after": 15,
++              "delta": 3
++            },
++            "donors": [
++              {
++                "r": 7,
++                "c": 9,
++                "delta": -2,
++                "estimatedNewFullRisk": 0
++              },
++              {
++                "r": 8,
++                "c": 1,
++                "delta": -1,
++                "estimatedNewFullRisk": 0
++              }
++            ],
++            "diagnosis": {
++              "highFullHits": 25,
++              "maxDeltaAtOtherSteps": 34
++            },
++            "capRange": [
++              13,
++              19
++            ]
++          },
++          "ms": 786,
++          "after": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "吃满中位 4>3"
++            ],
++            "gateDistance": 10,
++            "freeLowPct": 27,
++            "freeRunMax": 5,
++            "selectMedian": 8,
++            "fullMedian2": 4,
++            "pressurePct3": 58,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 20
++            }
++          },
++          "hash": "862f19be4a713a25ca6782b03e15ca07b0f0a80c30078c1b64f481d175fa33b5"
++        },
++        {
++          "meta": {
++            "strategy": "full-gate-directed-v1",
++            "target": {
++              "r": 6,
++              "c": 4,
++              "color": 32,
++              "before": 11,
++              "after": 17,
++              "delta": 6
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 7,
++                "delta": -1,
++                "estimatedNewFullRisk": 0
++              },
++              {
++                "r": 6,
++                "c": 0,
++                "delta": -5,
++                "estimatedNewFullRisk": 0
++              }
++            ],
++            "diagnosis": {
++              "highFullHits": 17,
++              "maxDeltaAtOtherSteps": 37
++            },
++            "capRange": [
++              13,
++              19
++            ]
++          },
++          "ms": 766,
++          "after": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "吃满中位 4>3"
++            ],
++            "gateDistance": 10,
++            "freeLowPct": 26,
++            "freeRunMax": 5,
++            "selectMedian": 8,
++            "fullMedian2": 4,
++            "pressurePct3": 59,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 20
++            }
++          },
++          "hash": "e3730293acc8dbc5b58f8cac349d22c987ba4e64b99bb7445d721d8048d6fe58"
++        },
++        {
++          "meta": {
++            "strategy": "full-gate-directed-v1",
++            "target": {
++              "r": 4,
++              "c": 6,
++              "color": 1,
++              "before": 10,
++              "after": 16,
++              "delta": 6
++            },
++            "donors": [
++              {
++                "r": 8,
++                "c": 6,
++                "delta": -6,
++                "estimatedNewFullRisk": 0
++              }
++            ],
++            "diagnosis": {
++              "highFullHits": 15,
++              "maxDeltaAtOtherSteps": 31
++            },
++            "capRange": [
++              13,
++              19
++            ]
++          },
++          "ms": 776,
++          "after": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "吃满中位 4>3"
++            ],
++            "gateDistance": 10,
++            "freeLowPct": 28,
++            "freeRunMax": 5,
++            "selectMedian": 8,
++            "fullMedian2": 4,
++            "pressurePct3": 56,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 20
++            }
++          },
++          "hash": "23bc8123d2e7ccbcffc6a6ad108d2902575850699f3ffe81c6155afd2c4b6414"
++        }
++      ],
++      "best": {
++        "meta": {
++          "strategy": "full-gate-directed-v1",
++          "target": {
++            "r": 6,
++            "c": 2,
++            "color": 32,
++            "before": 11,
++            "after": 17,
++            "delta": 6
++          },
++          "donors": [
++            {
++              "r": 5,
++              "c": 7,
++              "delta": -1,
++              "estimatedNewFullRisk": 0
++            },
++            {
++              "r": 6,
++              "c": 0,
++              "delta": -5,
++              "estimatedNewFullRisk": 0
++            }
++          ],
++          "diagnosis": {
++            "highFullHits": 29,
++            "maxDeltaAtOtherSteps": 45
++          },
++          "capRange": [
++            13,
++            19
++          ]
++        },
++        "ms": 736,
++        "after": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "吃满中位 4>3"
++          ],
++          "gateDistance": 10,
++          "freeLowPct": 27,
++          "freeRunMax": 6,
++          "selectMedian": 8,
++          "fullMedian2": 4,
++          "pressurePct3": 55,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 20
++          }
++        },
++        "hash": "f00eb7ee79b1dac0cf0a4b7e74ea8c05f14e07d6c5cfda4cc8d084fc8ecc9b17"
++      },
++      "elapsedMs": 4242
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\351\242\204\347\231\273\350\256\260_v519.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\351\242\204\347\231\273\350\256\260_v519.md"
+new file mode 100644
+index 0000000..defcaa1
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\220\203\346\273\241\351\227\250\345\256\232\345\220\221\345\256\271\351\207\217\347\262\276\350\260\203_\351\242\204\347\231\273\350\256\260_v519.md"
+@@ -0,0 +1,23 @@
++# 吃满门定向容量精调 · v519预登记
++
++> Kimi。基线：v518提交 `076629d`。本实验不接默认生产，不修改门槛，不继续通用debt排序的第三阶段。
++
++## 唯一变量与原理
++
++- 唯一变量：候选车的定位方式由通用债务/解锁评分，改为参考路线高吃满步骤的反事实定位；仍使用同色容量转移与原有±px守恒规则。
++- 对当前可吃满车，`deltaToPartial = 当前可消同色像素 - 车容量 + 1`，即至少增加这些px才会变成部分装载。
++- 对当前未吃满的同色donor，`newFullRisk = max(0, 移出px - (车容量 - 当前可消像素) + 1)`，估计它是否重新变成吃满车。
++- 优先覆盖多个高吃满步骤、最小越界px和低donor反作用；每个候选仍完整重解，静态估计只负责排序，不代替验证。
++
++## 样本、预算与保护
++
++- 首要样本：v518推荐图32677近失变体，只吃满中位4>3，完整体验已通过。
++- 单基底20秒、最多32个变体、最多8辆目标车；只试诊断计算出的最小正delta，不扫描无关±2/±4。
++- 必须保持可解、每色守恒、障碍签名、棋盘≥6、aboveMax=0、belowMin不增加。
++- 结构通过后再跑完整体验与多路线验收；结构或体验任一失败均不算转化。
++
++## 通过、否决与后续
++
++- 通过：至少1个变体同时结构pass、完整体验或已验证替代路线pass、保护全过，才允许在独立失败样本和保护样本复核。
++- 否决：0转化则记录“吃满门不是当前容量转移可独立修复”，不再加时长；下一步分析车序/门槛口径，而非放宽门。
++- 仅中位数下降、体验74.5%或单一静态delta正确均不算成功。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 3f4aaef..46374ed 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -47,6 +47,7 @@
+ | v517 预检混合切法 | review该选layer还是expose | 单臂各1/6且成功互补；独立seed混合2/6，结构不变；expose不推荐默认 | `预检切法分派_预登记_v517.md` + `预检切法分派_汇总_v517.json` | §507 |
+ | v518 结构近失容量精调 | 通用关键车±px能否修推荐图结构门 | ❌ 两轮各21变体0结构转化；首个±1px修freeLow/免费连且体验74.5%，仍吃满中位4>3；不串第三阶段、不投产 | `结构容量精调_预登记_v518.md` + 两份结果JSON + 近失复核JSON | §508 |
+ | v518 模拟器尺寸容错 | 内部level缺rows/cols是否会污染ring | ✅ 修复createState/outsideReachSeed/ring/floodFill；正常关10/10同解，缺尺寸/交替缓存回归通过 | `模拟器尺寸回归_v518.js` + `模拟器正常关卡对照_v518.json` | §508 |
++| v519 吃满门定向容量 | 按高吃满步骤和donor风险能否修最后结构门 | ❌ 可行4变体0转化；另4项受capMax/donor余量拒绝；minDelta跨状态不足，停止容量搜索，转门槛口径校准 | `吃满门定向容量精调_预登记_v519.md` + `吃满门定向容量精调_近失_v519.json` | §509 |
+ 
+ ## 当前权威产物
+ 
