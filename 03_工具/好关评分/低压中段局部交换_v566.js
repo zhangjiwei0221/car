@@ -9,10 +9,22 @@ const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const BASE_LEVEL = path.join(__dirname, 'P2P3归因_v566.levels', '010_1002.json');
-const BASE_ROUTE = path.join(__dirname, 'P2P3归因_v566.levels', '010_1002.route.json');
-const OUT = path.join(__dirname, '低压中段局部交换_v566.json');
-const LEVEL_DIR = path.join(__dirname, '低压中段局部交换_v566.levels');
+function arg(name, def) {
+  const prefix = '--' + name + '=';
+  const hit = process.argv.find(x => x.indexOf(prefix) === 0);
+  return hit ? hit.slice(prefix.length) : def;
+}
+const BASE_LEVEL = path.resolve(__dirname, arg('base-level', 'P2P3归因_v566.levels/010_1002.json'));
+const BASE_ROUTE = path.resolve(__dirname, arg('base-route', 'P2P3归因_v566.levels/010_1002.route.json'));
+const OUT = path.resolve(__dirname, arg('out', '低压中段局部交换_v566.json'));
+const LEVEL_DIR = path.resolve(__dirname, arg('levels-dir', '低压中段局部交换_v566.levels'));
+const TARGET_START = parseInt(arg('target-start', '10'), 10);
+const TARGET_END = parseInt(arg('target-end', '15'), 10);
+const DONOR_START = parseInt(arg('donor-start', '16'), 10);
+const DONOR_END = parseInt(arg('donor-end', '22'), 10);
+const CAP_MIN = parseInt(arg('cap-min', '35'), 10);
+const CAP_MAX = parseInt(arg('cap-max', '54'), 10);
+const PREREGISTRATION = arg('preregistration', '低压中段局部交换_预登记_v566.md');
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
@@ -24,10 +36,10 @@ const CFG = {
   ruleMode: 'instantChain',
   instantChain: true,
   bottomOnly: false,
-  boxSizeMin: 35,
-  boxSizeMax: 54,
-  capNormMin: 35,
-  capNormMax: 54,
+  boxSizeMin: CAP_MIN,
+  boxSizeMax: CAP_MAX,
+  capNormMin: CAP_MIN,
+  capNormMax: CAP_MAX,
   boardRowsMin: 6,
   boardRowsMax: 9,
   boardColsMin: 6,
@@ -173,8 +185,8 @@ function playerEvidence(level) {
 }
 
 function pairCandidates(level, actions) {
-  const targets = actions.slice(9, 15);
-  const donors = actions.slice(15, 22);
+  const targets = actions.slice(TARGET_START - 1, TARGET_END);
+  const donors = actions.slice(DONOR_START - 1, DONOR_END);
   const out = [];
   const seen = {};
   for (let ti = 0; ti < targets.length; ti++) {
@@ -188,14 +200,14 @@ function pairCandidates(level, actions) {
       seen[key] = true;
       out.push({
         target: {
-          step: ti + 10,
+          step: ti + TARGET_START,
           r: a.r,
           c: a.c,
           color: ca.color,
           count: ca.count
         },
         donor: {
-          step: di + 16,
+          step: di + DONOR_START,
           r: b.r,
           c: b.c,
           color: cb.color,
@@ -279,7 +291,7 @@ function main() {
   const report = {
     schema: 'low-pressure-local-order-swap-v566',
     date: '2026-10-26',
-    preregistration: '低压中段局部交换_预登记_v566.md',
+    preregistration: PREREGISTRATION,
     base: baseRec,
     summary: {
       pairs: pairs.length,
@@ -302,8 +314,8 @@ function main() {
       wallMsMedian: median(rows.map(x => x.wallMs)),
       wallMsMax: rows.length ? Math.max.apply(null, rows.map(x => x.wallMs)) : null,
       decision: hits.length
-        ? '存在单对车序交换使010/1002完整通过；先做消融和独立样本复核，不进生产。'
-        : (pairs.length + '个单对车序交换均未使010/1002完整通过；P3局部交换本样本否决。')
+        ? '存在单对车序交换使基底完整通过；先做消融和独立样本复核，不进生产。'
+        : (pairs.length + '个单对车序交换均未使基底完整通过；P3局部交换本样本否决。')
     },
     rows
   };
