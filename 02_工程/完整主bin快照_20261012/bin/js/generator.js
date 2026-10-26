@@ -3805,7 +3805,8 @@ AntSolver.Generator = (function() {
             return b.instantEntryReach != null && b.count > b.instantEntryReach;
           }).sort(function (a, b) { return (a.count - a.instantEntryReach) - (b.count - b.instantEntryReach) || a._seq - b._seq; });
           if (_debtCars.length) {
-            var _chosen = _debtCars.slice(0, _rootCols.length), _chosenSet = {};
+            var _prefixN = Math.max(_rootCols.length, Math.min(12, parseInt(config.instantPlanBranchPrefixDebts, 10) || _rootCols.length));
+            var _chosen = _debtCars.slice(0, _prefixN), _chosenSet = {};
             for (var _ci = 0; _ci < _chosen.length; _ci++) _chosenSet[_chosen[_ci]._seq] = 1;
             var _rest = list.filter(function (b) { return !_chosenSet[b._seq]; });
             list = _chosen.concat(_rest);
