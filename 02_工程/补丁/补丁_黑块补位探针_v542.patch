@@ -1,0 +1,631 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index 4eca1b4..b641b9c 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -27,6 +27,7 @@
+ > v539：007自动容量带推导为[31,31]，同色donor无余量，`CapacityTuner`变体为0；这不是容量分配无效，而是该带下实验无法执行。
+ > v540：用显式实验带[16,31]重跑（不进入生产），评测38个合法变体；仅seed1001免费连15→14，其余3/4不变，结构仍0/4、目标0/4。容量分配方向否决；下一轮只测007棋盘余量，容量输入不自动放宽。
+ > v541：007从7×8改为7×9。2/4 seed免费连下降≥2，4/4保持高压，容量无回退；但黑块4/4从17.9%升到27%，结构仍0/4、目标0/4。7×9不采纳，先处理黑块/棋盘填充或回退7×8。
++> v542：7×9上`blackPercent` 10→0没有改变实际黑块（17/63=27%，hash不变），黑块主要是棋盘补位；黑块不是独立旋钮可解的问题，下一步回到P0容量/棋盘可行性。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+@@ -57,6 +58,7 @@
+ - v538完成分支前缀债务8→12单因素：4/4免费连变差，高压仅2/4保持，结构0/4，容量合同无回退。分支前缀债务方向否决，下一步转007容量分配。
+ - v539/v540完成容量分配单因素：自动带[31,31]无可转移donor；显式实验带[16,31]评测38个变体，仅1/4免费连下降1步，结构0/4、目标0/4。容量分配方向否决，下一轮转棋盘余量。
+ - v541完成棋盘余量7×8→7×9：免费连2/4下降2步、高压4/4保持、容量无回退；黑块4/4升到27%，结构0/4、目标0/4。7×9未采纳，下一轮只处理7×9上的黑块/棋盘填充。
++- v542完成黑块补位探针：`blackPercent`10→0后007两seed仍为17块黑、27%，hash不变；planned仅5/6，surplus补位11/12。黑块由棋盘占格与容量可行性决定，下一步转P0容量/棋盘合同。
+ - 以下「下一步」仍是多图主产线基准，但产线现在与代码一致，口径不再分叉。
+ - 下一步不是继续堆模块，而是：**默认主产线多图基准 → 只读归因 → 针对最高频失败项做单变量实验。**
+ 
+@@ -684,9 +686,9 @@ for obstacle in candidates:
+ 
+ ## 6. 当前下一步：严格按此顺序
+ 
+-> **2026-10-26 v541 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。v538、v539/v540、v541分别排除了前缀债务、容量分配和未处理黑块的7×9；当前仍在P1/P2/P3，007仍缺结构合格，006/010问题未解决。
++> **2026-10-26 v542 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。v538、v539/v540、v541、v542排除前缀债务、容量分配、未处理黑块的7×9和黑块百分比旋钮；当前阻塞已回到P0容量/棋盘可行性。
+ >
+-> 下一轮唯一主实验（v542）：只在007的7×9基底上处理黑块/棋盘填充，固定seed1001/1002/88001/32677、容量带和prefix debts=8；先比较“保持7×9但减少补位黑块”的可执行方案，主目标是黑块不高于17.9%且不牺牲v541的免费连/高压；若无法做到，回退7×8，不能把27%黑块关交付。
++> 下一轮唯一主实验（v543）：只在007上审计P0容量/棋盘可行性。固定7×9和7×8两基底，比较实际box数、黑块补位、每色容量带和可达车位；不得修改容量区间，不得自动放宽。若容量带数学上无法同时满足容量下限与黑块上限，记录为输入冲突并给用户可选的容量或棋盘方案。
+ 
+ ### 下一步 A：多图主产线基准（先做）
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+index b68698b..f27417f 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+@@ -2,7 +2,7 @@
+ 
+ > **唯一验收骨架：本文件的 P0～P6。** `优质关卡生成_接管总纲.md` 中保留的历史实现卡和旧编号只能作为实现细节参考，不是第二套验收阶段。
+ 
+-> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v541 7×9有免费连信号但黑块恶化，未采纳**。
++> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v542 blackPercent=0仍不能消除7×9补位黑块，转P0容量/棋盘可行性**。
+ > 本文是唯一“已做什么 → 剩什么 → 如何实验 → 何时算完成”的执行流程；算法细节回查 `优质关卡生成_接管总纲.md`，历史数字回查工作日志对应节号。
+ > 瞬时模式的具体施工顺序见 [`瞬时模式生成器实施计划_v525.md`](瞬时模式生成器实施计划_v525.md)，它是本文 P0~P3 的技术分支，不替代本文验收框架。
+ 
+@@ -60,6 +60,7 @@
+ | 分支前缀债务8→12 | v538 007四seed免费连均恶化、结构仍0/4，高压仅2/4保持 | 因子否决，回退8；下一轮只测容量分配 |
+ | 容量分配 | v539自动带[31,31]无可转移donor；v540显式[16,31]评测38变体，仅1/4免费连降1步、结构0/4 | 容量方向否决，[16,31]不进入生产；下一轮只测棋盘余量 |
+ | 棋盘余量7×9 | v541 2/4免费连降≥2、4/4高压保持、容量无回退；黑块4/4升到27%、结构0/4 | 7×9不采纳；下一轮只在7×9处理黑块/填充，否则回退7×8 |
++| 黑块补位探针 | v542 blackPercent10→0后黑块仍17/63=27%、hash不变；planned 5/6、surplus 11/12 | 黑块不是独立旋钮；回到P0容量/棋盘可行性 |
+ 
+ ### 2.1 关键正结果
+ 
+@@ -74,6 +75,7 @@
+ - v538分支前缀债务8→12：007四seed免费连13→15、18→22、13→20、15→24，全部恶化；solver中段3/4仅2/4保持≥50%，结构仍0/4；容量合同无回退。因子否决，保持8。
+ - v539/v540容量分配：自动带[31,31]无可转移donor；显式实验带[16,31]下38个合法评测变体中，只有seed1001免费连15→14，结构仍0/4、目标0/4。容量方向否决，[16,31]不写回生产。
+ - v541棋盘余量7×9：007四seed中2/4免费连下降≥2，4/4保持高压、容量无回退；但黑块4/4从17.9%升到27%，结构仍0/4、目标0/4。7×9不采纳，下一轮只处理黑块/填充。
++- v542黑块补位探针：`blackPercent`10→0后两seed黑块仍为27%、hash不变，planned 5/6、surplus 11/12；必须回到P0容量/棋盘可行性，不能继续调黑块百分比。
+ 
+ ### 2.2 已验证、不能再走的弯路
+ 
+@@ -106,7 +108,7 @@
+ | 剩余项 | 当前卡点 | 下一步主实验 |
+ |---|---|---|
+ | 容量合同漏网 | 推荐图aboveMax=1 | 容量越界谱系追踪，先硬合同后体验 |
+-| 路线释放证据 | v538排除前缀债务，v539/v540排除容量分配，v541的7×9有信号但黑块恶化 | v542只在7×9上处理黑块/棋盘填充；006另立后续 |
++| 路线释放证据 | v541/v542证明7×9黑块是补位，不是blackPercent旋钮 | v543做P0容量/棋盘可行性审计；006另立后续 |
+ | 远/近压力不足 | 010/推荐仍有低压基底 | 近失局部修、远失换基底；不做统一容量加减 |
+ | 每色容量组合规划 | 目前主要同色转移，缺全局联合目标 | 每色候选集→全局Pareto组合→重解评价 |
+ | 车序与首行观感 | 双时间线有测量，稳定生成策略不足 | 局部交换、首行同色run、释放顺序联合评价 |
+@@ -333,8 +335,8 @@
+ ## 6. 推荐执行顺序（不要跳步）
+ 
+ ```text
+-v541棋盘余量7×9已完成（部分信号但黑块恶化）
+-→ v542：007 7×9黑块/棋盘填充单因素
++v542黑块补位探针已完成
++→ v543：P0容量/棋盘可行性审计
+ → P0容量越界谱系追踪（硬合同）
+ → 多图失败分布基线
+ → P1 release unknown评价覆盖
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 363bf53..7ee4607 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20776,3 +20776,33 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 
+ 1. v542只在7×9基底上处理黑块/棋盘填充，主目标是把黑块压回≤17.9%，且不牺牲v541的免费连和高压。
+ 2. 若7×9无法在黑块保护下保留改善，回退7×8；不把27%黑块作为交付结果。
++
++### 532. 【2026-10-26】v542：blackPercent=0仍不能消掉7×9补位黑块
++
++#### 532.1 问题（原话）
++
++- “下一步。”
++- v541的7×9出现免费连改善，但黑块从17.9%升到27%；需要判断这是不是`blackPercent`可控。
++
++#### 532.2 证据
++
++- 7×9探针显示 `blackStat.plannedTotal` 只有5/6，但 `surplusFilled` 达到11/12；实际黑块17/63=27%。
++- seed1001/1002比较`blackPercent=10`与`0`：两臂实际黑块都是17块，hash相同；`plannedTotal`从6/6降到5/6，但surplus补位抵消。
++- 因此黑块是棋盘空格补位，而不是单独的黑块比例旋钮；降`blackPercent`不能改变实际交付黑块。
++
++#### 532.3 改动
++
++- 新增`黑块补位探针_v542.js`、JSON和预登记；只改`blackPercent`，不改容量、棋盘、车序或障碍。
++- 无生产代码变更；这是P0/P3边界诊断，不是质量修复。
++
++#### 532.4 验证（前后数字）
++
++- seed1001：黑块17→17、黑块比例27%→27%、hash不变。
++- seed1002：黑块17→17、黑块比例27%→27%、hash不变。
++- 容量均守恒、aboveMax=0；免费连和结构未因`blackPercent`改变。
++
++#### 532.5 遗留
++
++1. v543回到P0容量/棋盘可行性审计，不再调`blackPercent`。
++2. 先计算7×8/7×9的box数、黑块补位、每色容量带和可达车位；若容量下限与黑块上限数学冲突，必须给用户可选输入方案，不能自动放宽。
++3. 006无候选、010低压仍分别独立处理。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index efd44e3..e725243 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v541 棋盘余量单因素）　|　当前版本：**v541**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v542 黑块补位探针）　|　当前版本：**v542**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~531。v541把007从7×8改为7×9：2/4 seed免费连下降≥2、4/4保持高压、容量无回退；但黑块4/4从17.9%升到27%，结构0/4、目标0/4。7×9不采纳；下一步只在7×9上处理黑块/棋盘填充，不能直接进默认。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~532。v542把7×9的`blackPercent`从10降到0：007两seed黑块仍为17/63=27%，其中planned 5/6、surplus 11/12，hash不变。黑块是棋盘补位，不是blackPercent可控；下一步转P0容量/棋盘可行性，不继续调黑块百分比。**
+ >
+ > **编号约定：验收阶段只有 P0～P6，以 [`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md) 为准。代码和历史文档中的 P7、P8、P9、P10 是实现名、旧编号或历史索引，不是额外验收阶段。**
+ >
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index da623ca..2b18612 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -292,3 +292,10 @@
+ - 2/4 seed免费连下降≥2：88001 18→8、32677 15→12；1001 13→13、1002 18→19。4/4保持solver中段3/4≥50%，容量守恒、aboveMax=0。
+ - 但黑块4/4从17.9%升到27%，结构0/4、目标0/4；7×9不能作为交付候选。
+ - 下一步v542只在7×9上处理黑块/棋盘填充，要求黑块不高于17.9%且不牺牲免费连/高压；若无法做到，回退7×8。
++
++## 36. v542：blackPercent=0不能消掉补位黑块
++
++- 007 7×9，seed1001/1002，A=`blackPercent=10`，B=`blackPercent=0`；其余参数固定。
++- 两seed A/B实际黑块均为17/63=27%，hash相同；`blackStat`显示planned 5/6，surplusFilled 11/12。
++- 结论：黑块主要由棋盘空格补位决定，不是`blackPercent`独立旋钮；7×9若压黑块需要改变车位/容量/棋盘可行性，不能继续调百分比。
++- 下一轮v543做P0容量/棋盘可行性审计；容量区间不自动放宽，先找出数学冲突和可选输入方案。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index 54a2a2d..a7f7827 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -107,6 +107,8 @@
+ - **v539/v540边界**：容量分配方向否决。下一轮只测007棋盘余量（7×8→7×9），不同时改容量或障碍。
+ - **v541结果**：007 7×8→7×9的4个seed中，2/4免费连下降≥2（88001 18→8、32677 15→12），4/4保持solver中段3/4≥50%，容量无回退；但黑块4/4从17.9%升到27%，结构仍0/4、目标0/4。7×9不采纳。
+ - **v541边界**：下一轮只在7×9基底上处理黑块/棋盘填充，先证明黑块不高于17.9%且不牺牲免费连/高压；否则回退7×8。
++- **v542结果**：7×9上`blackPercent`10→0后，两seed实际黑块仍为17/63=27%，hash不变；`blackStat` planned 5/6、surplus 11/12。黑块主要是棋盘补位，不是黑块比例旋钮。
++- **v542边界**：黑块百分比方向停止加码；下一轮回到P0容量/棋盘可行性，不自动放宽容量。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 2749bbe..6ec464d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v541 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=541">
++  <title>车接小人 v542 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=542">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v541</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v542</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,29 +773,29 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=541"></script>
+-  <script src="js/utils.js?v=541"></script>
++  <script src="js/zip.js?v=542"></script>
++  <script src="js/utils.js?v=542"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=541"></script>
+-  <script src="js/simulator.js?v=541"></script>
++  <script src="js/color-libs.js?v=542"></script>
++  <script src="js/simulator.js?v=542"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=541"></script>
+-  <script src="js/solver-strategy.js?v=541"></script>
+-  <script src="js/solver.js?v=541"></script>
+-  <script src="js/playersim.js?v=541"></script>
++  <script src="js/anchor-cut.js?v=542"></script>
++  <script src="js/solver-strategy.js?v=542"></script>
++  <script src="js/solver.js?v=542"></script>
++  <script src="js/playersim.js?v=542"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=541"></script>
+-  <script src="js/car-sequencer.js?v=541"></script>
+-  <script src="js/experience-goal.js?v=541"></script>
+-  <script src="js/release-route-constructor.js?v=541"></script>
+-  <script src="js/capacity-tuner.js?v=541"></script>
+-  <script src="js/instant-playout.js?v=541"></script>
+-  <script src="js/generator.js?v=541"></script>
+-  <script src="js/source-preflight.js?v=541"></script>
+-  <script src="js/analysis.js?v=541"></script>
++  <script src="js/solver-analysis.js?v=542"></script>
++  <script src="js/car-sequencer.js?v=542"></script>
++  <script src="js/experience-goal.js?v=542"></script>
++  <script src="js/release-route-constructor.js?v=542"></script>
++  <script src="js/capacity-tuner.js?v=542"></script>
++  <script src="js/instant-playout.js?v=542"></script>
++  <script src="js/generator.js?v=542"></script>
++  <script src="js/source-preflight.js?v=542"></script>
++  <script src="js/analysis.js?v=542"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=541"></script>
+-  <script src="js/app.js?v=541"></script>
++  <script src="js/level-editor.js?v=542"></script>
++  <script src="js/app.js?v=542"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 813fdd6..226a9e6 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -76,6 +76,7 @@
+ | v539 容量分配（自动带） | 当前自动容量带能否生成同色容量变体 | ➖ [31,31]无donor余量，4/4 seed变体0；不能判断容量效果 | `容量分配_v539.js` + JSON + 预登记 | §529 |
+ | v540 容量分配（[16,31]实验带） | 显式可行容量带下容量分配能否修007结构 | ❌ 38个变体，仅1/4免费连降1步、结构0/4、目标0/4；容量无回退，[16,31]不入生产 | `容量分配_松弛带_v540.js` + JSON + 预登记 | §530 |
+ | v541 棋盘余量7×9 | 增加一列能否降低007免费连且不恶化黑块 | 2/4免费连降≥2、4/4高压保持、容量无回退；但黑块4/4 17.9→27%、结构0/4，不采纳 | `棋盘余量7x9_v541.js` + JSON + 预登记 | §531 |
++| v542 黑块补位探针 | blackPercent能否消掉7×9补位黑块 | ❌ 10→0后两seed仍17/63=27%、hash不变；planned5/6、surplus11/12；黑块由棋盘补位决定 | `黑块补位探针_v542.js` + JSON + 预登记 | §532 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_v542.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_v542.js"
+new file mode 100644
+index 0000000..37fcb67
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_v542.js"
+@@ -0,0 +1,109 @@
++#!/usr/bin/env node
++/** v542：7×9上只比较blackPercent=10 vs 0，判断黑块是否由补位造成。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
++  'capacity-tuner.js', 'instant-playout.js', 'generator.js', 'source-preflight.js'];
++const IMAGE = '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt';
++const SEEDS = [1001, 1002];
++const OUT = path.resolve(ROOT, '03_工具/好关评分/黑块补位探针_v542.json');
++function load() {
++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function cfgFor(G, blocks, seed, blackPercent) {
++  const band = G.deriveCapacityBand(blocks);
++  return {
++    seed, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1],
++    capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: 7, boardRowsMax: 7, boardColsMin: 9, boardColsMax: 9,
++    boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanBranchCount: 2,
++    instantPlanBranchDebtRoots: true, instantPlanBranchPrefixDebts: 8,
++    blackPercent
++  };
++}
++function blackCount(level) {
++  let n = 0;
++  for (const row of level.board.cells) for (const x of row) if (x && x.t === 'black') n++;
++  return n;
++}
++function run(A, seed, blackPercent) {
++  const G = A.Generator;
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, IMAGE), 'utf8'));
++  const cfg = cfgFor(G, blocks, seed, blackPercent);
++  const t0 = Date.now();
++  let r = null;
++  try { r = G.produceFixed(blocks, cfg); }
++  catch (e) { r = { level: null, valid: false, error: String((e && e.message) || e) }; }
++  const level = r && r.level || null;
++  let black = 0, cells = 0, boxes = 0;
++  if (level) for (const row of level.board.cells) for (const x of row) {
++    cells++;
++    if (x && x.t === 'black') black++;
++    if (x && x.t === 'box') boxes++;
++  }
++  const q = level ? A.Quality.fromGeneration(r) : null;
++  const ca = level ? A.Quality.capacityEvidence(level, r.config || cfg) : null;
++  const hidden = r && r.blackStat || null;
++  const rec = {
++    seed, blackPercent, wallMs: Date.now() - t0, valid: !!(r && r.valid),
++    black, cells, blackPct: cells ? +(black / cells * 100).toFixed(1) : null,
++    boxes, blackStat: hidden && {
++      plannedTotal: hidden.plannedTotal, actualTotal: hidden.actualTotal,
++      surplusFilled: hidden.surplusFilled, wallBlacks: hidden.wallBlacks,
++      missing: hidden.missing
++    },
++    struct: !!(r && r.level && G.goalStructPass(r)),
++    freeRunMax: r && r.goodV3 && r.goodV3.fillCurve ? r.goodV3.fillCurve.freeRunMax : null,
++    capacity: ca && {
++      conserved: ca.conserved, aboveMax: ca.aboveMax, belowMin: ca.belowMin,
++      microCars: ca.microCars, boardFloorPass: ca.boardFloorPass
++    },
++    hash: level ? hash(level) : null
++  };
++  console.log(JSON.stringify(rec));
++  return rec;
++}
++const A = load();
++const rows = [];
++for (const seed of SEEDS) for (const p of [10, 0]) rows.push(run(A, seed, p));
++const pairs = SEEDS.map(seed => {
++  const a = rows.find(x => x.seed === seed && x.blackPercent === 10);
++  const b = rows.find(x => x.seed === seed && x.blackPercent === 0);
++  return {
++    seed,
++    blackPct: [a.blackPct, b.blackPct],
++    black: [a.black, b.black],
++    surplus: [a.blackStat && a.blackStat.surplusFilled, b.blackStat && b.blackStat.surplusFilled],
++    freeRun: [a.freeRunMax, b.freeRunMax],
++    capacityOk: !!(b.capacity && b.capacity.conserved && b.capacity.aboveMax === 0 &&
++      (!b.capacity.microCars || b.capacity.microCars.length === 0)),
++    blackPass: b.blackPct != null && b.blackPct <= 17.9
++  };
++});
++const summary = {
++  image: '007', seeds: SEEDS, rows: rows.length,
++  blackPass: pairs.filter(x => x.blackPass).length,
++  blackPct: pairs.map(x => ({ seed: x.seed, from: x.blackPct[0], to: x.blackPct[1] })),
++  surplusUnchanged: pairs.filter(x => x.surplus[0] === x.surplus[1]).length,
++  capacityRegressions: pairs.filter(x => !x.capacityOk).map(x => x.seed),
++  decision: pairs.some(x => x.blackPass)
++    ? 'blackPercent=0出现黑块保护信号，需扩大样本后再验证。'
++    : 'blackPercent=0未能压到17.9%以下，黑块主要是棋盘补位，回到P0容量/棋盘可行性。'
++};
++const report = { schema: 'black-fill-probe-v1', date: '2026-10-26',
++  preregistration: '黑块补位探针_预登记_v542.md', summary, pairs, rows };
++fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ summary, pairs }, null, 2));
++if (summary.capacityRegressions.length) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_v542.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_v542.json"
+new file mode 100644
+index 0000000..da9b5ae
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_v542.json"
+@@ -0,0 +1,183 @@
++{
++  "schema": "black-fill-probe-v1",
++  "date": "2026-10-26",
++  "preregistration": "黑块补位探针_预登记_v542.md",
++  "summary": {
++    "image": "007",
++    "seeds": [
++      1001,
++      1002
++    ],
++    "rows": 4,
++    "blackPass": 0,
++    "blackPct": [
++      {
++        "seed": 1001,
++        "from": 27,
++        "to": 27
++      },
++      {
++        "seed": 1002,
++        "from": 27,
++        "to": 27
++      }
++    ],
++    "surplusUnchanged": 1,
++    "capacityRegressions": [],
++    "decision": "blackPercent=0未能压到17.9%以下，黑块主要是棋盘补位，回到P0容量/棋盘可行性。"
++  },
++  "pairs": [
++    {
++      "seed": 1001,
++      "blackPct": [
++        27,
++        27
++      ],
++      "black": [
++        17,
++        17
++      ],
++      "surplus": [
++        11,
++        12
++      ],
++      "freeRun": [
++        12,
++        12
++      ],
++      "capacityOk": true,
++      "blackPass": false
++    },
++    {
++      "seed": 1002,
++      "blackPct": [
++        27,
++        27
++      ],
++      "black": [
++        17,
++        17
++      ],
++      "surplus": [
++        11,
++        11
++      ],
++      "freeRun": [
++        8,
++        8
++      ],
++      "capacityOk": true,
++      "blackPass": false
++    }
++  ],
++  "rows": [
++    {
++      "seed": 1001,
++      "blackPercent": 10,
++      "wallMs": 158269,
++      "valid": true,
++      "black": 17,
++      "cells": 63,
++      "blackPct": 27,
++      "boxes": 46,
++      "blackStat": {
++        "plannedTotal": 6,
++        "actualTotal": 17,
++        "surplusFilled": 11,
++        "wallBlacks": 5,
++        "missing": 0
++      },
++      "struct": false,
++      "freeRunMax": 12,
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "boardFloorPass": true
++      },
++      "hash": "3b46da0b0bbcbd1883b4e0e4f2d1ef99903c474ecc21a1646a1bd354b3bbaf37"
++    },
++    {
++      "seed": 1001,
++      "blackPercent": 0,
++      "wallMs": 143185,
++      "valid": true,
++      "black": 17,
++      "cells": 63,
++      "blackPct": 27,
++      "boxes": 46,
++      "blackStat": {
++        "plannedTotal": 5,
++        "actualTotal": 17,
++        "surplusFilled": 12,
++        "wallBlacks": 5,
++        "missing": 0
++      },
++      "struct": false,
++      "freeRunMax": 12,
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "boardFloorPass": true
++      },
++      "hash": "3b46da0b0bbcbd1883b4e0e4f2d1ef99903c474ecc21a1646a1bd354b3bbaf37"
++    },
++    {
++      "seed": 1002,
++      "blackPercent": 10,
++      "wallMs": 50626,
++      "valid": true,
++      "black": 17,
++      "cells": 63,
++      "blackPct": 27,
++      "boxes": 46,
++      "blackStat": {
++        "plannedTotal": 6,
++        "actualTotal": 17,
++        "surplusFilled": 11,
++        "wallBlacks": 6,
++        "missing": 0
++      },
++      "struct": false,
++      "freeRunMax": 8,
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "boardFloorPass": true
++      },
++      "hash": "230c534abb0b6c24af66727b3f5963b6cfe4973b30c879a97d8234a4232793b6"
++    },
++    {
++      "seed": 1002,
++      "blackPercent": 0,
++      "wallMs": 27263,
++      "valid": true,
++      "black": 17,
++      "cells": 63,
++      "blackPct": 27,
++      "boxes": 46,
++      "blackStat": {
++        "plannedTotal": 6,
++        "actualTotal": 17,
++        "surplusFilled": 11,
++        "wallBlacks": 6,
++        "missing": 0
++      },
++      "struct": false,
++      "freeRunMax": 8,
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "boardFloorPass": true
++      },
++      "hash": "230c534abb0b6c24af66727b3f5963b6cfe4973b30c879a97d8234a4232793b6"
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_\351\242\204\347\231\273\350\256\260_v542.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_\351\242\204\347\231\273\350\256\260_v542.md"
+new file mode 100644
+index 0000000..da1e9c7
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\273\221\345\235\227\350\241\245\344\275\215\346\216\242\351\222\210_\351\242\204\347\231\273\350\256\260_v542.md"
+@@ -0,0 +1,33 @@
++# 黑块补位探针 10→0 · v542 预登记
++
++> Kimi 方法建议。唯一验收骨架为 `优质关卡生成_详细工作流程.md` 的 P0～P6。
++
++## 背景
++
++v541 的 7×9 结果黑块从 17.9% 升到 27%。一次只读探针显示黑块 `planned=6`、`surplusFilled=11`，说明主要问题可能是棋盘空格补位，而不是规划黑块比例。v542 只验证 `blackPercent` 是否能控制这部分补位。
++
++## 唯一变量
++
++- A：7×9、`blackPercent=10`（当前实验配置默认值）。
++- B：7×9、`blackPercent=0`。
++- 图：007；seed 1001、1002。
++- 固定：容量带、prefix debts=8、棋盘 7×9、车序策略、障碍、P0 容量合同和其他参数。
++- 使用同一 `produceFixed` 路径，只改 `blackPercent`；不重新定义目标模式。
++
++## 主指标 / 保护
++
++- 实际黑块数和 `blackStat.plannedTotal/surplusFilled`；
++- 黑块比例是否≤17.9%；
++- 车数、容量守恒、aboveMax、belowMin；
++- 若黑块降低，检查免费连/结构是否退化。
++
++## 通过 / 否决
++
++- 通过：B 臂黑块≤17.9%，且容量不退化、免费连不恶化。
++- 否决：B 臂黑块仍>17.9%，或仅减少计划黑块但补位黑块不变。
++- 若否决，结论是黑块问题属于容量/棋盘补位，不是单独的 `blackPercent` 旋钮；下一轮回到 P0 容量/棋盘可行性。
++
++## 回滚点
++
++- 上一版：`3377b0b`（v541）。
++- 只读诊断，不改变默认生产。
+diff --git a/AGENTS.md b/AGENTS.md
+index 7e61783..13a8ab9 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,7 +1,7 @@
+ # AGENTS.md · 毛线汽车（关卡生成器）
+ 
+ > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
+-> 工作日志 **531 节 / 20778 行（约 822 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§531）。
++> 工作日志 **532 节 / 20808 行（约 824 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§532）。
+ 
+ ## 这是什么
+ 
+@@ -38,6 +38,7 @@ node 03_工具/好关评分/分支前缀债务12_v538.js
+ node 03_工具/好关评分/容量分配_v539.js
+ node 03_工具/好关评分/容量分配_松弛带_v540.js
+ node 03_工具/好关评分/棋盘余量7x9_v541.js
++node 03_工具/好关评分/黑块补位探针_v542.js
+ node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
+ grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
+ ```
+diff --git a/README.md b/README.md
+index 99c59b7..6248845 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v541**（7×9有免费连改善信号，但黑块4/4恶化，未采纳）。
++> 当前版本 **v542**（blackPercent=0仍无法消掉7×9补位黑块；问题回到P0容量/棋盘可行性）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看全流程对照图** | [`思维导图_求解器与关卡生产全流程.html`](思维导图_求解器与关卡生产全流程.html)（求解器 → 反解 → 关卡生产，自包含，双击可开） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v541）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v542）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **看详细实验与交付流程** | [`01_交接文档/优质关卡生成_详细工作流程.md`](01_交接文档/优质关卡生成_详细工作流程.md)（已完成/未完成、P0~P6实验卡、验收与回滚） |
