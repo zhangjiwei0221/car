@@ -20,7 +20,12 @@ const IMAGES = {
   '006': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt',
   '010': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_010.txt'
 };
-const KS = [1, 3];
+const KS = [1];
+const POLICIES = ['supply', 'shortDebt'];
+const RECIPES = [
+  { id: 'A_base', cutMode: 'layerCut2', maxPipes: 2, iceForceSteps: 0 },
+  { id: 'B_expose', cutMode: 'exposeCut', maxPipes: 1, iceForceSteps: 4 }
+];
 
 function load() {
   const sb = {
@@ -37,13 +42,13 @@ function hash(x) {
   return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');
 }
 
-function cfgFor(A, blocks, seed, K) {
+function cfgFor(A, blocks, seed, K, policy, recipe) {
   const b = A.Generator.deriveCapacityBand(blocks).band;
   return {
     seed,
     generatorFlow: 'new_fixed',
     ruleMode: 'instantChain',
-    instantPlanPolicy: 'supply',
+    instantPlanPolicy: policy,
     instantPlanTargetBuffer: 4,
     instantPlanMaxDebt: 40,
     instantPlanBranchCount: 2,
@@ -51,10 +56,10 @@ function cfgFor(A, blocks, seed, K) {
     instantPlanBranchPrefixDebts: 8,
     capScalePlan: [1.45, 1.15],
     boxSizeMin: b[0], boxSizeMax: b[1], capNormMin: b[0], capNormMax: b[1],
-    cutMode: 'layerCut2',
-    maxPipes: 2,
+    cutMode: recipe.cutMode,
+    maxPipes: recipe.maxPipes,
     chainByDemand: 4,
-    iceForceSteps: 0,
+    iceForceSteps: recipe.iceForceSteps,
     candidateCount: 14,
     portfolioK: K,
     boardRowsMin: 4, boardRowsMax: 6, boardColsMin: 6, boardColsMax: 8,
@@ -62,6 +67,7 @@ function cfgFor(A, blocks, seed, K) {
     boardExpandOnOverflow: true, boardFirst: true, boardFitGuard: 'warn',
     boardPrefer7: true, boardPrefer7Dims: null,
     p7BaseCount: 1, p7Repair: true, trapPost: false, pool: 1,
+    targetCarCount: 0,
     semanticObstacles: true, usableSpaceTarget: 0.86,
     blackPercent: 10, narrowPath: true,
     experienceGoal: true, instantReleaseRoute: false,
@@ -80,8 +86,8 @@ function main() {
   const rows = [];
   for (const image of Object.keys(IMAGES)) {
     const blocks = A.Generator.blocksFromTXT(fs.readFileSync(path.join(ROOT, IMAGES[image]), 'utf8'));
-    for (const K of KS) {
-      const cfg = cfgFor(A, blocks, K === 1 ? 1001 : 1002, K);
+    for (const recipe of RECIPES) for (const K of KS) for (const policy of POLICIES) {
+      const cfg = cfgFor(A, blocks, K === 1 ? 1001 : 1002, K, policy, recipe);
       const t0 = Date.now();
       let r = null;
       try { r = A.Generator.produce(blocks, cfg); }
@@ -94,7 +100,9 @@ function main() {
       })) : null;
       rows.push({
         image,
+        recipe: recipe.id,
         portfolioK: K,
+        policy,
         seed: cfg.seed,
         valid: !!(r && r.valid),
         levelHash: level ? hash(level) : null,
@@ -108,18 +116,21 @@ function main() {
         metrics: ev && ev.metrics || null,
         wallMs: Date.now() - t0
       });
-      console.log('[probe]', image, 'K=' + K, 'valid=' + !!(r && r.valid),
+      console.log('[probe]', image, recipe.id, policy, 'valid=' + !!(r && r.valid),
         'plan=' + (plan && plan.policy), 'fail=' + (r && r.lastFailReason || '-'),
         'board=' + (level ? level.board.rows + 'x' + level.board.cols : '-'));
     }
   }
   const summary = {
     runs: rows.length,
-    K1Valid: rows.filter(x => x.portfolioK === 1 && x.valid).length,
-    K3Valid: rows.filter(x => x.portfolioK === 3 && x.valid).length,
-    decision: rows.filter(x => x.portfolioK === 1 && x.valid).length > rows.filter(x => x.portfolioK === 3 && x.valid).length
-      ? 'portfolioK=1在当前完整配置下能出关而=3不能，应进一步验证是否作为多图目标修复。'
-      : '未证明portfolioK=1优于3。'
+    byRecipePolicy: Object.fromEntries(RECIPES.flatMap(recipe => POLICIES.map(p => {
+      const a = rows.filter(x => x.recipe === recipe.id && x.policy === p);
+      return [recipe.id + '/' + p, { valid: a.filter(x => x.valid).length, runs: a.length }];
+    }))),
+    decision: rows.filter(x => x.recipe === 'B_expose' && x.valid).length >
+      rows.filter(x => x.recipe === 'A_base' && x.valid).length
+      ? 'B_expose配方在当前多图近似配置下比A_base更能产出有效关，值得作为多图槽位候选。'
+      : '未证明B_expose优于A_base。'
   };
   fs.writeFileSync(OUT, JSON.stringify({
     schema: 'multi-goal-portfolio-probe-v567',

@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "567";
+var APP_BUILD = "568";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -7209,11 +7209,17 @@ AntSolver.App = (function() {
       fragmentMaxRate: wantPlan ? 0 : (b.config.fragmentMaxRate || 0)  // 规划内碎色=压力素材，闸门临时关
     });
     if (taskMode === 'goal') {
+      taskCfg.cutMode = 'exposeCut';
+      taskCfg.maxPipes = 1;
+      taskCfg.iceForceSteps = 4;
+      taskCfg.instantPlanPolicy = 'shortDebt';
       taskCfg.reviewMix = !!(taskPreflight && taskPreflight.status === 'review');
       // 【2026-10-22·用户裁决】目标模式：每轮 20 秒，不达标就换种子再来；
       //   主线程点「结束」时发 stop，produceGoal 在两轮之间收尾并返回当前最好。
       taskCfg.goalPerRoundMs = 20000;
-      taskCfg.goalBases = 3;   // 【v438】每轮 3 个基底，各自 A1~A4
+      taskCfg.goalBases = 1;
+      taskCfg.portfolioK = 1;
+      taskCfg.p7BaseCount = 1;
       taskCfg.timeBudgetMs = 20000;
       taskCfg.goalMaxMs = genGoalBudgetMs(); // v510：与页面每图搜索时间一致
       taskCfg.goalMaxRounds = 0;
@@ -7227,7 +7233,7 @@ AntSolver.App = (function() {
     });
     genLog('▶ 线程' + (slot.no + 1) + ' 接单：' + entry.name + '（车单' + (wantPlan ? '=' + cutplanBuild(entry.blocks, cutPlanParams.steps, cutplanParseBeats(cutPlanParams.beatsText)).cars.length + '辆' : '自动') +
       ' · 候选' + (b.config.candidateCount || 1) + ' × 轮' + (b.config.difficultyRounds || 1) +
-      (taskMode === 'goal' ? ' · 目标模式（预算内达标即停）' : '') + '）', '');
+      (taskMode === 'goal' ? ' · 目标模式（预算内达标即停） · 多图分支B配方shortDebt' : '') + '）', '');
     // 单关看门狗：超过【单关预算 + 2 分钟余量】仍无返回 → 判定该关卡死，跳过并只重启这一个槽（预算=0/不限时则不设）
     clearTimeout(slot.watchdog);
     // 【2026-10-22】目标模式不设看门狗：它本来就要一直跑，看门狗会把它误杀。
@@ -7548,6 +7554,10 @@ AntSolver.App = (function() {
           });
           cfg._build = APP_BUILD;
           if (b.mode === 'goal') {
+            cfg.cutMode = 'exposeCut';
+            cfg.maxPipes = 1;
+            cfg.iceForceSteps = 4;
+            cfg.instantPlanPolicy = 'shortDebt';
             cfg.reviewMix = !!(syncPreflight && syncPreflight.status === 'review');
             cfg.experienceGoal = genExperienceGoalEnabled();
             cfg.goalMaxMs = genGoalBudgetMs();
