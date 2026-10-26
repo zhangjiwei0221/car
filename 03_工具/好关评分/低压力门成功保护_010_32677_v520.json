@@ -1,0 +1,160 @@
+{
+  "schema": "low-pressure-gate-generation-ab-v1",
+  "date": "2026-10-26",
+  "oldCommit": "0425122",
+  "reviewMix": false,
+  "summary": {
+    "seed": 32677,
+    "budgetMs": 70000,
+    "roundMs": 20000,
+    "runs": 2,
+    "pass": {
+      "old": 1,
+      "new": 0
+    },
+    "struct": {
+      "old": 1,
+      "new": 1
+    },
+    "passRegressions": [
+      "010"
+    ],
+    "totalWallMs": {
+      "old": 79392,
+      "new": 75980
+    }
+  },
+  "pairs": [
+    {
+      "image": "010",
+      "pass": [
+        true,
+        false
+      ],
+      "struct": [
+        true,
+        true
+      ],
+      "wallMs": [
+        79392,
+        75980
+      ],
+      "rounds": [
+        4,
+        5
+      ],
+      "distance": [
+        25,
+        8.3
+      ],
+      "midBuffer34Pct": [
+        90.9,
+        41.7
+      ],
+      "passRegression": true,
+      "sameHash": false
+    }
+  ],
+  "rows": [
+    {
+      "arm": "old",
+      "image": "010",
+      "seed": 32677,
+      "wallMs": 79392,
+      "overrunMs": 9392,
+      "rounds": 4,
+      "stop": "pass_verified_route",
+      "valid": true,
+      "struct": true,
+      "pass": true,
+      "distance": 25,
+      "midBuffer34Pct": 90.9,
+      "release": "unknown_within_budget",
+      "gateReasons": [],
+      "fullMedian2": 1,
+      "capacity": {
+        "schema": "capacity-evidence-v1",
+        "rows": 6,
+        "cols": 6,
+        "boardFloorPass": true,
+        "cars": 23,
+        "capacitySum": 1225,
+        "pixels": 1225,
+        "conserved": true,
+        "minCap": 32,
+        "maxCap": 78,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78,
+        "belowMin": 1,
+        "aboveMax": 0,
+        "microCarMax": 2,
+        "microCars": [],
+        "microCount": 0,
+        "rangeExactFeasible": false,
+        "infeasibleColors": [
+          {
+            "color": 14,
+            "total": 32
+          }
+        ],
+        "row0Cars": 6,
+        "row0Colors": 5,
+        "row0MaxSameColor": 2,
+        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+      },
+      "hash": "a996b6257d370f666f4bd47788c252e9ec3efed4e92d2cbfde2a25b19e42c291",
+      "error": null
+    },
+    {
+      "arm": "new",
+      "image": "010",
+      "seed": 32677,
+      "wallMs": 75980,
+      "overrunMs": 5980,
+      "rounds": 5,
+      "stop": "goalTimeUp",
+      "valid": true,
+      "struct": true,
+      "pass": false,
+      "distance": 8.3,
+      "midBuffer34Pct": 41.7,
+      "release": "found",
+      "gateReasons": [],
+      "fullMedian2": 0,
+      "lowPressureFullMedian": 0,
+      "lowPressureSteps": 14,
+      "capacity": {
+        "schema": "capacity-evidence-v1",
+        "rows": 6,
+        "cols": 6,
+        "boardFloorPass": true,
+        "cars": 23,
+        "capacitySum": 1225,
+        "pixels": 1225,
+        "conserved": true,
+        "minCap": 32,
+        "maxCap": 78,
+        "boxSizeMin": 35,
+        "boxSizeMax": 78,
+        "belowMin": 1,
+        "aboveMax": 0,
+        "microCarMax": 2,
+        "microCars": [],
+        "microCount": 0,
+        "rangeExactFeasible": false,
+        "infeasibleColors": [
+          {
+            "color": 14,
+            "total": 32
+          }
+        ],
+        "row0Cars": 6,
+        "row0Colors": 4,
+        "row0MaxSameColor": 3,
+        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+      },
+      "hash": "1e3e8ce3d3588fad7e594fee085b520221880b59c4bd812cf5dad6aa8558804f",
+      "error": null
+    }
+  ]
+}
