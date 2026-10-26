@@ -6848,7 +6848,7 @@ AntSolver.App = (function() {
     // 【2026-10-22·用户裁决】两种出关模式：
     //   time = 按时间（到点输出最好）；goal = 按目标（总预算内达标即停，到点/手动结束输出当前最好）。
     var modeEl = document.getElementById('gen-mode');
-    var genMode = (modeEl && modeEl.value === 'goal') ? 'goal' : 'time';
+    var genMode = (modeEl && modeEl.value === 'time') ? 'time' : 'goal';
     config.genMode = genMode;   // 写进批次配置，便于回看“这批是按时间还是按目标跑的”
     // 【v153】切球规划器：哪几张图勾了「使用这份车单」，就把规划车单作为该关的切法（forcedBoxes 直通），
     //   并临时关闭碎色闸门——规划内的碎色是「背债车」的压力素材，不是缺陷（用户 2026-10-15 模型）。
