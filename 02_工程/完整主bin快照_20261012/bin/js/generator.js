@@ -3712,6 +3712,30 @@ AntSolver.Generator = (function() {
     var tFill = Date.now();
     var cells = struct.cells, rows = struct.rows, cols = struct.cols, pipeList = struct.pipeList;
     var conservation = [];
+    // 【v528】瞬时计划车单是生成依据：摆盘不得再按需求曲线/角色/交错改序。
+    var _preserveInstantOrder = !!(config && config._instantPlanStrict && config._instantPlayoutStat && config._instantPlayoutStat.ok);
+    /** v528：按真实棋盘激活顺序排列所有可放车格；BFS 的每个子格都与已访问格相邻。 */
+    function instantPlanCellOrder(cells0, rows0, cols0) {
+      var seen = {}, q = [], out = [], dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+      for (var c0 = 0; c0 < cols0; c0++) {
+        if (cells0[0][c0] == null) { seen['0,' + c0] = 1; q.push([0, c0]); }
+      }
+      for (var h0 = 0; h0 < q.length; h0++) {
+        var r0 = q[h0][0], c0b = q[h0][1];
+        out.push([r0, c0b, out.length]);
+        for (var d0 = 0; d0 < 4; d0++) {
+          var nr0 = r0 + dirs[d0][0], nc0 = c0b + dirs[d0][1], k0 = nr0 + ',' + nc0;
+          if (nr0 < 0 || nr0 >= rows0 || nc0 < 0 || nc0 >= cols0 || seen[k0] || cells0[nr0][nc0] != null) continue;
+          seen[k0] = 1; q.push([nr0, nc0]);
+        }
+      }
+      // 兜底：结构层若留下不连通格，仍保留在后面并记录，回放验证会如实失败。
+      for (var rr0 = 0; rr0 < rows0; rr0++) for (var cc0 = 0; cc0 < cols0; cc0++) {
+        var kk0 = rr0 + ',' + cc0;
+        if (cells0[rr0][cc0] == null && !seen[kk0]) { seen[kk0] = 1; out.push([rr0, cc0, out.length]); }
+      }
+      return out;
+    }
 
     var list = [];
     for (var bi = 0; bi < boxes.length; bi++)
@@ -3725,7 +3749,7 @@ AntSolver.Generator = (function() {
     // 【v239】再按【需求进度】重排：早熟的放浅位、晚熟的放深位。
     //   同需求进度时保留切序（消除序列），保证打法还是"由外向内"。
     var _dc = config && config._demandCurve;
-    if (_dc) {
+    if (_dc && !_preserveInstantOrder) {
       for (var dmi = 0; dmi < list.length; dmi++) list[dmi]._dm = demandAt(_dc, list[dmi].color, list[dmi].count);
       list.sort(function (a, b) { return (a._dm - b._dm) || (a._seq - b._seq); });
       // 【v265·用户目标】需求滞后 L：把整列车单循环左移 L 位再铺。
@@ -3740,7 +3764,7 @@ AntSolver.Generator = (function() {
       }
     }
 
-    list = applyRoleSchedule(list, config, rows, cols, timing);
+    if (!_preserveInstantOrder) list = applyRoleSchedule(list, config, rows, cols, timing);
     // 单扫填球：空格→普通盒；管道本体→入队 1 个
     //
     // ===== 局部交错摆放（v114，任务 ANT-GEN-FILL-INTERLEAVE-20260827）=====
@@ -3752,7 +3776,7 @@ AntSolver.Generator = (function() {
     // 口径：每个可放格从队列头部宽 W 的前瞻窗口里挑「颜色既不同于左邻、也不同于上邻」的盒；
     // 窗口内全冲突则退回队首（不卡住、不丢盒）。W 即位移上限 → 取盒顺序最多偏离 W 位，趋势不被打乱。
     // 管道入队不参与交错：管道队列不构成棋盘表面相邻。
-    var ilW2 = (config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6;
+    var ilW2 = _preserveInstantOrder ? 0 : ((config.fillInterleaveWindow != null) ? config.fillInterleaveWindow : 6);
     function pickNonAdj2(at, r, c) {
       if (ilW2 <= 0) return at;
       var lc = (c > 0) ? cells[r][c - 1] : null;
@@ -4093,7 +4117,7 @@ AntSolver.Generator = (function() {
       // 【seqFill】序列铺盘时，车单必须**严格按当用时刻 r 升序**落到序列格上：
       //   免费车（r=0）先上场，之后 r 递增 → 玩家越往后走，手上的车越晚才能装满 = 债。
       //   同时关掉颜色交错与第 0 行同色限量：它们会打乱序列，而 seqFill 的卖点正是"顺序可控"。
-      if (config.seqFill && _dc) {
+      if (config.seqFill && _dc && !_preserveInstantOrder) {
         for (var _sqi = 0; _sqi < list.length; _sqi++) {
           var _sqv = -1;
           try { _sqv = demandAt(_dc, list[_sqi].color, list[_sqi].count); } catch (e) { _sqv = -1; }
@@ -4107,6 +4131,11 @@ AntSolver.Generator = (function() {
           return a._seq - b._seq;
         });
         timing.seqFillList = { n: list.length, rMin: list[0] ? +list[0]._sqr.toFixed(2) : null, rMax: list[list.length - 1] ? +list[list.length - 1]._sqr.toFixed(2) : null };
+      }
+      // v528：严格瞬时计划以真实可达 BFS 覆盖蛇形序，每辆计划车放到下一可激活格。
+      if (_preserveInstantOrder) {
+        order = instantPlanCellOrder(cells, rows, cols);
+        timing.instantPlanCellOrder = { n: order.length, mode: 'reachable-bfs' };
       }
       // ===== 【v297·用户设计B】依赖层铺盘（`depFill`，默认关） =====
       // 用户 2026-10-20：「把依赖层用在铺盘上——第 L 层的格子只放 L_min ≤ L 的车，
@@ -4296,11 +4325,11 @@ AntSolver.Generator = (function() {
     }
     // 【v260】铺完之后做闸门借车（此时盒子才是障碍，扇出才有意义）
     var _gbStat = null;
-    try { _gbStat = gateBorrowAfterFill(cells, rows, cols, config); } catch (e) { _gbStat = null; }
+    try { _gbStat = _preserveInstantOrder ? null : gateBorrowAfterFill(cells, rows, cols, config); } catch (e) { _gbStat = null; }
     if (_gbStat) timing.gateBorrow = _gbStat;
     // 【v262】容量序列：同色浅车调大、深车调小（守恒），制造"开局吃不饱"的长债
     try {
-      var _csStat = shapeCapacitySequence(cells, rows, cols, config);
+      var _csStat = _preserveInstantOrder ? null : shapeCapacitySequence(cells, rows, cols, config);
       if (_csStat) timing.capSeq = _csStat;
     } catch (e) { }   // bindStat 此时还没声明，先挂 timing
     var rest = list.slice(fi);
@@ -4526,14 +4555,14 @@ AntSolver.Generator = (function() {
     }
     // 【v253】冰排程：冻住"开局免费车"，把取车顺序逼回需求序（在顶部封顶之前做，
     //   这样封顶仍会把前 2 行的过量障碍削掉，不会让排程把开局锁死）
-    try { bindStat.iceSchedule = applyIceSchedule(cells, rows, cols, config); } catch (e) { bindStat.iceSchedule = null; }
+    try { bindStat.iceSchedule = _preserveInstantOrder ? null : applyIceSchedule(cells, rows, cols, config); } catch (e) { bindStat.iceSchedule = null; }
     // 【v290】第 0 行同色限量的事后保证（在冰/链绑定之后做，避免动到被锁的格）
     // 【v291】卡点补救（前辈的 chokeSwap / chokeInflate，简化版）：只在本候选未合格时由上层调用
-    try { bindStat.repairSwap = repairGatewaySwap(cells, rows, cols, blocks, config); } catch (e) { bindStat.repairSwap = null; }
-    try { bindStat.repairInflate = repairInflate(cells, rows, cols, config); } catch (e) { bindStat.repairInflate = null; }
-    try { bindStat.row0Diversify = diversifyRow0(cells, rows, cols, config); } catch (e) { bindStat.row0Diversify = null; }
+    try { bindStat.repairSwap = _preserveInstantOrder ? null : repairGatewaySwap(cells, rows, cols, blocks, config); } catch (e) { bindStat.repairSwap = null; }
+    try { bindStat.repairInflate = _preserveInstantOrder ? null : repairInflate(cells, rows, cols, config); } catch (e) { bindStat.repairInflate = null; }
+    try { bindStat.row0Diversify = _preserveInstantOrder ? null : diversifyRow0(cells, rows, cols, config); } catch (e) { bindStat.row0Diversify = null; }
     // 【v277】锁链按"大色块 × 小色块"配对（铺完之后才做，因为要看真实的颜色/容量）
-    try { bindStat.chainByDemand = pairChainsByDemand(cells, rows, cols, config); } catch (e) { bindStat.chainByDemand = null; }
+    try { bindStat.chainByDemand = _preserveInstantOrder ? null : pairChainsByDemand(cells, rows, cols, config); } catch (e) { bindStat.chainByDemand = null; }
     enforceTopObstacleCap(cells, rows, cols, config);
     var afterTop = { ice: 0, q: 0, chain: 0, black: 0 };
     for (var tr2 = 0; tr2 < Math.min(2, rows); tr2++) for (var tc2 = 0; tc2 < cols; tc2++) {
@@ -4556,6 +4585,21 @@ AntSolver.Generator = (function() {
     for (var dr = 0; dr < rows; dr++) for (var dc = 0; dc < cols; dc++) {
       var db = cells[dr][dc];
       if (db && db.t === 'box' && db.chain > 0 && chainCnt[db.chain] < 2) db.chain = 0;
+    }
+    // v528：严格瞬时计划保留“计划格 → 摆位序”只读证据，供回放验证；正式导出不含该字段。
+    if (_preserveInstantOrder) {
+      // P4障碍目标化之前，先移除不属于playout模型的锁链/冰/问号，保证计划路线不被后置规则改序。
+      for (var zr = 0; zr < rows; zr++) for (var zc = 0; zc < cols; zc++) {
+        var zcell = cells[zr][zc];
+        if (zcell && zcell.t === 'box') { zcell.chain = 0; zcell.q = false; zcell.numice = 0; }
+      }
+      var _planCells = [];
+      for (var pr = 0; pr < rows; pr++) for (var pc = 0; pc < cols; pc++) {
+        var pcell = cells[pr][pc];
+        if (pcell && pcell.t === 'box' && pcell._seq != null) _planCells.push({ r: pr, c: pc, seq: pcell._seq, color: pcell.color, count: pcell.count });
+      }
+      _planCells.sort(function (a, b) { return a.seq - b.seq; });
+      board.instantPlanCells = _planCells;
     }
     // 清除铺盒临时标记
     for (var sr = 0; sr < rows; sr++) for (var sc = 0; sc < cols; sc++) {
@@ -5984,6 +6028,7 @@ AntSolver.Generator = (function() {
     if (boxes && boxes._instantPlayout && boxes._instantPlayout.ok === false) {
       return { ok: false, reason: 'instantPlayout', detail: JSON.stringify(boxes._instantPlayout), timing: timing, boxCount: 0 };
     }
+    var _preserveInstantOrder = !!(config && config._instantPlanStrict && config._instantPlayoutStat && config._instantPlayoutStat.ok);
     timing.boxBuildMs = Date.now() - tBox;
     var n = boxes.length;
 
@@ -6032,7 +6077,7 @@ AntSolver.Generator = (function() {
     // ③b 【v153】债务节拍落位：把"债车"的可见性/时机用冰或链固定下来（只挂 numice/chain，不动盒与容量）
     try {
       // 只在真的落了位时才挂诊断字段 —— 不落位时保持关卡本体与改动前【逐字节一致】（v149 口径不变测试就吃这个）
-      var beatStat = applyBeatProps(board, config, blocks);
+      var beatStat = _preserveInstantOrder ? null : applyBeatProps(board, config, blocks);
       if (beatStat) board.beatStat = beatStat;
     } catch (e) { board.beatStat = { applied: 0, error: String(e && e.message || e) }; }
 
@@ -6040,7 +6085,7 @@ AntSolver.Generator = (function() {
     //   见 earlyPressure 上方说明）。config.earlyPressure === false 可关掉（回退逐值回到 v158 行为）。
     // 跟随卡点判据 v2 的开关：config.chokeV2 === false ⇒ 整段不生效（保证"关掉 v2 = 逐值回到 v158"，
     //   v149 口径不变测试就是靠这条守住回退契约）。config.earlyPressure === false 也可单独关。
-    if (config.earlyPressure !== false && config.chokeV2 !== false) {
+    if (!_preserveInstantOrder && config.earlyPressure !== false && config.chokeV2 !== false) {
       try {
         var epStat = earlyPressure(board, blocks, config);
         if (epStat) board.earlyPressureStat = epStat;   // 只在真落地时挂诊断字段（不落地时保持本体一致）
@@ -6049,7 +6094,7 @@ AntSolver.Generator = (function() {
 
     // ③b2 【v187·实验】定向冰补足：结构层没撒的冰，在盒与债车都定下来之后按配额补
     try {
-      var iceTop = topUpIce(board, config);
+      var iceTop = _preserveInstantOrder ? null : topUpIce(board, config);
       if (iceTop) board.iceTopStat = iceTop;
     } catch (e) { board.iceTopStat = { error: String(e && e.message || e) }; }
 
@@ -6084,7 +6129,7 @@ AntSolver.Generator = (function() {
     // ③d 【v161】锁链相邻性兜底：同组的两/三辆车必须 4-邻接连通（用户：「不能跨过中间的车」）。
     //   放在结构阶段末尾（求解/审计之前）——清链会改变局面，必须在评价之前做完，否则审计结论是脏的。
     try {
-      var laStat = enforceChainAdjacency(board);
+      var laStat = _preserveInstantOrder ? null : enforceChainAdjacency(board);
       if (laStat) board.linkAdjStat = laStat;   // 只真修过才挂字段（未改动时不挂，保持"不动则本体一致"）
     } catch (e) { board.linkAdjStat = { error: String(e && e.message || e) }; }
 
@@ -6103,25 +6148,25 @@ AntSolver.Generator = (function() {
     // ⑤ 解析
     // ③b2 【v198·实验】设计器·摆位：把埋得最深的车换到第 0 行，制造"设计好的债"（默认关）
     try {
-      var dStat = designDebtPlacement(board, blocks, config);
+      var dStat = _preserveInstantOrder ? null : designDebtPlacement(board, blocks, config);
       if (dStat) board.designStat = dStat;
     } catch (e) { board.designStat = { ok: false, error: String((e && e.message) || e) }; }
 
     // ③b2a 【v212·实验】定向锁链：把"可点且深埋"的相邻两辆车绑成一组（默认关）
     try {
-      var cStat = planChains(board, blocks, config);
+      var cStat = _preserveInstantOrder ? null : planChains(board, blocks, config);
       if (cStat) board.chainStat2 = cStat;
     } catch (e) { board.chainStat2 = { ok: false, error: String((e && e.message) || e) }; }
 
     // ③b2b 【v211·实验】阀门规划：用数字冰把开局供给压到 K 辆以内
     try {
-      var vStat = planValves(board, blocks, config);
+      var vStat = _preserveInstantOrder ? null : planValves(board, blocks, config);
       if (vStat) board.valveStat = vStat;
     } catch (e) { board.valveStat = { ok: false, error: String((e && e.message) || e) }; }
 
     // ③b3 【v189·实验】"别掐死"修复：被埋色 → 拆掉开壳车上的障碍，让选择回来（默认关）
     try {
-      var strStat = repairStrangle(board, blocks, config);
+      var strStat = _preserveInstantOrder ? null : repairStrangle(board, blocks, config);
       if (strStat) board.strangleStat = strStat;
     } catch (e) { board.strangleStat = { error: String(e && e.message || e) }; }
 
@@ -12713,7 +12758,17 @@ AntSolver.Generator = (function() {
     if (config && config.ruleMode === 'instantChain' && AntSolver.InstantPlayout) {
       var _ip = AntSolver.InstantPlayout.plan({ blocks: blocks, bufferLimit: config.bufferLimit }, config);
       config._instantPlayoutStat = _ip && _ip.boxes && _ip.boxes._instantPlayout || null;
-      if (_ip && _ip.ok && _ip.boxes && _ip.boxes.length) return _ip.boxes;
+      if (_ip && _ip.ok && _ip.boxes && _ip.boxes.length) {
+        // v528：严格阶段先保证计划可重现；障碍目标化在P4再连同playout重算。
+        config._instantPlanStrict = config.instantPlanStrict !== false;
+        config.fillOrder = 'exposure';
+        config.seqFill = true;
+        config.fillInterleaveWindow = 0;
+        config.semanticObstacles = false;
+        config.earlyPressure = false;
+        config.roleSchedule = false;
+        return _ip.boxes;
+      }
       var _bad = [];
       _bad._instantPlayout = Object.assign({}, (config._instantPlayoutStat || {}), { ok: false,
         reason: _ip && _ip.reason ? _ip.reason : 'instant_playout_unavailable' });
@@ -15531,7 +15586,7 @@ AntSolver.Generator = (function() {
       try { out.readyStats = sampleReadyStats(out.level, config, 5); } catch (e) { out.readyStats = null; }
     }
     if (out && config && out.readyStats) config._readyStats = out.readyStats;
-    if (out && out.level && config && config.p7Repair && _pdLeft() > 15000) {
+    if (out && out.level && config && !config._instantPlanStrict && config.p7Repair && _pdLeft() > 15000) {
       config._repairDeadline = _pdT0 + _pdBudget - 8000;
       try {
         var _p7 = p7RepairLevel(out.level, config);
@@ -15545,7 +15600,7 @@ AntSolver.Generator = (function() {
     }
     // 【v377·P3 接入】生成后陷阱后处理：只对最终关、首通 20~80% 的基准跑；
     //   命中才替换，替换后用 evaluateLevel 重算 solve/audit/goodV3，绝不沿用旧指标。
-    if (out && out.level && config && config.trapPost && _pdLeft() > 12000) {
+    if (out && out.level && config && !config._instantPlanStrict && config.trapPost && _pdLeft() > 12000) {
       var _t0 = Date.now();
       var _fcB = out.goodV3 && out.goodV3.fillCurve;
       var _qB = out.goodV3 && out.goodV3.persist && out.goodV3.persist.quality;

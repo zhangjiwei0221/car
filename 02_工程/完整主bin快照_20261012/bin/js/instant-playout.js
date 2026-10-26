@@ -134,7 +134,10 @@ AntSolver.InstantPlayout = (function () {
       infeasibleCapacityColors: capBuilt.plans.filter(function (x) { return !x.exact; }).length,
       bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
       medianEntryReach: median(cars.map(function (c) { return c.entryReach; })),
-      medianConsumed: median(cars.map(function (c) { return c.consumed; })) };
+      medianConsumed: median(cars.map(function (c) { return c.consumed; })),
+      carSequence: cars.map(function (c) { return { id: c.id, color: c.color, cap: c.cap, slot: c.slot,
+        start: c.start, enterOrder: c.enterOrder, finishOrder: c.finishOrder || null, entryReach: c.entryReach,
+        colorRemaining: c.colorRemaining, consumed: c.consumed }; }) };
     return { ok: ok, reason: boxes._instantPlayout.reason, boxes: boxes, cars: cars, seq: seq, audit: audit };
   }
   return { plan: plan, capacityPlanForColor: capacityPlanForColor };
