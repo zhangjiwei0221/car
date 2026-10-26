@@ -1,0 +1,2153 @@
+{
+  "schema": "release-attribution-v553",
+  "date": "2026-10-26",
+  "preregistration": "释放归因_预登记_v553.md",
+  "summary": {
+    "rows": 3,
+    "valid": 3,
+    "hashMatches": 3,
+    "significantEvents": 3,
+    "eventsOutsideCurrent8": 3,
+    "eventsOutsideMidRange": 1,
+    "eventsOutsideButOracleValid": 2,
+    "budgetUnknownActions": 72,
+    "decision": "至少一个中段显著释放父状态在当前前8状态之外，且参考动作+后缀可独立回放形成显著降压：首要归因为中段高压状态覆盖；24次动作搜索仍有预算unknown，但不能把它当唯一原因。"
+  },
+  "rows": [
+    {
+      "shape": "9x7",
+      "seed": 1001,
+      "valid": true,
+      "expectedHash": "0f72e44ee766c984259f16138bfa5ecde65be9d9edf28e3aed50cc429cb1132e",
+      "actualHash": "0f72e44ee766c984259f16138bfa5ecde65be9d9edf28e3aed50cc429cb1132e",
+      "hashMismatch": false,
+      "genMs": 25495,
+      "searchMs": 8504,
+      "metrics": {
+        "midBuffer34Pct": 69.7,
+        "significantReleaseCount": 1,
+        "maxBuffer": 5,
+        "reasons": []
+      },
+      "structure": {
+        "struct": false,
+        "pass": false,
+        "gateReasons": [
+          "最长免费连 7>6"
+        ],
+        "freeRunMax": 7,
+        "fullMedian2": 3
+      },
+      "highPressureCoverage": {
+        "total": 34,
+        "totalMidRange": 23,
+        "current8Steps": [
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21
+        ],
+        "significantEventCount": 1,
+        "outsideCurrent8Count": 1,
+        "outsideMidRangeCount": 1,
+        "outsideCurrent8WithinMidCount": 0,
+        "oracleSignificantCount": 1,
+        "significantEvents": [
+          {
+            "event": {
+              "step": 51,
+              "from": 3,
+              "to": 1,
+              "amplitude": 2
+            },
+            "parentActionIndex": 50,
+            "parentState": {
+              "ordinal": null,
+              "ordinalAll": 34,
+              "actionIndex": 50,
+              "step": 51,
+              "progress": 0.951,
+              "buffer": 3,
+              "inMidRange": false,
+              "inCurrent8": false,
+              "action": {
+                "r": 2,
+                "c": 0,
+                "color": 31,
+                "count": 29
+              }
+            },
+            "outsideCurrent8": true,
+            "outsideMidRange": true,
+            "oracleSuffixReplay": {
+              "completed": true,
+              "amplitude": 3,
+              "minBufferWithinWindow": 0,
+              "finalReplayValid": true,
+              "routeActions": 1,
+              "step": 51,
+              "progress": 0.951,
+              "action": {
+                "r": 2,
+                "c": 0,
+                "color": 31,
+                "count": 29
+              }
+            }
+          }
+        ]
+      },
+      "searchAudit": {
+        "decisions": 8,
+        "attempts": 24,
+        "counts": {
+          "budget_unknown": 24
+        },
+        "rows": [
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 2,
+              "c": 5,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 38,
+              "step": 14,
+              "progress": 0.2098
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 816,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 816,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 704,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 3,
+              "c": 6,
+              "color": 34,
+              "count": 21
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 37,
+              "step": 15,
+              "progress": 0.2278
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 880,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 784,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 736,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2449,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 2,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 36,
+              "step": 16,
+              "progress": 0.2449
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 976,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2449,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 976,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2449,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1008,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.2612,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 5,
+              "c": 2,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 35,
+              "step": 17,
+              "progress": 0.2612
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 968,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.2612,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 928,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.2612,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 976,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2776,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 5,
+              "c": 3,
+              "color": 16,
+              "count": 24
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 34,
+              "step": 18,
+              "progress": 0.2776
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 944,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2776,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 960,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2776,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 816,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2971,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 6,
+              "c": 3,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 33,
+              "step": 19,
+              "progress": 0.2971
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1008,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2971,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 832,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2971,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1024,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.3135,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 3,
+              "c": 5,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 32,
+              "step": 20,
+              "progress": 0.3135
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1040,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.3135,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 928,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.3135,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 950,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.3298,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 3,
+              "color": 19,
+              "count": 21
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 31,
+              "step": 21,
+              "progress": 0.3298
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 960,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.3298,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 968,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.3298,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 976,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          }
+        ]
+      }
+    },
+    {
+      "shape": "9x7",
+      "seed": 1002,
+      "valid": true,
+      "expectedHash": "eeff5444341e501b56573fb996528ee7ffdd6355167bb7ffbda4bec9ee510551",
+      "actualHash": "eeff5444341e501b56573fb996528ee7ffdd6355167bb7ffbda4bec9ee510551",
+      "hashMismatch": false,
+      "genMs": 27699,
+      "searchMs": 8561,
+      "metrics": {
+        "midBuffer34Pct": 75.8,
+        "significantReleaseCount": 1,
+        "maxBuffer": 5,
+        "reasons": []
+      },
+      "structure": {
+        "struct": true,
+        "pass": false,
+        "gateReasons": [],
+        "freeRunMax": 6,
+        "fullMedian2": 3
+      },
+      "highPressureCoverage": {
+        "total": 35,
+        "totalMidRange": 25,
+        "current8Steps": [
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21
+        ],
+        "significantEventCount": 1,
+        "outsideCurrent8Count": 1,
+        "outsideMidRangeCount": 0,
+        "outsideCurrent8WithinMidCount": 1,
+        "oracleSignificantCount": 1,
+        "significantEvents": [
+          {
+            "event": {
+              "step": 39,
+              "from": 4,
+              "to": 2,
+              "amplitude": 2
+            },
+            "parentActionIndex": 38,
+            "parentState": {
+              "ordinal": 25,
+              "ordinalAll": 35,
+              "actionIndex": 38,
+              "step": 39,
+              "progress": 0.6784,
+              "buffer": 4,
+              "inMidRange": true,
+              "inCurrent8": false,
+              "action": {
+                "r": 7,
+                "c": 2,
+                "color": 15,
+                "count": 26
+              }
+            },
+            "outsideCurrent8": true,
+            "outsideMidRange": false,
+            "oracleSuffixReplay": {
+              "completed": true,
+              "amplitude": 3,
+              "minBufferWithinWindow": 1,
+              "finalReplayValid": true,
+              "routeActions": 13,
+              "step": 39,
+              "progress": 0.6784,
+              "action": {
+                "r": 7,
+                "c": 2,
+                "color": 15,
+                "count": 26
+              }
+            }
+          }
+        ]
+      },
+      "searchAudit": {
+        "decisions": 8,
+        "attempts": 24,
+        "counts": {
+          "budget_unknown": 24
+        },
+        "rows": [
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 3,
+              "c": 1,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 38,
+              "step": 14,
+              "progress": 0.2098
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 768,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 640,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 768,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 2,
+              "c": 2,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 37,
+              "step": 15,
+              "progress": 0.2278
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 880,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 752,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 496,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2457,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 4,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 36,
+              "step": 16,
+              "progress": 0.2457
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 944,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2457,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 784,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2457,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 864,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.262,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 3,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 35,
+              "step": 17,
+              "progress": 0.262
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 712,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.262,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 992,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.262,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 880,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2784,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 2,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 34,
+              "step": 18,
+              "progress": 0.2784
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1088,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2784,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1040,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2784,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1056,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2947,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 3,
+              "c": 5,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 33,
+              "step": 19,
+              "progress": 0.2947
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1088,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2947,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 896,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2947,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 624,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.311,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 5,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 32,
+              "step": 20,
+              "progress": 0.311
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 736,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.311,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 816,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.311,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 832,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.329,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 2,
+              "c": 5,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 31,
+              "step": 21,
+              "progress": 0.329
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1096,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.329,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 688,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.329,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 720,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          }
+        ]
+      }
+    },
+    {
+      "shape": "9x7",
+      "seed": 32677,
+      "valid": true,
+      "expectedHash": "4e670942c6ab918a2c6c0e64bf6e00752c25db86c30477aeb59a1e5ca505c1ae",
+      "actualHash": "4e670942c6ab918a2c6c0e64bf6e00752c25db86c30477aeb59a1e5ca505c1ae",
+      "hashMismatch": false,
+      "genMs": 37332,
+      "searchMs": 8726,
+      "metrics": {
+        "midBuffer34Pct": 75.8,
+        "significantReleaseCount": 1,
+        "maxBuffer": 5,
+        "reasons": []
+      },
+      "structure": {
+        "struct": true,
+        "pass": false,
+        "gateReasons": [],
+        "freeRunMax": 4,
+        "fullMedian2": 3
+      },
+      "highPressureCoverage": {
+        "total": 35,
+        "totalMidRange": 25,
+        "current8Steps": [
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21
+        ],
+        "significantEventCount": 1,
+        "outsideCurrent8Count": 1,
+        "outsideMidRangeCount": 0,
+        "outsideCurrent8WithinMidCount": 1,
+        "oracleSignificantCount": 1,
+        "significantEvents": [
+          {
+            "event": {
+              "step": 39,
+              "from": 4,
+              "to": 2,
+              "amplitude": 2
+            },
+            "parentActionIndex": 38,
+            "parentState": {
+              "ordinal": 25,
+              "ordinalAll": 35,
+              "actionIndex": 38,
+              "step": 39,
+              "progress": 0.6776,
+              "buffer": 4,
+              "inMidRange": true,
+              "inCurrent8": false,
+              "action": {
+                "r": 7,
+                "c": 2,
+                "color": 15,
+                "count": 26
+              }
+            },
+            "outsideCurrent8": true,
+            "outsideMidRange": false,
+            "oracleSuffixReplay": {
+              "completed": true,
+              "amplitude": 2,
+              "minBufferWithinWindow": 2,
+              "finalReplayValid": true,
+              "routeActions": 13,
+              "step": 39,
+              "progress": 0.6776,
+              "action": {
+                "r": 7,
+                "c": 2,
+                "color": 15,
+                "count": 26
+              }
+            }
+          }
+        ]
+      },
+      "searchAudit": {
+        "decisions": 8,
+        "attempts": 24,
+        "counts": {
+          "budget_unknown": 24
+        },
+        "rows": [
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 3,
+              "c": 1,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 38,
+              "step": 14,
+              "progress": 0.2098
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 712,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 784,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 1,
+            "referenceStep": 14,
+            "progress": 0.2098,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 712,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 2,
+              "c": 2,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 37,
+              "step": 15,
+              "progress": 0.2278
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 1040,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 624,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 2,
+            "referenceStep": 15,
+            "progress": 0.2278,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 544,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2457,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 4,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 36,
+              "step": 16,
+              "progress": 0.2457
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 864,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2457,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 768,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 3,
+            "referenceStep": 16,
+            "progress": 0.2457,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 672,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.262,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 3,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 35,
+              "step": 17,
+              "progress": 0.262
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 496,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.262,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 565,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 4,
+            "referenceStep": 17,
+            "progress": 0.262,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 640,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2784,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 2,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 34,
+              "step": 18,
+              "progress": 0.2784
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 592,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2784,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 720,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 5,
+            "referenceStep": 18,
+            "progress": 0.2784,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 656,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2947,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 3,
+              "c": 5,
+              "color": 34,
+              "count": 20
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 33,
+              "step": 19,
+              "progress": 0.2947
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 584,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2947,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 704,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 6,
+            "referenceStep": 19,
+            "progress": 0.2947,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 880,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.311,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 4,
+              "c": 5,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 32,
+              "step": 20,
+              "progress": 0.311
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 560,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.311,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 528,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 7,
+            "referenceStep": 20,
+            "progress": 0.311,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 672,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.329,
+            "beforeBuffer": 3,
+            "isReference": true,
+            "action": {
+              "r": 2,
+              "c": 5,
+              "color": 19,
+              "count": 22
+            },
+            "direct": {
+              "completed": true,
+              "amplitude": 0,
+              "minBufferWithinWindow": 3,
+              "finalReplayValid": true,
+              "routeActions": 31,
+              "step": 21,
+              "progress": 0.329
+            },
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 712,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.329,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 0,
+              "color": 13,
+              "count": 37
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 688,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          },
+          {
+            "decision": 8,
+            "referenceStep": 21,
+            "progress": 0.329,
+            "beforeBuffer": 3,
+            "isReference": false,
+            "action": {
+              "r": 1,
+              "c": 2,
+              "color": 30,
+              "count": 35
+            },
+            "direct": null,
+            "search": {
+              "routes": 0,
+              "status": "budget_exhausted",
+              "nodes": 528,
+              "budgetExhausted": true,
+              "elapsedMs": 0
+            },
+            "searchedEvidence": null,
+            "classification": "budget_unknown"
+          }
+        ]
+      }
+    }
+  ]
+}
