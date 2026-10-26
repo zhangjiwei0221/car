@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "571";
+var APP_BUILD = "572";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -6248,6 +6248,8 @@ AntSolver.App = (function() {
     // 卡点类型：本关实际抽中了哪几种（ANT-GEN-CHOKE-TYPES-20260824）。
     //   只进生产侧记录，不入关卡本体。用于度量多样性——改动前只能靠结构指纹反推用了什么手段。
     var cp = result.chokePlan || null;
+    var _actualChokeTypes = Array.isArray(result.actualChokeTypes) ? result.actualChokeTypes : null;
+    var _actualChokeTypesCN = Array.isArray(result.actualChokeTypesCN) ? result.actualChokeTypesCN : null;
     // 【v375·P4】统一质量字段：表头/CSV/报告同一来源
     var _ps = (result.goodV3 && result.goodV3.persist) || {};
     var _fc = (result.goodV3 && result.goodV3.fillCurve) || null;
