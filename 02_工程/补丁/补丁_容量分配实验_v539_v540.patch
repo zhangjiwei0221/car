@@ -1,0 +1,5463 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index 386aaa1..1ac3e08 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -24,6 +24,8 @@
+ > v536：三图×4seed×A/B共24次目标模式运行，off/on目标均0通过；结构合格各1次，唯一合格候选010/32677没有高压参考状态，路线证据无法救回。无容量回退、无已知成功回退；结论是路线不能绕过结构门，下一步先解决结构合格候选与高压路线供给的共同缺口。
+ > v537：固定v536 A行做只读分类：both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4。最高频可行动类别是007“有高压路线但结构不合格”（4/4，免费连13~18>6）；下一轮只测007分支前缀债务8→12，不同时改容量/棋盘/障碍。
+ > v538：007分支前缀债务8→12被否决。4/4 seed免费连变差（13→15、18→22、13→20、15→24），高压仅2/4保持，结构仍0/4；容量无回退。回退到8，下一轮只改007容量分配，不再加前缀债务。
++> v539：007自动容量带推导为[31,31]，同色donor无余量，`CapacityTuner`变体为0；这不是容量分配无效，而是该带下实验无法执行。
++> v540：用显式实验带[16,31]重跑（不进入生产），评测38个合法变体；仅seed1001免费连15→14，其余3/4不变，结构仍0/4、目标0/4。容量分配方向否决；下一轮只测007棋盘余量，容量输入不自动放宽。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+@@ -52,6 +54,7 @@
+ - v536完成候选接线 A/B：`instantReleaseRoute` 默认关闭；只有结构/容量合格的候选才计算路线。24次运行没有目标通过或救回，唯一结构合格候选没有高压状态。该负结果说明下一步不能继续加路线搜索，而要看结构门与高压路线供给是否共同成立。
+ - v537完成只读缺口分类：12个A行中只有1个结构合格，4个007有高压但结构不合格，3个010两者都不足，4个006无有效目标候选。下一步先修007的单一分支债务因素，不同时换容量或棋盘。
+ - v538完成分支前缀债务8→12单因素：4/4免费连变差，高压仅2/4保持，结构0/4，容量合同无回退。分支前缀债务方向否决，下一步转007容量分配。
++- v539/v540完成容量分配单因素：自动带[31,31]无可转移donor；显式实验带[16,31]评测38个变体，仅1/4免费连下降1步，结构0/4、目标0/4。容量分配方向否决，下一轮转棋盘余量。
+ - 以下「下一步」仍是多图主产线基准，但产线现在与代码一致，口径不再分叉。
+ - 下一步不是继续堆模块，而是：**默认主产线多图基准 → 只读归因 → 针对最高频失败项做单变量实验。**
+ 
+@@ -679,9 +682,9 @@ for obstacle in candidates:
+ 
+ ## 6. 当前下一步：严格按此顺序
+ 
+-> **2026-10-26 v538 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。v538已经排除“增加分支前缀债务”这个局部修复；007仍是高压但结构不合格，006仍无有效候选，010仍是低压/无路线。
++> **2026-10-26 v540 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。v538排除分支前缀债务，v539/v540排除容量分配；007仍是高压但结构不合格，006仍无有效候选，010仍是低压/无路线。
+ >
+-> 下一轮唯一主实验（v539）：只在007上做容量分配单因素；固定seed1001/1002/88001/32677、7×8棋盘、分支前缀债务8、障碍和其他参数。先在容量带内枚举少量合法分色容量方案，比较免费连、solver中段3/4、结构门和aboveMax；不得跨色偷像素或越用户区间。
++> 下一轮唯一主实验（v541）：只在007上做棋盘余量单因素，A=7×8，B=7×9；固定seed1001/1002/88001/32677、自动容量带、分支前缀债务8、障碍和其他参数。主目标是免费连下降≥2且solver中段3/4≥50%；保护是容量守恒、aboveMax=0、结构不回退和黑块不恶化。
+ 
+ ### 下一步 A：多图主产线基准（先做）
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+index bdc598e..d3a5bd3 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+@@ -2,7 +2,7 @@
+ 
+ > **唯一验收骨架：本文件的 P0～P6。** `优质关卡生成_接管总纲.md` 中保留的历史实现卡和旧编号只能作为实现细节参考，不是第二套验收阶段。
+ 
+-> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v538 分支前缀债务8→12被否决，回退8**。
++> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v540 容量分配被否决，下一轮转007棋盘余量**。
+ > 本文是唯一“已做什么 → 剩什么 → 如何实验 → 何时算完成”的执行流程；算法细节回查 `优质关卡生成_接管总纲.md`，历史数字回查工作日志对应节号。
+ > 瞬时模式的具体施工顺序见 [`瞬时模式生成器实施计划_v525.md`](瞬时模式生成器实施计划_v525.md)，它是本文 P0~P3 的技术分支，不替代本文验收框架。
+ 
+@@ -58,6 +58,7 @@
+ | 路线证据候选接线 | v536 A/B三图×4seed共24次：off/on目标均0通过，结构合格各1次；010/32677无高压状态，route tested=0 | 没有救回和回退；路线不能替代结构门 |
+ | 结构与路线缺口分类 | v537 12个A行：both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4；007四例均为高压但结构不合格 | 下一轮只测007分支前缀债务8→12 |
+ | 分支前缀债务8→12 | v538 007四seed免费连均恶化、结构仍0/4，高压仅2/4保持 | 因子否决，回退8；下一轮只测容量分配 |
++| 容量分配 | v539自动带[31,31]无可转移donor；v540显式[16,31]评测38变体，仅1/4免费连降1步、结构0/4 | 容量方向否决，[16,31]不进入生产；下一轮只测棋盘余量 |
+ 
+ ### 2.1 关键正结果
+ 
+@@ -70,6 +71,7 @@
+ - v536候选接线A/B：24次运行中off/on目标均0通过，结构合格各1次，B臂没有救回；唯一结构合格候选010/32677 solver中段3/4=0、route tested=0。容量和已知成功均无回退，默认开关仍关闭。
+ - v537结构/路线缺口分类：A行12个，both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4。007四seed是有高压路线但结构不合格，全部卡最长免费连13~18；006四seed无有效候选。下一步只改007分支前缀债务。
+ - v538分支前缀债务8→12：007四seed免费连13→15、18→22、13→20、15→24，全部恶化；solver中段3/4仅2/4保持≥50%，结构仍0/4；容量合同无回退。因子否决，保持8。
++- v539/v540容量分配：自动带[31,31]无可转移donor；显式实验带[16,31]下38个合法评测变体中，只有seed1001免费连15→14，结构仍0/4、目标0/4。容量方向否决，[16,31]不写回生产。
+ 
+ ### 2.2 已验证、不能再走的弯路
+ 
+@@ -102,7 +104,7 @@
+ | 剩余项 | 当前卡点 | 下一步主实验 |
+ |---|---|---|
+ | 容量合同漏网 | 推荐图aboveMax=1 | 容量越界谱系追踪，先硬合同后体验 |
+-| 路线释放证据 | v538已排除分支前缀债务；007仍高压但结构不合格 | v539只测007容量分配；006另立后续 |
++| 路线释放证据 | v538排除前缀债务，v539/v540排除容量分配；007仍高压但结构不合格 | v541只测007棋盘余量7×8→7×9；006另立后续 |
+ | 远/近压力不足 | 010/推荐仍有低压基底 | 近失局部修、远失换基底；不做统一容量加减 |
+ | 每色容量组合规划 | 目前主要同色转移，缺全局联合目标 | 每色候选集→全局Pareto组合→重解评价 |
+ | 车序与首行观感 | 双时间线有测量，稳定生成策略不足 | 局部交换、首行同色run、释放顺序联合评价 |
+@@ -329,8 +331,8 @@
+ ## 6. 推荐执行顺序（不要跳步）
+ 
+ ```text
+-v538分支前缀债务8→12已完成（否决）
+-→ v539：007容量分配单因素
++v540容量分配已完成（否决）
++→ v541：007棋盘余量7×8→7×9单因素
+ → P0容量越界谱系追踪（硬合同）
+ → 多图失败分布基线
+ → P1 release unknown评价覆盖
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index cc8a769..afd68dd 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20692,3 +20692,58 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. v539只在007上测容量分配单因素，固定prefix debts=8、7×8棋盘和障碍。
+ 2. 容量方案必须在用户容量带内、每色守恒，不得跨色偷像素；比较免费连、solver中段3/4、结构门和aboveMax。
+ 3. 006无有效候选和010低压继续独立处理，不与v539并行改。
++
++### 529. 【2026-10-26】v539：自动容量带无可转移donor，容量实验无法执行
++
++#### 529.1 问题（原话）
++
++- “下一步。”
++- v538排除分支前缀债务后，按计划验证007的同色容量分配。
++
++#### 529.2 证据
++
++- 007自动推导容量带为`[31,31]`；4个seed生成的最终车单中大量车辆容量为31、22、30等，同色donor没有`count-min`余量。
++- `CapacityTuner.variants`在`[31,31]`下4/4 seed均为`tested=0`；这不是“容量分配无效”，而是没有合法转移可评测。
++- 基线仍可正常生成：freeRun 15/14/14/15，中段3/4 56/65.4/56/56，结构均只失败免费连。
++
++#### 529.3 改动
++
++- 新增`容量分配_v539.js`、JSON和预登记；只读容量变体，不修改生产容量带、车序、棋盘或障碍。
++
++#### 529.4 验证（前后数字）
++
++- 4/4 seed：合法变体0，keyCars 8，容量带`[31,31]`；belowMin=27。
++- 由于没有变体，不能得出容量分配有效的结论，也不能把“0变体”写成容量失败。
++
++#### 529.5 遗留
++
++1. 若继续容量方向，必须使用明确实验输入而不是悄悄放宽自动带；先验证显式`[16,31]`。
++2. `[16,31]`只作为实验输入，不能写回生产默认。
++
++### 530. 【2026-10-26】v540：显式[16,31]容量分配仍无结构改善
++
++#### 530.1 问题（原话）
++
++- “下一步。”
++- v539无法构造变体，需在不改生产默认的前提下验证容量分配机制。
++
++#### 530.2 证据
++
++- 用显式实验带`[16,31]`，保持生成时的实际棋盘/车序/障碍和prefix debts=8不变；4个seed共评测38个合法容量变体。
++- 仅seed1001免费连15→14，另外三个seed 14/14、14/14、15/15不变；结构转化0/4，目标通过0/4，释放均unknown。
++- 容量均守恒、aboveMax=0、belowMin不增加、micro=0；没有保护回退。
++
++#### 530.3 改动
++
++- 新增`容量分配_松弛带_v540.js`、JSON和预登记；只改`CapacityTuner`的实验容量带，不改默认生成配置。
++- v540结果不把`[16,31]`写回UI或生产。
++
++#### 530.4 验证（前后数字）
++
++- 38个合法变体、0结构转化、0目标通过；免费连只有1/4下降1步，未达到预登记“至少2/4下降2步”。
++- 容量方向否决；下一轮按P0～P6转向007棋盘余量7×8→7×9单因素。
++
++#### 530.5 遗留
++
++1. v541只测棋盘余量，固定容量输入、prefix debts=8、seed和障碍。
++2. 006无候选、010低压和P0容量漏网继续独立处理，不与v541并行。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index c570736..0b82297 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v538 分支前缀债务单因素）　|　当前版本：**v538**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v540 容量分配单因素）　|　当前版本：**v540**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~528。v538把007的`instantPlanBranchPrefixDebts`从8改为12：4/4免费连变差（13→15、18→22、13→20、15→24），高压仅2/4保持，结构仍0/4；容量无回退。该单因素否决，回退8。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~530。v539自动容量带[31,31]无可转移donor、变体0；v540显式实验带[16,31]评测38个合法变体，仅seed1001免费连15→14，结构0/4转化、目标0/4通过。容量分配否决，[16,31]不进入生产；下一轮只测007棋盘余量。**
+ >
+ > **编号约定：验收阶段只有 P0～P6，以 [`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md) 为准。代码和历史文档中的 P7、P8、P9、P10 是实现名、旧编号或历史索引，不是额外验收阶段。**
+ >
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 044517f..baa1cc9 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -278,3 +278,10 @@
+ - 免费连A→B为13→15、18→22、13→20、15→24，4/4恶化；B的solver中段3/4只有50/57.7/72/68，1001和88001跌到3.7%/3.8%；结构A/B均0/4。
+ - 容量均守恒、aboveMax=0；没有越界，但没有质量收益。该单因素按预登记否决，回退8，不再继续加前缀债务。
+ - 下一步v539只在007上测容量分配单因素，固定棋盘、前缀债务8和障碍；不跨色偷像素、不越用户容量区间。
++
++## 34. v539~v540：容量分配方向否决
++
++- v539使用自动推导容量带`[31,31]`，4个007 seed的`CapacityTuner.variants`均为0：关键车多在31/22/30，而`[31,31]`没有同色donor余量，实验无法构造合法变体。
++- v540仅把实验输入设为显式`[16,31]`，不写回生产；仍保持原生成关卡、车序、棋盘和障碍。4个seed共评测38个合法容量变体。
++- 结果：只有seed1001免费连15→14，其他3/4不变；结构转化0/4，完整目标通过0/4，释放均为unknown。容量均守恒、aboveMax=0，没有保护回退。
++- 容量分配方向否决；`[16,31]`只作为实验输入保留，不进入默认。下一轮v541只测007棋盘余量7×8→7×9。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index 1d678a4..1688296 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -103,6 +103,8 @@
+ - **v537边界**：本步不改生成器。下一步只在007上做分支前缀债务8→12单因素A/B，不同时改容量、棋盘或障碍；006的无候选问题另立后续实验。
+ - **v538结果**：007 prefix debts 8→12的4个seed，免费连从13/18/13/15变为15/22/20/24，均恶化；solver中段3/4仅seed1002、32677保持≥50%，seed1001/88001跌到3.7%/3.8%；结构仍0/4，容量守恒/aboveMax=0。该因素否决，回退8。
+ - **v538边界**：分支前缀债务方向停止加码。下一步只换007容量分配，不同时改棋盘或障碍。
++- **v539/v540结果**：自动容量带[31,31]无可转移donor，变体0；显式实验带[16,31]评测38个合法变体，仅seed1001免费连15→14，其余不变，结构0/4转化、目标0/4通过，容量无回退。[16,31]不进入生产。
++- **v539/v540边界**：容量分配方向否决。下一轮只测007棋盘余量（7×8→7×9），不同时改容量或障碍。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index a2625dc..39387d1 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v538 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=538">
++  <title>车接小人 v540 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=540">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v538</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v540</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,29 +773,29 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=538"></script>
+-  <script src="js/utils.js?v=538"></script>
++  <script src="js/zip.js?v=540"></script>
++  <script src="js/utils.js?v=540"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=538"></script>
+-  <script src="js/simulator.js?v=538"></script>
++  <script src="js/color-libs.js?v=540"></script>
++  <script src="js/simulator.js?v=540"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=538"></script>
+-  <script src="js/solver-strategy.js?v=538"></script>
+-  <script src="js/solver.js?v=538"></script>
+-  <script src="js/playersim.js?v=538"></script>
++  <script src="js/anchor-cut.js?v=540"></script>
++  <script src="js/solver-strategy.js?v=540"></script>
++  <script src="js/solver.js?v=540"></script>
++  <script src="js/playersim.js?v=540"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=538"></script>
+-  <script src="js/car-sequencer.js?v=538"></script>
+-  <script src="js/experience-goal.js?v=538"></script>
+-  <script src="js/release-route-constructor.js?v=538"></script>
+-  <script src="js/capacity-tuner.js?v=538"></script>
+-  <script src="js/instant-playout.js?v=538"></script>
+-  <script src="js/generator.js?v=538"></script>
+-  <script src="js/source-preflight.js?v=538"></script>
+-  <script src="js/analysis.js?v=538"></script>
++  <script src="js/solver-analysis.js?v=540"></script>
++  <script src="js/car-sequencer.js?v=540"></script>
++  <script src="js/experience-goal.js?v=540"></script>
++  <script src="js/release-route-constructor.js?v=540"></script>
++  <script src="js/capacity-tuner.js?v=540"></script>
++  <script src="js/instant-playout.js?v=540"></script>
++  <script src="js/generator.js?v=540"></script>
++  <script src="js/source-preflight.js?v=540"></script>
++  <script src="js/analysis.js?v=540"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=538"></script>
+-  <script src="js/app.js?v=538"></script>
++  <script src="js/level-editor.js?v=540"></script>
++  <script src="js/app.js?v=540"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 6e5b0ed..04533b4 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -73,6 +73,8 @@
+ | v536 路线证据候选接线 | 完整释放路线能否在目标生成候选选择中救回关卡 | ❌ 三图×4seed×A/B共24次，off/on目标均0通过、结构合格各1；唯一合格候选无高压路线，B无救回；无容量/已知成功回退，默认关闭 | `释放路线生成对照_v536.js` + JSON + 预登记 | §526 |
+ | v537 结构/路线缺口分类 | 当前最缺的是结构、路线还是两者 | A行12个：both_ready0、structure_only1、route_only4、neither3、invalid4；007四例均为高压但结构不合格，下一步只测分支前缀债务8→12 | `结构路线缺口分类_v537.js` + JSON + 预登记 | §527 |
+ | v538 分支前缀债务8→12 | 增加短债车前缀能否降低007免费连并保持高压 | ❌ 4/4免费连恶化、结构仍0/4、高压仅2/4保持；容量无回退，回退8，转容量分配 | `分支前缀债务12_v538.js` + JSON + 预登记 | §528 |
++| v539 容量分配（自动带） | 当前自动容量带能否生成同色容量变体 | ➖ [31,31]无donor余量，4/4 seed变体0；不能判断容量效果 | `容量分配_v539.js` + JSON + 预登记 | §529 |
++| v540 容量分配（[16,31]实验带） | 显式可行容量带下容量分配能否修007结构 | ❌ 38个变体，仅1/4免费连降1步、结构0/4、目标0/4；容量无回退，[16,31]不入生产 | `容量分配_松弛带_v540.js` + JSON + 预登记 | §530 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_v539.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_v539.js"
+new file mode 100644
+index 0000000..05f2422
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_v539.js"
+@@ -0,0 +1,167 @@
++#!/usr/bin/env node
++/** v539：007同色容量再分配单因素，固定车序/棋盘/障碍。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
++  'capacity-tuner.js', 'instant-playout.js', 'generator.js', 'source-preflight.js'];
++const IMAGE = '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt';
++const SEEDS = [1001, 1002, 88001, 32677];
++const OUT = path.resolve(ROOT, '03_工具/好关评分/容量分配_v539.json');
++function load() {
++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function cfgFor(G, blocks, seed) {
++  const band = G.deriveCapacityBand(blocks);
++  return {
++    seed, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1],
++    capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: 7, boardRowsMax: 7, boardColsMin: 8, boardColsMax: 8,
++    boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanBranchCount: 2,
++    instantPlanBranchDebtRoots: true, instantPlanBranchPrefixDebts: 8,
++    experienceGoal: true, instantReleaseRoute: false,
++    goalPerRoundMs: 20000, goalMaxMs: 30000, goalMaxRounds: 2,
++    goalSharedBudget: true, candidateCount: 1, acceptMode: 'target',
++    targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0,
++    capacityTuneMs: 20000, capacityTuneCars: 8, capacityTuneVariants: 48,
++    capacityMin: band.band[0], capacityMax: band.band[1]
++  };
++}
++function metricsOf(A, level, ev, cfg, baselineCap) {
++  const q = ev && ev.goodV3 ? A.Quality.fromGeneration(Object.assign({}, ev, {
++    level, valid: true, config: cfg
++  })) : null;
++  const fc = ev && ev.goodV3 && ev.goodV3.fillCurve || {};
++  const xp = ev && ev.solveResult ? A.ExperienceGoal.evaluate(level, {
++    solveResult: ev.solveResult, decision: false, instantChain: true
++  }) : null;
++  const ca = A.Quality.capacityEvidence(level, cfg);
++  return {
++    valid: !!(ev && ev.valid), struct: !!(q && q.gatePass),
++    gateReasons: q && q.gateReasons || [], gateDistance: q && q.gateDistance,
++    freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
++    freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
++    fullMedian2: fc.fullMedian2 != null ? fc.fullMedian2 : null,
++    midBuffer34Pct: xp && xp.metrics && xp.metrics.midBuffer34Pct,
++    maxBuffer: xp && xp.metrics && xp.metrics.maxBuffer,
++    significantReleaseCount: xp && xp.metrics && xp.metrics.significantReleaseCount,
++    capacity: {
++      conserved: ca.conserved, boardFloorPass: ca.boardFloorPass,
++      aboveMax: ca.aboveMax, belowMin: ca.belowMin,
++      microCars: ca.microCars, minCap: ca.minCap, maxCap: ca.maxCap
++    },
++    belowMinNotWorse: !baselineCap || ca.belowMin <= baselineCap.belowMin
++  };
++}
++function protectedOk(m) {
++  return !!(m.valid && m.capacity.conserved && m.capacity.boardFloorPass &&
++    m.capacity.aboveMax === 0 && m.belowMinNotWorse &&
++    (!m.capacity.microCars || m.capacity.microCars.length === 0));
++}
++function better(a, b) {
++  if (!b) return true;
++  if (a.struct !== b.struct) return a.struct;
++  if ((a.gateReasons || []).length !== (b.gateReasons || []).length)
++    return (a.gateReasons || []).length < (b.gateReasons || []).length;
++  if ((a.freeRunMax || 999) !== (b.freeRunMax || 999)) return (a.freeRunMax || 999) < (b.freeRunMax || 999);
++  if ((a.freeLowPct || 0) !== (b.freeLowPct || 0)) return (a.freeLowPct || 0) < (b.freeLowPct || 0);
++  return (a.fullMedian2 || 99) < (b.fullMedian2 || 99);
++}
++function run(A, seed) {
++  const G = A.Generator, EG = A.ExperienceGoal;
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, IMAGE), 'utf8'));
++  const cfg = cfgFor(G, blocks, seed);
++  const t0 = Date.now();
++  let base = null;
++  try { base = G.produceGoal(blocks, cfg); }
++  catch (e) { base = { level: null, valid: false, error: String((e && e.message) || e) }; }
++  if (!base || !base.level || !base.valid) {
++    return { seed, valid: false, error: base && base.error || 'no_base_level', wallMs: Date.now() - t0, variants: [] };
++  }
++  const baseEval = G.evaluateLevel(base.level, cfg);
++  const baseMetrics = metricsOf(A, base.level, baseEval, cfg, null);
++  const made = A.CapacityTuner.variants(base.level, base.solveResult, {
++    capMin: cfg.boxSizeMin, capMax: cfg.boxSizeMax, maxCars: 8, maxVariants: 48
++  });
++  const out = { seed, valid: true, generationMs: Date.now() - t0,
++    base: { hash: hash(base.level), level: base.level, metrics: baseMetrics },
++    keyCars: made.keyCars, tested: 0, protectedRejected: 0, variants: [], best: null,
++    elapsedMs: 0 };
++  const variantStart = Date.now();
++  for (const v of made.variants) {
++    if (Date.now() - variantStart >= 20000) { out.stopped = 'variant_budget'; break; }
++    const ev = G.evaluateLevel(v.level, cfg);
++    const m = metricsOf(A, v.level, ev, cfg, baseMetrics.capacity);
++    const row = { meta: v.meta, hash: hash(v.level), metrics: m, level: v.level };
++    out.tested++;
++    out.variants.push(row);
++    if (!protectedOk(m)) { out.protectedRejected++; continue; }
++    if (better(m, out.best && out.best.metrics)) out.best = row;
++  }
++  if (out.best) {
++    const bestEv = G.evaluateLevel(out.best.level, cfg);
++    const full = EG.evaluate(out.best.level, {
++      solveResult: bestEv.solveResult, decision: true, instantChain: true
++    });
++    out.best.experience = full && {
++      pass: full.pass, status: full.status, reasons: full.reasons,
++      metrics: full.metrics, release: full.releaseDecision && full.releaseDecision.status
++    };
++  }
++  out.elapsedMs = Date.now() - t0;
++  console.log(JSON.stringify({
++    seed, generationMs: out.generationMs, tested: out.tested,
++    base: { struct: baseMetrics.struct, freeRun: baseMetrics.freeRunMax, freeLow: baseMetrics.freeLowPct, mid: baseMetrics.midBuffer34Pct },
++    best: out.best && {
++      struct: out.best.metrics.struct, freeRun: out.best.metrics.freeRunMax,
++      freeLow: out.best.metrics.freeLowPct, mid: out.best.metrics.midBuffer34Pct,
++      release: out.best.experience && out.best.experience.release,
++      targetPass: out.best.experience && out.best.experience.pass
++    }
++  }));
++  // 只保留基线/最佳 level 供复核，避免把 48 个完整关卡全部膨胀进结果。
++  out.best && delete out.best.level;
++  delete out.base.level;
++  out.variants = out.variants.map(x => Object.assign({}, x, { level: undefined }));
++  return out;
++}
++const A = load();
++const rows = [];
++for (const seed of SEEDS) rows.push(run(A, seed));
++const validRows = rows.filter(x => x.valid);
++const pairs = validRows.map(x => ({
++  seed: x.seed,
++  freeRun: [x.base.metrics.freeRunMax, x.best && x.best.metrics.freeRunMax],
++  freeRunDrop2: !!(x.best && x.base.metrics.freeRunMax != null && x.best.metrics.freeRunMax <= x.base.metrics.freeRunMax - 2),
++  struct: [x.base.metrics.struct, x.best && x.best.metrics.struct],
++  targetPass: x.best && x.best.experience && x.best.experience.pass,
++  protected: !x.best || protectedOk(x.best.metrics)
++}));
++const summary = {
++  image: '007', seeds: SEEDS, rows: rows.length, valid: validRows.length,
++  tested: validRows.reduce((n, x) => n + x.tested, 0),
++  protectedRejected: validRows.reduce((n, x) => n + x.protectedRejected, 0),
++  freeRunDrop2: pairs.filter(x => x.freeRunDrop2).length,
++  structTransitions: pairs.filter(x => !x.struct[0] && x.struct[1]).length,
++  targetPasses: pairs.filter(x => x.targetPass).length,
++  capacityRegressions: pairs.filter(x => !x.protected).map(x => x.seed),
++  decision: pairs.filter(x => x.freeRunDrop2 && x.struct[1]).length > 0
++    ? '容量分配出现结构改善信号，保留候选，不直接进默认。'
++    : '容量分配没有形成结构改善，下一轮改棋盘余量或另立006/010实验。'
++};
++const report = { schema: 'capacity-allocation-single-factor-v1', date: '2026-10-26',
++  preregistration: '容量分配_预登记_v539.md', summary, pairs, rows };
++fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ summary, pairs }, null, 2));
++if (summary.capacityRegressions.length) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_v539.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_v539.json"
+new file mode 100644
+index 0000000..35ad25d
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_v539.json"
+@@ -0,0 +1,687 @@
++{
++  "schema": "capacity-allocation-single-factor-v1",
++  "date": "2026-10-26",
++  "preregistration": "容量分配_预登记_v539.md",
++  "summary": {
++    "image": "007",
++    "seeds": [
++      1001,
++      1002,
++      88001,
++      32677
++    ],
++    "rows": 4,
++    "valid": 4,
++    "tested": 0,
++    "protectedRejected": 0,
++    "freeRunDrop2": 0,
++    "structTransitions": 0,
++    "targetPasses": 0,
++    "capacityRegressions": [],
++    "decision": "容量分配没有形成结构改善，下一轮改棋盘余量或另立006/010实验。"
++  },
++  "pairs": [
++    {
++      "seed": 1001,
++      "freeRun": [
++        15,
++        null
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        null
++      ],
++      "targetPass": null,
++      "protected": true
++    },
++    {
++      "seed": 1002,
++      "freeRun": [
++        14,
++        null
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        null
++      ],
++      "targetPass": null,
++      "protected": true
++    },
++    {
++      "seed": 88001,
++      "freeRun": [
++        14,
++        null
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        null
++      ],
++      "targetPass": null,
++      "protected": true
++    },
++    {
++      "seed": 32677,
++      "freeRun": [
++        15,
++        null
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        null
++      ],
++      "targetPass": null,
++      "protected": true
++    }
++  ],
++  "rows": [
++    {
++      "seed": 1001,
++      "valid": true,
++      "generationMs": 20984,
++      "base": {
++        "hash": "261c9b5999932a5231d131c3457c81c9b73dee5287eca7d82923c8a0aac50548",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 15>6"
++          ],
++          "gateDistance": 45,
++          "freeRunMax": 15,
++          "freeLowPct": 20,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 27,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 26,
++            "waitSteps": 26,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 33,
++          "count": 31,
++          "score": 60.5,
++          "reasons": {
++            "opens": 3,
++            "soleSupply": true,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 9
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 42,
++            "waitSteps": 42,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "color": 31,
++          "count": 27,
++          "score": 32.5,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 10,
++            "waitSteps": 1,
++            "initialDebt": 1
++          }
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "color": 32,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "color": 19,
++          "count": 31,
++          "score": 25,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 7,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        }
++      ],
++      "tested": 0,
++      "protectedRejected": 0,
++      "variants": [],
++      "best": null,
++      "elapsedMs": 20984
++    },
++    {
++      "seed": 1002,
++      "valid": true,
++      "generationMs": 24305,
++      "base": {
++        "hash": "e260be8bd27f273f7fe19f0ae7ab72bcec241f6109f8139d6e54b74feb0e6231",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 14>6"
++          ],
++          "gateDistance": 40,
++          "freeRunMax": 14,
++          "freeLowPct": 26,
++          "fullMedian2": 2,
++          "midBuffer34Pct": 65.4,
++          "maxBuffer": 3,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 27,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 22,
++            "waitSteps": 27,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 18,
++            "waitSteps": 18,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "color": 31,
++          "count": 31,
++          "score": 57.5,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 16,
++            "waitSteps": 16,
++            "initialDebt": 15
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 23,
++            "waitSteps": 23,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 22,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 25,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 5,
++          "c": 5,
++          "color": 33,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 24,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 5,
++          "c": 6,
++          "color": 13,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 12,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        }
++      ],
++      "tested": 0,
++      "protectedRejected": 0,
++      "variants": [],
++      "best": null,
++      "elapsedMs": 24306
++    },
++    {
++      "seed": 88001,
++      "valid": true,
++      "generationMs": 22330,
++      "base": {
++        "hash": "204543ba44d5ba9f29f68f9250c7a64b26302fed2922dc796b91f867184442f7",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 14>6"
++          ],
++          "gateDistance": 40,
++          "freeRunMax": 14,
++          "freeLowPct": 17,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 27,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 26,
++            "waitSteps": 26,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 33,
++          "count": 31,
++          "score": 60.5,
++          "reasons": {
++            "opens": 3,
++            "soleSupply": true,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 9
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 42,
++            "waitSteps": 42,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "color": 32,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "color": 19,
++          "count": 31,
++          "score": 25,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 7,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "color": 31,
++          "count": 27,
++          "score": 24.5,
++          "reasons": {
++            "opens": 0,
++            "soleSupply": true,
++            "timingGap": 10,
++            "waitSteps": 1,
++            "initialDebt": 1
++          }
++        }
++      ],
++      "tested": 0,
++      "protectedRejected": 0,
++      "variants": [],
++      "best": null,
++      "elapsedMs": 22330
++    },
++    {
++      "seed": 32677,
++      "valid": true,
++      "generationMs": 21392,
++      "base": {
++        "hash": "ef6960f9bacbf0466f08d77fedc2287c6282242864ae49acbf5456cc6300fe24",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 15>6"
++          ],
++          "gateDistance": 45,
++          "freeRunMax": 15,
++          "freeLowPct": 20,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 27,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 26,
++            "waitSteps": 26,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 33,
++          "count": 31,
++          "score": 60.5,
++          "reasons": {
++            "opens": 3,
++            "soleSupply": true,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 9
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 42,
++            "waitSteps": 42,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "color": 32,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "color": 19,
++          "count": 31,
++          "score": 25,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 7,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 6,
++          "c": 5,
++          "color": 31,
++          "count": 27,
++          "score": 24.5,
++          "reasons": {
++            "opens": 0,
++            "soleSupply": true,
++            "timingGap": 10,
++            "waitSteps": 1,
++            "initialDebt": 1
++          }
++        }
++      ],
++      "tested": 0,
++      "protectedRejected": 0,
++      "variants": [],
++      "best": null,
++      "elapsedMs": 21392
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246_v540.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246_v540.js"
+new file mode 100644
+index 0000000..9eb28dd
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246_v540.js"
+@@ -0,0 +1,173 @@
++#!/usr/bin/env node
++/** v540：显式实验容量带[16,31]下，验证007同色容量分配；不改生产默认。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
++  'capacity-tuner.js', 'instant-playout.js', 'generator.js', 'source-preflight.js'];
++const IMAGE = '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt';
++const SEEDS = [1001, 1002, 88001, 32677];
++const TUNE_MIN = 16, TUNE_MAX = 31;
++const OUT = path.resolve(ROOT, '03_工具/好关评分/容量分配_松弛带_v540.json');
++function load() {
++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function generationConfig(G, blocks, seed) {
++  const band = G.deriveCapacityBand(blocks);
++  return {
++    seed, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1],
++    capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: 7, boardRowsMax: 7, boardColsMin: 8, boardColsMax: 8,
++    boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanBranchCount: 2,
++    instantPlanBranchDebtRoots: true, instantPlanBranchPrefixDebts: 8,
++    experienceGoal: true, instantReleaseRoute: false,
++    goalPerRoundMs: 20000, goalMaxMs: 30000, goalMaxRounds: 2,
++    goalSharedBudget: true, candidateCount: 1, acceptMode: 'target',
++    targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0
++  };
++}
++function evaluationConfig(cfg) {
++  const o = Object.assign({}, cfg, {
++    boxSizeMin: TUNE_MIN, boxSizeMax: TUNE_MAX,
++    capNormMin: TUNE_MIN, capNormMax: TUNE_MAX
++  });
++  return o;
++}
++function metricsOf(A, level, ev, cfg, baselineCap) {
++  const q = ev && ev.goodV3 ? A.Quality.fromGeneration(Object.assign({}, ev, {
++    level, valid: true, config: cfg
++  })) : null;
++  const fc = ev && ev.goodV3 && ev.goodV3.fillCurve || {};
++  const xp = ev && ev.solveResult ? A.ExperienceGoal.evaluate(level, {
++    solveResult: ev.solveResult, decision: false, instantChain: true
++  }) : null;
++  const ca = A.Quality.capacityEvidence(level, cfg);
++  return {
++    valid: !!(ev && ev.valid), struct: !!(q && q.gatePass),
++    gateReasons: q && q.gateReasons || [], gateDistance: q && q.gateDistance,
++    freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
++    freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
++    fullMedian2: fc.fullMedian2 != null ? fc.fullMedian2 : null,
++    midBuffer34Pct: xp && xp.metrics && xp.metrics.midBuffer34Pct,
++    maxBuffer: xp && xp.metrics && xp.metrics.maxBuffer,
++    significantReleaseCount: xp && xp.metrics && xp.metrics.significantReleaseCount,
++    capacity: {
++      conserved: ca.conserved, boardFloorPass: ca.boardFloorPass,
++      aboveMax: ca.aboveMax, belowMin: ca.belowMin,
++      microCars: ca.microCars, minCap: ca.minCap, maxCap: ca.maxCap
++    },
++    belowMinNotWorse: !baselineCap || ca.belowMin <= baselineCap.belowMin
++  };
++}
++function protectedOk(m) {
++  return !!(m.valid && m.capacity.conserved && m.capacity.boardFloorPass &&
++    m.capacity.aboveMax === 0 && m.belowMinNotWorse &&
++    (!m.capacity.microCars || m.capacity.microCars.length === 0));
++}
++function better(a, b) {
++  if (!b) return true;
++  if (a.struct !== b.struct) return a.struct;
++  if ((a.gateReasons || []).length !== (b.gateReasons || []).length)
++    return (a.gateReasons || []).length < (b.gateReasons || []).length;
++  if ((a.freeRunMax || 999) !== (b.freeRunMax || 999)) return (a.freeRunMax || 999) < (b.freeRunMax || 999);
++  if ((a.freeLowPct || 0) !== (b.freeLowPct || 0)) return (a.freeLowPct || 0) < (b.freeLowPct || 0);
++  return (a.fullMedian2 || 99) < (b.fullMedian2 || 99);
++}
++function run(A, seed) {
++  const G = A.Generator, EG = A.ExperienceGoal;
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, IMAGE), 'utf8'));
++  const genCfg = generationConfig(G, blocks, seed);
++  const evalCfg = evaluationConfig(genCfg);
++  const t0 = Date.now();
++  let base = null;
++  try { base = G.produceGoal(blocks, genCfg); }
++  catch (e) { base = { level: null, valid: false, error: String((e && e.message) || e) }; }
++  if (!base || !base.level || !base.valid) {
++    return { seed, valid: false, error: base && base.error || 'no_base_level', wallMs: Date.now() - t0, variants: [] };
++  }
++  const baseEval = G.evaluateLevel(base.level, evalCfg);
++  const baseMetrics = metricsOf(A, base.level, baseEval, evalCfg, null);
++  const made = A.CapacityTuner.variants(base.level, base.solveResult, {
++    capMin: TUNE_MIN, capMax: TUNE_MAX, maxCars: 8, maxVariants: 48
++  });
++  const out = {
++    seed, valid: true, generationBand: [genCfg.boxSizeMin, genCfg.boxSizeMax],
++    experimentalBand: [TUNE_MIN, TUNE_MAX], generationMs: Date.now() - t0,
++    base: { hash: hash(base.level), metrics: baseMetrics }, keyCars: made.keyCars,
++    rejected: made.rejected, tested: 0, protectedRejected: 0,
++    variants: [], best: null, elapsedMs: 0
++  };
++  const variantStart = Date.now();
++  for (const v of made.variants) {
++    if (Date.now() - variantStart >= 20000) { out.stopped = 'variant_budget'; break; }
++    const ev = G.evaluateLevel(v.level, evalCfg);
++    const m = metricsOf(A, v.level, ev, evalCfg, baseMetrics.capacity);
++    const row = { meta: v.meta, hash: hash(v.level), metrics: m, level: v.level };
++    out.tested++; out.variants.push(row);
++    if (!protectedOk(m)) { out.protectedRejected++; continue; }
++    if (better(m, out.best && out.best.metrics)) out.best = row;
++  }
++  if (out.best) {
++    const bestEv = G.evaluateLevel(out.best.level, evalCfg);
++    const full = EG.evaluate(out.best.level, { solveResult: bestEv.solveResult, decision: true, instantChain: true });
++    out.best.experience = full && {
++      pass: full.pass, status: full.status, reasons: full.reasons,
++      metrics: full.metrics, release: full.releaseDecision && full.releaseDecision.status
++    };
++  }
++  out.elapsedMs = Date.now() - t0;
++  console.log(JSON.stringify({
++    seed, genBand: out.generationBand, tuneBand: out.experimentalBand,
++    tested: out.tested, keyCars: made.keyCars.length,
++    base: { struct: baseMetrics.struct, freeRun: baseMetrics.freeRunMax, mid: baseMetrics.midBuffer34Pct, cap: baseMetrics.capacity },
++    best: out.best && { struct: out.best.metrics.struct, freeRun: out.best.metrics.freeRunMax,
++      mid: out.best.metrics.midBuffer34Pct, max: out.best.metrics.maxBuffer,
++      targetPass: out.best.experience && out.best.experience.pass,
++      release: out.best.experience && out.best.experience.release }
++  }));
++  out.best && delete out.best.level;
++  out.variants = out.variants.map(x => Object.assign({}, x, { level: undefined }));
++  return out;
++}
++const A = load();
++const rows = [];
++for (const seed of SEEDS) rows.push(run(A, seed));
++const validRows = rows.filter(x => x.valid && x.base);
++const pairs = validRows.map(x => ({
++  seed: x.seed,
++  freeRun: [x.base.metrics.freeRunMax, x.best && x.best.metrics.freeRunMax],
++  freeRunDrop2: !!(x.best && x.base.metrics.freeRunMax != null && x.best.metrics.freeRunMax <= x.base.metrics.freeRunMax - 2),
++  struct: [x.base.metrics.struct, x.best && x.best.metrics.struct],
++  targetPass: !!(x.best && x.best.experience && x.best.experience.pass),
++  capacityOk: !x.best || protectedOk(x.best.metrics)
++}));
++const summary = {
++  image: '007', seeds: SEEDS, rows: rows.length, valid: validRows.length,
++  generationBand: '[31,31] (derived)', experimentalBand: '[16,31]',
++  tested: validRows.reduce((n, x) => n + x.tested, 0),
++  variantsConstructed: validRows.reduce((n, x) => n + (x.rejected ? x.rejected.length : 0) + x.tested, 0),
++  protectedRejected: validRows.reduce((n, x) => n + x.protectedRejected, 0),
++  freeRunDrop2: pairs.filter(x => x.freeRunDrop2).length,
++  structTransitions: pairs.filter(x => !x.struct[0] && x.struct[1]).length,
++  targetPasses: pairs.filter(x => x.targetPass).length,
++  capacityRegressions: pairs.filter(x => !x.capacityOk).map(x => x.seed),
++  decision: pairs.filter(x => x.freeRunDrop2 && x.struct[1]).length > 0
++    ? '显式[16,31]下出现结构改善信号，保留候选，不进入生产默认。'
++    : '显式[16,31]下没有结构改善，回退容量分配方向；[16,31]不得写回生产。'
++};
++const report = { schema: 'capacity-allocation-relaxed-band-v1', date: '2026-10-26',
++  preregistration: '容量分配_松弛带实验_预登记_v540.md', summary, pairs, rows };
++fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ summary, pairs }, null, 2));
++if (summary.capacityRegressions.length) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246_v540.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246_v540.json"
+new file mode 100644
+index 0000000..1d453a8
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246_v540.json"
+@@ -0,0 +1,3997 @@
++{
++  "schema": "capacity-allocation-relaxed-band-v1",
++  "date": "2026-10-26",
++  "preregistration": "容量分配_松弛带实验_预登记_v540.md",
++  "summary": {
++    "image": "007",
++    "seeds": [
++      1001,
++      1002,
++      88001,
++      32677
++    ],
++    "rows": 4,
++    "valid": 4,
++    "generationBand": "[31,31] (derived)",
++    "experimentalBand": "[16,31]",
++    "tested": 38,
++    "variantsConstructed": 163,
++    "protectedRejected": 0,
++    "freeRunDrop2": 0,
++    "structTransitions": 0,
++    "targetPasses": 0,
++    "capacityRegressions": [],
++    "decision": "显式[16,31]下没有结构改善，回退容量分配方向；[16,31]不得写回生产。"
++  },
++  "pairs": [
++    {
++      "seed": 1001,
++      "freeRun": [
++        15,
++        14
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        false
++      ],
++      "targetPass": false,
++      "capacityOk": true
++    },
++    {
++      "seed": 1002,
++      "freeRun": [
++        14,
++        14
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        false
++      ],
++      "targetPass": false,
++      "capacityOk": true
++    },
++    {
++      "seed": 88001,
++      "freeRun": [
++        14,
++        14
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        false
++      ],
++      "targetPass": false,
++      "capacityOk": true
++    },
++    {
++      "seed": 32677,
++      "freeRun": [
++        15,
++        15
++      ],
++      "freeRunDrop2": false,
++      "struct": [
++        false,
++        false
++      ],
++      "targetPass": false,
++      "capacityOk": true
++    }
++  ],
++  "rows": [
++    {
++      "seed": 1001,
++      "valid": true,
++      "generationBand": [
++        31,
++        31
++      ],
++      "experimentalBand": [
++        16,
++        31
++      ],
++      "generationMs": 20872,
++      "base": {
++        "hash": "261c9b5999932a5231d131c3457c81c9b73dee5287eca7d82923c8a0aac50548",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 15>6"
++          ],
++          "gateDistance": 45,
++          "freeRunMax": 15,
++          "freeLowPct": 20,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 26,
++            "waitSteps": 26,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 33,
++          "count": 31,
++          "score": 60.5,
++          "reasons": {
++            "opens": 3,
++            "soleSupply": true,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 9
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 42,
++            "waitSteps": 42,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "color": 31,
++          "count": 27,
++          "score": 32.5,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 10,
++            "waitSteps": 1,
++            "initialDebt": 1
++          }
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "color": 32,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "color": 19,
++          "count": 31,
++          "score": 25,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 7,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        }
++      ],
++      "rejected": [
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 1
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 2
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "delta": -1
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "delta": -2
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "delta": -4
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 1
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 2
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 4
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -1
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -2
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -4
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "delta": -4
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 1
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 2
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 4
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -1
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -2
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -4
++        }
++      ],
++      "tested": 10,
++      "protectedRejected": 0,
++      "variants": [
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "229ceb063de9d56ae28609bd89d8bf61a1bccc9e5d159279097d54a1e410101e",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "24864a4d0254dbe424e64b4f48d1c2a496f0c5ee7be110cf0d140269fb52c0b7",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "c4d2d4b1b384c60cb56acb36fd58e8c06d86d7642b7e30f9a980c6f48108ce1e",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 23,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "229ceb063de9d56ae28609bd89d8bf61a1bccc9e5d159279097d54a1e410101e",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 24,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "24864a4d0254dbe424e64b4f48d1c2a496f0c5ee7be110cf0d140269fb52c0b7",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 26,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "c4d2d4b1b384c60cb56acb36fd58e8c06d86d7642b7e30f9a980c6f48108ce1e",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "7b8a9ca5447cc982111e5818ccc5660f0463339587a9ed6ac691201f8dc22640",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "e4b3304be086d7867cd5dc71824974b8084071900ec90de157b31a80f0882637",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "997dcef3c694131ccda89b301dac0ebbad086e4f84b4905280735850dcc1db1a",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 76,
++            "maxBuffer": 4,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          },
++          "experience": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "significant_release_missing",
++              "release_decision_unknown_within_budget"
++            ],
++            "metrics": {
++              "midSteps": 25,
++              "midBuffer34Pct": 76,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 4,
++              "distance": 50
++            },
++            "release": "unknown_within_budget"
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 5,
++              "c": 4,
++              "color": 31,
++              "before": 27,
++              "after": 28,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 2,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 32.5,
++            "keyReasons": {
++              "opens": 1,
++              "soleSupply": true,
++              "timingGap": 10,
++              "waitSteps": 1,
++              "initialDebt": 1
++            }
++          },
++          "hash": "527e6333c086375604563b7d68dd79e657f4d9b8156bfecd9ef7f71294dbf891",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        }
++      ],
++      "best": {
++        "meta": {
++          "target": {
++            "r": 3,
++            "c": 3,
++            "color": 33,
++            "before": 31,
++            "after": 27,
++            "delta": -4
++          },
++          "donors": [
++            {
++              "r": 6,
++              "c": 6,
++              "delta": 4
++            }
++          ],
++          "capRange": [
++            16,
++            31
++          ],
++          "conserved": true,
++          "obstaclesPreserved": true,
++          "existingBelowMinMayOnlyIncrease": true,
++          "keyScore": 60.5,
++          "keyReasons": {
++            "opens": 3,
++            "soleSupply": true,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 9
++          }
++        },
++        "hash": "997dcef3c694131ccda89b301dac0ebbad086e4f84b4905280735850dcc1db1a",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 14>6"
++          ],
++          "gateDistance": 40,
++          "freeRunMax": 14,
++          "freeLowPct": 20,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 76,
++          "maxBuffer": 4,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        },
++        "experience": {
++          "pass": false,
++          "status": "fail",
++          "reasons": [
++            "significant_release_missing",
++            "release_decision_unknown_within_budget"
++          ],
++          "metrics": {
++            "midSteps": 25,
++            "midBuffer34Pct": 76,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 0,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 4,
++            "distance": 50
++          },
++          "release": "unknown_within_budget"
++        }
++      },
++      "elapsedMs": 46735,
++      "stopped": "variant_budget"
++    },
++    {
++      "seed": 1002,
++      "valid": true,
++      "generationBand": [
++        31,
++        31
++      ],
++      "experimentalBand": [
++        16,
++        31
++      ],
++      "generationMs": 24243,
++      "base": {
++        "hash": "e260be8bd27f273f7fe19f0ae7ab72bcec241f6109f8139d6e54b74feb0e6231",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 14>6"
++          ],
++          "gateDistance": 40,
++          "freeRunMax": 14,
++          "freeLowPct": 26,
++          "fullMedian2": 2,
++          "midBuffer34Pct": 65.4,
++          "maxBuffer": 3,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 22,
++            "waitSteps": 27,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 18,
++            "waitSteps": 18,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "color": 31,
++          "count": 31,
++          "score": 57.5,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 16,
++            "waitSteps": 16,
++            "initialDebt": 15
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 23,
++            "waitSteps": 23,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 22,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 25,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 5,
++          "c": 5,
++          "color": 33,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 24,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 5,
++          "c": 6,
++          "color": 13,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 12,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        }
++      ],
++      "rejected": [
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "delta": 1
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "delta": 2
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "delta": 1
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "delta": 2
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "delta": 4
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "delta": -1
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "delta": -2
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "delta": -4
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "delta": 1
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "delta": 2
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "delta": 4
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "delta": -1
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "delta": -2
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "delta": -4
++        },
++        {
++          "r": 5,
++          "c": 5,
++          "delta": -1
++        },
++        {
++          "r": 5,
++          "c": 5,
++          "delta": -2
++        },
++        {
++          "r": 5,
++          "c": 5,
++          "delta": -4
++        },
++        {
++          "r": 5,
++          "c": 6,
++          "delta": 4
++        },
++        {
++          "r": 5,
++          "c": 6,
++          "delta": -4
++        }
++      ],
++      "tested": 10,
++      "protectedRejected": 0,
++      "variants": [
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 22,
++              "waitSteps": 27,
++              "initialDebt": 31
++            }
++          },
++          "hash": "dc3f4a9fac9f729ec4e359a7f244fafb4cf0fbecb11a313c2632e15a37f49faa",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 2,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          },
++          "experience": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "significant_release_missing",
++              "release_decision_unknown_within_budget"
++            ],
++            "metrics": {
++              "midSteps": 26,
++              "midBuffer34Pct": 65.4,
++              "midBuffer5Pct": 0,
++              "maxBuffer5Run": 0,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 3,
++              "distance": 50
++            },
++            "release": "unknown_within_budget"
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 22,
++              "waitSteps": 27,
++              "initialDebt": 31
++            }
++          },
++          "hash": "a1fcd4807cb3b5f3189f7432962e9b498f67f1ed7537d7af07904ab06fe5dff2",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 2,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 22,
++              "waitSteps": 27,
++              "initialDebt": 31
++            }
++          },
++          "hash": "4044cceca44d6e285d9643a2d5b240fa453113b3fcd04952f9193f02f0c42f43",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 2,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 23,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 18,
++              "waitSteps": 18,
++              "initialDebt": 22
++            }
++          },
++          "hash": "dc3f4a9fac9f729ec4e359a7f244fafb4cf0fbecb11a313c2632e15a37f49faa",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 2,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 24,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 18,
++              "waitSteps": 18,
++              "initialDebt": 22
++            }
++          },
++          "hash": "a1fcd4807cb3b5f3189f7432962e9b498f67f1ed7537d7af07904ab06fe5dff2",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 2,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 26,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 18,
++              "waitSteps": 18,
++              "initialDebt": 22
++            }
++          },
++          "hash": "4044cceca44d6e285d9643a2d5b240fa453113b3fcd04952f9193f02f0c42f43",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 2,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 31,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 4,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 57.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 16,
++              "waitSteps": 16,
++              "initialDebt": 15
++            }
++          },
++          "hash": "2f7d62e1b7bb61cac3a55986f133caf25ee18600363836043cba0fcd2ec0e42e",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 31,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 4,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 57.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 16,
++              "waitSteps": 16,
++              "initialDebt": 15
++            }
++          },
++          "hash": "c054e497b37f6826fd71700997a0bc9ebad19c5faf119794a00852cc73b8b62b",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 2,
++              "color": 31,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 5,
++                "c": 4,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 57.5,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 16,
++              "waitSteps": 16,
++              "initialDebt": 15
++            }
++          },
++          "hash": "016b994de1b32bc6de5f3384a0d13a9becc4c613758402ec594d9cf90e215be8",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 20>6"
++            ],
++            "gateDistance": 70,
++            "freeRunMax": 20,
++            "freeLowPct": 30,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 50,
++            "maxBuffer": 4,
++            "significantReleaseCount": 1,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 5,
++              "c": 5,
++              "color": 33,
++              "before": 19,
++              "after": 20,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 7,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 26,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 24,
++              "waitSteps": 0,
++              "initialDebt": 0
++            }
++          },
++          "hash": "62aa313096c5c29c2bb8af228a4bad668a8cab7ae09e8f969eaf39d70ea3214c",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 26,
++            "fullMedian2": 2,
++            "midBuffer34Pct": 65.4,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        }
++      ],
++      "best": {
++        "meta": {
++          "target": {
++            "r": 1,
++            "c": 0,
++            "color": 28,
++            "before": 31,
++            "after": 30,
++            "delta": -1
++          },
++          "donors": [
++            {
++              "r": 2,
++              "c": 0,
++              "delta": 1
++            }
++          ],
++          "capRange": [
++            16,
++            31
++          ],
++          "conserved": true,
++          "obstaclesPreserved": true,
++          "existingBelowMinMayOnlyIncrease": true,
++          "keyScore": 62,
++          "keyReasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 22,
++            "waitSteps": 27,
++            "initialDebt": 31
++          }
++        },
++        "hash": "dc3f4a9fac9f729ec4e359a7f244fafb4cf0fbecb11a313c2632e15a37f49faa",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 14>6"
++          ],
++          "gateDistance": 40,
++          "freeRunMax": 14,
++          "freeLowPct": 26,
++          "fullMedian2": 2,
++          "midBuffer34Pct": 65.4,
++          "maxBuffer": 3,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        },
++        "experience": {
++          "pass": false,
++          "status": "fail",
++          "reasons": [
++            "significant_release_missing",
++            "release_decision_unknown_within_budget"
++          ],
++          "metrics": {
++            "midSteps": 26,
++            "midBuffer34Pct": 65.4,
++            "midBuffer5Pct": 0,
++            "maxBuffer5Run": 0,
++            "significantReleaseCount": 0,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 3,
++            "distance": 50
++          },
++          "release": "unknown_within_budget"
++        }
++      },
++      "elapsedMs": 49047,
++      "stopped": "variant_budget"
++    },
++    {
++      "seed": 88001,
++      "valid": true,
++      "generationBand": [
++        31,
++        31
++      ],
++      "experimentalBand": [
++        16,
++        31
++      ],
++      "generationMs": 23403,
++      "base": {
++        "hash": "204543ba44d5ba9f29f68f9250c7a64b26302fed2922dc796b91f867184442f7",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 14>6"
++          ],
++          "gateDistance": 40,
++          "freeRunMax": 14,
++          "freeLowPct": 17,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 26,
++            "waitSteps": 26,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 33,
++          "count": 31,
++          "score": 60.5,
++          "reasons": {
++            "opens": 3,
++            "soleSupply": true,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 9
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 42,
++            "waitSteps": 42,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "color": 32,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "color": 19,
++          "count": 31,
++          "score": 25,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 7,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "color": 31,
++          "count": 27,
++          "score": 24.5,
++          "reasons": {
++            "opens": 0,
++            "soleSupply": true,
++            "timingGap": 10,
++            "waitSteps": 1,
++            "initialDebt": 1
++          }
++        }
++      ],
++      "rejected": [
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 1
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 2
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 1
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 2
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 4
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -1
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -2
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -4
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "delta": -4
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 1
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 2
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 4
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -1
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -2
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -4
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "delta": -1
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "delta": -2
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "delta": -4
++        }
++      ],
++      "tested": 9,
++      "protectedRejected": 0,
++      "variants": [
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "2234f6c137f6da6c4e2299d058028f68ecb74b27e885c01a2cc23af245b25d58",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          },
++          "experience": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "significant_release_missing",
++              "release_decision_unknown_within_budget"
++            ],
++            "metrics": {
++              "midSteps": 25,
++              "midBuffer34Pct": 56,
++              "midBuffer5Pct": 20,
++              "maxBuffer5Run": 5,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 5,
++              "distance": 50
++            },
++            "release": "unknown_within_budget"
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "4e83916d3c0305a0eb00de21ce1f77d8fabc1c35c2336999f6672e4277514979",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "82ce30002745d898eee2a9878fca4a031b3956b8963f41d84bab227a4b72827f",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 23,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "2234f6c137f6da6c4e2299d058028f68ecb74b27e885c01a2cc23af245b25d58",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 24,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "4e83916d3c0305a0eb00de21ce1f77d8fabc1c35c2336999f6672e4277514979",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 26,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "82ce30002745d898eee2a9878fca4a031b3956b8963f41d84bab227a4b72827f",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "cd5fbebe4db997c223dcb118d31f8595369770777875ca2e37eaf35765b1959b",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "e7d6d8bbb0cf51a2c7c89b6b85b4a0f3422a53d1e0cd35cf2a6f2fb2c50f8e28",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 17,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "850bc455b288825adc184d078028948b910f610ee238100328deb36170fd4369",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 14>6"
++            ],
++            "gateDistance": 40,
++            "freeRunMax": 14,
++            "freeLowPct": 22,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 76,
++            "maxBuffer": 4,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        }
++      ],
++      "best": {
++        "meta": {
++          "target": {
++            "r": 1,
++            "c": 0,
++            "color": 28,
++            "before": 31,
++            "after": 30,
++            "delta": -1
++          },
++          "donors": [
++            {
++              "r": 2,
++              "c": 0,
++              "delta": 1
++            }
++          ],
++          "capRange": [
++            16,
++            31
++          ],
++          "conserved": true,
++          "obstaclesPreserved": true,
++          "existingBelowMinMayOnlyIncrease": true,
++          "keyScore": 62,
++          "keyReasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        "hash": "2234f6c137f6da6c4e2299d058028f68ecb74b27e885c01a2cc23af245b25d58",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 14>6"
++          ],
++          "gateDistance": 40,
++          "freeRunMax": 14,
++          "freeLowPct": 17,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        },
++        "experience": {
++          "pass": false,
++          "status": "fail",
++          "reasons": [
++            "significant_release_missing",
++            "release_decision_unknown_within_budget"
++          ],
++          "metrics": {
++            "midSteps": 25,
++            "midBuffer34Pct": 56,
++            "midBuffer5Pct": 20,
++            "maxBuffer5Run": 5,
++            "significantReleaseCount": 0,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 50
++          },
++          "release": "unknown_within_budget"
++        }
++      },
++      "elapsedMs": 49740,
++      "stopped": "variant_budget"
++    },
++    {
++      "seed": 32677,
++      "valid": true,
++      "generationBand": [
++        31,
++        31
++      ],
++      "experimentalBand": [
++        16,
++        31
++      ],
++      "generationMs": 22174,
++      "base": {
++        "hash": "ef6960f9bacbf0466f08d77fedc2287c6282242864ae49acbf5456cc6300fe24",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 15>6"
++          ],
++          "gateDistance": 45,
++          "freeRunMax": 15,
++          "freeLowPct": 20,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        }
++      },
++      "keyCars": [
++        {
++          "r": 1,
++          "c": 0,
++          "color": 28,
++          "count": 31,
++          "score": 62,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "color": 28,
++          "count": 22,
++          "score": 61,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 26,
++            "waitSteps": 26,
++            "initialDebt": 22
++          }
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "color": 33,
++          "count": 31,
++          "score": 60.5,
++          "reasons": {
++            "opens": 3,
++            "soleSupply": true,
++            "timingGap": 6,
++            "waitSteps": 6,
++            "initialDebt": 9
++          }
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "color": 5,
++          "count": 30,
++          "score": 54,
++          "reasons": {
++            "opens": 1,
++            "soleSupply": true,
++            "timingGap": 42,
++            "waitSteps": 42,
++            "initialDebt": 30
++          }
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "color": 19,
++          "count": 31,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "color": 32,
++          "count": 19,
++          "score": 26,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 8,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "color": 19,
++          "count": 31,
++          "score": 25,
++          "reasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 7,
++            "waitSteps": 0,
++            "initialDebt": 0
++          }
++        },
++        {
++          "r": 6,
++          "c": 5,
++          "color": 31,
++          "count": 27,
++          "score": 24.5,
++          "reasons": {
++            "opens": 0,
++            "soleSupply": true,
++            "timingGap": 10,
++            "waitSteps": 1,
++            "initialDebt": 1
++          }
++        }
++      ],
++      "rejected": [
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 1
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 2
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": 4
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -1
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -2
++        },
++        {
++          "r": 0,
++          "c": 0,
++          "delta": -4
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 1
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 2
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": 4
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -1
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -2
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "delta": -4
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "delta": -4
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 1
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 2
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": 4
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -1
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -2
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "delta": -4
++        },
++        {
++          "r": 6,
++          "c": 5,
++          "delta": -1
++        },
++        {
++          "r": 6,
++          "c": 5,
++          "delta": -2
++        },
++        {
++          "r": 6,
++          "c": 5,
++          "delta": -4
++        }
++      ],
++      "tested": 9,
++      "protectedRejected": 0,
++      "variants": [
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "6c6f509fa19faeaf8f3c8641c3b9d2e195434978ba76ffaf2ad82a0df5cf73d2",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          },
++          "experience": {
++            "pass": false,
++            "status": "fail",
++            "reasons": [
++              "significant_release_missing",
++              "release_decision_unknown_within_budget"
++            ],
++            "metrics": {
++              "midSteps": 25,
++              "midBuffer34Pct": 56,
++              "midBuffer5Pct": 20,
++              "maxBuffer5Run": 5,
++              "significantReleaseCount": 0,
++              "oscillationCount": 1,
++              "lateHighPressurePct": 0,
++              "maxBuffer": 5,
++              "distance": 50
++            },
++            "release": "unknown_within_budget"
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "c7c9472d32c0e457383c146bc365b8e31c0857a0b99a972ab92996cd55ab9ddc",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 1,
++              "c": 0,
++              "color": 28,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 2,
++                "c": 0,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 62,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 27,
++              "waitSteps": 34,
++              "initialDebt": 31
++            }
++          },
++          "hash": "9bb8afa6c78ea1bca3f9d3e08228ed34d84c15c56dccf6a267489e94f111398a",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 23,
++              "delta": 1
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "6c6f509fa19faeaf8f3c8641c3b9d2e195434978ba76ffaf2ad82a0df5cf73d2",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 24,
++              "delta": 2
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "c7c9472d32c0e457383c146bc365b8e31c0857a0b99a972ab92996cd55ab9ddc",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 2,
++              "c": 0,
++              "color": 28,
++              "before": 22,
++              "after": 26,
++              "delta": 4
++            },
++            "donors": [
++              {
++                "r": 1,
++                "c": 0,
++                "delta": -4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 61,
++            "keyReasons": {
++              "opens": 2,
++              "soleSupply": true,
++              "timingGap": 26,
++              "waitSteps": 26,
++              "initialDebt": 22
++            }
++          },
++          "hash": "9bb8afa6c78ea1bca3f9d3e08228ed34d84c15c56dccf6a267489e94f111398a",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 30,
++              "delta": -1
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 1
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "54abbbfb2f48560ad96777991f0aa4bd2968e1342e6929a2d05ca2686671de93",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 29,
++              "delta": -2
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 2
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "1f5abfa0bbd2a3d95e2519a275c2467b44fb882b8055185548e8c48667b584fa",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 15>6"
++            ],
++            "gateDistance": 45,
++            "freeRunMax": 15,
++            "freeLowPct": 20,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 56,
++            "maxBuffer": 5,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        },
++        {
++          "meta": {
++            "target": {
++              "r": 3,
++              "c": 3,
++              "color": 33,
++              "before": 31,
++              "after": 27,
++              "delta": -4
++            },
++            "donors": [
++              {
++                "r": 6,
++                "c": 6,
++                "delta": 4
++              }
++            ],
++            "capRange": [
++              16,
++              31
++            ],
++            "conserved": true,
++            "obstaclesPreserved": true,
++            "existingBelowMinMayOnlyIncrease": true,
++            "keyScore": 60.5,
++            "keyReasons": {
++              "opens": 3,
++              "soleSupply": true,
++              "timingGap": 6,
++              "waitSteps": 6,
++              "initialDebt": 9
++            }
++          },
++          "hash": "a9394efd1e2a462bf8a47eef9b162090aa52c1410a343b3fc81b79af3a8d2be7",
++          "metrics": {
++            "valid": true,
++            "struct": false,
++            "gateReasons": [
++              "最长免费连 16>6"
++            ],
++            "gateDistance": 50,
++            "freeRunMax": 16,
++            "freeLowPct": 24,
++            "fullMedian2": 3,
++            "midBuffer34Pct": 76,
++            "maxBuffer": 4,
++            "significantReleaseCount": 0,
++            "capacity": {
++              "conserved": true,
++              "boardFloorPass": true,
++              "aboveMax": 0,
++              "belowMin": 0,
++              "microCars": [],
++              "minCap": 16,
++              "maxCap": 31
++            },
++            "belowMinNotWorse": true
++          }
++        }
++      ],
++      "best": {
++        "meta": {
++          "target": {
++            "r": 1,
++            "c": 0,
++            "color": 28,
++            "before": 31,
++            "after": 30,
++            "delta": -1
++          },
++          "donors": [
++            {
++              "r": 2,
++              "c": 0,
++              "delta": 1
++            }
++          ],
++          "capRange": [
++            16,
++            31
++          ],
++          "conserved": true,
++          "obstaclesPreserved": true,
++          "existingBelowMinMayOnlyIncrease": true,
++          "keyScore": 62,
++          "keyReasons": {
++            "opens": 2,
++            "soleSupply": true,
++            "timingGap": 27,
++            "waitSteps": 34,
++            "initialDebt": 31
++          }
++        },
++        "hash": "6c6f509fa19faeaf8f3c8641c3b9d2e195434978ba76ffaf2ad82a0df5cf73d2",
++        "metrics": {
++          "valid": true,
++          "struct": false,
++          "gateReasons": [
++            "最长免费连 15>6"
++          ],
++          "gateDistance": 45,
++          "freeRunMax": 15,
++          "freeLowPct": 20,
++          "fullMedian2": 3,
++          "midBuffer34Pct": 56,
++          "maxBuffer": 5,
++          "significantReleaseCount": 0,
++          "capacity": {
++            "conserved": true,
++            "boardFloorPass": true,
++            "aboveMax": 0,
++            "belowMin": 0,
++            "microCars": [],
++            "minCap": 16,
++            "maxCap": 31
++          },
++          "belowMinNotWorse": true
++        },
++        "experience": {
++          "pass": false,
++          "status": "fail",
++          "reasons": [
++            "significant_release_missing",
++            "release_decision_unknown_within_budget"
++          ],
++          "metrics": {
++            "midSteps": 25,
++            "midBuffer34Pct": 56,
++            "midBuffer5Pct": 20,
++            "maxBuffer5Run": 5,
++            "significantReleaseCount": 0,
++            "oscillationCount": 1,
++            "lateHighPressurePct": 0,
++            "maxBuffer": 5,
++            "distance": 50
++          },
++          "release": "unknown_within_budget"
++        }
++      },
++      "elapsedMs": 47636,
++      "stopped": "variant_budget"
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246\345\256\236\351\252\214_\351\242\204\347\231\273\350\256\260_v540.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246\345\256\236\351\252\214_\351\242\204\347\231\273\350\256\260_v540.md"
+new file mode 100644
+index 0000000..a20607d
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\346\235\276\345\274\233\345\270\246\345\256\236\351\252\214_\351\242\204\347\231\273\350\256\260_v540.md"
+@@ -0,0 +1,42 @@
++# 容量分配 · 显式实验容量带 [16,31] · v540 预登记
++
++> Kimi 方法建议。此 `[16,31]` 是显式实验输入，不是自动放宽生产容量，也不进入默认配置。
++
++## 为什么需要这一步
++
++v539 在自动推导的 `[31,31]` 容量带内 `tested=0`：007 的当前车辆多在31、22、19等容量，`[31,31]` 没有同色 donor 余量，32个容量变体全部无法构造。因此不能用 v539 判断容量分配是否有帮助。
++
++## 假设
++
++把实验容量带明确设为 `[16,31]`，保持同一批007基线关卡、车序、棋盘和障碍不变，只允许同色车辆之间转移像素，可以产生合法容量变体；若变体能降低免费连，同时保持 solver 中段3/4≥50%和容量合同，则容量分配值得继续研究。
++
++## 唯一变量
++
++- 基线：007、seed1001/1002/88001/32677，沿用v539生成的配置和车序。
++- 实验容量带：`16..31`，显式输入，仅用于 `CapacityTuner` 和容量审计；生产默认仍使用 `deriveCapacityBand` 结果。
++- `CapacityTuner`：同色 transfer，±1/±2/±4px；每色总像素不变、障碍签名不变、不放宽用户区间。
++- 不改变车序、棋盘、分支前缀债务8、障碍和求解规则。
++
++## 预算
++
++- 每 seed 最多20秒生成容量变体；最多48个变体。
++- 记录关键车、变体数、被拒绝原因、基线/最佳hash和完整释放状态。
++
++## 主指标 / 保护
++
++- 免费连下降至少2步；
++- solver中段3/4≥50%；
++- `goalStructPass`是否转化；
++- 容量守恒、`aboveMax=0`、`belowMin`不增加、无micro车；
++- 棋盘行列≥6，障碍签名不变。
++
++## 通过 / 否决
++
++- 通过：至少2/4 seed同时满足免费连下降、高压保持和容量保护；或至少1/4 seed结构转化。
++- 否决：容量变体仍全部不可构造；或改善免费连但高压/结构/容量回退。
++- 结果不论正负，都不能把`[16,31]`写回生产默认，必须先由用户确认容量输入。
++
++## 回滚点
++
++- 上一版：`db3bb7c`（v538）。
++- v539结果为“自动带[31,31]无法生成变体”，保留不回滚；v540只新增实验工具。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\351\242\204\347\231\273\350\256\260_v539.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\351\242\204\347\231\273\350\256\260_v539.md"
+new file mode 100644
+index 0000000..2741bc2
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\345\210\206\351\205\215_\351\242\204\347\231\273\350\256\260_v539.md"
+@@ -0,0 +1,45 @@
++# 容量分配单因素 · v539 预登记
++
++> Kimi 方法建议。唯一验收骨架为 `优质关卡生成_详细工作流程.md` 的 P0～P6。
++
++## 假设
++
++v538 已排除增加分支前缀债务。v537 的 007 四 seed 都是“有高压路线但结构不合格”，主要结构失败是最长免费连过长。保持车序、棋盘、障碍和前 8 辆短债车不变，只在同一颜色车辆之间做容量再分配，可能减少免费连，同时保住 solver 中段 3/4。
++
++## 唯一变量
++
++- 基线：007、seed1001/1002/88001/32677、`instantPlanBranchPrefixDebts=8`、7×8、2分支、`targetBuffer=4`、`maxDebt=40`、无P7、无陷阱后处理。
++- 变体：`CapacityTuner.variants` 对少量关键同色车做 ±1/±2/±4px 转移；每色总像素不变，障碍签名不变，容量不越用户区间。
++- 不改变车序、棋盘、障碍、前缀债务或总像素；不跨颜色转移。
++
++## 预算
++
++- 每个 seed 先生成基线；每个基线最多 20 秒、最多 48 个容量变体。
++- 每个变体先做完整 `evaluateLevel` 结构/压力评价；只对结构通过的最佳候选做完整释放决策。
++- 记录实际墙钟、变体数、拒绝原因、基线/变体 hash。
++
++## 主指标
++
++- `freeRunMax`；
++- solver 中段3/4；
++- `goalStructPass`；
++- maxBuffer 和释放证据。
++
++## 保护指标
++
++- 棋盘行列≥6；
++- 每色像素守恒、`aboveMax=0`、`belowMin` 不增加、无 micro 车；
++- 障碍签名不变；
++- 不把结构不合格候选通过容量变体伪造成通过；
++- `instantPlanBranchPrefixDebts` 保持8。
++
++## 通过 / 否决
++
++- 有价值：至少 2/4 seed 的免费连降低至少2步，且 solver 中段3/4≥50%、容量合同不退化。
++- 强通过：至少 1/4 seed 从结构不合格变为 `goalStructPass=true`，且完整释放决策通过。
++- 否决：4/4 seed均无免费连改善；或改善免费连导致高压/结构/容量回退。
++
++## 回滚点
++
++- 上一版：`db3bb7c`（v538）。
++- 只读变体工具，不改变默认生成器；失败不写入生产配置。
+diff --git a/AGENTS.md b/AGENTS.md
+index 7d9141b..e9d6fc4 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,7 +1,7 @@
+ # AGENTS.md · 毛线汽车（关卡生成器）
+ 
+ > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
+-> 工作日志 **528 节 / 20694 行（约 818 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§528）。
++> 工作日志 **530 节 / 20749 行（约 821 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§530）。
+ 
+ ## 这是什么
+ 
+@@ -35,6 +35,8 @@ node 03_工具/好关评分/释放路线构造多图_v535.js --images=007,006,01
+ node 03_工具/好关评分/释放路线生成对照_v536.js --images=007,006,010 --seeds=1001,1002,88001,32677 --budget=30000 --round=20000 --max-rounds=2
+ node 03_工具/好关评分/结构路线缺口分类_v537.js
+ node 03_工具/好关评分/分支前缀债务12_v538.js
++node 03_工具/好关评分/容量分配_v539.js
++node 03_工具/好关评分/容量分配_松弛带_v540.js
+ node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
+ grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
+ ```
+diff --git a/README.md b/README.md
+index 45d752d..b28a650 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v538**（007分支前缀债务8→12被否决：免费连4/4变差，容量无回退）。
++> 当前版本 **v540**（容量分配被否决：自动带无合法变体，显式[16,31]也未改善结构）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看全流程对照图** | [`思维导图_求解器与关卡生产全流程.html`](思维导图_求解器与关卡生产全流程.html)（求解器 → 反解 → 关卡生产，自包含，双击可开） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v538）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v540）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **看详细实验与交付流程** | [`01_交接文档/优质关卡生成_详细工作流程.md`](01_交接文档/优质关卡生成_详细工作流程.md)（已完成/未完成、P0~P6实验卡、验收与回滚） |
