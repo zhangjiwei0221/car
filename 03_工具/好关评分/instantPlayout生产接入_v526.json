@@ -3,31 +3,33 @@
   "date": "2026-10-26",
   "plans": {
     "006": {
-      "ms": 16,
+      "ms": 102,
       "ok": true,
       "reason": null,
       "cars": 37,
       "audit": {
         "aboveMax": 0,
-        "belowMin": 5,
+        "belowMin": 6,
+        "microCount": 0,
         "unfinished": 0,
         "covered": 1225,
         "total": 1225,
         "deadlock": false
       },
-      "minCap": 10,
+      "minCap": 19,
       "maxCap": 38,
       "bufferEvents": 6,
-      "hash": "866b51be2d5911dd15e746196d084b63967b160b651cd145ab6803552ecd797c"
+      "hash": "815b4e93a87f9f1bd64b4d80711c07c1c0326591ebfee35c8125a11eb90f8dd9"
     },
     "010": {
-      "ms": 8,
+      "ms": 9,
       "ok": true,
       "reason": null,
       "cars": 27,
       "audit": {
         "aboveMax": 0,
         "belowMin": 1,
+        "microCount": 0,
         "unfinished": 0,
         "covered": 1225,
         "total": 1225,
@@ -45,21 +47,22 @@
       "cars": 46,
       "audit": {
         "aboveMax": 0,
-        "belowMin": 12,
+        "belowMin": 27,
+        "microCount": 0,
         "unfinished": 0,
         "covered": 1225,
         "total": 1225,
         "deadlock": false
       },
-      "minCap": 2,
+      "minCap": 16,
       "maxCap": 31,
-      "bufferEvents": 3,
-      "hash": "a5dbd60a0481cd3c93606fc657318c7b5107fe381e9df66df4f55e56f80dc2e3"
+      "bufferEvents": 7,
+      "hash": "5b158d97a20b938f4def1dd050538221b237aa7b582a82766dc54e43e37331d9"
     }
   },
   "instantEndToEnd": {
     "006": {
-      "ms": 757,
+      "ms": 727,
       "level": true,
       "valid": true,
       "structural": {
@@ -72,7 +75,7 @@
         "elimOrder": "instant"
       },
       "instant": {
-        "schema": "instant-playout-v1",
+        "schema": "instant-playout-v2",
         "ok": true,
         "reason": null,
         "cars": 37,
@@ -84,12 +87,158 @@
         ],
         "audit": {
           "aboveMax": 0,
-          "belowMin": 5,
+          "belowMin": 6,
+          "microCount": 0,
           "unfinished": 0,
           "covered": 1225,
           "total": 1225,
           "deadlock": false
         },
+        "capacityPlans": [
+          {
+            "color": 4,
+            "total": 61,
+            "caps": [
+              31,
+              30
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 5,
+            "total": 103,
+            "caps": [
+              35,
+              34,
+              34
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 13,
+            "total": 55,
+            "caps": [
+              31,
+              24
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 14,
+            "total": 89,
+            "caps": [
+              31,
+              31,
+              27
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 15,
+            "total": 171,
+            "caps": [
+              35,
+              34,
+              34,
+              34,
+              34
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 17,
+            "total": 76,
+            "caps": [
+              38,
+              38
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 21,
+            "total": 36,
+            "caps": [
+              36
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 22,
+            "total": 35,
+            "caps": [
+              35
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 28,
+            "total": 69,
+            "caps": [
+              35,
+              34
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 30,
+            "total": 135,
+            "caps": [
+              34,
+              34,
+              34,
+              33
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 31,
+            "total": 304,
+            "caps": [
+              38,
+              38,
+              38,
+              38,
+              38,
+              38,
+              38,
+              38
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 33,
+            "total": 41,
+            "caps": [
+              21,
+              20
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 34,
+            "total": 50,
+            "caps": [
+              31,
+              19
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          }
+        ],
+        "exactCapacityColors": 8,
+        "infeasibleCapacityColors": 5,
         "bufferEvents": 6,
         "medianReachableAtEntry": 34
       },
@@ -102,11 +251,11 @@
         "capacitySum": 1225,
         "pixels": 1225,
         "conserved": true,
-        "minCap": 10,
+        "minCap": 19,
         "maxCap": 40,
         "boxSizeMin": 31,
         "boxSizeMax": 40,
-        "belowMin": 5,
+        "belowMin": 6,
         "aboveMax": 0,
         "microCarMax": 2,
         "microCars": [],
@@ -143,11 +292,11 @@
         "rows": 7,
         "cols": 8
       },
-      "hash": "a69b50843862f1c9412e53b10bd44b2d2c8da12ce982b311249b9bc597ffbcf8",
-      "stop": "pass_early_stop"
+      "hash": "977114e103fda0b6df161f35402d8ca72821bc71bb956200358cbfc77745da77",
+      "stop": "exhausted"
     },
     "010": {
-      "ms": 530,
+      "ms": 532,
       "level": true,
       "valid": true,
       "structural": {
@@ -160,7 +309,7 @@
         "elimOrder": "instant"
       },
       "instant": {
-        "schema": "instant-playout-v1",
+        "schema": "instant-playout-v2",
         "ok": true,
         "reason": null,
         "cars": 27,
@@ -173,11 +322,139 @@
         "audit": {
           "aboveMax": 0,
           "belowMin": 1,
+          "microCount": 0,
           "unfinished": 0,
           "covered": 1225,
           "total": 1225,
           "deadlock": false
         },
+        "capacityPlans": [
+          {
+            "color": 1,
+            "total": 82,
+            "caps": [
+              41,
+              41
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 2,
+            "total": 42,
+            "caps": [
+              42
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 3,
+            "total": 104,
+            "caps": [
+              52,
+              52
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 5,
+            "total": 236,
+            "caps": [
+              48,
+              47,
+              47,
+              47,
+              47
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 14,
+            "total": 32,
+            "caps": [
+              32
+            ],
+            "exact": false,
+            "reason": "color_below_min"
+          },
+          {
+            "color": 24,
+            "total": 91,
+            "caps": [
+              46,
+              45
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 25,
+            "total": 35,
+            "caps": [
+              35
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 26,
+            "total": 38,
+            "caps": [
+              38
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 30,
+            "total": 107,
+            "caps": [
+              54,
+              53
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 32,
+            "total": 199,
+            "caps": [
+              50,
+              50,
+              50,
+              49
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 33,
+            "total": 181,
+            "caps": [
+              46,
+              45,
+              45,
+              45
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 34,
+            "total": 78,
+            "caps": [
+              39,
+              39
+            ],
+            "exact": true,
+            "reason": null
+          }
+        ],
+        "exactCapacityColors": 11,
+        "infeasibleCapacityColors": 1,
         "bufferEvents": 3,
         "medianReachableAtEntry": 46
       },
@@ -219,7 +496,7 @@
       "stop": "pass_early_stop"
     },
     "007": {
-      "ms": 785,
+      "ms": 885,
       "level": true,
       "valid": true,
       "structural": {
@@ -232,7 +509,7 @@
         "elimOrder": "instant"
       },
       "instant": {
-        "schema": "instant-playout-v1",
+        "schema": "instant-playout-v2",
         "ok": true,
         "reason": null,
         "cars": 46,
@@ -244,14 +521,169 @@
         ],
         "audit": {
           "aboveMax": 0,
-          "belowMin": 12,
+          "belowMin": 27,
+          "microCount": 0,
           "unfinished": 0,
           "covered": 1225,
           "total": 1225,
           "deadlock": false
         },
-        "bufferEvents": 3,
-        "medianReachableAtEntry": 31
+        "capacityPlans": [
+          {
+            "color": 1,
+            "total": 52,
+            "caps": [
+              31,
+              21
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 5,
+            "total": 30,
+            "caps": [
+              30
+            ],
+            "exact": false,
+            "reason": "color_below_min"
+          },
+          {
+            "color": 13,
+            "total": 37,
+            "caps": [
+              19,
+              18
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 14,
+            "total": 33,
+            "caps": [
+              17,
+              16
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 15,
+            "total": 52,
+            "caps": [
+              31,
+              21
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 16,
+            "total": 70,
+            "caps": [
+              24,
+              23,
+              23
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 19,
+            "total": 434,
+            "caps": [
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31,
+              31
+            ],
+            "exact": true,
+            "reason": null
+          },
+          {
+            "color": 28,
+            "total": 53,
+            "caps": [
+              31,
+              22
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 30,
+            "total": 35,
+            "caps": [
+              18,
+              17
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 31,
+            "total": 58,
+            "caps": [
+              31,
+              27
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 32,
+            "total": 39,
+            "caps": [
+              20,
+              19
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 33,
+            "total": 50,
+            "caps": [
+              31,
+              19
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          },
+          {
+            "color": 34,
+            "total": 282,
+            "caps": [
+              29,
+              29,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28,
+              28
+            ],
+            "exact": false,
+            "reason": "no_exact_partition"
+          }
+        ],
+        "exactCapacityColors": 1,
+        "infeasibleCapacityColors": 12,
+        "bufferEvents": 7,
+        "medianReachableAtEntry": 28
       },
       "capacity": {
         "schema": "capacity-evidence-v1",
@@ -262,23 +694,15 @@
         "capacitySum": 1225,
         "pixels": 1225,
         "conserved": true,
-        "minCap": 2,
+        "minCap": 16,
         "maxCap": 31,
         "boxSizeMin": 31,
         "boxSizeMax": 31,
-        "belowMin": 12,
+        "belowMin": 27,
         "aboveMax": 0,
         "microCarMax": 2,
-        "microCars": [
-          {
-            "r": 4,
-            "c": 7,
-            "color": 14,
-            "count": 2,
-            "inPipe": false
-          }
-        ],
-        "microCount": 1,
+        "microCars": [],
+        "microCount": 0,
         "rangeExactFeasible": false,
         "infeasibleColors": [
           {
@@ -339,7 +763,7 @@
         "rows": 7,
         "cols": 8
       },
-      "hash": "98a15f4f74334cbfb463ee61d4ac3d952990b82e6c9049447bf148def9a3cf20",
+      "hash": "7cb365e928d0cc3a48f9d9c2878796c45db1e6e4bd0878e8833f60a6eb75dcd5",
       "stop": "exhausted"
     }
   },

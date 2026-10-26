@@ -1,0 +1,1545 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index 6e5e139..6c97528 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -11,6 +11,7 @@
+ > 当前结果：代码到v522。v521最终低压力补充与搜索隔离的保护继续成立。v522把usableSpaceDeviation改为实测中位可用率驱动的一次同seed重试，并加快速无候选退避；精确失败70/70后0.86→0.690476出关并完整达标，006已知成功hash不变。真实UI批次32合格1/1、COMPLETED，A/C不再高速空转。下一步多图/独立seed验证重试泛化、release unknown与真人校准；障碍目标化未完成。
+ > v525（进行中）：已统一`ruleMode`三态契约，选中瞬时连锁时`instantChain=true`且`elimOrder=instant`；默认四边真实关卡hash不变。下一项把`instantPlayout`接入切车，否则生成仍不能称为按实机瞬时顺序造关。
+ > v526：`instantPlayout`已接入瞬时模式切车，按真实最左空槽/FIFO/最近曼哈顿生成每车像素计划；3图端到端结构均过、aboveMax=0、默认四边hash不变。下一步容量计划处理belowMin/2px车。
++> v527：每色容量计划首版完成，007最小车2→16px、micro=0；006/010/007仍全覆盖、无死锁、aboveMax=0且结构出关。belowMin因区间数学不可分仍存在，下一步验证临界容量候选和整关体验。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index ad0cb98..7e3e1cf 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20310,3 +20310,34 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. 第3步容量计划：每色先做区间内可行拆分，临界容量围绕可达量/下一波/余量构造有限候选，禁止2px与未声明belowMin。
+ 2. 第4步要验证最终棋盘按瞬时规则回放能重现playout的主要车序，不仅看“能解”。
+ 3. 瞬时模式仍未做多seed体验/障碍/真人；默认生产仍四边。
++
++### 517. 【2026-10-26】v527：每色容量计划首版，007最小车2px→16px
++
++#### 517.1 问题（原话）
++
++- “车容量、障碍设置合理。”
++- “我发现有容量为2的车，这能造成债务？”
++
++#### 517.2 证据
++
++- v526计划全覆盖且aboveMax=0，但belowMin为006=5、010=1、007=12，007还出现1辆2px车。
++- 直接按余量逐车取容量会把尾数塞成微车；单纯所有颜色均衡又会增加belowMin车数（006曾10、007曾32）。
++
++#### 517.3 改动
++
++- Kimi新增每色容量队列`capacityPlanForColor`：车数=`ceil(P/max)`；可落区间时均衡且Σ=P；不可分时先最小化belowMin车数，若尾车小于`min/2`则改均衡拆分。
++- instantPlayout按颜色消费容量队列，记录entryReach/colorRemaining、capacityPlans、exact/infeasible colors；schema升级`instant-playout-v2`。
++- 版本升v527；不改用户boxSizeMin/Max，不越过上限。
++
++#### 517.4 验证（改前后数字）
++
++- 单测：P103/31~40→[35,34,34]精确；P55→[31,24]；P41→[21,20]避免小尾；P33/31~31→[17,16]；P282/31~31→10辆28~29，全部Σ=P且≤31。
++- v526→v527：006最小车10→19、micro=0、belowMin5→6；010最小32、belowMin1不变；007最小2→16、micro=0、belowMin12→27（因把31+2改为均衡尾车）。
++- 三图仍覆盖1225/1225、无死锁、unfinished=0、aboveMax=0，端到端`produceFixed`结构均通过；默认四边006 hash仍`48680c72...`。
++- `node --check instant-playout/generator/gen-worker`与`git diff --check`通过。
++
++#### 517.5 遗留
++
++1. 007容量区间[31,31]对多数颜色数学不可精确拆分，需在目标图预检/容量策略中明确说明，不能偷放宽。
++2. 下一步构造“可达量A / A+1 / 下一波 / 余量”的临界容量候选，比较压力、释放和belowMin代价。
++3. 容量计划只是生成候选；必须再走完整体验，不能用结构过代替好关。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 25ef453..e64bd43 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v526 瞬时模式 instantPlayout 切车）　|　当前版本：**v526**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v527 瞬时模式容量计划首版）　|　当前版本：**v527**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~516。v526把instantPlayout接入瞬时模式切车：006/010/007全覆盖、无死锁、aboveMax=0且端到端出关；默认四边hash不变。下一项容量计划处理006/010/007的5/1/12辆belowMin及007的2px车。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~517。v527完成每色容量计划首版：007的2px车消除、最小容量16px；006/010/007仍aboveMax=0、全覆盖、无死锁且结构出关。区间数学不可分的belowMin仍如实保留，下一步验证临界容量候选与整关体验。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index 02a8e02..6679b79 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -54,7 +54,7 @@
+ - 006/010/007计划均覆盖1225/1225、无死锁、无未完成、aboveMax=0；端到端均生成可解且结构通过关卡，耗时约0.53~0.79s。
+ - 默认四边006最终hash仍为`48680c72...`。遗留：低于下限车006=5、010=1、007=12，007最小2px，进入第3步容量计划。
+ 
+-### 第3步：容量计划（下一项）
++### 第3步：容量计划（v527 首版完成）
+ 
+ - 先按颜色求可行车数集合：满足`Σcap=P`且每车在`[boxMin,boxMax]`；无可行解时明确`capacityInfeasible`。
+ - 每辆候选车按进场状态计算：当前可达量`A`、该色剩余量`T`、下一波解锁量`N`。
+@@ -62,6 +62,8 @@
+ - 每个候选都重跑完整playout，不看静态单点；记录容量变化导致的颜色、槽位、债务和释放变化。
+ - 小色可以通过解锁贡献承担关键债务，但不得用未声明的低于区间容量实现；用户若允许小容量档，需单独立参数合同。
+ - 首轮验收：原007最小2px、006/010低于下限问题消失，或明确判该图容量不可行；不得靠“余量并车”造巨车。
++- **v527结果**：每色先求Σ=P的容量队列。可落在区间时均衡拆分；不可分时先减少belowMin车数，尾车过小再均衡拆分。007最小2px→16px、microCount=0；006/010/007仍全部覆盖、无死锁、aboveMax=0、结构出关。
++- 区间数学不可分的车仍如实保留：006 belowMin=6、010=1、007=27；下一步用可达量/下一波/余量构造临界容量变体，比较压力与释放，不靠放宽上下界。
+ 
+ ### 第4步：摆盘与车序
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 5fafc46..28f2301 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v526 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=526">
++  <title>车接小人 v527 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=527">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v526</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v527</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,28 +773,28 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=526"></script>
+-  <script src="js/utils.js?v=526"></script>
++  <script src="js/zip.js?v=527"></script>
++  <script src="js/utils.js?v=527"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=526"></script>
+-  <script src="js/simulator.js?v=526"></script>
++  <script src="js/color-libs.js?v=527"></script>
++  <script src="js/simulator.js?v=527"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=526"></script>
+-  <script src="js/solver-strategy.js?v=526"></script>
+-  <script src="js/solver.js?v=526"></script>
+-  <script src="js/playersim.js?v=526"></script>
++  <script src="js/anchor-cut.js?v=527"></script>
++  <script src="js/solver-strategy.js?v=527"></script>
++  <script src="js/solver.js?v=527"></script>
++  <script src="js/playersim.js?v=527"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=526"></script>
+-  <script src="js/car-sequencer.js?v=526"></script>
+-  <script src="js/experience-goal.js?v=526"></script>
+-  <script src="js/capacity-tuner.js?v=526"></script>
+-  <script src="js/instant-playout.js?v=526"></script>
+-  <script src="js/generator.js?v=526"></script>
+-  <script src="js/source-preflight.js?v=526"></script>
+-  <script src="js/analysis.js?v=526"></script>
++  <script src="js/solver-analysis.js?v=527"></script>
++  <script src="js/car-sequencer.js?v=527"></script>
++  <script src="js/experience-goal.js?v=527"></script>
++  <script src="js/capacity-tuner.js?v=527"></script>
++  <script src="js/instant-playout.js?v=527"></script>
++  <script src="js/generator.js?v=527"></script>
++  <script src="js/source-preflight.js?v=527"></script>
++  <script src="js/analysis.js?v=527"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=526"></script>
+-  <script src="js/app.js?v=526"></script>
++  <script src="js/level-editor.js?v=527"></script>
++  <script src="js/app.js?v=527"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
+index 3c5cd80..3279bce 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
+@@ -13,14 +13,47 @@ AntSolver.InstantPlayout = (function () {
+     }
+     return m;
+   }
+-  /** 当前余量的可行单车容量；低于下限的尾车保留给step3容量规划处理并如实审计。 */
+-  function planCap(remain, minCap, maxCap) {
+-    if (!(remain > 0)) return 0;
+-    if (remain <= maxCap) return remain;
+-    var n = Math.ceil(remain / maxCap), cap = Math.ceil(remain / n);
+-    if (cap < minCap) cap = minCap;
+-    if (cap > maxCap) cap = maxCap;
+-    return cap;
++  /**
++   * 每色容量队列：车数取 ceil(P/max)，容量尽量均衡，严格 Σ=P、每车≤max。
++   * 若 P < 车数×min（区间数学不可分），仍取均衡解以最大化最小车容量并如实标记；
++   * 不把余数塞成 1~2px 尾车，也不越过用户上限。
++   */
++  function capacityPlanForColor(total, minCap, maxCap) {
++    if (!(total > 0)) return { total: total, caps: [], exact: true, reason: 'empty' };
++    var n = Math.max(1, Math.ceil(total / maxCap));
++    var base = Math.floor(total / n), rem = total - base * n;
++    var caps = [];
++    if (total >= n * minCap) {
++      for (var i = 0; i < n; i++) caps.push(base + (i < rem ? 1 : 0));
++    } else {
++      // 无法全部落入区间：先最小化 belowMin 车数（m辆≥min + 一个余量），
++      // 余量过小则改均衡拆分，避免 1~2px 尾车。只调整拆分，不改用户上下界。
++      var m = Math.min(n, Math.floor(total / minCap));
++      var tail = total - m * minCap;
++      if (tail > 0 && tail >= minCap / 2) {
++        for (var j = 0; j < m; j++) caps.push(minCap);
++        caps.push(tail);
++      } else {
++        for (var k = 0; k < n; k++) caps.push(base + (k < rem ? 1 : 0));
++      }
++    }
++    caps.sort(function (a, b) { return b - a; });
++    var exact = caps.every(function (c) { return c >= minCap && c <= maxCap; });
++    var reason = exact ? null : (total < minCap ? 'color_below_min' : 'no_exact_partition');
++    return { total: total, caps: caps, exact: exact, reason: reason, average: total / n, cars: n };
++  }
++  function buildCapacityQueues(blocks, rows, cols, minCap, maxCap) {
++    var totals = {};
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var v = blocks[r][c]; if (v > 0) totals[v] = (totals[v] || 0) + 1;
++    }
++    var queues = {}, plans = [];
++    var colors = Object.keys(totals).map(Number).sort(function (a, b) { return a - b; });
++    for (var i = 0; i < colors.length; i++) {
++      var col = colors[i], p = capacityPlanForColor(totals[col], minCap, maxCap);
++      queues[col] = p.caps.slice(); plans.push({ color: col, total: p.total, caps: p.caps, exact: p.exact, reason: p.reason });
++    }
++    return { queues: queues, plans: plans };
+   }
+   function plan(level, config) {
+     var lv = parsed(level), blocks = lv.blocks, rows = lv.rows || blocks.length, cols = lv.cols || (blocks[0] || []).length;
+@@ -28,6 +61,7 @@ AntSolver.InstantPlayout = (function () {
+     var capMax = Math.max(capMin, parseInt(config && config.boxSizeMax, 10) || capMin);
+     var bufferLimit = Math.max(1, parseInt(config && config.bufferLimit, 10) || lv.bufferLimit || 5);
+     var elim = AntSolver.outsideReachSeed(blocks, rows, cols, false);
++    var capBuilt = buildCapacityQueues(blocks, rows, cols, capMin, capMax), capQueues = capBuilt.queues, capIndex = {};
+     var seq = AntSolver.create2D(rows, cols, 0), slots = [], active = [], cars = [], done = 0, total = 0;
+     for (var rr = 0; rr < rows; rr++) for (var cc = 0; cc < cols; cc++) if (blocks[rr][cc] > 0) total++;
+     function freeSlot() { for (var k = 0; k < bufferLimit; k++) if (!slots[k]) return k; return -1; }
+@@ -70,11 +104,13 @@ AntSolver.InstantPlayout = (function () {
+         if (n > bestReach) { bestReach = n; bestColor = colors[bi]; }
+       }
+       if (bestColor == null || bestReach <= 0) { deadlock = true; deadlockReason = 'no_reachable_color'; break; }
+-      var cap = planCap(rem[bestColor], capMin, capMax);
++      var ci = capIndex[bestColor] || 0, queue = capQueues[bestColor] || [];
++      var cap = queue[ci] || 0;
++      capIndex[bestColor] = ci + 1;
+       if (!(cap > 0)) { deadlock = true; deadlockReason = 'capacity_unavailable'; break; }
+       var car = { id: cars.length + 1, color: bestColor, cap: cap, remaining: cap, consumed: 0,
+         slot: slot, start: start, pixels: [], finished: false, active: true, enterOrder: cars.length + 1,
+-        bufferBefore: active.length };
++        bufferBefore: active.length, entryReach: bestReach, colorRemaining: rem[bestColor] };
+       cars.push(car); slots[slot] = car; active.push(car);
+       if (advance(car) <= 0) { deadlock = true; deadlockReason = 'new_car_no_progress'; break; }
+       if (car.finished) { slots[car.slot] = null; car.active = false; active = active.filter(function (x) { return x !== car; }); }
+@@ -82,19 +118,24 @@ AntSolver.InstantPlayout = (function () {
+     }
+     var unfinished = cars.filter(function (c) { return !c.finished; });
+     var counts = cars.map(function (c) { return c.cap; });
++    var microThreshold = Math.min(2, capMax);
+     var audit = { aboveMax: counts.filter(function (x) { return x > capMax; }).length,
+       belowMin: counts.filter(function (x) { return x < capMin; }).length,
++      microCount: counts.filter(function (x) { return x <= microThreshold; }).length,
+       unfinished: unfinished.length, covered: done, total: total, deadlock: !!deadlock };
+     var ok = !deadlock && done === total && !unfinished.length && !audit.aboveMax;
+     var boxes = cars.map(function (c, i) {
+       return { color: c.color, count: c.cap, elimSeq: i, instantEnterOrder: c.enterOrder,
+-        instantSlot: c.slot, instantPixels: c.pixels };
++        instantSlot: c.slot, instantPixels: c.pixels, instantEntryReach: c.entryReach, instantColorRemaining: c.colorRemaining };
+     });
+-    boxes._instantPlayout = { schema: 'instant-playout-v1', ok: ok, reason: ok ? null : (deadlockReason || 'coverage_incomplete'),
++    boxes._instantPlayout = { schema: 'instant-playout-v2', ok: ok, reason: ok ? null : (deadlockReason || 'coverage_incomplete'),
+       cars: cars.length, covered: done, total: total, capRange: [capMin, capMax], audit: audit,
++      capacityPlans: capBuilt.plans, exactCapacityColors: capBuilt.plans.filter(function (x) { return x.exact; }).length,
++      infeasibleCapacityColors: capBuilt.plans.filter(function (x) { return !x.exact; }).length,
+       bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
+-      medianReachableAtEntry: median(cars.map(function (c) { return c.consumed; })) };
++      medianEntryReach: median(cars.map(function (c) { return c.entryReach; })),
++      medianConsumed: median(cars.map(function (c) { return c.consumed; })) };
+     return { ok: ok, reason: boxes._instantPlayout.reason, boxes: boxes, cars: cars, seq: seq, audit: audit };
+   }
+-  return { plan: plan };
++  return { plan: plan, capacityPlanForColor: capacityPlanForColor };
+ })();
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.json"
+index 720039f..8eff87b 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.json"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.json"
+@@ -3,31 +3,33 @@
+   "date": "2026-10-26",
+   "plans": {
+     "006": {
+-      "ms": 16,
++      "ms": 102,
+       "ok": true,
+       "reason": null,
+       "cars": 37,
+       "audit": {
+         "aboveMax": 0,
+-        "belowMin": 5,
++        "belowMin": 6,
++        "microCount": 0,
+         "unfinished": 0,
+         "covered": 1225,
+         "total": 1225,
+         "deadlock": false
+       },
+-      "minCap": 10,
++      "minCap": 19,
+       "maxCap": 38,
+       "bufferEvents": 6,
+-      "hash": "866b51be2d5911dd15e746196d084b63967b160b651cd145ab6803552ecd797c"
++      "hash": "815b4e93a87f9f1bd64b4d80711c07c1c0326591ebfee35c8125a11eb90f8dd9"
+     },
+     "010": {
+-      "ms": 8,
++      "ms": 9,
+       "ok": true,
+       "reason": null,
+       "cars": 27,
+       "audit": {
+         "aboveMax": 0,
+         "belowMin": 1,
++        "microCount": 0,
+         "unfinished": 0,
+         "covered": 1225,
+         "total": 1225,
+@@ -45,21 +47,22 @@
+       "cars": 46,
+       "audit": {
+         "aboveMax": 0,
+-        "belowMin": 12,
++        "belowMin": 27,
++        "microCount": 0,
+         "unfinished": 0,
+         "covered": 1225,
+         "total": 1225,
+         "deadlock": false
+       },
+-      "minCap": 2,
++      "minCap": 16,
+       "maxCap": 31,
+-      "bufferEvents": 3,
+-      "hash": "a5dbd60a0481cd3c93606fc657318c7b5107fe381e9df66df4f55e56f80dc2e3"
++      "bufferEvents": 7,
++      "hash": "5b158d97a20b938f4def1dd050538221b237aa7b582a82766dc54e43e37331d9"
+     }
+   },
+   "instantEndToEnd": {
+     "006": {
+-      "ms": 757,
++      "ms": 727,
+       "level": true,
+       "valid": true,
+       "structural": {
+@@ -72,7 +75,7 @@
+         "elimOrder": "instant"
+       },
+       "instant": {
+-        "schema": "instant-playout-v1",
++        "schema": "instant-playout-v2",
+         "ok": true,
+         "reason": null,
+         "cars": 37,
+@@ -84,12 +87,158 @@
+         ],
+         "audit": {
+           "aboveMax": 0,
+-          "belowMin": 5,
++          "belowMin": 6,
++          "microCount": 0,
+           "unfinished": 0,
+           "covered": 1225,
+           "total": 1225,
+           "deadlock": false
+         },
++        "capacityPlans": [
++          {
++            "color": 4,
++            "total": 61,
++            "caps": [
++              31,
++              30
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 5,
++            "total": 103,
++            "caps": [
++              35,
++              34,
++              34
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 13,
++            "total": 55,
++            "caps": [
++              31,
++              24
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 14,
++            "total": 89,
++            "caps": [
++              31,
++              31,
++              27
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 15,
++            "total": 171,
++            "caps": [
++              35,
++              34,
++              34,
++              34,
++              34
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 17,
++            "total": 76,
++            "caps": [
++              38,
++              38
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 21,
++            "total": 36,
++            "caps": [
++              36
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 22,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 69,
++            "caps": [
++              35,
++              34
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 135,
++            "caps": [
++              34,
++              34,
++              34,
++              33
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 31,
++            "total": 304,
++            "caps": [
++              38,
++              38,
++              38,
++              38,
++              38,
++              38,
++              38,
++              38
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 41,
++            "caps": [
++              21,
++              20
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 34,
++            "total": 50,
++            "caps": [
++              31,
++              19
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          }
++        ],
++        "exactCapacityColors": 8,
++        "infeasibleCapacityColors": 5,
+         "bufferEvents": 6,
+         "medianReachableAtEntry": 34
+       },
+@@ -102,11 +251,11 @@
+         "capacitySum": 1225,
+         "pixels": 1225,
+         "conserved": true,
+-        "minCap": 10,
++        "minCap": 19,
+         "maxCap": 40,
+         "boxSizeMin": 31,
+         "boxSizeMax": 40,
+-        "belowMin": 5,
++        "belowMin": 6,
+         "aboveMax": 0,
+         "microCarMax": 2,
+         "microCars": [],
+@@ -143,11 +292,11 @@
+         "rows": 7,
+         "cols": 8
+       },
+-      "hash": "a69b50843862f1c9412e53b10bd44b2d2c8da12ce982b311249b9bc597ffbcf8",
+-      "stop": "pass_early_stop"
++      "hash": "977114e103fda0b6df161f35402d8ca72821bc71bb956200358cbfc77745da77",
++      "stop": "exhausted"
+     },
+     "010": {
+-      "ms": 530,
++      "ms": 532,
+       "level": true,
+       "valid": true,
+       "structural": {
+@@ -160,7 +309,7 @@
+         "elimOrder": "instant"
+       },
+       "instant": {
+-        "schema": "instant-playout-v1",
++        "schema": "instant-playout-v2",
+         "ok": true,
+         "reason": null,
+         "cars": 27,
+@@ -173,11 +322,139 @@
+         "audit": {
+           "aboveMax": 0,
+           "belowMin": 1,
++          "microCount": 0,
+           "unfinished": 0,
+           "covered": 1225,
+           "total": 1225,
+           "deadlock": false
+         },
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 82,
++            "caps": [
++              41,
++              41
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 2,
++            "total": 42,
++            "caps": [
++              42
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 3,
++            "total": 104,
++            "caps": [
++              52,
++              52
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 5,
++            "total": 236,
++            "caps": [
++              48,
++              47,
++              47,
++              47,
++              47
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 14,
++            "total": 32,
++            "caps": [
++              32
++            ],
++            "exact": false,
++            "reason": "color_below_min"
++          },
++          {
++            "color": 24,
++            "total": 91,
++            "caps": [
++              46,
++              45
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 25,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 26,
++            "total": 38,
++            "caps": [
++              38
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 107,
++            "caps": [
++              54,
++              53
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 32,
++            "total": 199,
++            "caps": [
++              50,
++              50,
++              50,
++              49
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 181,
++            "caps": [
++              46,
++              45,
++              45,
++              45
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 34,
++            "total": 78,
++            "caps": [
++              39,
++              39
++            ],
++            "exact": true,
++            "reason": null
++          }
++        ],
++        "exactCapacityColors": 11,
++        "infeasibleCapacityColors": 1,
+         "bufferEvents": 3,
+         "medianReachableAtEntry": 46
+       },
+@@ -219,7 +496,7 @@
+       "stop": "pass_early_stop"
+     },
+     "007": {
+-      "ms": 785,
++      "ms": 885,
+       "level": true,
+       "valid": true,
+       "structural": {
+@@ -232,7 +509,7 @@
+         "elimOrder": "instant"
+       },
+       "instant": {
+-        "schema": "instant-playout-v1",
++        "schema": "instant-playout-v2",
+         "ok": true,
+         "reason": null,
+         "cars": 46,
+@@ -244,14 +521,169 @@
+         ],
+         "audit": {
+           "aboveMax": 0,
+-          "belowMin": 12,
++          "belowMin": 27,
++          "microCount": 0,
+           "unfinished": 0,
+           "covered": 1225,
+           "total": 1225,
+           "deadlock": false
+         },
+-        "bufferEvents": 3,
+-        "medianReachableAtEntry": 31
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 52,
++            "caps": [
++              31,
++              21
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 5,
++            "total": 30,
++            "caps": [
++              30
++            ],
++            "exact": false,
++            "reason": "color_below_min"
++          },
++          {
++            "color": 13,
++            "total": 37,
++            "caps": [
++              19,
++              18
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 14,
++            "total": 33,
++            "caps": [
++              17,
++              16
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 15,
++            "total": 52,
++            "caps": [
++              31,
++              21
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 16,
++            "total": 70,
++            "caps": [
++              24,
++              23,
++              23
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 19,
++            "total": 434,
++            "caps": [
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31,
++              31
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 53,
++            "caps": [
++              31,
++              22
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 30,
++            "total": 35,
++            "caps": [
++              18,
++              17
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 31,
++            "total": 58,
++            "caps": [
++              31,
++              27
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 32,
++            "total": 39,
++            "caps": [
++              20,
++              19
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 33,
++            "total": 50,
++            "caps": [
++              31,
++              19
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          },
++          {
++            "color": 34,
++            "total": 282,
++            "caps": [
++              29,
++              29,
++              28,
++              28,
++              28,
++              28,
++              28,
++              28,
++              28,
++              28
++            ],
++            "exact": false,
++            "reason": "no_exact_partition"
++          }
++        ],
++        "exactCapacityColors": 1,
++        "infeasibleCapacityColors": 12,
++        "bufferEvents": 7,
++        "medianReachableAtEntry": 28
+       },
+       "capacity": {
+         "schema": "capacity-evidence-v1",
+@@ -262,23 +694,15 @@
+         "capacitySum": 1225,
+         "pixels": 1225,
+         "conserved": true,
+-        "minCap": 2,
++        "minCap": 16,
+         "maxCap": 31,
+         "boxSizeMin": 31,
+         "boxSizeMax": 31,
+-        "belowMin": 12,
++        "belowMin": 27,
+         "aboveMax": 0,
+         "microCarMax": 2,
+-        "microCars": [
+-          {
+-            "r": 4,
+-            "c": 7,
+-            "color": 14,
+-            "count": 2,
+-            "inPipe": false
+-          }
+-        ],
+-        "microCount": 1,
++        "microCars": [],
++        "microCount": 0,
+         "rangeExactFeasible": false,
+         "infeasibleColors": [
+           {
+@@ -339,7 +763,7 @@
+         "rows": 7,
+         "cols": 8
+       },
+-      "hash": "98a15f4f74334cbfb463ee61d4ac3d952990b82e6c9049447bf148def9a3cf20",
++      "hash": "7cb365e928d0cc3a48f9d9c2878796c45db1e6e4bd0878e8833f60a6eb75dcd5",
+       "stop": "exhausted"
+     }
+   },
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 5b4ff03..b6a8975 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -61,6 +61,7 @@
+ | v525 三态规则契约 | UI选瞬时但生成侧仍圈序的口径分裂 | ✅ ruleMode派生bottomOnly/instantChain/elimOrder；瞬时固定elimOrder=instant；默认四边006新旧hash相同 | `三态规则契约_v525.js` + `三态规则真实回归_v525.json` | §515 |
+ | 瞬时模式施工计划 | 如何真正按实机顺序造关 | 规则契约已完成；下一步instantPlayout接切车，再容量/摆盘/体验/障碍 | `瞬时模式生成器实施计划_v525.md` | §515 |
+ | v526 instantPlayout切车 | 生成器能否按实机车辆像素顺序造车 | ✅ 006/010/007覆盖全覆盖/无死锁/aboveMax=0/端到端结构过；默认四边hash不变；遗留belowMin 5/1/12 | `instantPlayout生产接入_v526.js` + JSON | §516 |
++| v527 每色容量计划 | 能否消掉2px并保持容量上界 | ✅ 007最小2→16px且micro=0；3图守恒/无死锁/aboveMax=0/结构过；belowMin 6/1/27为区间不可分 | `容量计划_v527.js` + JSON | §517 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\350\256\241\345\210\222_v527.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\350\256\241\345\210\222_v527.js"
+new file mode 100644
+index 0000000..37fc120
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\350\256\241\345\210\222_v527.js"
+@@ -0,0 +1,33 @@
++#!/usr/bin/env node
++/** v527：每色容量计划单测 + 三图生产计划复核。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), assert = require('assert');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const P = sb.AntSolver.InstantPlayout;
++function check(total, min, max) {
++  const x = P.capacityPlanForColor(total, min, max);
++  assert.strictEqual(x.caps.reduce((a, b) => a + b, 0), total);
++  assert.ok(x.caps.every(c => c <= max && c >= 1), 'capacity must stay <= max and >0');
++  assert.ok(x.caps.filter(c => c <= 2).length === 0, 'must avoid 1-2px cars when alternative exists');
++  return { total, min, max, ...x };
++}
++const out = { schema: 'capacity-plan-v527', date: '2026-10-26', cases: {}, plans: {} };
++out.cases.exact = check(103, 31, 40);
++out.cases.countFirst = check(55, 31, 40);
++out.cases.balancedTail = check(41, 31, 40);
++out.cases.noMicroOnSingletonBand = check(33, 31, 31);
++out.cases.large = check(282, 31, 31);
++const files = { '006': '35x35拼接图纸_006.txt', '010': '35x35拼接图纸_010.txt', '007': '35x35拼接图纸_007.txt' };
++for (const id in files) {
++  const blocks = sb.AntSolver.Generator.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库', files[id]), 'utf8'));
++  const band = sb.AntSolver.Generator.deriveCapacityBand(blocks), t = Date.now();
++  const p = P.plan({ blocks, bufferLimit: 5 }, { boxSizeMin: band.band[0], boxSizeMax: band.band[1], bufferLimit: 5 });
++  out.plans[id] = { ms: Date.now() - t, band: band.band, ok: p.ok, audit: p.audit,
++    minCap: Math.min(...p.cars.map(x => x.cap)), maxCap: Math.max(...p.cars.map(x => x.cap)),
++    capacityPlans: p.boxes._instantPlayout.capacityPlans };
++}
++fs.writeFileSync(path.join(__dirname, '容量计划_v527.json'), JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify(out, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\350\256\241\345\210\222_v527.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\350\256\241\345\210\222_v527.json"
+new file mode 100644
+index 0000000..ec30e7a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\271\351\207\217\350\256\241\345\210\222_v527.json"
+@@ -0,0 +1,559 @@
++{
++  "schema": "capacity-plan-v527",
++  "date": "2026-10-26",
++  "cases": {
++    "exact": {
++      "total": 103,
++      "min": 31,
++      "max": 40,
++      "caps": [
++        35,
++        34,
++        34
++      ],
++      "exact": true,
++      "reason": null,
++      "average": 34.333333333333336,
++      "cars": 3
++    },
++    "countFirst": {
++      "total": 55,
++      "min": 31,
++      "max": 40,
++      "caps": [
++        31,
++        24
++      ],
++      "exact": false,
++      "reason": "no_exact_partition",
++      "average": 27.5,
++      "cars": 2
++    },
++    "balancedTail": {
++      "total": 41,
++      "min": 31,
++      "max": 40,
++      "caps": [
++        21,
++        20
++      ],
++      "exact": false,
++      "reason": "no_exact_partition",
++      "average": 20.5,
++      "cars": 2
++    },
++    "noMicroOnSingletonBand": {
++      "total": 33,
++      "min": 31,
++      "max": 31,
++      "caps": [
++        17,
++        16
++      ],
++      "exact": false,
++      "reason": "no_exact_partition",
++      "average": 16.5,
++      "cars": 2
++    },
++    "large": {
++      "total": 282,
++      "min": 31,
++      "max": 31,
++      "caps": [
++        29,
++        29,
++        28,
++        28,
++        28,
++        28,
++        28,
++        28,
++        28,
++        28
++      ],
++      "exact": false,
++      "reason": "no_exact_partition",
++      "average": 28.2,
++      "cars": 10
++    }
++  },
++  "plans": {
++    "006": {
++      "ms": 16,
++      "band": [
++        31,
++        40
++      ],
++      "ok": true,
++      "audit": {
++        "aboveMax": 0,
++        "belowMin": 6,
++        "microCount": 0,
++        "unfinished": 0,
++        "covered": 1225,
++        "total": 1225,
++        "deadlock": false
++      },
++      "minCap": 19,
++      "maxCap": 38,
++      "capacityPlans": [
++        {
++          "color": 4,
++          "total": 61,
++          "caps": [
++            31,
++            30
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 5,
++          "total": 103,
++          "caps": [
++            35,
++            34,
++            34
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 13,
++          "total": 55,
++          "caps": [
++            31,
++            24
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 14,
++          "total": 89,
++          "caps": [
++            31,
++            31,
++            27
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 15,
++          "total": 171,
++          "caps": [
++            35,
++            34,
++            34,
++            34,
++            34
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 17,
++          "total": 76,
++          "caps": [
++            38,
++            38
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 21,
++          "total": 36,
++          "caps": [
++            36
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 22,
++          "total": 35,
++          "caps": [
++            35
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 28,
++          "total": 69,
++          "caps": [
++            35,
++            34
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 30,
++          "total": 135,
++          "caps": [
++            34,
++            34,
++            34,
++            33
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 31,
++          "total": 304,
++          "caps": [
++            38,
++            38,
++            38,
++            38,
++            38,
++            38,
++            38,
++            38
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 33,
++          "total": 41,
++          "caps": [
++            21,
++            20
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 34,
++          "total": 50,
++          "caps": [
++            31,
++            19
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        }
++      ]
++    },
++    "010": {
++      "ms": 10,
++      "band": [
++        35,
++        54
++      ],
++      "ok": true,
++      "audit": {
++        "aboveMax": 0,
++        "belowMin": 1,
++        "microCount": 0,
++        "unfinished": 0,
++        "covered": 1225,
++        "total": 1225,
++        "deadlock": false
++      },
++      "minCap": 32,
++      "maxCap": 54,
++      "capacityPlans": [
++        {
++          "color": 1,
++          "total": 82,
++          "caps": [
++            41,
++            41
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 2,
++          "total": 42,
++          "caps": [
++            42
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 3,
++          "total": 104,
++          "caps": [
++            52,
++            52
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 5,
++          "total": 236,
++          "caps": [
++            48,
++            47,
++            47,
++            47,
++            47
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 14,
++          "total": 32,
++          "caps": [
++            32
++          ],
++          "exact": false,
++          "reason": "color_below_min"
++        },
++        {
++          "color": 24,
++          "total": 91,
++          "caps": [
++            46,
++            45
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 25,
++          "total": 35,
++          "caps": [
++            35
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 26,
++          "total": 38,
++          "caps": [
++            38
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 30,
++          "total": 107,
++          "caps": [
++            54,
++            53
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 32,
++          "total": 199,
++          "caps": [
++            50,
++            50,
++            50,
++            49
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 33,
++          "total": 181,
++          "caps": [
++            46,
++            45,
++            45,
++            45
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 34,
++          "total": 78,
++          "caps": [
++            39,
++            39
++          ],
++          "exact": true,
++          "reason": null
++        }
++      ]
++    },
++    "007": {
++      "ms": 13,
++      "band": [
++        31,
++        31
++      ],
++      "ok": true,
++      "audit": {
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCount": 0,
++        "unfinished": 0,
++        "covered": 1225,
++        "total": 1225,
++        "deadlock": false
++      },
++      "minCap": 16,
++      "maxCap": 31,
++      "capacityPlans": [
++        {
++          "color": 1,
++          "total": 52,
++          "caps": [
++            31,
++            21
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 5,
++          "total": 30,
++          "caps": [
++            30
++          ],
++          "exact": false,
++          "reason": "color_below_min"
++        },
++        {
++          "color": 13,
++          "total": 37,
++          "caps": [
++            19,
++            18
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 14,
++          "total": 33,
++          "caps": [
++            17,
++            16
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 15,
++          "total": 52,
++          "caps": [
++            31,
++            21
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 16,
++          "total": 70,
++          "caps": [
++            24,
++            23,
++            23
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 19,
++          "total": 434,
++          "caps": [
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31
++          ],
++          "exact": true,
++          "reason": null
++        },
++        {
++          "color": 28,
++          "total": 53,
++          "caps": [
++            31,
++            22
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 30,
++          "total": 35,
++          "caps": [
++            18,
++            17
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 31,
++          "total": 58,
++          "caps": [
++            31,
++            27
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 32,
++          "total": 39,
++          "caps": [
++            20,
++            19
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 33,
++          "total": 50,
++          "caps": [
++            31,
++            19
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        },
++        {
++          "color": 34,
++          "total": 282,
++          "caps": [
++            29,
++            29,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28
++          ],
++          "exact": false,
++          "reason": "no_exact_partition"
++        }
++      ]
++    }
++  }
++}
+diff --git a/README.md b/README.md
+index 95cb3a0..744f212 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v526**（瞬时模式已接入 instantPlayout 切车；容量计划继续）。
++> 当前版本 **v527**（瞬时模式 instantPlayout 已接入，容量计划首版完成）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
