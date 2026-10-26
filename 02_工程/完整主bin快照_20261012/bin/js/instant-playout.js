@@ -55,7 +55,9 @@ AntSolver.InstantPlayout = (function () {
     }
     return { queues: queues, plans: plans };
   }
-  function plan(level, config) {
+  function plan(level, config, opts) {
+    opts = opts || {};
+    var policy = opts.policy || config && config.instantPlanPolicy || 'supply';
     var lv = parsed(level), blocks = lv.blocks, rows = lv.rows || blocks.length, cols = lv.cols || (blocks[0] || []).length;
     var capMin = Math.max(1, parseInt(config && config.boxSizeMin, 10) || 1);
     var capMax = Math.max(capMin, parseInt(config && config.boxSizeMax, 10) || capMin);
@@ -99,9 +101,34 @@ AntSolver.InstantPlayout = (function () {
       var start = startOf(slot, rows, cols, bufferLimit), rem = remainingByColor(elim, blocks, rows, cols);
       var bestColor = null, bestReach = 0;
       var colors = Object.keys(rem).map(Number).sort(function (a, b) { return a - b; });
+      var candidates = [];
       for (var bi = 0; bi < colors.length; bi++) {
         var n = reachableCount(colors[bi], start);
+        var qci = capIndex[colors[bi]] || 0, qcap = (capQueues[colors[bi]] || [])[qci] || 0;
+        candidates.push({ color: colors[bi], reach: n, cap: qcap, debt: qcap - n });
         if (n > bestReach) { bestReach = n; bestColor = colors[bi]; }
+      }
+      if (policy === 'shortDebt' || policy === 'mixedDebt') {
+        var debtCandidates = candidates.filter(function (x) { return x.debt > 0 && x.reach > 0; });
+        debtCandidates.sort(function (a, b) { return a.debt - b.debt || b.reach - a.reach || a.color - b.color; });
+        var debtEvery = Math.max(2, parseInt(opts.debtEvery || config && config.instantPlanDebtEvery, 10) || 2);
+        var useDebt = policy === 'shortDebt' || (cars.length % debtEvery === debtEvery - 1);
+        if (useDebt && debtCandidates.length) { bestColor = debtCandidates[0].color; bestReach = debtCandidates[0].reach; }
+      }
+      if (policy === 'targetBuffer') {
+        var tProg = total ? done / total : 0;
+        var pLo = opts.pressureLo != null ? +opts.pressureLo : (config && config.instantPlanPressureLo != null ? +config.instantPlanPressureLo : 0.15);
+        var pHi = opts.pressureHi != null ? +opts.pressureHi : (config && config.instantPlanPressureHi != null ? +config.instantPlanPressureHi : 0.72);
+        var tBuf = Math.max(1, parseInt(opts.targetBuffer || config && config.instantPlanTargetBuffer, 10) || 3);
+        var maxDebt = Math.max(1, parseInt(opts.maxDebt || config && config.instantPlanMaxDebt, 10) || 8);
+        var debts = candidates.filter(function (x) { return x.debt >= 2 && x.debt <= maxDebt && x.reach > 0; })
+          .sort(function (a, b) { return b.debt - a.debt || b.reach - a.reach || a.color - b.color; });
+        if (tProg >= pLo && tProg <= pHi && active.length < tBuf && debts.length) {
+          bestColor = debts[0].color; bestReach = debts[0].reach;
+        } else {
+          var supplies = candidates.filter(function (x) { return x.debt <= 0; }).sort(function (a, b) { return b.reach - a.reach || a.color - b.color; });
+          if (supplies.length) { bestColor = supplies[0].color; bestReach = supplies[0].reach; }
+        }
       }
       if (bestColor == null || bestReach <= 0) { deadlock = true; deadlockReason = 'no_reachable_color'; break; }
       var ci = capIndex[bestColor] || 0, queue = capQueues[bestColor] || [];
@@ -110,7 +137,7 @@ AntSolver.InstantPlayout = (function () {
       if (!(cap > 0)) { deadlock = true; deadlockReason = 'capacity_unavailable'; break; }
       var car = { id: cars.length + 1, color: bestColor, cap: cap, remaining: cap, consumed: 0,
         slot: slot, start: start, pixels: [], finished: false, active: true, enterOrder: cars.length + 1,
-        bufferBefore: active.length, entryReach: bestReach, colorRemaining: rem[bestColor] };
+        bufferBefore: active.length, entryReach: bestReach, colorRemaining: rem[bestColor], debt: cap - bestReach };
       cars.push(car); slots[slot] = car; active.push(car);
       if (advance(car) <= 0) { deadlock = true; deadlockReason = 'new_car_no_progress'; break; }
       if (car.finished) { slots[car.slot] = null; car.active = false; active = active.filter(function (x) { return x !== car; }); }
@@ -128,16 +155,19 @@ AntSolver.InstantPlayout = (function () {
       return { color: c.color, count: c.cap, elimSeq: i, instantEnterOrder: c.enterOrder,
         instantSlot: c.slot, instantPixels: c.pixels, instantEntryReach: c.entryReach, instantColorRemaining: c.colorRemaining };
     });
-    boxes._instantPlayout = { schema: 'instant-playout-v2', ok: ok, reason: ok ? null : (deadlockReason || 'coverage_incomplete'),
+    var maxBuffer = Math.max.apply(null, cars.map(function (c) { return c.bufferBefore + 1; }).concat([0]));
+    boxes._instantPlayout = { schema: 'instant-playout-v2', ok: ok, reason: ok ? null : (deadlockReason || 'coverage_incomplete'), policy: policy,
       cars: cars.length, covered: done, total: total, capRange: [capMin, capMax], audit: audit,
       capacityPlans: capBuilt.plans, exactCapacityColors: capBuilt.plans.filter(function (x) { return x.exact; }).length,
       infeasibleCapacityColors: capBuilt.plans.filter(function (x) { return !x.exact; }).length,
       bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
+      debtCars: cars.filter(function (c) { return c.debt > 0; }).length,
+      maxBuffer: maxBuffer,
       medianEntryReach: median(cars.map(function (c) { return c.entryReach; })),
       medianConsumed: median(cars.map(function (c) { return c.consumed; })),
       carSequence: cars.map(function (c) { return { id: c.id, color: c.color, cap: c.cap, slot: c.slot,
         start: c.start, enterOrder: c.enterOrder, finishOrder: c.finishOrder || null, entryReach: c.entryReach,
-        colorRemaining: c.colorRemaining, consumed: c.consumed }; }) };
+        colorRemaining: c.colorRemaining, consumed: c.consumed, debt: c.debt }; }) };
     return { ok: ok, reason: boxes._instantPlayout.reason, boxes: boxes, cars: cars, seq: seq, audit: audit };
   }
   return { plan: plan, capacityPlanForColor: capacityPlanForColor };
