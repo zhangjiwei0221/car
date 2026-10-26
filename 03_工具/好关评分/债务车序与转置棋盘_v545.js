@@ -16,6 +16,8 @@ const POLICIES = [
 ];
 const SEEDS = [1001, 1002, 32677];
 const OUT = path.resolve(ROOT, '03_工具/好关评分/债务车序与转置棋盘_v545.json');
+const requestedOut = process.argv.find(x => x.startsWith('--out='));
+const outPath = requestedOut ? path.resolve(ROOT, requestedOut.slice(6)) : OUT;
 function load() {
   const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
     WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
@@ -134,6 +136,6 @@ const summary = {
 };
 const report = { schema: 'debt-order-transpose-v1', date: '2026-10-26',
   preregistration: '债务车序与转置棋盘_预登记_v545.md', summary, rows };
-fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
+fs.writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify({ summary }, null, 2));
 if (summary.capacityOk !== rows.length) process.exitCode = 1;

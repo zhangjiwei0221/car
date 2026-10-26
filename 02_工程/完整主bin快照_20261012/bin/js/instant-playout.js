@@ -169,7 +169,10 @@ AntSolver.InstantPlayout = (function () {
         var debtCandidates = candidates.filter(function (x) { return x.debt > 0 && x.reach > 0; });
         debtCandidates.sort(function (a, b) { return a.debt - b.debt || b.reach - a.reach || a.color - b.color; });
         var debtEvery = Math.max(2, parseInt(opts.debtEvery || config && config.instantPlanDebtEvery, 10) || 2);
-        var useDebt = policy === 'shortDebt' || (cars.length % debtEvery === debtEvery - 1);
+        // v546：只剩最后一个空槽时不再主动塞新债务车；否则短债策略容易把
+        // 5 个槽全部占成“能消一点但消不完”的车，随后 buffer_full_no_progress。
+        var debtSlotSafe = active.length < bufferLimit - 1;
+        var useDebt = debtSlotSafe && (policy === 'shortDebt' || (cars.length % debtEvery === debtEvery - 1));
         if (useDebt && debtCandidates.length) { bestColor = debtCandidates[0].color; bestReach = debtCandidates[0].reach; }
       }
       if (policy === 'targetBuffer') {
