@@ -1080,7 +1080,14 @@ AntSolver.Quality.capacityEvidence = function (level, config) {
     }
   }
   var blocks = level && level.blocks || [];
-  for (var br = 0; br < blocks.length; br++) for (var bc = 0; bc < blocks[br].length; bc++) if (blocks[br][bc] > 0) pixels++;
+  var targetByColor = {};
+  for (var br = 0; br < blocks.length; br++) for (var bc = 0; bc < blocks[br].length; bc++) {
+    var targetColor = blocks[br][bc];
+    if (targetColor > 0) {
+      pixels++;
+      targetByColor[targetColor] = (targetByColor[targetColor] || 0) + 1;
+    }
+  }
   var sum = 0, below = 0, above = 0, micro = [], minCap = null, maxCap = null;
   for (var i = 0; i < cars.length; i++) {
     var car = cars[i], n = car.count;
@@ -1104,10 +1111,22 @@ AntSolver.Quality.capacityEvidence = function (level, config) {
     var rc = row0[ri].color; row0Colors[rc] = (row0Colors[rc] || 0) + 1;
     row0MaxSame = Math.max(row0MaxSame, row0Colors[rc]);
   }
+  var colorMismatches = [], colorKeys = {};
+  for (var aColor in byColor) colorKeys[aColor] = true;
+  for (var tColor in targetByColor) colorKeys[tColor] = true;
+  for (var cKey in colorKeys) {
+    var actualColorSum = byColor[cKey] || 0;
+    var targetColorSum = targetByColor[cKey] || 0;
+    if (actualColorSum !== targetColorSum) {
+      colorMismatches.push({ color: +cKey, target: targetColorSum, actual: actualColorSum });
+    }
+  }
+  var perColorConserved = colorMismatches.length === 0;
   return {
     schema: 'capacity-evidence-v1', rows: board.rows, cols: board.cols,
     boardFloorPass: board.rows >= 6 && board.cols >= 6,
     cars: cars.length, capacitySum: sum, pixels: pixels, conserved: sum === pixels,
+    perColorConserved: perColorConserved, colorMismatches: colorMismatches,
     minCap: minCap, maxCap: maxCap, boxSizeMin: minC || null, boxSizeMax: maxC || null,
     belowMin: below, aboveMax: above,
     microCarMax: microMax, microCars: micro, microCount: micro.length,

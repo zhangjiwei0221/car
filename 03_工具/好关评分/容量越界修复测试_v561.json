@@ -1,0 +1,107 @@
+{
+  "schema": "capacity-choke-fix-test-v561",
+  "date": "2026-10-26",
+  "oldCommit": "ed468cd",
+  "cases": {
+    "oldBig": {
+      "kind": "bigBox",
+      "applied": true,
+      "counts": [
+        31,
+        13,
+        13,
+        13,
+        13
+      ],
+      "sum": 83,
+      "min": 13,
+      "max": 31,
+      "above19": [
+        31
+      ],
+      "diagnostic": {
+        "target": 80,
+        "color": 5,
+        "count": 31
+      }
+    },
+    "oldSpread": {
+      "kind": "spread",
+      "applied": true,
+      "counts": [
+        13,
+        13,
+        31,
+        13,
+        13
+      ],
+      "sum": 83,
+      "min": 13,
+      "max": 31,
+      "above19": [
+        31
+      ],
+      "diagnostic": {
+        "boxes": 1,
+        "amount": 15
+      }
+    },
+    "newBig": {
+      "kind": "bigBox",
+      "applied": true,
+      "counts": [
+        19,
+        17,
+        16,
+        18,
+        13
+      ],
+      "sum": 83,
+      "min": 13,
+      "max": 19,
+      "above19": [],
+      "perColorConserved": true,
+      "colorMismatches": [],
+      "diagnostic": {
+        "target": 19,
+        "uncappedTarget": 80,
+        "contractMax": 19,
+        "color": 5,
+        "count": 19
+      }
+    },
+    "newSpread": {
+      "kind": "spread",
+      "applied": true,
+      "counts": [
+        13,
+        17,
+        16,
+        18,
+        19
+      ],
+      "sum": 83,
+      "min": 13,
+      "max": 19,
+      "above19": [],
+      "perColorConserved": true,
+      "colorMismatches": [],
+      "diagnostic": {
+        "boxes": 1,
+        "amount": 15,
+        "contractMax": 19
+      }
+    }
+  },
+  "checks": {
+    "oldBigReproduced": true,
+    "oldSpreadReproduced": true,
+    "newBigWithinCap": true,
+    "newSpreadWithinCap": true,
+    "newBigConserved": true,
+    "newSpreadConserved": true,
+    "newBigPerColorConserved": true,
+    "newSpreadPerColorConserved": true
+  },
+  "pass": true
+}

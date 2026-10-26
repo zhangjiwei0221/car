@@ -1,0 +1,255 @@
+{
+  "schema": "capacity-hard-contract-regression-v561",
+  "date": "2026-10-26",
+  "checks": {
+    "pageVersion": true,
+    "cacheVersion20": true,
+    "appBuild561": true,
+    "targetPreferenceStillOn": true,
+    "bigBoxClampPresent": true,
+    "spreadClampPresent": true,
+    "perColorEvidencePresent": true,
+    "targetGateUsesPerColor": true,
+    "causalFixTest": true,
+    "oldAboveMaxReproduced": true,
+    "newAboveMaxRemoved": true,
+    "knownSuccessProtection": true,
+    "timeModeUnchanged": true
+  },
+  "evidence": {
+    "causalFixTest": {
+      "schema": "capacity-choke-fix-test-v561",
+      "date": "2026-10-26",
+      "oldCommit": "ed468cd",
+      "cases": {
+        "oldBig": {
+          "kind": "bigBox",
+          "applied": true,
+          "counts": [
+            31,
+            13,
+            13,
+            13,
+            13
+          ],
+          "sum": 83,
+          "min": 13,
+          "max": 31,
+          "above19": [
+            31
+          ],
+          "diagnostic": {
+            "target": 80,
+            "color": 5,
+            "count": 31
+          }
+        },
+        "oldSpread": {
+          "kind": "spread",
+          "applied": true,
+          "counts": [
+            13,
+            13,
+            31,
+            13,
+            13
+          ],
+          "sum": 83,
+          "min": 13,
+          "max": 31,
+          "above19": [
+            31
+          ],
+          "diagnostic": {
+            "boxes": 1,
+            "amount": 15
+          }
+        },
+        "newBig": {
+          "kind": "bigBox",
+          "applied": true,
+          "counts": [
+            19,
+            17,
+            16,
+            18,
+            13
+          ],
+          "sum": 83,
+          "min": 13,
+          "max": 19,
+          "above19": [],
+          "perColorConserved": true,
+          "colorMismatches": [],
+          "diagnostic": {
+            "target": 19,
+            "uncappedTarget": 80,
+            "contractMax": 19,
+            "color": 5,
+            "count": 19
+          }
+        },
+        "newSpread": {
+          "kind": "spread",
+          "applied": true,
+          "counts": [
+            13,
+            17,
+            16,
+            18,
+            19
+          ],
+          "sum": 83,
+          "min": 13,
+          "max": 19,
+          "above19": [],
+          "perColorConserved": true,
+          "colorMismatches": [],
+          "diagnostic": {
+            "boxes": 1,
+            "amount": 15,
+            "contractMax": 19
+          }
+        }
+      },
+      "checks": {
+        "oldBigReproduced": true,
+        "oldSpreadReproduced": true,
+        "newBigWithinCap": true,
+        "newSpreadWithinCap": true,
+        "newBigConserved": true,
+        "newSpreadConserved": true,
+        "newBigPerColorConserved": true,
+        "newSpreadPerColorConserved": true
+      },
+      "pass": true
+    },
+    "oldRepro": {
+      "arm": "old",
+      "image": "recommend",
+      "seed": 88001,
+      "wallMs": 49116,
+      "overrunMs": 4116,
+      "rounds": 4,
+      "stop": "goalTimeUp",
+      "valid": true,
+      "struct": false,
+      "pass": false,
+      "distance": 32.5,
+      "midBuffer34Pct": 17.5,
+      "release": "found",
+      "usableSpaceRepair": null,
+      "gateReasons": [
+        "吃满中位 6>3",
+        "freeLow 60%>30%",
+        "最长免费连 25>6"
+      ],
+      "fullMedian2": 6,
+      "capacity": {
+        "schema": "capacity-evidence-v1",
+        "rows": 8,
+        "cols": 9,
+        "boardFloorPass": true,
+        "cars": 69,
+        "capacitySum": 1225,
+        "pixels": 1225,
+        "conserved": true,
+        "minCap": 13,
+        "maxCap": 26,
+        "boxSizeMin": 13,
+        "boxSizeMax": 19,
+        "belowMin": 0,
+        "aboveMax": 1,
+        "microCarMax": 2,
+        "microCars": [],
+        "microCount": 0,
+        "rangeExactFeasible": true,
+        "infeasibleColors": [],
+        "row0Cars": 9,
+        "row0Colors": 4,
+        "row0MaxSameColor": 3,
+        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+      },
+      "hash": "853d641a7c5e09218eec1fd28f1e9f90bc5b5aa6f05484179646ef7d04126cfa",
+      "error": null
+    },
+    "newRepro": {
+      "arm": "new",
+      "image": "recommend",
+      "seed": 88001,
+      "wallMs": 47649,
+      "overrunMs": 2649,
+      "rounds": 4,
+      "stop": "goalTimeUp",
+      "valid": true,
+      "struct": false,
+      "pass": false,
+      "distance": 30.9,
+      "midBuffer34Pct": 19.1,
+      "release": "found",
+      "usableSpaceRepair": null,
+      "gateReasons": [
+        "吃满中位 5>3",
+        "freeLow 49%>30%",
+        "最长免费连 28>6"
+      ],
+      "fullMedian2": 5,
+      "capacity": {
+        "schema": "capacity-evidence-v1",
+        "rows": 9,
+        "cols": 10,
+        "boardFloorPass": true,
+        "cars": 85,
+        "capacitySum": 1225,
+        "pixels": 1225,
+        "conserved": true,
+        "minCap": 10,
+        "maxCap": 19,
+        "boxSizeMin": 13,
+        "boxSizeMax": 19,
+        "belowMin": 21,
+        "aboveMax": 0,
+        "microCarMax": 2,
+        "microCars": [],
+        "microCount": 0,
+        "rangeExactFeasible": true,
+        "infeasibleColors": [],
+        "row0Cars": 10,
+        "row0Colors": 3,
+        "row0MaxSameColor": 5,
+        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+      },
+      "hash": "22b337fc703e831acb7780d08367311e16eac97024f2dc227a096236d802639b",
+      "error": null
+    },
+    "protection": {
+      "targetRows": 3,
+      "targetValid": 3,
+      "configOk": true,
+      "v547HashMatches": [
+        1002,
+        32677
+      ],
+      "structuralSignificantFound": [
+        1002,
+        32677
+      ],
+      "sample1001Status": "found",
+      "wholeGoalPass": [
+        1002,
+        32677
+      ],
+      "timeMode": {
+        "valid": true,
+        "hash": "0f5310dd5cbae645b8857bae89ccf28364708ee0b791a320f31d06bc157646de",
+        "expectedHash": "0f5310dd5cbae645b8857bae89ccf28364708ee0b791a320f31d06bc157646de",
+        "hashMatch": true,
+        "config": {},
+        "elapsedMs": 784
+      },
+      "pass": true,
+      "decision": "目标体验配置包接入正确，两个结构样本达到完整目标通过；1001虽有显著释放但结构门未过、goalPass=false；时间模式hash不变。"
+    }
+  },
+  "pass": true
+}

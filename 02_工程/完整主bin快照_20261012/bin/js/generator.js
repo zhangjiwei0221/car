@@ -9381,6 +9381,13 @@ AntSolver.Generator = (function() {
    */
   function chokeInflate(board, targets, config, blocks) {
     var cells = board.cells, rows = board.rows, cols = board.cols, min = config.boxSizeMin || 2, max = config.boxSizeMax || 52;
+    // v561：卡点增容也受用户容量快照约束。旧逻辑使用绝对 bigBoxCap 80~110，
+    // 会在容量带 [13,19] 的图上造出 26px 车；卡点不能绕过硬合同。
+    var contractMax = parseInt(config._userCapMax, 10) || 0;
+    var declaredMax = parseInt(config.boxSizeMax, 10) || 0;
+    if (contractMax > 0 && declaredMax > 0) contractMax = Math.min(contractMax, declaredMax);
+    else contractMax = contractMax || declaredMax || max;
+    contractMax = Math.max(min, contractMax);
     var target;
     if (config.bigBoxCapMin != null && config.bigBoxCapMax != null) {
       var cLo = parseInt(config.bigBoxCapMin, 10), cHi = parseInt(config.bigBoxCapMax, 10);
@@ -9392,6 +9399,8 @@ AntSolver.Generator = (function() {
       if (hi < lo) hi = lo;
       target = Math.round(max * (lo + rnd() * (hi - lo)));
     }
+    var uncappedTarget = target;
+    target = Math.min(contractMax, Math.max(min, target));
     var sinks = [];
     // 【落位⑤ 与大容量球位置组合】共位开启时允许（并优先）选锁链格；缺省仍避开锁链。
     var comboBig = chainComboOn(config, 'bigBox');
@@ -9422,7 +9431,15 @@ AntSolver.Generator = (function() {
     if (!donors.length) return false;
     var moved = false;
     for (var j = 0; j < donors.length && sink.count < target; j++) { var d = donors[j], take = Math.min(d.count - min, target - sink.count); if (take > 0) { d.count -= take; sink.count += take; moved = true; } }
-    if (moved) { board._chokeBigBox = { target: target, color: sink.color, count: sink.count }; }
+    if (moved) {
+      board._chokeBigBox = {
+        target: target,
+        uncappedTarget: uncappedTarget,
+        contractMax: contractMax,
+        color: sink.color,
+        count: sink.count
+      };
+    }
     return moved;
   }
 
@@ -9434,6 +9451,11 @@ AntSolver.Generator = (function() {
    */
   function chokeInflateSpread(board, targets, config) {
     var cells = board.cells, rows = board.rows, cols = board.cols, min = config.boxSizeMin || 2;
+    var contractMax = parseInt(config._userCapMax, 10) || 0;
+    var declaredMax = parseInt(config.boxSizeMax, 10) || 0;
+    if (contractMax > 0 && declaredMax > 0) contractMax = Math.min(contractMax, declaredMax);
+    else contractMax = contractMax || declaredMax;
+    if (contractMax > 0) contractMax = Math.max(min, contractMax);
     var N = config.inflateBoxCount != null ? Math.max(1, parseInt(config.inflateBoxCount, 10)) : 2;
     var M = config.inflateAmount != null ? Math.max(1, parseInt(config.inflateAmount, 10)) : 15;
     var pool = [];
@@ -9451,14 +9473,17 @@ AntSolver.Generator = (function() {
         if (e && e.t === 'box' && e !== sink && e.color === sink.color && e.chain === 0) donors.push(e);
       }
       if (!donors.length) continue;
-      var want = sink.count + M, moved = false;
+      var want = sink.count + M;
+      if (contractMax > 0) want = Math.min(want, contractMax);
+      if (want <= sink.count) continue;
+      var moved = false;
       for (var j = 0; j < donors.length && sink.count < want; j++) {
         var d = donors[j], take = Math.min(d.count - min, want - sink.count);
         if (take > 0) { d.count -= take; sink.count += take; moved = true; }
       }
       if (moved) { movedAny = true; done++; }
     }
-    if (movedAny) board._chokeInflate = { boxes: done, amount: M };
+    if (movedAny) board._chokeInflate = { boxes: done, amount: M, contractMax: contractMax || null };
     return movedAny;
   }
 
@@ -15130,7 +15155,8 @@ AntSolver.Generator = (function() {
     if (!ca && cand && cand.level && AntSolver.Quality) {
       try { ca = AntSolver.Quality.capacityEvidence(cand.level, cand.config || config || {}); cand.capacityAudit = ca; } catch (e) { return false; }
     }
-    return !!(ca && ca.conserved && ca.boardFloorPass && ca.aboveMax === 0);
+    return !!(ca && ca.conserved && ca.perColorConserved !== false &&
+      ca.boardFloorPass && ca.aboveMax === 0);
   }
   function goalExperiencePass(cand, config) {
     if (!cand || !cand.valid || !goalStructPass(cand) || !experienceCapacityOk(cand, config)) return false;
