@@ -1,0 +1,829 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index e52e231..386aaa1 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -23,6 +23,7 @@
+ > v535：路线构造已模块化。007从第29步分叉`(2,2)`，46步完整回放达72%/max4/释放1，搜索380ms；006/010的plan参考路线已分别57.9%/76.5%且直接回放通过。三图全过，但006/010未触发构造搜索，010仍有max5/黑块25%风险；下一步接生成候选并做多seed。
+ > v536：三图×4seed×A/B共24次目标模式运行，off/on目标均0通过；结构合格各1次，唯一合格候选010/32677没有高压参考状态，路线证据无法救回。无容量回退、无已知成功回退；结论是路线不能绕过结构门，下一步先解决结构合格候选与高压路线供给的共同缺口。
+ > v537：固定v536 A行做只读分类：both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4。最高频可行动类别是007“有高压路线但结构不合格”（4/4，免费连13~18>6）；下一轮只测007分支前缀债务8→12，不同时改容量/棋盘/障碍。
++> v538：007分支前缀债务8→12被否决。4/4 seed免费连变差（13→15、18→22、13→20、15→24），高压仅2/4保持，结构仍0/4；容量无回退。回退到8，下一轮只改007容量分配，不再加前缀债务。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+@@ -50,6 +51,7 @@
+ - v535把该能力封装为`AntSolver.ReleaseRouteConstructor`。三图各自有完整可回放路线：007为构造分叉，006/010为参考计划路线直接通过；本轮只证明模块与验收可用，没有证明候选选择、随机seed或真实UI泛化。
+ - v536完成候选接线 A/B：`instantReleaseRoute` 默认关闭；只有结构/容量合格的候选才计算路线。24次运行没有目标通过或救回，唯一结构合格候选没有高压状态。该负结果说明下一步不能继续加路线搜索，而要看结构门与高压路线供给是否共同成立。
+ - v537完成只读缺口分类：12个A行中只有1个结构合格，4个007有高压但结构不合格，3个010两者都不足，4个006无有效目标候选。下一步先修007的单一分支债务因素，不同时换容量或棋盘。
++- v538完成分支前缀债务8→12单因素：4/4免费连变差，高压仅2/4保持，结构0/4，容量合同无回退。分支前缀债务方向否决，下一步转007容量分配。
+ - 以下「下一步」仍是多图主产线基准，但产线现在与代码一致，口径不再分叉。
+ - 下一步不是继续堆模块，而是：**默认主产线多图基准 → 只读归因 → 针对最高频失败项做单变量实验。**
+ 
+@@ -677,9 +679,9 @@ for obstacle in candidates:
+ 
+ ## 6. 当前下一步：严格按此顺序
+ 
+-> **2026-10-26 v537 后的实际施工位置：** 唯一验收骨架已固定为 `优质关卡生成_详细工作流程.md` 的 P0～P6。v537证明007是最高频可行动缺口（4/4为高压但结构不合格），006是独立的无候选问题，010是结构合格但低压/无路线问题。
++> **2026-10-26 v538 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。v538已经排除“增加分支前缀债务”这个局部修复；007仍是高压但结构不合格，006仍无有效候选，010仍是低压/无路线。
+ >
+-> 下一轮唯一主实验（v538）：只在007上把`instantPlanBranchPrefixDebts`从8改为12；图、seed1001/1002/88001/32677、容量、棋盘、障碍和其他参数全部固定。主目标是降低免费连并保持solver中段3/4≥50%；保护是结构门不回退、容量守恒、aboveMax=0、独立回放通过。若8→12无效，才允许下一轮换容量分配或棋盘余量，不得并行改。
++> 下一轮唯一主实验（v539）：只在007上做容量分配单因素；固定seed1001/1002/88001/32677、7×8棋盘、分支前缀债务8、障碍和其他参数。先在容量带内枚举少量合法分色容量方案，比较免费连、solver中段3/4、结构门和aboveMax；不得跨色偷像素或越用户区间。
+ 
+ ### 下一步 A：多图主产线基准（先做）
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+index e0fd99a..bdc598e 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+@@ -2,7 +2,7 @@
+ 
+ > **唯一验收骨架：本文件的 P0～P6。** `优质关卡生成_接管总纲.md` 中保留的历史实现卡和旧编号只能作为实现细节参考，不是第二套验收阶段。
+ 
+-> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v537 结构/路线缺口分类，P0～P6唯一验收骨架已统一**。
++> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v538 分支前缀债务8→12被否决，回退8**。
+ > 本文是唯一“已做什么 → 剩什么 → 如何实验 → 何时算完成”的执行流程；算法细节回查 `优质关卡生成_接管总纲.md`，历史数字回查工作日志对应节号。
+ > 瞬时模式的具体施工顺序见 [`瞬时模式生成器实施计划_v525.md`](瞬时模式生成器实施计划_v525.md)，它是本文 P0~P3 的技术分支，不替代本文验收框架。
+ 
+@@ -57,6 +57,7 @@
+ | 多图路线构造模块 | v535 007构造46步72%/max4/释放1（380ms）；006/010参考路线57.9%/76.5%直接通过 | 三图单seed通过；006/010未触发构造，010有max5/黑块25%风险 |
+ | 路线证据候选接线 | v536 A/B三图×4seed共24次：off/on目标均0通过，结构合格各1次；010/32677无高压状态，route tested=0 | 没有救回和回退；路线不能替代结构门 |
+ | 结构与路线缺口分类 | v537 12个A行：both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4；007四例均为高压但结构不合格 | 下一轮只测007分支前缀债务8→12 |
++| 分支前缀债务8→12 | v538 007四seed免费连均恶化、结构仍0/4，高压仅2/4保持 | 因子否决，回退8；下一轮只测容量分配 |
+ 
+ ### 2.1 关键正结果
+ 
+@@ -68,6 +69,7 @@
+ - v535多图模块：三图含生成总墙钟3.632秒；007首次搜索即找到通过路线，006/010计划参考路线直接通过。完整签名均已独立回放，守恒/aboveMax=0/micro=0。
+ - v536候选接线A/B：24次运行中off/on目标均0通过，结构合格各1次，B臂没有救回；唯一结构合格候选010/32677 solver中段3/4=0、route tested=0。容量和已知成功均无回退，默认开关仍关闭。
+ - v537结构/路线缺口分类：A行12个，both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4。007四seed是有高压路线但结构不合格，全部卡最长免费连13~18；006四seed无有效候选。下一步只改007分支前缀债务。
++- v538分支前缀债务8→12：007四seed免费连13→15、18→22、13→20、15→24，全部恶化；solver中段3/4仅2/4保持≥50%，结构仍0/4；容量合同无回退。因子否决，保持8。
+ 
+ ### 2.2 已验证、不能再走的弯路
+ 
+@@ -100,7 +102,7 @@
+ | 剩余项 | 当前卡点 | 下一步主实验 |
+ |---|---|---|
+ | 容量合同漏网 | 推荐图aboveMax=1 | 容量越界谱系追踪，先硬合同后体验 |
+-| 路线释放证据 | v537已分离缺口；007是最高频可行动类别，006是独立无候选问题 | v538只测007分支前缀债务8→12；006另立后续 |
++| 路线释放证据 | v538已排除分支前缀债务；007仍高压但结构不合格 | v539只测007容量分配；006另立后续 |
+ | 远/近压力不足 | 010/推荐仍有低压基底 | 近失局部修、远失换基底；不做统一容量加减 |
+ | 每色容量组合规划 | 目前主要同色转移，缺全局联合目标 | 每色候选集→全局Pareto组合→重解评价 |
+ | 车序与首行观感 | 双时间线有测量，稳定生成策略不足 | 局部交换、首行同色run、释放顺序联合评价 |
+@@ -327,8 +329,8 @@
+ ## 6. 推荐执行顺序（不要跳步）
+ 
+ ```text
+-v537结构/路线缺口分类已完成
+-→ v538：007分支前缀债务8→12单因素
++v538分支前缀债务8→12已完成（否决）
++→ v539：007容量分配单因素
+ → P0容量越界谱系追踪（硬合同）
+ → 多图失败分布基线
+ → P1 release unknown评价覆盖
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 898db79..cc8a769 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20661,3 +20661,34 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. v538只在007上测试`instantPlanBranchPrefixDebts` 8→12，固定seed1001/1002/88001/32677、容量、棋盘、障碍和其他参数。
+ 2. 主目标：免费连至少降低2步且solver中段3/4≥50%；保护：`goalStructPass`不回退、容量守恒、aboveMax=0、独立回放通过。
+ 3. 006无候选、010低压和P0容量漏网分别另立实验；不得与v538并行修改。
++
++### 528. 【2026-10-26】v538：分支前缀债务8→12被否决
++
++#### 528.1 问题（原话）
++
++- “继续（`instantPlanBranchPrefixDebts` 从 8 改到 12是啥意思）。”
++- 需要解释参数含义并验证增加分支前缀短债车能否改善007的免费连，同时保持高压和容量合同。
++
++#### 528.2 证据
++
++- `instantPlanBranchPrefixDebts`不是容量或障碍数量，而是瞬时计划车单中优先放入的短债车数量；短债车按`count - instantEntryReach`从小债务开始排序，取前N辆放到车单前缀，剩余车辆保持原顺序，代码上限为12。
++- v537的007四seed均为“有高压路线但结构不合格”，免费连13/18/13/15>6；因此本轮只测8→12。
++- 运行条件：007、seed1001/1002/88001/32677、容量/棋盘/障碍/其他参数固定，30秒目标预算、每轮20秒、最多2轮、`instantReleaseRoute=false`。
++
++#### 528.3 改动
++
++- 新增`分支前缀债务12_v538.js`、JSON和预登记；仅改变`instantPlanBranchPrefixDebts`，没有修改默认生成器参数。
++- 没有新增障碍、没有改动容量区间、棋盘范围、分支入口位置或路线构造逻辑。
++
++#### 528.4 验证（改前后数字）
++
++- 免费连A→B：13→15、18→22、13→20、15→24，4/4均恶化，没有达到“至少2/4下降2步”。
++- solver中段3/4 A→B：72→3.7、50→57.7、72→3.8、72→68；只有2/4保持≥50%，两例高压崩溃。
++- 结构A/B均0/4，目标通过均0/4；容量均守恒、aboveMax=0，无越界。
++- 结论：该方向否决，保持前缀债务8；下一步只改007容量分配。
++
++#### 528.5 遗留
++
++1. v539只在007上测容量分配单因素，固定prefix debts=8、7×8棋盘和障碍。
++2. 容量方案必须在用户容量带内、每色守恒，不得跨色偷像素；比较免费连、solver中段3/4、结构门和aboveMax。
++3. 006无有效候选和010低压继续独立处理，不与v539并行改。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index f9610e5..c570736 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v537 结构/路线缺口分类）　|　当前版本：**v537**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v538 分支前缀债务单因素）　|　当前版本：**v538**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~527。v537只读分类12个A行：both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4；最高频可行动类别是007“有高压路线但结构不合格”，4/4均卡最长免费连13~18>6。下一轮只测试007分支前缀债务8→12，不改容量/棋盘/障碍。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~528。v538把007的`instantPlanBranchPrefixDebts`从8改为12：4/4免费连变差（13→15、18→22、13→20、15→24），高压仅2/4保持，结构仍0/4；容量无回退。该单因素否决，回退8。**
+ >
+ > **编号约定：验收阶段只有 P0～P6，以 [`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md) 为准。代码和历史文档中的 P7、P8、P9、P10 是实现名、旧编号或历史索引，不是额外验收阶段。**
+ >
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index e15caea..044517f 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -271,3 +271,10 @@
+ - 007四seed全部为`route_only`：solver中段3/4=50/50/72/72，max4，但结构门均因最长免费连18/18/13/15>6失败。010/seed32677是唯一`structure_only`，solver中段3/4=0、无高压状态；其余三个010是`neither`。006四seed全是`invalid`，属于独立的无候选/管道容量问题。
+ - 最高频可行动类别选007的“高压但结构不合格”，下一轮只改一个因素：`instantPlanBranchPrefixDebts`从8改为12。目标是将免费连至少降低2步并保持solver中段3/4≥50%；保护是结构门不退化、容量守恒、aboveMax=0、独立回放通过。
+ - 本步不修改生成器；P0～P6仍是唯一验收骨架。006无候选、010低压和P0容量漏网分别保留为后续独立问题，不能与v538混在一起修。
++
++## 33. v538：分支前缀债务8→12否决
++
++- 只看007，seed1001/1002/88001/32677；A=`instantPlanBranchPrefixDebts=8`，B=12；其他参数和30秒目标模式预算固定。
++- 免费连A→B为13→15、18→22、13→20、15→24，4/4恶化；B的solver中段3/4只有50/57.7/72/68，1001和88001跌到3.7%/3.8%；结构A/B均0/4。
++- 容量均守恒、aboveMax=0；没有越界，但没有质量收益。该单因素按预登记否决，回退8，不再继续加前缀债务。
++- 下一步v539只在007上测容量分配单因素，固定棋盘、前缀债务8和障碍；不跨色偷像素、不越用户容量区间。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index f97e6fd..1d678a4 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -101,6 +101,8 @@
+ - **v536边界**：路线证据不能替代 `goalStructPass`，也不能修复没有高压状态的结构合格关。下一步先定位结构合格候选与高压路线供给的共同缺口，不继续扩大路线搜索或接默认。
+ - **v537结果**：对v536 A行做只读分类，both_ready=0、structure_only=1、route_only=4、neither=3、invalid=4。007四seed全部是“有高压但结构不合格”，solver中段3/4=50/50/72/72，唯一结构失败项为最长免费连18/18/13/15>6；006四seed无有效目标候选；010一例结构合格但低压、三例双缺口。
+ - **v537边界**：本步不改生成器。下一步只在007上做分支前缀债务8→12单因素A/B，不同时改容量、棋盘或障碍；006的无候选问题另立后续实验。
++- **v538结果**：007 prefix debts 8→12的4个seed，免费连从13/18/13/15变为15/22/20/24，均恶化；solver中段3/4仅seed1002、32677保持≥50%，seed1001/88001跌到3.7%/3.8%；结构仍0/4，容量守恒/aboveMax=0。该因素否决，回退8。
++- **v538边界**：分支前缀债务方向停止加码。下一步只换007容量分配，不同时改棋盘或障碍。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index cafdfcc..a2625dc 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v537 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=537">
++  <title>车接小人 v538 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=538">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v537</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v538</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,29 +773,29 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=537"></script>
+-  <script src="js/utils.js?v=537"></script>
++  <script src="js/zip.js?v=538"></script>
++  <script src="js/utils.js?v=538"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=537"></script>
+-  <script src="js/simulator.js?v=537"></script>
++  <script src="js/color-libs.js?v=538"></script>
++  <script src="js/simulator.js?v=538"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=537"></script>
+-  <script src="js/solver-strategy.js?v=537"></script>
+-  <script src="js/solver.js?v=537"></script>
+-  <script src="js/playersim.js?v=537"></script>
++  <script src="js/anchor-cut.js?v=538"></script>
++  <script src="js/solver-strategy.js?v=538"></script>
++  <script src="js/solver.js?v=538"></script>
++  <script src="js/playersim.js?v=538"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=537"></script>
+-  <script src="js/car-sequencer.js?v=537"></script>
+-  <script src="js/experience-goal.js?v=537"></script>
+-  <script src="js/release-route-constructor.js?v=537"></script>
+-  <script src="js/capacity-tuner.js?v=537"></script>
+-  <script src="js/instant-playout.js?v=537"></script>
+-  <script src="js/generator.js?v=537"></script>
+-  <script src="js/source-preflight.js?v=537"></script>
+-  <script src="js/analysis.js?v=537"></script>
++  <script src="js/solver-analysis.js?v=538"></script>
++  <script src="js/car-sequencer.js?v=538"></script>
++  <script src="js/experience-goal.js?v=538"></script>
++  <script src="js/release-route-constructor.js?v=538"></script>
++  <script src="js/capacity-tuner.js?v=538"></script>
++  <script src="js/instant-playout.js?v=538"></script>
++  <script src="js/generator.js?v=538"></script>
++  <script src="js/source-preflight.js?v=538"></script>
++  <script src="js/analysis.js?v=538"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=537"></script>
+-  <script src="js/app.js?v=537"></script>
++  <script src="js/level-editor.js?v=538"></script>
++  <script src="js/app.js?v=538"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_v538.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_v538.js"
+new file mode 100644
+index 0000000..e75842e
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_v538.js"
+@@ -0,0 +1,110 @@
++#!/usr/bin/env node
++/** v538：007上只比较 instantPlanBranchPrefixDebts 8 vs 12。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
++  'release-route-constructor.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js',
++  'source-preflight.js'];
++const IMAGE = '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt';
++const SEEDS = [1001, 1002, 88001, 32677];
++const outPath = path.resolve(ROOT, '03_工具/好关评分/分支前缀债务12_v538.json');
++function load() {
++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function configFor(G, blocks, seed, prefixDebts) {
++  const band = G.deriveCapacityBand(blocks);
++  return {
++    seed, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1],
++    capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: 7, boardRowsMax: 7, boardColsMin: 8, boardColsMax: 8,
++    boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanBranchCount: 2,
++    instantPlanBranchDebtRoots: true, instantPlanBranchPrefixDebts: prefixDebts,
++    experienceGoal: true, instantReleaseRoute: false,
++    goalPerRoundMs: 20000, goalMaxMs: 30000, goalMaxRounds: 2,
++    goalSharedBudget: true, candidateCount: 1, acceptMode: 'target',
++    targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0,
++    capacityTuneMs: 2000, capacityTuneCars: 4, capacityTuneVariants: 12
++  };
++}
++function run(A, seed, prefixDebts) {
++  const G = A.Generator, blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, IMAGE), 'utf8'));
++  const cfg = configFor(G, blocks, seed, prefixDebts);
++  const t0 = Date.now();
++  let r = null;
++  try { r = G.produceGoal(blocks, cfg); }
++  catch (e) { r = { level: null, valid: false, error: String((e && e.message) || e) }; }
++  const q = r && r.level ? A.Quality.fromGeneration(r) : null;
++  const fc = r && r.goodV3 && r.goodV3.fillCurve || {};
++  const ev = r && r.level ? A.ExperienceGoal.evaluate(r.level, {
++    solveResult: r.solveResult, decision: false, instantChain: true
++  }) : null;
++  const cap = r && r.level ? A.Quality.capacityEvidence(r.level, r.config || cfg) : null;
++  const rec = {
++    seed, prefixDebts, wallMs: Date.now() - t0,
++    valid: !!(r && r.valid), struct: !!(r && r.level && G.goalStructPass(r)),
++    pass: !!(r && r.level && G.goalResultExperiencePass(r, cfg)),
++    freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
++    freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
++    fullMedian2: fc.fullMedian2 != null ? fc.fullMedian2 : null,
++    solverMid: ev && ev.metrics && ev.metrics.midBuffer34Pct,
++    solverMax: ev && ev.metrics && ev.metrics.maxBuffer,
++    release: ev && ev.releaseDecision && ev.releaseDecision.status,
++    qGateReasons: q && q.gateReasons || [],
++    capacity: cap && {
++      conserved: cap.conserved, aboveMax: cap.aboveMax, belowMin: cap.belowMin,
++      microCars: cap.microCars, minCap: cap.minCap, maxCap: cap.maxCap
++    },
++    board: r && r.level ? { rows: r.level.board.rows, cols: r.level.board.cols } : null,
++    hash: r && r.level ? hash(r.level) : null,
++    error: r && r.error || null
++  };
++  console.log(JSON.stringify(rec));
++  return rec;
++}
++const A = load();
++const rows = [];
++for (const seed of SEEDS) for (const prefixDebts of [8, 12]) rows.push(run(A, seed, prefixDebts));
++const pairs = SEEDS.map(seed => {
++  const a = rows.find(x => x.seed === seed && x.prefixDebts === 8);
++  const b = rows.find(x => x.seed === seed && x.prefixDebts === 12);
++  return {
++    seed,
++    freeRun: [a.freeRunMax, b.freeRunMax],
++    freeRunDrop2: a.freeRunMax != null && b.freeRunMax != null && b.freeRunMax <= a.freeRunMax - 2,
++    solverMid: [a.solverMid, b.solverMid],
++    highPressureKept: b.solverMid != null && b.solverMid >= 50,
++    struct: [a.struct, b.struct],
++    sameHash: a.hash === b.hash,
++    capacityOk: !!(b.capacity && b.capacity.conserved && b.capacity.aboveMax === 0 && (!b.capacity.microCars || b.capacity.microCars.length === 0))
++  };
++});
++const summary = {
++  image: '007', seeds: SEEDS, rows: rows.length,
++  valid: rows.filter(x => x.valid).length,
++  structA: rows.filter(x => x.prefixDebts === 8 && x.struct).length,
++  structB: rows.filter(x => x.prefixDebts === 12 && x.struct).length,
++  freeRunDrop2: pairs.filter(x => x.freeRunDrop2).length,
++  highPressureKept: pairs.filter(x => x.highPressureKept).length,
++  capacityRegressions: pairs.filter(x => !x.capacityOk).map(x => x.seed),
++  strongPass: pairs.filter(x => !x.struct[0] && x.struct[1] && x.highPressureKept && x.capacityOk).length,
++  decision: pairs.filter(x => x.freeRunDrop2 && x.highPressureKept && x.capacityOk).length >= 2
++    ? '8→12有可用信号，保留为后续候选，不直接进默认。'
++    : '8→12没有达到至少2/4 seed的有价值改善，回退到8并改用下一单因素。'
++};
++const report = { schema: 'instant-plan-branch-prefix-debt-v1', date: '2026-10-26',
++  preregistration: '分支前缀债务12_预登记_v538.md', summary, pairs, rows };
++fs.writeFileSync(outPath, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ summary, pairs }, null, 2));
++if (summary.capacityRegressions.length) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_v538.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_v538.json"
+new file mode 100644
+index 0000000..ec2ecdc
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_v538.json"
+@@ -0,0 +1,357 @@
++{
++  "schema": "instant-plan-branch-prefix-debt-v1",
++  "date": "2026-10-26",
++  "preregistration": "分支前缀债务12_预登记_v538.md",
++  "summary": {
++    "image": "007",
++    "seeds": [
++      1001,
++      1002,
++      88001,
++      32677
++    ],
++    "rows": 8,
++    "valid": 8,
++    "structA": 0,
++    "structB": 0,
++    "freeRunDrop2": 0,
++    "highPressureKept": 2,
++    "capacityRegressions": [],
++    "strongPass": 0,
++    "decision": "8→12没有达到至少2/4 seed的有价值改善，回退到8并改用下一单因素。"
++  },
++  "pairs": [
++    {
++      "seed": 1001,
++      "freeRun": [
++        13,
++        15
++      ],
++      "freeRunDrop2": false,
++      "solverMid": [
++        72,
++        3.7
++      ],
++      "highPressureKept": false,
++      "struct": [
++        false,
++        false
++      ],
++      "sameHash": false,
++      "capacityOk": true
++    },
++    {
++      "seed": 1002,
++      "freeRun": [
++        18,
++        22
++      ],
++      "freeRunDrop2": false,
++      "solverMid": [
++        50,
++        57.7
++      ],
++      "highPressureKept": true,
++      "struct": [
++        false,
++        false
++      ],
++      "sameHash": false,
++      "capacityOk": true
++    },
++    {
++      "seed": 88001,
++      "freeRun": [
++        13,
++        20
++      ],
++      "freeRunDrop2": false,
++      "solverMid": [
++        72,
++        3.8
++      ],
++      "highPressureKept": false,
++      "struct": [
++        false,
++        false
++      ],
++      "sameHash": false,
++      "capacityOk": true
++    },
++    {
++      "seed": 32677,
++      "freeRun": [
++        15,
++        24
++      ],
++      "freeRunDrop2": false,
++      "solverMid": [
++        72,
++        68
++      ],
++      "highPressureKept": true,
++      "struct": [
++        false,
++        false
++      ],
++      "sameHash": false,
++      "capacityOk": true
++    }
++  ],
++  "rows": [
++    {
++      "seed": 1001,
++      "prefixDebts": 8,
++      "wallMs": 19919,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 13,
++      "freeLowPct": 15,
++      "fullMedian2": 3,
++      "solverMid": 72,
++      "solverMax": 4,
++      "release": null,
++      "qGateReasons": [
++        "最长免费连 13>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "261c9b5999932a5231d131c3457c81c9b73dee5287eca7d82923c8a0aac50548",
++      "error": null
++    },
++    {
++      "seed": 1001,
++      "prefixDebts": 12,
++      "wallMs": 17526,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 15,
++      "freeLowPct": 35,
++      "fullMedian2": 4,
++      "solverMid": 3.7,
++      "solverMax": 3,
++      "release": null,
++      "qGateReasons": [
++        "吃满中位 4>3",
++        "freeLow 35%>30%",
++        "最长免费连 15>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "8ade621967556fe22fbb9d82408c9f7237f36f51333de0325f52c5752999e55c",
++      "error": null
++    },
++    {
++      "seed": 1002,
++      "prefixDebts": 8,
++      "wallMs": 23451,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 18,
++      "freeLowPct": 30,
++      "fullMedian2": 3,
++      "solverMid": 50,
++      "solverMax": 4,
++      "release": null,
++      "qGateReasons": [
++        "最长免费连 18>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "e260be8bd27f273f7fe19f0ae7ab72bcec241f6109f8139d6e54b74feb0e6231",
++      "error": null
++    },
++    {
++      "seed": 1002,
++      "prefixDebts": 12,
++      "wallMs": 20372,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 22,
++      "freeLowPct": 28,
++      "fullMedian2": 5,
++      "solverMid": 57.7,
++      "solverMax": 3,
++      "release": null,
++      "qGateReasons": [
++        "吃满中位 5>3",
++        "最长免费连 22>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "f0fa248d8807bd8f02782624117f5669f0292d6d6c60ea1aacfd90a0deca4dba",
++      "error": null
++    },
++    {
++      "seed": 88001,
++      "prefixDebts": 8,
++      "wallMs": 21562,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 13,
++      "freeLowPct": 13,
++      "fullMedian2": 3,
++      "solverMid": 72,
++      "solverMax": 4,
++      "release": null,
++      "qGateReasons": [
++        "最长免费连 13>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "204543ba44d5ba9f29f68f9250c7a64b26302fed2922dc796b91f867184442f7",
++      "error": null
++    },
++    {
++      "seed": 88001,
++      "prefixDebts": 12,
++      "wallMs": 19184,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 20,
++      "freeLowPct": 43,
++      "fullMedian2": 4,
++      "solverMid": 3.8,
++      "solverMax": 3,
++      "release": null,
++      "qGateReasons": [
++        "吃满中位 4>3",
++        "freeLow 43%>30%",
++        "最长免费连 20>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "f4358842087b9f22af96efb8301ffdf075557812491c47cf47f93ac62fb26147",
++      "error": null
++    },
++    {
++      "seed": 32677,
++      "prefixDebts": 8,
++      "wallMs": 20490,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 15,
++      "freeLowPct": 17,
++      "fullMedian2": 3,
++      "solverMid": 72,
++      "solverMax": 4,
++      "release": null,
++      "qGateReasons": [
++        "最长免费连 15>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "ef6960f9bacbf0466f08d77fedc2287c6282242864ae49acbf5456cc6300fe24",
++      "error": null
++    },
++    {
++      "seed": 32677,
++      "prefixDebts": 12,
++      "wallMs": 12753,
++      "valid": true,
++      "struct": false,
++      "pass": false,
++      "freeRunMax": 24,
++      "freeLowPct": 24,
++      "fullMedian2": 4,
++      "solverMid": 68,
++      "solverMax": 3,
++      "release": null,
++      "qGateReasons": [
++        "吃满中位 4>3",
++        "最长免费连 24>6"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "afb29f1a263d1194fa1e2b894df075a08e3389e4e34346614e73817f013e1090",
++      "error": null
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_\351\242\204\347\231\273\350\256\260_v538.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_\351\242\204\347\231\273\350\256\260_v538.md"
+new file mode 100644
+index 0000000..bdf0d19
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\210\206\346\224\257\345\211\215\347\274\200\345\200\272\345\212\24112_\351\242\204\347\231\273\350\256\260_v538.md"
+@@ -0,0 +1,55 @@
++# 分支前缀债务 8→12 · v538 预登记
++
++> Kimi 方法建议。唯一验收骨架为 `优质关卡生成_详细工作流程.md` 的 P0～P6。
++
++## 背景
++
++v537 只读分类发现 007 的 4/4 个 A 行都是“有高压路线但结构不合格”，全部卡在最长免费连 `18/18/13/15 > 6`。v538 只验证：增加瞬时计划的分支前缀短债车数量，能否降低免费连，同时保住高压。
++
++## 参数解释
++
++`instantPlanBranchPrefixDebts` 是瞬时计划中“分支前缀短债车”的数量上限，不是容量，不是障碍数量，也不是车总数。
++
++代码在生成瞬时计划车单时：
++
++1. 先找 `instantEntryReach` 已知、且 `count > instantEntryReach` 的短债车；
++2. 按“超出可达像素数的债务”从小到大排序；
++3. 取前 N 辆放到车单前缀；
++4. 其余车保持原相对顺序。
++
++N=8 → N=12 表示让更多短债车先进入计划。实现上限是 12；如果短债车不足，前缀会少于 12 辆。
++
++## 唯一变量
++
++- A：`instantPlanBranchPrefixDebts=8`。
++- B：`instantPlanBranchPrefixDebts=12`。
++- 图：007。
++- seed：1001、1002、88001、32677。
++- 其余固定：`instantPlanBranchCount=2`、`instantPlanBranchDebtRoots=true`、`targetBuffer=4`、`maxDebt=40`、容量区间由 `deriveCapacityBand` 推导、棋盘 7×8、无 P7、无陷阱后处理、无新增障碍。
++- 目标模式预算：30秒、每轮20秒、最多2轮、`candidateCount=1`；`instantReleaseRoute=false`，避免路线证据成为第二变量。
++
++## 主指标
++
++- `freeRunMax`：最长免费连；
++- solver 中段3/4；
++- maxBuffer；
++- `goalStructPass`。
++
++## 保护指标
++
++- 棋盘行列≥6；
++- 每色容量守恒、`aboveMax=0`、无 micro 车；
++- 容量/棋盘范围不被前缀债务改写；
++- 已知不合格样本不能因修改被伪造成通过；
++- 记录每图墙钟、hash、qGate 原因和容量证据。
++
++## 通过 / 否决
++
++- 有价值：至少 2/4 seed 的 `freeRunMax` 从 A 到 B 降低至少2，且 solver 中段3/4仍≥50%，无容量回退。
++- 强通过：至少 1/4 seed 从结构不合格变为 `goalStructPass=true`，且高压/容量/回放不退化。
++- 否决：没有任何 seed 降低免费连；或改善免费连但高压掉到50%以下；或容量/棋盘合同回退。
++
++## 回滚点
++
++- 上一版：`188bafc`（v537）。
++- B 参数仅在实验工具中设置，不进入 UI 默认；失败即保持8。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index c8cc91a..6e5b0ed 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -72,6 +72,7 @@
+ | v535 多图路线构造模块 | v534方法能否复用三图，并收口耗时 | ✅ 007构造46步72%/max4/释放1、380ms；006/010参考路线57.9%/76.5%直接通过；三图含生成3.632s、独立回放全过。边界：006/010未触发构造，010 max5/黑块25% | `release-route-constructor.js` + `释放路线构造多图_v535.js` + JSON + 预登记 | §525 |
+ | v536 路线证据候选接线 | 完整释放路线能否在目标生成候选选择中救回关卡 | ❌ 三图×4seed×A/B共24次，off/on目标均0通过、结构合格各1；唯一合格候选无高压路线，B无救回；无容量/已知成功回退，默认关闭 | `释放路线生成对照_v536.js` + JSON + 预登记 | §526 |
+ | v537 结构/路线缺口分类 | 当前最缺的是结构、路线还是两者 | A行12个：both_ready0、structure_only1、route_only4、neither3、invalid4；007四例均为高压但结构不合格，下一步只测分支前缀债务8→12 | `结构路线缺口分类_v537.js` + JSON + 预登记 | §527 |
++| v538 分支前缀债务8→12 | 增加短债车前缀能否降低007免费连并保持高压 | ❌ 4/4免费连恶化、结构仍0/4、高压仅2/4保持；容量无回退，回退8，转容量分配 | `分支前缀债务12_v538.js` + JSON + 预登记 | §528 |
+ 
+ ## 当前权威产物
+ 
+diff --git a/AGENTS.md b/AGENTS.md
+index 285d09a..7d9141b 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,7 +1,7 @@
+ # AGENTS.md · 毛线汽车（关卡生成器）
+ 
+ > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
+-> 工作日志 **527 节 / 20663 行（约 816 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§527）。
++> 工作日志 **528 节 / 20694 行（约 818 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§528）。
+ 
+ ## 这是什么
+ 
+@@ -34,6 +34,7 @@ node 03_工具/好关评分/产线对比.js --flows new_fixed --seed-list 1001,1
+ node 03_工具/好关评分/释放路线构造多图_v535.js --images=007,006,010
+ node 03_工具/好关评分/释放路线生成对照_v536.js --images=007,006,010 --seeds=1001,1002,88001,32677 --budget=30000 --round=20000 --max-rounds=2
+ node 03_工具/好关评分/结构路线缺口分类_v537.js
++node 03_工具/好关评分/分支前缀债务12_v538.js
+ node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
+ grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
+ ```
+diff --git a/README.md b/README.md
+index 95ea3a7..45d752d 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v537**（P0～P6验收骨架已统一；缺口分类显示007为“高压但结构不合格”、006无有效候选）。
++> 当前版本 **v538**（007分支前缀债务8→12被否决：免费连4/4变差，容量无回退）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看全流程对照图** | [`思维导图_求解器与关卡生产全流程.html`](思维导图_求解器与关卡生产全流程.html)（求解器 → 反解 → 关卡生产，自包含，双击可开） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v537）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v538）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **看详细实验与交付流程** | [`01_交接文档/优质关卡生成_详细工作流程.md`](01_交接文档/优质关卡生成_详细工作流程.md)（已完成/未完成、P0~P6实验卡、验收与回滚） |
