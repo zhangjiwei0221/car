@@ -1,0 +1,744 @@
+{
+  "schema": "board-capacity-matrix-v1",
+  "date": "2026-10-26",
+  "preregistration": "棋盘容量矩阵_预登记_v543.md",
+  "summary": {
+    "image": "007",
+    "seeds": [
+      1001,
+      1002,
+      32677
+    ],
+    "arms": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "rows": 12,
+    "valid": 12,
+    "byArm": {
+      "A": {
+        "runs": 3,
+        "valid": 3,
+        "struct": 0,
+        "pass": 0,
+        "blackPct": [
+          17.9,
+          17.9,
+          17.9
+        ],
+        "freeRun": [
+          13,
+          18,
+          15
+        ],
+        "mid": [
+          72,
+          50,
+          72
+        ],
+        "boxes": [
+          46,
+          46,
+          46
+        ],
+        "capacityBad": []
+      },
+      "B": {
+        "runs": 3,
+        "valid": 3,
+        "struct": 1,
+        "pass": 1,
+        "blackPct": [
+          26.5,
+          26.5,
+          26.5
+        ],
+        "freeRun": [
+          7,
+          3,
+          11
+        ],
+        "mid": [
+          30,
+          52.4,
+          5
+        ],
+        "boxes": [
+          36,
+          36,
+          36
+        ],
+        "capacityBad": []
+      },
+      "C": {
+        "runs": 3,
+        "valid": 3,
+        "struct": 1,
+        "pass": 0,
+        "blackPct": [
+          35.7,
+          35.7,
+          35.7
+        ],
+        "freeRun": [
+          7,
+          4,
+          9
+        ],
+        "mid": [
+          35,
+          40.9,
+          30
+        ],
+        "boxes": [
+          36,
+          36,
+          36
+        ],
+        "capacityBad": []
+      },
+      "D": {
+        "runs": 3,
+        "valid": 3,
+        "struct": 3,
+        "pass": 1,
+        "blackPct": [
+          42.9,
+          42.9,
+          42.9
+        ],
+        "freeRun": [
+          0,
+          4,
+          2
+        ],
+        "mid": [
+          77.3,
+          95.2,
+          56.5
+        ],
+        "boxes": [
+          36,
+          36,
+          36
+        ],
+        "capacityBad": []
+      }
+    },
+    "black20": [
+      "A/1001",
+      "A/1002",
+      "A/32677"
+    ],
+    "structurePass": [
+      "D/1001",
+      "B/1002",
+      "C/1002",
+      "D/1002",
+      "D/32677"
+    ],
+    "targetPass": [
+      "D/1001",
+      "B/1002"
+    ],
+    "capacityBad": [],
+    "decision": "[20,40]没有同时达到黑块≤20%和完整目标通过；targetCarCount 41/46/52 实际仍为36 boxes，先修目标车数落位，再测更小棋盘。",
+    "targetCarsReached": 0,
+    "acceptablePass": 0
+  },
+  "rows": [
+    {
+      "arm": "A",
+      "seed": 1001,
+      "board": "7x8",
+      "cap": [
+        31,
+        31
+      ],
+      "targetCars": null,
+      "wallMs": 19881,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 46,
+      "black": 10,
+      "blackPct": 17.9,
+      "freeRunMax": 13,
+      "freeLowPct": 15,
+      "midBuffer34Pct": 72,
+      "maxBuffer": 4,
+      "significantReleaseCount": 0,
+      "solverRelease": "unknown_within_budget",
+      "struct": false,
+      "pass": false,
+      "qGateReasons": [
+        "最长免费连 13>6"
+      ],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻100%>85%（一眼看穿）",
+        "吃满中位3>2（太白给）",
+        "T陷阱0%<10%（没压力）",
+        "R后悔0pp<15（没岔路）",
+        "最长免费连13步>5"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 27,
+        "microCars": [],
+        "minCap": 16,
+        "maxCap": 31,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 8
+      },
+      "hash": "261c9b5999932a5231d131c3457c81c9b73dee5287eca7d82923c8a0aac50548",
+      "error": null
+    },
+    {
+      "arm": "B",
+      "seed": 1001,
+      "board": "7x7",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 41,
+      "wallMs": 17077,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 36,
+      "black": 13,
+      "blackPct": 26.5,
+      "freeRunMax": 7,
+      "freeLowPct": 19,
+      "midBuffer34Pct": 30,
+      "maxBuffer": 5,
+      "significantReleaseCount": 0,
+      "solverRelease": "found",
+      "struct": false,
+      "pass": false,
+      "qGateReasons": [
+        "最长免费连 7>6"
+      ],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻0%<40%（偏黑）",
+        "吃满中位3>2（太白给）",
+        "T未测",
+        "R后悔0pp<15（没岔路）",
+        "最长免费连7步>5"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 7
+      },
+      "hash": "649696eca2d295a83e981d7d69bd4d4c54e8d959b36ce21ad4cb919787be2043",
+      "error": null
+    },
+    {
+      "arm": "C",
+      "seed": 1001,
+      "board": "7x8",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 46,
+      "wallMs": 14359,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 36,
+      "black": 20,
+      "blackPct": 35.7,
+      "freeRunMax": 7,
+      "freeLowPct": 17,
+      "midBuffer34Pct": 35,
+      "maxBuffer": 5,
+      "significantReleaseCount": 0,
+      "solverRelease": "found",
+      "struct": false,
+      "pass": false,
+      "qGateReasons": [
+        "最长免费连 7>6"
+      ],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻0%<40%（偏黑）",
+        "吃满中位3>2（太白给）",
+        "T未测",
+        "R后悔0pp<15（没岔路）",
+        "最长免费连7步>5"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 8
+      },
+      "hash": "19360cb81fad57903a27f9c5f6664e8fb247a67afa4f24ba6e70d635f441aa61",
+      "error": null
+    },
+    {
+      "arm": "D",
+      "seed": 1001,
+      "board": "7x9",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 52,
+      "wallMs": 4403,
+      "valid": true,
+      "rounds": 1,
+      "stop": "pass",
+      "boxes": 36,
+      "black": 27,
+      "blackPct": 42.9,
+      "freeRunMax": 0,
+      "freeLowPct": 0,
+      "midBuffer34Pct": 77.3,
+      "maxBuffer": 4,
+      "significantReleaseCount": 1,
+      "solverRelease": "found",
+      "struct": true,
+      "pass": true,
+      "qGateReasons": [],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻0%<40%（偏黑）",
+        "T未测",
+        "R后悔0pp<15（没岔路）"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 9
+      },
+      "hash": "a574b46770c2393b0a83a312d3e57b1db153aeca1a858cffc82fb4eaf6866a57",
+      "error": null
+    },
+    {
+      "arm": "A",
+      "seed": 1002,
+      "board": "7x8",
+      "cap": [
+        31,
+        31
+      ],
+      "targetCars": null,
+      "wallMs": 23675,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 46,
+      "black": 10,
+      "blackPct": 17.9,
+      "freeRunMax": 18,
+      "freeLowPct": 30,
+      "midBuffer34Pct": 50,
+      "maxBuffer": 4,
+      "significantReleaseCount": 1,
+      "solverRelease": "unknown_within_budget",
+      "struct": false,
+      "pass": false,
+      "qGateReasons": [
+        "最长免费连 18>6"
+      ],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻100%>85%（一眼看穿）",
+        "吃满中位3>2（太白给）",
+        "T陷阱0%<10%（没压力）",
+        "R后悔0pp<15（没岔路）",
+        "最长免费连18步>5"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 27,
+        "microCars": [],
+        "minCap": 16,
+        "maxCap": 31,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 8
+      },
+      "hash": "e260be8bd27f273f7fe19f0ae7ab72bcec241f6109f8139d6e54b74feb0e6231",
+      "error": null
+    },
+    {
+      "arm": "B",
+      "seed": 1002,
+      "board": "7x7",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 41,
+      "wallMs": 10760,
+      "valid": true,
+      "rounds": 1,
+      "stop": "pass",
+      "boxes": 36,
+      "black": 13,
+      "blackPct": 26.5,
+      "freeRunMax": 3,
+      "freeLowPct": 8,
+      "midBuffer34Pct": 52.4,
+      "maxBuffer": 4,
+      "significantReleaseCount": 2,
+      "solverRelease": "found",
+      "struct": true,
+      "pass": true,
+      "qGateReasons": [],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻100%>85%（一眼看穿）",
+        "T陷阱0%<10%（没压力）",
+        "R后悔0pp<15（没岔路）"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 7
+      },
+      "hash": "f41a43707c3aa31dd1118858976c599e3a42770f7e0b576d7bbf2d68ba274323",
+      "error": null
+    },
+    {
+      "arm": "C",
+      "seed": 1002,
+      "board": "7x8",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 46,
+      "wallMs": 12024,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 36,
+      "black": 20,
+      "blackPct": 35.7,
+      "freeRunMax": 4,
+      "freeLowPct": 11,
+      "midBuffer34Pct": 40.9,
+      "maxBuffer": 4,
+      "significantReleaseCount": 1,
+      "solverRelease": "found",
+      "struct": true,
+      "pass": false,
+      "qGateReasons": [],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻100%>85%（一眼看穿）",
+        "T陷阱0%<10%（没压力）",
+        "R后悔0pp<15（没岔路）"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 8
+      },
+      "hash": "3c6213155b3d47b643d96ce199b83aec7272c63c878f63b159394c1c780b760e",
+      "error": null
+    },
+    {
+      "arm": "D",
+      "seed": 1002,
+      "board": "7x9",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 52,
+      "wallMs": 19173,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 36,
+      "black": 27,
+      "blackPct": 42.9,
+      "freeRunMax": 4,
+      "freeLowPct": 0,
+      "midBuffer34Pct": 95.2,
+      "maxBuffer": 4,
+      "significantReleaseCount": 1,
+      "solverRelease": "unknown_within_budget",
+      "struct": true,
+      "pass": false,
+      "qGateReasons": [],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻100%>85%（一眼看穿）",
+        "T陷阱0%<10%（没压力）",
+        "R后悔0pp<15（没岔路）"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 9
+      },
+      "hash": "4e9269695fde4c71f33a2365b7785a3041dc6ed41a99f7da97edc4d1c7df6bc6",
+      "error": null
+    },
+    {
+      "arm": "A",
+      "seed": 32677,
+      "board": "7x8",
+      "cap": [
+        31,
+        31
+      ],
+      "targetCars": null,
+      "wallMs": 20508,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 46,
+      "black": 10,
+      "blackPct": 17.9,
+      "freeRunMax": 15,
+      "freeLowPct": 17,
+      "midBuffer34Pct": 72,
+      "maxBuffer": 4,
+      "significantReleaseCount": 0,
+      "solverRelease": "unknown_within_budget",
+      "struct": false,
+      "pass": false,
+      "qGateReasons": [
+        "最长免费连 15>6"
+      ],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻100%>85%（一眼看穿）",
+        "吃满中位3>2（太白给）",
+        "T陷阱0%<10%（没压力）",
+        "R后悔0pp<15（没岔路）",
+        "最长免费连15步>5"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 27,
+        "microCars": [],
+        "minCap": 16,
+        "maxCap": 31,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 8
+      },
+      "hash": "ef6960f9bacbf0466f08d77fedc2287c6282242864ae49acbf5456cc6300fe24",
+      "error": null
+    },
+    {
+      "arm": "B",
+      "seed": 32677,
+      "board": "7x7",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 41,
+      "wallMs": 15625,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 36,
+      "black": 13,
+      "blackPct": 26.5,
+      "freeRunMax": 11,
+      "freeLowPct": 17,
+      "midBuffer34Pct": 5,
+      "maxBuffer": 5,
+      "significantReleaseCount": 0,
+      "solverRelease": "found",
+      "struct": false,
+      "pass": false,
+      "qGateReasons": [
+        "最长免费连 11>6"
+      ],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻100%>85%（一眼看穿）",
+        "T未测",
+        "R后悔0pp<15（没岔路）",
+        "最长免费连11步>5"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 7
+      },
+      "hash": "9e028dfa0351ccc9a9f29b18f05d1c64d1a7dcce5709fc79b8af897a4734337d",
+      "error": null
+    },
+    {
+      "arm": "C",
+      "seed": 32677,
+      "board": "7x8",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 46,
+      "wallMs": 22171,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 36,
+      "black": 20,
+      "blackPct": 35.7,
+      "freeRunMax": 9,
+      "freeLowPct": 11,
+      "midBuffer34Pct": 30,
+      "maxBuffer": 5,
+      "significantReleaseCount": 0,
+      "solverRelease": "found",
+      "struct": false,
+      "pass": false,
+      "qGateReasons": [
+        "最长免费连 9>6"
+      ],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻0%<40%（偏黑）",
+        "吃满中位3>2（太白给）",
+        "T未测",
+        "R后悔0pp<15（没岔路）",
+        "最长免费连9步>5"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 8
+      },
+      "hash": "5c6a5cc27a519c8425ce4212071918ffeb1fa9e86ef799ed6ad5a9da2fc3d844",
+      "error": null
+    },
+    {
+      "arm": "D",
+      "seed": 32677,
+      "board": "7x9",
+      "cap": [
+        20,
+        40
+      ],
+      "targetCars": 52,
+      "wallMs": 17743,
+      "valid": true,
+      "rounds": 2,
+      "stop": "goalMaxRounds",
+      "boxes": 36,
+      "black": 27,
+      "blackPct": 42.9,
+      "freeRunMax": 2,
+      "freeLowPct": 0,
+      "midBuffer34Pct": 56.5,
+      "maxBuffer": 4,
+      "significantReleaseCount": 0,
+      "solverRelease": "unknown_within_budget",
+      "struct": true,
+      "pass": false,
+      "qGateReasons": [],
+      "qReasons": [
+        "学会后100%>85%（一学就会）",
+        "前瞻0%<40%（偏黑）",
+        "T陷阱0%<10%（没压力）",
+        "R后悔0pp<15（没岔路）"
+      ],
+      "capacity": {
+        "conserved": true,
+        "aboveMax": 0,
+        "belowMin": 0,
+        "microCars": [],
+        "minCap": 25,
+        "maxCap": 40,
+        "boardFloorPass": true
+      },
+      "actualBoard": {
+        "rows": 7,
+        "cols": 9
+      },
+      "hash": "d36b43d979732091e207e6378d664ccb6de3912ccab6cb76f757e9125f5fca18",
+      "error": null
+    }
+  ]
+}

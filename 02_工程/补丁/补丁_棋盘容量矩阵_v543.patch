@@ -1,0 +1,1208 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index b641b9c..3430303 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -28,6 +28,7 @@
+ > v540：用显式实验带[16,31]重跑（不进入生产），评测38个合法变体；仅seed1001免费连15→14，其余3/4不变，结构仍0/4、目标0/4。容量分配方向否决；下一轮只测007棋盘余量，容量输入不自动放宽。
+ > v541：007从7×8改为7×9。2/4 seed免费连下降≥2，4/4保持高压，容量无回退；但黑块4/4从17.9%升到27%，结构仍0/4、目标0/4。7×9不采纳，先处理黑块/棋盘填充或回退7×8。
+ > v542：7×9上`blackPercent` 10→0没有改变实际黑块（17/63=27%，hash不变），黑块主要是棋盘补位；黑块不是独立旋钮可解的问题，下一步回到P0容量/棋盘可行性。
++> v543：007四臂矩阵A7×8[31,31]、B7×7[20,40]、C7×8[20,40]、D7×9[20,40]；[20,40]三臂实际仍只有36 boxes，黑块26.5%~42.9%，targetCarCount 41/46/52未落地。A臂黑块17.9%但结构0/3；没有臂同时达到黑块≤20%和完整目标通过，下一步先修目标车数落位。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+@@ -59,6 +60,7 @@
+ - v539/v540完成容量分配单因素：自动带[31,31]无可转移donor；显式实验带[16,31]评测38个变体，仅1/4免费连下降1步，结构0/4、目标0/4。容量分配方向否决，下一轮转棋盘余量。
+ - v541完成棋盘余量7×8→7×9：免费连2/4下降2步、高压4/4保持、容量无回退；黑块4/4升到27%，结构0/4、目标0/4。7×9未采纳，下一轮只处理7×9上的黑块/棋盘填充。
+ - v542完成黑块补位探针：`blackPercent`10→0后007两seed仍为17块黑、27%，hash不变；planned仅5/6，surplus补位11/12。黑块由棋盘占格与容量可行性决定，下一步转P0容量/棋盘合同。
++- v543完成棋盘×容量矩阵：[20,40]三臂实际仍36 boxes，黑块26.5%~42.9%，targetCarCount41/46/52未落地；只有A 7×8保持17.9%黑块但结构0/3。下一步先修目标车数落位，再讨论6×6/6×7/7×6。
+ - 以下「下一步」仍是多图主产线基准，但产线现在与代码一致，口径不再分叉。
+ - 下一步不是继续堆模块，而是：**默认主产线多图基准 → 只读归因 → 针对最高频失败项做单变量实验。**
+ 
+@@ -686,9 +688,9 @@ for obstacle in candidates:
+ 
+ ## 6. 当前下一步：严格按此顺序
+ 
+-> **2026-10-26 v542 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。v538、v539/v540、v541、v542排除前缀债务、容量分配、未处理黑块的7×9和黑块百分比旋钮；当前阻塞已回到P0容量/棋盘可行性。
++> **2026-10-26 v543 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。v543证明`[20,40]`的目标车数没有落地，不能继续用“降容量”直接解释黑块；下一步只修目标车数/boxes落位，再验证6×6/6×7/7×6及7×7以上棋盘。
+ >
+-> 下一轮唯一主实验（v543）：只在007上审计P0容量/棋盘可行性。固定7×9和7×8两基底，比较实际box数、黑块补位、每色容量带和可达车位；不得修改容量区间，不得自动放宽。若容量带数学上无法同时满足容量下限与黑块上限，记录为输入冲突并给用户可选的容量或棋盘方案。
++> 下一轮唯一主实验（v544）：只修`[20,40]`下`targetCarCount`到实际boxes的落位链，固定007、seed1001/1002/32677、棋盘7×7/7×8/7×9和障碍；主目标是目标车数真正达到41/46/52，且每车容量仍在带内。随后再比较黑块、免费连、solver中段3/4和完整回放；不自动改UI默认。
+ 
+ ### 下一步 A：多图主产线基准（先做）
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+index f27417f..3c905c7 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+@@ -2,7 +2,7 @@
+ 
+ > **唯一验收骨架：本文件的 P0～P6。** `优质关卡生成_接管总纲.md` 中保留的历史实现卡和旧编号只能作为实现细节参考，不是第二套验收阶段。
+ 
+-> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v542 blackPercent=0仍不能消除7×9补位黑块，转P0容量/棋盘可行性**。
++> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v543 棋盘×容量矩阵；[20,40] targetCarCount未落地，先修车数落位**。
+ > 本文是唯一“已做什么 → 剩什么 → 如何实验 → 何时算完成”的执行流程；算法细节回查 `优质关卡生成_接管总纲.md`，历史数字回查工作日志对应节号。
+ > 瞬时模式的具体施工顺序见 [`瞬时模式生成器实施计划_v525.md`](瞬时模式生成器实施计划_v525.md)，它是本文 P0~P3 的技术分支，不替代本文验收框架。
+ 
+@@ -20,6 +20,8 @@
+ 4. 玩家能通过思考释放暂存压力，最后通关；
+ 5. 生成不能靠无限局部搜索耗数小时。
+ 
++> **棋盘尺寸新要求（用户确认，2026-10-26）**：行列均不得小于6；6×6、6×7、7×6是最低允许形态；优先考虑行列都≥7；行列最大为9。尺寸可行性与容量带/车位占用联合判定，不能为了尺寸或黑块自动放宽容量。
++
+ ### 1.2 不把什么当成功
+ 
+ - 找到一条全知解 ≠ 好关；首通低 ≠ 好关；峰值高 ≠ 好关。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 7ee4607..d8a7304 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20806,3 +20806,33 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. v543回到P0容量/棋盘可行性审计，不再调`blackPercent`。
+ 2. 先计算7×8/7×9的box数、黑块补位、每色容量带和可达车位；若容量下限与黑块上限数学冲突，必须给用户可选输入方案，不能自动放宽。
+ 3. 006无候选、010低压仍分别独立处理。
++
++### 533. 【2026-10-26】v543：棋盘×容量矩阵，targetCarCount没有落地
++
++#### 533.1 问题（原话）
++
++- “我看你一直在强调的黑块的占比……是否能降低车子的容量的，从而去让那些黑块的地方放车子，从而减少黑块呢。因为现在有新需求！就是最后棋盘都能大点，6×6，6×7，7×6是最低要求，但优先考虑行列都是7及以上（行列为9是极限）。”
++- 需要先评估容量降低能否填车、棋盘范围是否可行，以及是否破坏卡点。
++
++#### 533.2 证据
++
++- 007总像素1225、13色；`[31,31]`严格分区不可行；`[20,40]`严格可行，理论上可形成36～53辆车。
++- 按黑块≤17.9%估算：7×7至少41 boxes、7×8至少46、7×9至少52。
++- 四臂各3 seed真实生成：A 7×8[31,31]实际46 boxes/17.9%黑；B 7×7[20,40]目标41、C 7×8目标46、D 7×9目标52，但三臂实际均只有36 boxes，targetCarCount没有落地。
++- B/C/D黑块分别约26.5%/35.7%/42.9%；B/1002、D/1001虽结构/目标通过，但黑块明显不可接受。A结构0/3。
++
++#### 533.3 改动
++
++- 新增`棋盘容量矩阵_v543.js`、JSON和预登记；只传实验容量带/目标车数，不改生产默认。
++- 明确记录新棋盘要求：6×6、6×7、7×6最低允许，优先≥7，最大9；尺寸与容量联合判定。
++
++#### 533.4 验证（前后数字）
++
++- `[20,40]`理论严格可行且有足够车数，但实际targetCarCount 41/46/52均未达到，实际boxes=36。
++- 没有臂同时满足黑块≤20%+完整目标通过；因此不能依据v543宣称降容量能生成好关，也不能进入障碍阶段。
++
++#### 533.5 遗留
++
++1. v544只修`[20,40]`下targetCarCount→实际boxes的落位链，固定007、seed和棋盘。
++2. 目标车数真正达到41/46/52后，再比较黑块、免费连、solver中段3/4、容量和完整回放。
++3. 6×6/6×7/7×6另做尺寸可行性，不与v544混改；容量输入不得自动放宽。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index e725243..d69d0bc 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v542 黑块补位探针）　|　当前版本：**v542**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v543 棋盘×容量矩阵）　|　当前版本：**v543**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~532。v542把7×9的`blackPercent`从10降到0：007两seed黑块仍为17/63=27%，其中planned 5/6、surplus 11/12，hash不变。黑块是棋盘补位，不是blackPercent可控；下一步转P0容量/棋盘可行性，不继续调黑块百分比。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~533。v543四臂矩阵：A 7×8[31,31]、B 7×7[20,40]、C 7×8[20,40]、D 7×9[20,40]；[20,40]三臂实际均只有36 boxes，黑块26.5%~42.9%，targetCarCount 41/46/52未落地；A 7×8黑块17.9%但结构0/3。没有臂同时满足黑块≤20%和完整目标通过；下一步先修目标车数落位。**
+ >
+ > **编号约定：验收阶段只有 P0～P6，以 [`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md) 为准。代码和历史文档中的 P7、P8、P9、P10 是实现名、旧编号或历史索引，不是额外验收阶段。**
+ >
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 2b18612..19778c2 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -299,3 +299,11 @@
+ - 两seed A/B实际黑块均为17/63=27%，hash相同；`blackStat`显示planned 5/6，surplusFilled 11/12。
+ - 结论：黑块主要由棋盘空格补位决定，不是`blackPercent`独立旋钮；7×9若压黑块需要改变车位/容量/棋盘可行性，不能继续调百分比。
+ - 下一轮v543做P0容量/棋盘可行性审计；容量区间不自动放宽，先找出数学冲突和可选输入方案。
++
++## 37. v543：棋盘×容量矩阵，targetCarCount未落地
++
++- 用户新棋盘要求：行列≥6；6×6、6×7、7×6为最低允许形态；优先行列都≥7；最大9×9。尺寸与容量必须联合判定。
++- 007数学审计：总像素1225、13色；`[31,31]`严格不可分，`[20,40]`严格可分且理论可形成36~53辆车；7×7/7×8/7×9理论分别需要41/46/52辆车才能把黑块压到参照17.9%附近。
++- 真实四臂：A 7×8[31,31]、B 7×7[20,40]目标41车、C 7×8[20,40]目标46车、D 7×9[20,40]目标52车，各3 seed。A实际46 boxes/17.9%黑；B/C/D实际全部36 boxes，黑块26.5%/35.7%/42.9%，targetCarCount未达到。
++- B/D有部分结构/目标通过（B/1002、D/1001），但黑块仍>20%，不能交付；A结构0/3。说明当前阻塞是目标车数没有真正落到boxes，而不是单纯容量带不可行。
++- 下一步v544只修[20,40]下targetCarCount→实际boxes的落位链；达到41/46/52且每车容量在带内后，再比较黑块、免费连、solver中段3/4和完整回放。6×6/6×7/7×6另做尺寸可行性，不在本轮混改。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index a7f7827..2a3a588 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -109,6 +109,8 @@
+ - **v541边界**：下一轮只在7×9基底上处理黑块/棋盘填充，先证明黑块不高于17.9%且不牺牲免费连/高压；否则回退7×8。
+ - **v542结果**：7×9上`blackPercent`10→0后，两seed实际黑块仍为17/63=27%，hash不变；`blackStat` planned 5/6、surplus 11/12。黑块主要是棋盘补位，不是黑块比例旋钮。
+ - **v542边界**：黑块百分比方向停止加码；下一轮回到P0容量/棋盘可行性，不自动放宽容量。
++- **v543结果**：007四臂矩阵中A7×8[31,31]黑块17.9%但结构0/3；B7×7、C7×8、D7×9在[20,40]下实际均36 boxes，targetCarCount41/46/52未落地，黑块26.5%~42.9%。没有臂同时满足黑块≤20%和完整目标通过。
++- **v543边界**：下一轮只修[20,40]下targetCarCount到实际boxes的落位链，固定棋盘/seed/障碍；修好后再评估6×6/6×7/7×6和7×7以上。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 6ec464d..375ffb9 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v542 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=542">
++  <title>车接小人 v543 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=543">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v542</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v543</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,29 +773,29 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=542"></script>
+-  <script src="js/utils.js?v=542"></script>
++  <script src="js/zip.js?v=543"></script>
++  <script src="js/utils.js?v=543"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=542"></script>
+-  <script src="js/simulator.js?v=542"></script>
++  <script src="js/color-libs.js?v=543"></script>
++  <script src="js/simulator.js?v=543"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=542"></script>
+-  <script src="js/solver-strategy.js?v=542"></script>
+-  <script src="js/solver.js?v=542"></script>
+-  <script src="js/playersim.js?v=542"></script>
++  <script src="js/anchor-cut.js?v=543"></script>
++  <script src="js/solver-strategy.js?v=543"></script>
++  <script src="js/solver.js?v=543"></script>
++  <script src="js/playersim.js?v=543"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=542"></script>
+-  <script src="js/car-sequencer.js?v=542"></script>
+-  <script src="js/experience-goal.js?v=542"></script>
+-  <script src="js/release-route-constructor.js?v=542"></script>
+-  <script src="js/capacity-tuner.js?v=542"></script>
+-  <script src="js/instant-playout.js?v=542"></script>
+-  <script src="js/generator.js?v=542"></script>
+-  <script src="js/source-preflight.js?v=542"></script>
+-  <script src="js/analysis.js?v=542"></script>
++  <script src="js/solver-analysis.js?v=543"></script>
++  <script src="js/car-sequencer.js?v=543"></script>
++  <script src="js/experience-goal.js?v=543"></script>
++  <script src="js/release-route-constructor.js?v=543"></script>
++  <script src="js/capacity-tuner.js?v=543"></script>
++  <script src="js/instant-playout.js?v=543"></script>
++  <script src="js/generator.js?v=543"></script>
++  <script src="js/source-preflight.js?v=543"></script>
++  <script src="js/analysis.js?v=543"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=542"></script>
+-  <script src="js/app.js?v=542"></script>
++  <script src="js/level-editor.js?v=543"></script>
++  <script src="js/app.js?v=543"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 226a9e6..7554d5d 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -77,6 +77,7 @@
+ | v540 容量分配（[16,31]实验带） | 显式可行容量带下容量分配能否修007结构 | ❌ 38个变体，仅1/4免费连降1步、结构0/4、目标0/4；容量无回退，[16,31]不入生产 | `容量分配_松弛带_v540.js` + JSON + 预登记 | §530 |
+ | v541 棋盘余量7×9 | 增加一列能否降低007免费连且不恶化黑块 | 2/4免费连降≥2、4/4高压保持、容量无回退；但黑块4/4 17.9→27%、结构0/4，不采纳 | `棋盘余量7x9_v541.js` + JSON + 预登记 | §531 |
+ | v542 黑块补位探针 | blackPercent能否消掉7×9补位黑块 | ❌ 10→0后两seed仍17/63=27%、hash不变；planned5/6、surplus11/12；黑块由棋盘补位决定 | `黑块补位探针_v542.js` + JSON + 预登记 | §532 |
++| v543 棋盘×容量矩阵 | [20,40]能否在7×7/7×8/7×9填车降黑块并保高压 | ❌ A 7×8黑块17.9%但结构0/3；B/C/D实际均36 boxes、targetCarCount41/46/52未落地，黑块26.5%~42.9%；无臂同时达黑块≤20%+完整通过 | `棋盘容量矩阵_v543.js` + JSON + 预登记 | §533 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_v543.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_v543.js"
+new file mode 100644
+index 0000000..787a746
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_v543.js"
+@@ -0,0 +1,137 @@
++#!/usr/bin/env node
++/** v543：007棋盘×容量联合矩阵；显式[20,40]实验输入，不改默认。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
++  'capacity-tuner.js', 'instant-playout.js', 'generator.js', 'source-preflight.js'];
++const IMAGE = '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt';
++const SEEDS = [1001, 1002, 32677];
++const ARMS = [
++  { id: 'A', rows: 7, cols: 8, capMin: 31, capMax: 31, targetCars: null },
++  { id: 'B', rows: 7, cols: 7, capMin: 20, capMax: 40, targetCars: 41 },
++  { id: 'C', rows: 7, cols: 8, capMin: 20, capMax: 40, targetCars: 46 },
++  { id: 'D', rows: 7, cols: 9, capMin: 20, capMax: 40, targetCars: 52 }
++];
++const OUT = path.resolve(ROOT, '03_工具/好关评分/棋盘容量矩阵_v543.json');
++function load() {
++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function cfgFor(G, blocks, seed, arm) {
++  return {
++    seed, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: arm.capMin, boxSizeMax: arm.capMax,
++    capNormMin: arm.capMin, capNormMax: arm.capMax,
++    boardRowsMin: arm.rows, boardRowsMax: arm.rows,
++    boardColsMin: arm.cols, boardColsMax: arm.cols,
++    boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanBranchCount: 2,
++    instantPlanBranchDebtRoots: true, instantPlanBranchPrefixDebts: 8,
++    targetCarCount: arm.targetCars || undefined,
++    blackPercent: 10,
++    experienceGoal: true, instantReleaseRoute: false,
++    goalPerRoundMs: 20000, goalMaxMs: 30000, goalMaxRounds: 2,
++    goalSharedBudget: true, candidateCount: 1, acceptMode: 'target',
++    targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0
++  };
++}
++function blackPct(level) {
++  let n = 0, black = 0;
++  for (const row of level.board.cells) for (const x of row) {
++    n++;
++    if (x && x.t === 'black') black++;
++  }
++  return n ? +(black / n * 100).toFixed(1) : null;
++}
++function countBoxes(level) {
++  let n = 0;
++  for (const row of level.board.cells) for (const x of row) if (x && x.t === 'box') n++;
++  return n;
++}
++function run(A, seed, arm) {
++  const G = A.Generator, EG = A.ExperienceGoal;
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, IMAGE), 'utf8'));
++  const cfg = cfgFor(G, blocks, seed, arm);
++  const t0 = Date.now();
++  let r = null;
++  try { r = G.produceGoal(blocks, cfg); }
++  catch (e) { r = { level: null, valid: false, error: String((e && e.message) || e) }; }
++  const level = r && r.level || null;
++  const q = level ? A.Quality.fromGeneration(r) : null;
++  const ca = level ? A.Quality.capacityEvidence(level, r.config || cfg) : null;
++  const ev = r && r._experienceFull || (level ? EG.evaluate(level, {
++    solveResult: r.solveResult, decision: false, instantChain: true
++  }) : null);
++  const fc = r && r.goodV3 && r.goodV3.fillCurve || {};
++  const rec = {
++    arm: arm.id, seed, board: `${arm.rows}x${arm.cols}`,
++    cap: [arm.capMin, arm.capMax], targetCars: arm.targetCars,
++    wallMs: Date.now() - t0, valid: !!(r && r.valid),
++    rounds: r && r.goalRounds || 0, stop: r && r.goalStopReason || null,
++    boxes: level ? countBoxes(level) : null,
++    black: level ? (() => { let n = 0; for (const row of level.board.cells) for (const x of row) if (x && x.t === 'black') n++; return n; })() : null,
++    blackPct: level ? blackPct(level) : null,
++    freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
++    freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
++    midBuffer34Pct: ev && ev.metrics && ev.metrics.midBuffer34Pct,
++    maxBuffer: ev && ev.metrics && ev.metrics.maxBuffer,
++    significantReleaseCount: ev && ev.metrics && ev.metrics.significantReleaseCount,
++    solverRelease: ev && ev.releaseDecision && ev.releaseDecision.status,
++    struct: !!(level && G.goalStructPass(r)),
++    pass: !!(level && G.goalResultExperiencePass(r, cfg)),
++    qGateReasons: q && q.gateReasons || [],
++    qReasons: q && q.reasons || [],
++    capacity: ca && {
++      conserved: ca.conserved, aboveMax: ca.aboveMax, belowMin: ca.belowMin,
++      microCars: ca.microCars, minCap: ca.minCap, maxCap: ca.maxCap,
++      boardFloorPass: ca.boardFloorPass
++    },
++    actualBoard: level ? { rows: level.board.rows, cols: level.board.cols } : null,
++    hash: level ? hash(level) : null,
++    error: r && r.error || null
++  };
++  console.log(JSON.stringify(rec));
++  return rec;
++}
++const A = load();
++const rows = [];
++for (const seed of SEEDS) for (const arm of ARMS) rows.push(run(A, seed, arm));
++const byArm = {};
++for (const arm of ARMS) {
++  const a = rows.filter(x => x.arm === arm.id);
++  byArm[arm.id] = {
++    runs: a.length, valid: a.filter(x => x.valid).length,
++    struct: a.filter(x => x.struct).length, pass: a.filter(x => x.pass).length,
++    blackPct: a.map(x => x.blackPct), freeRun: a.map(x => x.freeRunMax),
++    mid: a.map(x => x.midBuffer34Pct), boxes: a.map(x => x.boxes),
++    capacityBad: a.filter(x => !x.capacity || !x.capacity.conserved || x.capacity.aboveMax > 0).map(x => x.seed)
++  };
++}
++const summary = {
++  image: '007', seeds: SEEDS, arms: ARMS.map(x => x.id), rows: rows.length,
++  valid: rows.filter(x => x.valid).length,
++  byArm,
++  black20: rows.filter(x => x.blackPct != null && x.blackPct <= 20).map(x => x.arm + '/' + x.seed),
++  targetCarsReached: rows.filter(x => x.targetCars && x.boxes != null && x.boxes >= x.targetCars).length,
++  acceptablePass: rows.filter(x => x.pass && x.blackPct != null && x.blackPct <= 20).length,
++  structurePass: rows.filter(x => x.struct).map(x => x.arm + '/' + x.seed),
++  targetPass: rows.filter(x => x.pass).map(x => x.arm + '/' + x.seed),
++  capacityBad: rows.filter(x => !x.capacity || !x.capacity.conserved || x.capacity.aboveMax > 0).map(x => x.arm + '/' + x.seed),
++  decision: rows.some(x => x.pass && x.blackPct != null && x.blackPct <= 20)
++    ? '出现“黑块≤20%+完整目标通过”的实验候选，可扩大样本。'
++    : '[20,40]没有同时达到黑块≤20%和完整目标通过；targetCarCount 41/46/52 实际仍为36 boxes，先修目标车数落位，再测更小棋盘。'
++};
++const report = { schema: 'board-capacity-matrix-v1', date: '2026-10-26',
++  preregistration: '棋盘容量矩阵_预登记_v543.md', summary, rows };
++fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ summary }, null, 2));
++if (summary.capacityBad.length) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_v543.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_v543.json"
+new file mode 100644
+index 0000000..c81cbb4
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_v543.json"
+@@ -0,0 +1,744 @@
++{
++  "schema": "board-capacity-matrix-v1",
++  "date": "2026-10-26",
++  "preregistration": "棋盘容量矩阵_预登记_v543.md",
++  "summary": {
++    "image": "007",
++    "seeds": [
++      1001,
++      1002,
++      32677
++    ],
++    "arms": [
++      "A",
++      "B",
++      "C",
++      "D"
++    ],
++    "rows": 12,
++    "valid": 12,
++    "byArm": {
++      "A": {
++        "runs": 3,
++        "valid": 3,
++        "struct": 0,
++        "pass": 0,
++        "blackPct": [
++          17.9,
++          17.9,
++          17.9
++        ],
++        "freeRun": [
++          13,
++          18,
++          15
++        ],
++        "mid": [
++          72,
++          50,
++          72
++        ],
++        "boxes": [
++          46,
++          46,
++          46
++        ],
++        "capacityBad": []
++      },
++      "B": {
++        "runs": 3,
++        "valid": 3,
++        "struct": 1,
++        "pass": 1,
++        "blackPct": [
++          26.5,
++          26.5,
++          26.5
++        ],
++        "freeRun": [
++          7,
++          3,
++          11
++        ],
++        "mid": [
++          30,
++          52.4,
++          5
++        ],
++        "boxes": [
++          36,
++          36,
++          36
++        ],
++        "capacityBad": []
++      },
++      "C": {
++        "runs": 3,
++        "valid": 3,
++        "struct": 1,
++        "pass": 0,
++        "blackPct": [
++          35.7,
++          35.7,
++          35.7
++        ],
++        "freeRun": [
++          7,
++          4,
++          9
++        ],
++        "mid": [
++          35,
++          40.9,
++          30
++        ],
++        "boxes": [
++          36,
++          36,
++          36
++        ],
++        "capacityBad": []
++      },
++      "D": {
++        "runs": 3,
++        "valid": 3,
++        "struct": 3,
++        "pass": 1,
++        "blackPct": [
++          42.9,
++          42.9,
++          42.9
++        ],
++        "freeRun": [
++          0,
++          4,
++          2
++        ],
++        "mid": [
++          77.3,
++          95.2,
++          56.5
++        ],
++        "boxes": [
++          36,
++          36,
++          36
++        ],
++        "capacityBad": []
++      }
++    },
++    "black20": [
++      "A/1001",
++      "A/1002",
++      "A/32677"
++    ],
++    "structurePass": [
++      "D/1001",
++      "B/1002",
++      "C/1002",
++      "D/1002",
++      "D/32677"
++    ],
++    "targetPass": [
++      "D/1001",
++      "B/1002"
++    ],
++    "capacityBad": [],
++    "decision": "[20,40]没有同时达到黑块≤20%和完整目标通过；targetCarCount 41/46/52 实际仍为36 boxes，先修目标车数落位，再测更小棋盘。",
++    "targetCarsReached": 0,
++    "acceptablePass": 0
++  },
++  "rows": [
++    {
++      "arm": "A",
++      "seed": 1001,
++      "board": "7x8",
++      "cap": [
++        31,
++        31
++      ],
++      "targetCars": null,
++      "wallMs": 19881,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 46,
++      "black": 10,
++      "blackPct": 17.9,
++      "freeRunMax": 13,
++      "freeLowPct": 15,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "unknown_within_budget",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "最长免费连 13>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位3>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连13步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "261c9b5999932a5231d131c3457c81c9b73dee5287eca7d82923c8a0aac50548",
++      "error": null
++    },
++    {
++      "arm": "B",
++      "seed": 1001,
++      "board": "7x7",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 41,
++      "wallMs": 17077,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 36,
++      "black": 13,
++      "blackPct": 26.5,
++      "freeRunMax": 7,
++      "freeLowPct": 19,
++      "midBuffer34Pct": 30,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "最长免费连 7>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻0%<40%（偏黑）",
++        "吃满中位3>2（太白给）",
++        "T未测",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连7步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 7
++      },
++      "hash": "649696eca2d295a83e981d7d69bd4d4c54e8d959b36ce21ad4cb919787be2043",
++      "error": null
++    },
++    {
++      "arm": "C",
++      "seed": 1001,
++      "board": "7x8",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 46,
++      "wallMs": 14359,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 36,
++      "black": 20,
++      "blackPct": 35.7,
++      "freeRunMax": 7,
++      "freeLowPct": 17,
++      "midBuffer34Pct": 35,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "最长免费连 7>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻0%<40%（偏黑）",
++        "吃满中位3>2（太白给）",
++        "T未测",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连7步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "19360cb81fad57903a27f9c5f6664e8fb247a67afa4f24ba6e70d635f441aa61",
++      "error": null
++    },
++    {
++      "arm": "D",
++      "seed": 1001,
++      "board": "7x9",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 52,
++      "wallMs": 4403,
++      "valid": true,
++      "rounds": 1,
++      "stop": "pass",
++      "boxes": 36,
++      "black": 27,
++      "blackPct": 42.9,
++      "freeRunMax": 0,
++      "freeLowPct": 0,
++      "midBuffer34Pct": 77.3,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "solverRelease": "found",
++      "struct": true,
++      "pass": true,
++      "qGateReasons": [],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻0%<40%（偏黑）",
++        "T未测",
++        "R后悔0pp<15（没岔路）"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 9
++      },
++      "hash": "a574b46770c2393b0a83a312d3e57b1db153aeca1a858cffc82fb4eaf6866a57",
++      "error": null
++    },
++    {
++      "arm": "A",
++      "seed": 1002,
++      "board": "7x8",
++      "cap": [
++        31,
++        31
++      ],
++      "targetCars": null,
++      "wallMs": 23675,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 46,
++      "black": 10,
++      "blackPct": 17.9,
++      "freeRunMax": 18,
++      "freeLowPct": 30,
++      "midBuffer34Pct": 50,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "solverRelease": "unknown_within_budget",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "最长免费连 18>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位3>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连18步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "e260be8bd27f273f7fe19f0ae7ab72bcec241f6109f8139d6e54b74feb0e6231",
++      "error": null
++    },
++    {
++      "arm": "B",
++      "seed": 1002,
++      "board": "7x7",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 41,
++      "wallMs": 10760,
++      "valid": true,
++      "rounds": 1,
++      "stop": "pass",
++      "boxes": 36,
++      "black": 13,
++      "blackPct": 26.5,
++      "freeRunMax": 3,
++      "freeLowPct": 8,
++      "midBuffer34Pct": 52.4,
++      "maxBuffer": 4,
++      "significantReleaseCount": 2,
++      "solverRelease": "found",
++      "struct": true,
++      "pass": true,
++      "qGateReasons": [],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 7
++      },
++      "hash": "f41a43707c3aa31dd1118858976c599e3a42770f7e0b576d7bbf2d68ba274323",
++      "error": null
++    },
++    {
++      "arm": "C",
++      "seed": 1002,
++      "board": "7x8",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 46,
++      "wallMs": 12024,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 36,
++      "black": 20,
++      "blackPct": 35.7,
++      "freeRunMax": 4,
++      "freeLowPct": 11,
++      "midBuffer34Pct": 40.9,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "solverRelease": "found",
++      "struct": true,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "3c6213155b3d47b643d96ce199b83aec7272c63c878f63b159394c1c780b760e",
++      "error": null
++    },
++    {
++      "arm": "D",
++      "seed": 1002,
++      "board": "7x9",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 52,
++      "wallMs": 19173,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 36,
++      "black": 27,
++      "blackPct": 42.9,
++      "freeRunMax": 4,
++      "freeLowPct": 0,
++      "midBuffer34Pct": 95.2,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "solverRelease": "unknown_within_budget",
++      "struct": true,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 9
++      },
++      "hash": "4e9269695fde4c71f33a2365b7785a3041dc6ed41a99f7da97edc4d1c7df6bc6",
++      "error": null
++    },
++    {
++      "arm": "A",
++      "seed": 32677,
++      "board": "7x8",
++      "cap": [
++        31,
++        31
++      ],
++      "targetCars": null,
++      "wallMs": 20508,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 46,
++      "black": 10,
++      "blackPct": 17.9,
++      "freeRunMax": 15,
++      "freeLowPct": 17,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "unknown_within_budget",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "最长免费连 15>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位3>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连15步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "ef6960f9bacbf0466f08d77fedc2287c6282242864ae49acbf5456cc6300fe24",
++      "error": null
++    },
++    {
++      "arm": "B",
++      "seed": 32677,
++      "board": "7x7",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 41,
++      "wallMs": 15625,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 36,
++      "black": 13,
++      "blackPct": 26.5,
++      "freeRunMax": 11,
++      "freeLowPct": 17,
++      "midBuffer34Pct": 5,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "最长免费连 11>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "T未测",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连11步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 7
++      },
++      "hash": "9e028dfa0351ccc9a9f29b18f05d1c64d1a7dcce5709fc79b8af897a4734337d",
++      "error": null
++    },
++    {
++      "arm": "C",
++      "seed": 32677,
++      "board": "7x8",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 46,
++      "wallMs": 22171,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 36,
++      "black": 20,
++      "blackPct": 35.7,
++      "freeRunMax": 9,
++      "freeLowPct": 11,
++      "midBuffer34Pct": 30,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "最长免费连 9>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻0%<40%（偏黑）",
++        "吃满中位3>2（太白给）",
++        "T未测",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连9步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "5c6a5cc27a519c8425ce4212071918ffeb1fa9e86ef799ed6ad5a9da2fc3d844",
++      "error": null
++    },
++    {
++      "arm": "D",
++      "seed": 32677,
++      "board": "7x9",
++      "cap": [
++        20,
++        40
++      ],
++      "targetCars": 52,
++      "wallMs": 17743,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "boxes": 36,
++      "black": 27,
++      "blackPct": 42.9,
++      "freeRunMax": 2,
++      "freeLowPct": 0,
++      "midBuffer34Pct": 56.5,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "unknown_within_budget",
++      "struct": true,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻0%<40%（偏黑）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 25,
++        "maxCap": 40,
++        "boardFloorPass": true
++      },
++      "actualBoard": {
++        "rows": 7,
++        "cols": 9
++      },
++      "hash": "d36b43d979732091e207e6378d664ccb6de3912ccab6cb76f757e9125f5fca18",
++      "error": null
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_\351\242\204\347\231\273\350\256\260_v543.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_\351\242\204\347\231\273\350\256\260_v543.md"
+new file mode 100644
+index 0000000..e09a343
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\345\256\271\351\207\217\347\237\251\351\230\265_\351\242\204\347\231\273\350\256\260_v543.md"
+@@ -0,0 +1,47 @@
++# 棋盘×容量联合矩阵 · v543 预登记
++
++> Kimi 方法建议。唯一验收骨架为 `优质关卡生成_详细工作流程.md` 的 P0～P6。`[20,40]` 是显式实验容量输入，不自动写回生产。
++
++## 背景
++
++v541/v542 证明 7×9 的 27% 黑块主要是棋盘补位，`blackPercent` 不能消除。007 总像素1225、13色；在当前 `[31,31]` 带内严格分区不可行。v543 验证：用显式 `[20,40]` 容量带和更高目标车数，在允许的棋盘范围内同时降低黑块、保持高压和容量合同。
++
++## 四臂
++
++| 臂 | 棋盘 | 容量带 | targetCarCount |
++|---|---|---:|---:|
++| A | 7×8 | `[31,31]` | 生成器当前行为 |
++| B | 7×7 | `[20,40]` | 41 |
++| C | 7×8 | `[20,40]` | 46 |
++| D | 7×9 | `[20,40]` | 52 |
++
++- 图：007；seed1001、1002、32677。
++- 固定：瞬时连锁、四方向、2分支、`instantPlanBranchPrefixDebts=8`、`targetBuffer=4`、`maxDebt=40`、无障碍、无P7、无陷阱后处理。
++- 目标模式：30秒、每轮20秒、最多2轮、candidateCount=1。
++
++## 主指标
++
++- 实际车数/boxes；
++- 黑块数量和比例；
++- `freeRunMax`；
++- solver中段3/4和maxBuffer；
++- `goalStructPass` / 完整目标通过。
++
++## 保护指标
++
++- 每色守恒、`aboveMax=0`、无micro车、棋盘≥6×6；
++- 实际容量必须在对应输入带内（允许因目标源数学不可分而记录belowMin，不得静默放宽）；
++- 不新增障碍，不改变入口规则；
++- 记录实际车数是否达到targetCarCount。
++
++## 通过 / 否决
++
++- 强通过：至少一个`[20,40]`臂在3 seed中产生结构合格且完整目标通过的样本，黑块≤20%，容量aboveMax=0。
++- 部分通过：黑块降≥5个百分点且freeRun不恶化，但压力/结构/完整路线未全过。
++- 否决：容量带下无有效生成，或黑块没有下降，或高压/容量合同回退。
++- 本步只读实验，不改变生产默认。
++
++## 回滚点
++
++- 上一版：`bd2307a`（v542）。
++- 实验臂参数仅写入工具，不写入UI或默认配置。
+diff --git a/AGENTS.md b/AGENTS.md
+index 13a8ab9..01cacb0 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,7 +1,7 @@
+ # AGENTS.md · 毛线汽车（关卡生成器）
+ 
+ > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
+-> 工作日志 **532 节 / 20808 行（约 824 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§532）。
++> 工作日志 **533 节 / 20838 行（约 825 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§533）。
+ 
+ ## 这是什么
+ 
+@@ -39,6 +39,7 @@ node 03_工具/好关评分/容量分配_v539.js
+ node 03_工具/好关评分/容量分配_松弛带_v540.js
+ node 03_工具/好关评分/棋盘余量7x9_v541.js
+ node 03_工具/好关评分/黑块补位探针_v542.js
++node 03_工具/好关评分/棋盘容量矩阵_v543.js
+ node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
+ grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
+ ```
+diff --git a/README.md b/README.md
+index 6248845..5f59583 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v542**（blackPercent=0仍无法消掉7×9补位黑块；问题回到P0容量/棋盘可行性）。
++> 当前版本 **v543**（棋盘×容量矩阵：targetCarCount未落地，[20,40]未能同时满足黑块和压力）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看全流程对照图** | [`思维导图_求解器与关卡生产全流程.html`](思维导图_求解器与关卡生产全流程.html)（求解器 → 反解 → 关卡生产，自包含，双击可开） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v542）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v543）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **看详细实验与交付流程** | [`01_交接文档/优质关卡生成_详细工作流程.md`](01_交接文档/优质关卡生成_详细工作流程.md)（已完成/未完成、P0~P6实验卡、验收与回滚） |
