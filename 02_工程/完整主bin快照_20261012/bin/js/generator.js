@@ -3771,8 +3771,12 @@ AntSolver.Generator = (function() {
       var _rootCols = [], _row0Null = [];
       for (var _bc = 0; _bc < cols; _bc++) if (cells[0][_bc] == null) _row0Null.push(_bc);
       if (_row0Null.length >= _branchN) {
-        if (_branchN === 2) _rootCols = [_row0Null[0], _row0Null[_row0Null.length - 1]];
-        else { _rootCols = [_row0Null[0], _row0Null[Math.floor(_row0Null.length / 2)], _row0Null[_row0Null.length - 1]]; }
+        var _preferred = Array.isArray(config.instantPlanBranchRootCols) ? config.instantPlanBranchRootCols : null;
+        if (_preferred) _rootCols = _preferred.filter(function (c) { return _row0Null.indexOf(c) >= 0; }).slice(0, _branchN);
+        if (_rootCols.length < _branchN) {
+          if (_branchN === 2) _rootCols = [_row0Null[0], _row0Null[_row0Null.length - 1]];
+          else { _rootCols = [_row0Null[0], _row0Null[Math.floor(_row0Null.length / 2)], _row0Null[_row0Null.length - 1]]; }
+        }
         var _removed = 0;
         for (var _rc = 0; _rc < cols; _rc++) {
           if (_rootCols.indexOf(_rc) < 0 && cells[0][_rc] == null) { cells[0][_rc] = { t: 'black' }; _removed++; }
