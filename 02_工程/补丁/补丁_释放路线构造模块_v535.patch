@@ -1,0 +1,7180 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index f0564ec..1424362 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -19,6 +19,7 @@
+ > v532：2分支入口位置扫描12组，plan4/12、solver0/12、solver低压12/12；入口拓扑不是主因，下一步分支内部债务序列/释放序列。
+ > v533：分支前缀债务让007求解器中段3/4达52%/72%，但release unknown；下一步专项释放动作搜索，不继续加前缀债务。
+ > v534：把007高压父状态的可执行释压动作拼回完整路线并独立回放；40/117候选同时达中段3/4≥50%+显著释放，最佳46步80%/max4/释放1/黑块17.9%。单图单seed正结果，下一步做成多图路线构造模块，不接默认生产。
++> v535：路线构造已模块化。007从第29步分叉`(2,2)`，46步完整回放达72%/max4/释放1，搜索380ms；006/010的plan参考路线已分别57.9%/76.5%且直接回放通过。三图全过，但006/010未触发构造搜索，010仍有max5/黑块25%风险；下一步接生成候选并做多seed。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+@@ -43,6 +44,7 @@
+ - v499 收口：结构门优先、黑块只在结构门之后压（≤30% 挡极端、≤15% 偏好）。生产集 5 seed **15/15**、留出 **7/9**；黑块中位 14~19%、最大 28%。
+ - 图集管理：推荐图（m=3）与好图（15% 黑块下白给≥15）已移出生产图集，见日志 §465/§478。
+ - v524~v534 已切到“瞬时连锁生成”专项：真实最左空槽+最近曼哈顿切车、计划可回放落位、目标债务与有限分支已成立；v534首次得到“完整高压路线 + 显著释放 + 最终通关”同一条可回放签名，但仍只有007单图单seed，未接默认。
++- v535把该能力封装为`AntSolver.ReleaseRouteConstructor`。三图各自有完整可回放路线：007为构造分叉，006/010为参考计划路线直接通过；本轮只证明模块与验收可用，没有证明候选选择、随机seed或真实UI泛化。
+ - 以下「下一步」仍是多图主产线基准，但产线现在与代码一致，口径不再分叉。
+ - 下一步不是继续堆模块，而是：**默认主产线多图基准 → 只读归因 → 针对最高频失败项做单变量实验。**
+ 
+@@ -655,9 +657,9 @@ for obstacle in candidates:
+ 
+ ## 6. 当前下一步：严格按此顺序
+ 
+-> **2026-10-26 v534 后的实际施工位置：** 当前不再回到通用“下一步 A”从头跑。先把 v534 的单图脚本做成路线构造模块，要求输出完整 `pickOrder`、释压动作和独立回放证据；再用 006/010 同口径复跑；三图成立后才接生成候选选择。P4 目标化障碍继续暂停，不能在路线泛化前加冰链。
++> **2026-10-26 v535 后的实际施工位置：** 路线构造模块和三图单seed验收已经成立。下一步不是增加障碍，而是把模块接到生成候选选择，并在不改容量/棋盘/产线的前提下跑独立seed，确认“生成时能找到并保留这条路线”而不是只在离线工具里找到。
+ >
+-> 下一轮唯一主实验（v535）：固定 007 成功样本做模块复现，同时跑 006/010；主指标仍是 `finalReplayValid + midBuffer34Pct>=50 + significantReleaseCount>=1`，保护指标为守恒、aboveMax=0、无micro、黑块不增加。记录墙钟、候选数、重复签名和 P50/P90，防止路线构造把单关拖到数小时。
++> 下一轮唯一主实验（v536）：同图独立seed 1002/88001/32677，比较“不接路线构造”和“生成候选阶段接入路线构造”的命中、最终关卡hash、完整路线数、搜索墙钟和退化。主指标仍是 `finalReplayValid + midBuffer34Pct>=50 + significantReleaseCount>=1`；保护指标为守恒、aboveMax=0、无micro、黑块不增加、已知成功不回退。未过三seed前不接默认。
+ 
+ ### 下一步 A：多图主产线基准（先做）
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+index 784cde9..493295a 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+@@ -1,6 +1,6 @@
+ # 优质关卡生成 · 详细实验与交付工作流程
+ 
+-> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v534 释放路线构造，单图正结果、尚未接生产**。
++> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v535 多图路线构造模块，三图单seed通过、尚未接生产**。
+ > 本文是唯一“已做什么 → 剩什么 → 如何实验 → 何时算完成”的执行流程；算法细节回查 `优质关卡生成_接管总纲.md`，历史数字回查工作日志对应节号。
+ > 瞬时模式的具体施工顺序见 [`瞬时模式生成器实施计划_v525.md`](瞬时模式生成器实施计划_v525.md)，它是本文 P0~P3 的技术分支，不替代本文验收框架。
+ 
+@@ -52,6 +52,7 @@
+ | UI与落库 | v522批次32：COMPLETED、合格1/1、52.9%中段3/4、2次显著释放 | 真实链路已跑通，但样本仍有限 |
+ | Git与实验留痕 | 预登记、前后数字、补丁、日志、版本、回退点 | 后续必须继续执行，不能口头改参数 |
+ | 瞬时完整释放路线 | v534 把高压父状态的释压动作拼回完整 `pickOrder`，007得到46步、中段3/4=80%、max4、显著释放1、回放通关 | 证明路线级可行性；仍是单图单seed，未做模块化、多图或生产接线 |
++| 多图路线构造模块 | v535 007构造46步72%/max4/释放1（380ms）；006/010参考路线57.9%/76.5%直接通过 | 三图单seed通过；006/010未触发构造，010有max5/黑块25%风险 |
+ 
+ ### 2.1 关键正结果
+ 
+@@ -60,6 +61,7 @@
+ - v522精确失败基底：70个失败候选的真实可用率中位 **69.0%**，目标`0.86→0.690476`后一次出关；目标轮完整通过 **66.7% + release found**。
+ - v522真实UI：A/C均执行可用率重试，B第4轮达标，约111秒，**合格1/1、COMPLETED**。
+ - v534瞬时路线构造：007 117个候选里40个同时满足中段3/4≥50%与显著释放；最佳路线80%/max4/释放1/独立回放通关，黑块17.9%，证明不再是“只有单步释放证据”。
++- v535多图模块：三图含生成总墙钟3.632秒；007首次搜索即找到通过路线，006/010计划参考路线直接通过。完整签名均已独立回放，守恒/aboveMax=0/micro=0。
+ 
+ ### 2.2 已验证、不能再走的弯路
+ 
+@@ -92,7 +94,7 @@
+ | 剩余项 | 当前卡点 | 下一步主实验 |
+ |---|---|---|
+ | 容量合同漏网 | 推荐图aboveMax=1 | 容量越界谱系追踪，先硬合同后体验 |
+-| 路线释放证据 | 007已有完整高压+释放+通关正结果；006/010和成本统计未做 | 先做多图路线构造模块，记录墙钟/去重/P50/P90，再接生产 |
++| 路线释放证据 | 三图单seed均有完整通过路线；006/010未触发构造，独立seed和生成接线未做 | v536接候选选择并跑独立seed，保持容量/棋盘/产线不变 |
+ | 远/近压力不足 | 010/推荐仍有低压基底 | 近失局部修、远失换基底；不做统一容量加减 |
+ | 每色容量组合规划 | 目前主要同色转移，缺全局联合目标 | 每色候选集→全局Pareto组合→重解评价 |
+ | 车序与首行观感 | 双时间线有测量，稳定生成策略不足 | 局部交换、首行同色run、释放顺序联合评价 |
+@@ -319,8 +321,8 @@
+ ## 6. 推荐执行顺序（不要跳步）
+ 
+ ```text
+-v534路线构造模块化与多图复跑
+-→ 路线选择/生成接线
++v535路线构造模块已完成（三图单seed）
++→ v536生成候选接线+独立seed
+ → P0容量越界谱系追踪（硬合同）
+ → 多图失败分布基线
+ → P1 release unknown评价覆盖
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 3700b1a..baf9ade 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20560,3 +20560,37 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. v535把实验脚本改成可复用路线构造模块，必须输出完整`pickOrder`、释压证据、`finalReplayValid`，不能只返回一个动作或指标。
+ 2. 同口径复跑006/010；记录生成耗时、候选总数、唯一签名数、P50/P90，先解决成本再谈接线。
+ 3. 三图均有完整高压释放路线后，再讨论如何把路线证据接入生成候选选择；当前不进入目标化冰链障碍，也不把007单图结果当默认生产成功。
++
++### 525. 【2026-10-26】v535：路线构造模块三图单seed通过，并收口到秒级搜索
++
++#### 525.1 问题（原话）
++
++- “好的，下一步。”
++- v534 只有007单图脚本，未记录整轮墙钟与唯一路线数；需要验证同一方法能否模块化并在006/010复用，同时回答是否会为一关搜索数小时。
++
++#### 525.2 证据
++
++- 007棋盘与v534完全相同；参考solver路线仍有中段3/4=72%、max4、显著释放0，说明难度证据没变，缺的只是完整释放路线。
++- 首版模块按参考路线顺序处理高压状态：007搜索用满180秒，`tested=238`但仅17条唯一完整路线，最好中段3/4=40%，未通过。该顺序被否决，不能以“预算不够”代替失败。
++- 根因是v534成功分叉位于路线第29~30步，靠近中后段；前面大量参考动作和无释放搜索先消耗预算。
++- 改为先验证参考路线；把高压状态按离中段60%的进度排序；同一状态优先尝试增加债务的非参考动作；首次完整通过后停止。
++
++#### 525.3 改动
++
++- Kimi新增只读模块`02_工程/完整主bin快照_20261012/bin/js/release-route-constructor.js`，提供`construct/metricsOf/sigOf/passOf`；输出完整签名、参考/构造动作、分叉位置、显著释压事件、独立回放指标、候选数和耗时。
++- 新增多图工具`03_工具/好关评分/释放路线构造多图_v535.js`与预登记；模块在页面加载，但不参与`produceFixed`、目标验收、候选选择或默认四边路径。
++- 版本升至v535；工程说明、接管总纲、详细工作流程、瞬时模式施工计划、目标体验计划、实验索引同步。
++
++#### 525.4 验证（改前后数字）
++
++- 007：从参考动作`(3,7)`在第29步分叉到`(2,2)`，完整46步独立回放通关；中段3/4=72%、max4、显著释放1，释压事件第30步`4→1`幅度3；构造搜索380ms，测试1条即通过。
++- 006：prefix6的plan参考路线32步直接通过，中段3/4=57.9%、max4、显著释放1，第28步`4→0`幅度4；验证19ms。该图未触发构造分叉。
++- 010：prefix2的plan参考路线27步直接通过，中段3/4=76.5%、max5、显著释放2，第15步`5→2`幅度3；验证17ms。该图未触发构造分叉。
++- 三图含生成总墙钟3.632秒，独立按保存签名回放均通关；容量守恒、aboveMax=0、micro=0。黑块/容量余量：007 17.9%/belowMin27，006 11.1%/belowMin6，010 25%/belowMin1。
++- 保护边界：006/010只证明已有好路线能被模块验证，没有证明模块能从它们的失败参考路线构造出来；010的max5与25%黑块仍是交付风险。单seed也不能证明泛化。
++
++#### 525.5 遗留
++
++1. v536把路线构造接入生成候选选择，但必须保持容量、棋盘、分支债务和默认产线合同不变。
++2. 跑独立seed1002/88001/32677，比较接入前后目标命中、最终关卡hash、完整路线数、搜索墙钟、成功回退和容量/黑块退化。
++3. 006/010需要构造失败参考路线的专项测试，避免“参考路线本来就好”掩盖构造能力；三seed通过前不把模块设为默认。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 419895c..6750303 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v534 释放路线构造实验）　|　当前版本：**v534**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v535 多图释放路线构造模块）　|　当前版本：**v535**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~524。v534把高压状态发现的释压动作拼回完整路线：007最佳46步中段3/4=80%、maxBuffer=4、显著释放1、独立回放通关、黑块17.9%；下一步做成可复用的多图路线构造模块。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~525。v535模块化后007构造路线中段3/4=72%、max4、显著释放1、搜索380ms；006/010计划参考路线分别57.9%/76.5%且直接完整回放通过。三图均通过，但010仍有max5和25%黑块风险；下一步才做生成候选接线与多seed。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
+@@ -89,6 +89,7 @@
+ | `simulator.js` | 规则内核：棋盘可达/激活、消除 flood-fill、锁链/冰判定 |
+ | `analysis.js` | 审核：卡点审计、难度分 |
+ | `utils.js` | 关卡解析、游戏格式转换 `toGameFormat` |
++| `release-route-constructor.js` | v535只读路线构造模块：验证参考路线，或从接近中段的高压父状态构造完整`pickOrder`并独立回放；尚未参与默认生成 |
+ 
+ ### 3.2 两条产线
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index edd612e..af86ac7 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -249,3 +249,11 @@
+ - v534首次把高压父状态发现的释压动作拼回完整路线并从头回放。007共测试117候选：显著释放68、中段3/4≥50%共58、两者同时成立40；最佳完整路线46步，中段3/4=80%、maxBuffer=4、显著释放1、`finalReplayValid=true`，释压点在第30步`(2,2)`颜色31，棋盘7×8、黑块17.9%、容量守恒/aboveMax=0/micro=0。
+ - 该结果证明“完整高压+真实释放+最终通关”可以共存，不再只是`release found`单步证据；但它只覆盖007/seed1001，脚本未记录整轮墙钟和重复签名，未接生成器，也未验证玩家可学习性。
+ - 下一步`v535`把脚本改成路线构造模块：输入同规则关卡和参考解，输出完整`pickOrder`、释压证据、`midBuffer34Pct/significantReleaseCount/finalReplayValid`；先复现007，再同口径跑006/010，并记录候选数、唯一路线数、墙钟与P50/P90。三图成立后才讨论接候选选择，仍不进入冰链障碍。
++
++## 30. v535：多图释放路线构造模块
++
++- 首版模块按参考路线顺序处理全部高压状态，在007用满180秒仍只有17条唯一路线、最好中段3/4=40%，未复现v534；该顺序被否决。根因是目标分叉靠近路线后段，前面大量高成本搜索先耗尽预算。
++- 改为“先验证参考路线；高压状态按离中段60%的进度排序；优先尝试增加债务的非参考动作；首次通过即停止”。007第29步从参考动作`(3,7)`分叉到`(2,2)`，46步独立回放通关，中段3/4=72%、max4、显著释放1，释压事件在第30步`4→1`、幅度3，构造搜索380ms。
++- 006 prefix6的plan参考路线32步、57.9%/max4/释放1，释压事件第28步`4→0`、幅度4；010 prefix2的plan参考路线27步、76.5%/max5/释放2，释压事件第15步`5→2`、幅度3。两者在参考验证阶段直接通过，搜索分别19/17ms，未触发构造分叉。
++- 三图加生成总墙钟3.632秒；容量均守恒、aboveMax=0、micro=0。007黑块17.9%/belowMin27，006黑块11.1%/belowMin6，010黑块25%/belowMin1；belowMin仍是区间不可整除余量。
++- 边界：本轮是三图单seed；006/010只证明“已有好路线能被模块验证”，不证明模块能从失败参考路线构造成功；010的max5和25%黑块仍是交付风险。下一步`v536`接生成候选并跑独立seed，保持容量、棋盘和产线不变，不进入障碍。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index e4b52cc..e193da8 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -95,6 +95,8 @@
+ - **v533结果**：2分支前缀债务prefix2~8扫描；007 prefix6/8求解器中段3/4达52%/72%，但release仍unknown；006 prefix6计划路线57.9%通过但solver10%。下一步锁定高压路线，专项搜索可执行释放动作。
+ - **v534结果**：007 prefix8高压父状态枚举117个完整路线候选，68个有显著释放、58个中段3/4≥50%、40个两者同时成立；最佳46步，中段3/4=80%、maxBuffer=4、显著释放1、独立回放通关，黑块17.9%、容量aboveMax=0/micro=0。证明“完整高压+释放+通关”可共存在一条路线。
+ - **v534边界**：只有007/seed1001；脚本未记录整轮墙钟和去重，尚未接生成器。下一项先做多图路线构造模块与成本收口，不进入障碍。
++- **v535结果**：新增`AntSolver.ReleaseRouteConstructor`。首次顺序搜索在007用满180秒、最好中段40%，否决该顺序；改为先验参考路线、把高压状态按接近60%进度排序、优先尝试增加债务的非参考动作并在首次通过后停止。最终007第29步从`(3,7)`分叉到`(2,2)`，46步回放达72%/max4/释放1，搜索380ms；006/010计划路线分别57.9%/76.5%、释放1/2，模块直接验证通过，搜索19/17ms。三图含生成总墙钟3.632s。
++- **v535边界**：006/010是参考路线直接通过，没有触发构造搜索；010仍为max5、黑块25%。三图单seed不能证明泛化，下一步接生成候选并用独立seed验证，不进入障碍。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 358462c..cfa32f4 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v534 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=534">
++  <title>车接小人 v535 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=535">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v534</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v535</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,28 +773,29 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=534"></script>
+-  <script src="js/utils.js?v=534"></script>
++  <script src="js/zip.js?v=535"></script>
++  <script src="js/utils.js?v=535"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=534"></script>
+-  <script src="js/simulator.js?v=534"></script>
++  <script src="js/color-libs.js?v=535"></script>
++  <script src="js/simulator.js?v=535"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=534"></script>
+-  <script src="js/solver-strategy.js?v=534"></script>
+-  <script src="js/solver.js?v=534"></script>
+-  <script src="js/playersim.js?v=534"></script>
++  <script src="js/anchor-cut.js?v=535"></script>
++  <script src="js/solver-strategy.js?v=535"></script>
++  <script src="js/solver.js?v=535"></script>
++  <script src="js/playersim.js?v=535"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=534"></script>
+-  <script src="js/car-sequencer.js?v=534"></script>
+-  <script src="js/experience-goal.js?v=534"></script>
+-  <script src="js/capacity-tuner.js?v=534"></script>
+-  <script src="js/instant-playout.js?v=534"></script>
+-  <script src="js/generator.js?v=534"></script>
+-  <script src="js/source-preflight.js?v=534"></script>
+-  <script src="js/analysis.js?v=534"></script>
++  <script src="js/solver-analysis.js?v=535"></script>
++  <script src="js/car-sequencer.js?v=535"></script>
++  <script src="js/experience-goal.js?v=535"></script>
++  <script src="js/release-route-constructor.js?v=535"></script>
++  <script src="js/capacity-tuner.js?v=535"></script>
++  <script src="js/instant-playout.js?v=535"></script>
++  <script src="js/generator.js?v=535"></script>
++  <script src="js/source-preflight.js?v=535"></script>
++  <script src="js/analysis.js?v=535"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=534"></script>
+-  <script src="js/app.js?v=534"></script>
++  <script src="js/level-editor.js?v=535"></script>
++  <script src="js/app.js?v=535"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/release-route-constructor.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/release-route-constructor.js"
+new file mode 100644
+index 0000000..98d7b50
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/release-route-constructor.js"
+@@ -0,0 +1,249 @@
++/** v535：从参考路线的高压父状态构造完整、可独立回放的释放路线。只读模块，不参与默认生成。 */
++var AntSolver = AntSolver || {};
++AntSolver.ReleaseRouteConstructor = (function () {
++  var Sim = AntSolver.Simulator, SA = AntSolver.SolverAnalysis, EG = AntSolver.ExperienceGoal;
++  var DEFAULTS = {
++    midLo: 0.20, midHi: 0.85, minBuffer: 3,
++    maxAlternativesPerState: 8, timePerAlternativeMs: 900, maxNodes: 3000,
++    beamWidth: 16, branchWidth: 8, maxUniqueCandidates: 160,
++    overallTimeBudgetMs: 180000, minBuffer34Pct: 50,
++    minSignificantReleases: 1, maxAcceptedBuffer: 4,
++    targetMidProgress: 0.60, stopAfterFirstPass: true
++  };
++
++  function cfg(opts) {
++    var o = Object.assign({}, DEFAULTS, opts || {});
++    o.midLo = Math.max(0, Math.min(1, +o.midLo));
++    o.midHi = Math.max(o.midLo, Math.min(1, +o.midHi));
++    return o;
++  }
++  function parsed(level) {
++    return level && level.rows && level.totalPixels != null && level.board ? level : AntSolver.parseLevel(level);
++  }
++  function sigOf(actions) {
++    return (actions || []).map(function (a) { return a.r + ',' + a.c; }).join(' ');
++  }
++  function actionOf(m) {
++    return { r: m.r, c: m.c, color: m.antBox ? m.antBox.color : null, count: m.antBox ? m.antBox.count : null };
++  }
++  function pctRank(sorted, p) {
++    if (!sorted.length) return null;
++    var i = Math.max(0, Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1));
++    return sorted[i];
++  }
++  function metricsOf(level, actions, opts) {
++    var lv = parsed(level);
++    var start = Sim.createState(lv, { useSlotStart: true, instantChain: true });
++    var replayed = SA.replayFromState(start, actions);
++    if (!replayed.completed) return { finalReplayValid: false, replayReason: replayed.reason || 'incomplete' };
++    var curve = EG.curveFromTrace(replayed.trace, replayed.totalPixels,
++      replayed.state ? replayed.state.bufferLimit : (lv.bufferLimit || 5), { instantChain: true });
++    var significant = (curve.pressure.releaseEvents || []).filter(function (e) {
++      return (e.amplitude || 0) >= 2;
++    });
++    return {
++      finalReplayValid: true, replaySteps: replayed.steps,
++      midBuffer34Pct: curve.midBuffer34Pct,
++      maxBuffer: curve.pressure.maxBuffer,
++      significantReleaseCount: curve.pressure.significantReleaseCount,
++      significantReleaseEvents: significant,
++      firstSignificantRelease: significant[0] || null,
++      pressure: curve.pressure
++    };
++  }
++  function passOf(metrics, o) {
++    return !!(metrics.finalReplayValid &&
++      (metrics.midBuffer34Pct || 0) >= o.minBuffer34Pct &&
++      (metrics.significantReleaseCount || 0) >= o.minSignificantReleases);
++  }
++  function better(a, b, o) {
++    if (!b) return true;
++    var ap = passOf(a, o) ? 1 : 0, bp = passOf(b, o) ? 1 : 0;
++    if (ap !== bp) return ap > bp;
++    var ab = a.maxBuffer <= o.maxAcceptedBuffer ? 1 : 0;
++    var bb = b.maxBuffer <= o.maxAcceptedBuffer ? 1 : 0;
++    if (ab !== bb) return ab > bb;
++    if ((a.significantReleaseCount || 0) !== (b.significantReleaseCount || 0))
++      return (a.significantReleaseCount || 0) > (b.significantReleaseCount || 0);
++    if ((a.midBuffer34Pct || 0) !== (b.midBuffer34Pct || 0))
++      return (a.midBuffer34Pct || 0) > (b.midBuffer34Pct || 0);
++    if ((a.maxBuffer || 0) !== (b.maxBuffer || 0)) return (a.maxBuffer || 0) < (b.maxBuffer || 0);
++    return (a.fullSteps || 0) < (b.fullSteps || 0);
++  }
++  function candidateOf(level, source, actions, meta, o) {
++    var metrics = metricsOf(level, actions, o);
++    if (!metrics.finalReplayValid) return null;
++    return Object.assign({
++      source: source, fullSteps: actions.length, fullSig: sigOf(actions),
++      finalReplayValid: true, midBuffer34Pct: metrics.midBuffer34Pct,
++      maxBuffer: metrics.maxBuffer, significantReleaseCount: metrics.significantReleaseCount,
++      firstSignificantRelease: metrics.firstSignificantRelease,
++      pass: passOf(metrics, o)
++    }, meta || {});
++  }
++  function collectFromSource(level, source, state, o, seen, out) {
++    var lv = parsed(level);
++    var actions = SA.normalizeActions(source.pickOrder || source.route || source.actions || []);
++    var s = Sim.createState(lv, { useSlotStart: true, instantChain: true });
++    var snapshots = [];
++    for (var i = 0; i < actions.length; i++) {
++      if (Date.now() >= state.deadline || s.gameWon || s.gameOver) break;
++      var ref = actions[i];
++      if (!Sim.isPickable(s, ref.r, ref.c)) {
++        state.invalidSources.push({ source: source.name, step: i + 1, reason: 'illegal_reference_pick' });
++        break;
++      }
++      var progress = s.totalPixels ? s.eliminatedPixels / s.totalPixels : 0;
++      if (s.buffer.length >= o.minBuffer && progress >= o.midLo && progress <= o.midHi) {
++        snapshots.push({ step: i + 1, progress: progress, buffer: s.buffer.length,
++          state: AntSolver.SolverStrategy.cloneState(s), ref: ref, prefix: actions.slice(0, i) });
++      }
++      Sim.applyPick(s, ref.r, ref.c);
++      if (s.eliminatedPixels >= s.totalPixels) { s.gameWon = true; s.gameOver = true; }
++    }
++    snapshots.sort(function (a, b) {
++      var ad = Math.abs(a.progress - o.targetMidProgress);
++      var bd = Math.abs(b.progress - o.targetMidProgress);
++      return ad - bd || Math.abs(b.buffer - 4) - Math.abs(a.buffer - 4) || b.progress - a.progress;
++    });
++    for (var si = 0; si < snapshots.length; si++) {
++      if (Date.now() >= state.deadline || state.unique >= o.maxUniqueCandidates) {
++        state.budgetExhausted = true;
++        break;
++      }
++      if (o.stopAfterFirstPass && state.best && passOf(state.best, o)) break;
++      var snap = snapshots[si];
++      state.highPressureStates++;
++      var moves = Sim.listMoves(snap.state).filter(function (m) { return !m.blocked; });
++      var ranked = moves.map(function (m) {
++        var after = AntSolver.SolverStrategy.cloneState(snap.state);
++        Sim.applyPick(after, m.r, m.c);
++        if (after.eliminatedPixels >= after.totalPixels) {
++          after.gameWon = true; after.gameOver = true;
++        }
++        return { m: m, after: after, debtGain: after.buffer.length - snap.buffer,
++          changed: !(m.r === snap.ref.r && m.c === snap.ref.c) };
++      });
++      ranked.sort(function (a, b) {
++        return (b.debtGain - a.debtGain) || (b.changed - a.changed) ||
++          (b.after.buffer.length - a.after.buffer.length) || (a.m.r - b.m.r) || (a.m.c - b.m.c);
++      });
++      ranked = ranked.slice(0, Math.max(1, o.maxAlternativesPerState));
++      for (var mi = 0; mi < ranked.length; mi++) {
++        if (Date.now() >= state.deadline || state.unique >= o.maxUniqueCandidates) {
++          state.budgetExhausted = true;
++          break;
++        }
++        var item = ranked[mi], m = item.m, after = item.after;
++        var t0 = Date.now(), suffix = [], searched = null;
++        if (!after.gameWon) {
++          searched = SA.searchFromState(after, {
++            timeBudgetMs: o.timePerAlternativeMs, maxNodes: o.maxNodes,
++            beamWidth: o.beamWidth, branchWidth: o.branchWidth, maxRoutes: 1
++          });
++          if (!searched.routes.length) {
++            state.tested++;
++            state.searchMs.push(Date.now() - t0);
++            continue;
++          }
++          suffix = searched.routes[0].actions || [];
++        }
++        var full = snap.prefix.concat([actionOf(m)], suffix);
++        var sig = sigOf(full);
++        state.tested++;
++        state.searchMs.push(Date.now() - t0);
++        if (seen[sig]) {
++          state.duplicates++;
++          continue;
++        }
++        seen[sig] = true;
++        var divergence = null;
++        for (var di = 0; di < Math.min(full.length, actions.length); di++) {
++          if (full[di].r !== actions[di].r || full[di].c !== actions[di].c) {
++            divergence = { step: di + 1, reference: { r: actions[di].r, c: actions[di].c },
++              constructed: { r: full[di].r, c: full[di].c } };
++            break;
++          }
++        }
++        var candidate = candidateOf(level, source.name, full, {
++          step: snap.step, progress: +snap.progress.toFixed(3),
++          action: actionOf(m), referenceAction: { r: snap.ref.r, c: snap.ref.c },
++          changedAction: item.changed, divergence: divergence,
++          searchNodes: searched ? searched.nodes : 0,
++          searchStatus: searched ? searched.status : 'direct_win',
++          searchElapsedMs: Date.now() - t0
++        }, o);
++        if (!candidate) {
++          state.replayRejected++;
++          continue;
++        }
++        out.push(candidate);
++        state.unique++;
++        if (better(candidate, state.best, o)) state.best = candidate;
++        if (o.stopAfterFirstPass && candidate.pass) break;
++      }
++    }
++  }
++  function construct(level, sources, opts) {
++    var o = cfg(opts), t0 = Date.now(), out = [], seen = {};
++    var state = {
++      deadline: t0 + Math.max(1, o.overallTimeBudgetMs), tested: 0, unique: 0,
++      duplicates: 0, replayRejected: 0, highPressureStates: 0,
++      invalidSources: [], searchMs: [], best: null, budgetExhausted: false
++    };
++    var input = (sources || []).slice().sort(function (a, b) {
++      var am = metricsOf(level, SA.normalizeActions(a.pickOrder || a.route || a.actions || []), o);
++      var bm = metricsOf(level, SA.normalizeActions(b.pickOrder || b.route || b.actions || []), o);
++      return (bm.midBuffer34Pct || 0) - (am.midBuffer34Pct || 0);
++    });
++    var sourceBaselines = [];
++    for (var si = 0; si < input.length; si++) {
++      var sourceActions = SA.normalizeActions(input[si].pickOrder || input[si].route || input[si].actions || []);
++      var refCandidate = candidateOf(level, input[si].name, sourceActions, { kind: 'reference' }, o);
++      sourceBaselines.push({ source: input[si].name, steps: sourceActions.length,
++        midBuffer34Pct: refCandidate && refCandidate.midBuffer34Pct,
++        maxBuffer: refCandidate && refCandidate.maxBuffer,
++        significantReleaseCount: refCandidate && refCandidate.significantReleaseCount,
++        finalReplayValid: !!(refCandidate && refCandidate.finalReplayValid),
++        pass: !!(refCandidate && refCandidate.pass) });
++      if (refCandidate && refCandidate.pass) {
++        out.push(refCandidate);
++        seen[refCandidate.fullSig] = true;
++        state.unique++;
++        if (better(refCandidate, state.best, o)) state.best = refCandidate;
++      }
++    }
++    for (var i = 0; i < input.length; i++) {
++      if (Date.now() >= state.deadline || state.unique >= o.maxUniqueCandidates) {
++        state.budgetExhausted = true;
++        break;
++      }
++      if (o.stopAfterFirstPass && state.best && passOf(state.best, o)) break;
++      collectFromSource(level, input[i], state, o, seen, out);
++    }
++    var sortedMs = state.searchMs.slice().sort(function (a, b) { return a - b; });
++    out.sort(function (a, b) {
++      if (passOf(a, o) !== passOf(b, o)) return passOf(a, o) ? -1 : 1;
++      if (a.maxBuffer !== b.maxBuffer) return a.maxBuffer - b.maxBuffer;
++      if (b.significantReleaseCount !== a.significantReleaseCount)
++        return b.significantReleaseCount - a.significantReleaseCount;
++      return (b.midBuffer34Pct || 0) - (a.midBuffer34Pct || 0);
++    });
++    return {
++      schema: 'release-route-constructor-v1', config: o,
++      summary: {
++        wallMs: Date.now() - t0, highPressureStates: state.highPressureStates,
++        tested: state.tested, unique: state.unique, duplicates: state.duplicates,
++        replayRejected: state.replayRejected, invalidSources: state.invalidSources,
++        withRelease: out.filter(function (x) { return (x.significantReleaseCount || 0) >= o.minSignificantReleases; }).length,
++        withMid50: out.filter(function (x) { return (x.midBuffer34Pct || 0) >= o.minBuffer34Pct; }).length,
++        pass: out.filter(function (x) { return x.pass; }).length,
++        searchMsP50: pctRank(sortedMs, 0.50), searchMsP90: pctRank(sortedMs, 0.90),
++        sourceBaselines: sourceBaselines,
++        best: state.best, budgetExhausted: state.budgetExhausted
++      },
++      candidates: out
++    };
++  }
++  return { DEFAULTS: DEFAULTS, construct: construct, metricsOf: metricsOf, sigOf: sigOf, passOf: passOf };
++})();
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 03bbe89..89597be 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -69,6 +69,7 @@
+ | v532 分支入口车序 | 入口位置/入口债务车是否足够 | ❌ 12组plan4/12、solver0/12、solver低压12/12；入口拓扑不是主因，转分支内部债务序列 | `瞬时分支车序_v532.js` + JSON | §522 |
+ | v533 分支前缀债务 | 分支前几辆车全部做短债能否制造solver高压 | 007 prefix6/8 solver mid52/72%但release unknown；006 prefix6 plan57.9% pass；下一步释放搜索 | `瞬时分支前缀债务_v533.js` + JSON | §523 |
+ | v534 释放路线构造 | 单步释压动作能否拼回完整高压且最终可回放的通关路线 | ✅ 007测试117候选，40条同时达中段3/4≥50%+显著释放；最佳46步、80%/max4/释放1、独立回放通关、黑块17.9%；仅单图单seed，尚未接线 | `释放路线构造_v534.js` + JSON + 预登记 | §524 |
++| v535 多图路线构造模块 | v534方法能否复用三图，并收口耗时 | ✅ 007构造46步72%/max4/释放1、380ms；006/010参考路线57.9%/76.5%直接通过；三图含生成3.632s、独立回放全过。边界：006/010未触发构造，010 max5/黑块25% | `release-route-constructor.js` + `释放路线构造多图_v535.js` + JSON + 预登记 | §525 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\345\244\232\345\233\276_v535.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\345\244\232\345\233\276_v535.js"
+new file mode 100644
+index 0000000..faed667
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\345\244\232\345\233\276_v535.js"
+@@ -0,0 +1,125 @@
++#!/usr/bin/env node
++/** v535：用通用释放路线构造模块复跑007/006/010，记录完整路线与耗时。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
++  'release-route-constructor.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
++  WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb);
++for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator, RRC = A.ReleaseRouteConstructor;
++const ALL = [
++  { id: '007', rows: 7, cols: 8, prefixDebts: 8 },
++  { id: '006', rows: 6, cols: 6, prefixDebts: 6 },
++  { id: '010', rows: 6, cols: 6, prefixDebts: 2 }
++];
++const argImages = (process.argv.find(x => x.startsWith('--images=')) || '').split('=')[1];
++const wanted = argImages ? new Set(argImages.split(',').map(x => x.trim()).filter(Boolean)) : null;
++const specs = ALL.filter(s => !wanted || wanted.has(s.id));
++function planRoute(level) {
++  return (level.board.instantPlanCells || []).map((p, i) => ({
++    r: p.r, c: p.c, color: p.color, count: p.count, step: i, chainIndex: 0
++  }));
++}
++function blackPct(level) {
++  let cells = 0, black = 0;
++  for (const row of level.board.cells) for (const cell of row) {
++    cells++;
++    if (cell && cell.t === 'black') black++;
++  }
++  return cells ? +(black / cells * 100).toFixed(1) : null;
++}
++function baseline(level, route, label) {
++  const metrics = RRC.metricsOf(level, route, {});
++  return Object.assign({ source: label, steps: (route || []).length }, metrics);
++}
++const out = {
++  schema: 'release-route-constructor-multi-v1', date: '2026-10-26',
++  preregistration: '释放路线构造模块_预登记_v535.md',
++  config: { seed: 1001, ruleMode: 'instantChain', targetBuffer: 4, maxDebt: 40,
++    branchCount: 2, p7BaseCount: 0, trapPost: false,
++    constructor: RRC.DEFAULTS }, images: [], summary: null
++};
++const allT0 = Date.now();
++for (const spec of specs) {
++  const imageT0 = Date.now();
++  const blocks = G.blocksFromTXT(fs.readFileSync(
++    path.join(ROOT, '蚂蚁图库', '拼接图', '拼接图图库', `35x35拼接图纸_${spec.id}.txt`), 'utf8'));
++  const band = G.deriveCapacityBand(blocks);
++  const cfg = {
++    seed: 1001, candidateCount: 1, rounds: 0, timeBudgetMs: 12000,
++    ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1],
++    capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: spec.rows, boardRowsMax: spec.rows,
++    boardColsMin: spec.cols, boardColsMax: spec.cols,
++    boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanBranchCount: 2,
++    instantPlanBranchDebtRoots: true, instantPlanBranchPrefixDebts: spec.prefixDebts
++  };
++  const genT0 = Date.now();
++  const generated = G.produceFixed(blocks, cfg);
++  const generationMs = Date.now() - genT0;
++  if (!generated || !generated.level) {
++    out.images.push({ image: spec.id, prefixDebts: spec.prefixDebts, generationMs,
++      generated: false, reason: generated && generated.lastFailReason || 'no_level' });
++    console.log(JSON.stringify({ image: spec.id, generated: false, generationMs }));
++    continue;
++  }
++  const level = generated.level;
++  const solverRoute = generated.solveResult && generated.solveResult.pickOrder || [];
++  const plan = planRoute(level);
++  const sources = [
++    { name: 'solver', pickOrder: solverRoute },
++    { name: 'plan', pickOrder: plan }
++  ];
++  const constructed = RRC.construct(level, sources, {});
++  const cap = A.Quality.capacityEvidence(level, generated.config || cfg);
++  const row = {
++    image: spec.id, prefixDebts: spec.prefixDebts, generationMs,
++    totalMs: Date.now() - imageT0, searchMs: constructed.summary.wallMs,
++    generated: true, structural: generated.structural || null,
++    board: { rows: level.board.rows, cols: level.board.cols },
++    blackPct: blackPct(level),
++    capacity: {
++      conserved: cap.conserved, aboveMax: cap.aboveMax, belowMin: cap.belowMin,
++      microCars: cap.microCars, minCap: cap.minCap, maxCap: cap.maxCap
++    },
++    baselines: [baseline(level, solverRoute, 'solver'), baseline(level, plan, 'plan')],
++    constructor: constructed.summary,
++    best: constructed.summary.best,
++    level
++  };
++  out.images.push(row);
++  console.log(JSON.stringify({
++    image: spec.id, generationMs, searchMs: row.searchMs, blackPct: row.blackPct,
++    tested: row.constructor.tested, unique: row.constructor.unique,
++    duplicates: row.constructor.duplicates, pass: row.constructor.pass,
++    best: row.best && {
++      source: row.best.source, fullSteps: row.best.fullSteps,
++      midBuffer34Pct: row.best.midBuffer34Pct, maxBuffer: row.best.maxBuffer,
++      significantReleaseCount: row.best.significantReleaseCount,
++      changedAction: row.best.changedAction
++    }
++  }));
++}
++const passing = out.images.filter(x => x.generated && x.constructor && x.constructor.pass > 0);
++out.summary = {
++  images: out.images.length, generated: out.images.filter(x => x.generated).length,
++  passingImages: passing.length,
++  passingIds: passing.map(x => x.image),
++  totalWallMs: Date.now() - allT0,
++  allPass: passing.length === out.images.length,
++  decision: passing.length === out.images.length
++    ? '三图均构造出完整高压释放路线；下一步做生成候选接线与多seed成本验证。'
++    : '未达三图全通过；保留成功图证据，失败图不得用单步释放或未知结果代替。'
++};
++const outPath = path.join(__dirname, '释放路线构造多图_v535.json');
++fs.writeFileSync(outPath, JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify(out.summary, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\345\244\232\345\233\276_v535.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\345\244\232\345\233\276_v535.json"
+new file mode 100644
+index 0000000..8f5c515
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\345\244\232\345\233\276_v535.json"
+@@ -0,0 +1,6405 @@
++{
++  "schema": "release-route-constructor-multi-v1",
++  "date": "2026-10-26",
++  "preregistration": "释放路线构造模块_预登记_v535.md",
++  "config": {
++    "seed": 1001,
++    "ruleMode": "instantChain",
++    "targetBuffer": 4,
++    "maxDebt": 40,
++    "branchCount": 2,
++    "p7BaseCount": 0,
++    "trapPost": false,
++    "constructor": {
++      "midLo": 0.2,
++      "midHi": 0.85,
++      "minBuffer": 3,
++      "maxAlternativesPerState": 8,
++      "timePerAlternativeMs": 900,
++      "maxNodes": 3000,
++      "beamWidth": 16,
++      "branchWidth": 8,
++      "maxUniqueCandidates": 160,
++      "overallTimeBudgetMs": 180000,
++      "minBuffer34Pct": 50,
++      "minSignificantReleases": 1,
++      "maxAcceptedBuffer": 4,
++      "targetMidProgress": 0.6,
++      "stopAfterFirstPass": true
++    }
++  },
++  "images": [
++    {
++      "image": "007",
++      "prefixDebts": 8,
++      "generationMs": 1252,
++      "totalMs": 1707,
++      "searchMs": 380,
++      "generated": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "blackPct": 17.9,
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 27,
++        "microCars": [],
++        "minCap": 16,
++        "maxCap": 31
++      },
++      "baselines": [
++        {
++          "source": "solver",
++          "steps": 46,
++          "finalReplayValid": true,
++          "replaySteps": 46,
++          "midBuffer34Pct": 72,
++          "maxBuffer": 4,
++          "significantReleaseCount": 0,
++          "significantReleaseEvents": [],
++          "firstSignificantRelease": null,
++          "pressure": {
++            "bufferLimit": 5,
++            "highThreshold": 3,
++            "criticalThreshold": 4,
++            "steps": 46,
++            "maxBuffer": 4,
++            "avgBuffer": 2.348,
++            "sustainedHighPressurePct": 72,
++            "criticalPressurePct": 13,
++            "earlyZeroBufferPct": 9.1,
++            "lateHighPressurePct": 0,
++            "longestHighRun": 26,
++            "highEpisodes": [
++              {
++                "startStep": 4,
++                "peak": 4,
++                "length": 26,
++                "endStep": 29,
++                "releaseAmplitude": 1
++              }
++            ],
++            "oscillationCount": 1,
++            "releaseEvents": [
++              {
++                "step": 30,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              }
++            ],
++            "releaseAmplitudes": [
++              1
++            ],
++            "significantReleaseCount": 0
++          }
++        },
++        {
++          "source": "plan",
++          "steps": 46,
++          "finalReplayValid": false,
++          "replayReason": "dead"
++        }
++      ],
++      "constructor": {
++        "wallMs": 380,
++        "highPressureStates": 1,
++        "tested": 1,
++        "unique": 1,
++        "duplicates": 0,
++        "replayRejected": 0,
++        "invalidSources": [],
++        "withRelease": 1,
++        "withMid50": 1,
++        "pass": 1,
++        "searchMsP50": 336,
++        "searchMsP90": 336,
++        "sourceBaselines": [
++          {
++            "source": "solver",
++            "steps": 46,
++            "midBuffer34Pct": 72,
++            "maxBuffer": 4,
++            "significantReleaseCount": 0,
++            "finalReplayValid": true,
++            "pass": false
++          },
++          {
++            "source": "plan",
++            "steps": 46,
++            "midBuffer34Pct": null,
++            "maxBuffer": null,
++            "significantReleaseCount": null,
++            "finalReplayValid": false,
++            "pass": false
++          }
++        ],
++        "best": {
++          "source": "solver",
++          "fullSteps": 46,
++          "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 2,2 1,6 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 5,5 2,7 5,4 5,6 4,4 5,3",
++          "finalReplayValid": true,
++          "midBuffer34Pct": 72,
++          "maxBuffer": 4,
++          "significantReleaseCount": 1,
++          "firstSignificantRelease": {
++            "step": 30,
++            "from": 4,
++            "to": 1,
++            "amplitude": 3
++          },
++          "pass": true,
++          "step": 29,
++          "progress": 0.593,
++          "action": {
++            "r": 2,
++            "c": 2,
++            "color": 31,
++            "count": 31
++          },
++          "referenceAction": {
++            "r": 3,
++            "c": 7
++          },
++          "changedAction": true,
++          "divergence": {
++            "step": 29,
++            "reference": {
++              "r": 3,
++              "c": 7
++            },
++            "constructed": {
++              "r": 2,
++              "c": 2
++            }
++          },
++          "searchNodes": 1379,
++          "searchStatus": "solved",
++          "searchElapsedMs": 336
++        },
++        "budgetExhausted": false
++      },
++      "best": {
++        "source": "solver",
++        "fullSteps": 46,
++        "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 2,2 1,6 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 5,5 2,7 5,4 5,6 4,4 5,3",
++        "finalReplayValid": true,
++        "midBuffer34Pct": 72,
++        "maxBuffer": 4,
++        "significantReleaseCount": 1,
++        "firstSignificantRelease": {
++          "step": 30,
++          "from": 4,
++          "to": 1,
++          "amplitude": 3
++        },
++        "pass": true,
++        "step": 29,
++        "progress": 0.593,
++        "action": {
++          "r": 2,
++          "c": 2,
++          "color": 31,
++          "count": 31
++        },
++        "referenceAction": {
++          "r": 3,
++          "c": 7
++        },
++        "changedAction": true,
++        "divergence": {
++          "step": 29,
++          "reference": {
++            "r": 3,
++            "c": 7
++          },
++          "constructed": {
++            "r": 2,
++            "c": 2
++          }
++        },
++        "searchNodes": 1379,
++        "searchStatus": "solved",
++        "searchElapsedMs": 336
++      },
++      "level": {
++        "blocks": [
++          [
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            15,
++            15,
++            28,
++            28,
++            30,
++            30,
++            5,
++            5,
++            15,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            15,
++            1,
++            28,
++            28,
++            30,
++            31,
++            30,
++            30,
++            5,
++            5,
++            14,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            15,
++            1,
++            28,
++            28,
++            31,
++            5,
++            31,
++            30,
++            5,
++            5,
++            14,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            32,
++            32,
++            32,
++            15,
++            1,
++            1,
++            28,
++            28,
++            30,
++            31,
++            5,
++            30,
++            5,
++            5,
++            14,
++            14,
++            15,
++            32,
++            32,
++            32,
++            32,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            15,
++            1,
++            1,
++            28,
++            28,
++            30,
++            5,
++            28,
++            5,
++            5,
++            5,
++            14,
++            14,
++            15,
++            34,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            15,
++            1,
++            1,
++            28,
++            28,
++            30,
++            28,
++            5,
++            28,
++            5,
++            5,
++            14,
++            14,
++            15,
++            34,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            15,
++            1,
++            1,
++            28,
++            28,
++            30,
++            30,
++            28,
++            30,
++            5,
++            5,
++            14,
++            14,
++            15,
++            34,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            19,
++            15,
++            1,
++            28,
++            28,
++            30,
++            30,
++            30,
++            30,
++            5,
++            5,
++            14,
++            15,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            19,
++            19,
++            15,
++            1,
++            28,
++            28,
++            30,
++            30,
++            5,
++            5,
++            14,
++            15,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            19,
++            19,
++            19,
++            15,
++            15,
++            28,
++            30,
++            30,
++            5,
++            15,
++            15,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            15,
++            5,
++            5,
++            5,
++            5,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            15,
++            5,
++            15,
++            15,
++            5,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            19,
++            15,
++            15,
++            15,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            34,
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            15,
++            28,
++            14,
++            28,
++            14,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            32,
++            33,
++            33,
++            34,
++            19,
++            19,
++            19,
++            19,
++            15,
++            14,
++            14,
++            14,
++            14,
++            15,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            33,
++            1,
++            1,
++            33,
++            19,
++            19,
++            19,
++            15,
++            28,
++            28,
++            14,
++            28,
++            14,
++            28,
++            15,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            33,
++            1,
++            1,
++            1,
++            1,
++            33,
++            19,
++            19,
++            19,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            19,
++            19,
++            19,
++            16,
++            16,
++            16,
++            16,
++            34,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            33,
++            31,
++            31,
++            31,
++            31,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            31,
++            31,
++            31,
++            31,
++            16,
++            32,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            33,
++            1,
++            31,
++            14,
++            14,
++            31,
++            1,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            31,
++            31,
++            31,
++            31,
++            13,
++            31,
++            16,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            33,
++            31,
++            14,
++            14,
++            31,
++            14,
++            31,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            31,
++            31,
++            13,
++            13,
++            31,
++            31,
++            13,
++            31,
++            16,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            33,
++            1,
++            14,
++            31,
++            13,
++            14,
++            1,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            31,
++            13,
++            13,
++            13,
++            13,
++            31,
++            13,
++            31,
++            16,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            33,
++            31,
++            14,
++            13,
++            31,
++            14,
++            31,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            31,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            31,
++            16,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            33,
++            1,
++            1,
++            14,
++            14,
++            14,
++            14,
++            1,
++            1,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            13,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            13,
++            16,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            33,
++            1,
++            33,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            33,
++            1,
++            33,
++            19,
++            19,
++            19,
++            19,
++            16,
++            31,
++            16,
++            28,
++            28,
++            13,
++            28,
++            28,
++            13,
++            28,
++            28,
++            16,
++            31,
++            16,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            33,
++            1,
++            33,
++            1,
++            1,
++            1,
++            1,
++            1,
++            1,
++            33,
++            1,
++            33,
++            34,
++            34,
++            34,
++            16,
++            28,
++            31,
++            31,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            31,
++            31,
++            28,
++            16,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            33,
++            1,
++            33,
++            1,
++            1,
++            1,
++            1,
++            1,
++            1,
++            33,
++            1,
++            33,
++            34,
++            34,
++            16,
++            28,
++            13,
++            13,
++            28,
++            28,
++            31,
++            31,
++            28,
++            28,
++            31,
++            31,
++            28,
++            28,
++            13,
++            13,
++            28,
++            16,
++            34
++          ],
++          [
++            34,
++            34,
++            33,
++            33,
++            34,
++            1,
++            34,
++            1,
++            34,
++            1,
++            34,
++            1,
++            33,
++            33,
++            34,
++            34,
++            16,
++            13,
++            13,
++            16,
++            28,
++            31,
++            31,
++            31,
++            28,
++            28,
++            31,
++            31,
++            31,
++            28,
++            16,
++            13,
++            13,
++            16,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            32,
++            32,
++            32,
++            32,
++            32,
++            16,
++            16,
++            28,
++            13,
++            28,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            28,
++            13,
++            28,
++            16,
++            16,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            33,
++            30,
++            30,
++            30,
++            30,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            33,
++            1,
++            30,
++            30,
++            1,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            16,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            33,
++            1,
++            1,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            16,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            19,
++            19,
++            19,
++            19,
++            19,
++            33,
++            33,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            19,
++            34,
++            34
++          ],
++          [
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34
++          ]
++        ],
++        "bufferLimit": 5,
++        "board": {
++          "rows": 7,
++          "cols": 8,
++          "cells": [
++            [
++              {
++                "t": "box",
++                "color": 5,
++                "count": 30,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 28,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 1,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 15,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 32,
++                "count": 20,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 28,
++                "count": 22,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 29,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 31,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 15,
++                "count": 21,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 34,
++                "count": 29,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 33,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 16,
++                "count": 23,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 32,
++                "count": 19,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 30,
++                "count": 17,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 14,
++                "count": 17,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 19,
++                "count": 31,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 16,
++                "count": 24,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 16,
++                "count": 23,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 14,
++                "count": 16,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 13,
++                "count": 18,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 1,
++                "count": 21,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 30,
++                "count": 18,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 34,
++                "count": 28,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "box",
++                "color": 31,
++                "count": 27,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 33,
++                "count": 19,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 13,
++                "count": 19,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ]
++          ],
++          "instantPlanCells": [
++            {
++              "r": 0,
++              "c": 0,
++              "seq": 0,
++              "color": 5,
++              "count": 30
++            },
++            {
++              "r": 0,
++              "c": 7,
++              "seq": 1,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 1,
++              "c": 0,
++              "seq": 2,
++              "color": 28,
++              "count": 31
++            },
++            {
++              "r": 1,
++              "c": 7,
++              "seq": 3,
++              "color": 32,
++              "count": 20
++            },
++            {
++              "r": 2,
++              "c": 0,
++              "seq": 4,
++              "color": 28,
++              "count": 22
++            },
++            {
++              "r": 1,
++              "c": 1,
++              "seq": 5,
++              "color": 1,
++              "count": 31
++            },
++            {
++              "r": 2,
++              "c": 7,
++              "seq": 6,
++              "color": 15,
++              "count": 21
++            },
++            {
++              "r": 1,
++              "c": 6,
++              "seq": 7,
++              "color": 15,
++              "count": 31
++            },
++            {
++              "r": 3,
++              "c": 0,
++              "seq": 8,
++              "color": 34,
++              "count": 29
++            },
++            {
++              "r": 2,
++              "c": 1,
++              "seq": 9,
++              "color": 34,
++              "count": 29
++            },
++            {
++              "r": 1,
++              "c": 2,
++              "seq": 10,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 3,
++              "c": 7,
++              "seq": 11,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 2,
++              "c": 6,
++              "seq": 12,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 1,
++              "c": 5,
++              "seq": 13,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 4,
++              "c": 0,
++              "seq": 14,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 3,
++              "c": 1,
++              "seq": 15,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 2,
++              "c": 2,
++              "seq": 16,
++              "color": 31,
++              "count": 31
++            },
++            {
++              "r": 1,
++              "c": 3,
++              "seq": 17,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 4,
++              "c": 7,
++              "seq": 18,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 3,
++              "c": 6,
++              "seq": 19,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 2,
++              "c": 5,
++              "seq": 20,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 1,
++              "c": 4,
++              "seq": 21,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 5,
++              "c": 0,
++              "seq": 22,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 4,
++              "c": 1,
++              "seq": 23,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 3,
++              "c": 2,
++              "seq": 24,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 2,
++              "c": 3,
++              "seq": 25,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 5,
++              "c": 7,
++              "seq": 26,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 4,
++              "c": 6,
++              "seq": 27,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 3,
++              "c": 5,
++              "seq": 28,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 2,
++              "c": 4,
++              "seq": 29,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 6,
++              "c": 0,
++              "seq": 30,
++              "color": 34,
++              "count": 28
++            },
++            {
++              "r": 5,
++              "c": 1,
++              "seq": 31,
++              "color": 16,
++              "count": 24
++            },
++            {
++              "r": 4,
++              "c": 2,
++              "seq": 32,
++              "color": 16,
++              "count": 23
++            },
++            {
++              "r": 3,
++              "c": 3,
++              "seq": 33,
++              "color": 33,
++              "count": 31
++            },
++            {
++              "r": 6,
++              "c": 7,
++              "seq": 34,
++              "color": 13,
++              "count": 19
++            },
++            {
++              "r": 5,
++              "c": 6,
++              "seq": 35,
++              "color": 30,
++              "count": 18
++            },
++            {
++              "r": 4,
++              "c": 5,
++              "seq": 36,
++              "color": 14,
++              "count": 17
++            },
++            {
++              "r": 3,
++              "c": 4,
++              "seq": 37,
++              "color": 19,
++              "count": 31
++            },
++            {
++              "r": 5,
++              "c": 2,
++              "seq": 38,
++              "color": 16,
++              "count": 23
++            },
++            {
++              "r": 4,
++              "c": 3,
++              "seq": 39,
++              "color": 32,
++              "count": 19
++            },
++            {
++              "r": 6,
++              "c": 6,
++              "seq": 40,
++              "color": 33,
++              "count": 19
++            },
++            {
++              "r": 5,
++              "c": 5,
++              "seq": 41,
++              "color": 1,
++              "count": 21
++            },
++            {
++              "r": 4,
++              "c": 4,
++              "seq": 42,
++              "color": 30,
++              "count": 17
++            },
++            {
++              "r": 5,
++              "c": 3,
++              "seq": 43,
++              "color": 14,
++              "count": 16
++            },
++            {
++              "r": 6,
++              "c": 5,
++              "seq": 44,
++              "color": 31,
++              "count": 27
++            },
++            {
++              "r": 5,
++              "c": 4,
++              "seq": 45,
++              "color": 13,
++              "count": 18
++            }
++          ],
++          "narrowStat": {
++            "enabled": true,
++            "prob": 1,
++            "hit": true,
++            "gaps": 3,
++            "applied": true,
++            "source": "legacy:narrowPathProb",
++            "byChokeType": false,
++            "gapsMin": 2,
++            "gapsMax": 3
++          },
++          "spaceQuota": null,
++          "pipeStat": {
++            "want": 0,
++            "placed": 0,
++            "overflowPlanned": 0,
++            "overflowActual": 0,
++            "capacityPerPipe": 4,
++            "coords": [],
++            "floorCount": 2,
++            "floorDepth": 2
++          }
++        }
++      }
++    },
++    {
++      "image": "006",
++      "prefixDebts": 6,
++      "generationMs": 969,
++      "totalMs": 1110,
++      "searchMs": 19,
++      "generated": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "board": {
++        "rows": 6,
++        "cols": 6
++      },
++      "blackPct": 11.1,
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 6,
++        "microCars": [],
++        "minCap": 20,
++        "maxCap": 45
++      },
++      "baselines": [
++        {
++          "source": "solver",
++          "steps": 32,
++          "finalReplayValid": true,
++          "replaySteps": 32,
++          "midBuffer34Pct": 10,
++          "maxBuffer": 3,
++          "significantReleaseCount": 0,
++          "significantReleaseEvents": [],
++          "firstSignificantRelease": null,
++          "pressure": {
++            "bufferLimit": 5,
++            "highThreshold": 3,
++            "criticalThreshold": 4,
++            "steps": 32,
++            "maxBuffer": 3,
++            "avgBuffer": 1.406,
++            "sustainedHighPressurePct": 10,
++            "criticalPressurePct": 0,
++            "earlyZeroBufferPct": 0,
++            "lateHighPressurePct": 0,
++            "longestHighRun": 2,
++            "highEpisodes": [
++              {
++                "startStep": 3,
++                "peak": 3,
++                "length": 1,
++                "endStep": 3,
++                "releaseAmplitude": 1
++              },
++              {
++                "startStep": 11,
++                "peak": 3,
++                "length": 2,
++                "endStep": 12,
++                "releaseAmplitude": 1
++              }
++            ],
++            "oscillationCount": 2,
++            "releaseEvents": [
++              {
++                "step": 4,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              },
++              {
++                "step": 13,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              }
++            ],
++            "releaseAmplitudes": [
++              1,
++              1
++            ],
++            "significantReleaseCount": 0
++          }
++        },
++        {
++          "source": "plan",
++          "steps": 32,
++          "finalReplayValid": true,
++          "replaySteps": 32,
++          "midBuffer34Pct": 57.9,
++          "maxBuffer": 4,
++          "significantReleaseCount": 1,
++          "significantReleaseEvents": [
++            {
++              "step": 28,
++              "from": 4,
++              "to": 0,
++              "amplitude": 4
++            }
++          ],
++          "firstSignificantRelease": {
++            "step": 28,
++            "from": 4,
++            "to": 0,
++            "amplitude": 4
++          },
++          "pressure": {
++            "bufferLimit": 5,
++            "highThreshold": 3,
++            "criticalThreshold": 4,
++            "steps": 32,
++            "maxBuffer": 4,
++            "avgBuffer": 2.156,
++            "sustainedHighPressurePct": 57.9,
++            "criticalPressurePct": 6.3,
++            "earlyZeroBufferPct": 0,
++            "lateHighPressurePct": 37.5,
++            "longestHighRun": 7,
++            "highEpisodes": [
++              {
++                "startStep": 3,
++                "peak": 3,
++                "length": 1,
++                "endStep": 3,
++                "releaseAmplitude": 1
++              },
++              {
++                "startStep": 5,
++                "peak": 3,
++                "length": 1,
++                "endStep": 5,
++                "releaseAmplitude": 1
++              },
++              {
++                "startStep": 8,
++                "peak": 3,
++                "length": 1,
++                "endStep": 8,
++                "releaseAmplitude": 1
++              },
++              {
++                "startStep": 11,
++                "peak": 3,
++                "length": 1,
++                "endStep": 11,
++                "releaseAmplitude": 1
++              },
++              {
++                "startStep": 16,
++                "peak": 3,
++                "length": 3,
++                "endStep": 18,
++                "releaseAmplitude": 1
++              },
++              {
++                "startStep": 21,
++                "peak": 4,
++                "length": 7,
++                "endStep": 27,
++                "releaseAmplitude": 4
++              }
++            ],
++            "oscillationCount": 6,
++            "releaseEvents": [
++              {
++                "step": 4,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              },
++              {
++                "step": 6,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              },
++              {
++                "step": 9,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              },
++              {
++                "step": 12,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              },
++              {
++                "step": 19,
++                "from": 3,
++                "to": 2,
++                "amplitude": 1
++              },
++              {
++                "step": 28,
++                "from": 4,
++                "to": 0,
++                "amplitude": 4
++              }
++            ],
++            "releaseAmplitudes": [
++              1,
++              1,
++              1,
++              1,
++              1,
++              4
++            ],
++            "significantReleaseCount": 1
++          }
++        }
++      ],
++      "constructor": {
++        "wallMs": 19,
++        "highPressureStates": 0,
++        "tested": 0,
++        "unique": 1,
++        "duplicates": 0,
++        "replayRejected": 0,
++        "invalidSources": [],
++        "withRelease": 1,
++        "withMid50": 1,
++        "pass": 1,
++        "searchMsP50": null,
++        "searchMsP90": null,
++        "sourceBaselines": [
++          {
++            "source": "plan",
++            "steps": 32,
++            "midBuffer34Pct": 57.9,
++            "maxBuffer": 4,
++            "significantReleaseCount": 1,
++            "finalReplayValid": true,
++            "pass": true
++          },
++          {
++            "source": "solver",
++            "steps": 32,
++            "midBuffer34Pct": 10,
++            "maxBuffer": 3,
++            "significantReleaseCount": 0,
++            "finalReplayValid": true,
++            "pass": false
++          }
++        ],
++        "best": {
++          "source": "plan",
++          "fullSteps": 32,
++          "fullSig": "0,0 0,5 1,0 1,5 2,0 1,1 2,5 1,4 3,0 2,1 1,2 3,5 2,4 1,3 4,0 3,1 2,2 4,5 3,4 2,3 5,0 4,1 3,2 5,5 4,4 3,3 5,1 4,2 5,4 4,3 5,2 5,3",
++          "finalReplayValid": true,
++          "midBuffer34Pct": 57.9,
++          "maxBuffer": 4,
++          "significantReleaseCount": 1,
++          "firstSignificantRelease": {
++            "step": 28,
++            "from": 4,
++            "to": 0,
++            "amplitude": 4
++          },
++          "pass": true,
++          "kind": "reference"
++        },
++        "budgetExhausted": false
++      },
++      "best": {
++        "source": "plan",
++        "fullSteps": 32,
++        "fullSig": "0,0 0,5 1,0 1,5 2,0 1,1 2,5 1,4 3,0 2,1 1,2 3,5 2,4 1,3 4,0 3,1 2,2 4,5 3,4 2,3 5,0 4,1 3,2 5,5 4,4 3,3 5,1 4,2 5,4 4,3 5,2 5,3",
++        "finalReplayValid": true,
++        "midBuffer34Pct": 57.9,
++        "maxBuffer": 4,
++        "significantReleaseCount": 1,
++        "firstSignificantRelease": {
++          "step": 28,
++          "from": 4,
++          "to": 0,
++          "amplitude": 4
++        },
++        "pass": true,
++        "kind": "reference"
++      },
++      "level": {
++        "blocks": [
++          [
++            31,
++            30,
++            30,
++            30,
++            30,
++            30,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            30,
++            30,
++            30,
++            30,
++            30,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            30,
++            30,
++            30,
++            30,
++            30,
++            31
++          ],
++          [
++            5,
++            31,
++            31,
++            31,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5,
++            15,
++            5,
++            5,
++            5,
++            5,
++            5,
++            15,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            15,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            15,
++            21,
++            15,
++            31,
++            31,
++            31,
++            31,
++            31,
++            15,
++            22,
++            15,
++            5,
++            5,
++            5,
++            15,
++            22,
++            15,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            15,
++            14,
++            31,
++            14,
++            14,
++            14,
++            15,
++            14,
++            14,
++            15,
++            21,
++            21,
++            15,
++            31,
++            31,
++            31,
++            31,
++            5,
++            15,
++            22,
++            15,
++            5,
++            15,
++            22,
++            15,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            15,
++            31,
++            14,
++            14,
++            14,
++            15,
++            22,
++            15,
++            14,
++            15,
++            21,
++            21,
++            15,
++            31,
++            31,
++            31,
++            31,
++            5,
++            5,
++            15,
++            22,
++            15,
++            22,
++            15,
++            5,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            15,
++            14,
++            14,
++            14,
++            14,
++            15,
++            22,
++            15,
++            14,
++            15,
++            21,
++            21,
++            15,
++            31,
++            31,
++            31,
++            33,
++            33,
++            33,
++            33,
++            33,
++            22,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            14,
++            21,
++            14,
++            14,
++            14,
++            15,
++            14,
++            14,
++            15,
++            21,
++            21,
++            15,
++            30,
++            30,
++            33,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            33,
++            30,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            14,
++            21,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            15,
++            21,
++            21,
++            15,
++            30,
++            33,
++            28,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            28,
++            22,
++            22,
++            28,
++            33,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            21,
++            21,
++            15,
++            30,
++            33,
++            28,
++            15,
++            31,
++            14,
++            31,
++            14,
++            31,
++            14,
++            14,
++            15,
++            28,
++            22,
++            22,
++            28,
++            33,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            15,
++            21,
++            21,
++            15,
++            30,
++            33,
++            28,
++            15,
++            31,
++            31,
++            14,
++            31,
++            14,
++            14,
++            14,
++            15,
++            28,
++            28,
++            28,
++            28,
++            33,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            14,
++            21,
++            14,
++            14,
++            14,
++            14,
++            31,
++            14,
++            15,
++            21,
++            21,
++            15,
++            30,
++            33,
++            28,
++            15,
++            31,
++            14,
++            31,
++            14,
++            14,
++            14,
++            22,
++            15,
++            28,
++            14,
++            14,
++            28,
++            33,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            14,
++            21,
++            14,
++            14,
++            14,
++            31,
++            14,
++            31,
++            15,
++            21,
++            21,
++            15,
++            30,
++            33,
++            28,
++            15,
++            14,
++            31,
++            14,
++            14,
++            14,
++            22,
++            14,
++            15,
++            28,
++            14,
++            14,
++            28,
++            33,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            31,
++            14,
++            15,
++            21,
++            21,
++            15,
++            30,
++            33,
++            28,
++            15,
++            31,
++            14,
++            14,
++            14,
++            22,
++            14,
++            22,
++            15,
++            28,
++            14,
++            14,
++            28,
++            33,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            14,
++            21,
++            14,
++            21,
++            14,
++            21,
++            14,
++            21,
++            15,
++            21,
++            21,
++            15,
++            30,
++            33,
++            28,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            28,
++            28,
++            28,
++            28,
++            33,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            15,
++            21,
++            14,
++            21,
++            14,
++            21,
++            14,
++            21,
++            14,
++            15,
++            21,
++            15,
++            30,
++            30,
++            30,
++            33,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            33,
++            30,
++            30,
++            31
++          ],
++          [
++            5,
++            31,
++            31,
++            31,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            5,
++            31,
++            31,
++            31,
++            31,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            31,
++            15,
++            15,
++            5,
++            5,
++            5,
++            5,
++            15,
++            15,
++            5,
++            5,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            5,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            5,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            31,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            34,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            5,
++            31,
++            31,
++            31,
++            31,
++            31,
++            17,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            17,
++            31,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            31,
++            31,
++            34,
++            5,
++            4,
++            4,
++            4,
++            4,
++            4,
++            4,
++            5,
++            34,
++            31,
++            31,
++            31,
++            31,
++            17,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            17,
++            31,
++            5
++          ],
++          [
++            31,
++            30,
++            30,
++            30,
++            34,
++            5,
++            4,
++            4,
++            4,
++            4,
++            4,
++            4,
++            4,
++            4,
++            5,
++            34,
++            30,
++            30,
++            30,
++            17,
++            31,
++            31,
++            31,
++            31,
++            31,
++            22,
++            31,
++            30,
++            31,
++            31,
++            30,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            30,
++            34,
++            5,
++            4,
++            30,
++            30,
++            4,
++            30,
++            30,
++            4,
++            30,
++            5,
++            34,
++            30,
++            30,
++            30,
++            17,
++            31,
++            13,
++            13,
++            31,
++            22,
++            22,
++            31,
++            30,
++            31,
++            30,
++            30,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            30,
++            34,
++            5,
++            4,
++            4,
++            4,
++            4,
++            4,
++            4,
++            4,
++            4,
++            5,
++            34,
++            30,
++            30,
++            30,
++            17,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            30,
++            34,
++            5,
++            4,
++            4,
++            4,
++            4,
++            4,
++            30,
++            30,
++            30,
++            30,
++            34,
++            30,
++            30,
++            30,
++            17,
++            31,
++            31,
++            31,
++            31,
++            17,
++            17,
++            17,
++            17,
++            31,
++            31,
++            31,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            30,
++            34,
++            5,
++            15,
++            4,
++            4,
++            4,
++            4,
++            4,
++            30,
++            30,
++            30,
++            15,
++            5,
++            34,
++            30,
++            30,
++            17,
++            31,
++            31,
++            31,
++            17,
++            13,
++            13,
++            13,
++            13,
++            17,
++            31,
++            31,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            34,
++            5,
++            4,
++            4,
++            15,
++            4,
++            4,
++            4,
++            30,
++            30,
++            30,
++            28,
++            15,
++            4,
++            5,
++            34,
++            30,
++            17,
++            31,
++            31,
++            17,
++            13,
++            15,
++            15,
++            15,
++            15,
++            13,
++            17,
++            31,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            34,
++            5,
++            4,
++            4,
++            4,
++            15,
++            15,
++            15,
++            15,
++            28,
++            28,
++            28,
++            28,
++            15,
++            4,
++            5,
++            5,
++            34,
++            17,
++            31,
++            17,
++            13,
++            15,
++            31,
++            15,
++            31,
++            15,
++            15,
++            13,
++            17,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            34,
++            5,
++            4,
++            4,
++            15,
++            22,
++            22,
++            22,
++            22,
++            15,
++            15,
++            15,
++            15,
++            4,
++            4,
++            5,
++            5,
++            34,
++            17,
++            31,
++            17,
++            13,
++            15,
++            15,
++            31,
++            15,
++            15,
++            4,
++            13,
++            17,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            31,
++            30,
++            34,
++            4,
++            15,
++            22,
++            22,
++            22,
++            22,
++            22,
++            22,
++            22,
++            22,
++            22,
++            15,
++            4,
++            34,
++            34,
++            30,
++            17,
++            31,
++            17,
++            13,
++            22,
++            22,
++            30,
++            31,
++            4,
++            4,
++            13,
++            17,
++            31,
++            17,
++            30,
++            31
++          ],
++          [
++            5,
++            31,
++            34,
++            4,
++            15,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            13,
++            15,
++            4,
++            34,
++            31,
++            31,
++            17,
++            31,
++            17,
++            13,
++            15,
++            31,
++            30,
++            30,
++            4,
++            4,
++            13,
++            17,
++            31,
++            17,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            34,
++            4,
++            4,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            15,
++            4,
++            34,
++            31,
++            31,
++            17,
++            31,
++            31,
++            17,
++            13,
++            13,
++            31,
++            31,
++            13,
++            13,
++            17,
++            31,
++            31,
++            17,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            34,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            28,
++            34,
++            31,
++            31,
++            17,
++            31,
++            31,
++            31,
++            17,
++            13,
++            13,
++            13,
++            13,
++            17,
++            31,
++            31,
++            31,
++            17,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            34,
++            28,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            34,
++            28,
++            34,
++            31,
++            31,
++            31,
++            17,
++            31,
++            31,
++            31,
++            31,
++            17,
++            17,
++            17,
++            17,
++            31,
++            31,
++            31,
++            31,
++            17,
++            31,
++            5
++          ],
++          [
++            5,
++            31,
++            31,
++            34,
++            34,
++            31,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            34,
++            31,
++            31,
++            31,
++            31,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            17,
++            31,
++            31,
++            5
++          ],
++          [
++            31,
++            30,
++            30,
++            30,
++            30,
++            30,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            30,
++            30,
++            30,
++            30,
++            30,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            31,
++            30,
++            30,
++            30,
++            30,
++            30,
++            31
++          ]
++        ],
++        "bufferLimit": 5,
++        "board": {
++          "rows": 6,
++          "cols": 6,
++          "cells": [
++            [
++              {
++                "t": "box",
++                "color": 15,
++                "count": 43,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "box",
++                "color": 21,
++                "count": 36,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 15,
++                "count": 42,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 14,
++                "count": 44,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 15,
++                "count": 43,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 35,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 30,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 30,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 28,
++                "count": 34,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 31,
++                "count": 44,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 14,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 31,
++                "count": 43,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 33,
++                "count": 41,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 31,
++                "count": 44,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 31,
++                "count": 44,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 15,
++                "count": 43,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 25,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 13,
++                "count": 35,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 17,
++                "count": 38,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 22,
++                "count": 35,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 31,
++                "count": 43,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 28,
++                "count": 35,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 31,
++                "count": 43,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 33,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 35,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 31,
++                "count": 43,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 30,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 4,
++                "count": 26,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 34,
++                "count": 25,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 13,
++                "count": 20,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 17,
++                "count": 38,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 4,
++                "count": 35,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ]
++          ],
++          "instantPlanCells": [
++            {
++              "r": 0,
++              "c": 0,
++              "seq": 0,
++              "color": 15,
++              "count": 43
++            },
++            {
++              "r": 0,
++              "c": 5,
++              "seq": 1,
++              "color": 21,
++              "count": 36
++            },
++            {
++              "r": 1,
++              "c": 0,
++              "seq": 2,
++              "color": 15,
++              "count": 42
++            },
++            {
++              "r": 1,
++              "c": 5,
++              "seq": 3,
++              "color": 30,
++              "count": 45
++            },
++            {
++              "r": 2,
++              "c": 0,
++              "seq": 4,
++              "color": 28,
++              "count": 34
++            },
++            {
++              "r": 1,
++              "c": 1,
++              "seq": 5,
++              "color": 14,
++              "count": 44
++            },
++            {
++              "r": 2,
++              "c": 5,
++              "seq": 6,
++              "color": 31,
++              "count": 44
++            },
++            {
++              "r": 1,
++              "c": 4,
++              "seq": 7,
++              "color": 30,
++              "count": 45
++            },
++            {
++              "r": 3,
++              "c": 0,
++              "seq": 8,
++              "color": 31,
++              "count": 44
++            },
++            {
++              "r": 2,
++              "c": 1,
++              "seq": 9,
++              "color": 31,
++              "count": 44
++            },
++            {
++              "r": 1,
++              "c": 2,
++              "seq": 10,
++              "color": 15,
++              "count": 43
++            },
++            {
++              "r": 3,
++              "c": 5,
++              "seq": 11,
++              "color": 22,
++              "count": 35
++            },
++            {
++              "r": 2,
++              "c": 4,
++              "seq": 12,
++              "color": 33,
++              "count": 41
++            },
++            {
++              "r": 1,
++              "c": 3,
++              "seq": 13,
++              "color": 5,
++              "count": 35
++            },
++            {
++              "r": 4,
++              "c": 0,
++              "seq": 14,
++              "color": 31,
++              "count": 43
++            },
++            {
++              "r": 3,
++              "c": 1,
++              "seq": 15,
++              "color": 15,
++              "count": 43
++            },
++            {
++              "r": 2,
++              "c": 2,
++              "seq": 16,
++              "color": 14,
++              "count": 45
++            },
++            {
++              "r": 4,
++              "c": 5,
++              "seq": 17,
++              "color": 31,
++              "count": 43
++            },
++            {
++              "r": 3,
++              "c": 4,
++              "seq": 18,
++              "color": 17,
++              "count": 38
++            },
++            {
++              "r": 2,
++              "c": 3,
++              "seq": 19,
++              "color": 31,
++              "count": 43
++            },
++            {
++              "r": 5,
++              "c": 0,
++              "seq": 20,
++              "color": 30,
++              "count": 45
++            },
++            {
++              "r": 4,
++              "c": 1,
++              "seq": 21,
++              "color": 28,
++              "count": 35
++            },
++            {
++              "r": 3,
++              "c": 2,
++              "seq": 22,
++              "color": 34,
++              "count": 25
++            },
++            {
++              "r": 5,
++              "c": 5,
++              "seq": 23,
++              "color": 4,
++              "count": 35
++            },
++            {
++              "r": 4,
++              "c": 4,
++              "seq": 24,
++              "color": 5,
++              "count": 35
++            },
++            {
++              "r": 3,
++              "c": 3,
++              "seq": 25,
++              "color": 13,
++              "count": 35
++            },
++            {
++              "r": 5,
++              "c": 1,
++              "seq": 26,
++              "color": 4,
++              "count": 26
++            },
++            {
++              "r": 4,
++              "c": 2,
++              "seq": 27,
++              "color": 31,
++              "count": 43
++            },
++            {
++              "r": 5,
++              "c": 4,
++              "seq": 28,
++              "color": 17,
++              "count": 38
++            },
++            {
++              "r": 4,
++              "c": 3,
++              "seq": 29,
++              "color": 5,
++              "count": 33
++            },
++            {
++              "r": 5,
++              "c": 2,
++              "seq": 30,
++              "color": 34,
++              "count": 25
++            },
++            {
++              "r": 5,
++              "c": 3,
++              "seq": 31,
++              "color": 13,
++              "count": 20
++            }
++          ],
++          "narrowStat": {
++            "enabled": true,
++            "prob": 1,
++            "hit": true,
++            "gaps": 2,
++            "applied": true,
++            "source": "legacy:narrowPathProb",
++            "byChokeType": false,
++            "gapsMin": 2,
++            "gapsMax": 3
++          },
++          "spaceQuota": null,
++          "pipeStat": {
++            "want": 0,
++            "placed": 0,
++            "overflowPlanned": 0,
++            "overflowActual": 0,
++            "capacityPerPipe": 4,
++            "coords": [],
++            "floorCount": 2,
++            "floorDepth": 2
++          }
++        }
++      }
++    },
++    {
++      "image": "010",
++      "prefixDebts": 2,
++      "generationMs": 707,
++      "totalMs": 785,
++      "searchMs": 17,
++      "generated": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "board": {
++        "rows": 6,
++        "cols": 6
++      },
++      "blackPct": 25,
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 1,
++        "microCars": [],
++        "minCap": 32,
++        "maxCap": 54
++      },
++      "baselines": [
++        {
++          "source": "solver",
++          "steps": 27,
++          "finalReplayValid": true,
++          "replaySteps": 27,
++          "midBuffer34Pct": 0,
++          "maxBuffer": 2,
++          "significantReleaseCount": 0,
++          "significantReleaseEvents": [],
++          "firstSignificantRelease": null,
++          "pressure": {
++            "bufferLimit": 5,
++            "highThreshold": 3,
++            "criticalThreshold": 4,
++            "steps": 27,
++            "maxBuffer": 2,
++            "avgBuffer": 0.926,
++            "sustainedHighPressurePct": 0,
++            "criticalPressurePct": 0,
++            "earlyZeroBufferPct": 40,
++            "lateHighPressurePct": 0,
++            "longestHighRun": 0,
++            "highEpisodes": [],
++            "oscillationCount": 0,
++            "releaseEvents": [],
++            "releaseAmplitudes": [],
++            "significantReleaseCount": 0
++          }
++        },
++        {
++          "source": "plan",
++          "steps": 27,
++          "finalReplayValid": true,
++          "replaySteps": 27,
++          "midBuffer34Pct": 76.5,
++          "maxBuffer": 5,
++          "significantReleaseCount": 2,
++          "significantReleaseEvents": [
++            {
++              "step": 15,
++              "from": 5,
++              "to": 2,
++              "amplitude": 3
++            },
++            {
++              "step": 25,
++              "from": 3,
++              "to": 1,
++              "amplitude": 2
++            }
++          ],
++          "firstSignificantRelease": {
++            "step": 15,
++            "from": 5,
++            "to": 2,
++            "amplitude": 3
++          },
++          "pressure": {
++            "bufferLimit": 5,
++            "highThreshold": 3,
++            "criticalThreshold": 4,
++            "steps": 27,
++            "maxBuffer": 5,
++            "avgBuffer": 2.667,
++            "sustainedHighPressurePct": 82.4,
++            "criticalPressurePct": 40.7,
++            "earlyZeroBufferPct": 0,
++            "lateHighPressurePct": 40,
++            "longestHighRun": 9,
++            "highEpisodes": [
++              {
++                "startStep": 9,
++                "peak": 5,
++                "length": 6,
++                "endStep": 14,
++                "releaseAmplitude": 3
++              },
++              {
++                "startStep": 16,
++                "peak": 4,
++                "length": 9,
++                "endStep": 24,
++                "releaseAmplitude": 2
++              }
++            ],
++            "oscillationCount": 2,
++            "releaseEvents": [
++              {
++                "step": 15,
++                "from": 5,
++                "to": 2,
++                "amplitude": 3
++              },
++              {
++                "step": 25,
++                "from": 3,
++                "to": 1,
++                "amplitude": 2
++              }
++            ],
++            "releaseAmplitudes": [
++              3,
++              2
++            ],
++            "significantReleaseCount": 2
++          }
++        }
++      ],
++      "constructor": {
++        "wallMs": 17,
++        "highPressureStates": 0,
++        "tested": 0,
++        "unique": 1,
++        "duplicates": 0,
++        "replayRejected": 0,
++        "invalidSources": [],
++        "withRelease": 1,
++        "withMid50": 1,
++        "pass": 1,
++        "searchMsP50": null,
++        "searchMsP90": null,
++        "sourceBaselines": [
++          {
++            "source": "plan",
++            "steps": 27,
++            "midBuffer34Pct": 76.5,
++            "maxBuffer": 5,
++            "significantReleaseCount": 2,
++            "finalReplayValid": true,
++            "pass": true
++          },
++          {
++            "source": "solver",
++            "steps": 27,
++            "midBuffer34Pct": 0,
++            "maxBuffer": 2,
++            "significantReleaseCount": 0,
++            "finalReplayValid": true,
++            "pass": false
++          }
++        ],
++        "best": {
++          "source": "plan",
++          "fullSteps": 27,
++          "fullSig": "0,0 0,5 1,0 1,5 2,0 1,1 2,5 1,4 3,0 2,1 1,2 3,5 2,4 1,3 4,0 3,1 2,2 4,5 3,4 2,3 4,1 3,2 5,5 4,4 3,3 4,2 4,3",
++          "finalReplayValid": true,
++          "midBuffer34Pct": 76.5,
++          "maxBuffer": 5,
++          "significantReleaseCount": 2,
++          "firstSignificantRelease": {
++            "step": 15,
++            "from": 5,
++            "to": 2,
++            "amplitude": 3
++          },
++          "pass": true,
++          "kind": "reference"
++        },
++        "budgetExhausted": false
++      },
++      "best": {
++        "source": "plan",
++        "fullSteps": 27,
++        "fullSig": "0,0 0,5 1,0 1,5 2,0 1,1 2,5 1,4 3,0 2,1 1,2 3,5 2,4 1,3 4,0 3,1 2,2 4,5 3,4 2,3 4,1 3,2 5,5 4,4 3,3 4,2 4,3",
++        "finalReplayValid": true,
++        "midBuffer34Pct": 76.5,
++        "maxBuffer": 5,
++        "significantReleaseCount": 2,
++        "firstSignificantRelease": {
++          "step": 15,
++          "from": 5,
++          "to": 2,
++          "amplitude": 3
++        },
++        "pass": true,
++        "kind": "reference"
++      },
++      "level": {
++        "blocks": [
++          [
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            33,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            33,
++            33,
++            33,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            32,
++            33,
++            33,
++            33,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            33,
++            33,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            33,
++            33,
++            24,
++            24,
++            33,
++            25,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            33,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            33,
++            33,
++            24,
++            24,
++            24,
++            33,
++            33,
++            33,
++            25,
++            30,
++            25,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            33,
++            25,
++            33,
++            24,
++            24,
++            33,
++            26,
++            2,
++            2,
++            33,
++            33,
++            25,
++            25,
++            25,
++            25,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            33,
++            33,
++            33,
++            24,
++            33,
++            2,
++            26,
++            2,
++            2,
++            26,
++            26,
++            33,
++            33,
++            30,
++            30,
++            25,
++            25,
++            25,
++            25,
++            25,
++            25,
++            30,
++            25,
++            25,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            33,
++            25,
++            33,
++            24,
++            33,
++            2,
++            2,
++            2,
++            26,
++            26,
++            2,
++            24,
++            24,
++            33,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            25,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            33,
++            30,
++            33,
++            24,
++            33,
++            2,
++            26,
++            26,
++            2,
++            26,
++            2,
++            26,
++            24,
++            24,
++            33,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            25,
++            32,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            33,
++            33,
++            30,
++            33,
++            33,
++            26,
++            2,
++            26,
++            26,
++            2,
++            26,
++            2,
++            26,
++            24,
++            24,
++            33,
++            25,
++            25,
++            25,
++            25,
++            25,
++            32,
++            32,
++            33,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            33,
++            33,
++            30,
++            30,
++            33,
++            26,
++            26,
++            2,
++            26,
++            26,
++            26,
++            24,
++            33,
++            33,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            14,
++            14,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            33,
++            30,
++            30,
++            33,
++            33,
++            33,
++            2,
++            2,
++            24,
++            33,
++            33,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            14,
++            14,
++            25,
++            25,
++            30,
++            33,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            33,
++            33,
++            33,
++            30,
++            30,
++            30,
++            33,
++            33,
++            33,
++            33,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            14,
++            25,
++            30,
++            30,
++            30,
++            33,
++            5,
++            5,
++            5,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            5,
++            5,
++            33,
++            33,
++            33,
++            25,
++            25,
++            25,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            33,
++            33,
++            5,
++            5,
++            5,
++            34,
++            34,
++            34,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            5,
++            5,
++            5,
++            5,
++            5,
++            33,
++            33,
++            33,
++            25,
++            25,
++            25,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            30,
++            33,
++            33,
++            33,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            33,
++            34,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            33,
++            33,
++            33,
++            33,
++            25,
++            25,
++            30,
++            30,
++            30,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            33,
++            34,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            34,
++            33,
++            34,
++            32,
++            34
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            33,
++            33,
++            34,
++            34,
++            33
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            33,
++            34,
++            34,
++            33,
++            14
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            34,
++            33,
++            34,
++            33,
++            14,
++            14
++          ],
++          [
++            3,
++            24,
++            24,
++            24,
++            24,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            24,
++            24,
++            24,
++            24,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            34,
++            33,
++            33,
++            14,
++            14,
++            34
++          ],
++          [
++            24,
++            1,
++            1,
++            1,
++            1,
++            24,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            24,
++            1,
++            1,
++            1,
++            1,
++            24,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            34,
++            33,
++            14,
++            34,
++            34,
++            33
++          ],
++          [
++            24,
++            1,
++            1,
++            1,
++            1,
++            1,
++            24,
++            5,
++            24,
++            24,
++            5,
++            24,
++            1,
++            1,
++            1,
++            1,
++            1,
++            24,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            34,
++            33,
++            14,
++            14,
++            34,
++            34,
++            33
++          ],
++          [
++            24,
++            1,
++            1,
++            1,
++            26,
++            26,
++            1,
++            24,
++            1,
++            1,
++            24,
++            1,
++            26,
++            26,
++            1,
++            1,
++            1,
++            24,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            14,
++            33,
++            14,
++            34,
++            34,
++            33,
++            33,
++            34
++          ],
++          [
++            24,
++            1,
++            1,
++            1,
++            26,
++            26,
++            26,
++            24,
++            1,
++            1,
++            24,
++            26,
++            26,
++            26,
++            1,
++            1,
++            1,
++            24,
++            5,
++            5,
++            5,
++            34,
++            34,
++            34,
++            34,
++            34,
++            33,
++            33,
++            14,
++            34,
++            33,
++            33,
++            34,
++            34,
++            3
++          ],
++          [
++            24,
++            1,
++            1,
++            1,
++            1,
++            1,
++            1,
++            24,
++            1,
++            1,
++            24,
++            1,
++            1,
++            1,
++            1,
++            1,
++            1,
++            24,
++            5,
++            5,
++            34,
++            33,
++            33,
++            33,
++            33,
++            33,
++            33,
++            34,
++            34,
++            33,
++            34,
++            34,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            24,
++            1,
++            1,
++            1,
++            24,
++            24,
++            26,
++            24,
++            24,
++            24,
++            24,
++            24,
++            1,
++            1,
++            1,
++            1,
++            24,
++            5,
++            34,
++            33,
++            2,
++            2,
++            2,
++            2,
++            2,
++            33,
++            34,
++            34,
++            33,
++            34,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            24,
++            24,
++            24,
++            24,
++            1,
++            26,
++            1,
++            24,
++            24,
++            1,
++            26,
++            1,
++            24,
++            24,
++            24,
++            24,
++            5,
++            5,
++            34,
++            33,
++            2,
++            33,
++            33,
++            33,
++            2,
++            33,
++            33,
++            33,
++            33,
++            34,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            24,
++            1,
++            26,
++            1,
++            1,
++            24,
++            5,
++            24,
++            1,
++            26,
++            1,
++            24,
++            5,
++            5,
++            5,
++            5,
++            34,
++            33,
++            2,
++            33,
++            34,
++            34,
++            33,
++            2,
++            2,
++            33,
++            34,
++            5,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            24,
++            1,
++            26,
++            1,
++            1,
++            24,
++            5,
++            5,
++            24,
++            1,
++            1,
++            26,
++            1,
++            24,
++            5,
++            5,
++            5,
++            34,
++            33,
++            2,
++            33,
++            34,
++            33,
++            33,
++            33,
++            2,
++            2,
++            33,
++            34,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            24,
++            1,
++            1,
++            26,
++            1,
++            1,
++            24,
++            5,
++            5,
++            5,
++            24,
++            24,
++            24,
++            1,
++            1,
++            24,
++            5,
++            5,
++            34,
++            33,
++            2,
++            2,
++            33,
++            33,
++            34,
++            34,
++            33,
++            2,
++            33,
++            34,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            24,
++            24,
++            24,
++            1,
++            1,
++            24,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            24,
++            1,
++            24,
++            32,
++            32,
++            32,
++            34,
++            33,
++            33,
++            33,
++            33,
++            2,
++            33,
++            34,
++            33,
++            2,
++            33,
++            34,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            24,
++            1,
++            24,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            24,
++            32,
++            32,
++            32,
++            32,
++            32,
++            34,
++            34,
++            34,
++            33,
++            2,
++            2,
++            33,
++            2,
++            2,
++            33,
++            34,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            32,
++            32,
++            32,
++            24,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            32,
++            34,
++            33,
++            2,
++            2,
++            33,
++            33,
++            34,
++            32,
++            32,
++            32,
++            32,
++            3
++          ],
++          [
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            3,
++            34,
++            33,
++            33,
++            34,
++            34,
++            34,
++            3,
++            3,
++            3,
++            3,
++            3
++          ]
++        ],
++        "bufferLimit": 5,
++        "board": {
++          "rows": 6,
++          "cols": 6,
++          "cells": [
++            [
++              {
++                "t": "box",
++                "color": 34,
++                "count": 39,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "box",
++                "color": 30,
++                "count": 53,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 3,
++                "count": 52,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 48,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 47,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 2,
++                "count": 42,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 14,
++                "count": 32,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 32,
++                "count": 50,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 32,
++                "count": 50,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 32,
++                "count": 49,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 30,
++                "count": 54,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 26,
++                "count": 38,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 33,
++                "count": 46,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 32,
++                "count": 50,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 34,
++                "count": 39,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 25,
++                "count": 35,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 1,
++                "count": 41,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 33,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 33,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 47,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "box",
++                "color": 33,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 24,
++                "count": 46,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 1,
++                "count": 41,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 24,
++                "count": 45,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 47,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              },
++              {
++                "t": "box",
++                "color": 5,
++                "count": 47,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ],
++            [
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "black"
++              },
++              {
++                "t": "box",
++                "color": 3,
++                "count": 52,
++                "chain": 0,
++                "q": false,
++                "numice": 0
++              }
++            ]
++          ],
++          "instantPlanCells": [
++            {
++              "r": 0,
++              "c": 0,
++              "seq": 0,
++              "color": 34,
++              "count": 39
++            },
++            {
++              "r": 0,
++              "c": 5,
++              "seq": 1,
++              "color": 30,
++              "count": 53
++            },
++            {
++              "r": 1,
++              "c": 0,
++              "seq": 2,
++              "color": 3,
++              "count": 52
++            },
++            {
++              "r": 1,
++              "c": 5,
++              "seq": 3,
++              "color": 32,
++              "count": 50
++            },
++            {
++              "r": 2,
++              "c": 0,
++              "seq": 4,
++              "color": 32,
++              "count": 50
++            },
++            {
++              "r": 1,
++              "c": 1,
++              "seq": 5,
++              "color": 5,
++              "count": 48
++            },
++            {
++              "r": 2,
++              "c": 5,
++              "seq": 6,
++              "color": 32,
++              "count": 50
++            },
++            {
++              "r": 1,
++              "c": 4,
++              "seq": 7,
++              "color": 14,
++              "count": 32
++            },
++            {
++              "r": 3,
++              "c": 0,
++              "seq": 8,
++              "color": 34,
++              "count": 39
++            },
++            {
++              "r": 2,
++              "c": 1,
++              "seq": 9,
++              "color": 32,
++              "count": 49
++            },
++            {
++              "r": 1,
++              "c": 2,
++              "seq": 10,
++              "color": 5,
++              "count": 47
++            },
++            {
++              "r": 3,
++              "c": 5,
++              "seq": 11,
++              "color": 5,
++              "count": 47
++            },
++            {
++              "r": 2,
++              "c": 4,
++              "seq": 12,
++              "color": 33,
++              "count": 46
++            },
++            {
++              "r": 1,
++              "c": 3,
++              "seq": 13,
++              "color": 2,
++              "count": 42
++            },
++            {
++              "r": 4,
++              "c": 0,
++              "seq": 14,
++              "color": 33,
++              "count": 45
++            },
++            {
++              "r": 3,
++              "c": 1,
++              "seq": 15,
++              "color": 25,
++              "count": 35
++            },
++            {
++              "r": 2,
++              "c": 2,
++              "seq": 16,
++              "color": 30,
++              "count": 54
++            },
++            {
++              "r": 4,
++              "c": 5,
++              "seq": 17,
++              "color": 5,
++              "count": 47
++            },
++            {
++              "r": 3,
++              "c": 4,
++              "seq": 18,
++              "color": 33,
++              "count": 45
++            },
++            {
++              "r": 2,
++              "c": 3,
++              "seq": 19,
++              "color": 26,
++              "count": 38
++            },
++            {
++              "r": 4,
++              "c": 1,
++              "seq": 20,
++              "color": 24,
++              "count": 46
++            },
++            {
++              "r": 3,
++              "c": 2,
++              "seq": 21,
++              "color": 1,
++              "count": 41
++            },
++            {
++              "r": 5,
++              "c": 5,
++              "seq": 22,
++              "color": 3,
++              "count": 52
++            },
++            {
++              "r": 4,
++              "c": 4,
++              "seq": 23,
++              "color": 5,
++              "count": 47
++            },
++            {
++              "r": 3,
++              "c": 3,
++              "seq": 24,
++              "color": 33,
++              "count": 45
++            },
++            {
++              "r": 4,
++              "c": 2,
++              "seq": 25,
++              "color": 1,
++              "count": 41
++            },
++            {
++              "r": 4,
++              "c": 3,
++              "seq": 26,
++              "color": 24,
++              "count": 45
++            }
++          ],
++          "narrowStat": {
++            "enabled": true,
++            "prob": 1,
++            "hit": true,
++            "gaps": 2,
++            "applied": true,
++            "source": "legacy:narrowPathProb",
++            "byChokeType": false,
++            "gapsMin": 2,
++            "gapsMax": 3
++          },
++          "spaceQuota": null,
++          "pipeStat": {
++            "want": 0,
++            "placed": 0,
++            "overflowPlanned": 0,
++            "overflowActual": 0,
++            "capacityPerPipe": 4,
++            "coords": [],
++            "floorCount": 2,
++            "floorDepth": 2
++          }
++        }
++      }
++    }
++  ],
++  "summary": {
++    "images": 3,
++    "generated": 3,
++    "passingImages": 3,
++    "passingIds": [
++      "007",
++      "006",
++      "010"
++    ],
++    "totalWallMs": 3632,
++    "allPass": true,
++    "decision": "三图均构造出完整高压释放路线；下一步做生成候选接线与多seed成本验证。"
++  }
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\346\250\241\345\235\227_\351\242\204\347\231\273\350\256\260_v535.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\346\250\241\345\235\227_\351\242\204\347\231\273\350\256\260_v535.md"
+new file mode 100644
+index 0000000..559bd58
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240\346\250\241\345\235\227_\351\242\204\347\231\273\350\256\260_v535.md"
+@@ -0,0 +1,61 @@
++# 释放路线构造模块 · v535 预登记
++
++> Kimi 方法建议。先写判据再运行；本轮只验证“v534 方法能否模块化并在三图复用”，不接默认生产。
++
++## 假设
++
++把 v534 的流程封装为 `AntSolver.ReleaseRouteConstructor` 后，同一实现可以从计划路线或求解器路线的高压父状态构造完整 `pickOrder`，再从头独立回放；007 能复现 v534 正结果，006/010 也能各得到至少一条同时满足中段压力与显著释放的完整路线。
++
++## 唯一变量
++
++- 上一版：v534 单图脚本，只处理 007 的求解器路线。
++- 本版：同一构造算法模块化；每条参考路线都可作为输入，并输出完整路线签名、释压事件、独立回放指标和耗时。
++- 不修改切车、容量、分支债务、棋盘或障碍；不把结果接生成器。
++
++## 图、seed 与固定配置
++
++| 图 | seed | 棋盘 | 分支前缀债务 | 参考路线 |
++|---|---:|---:|---:|---|
++| 007 | 1001 | 7×8 | 8 | solver + plan |
++| 006 | 1001 | 6×6 | 6 | solver + plan |
++| 010 | 1001 | 6×6 | 2 | solver + plan |
++
++- 规则固定为四方向瞬时连锁；`targetBuffer=4`、`maxDebt=40`、2 分支、无 P7、无陷阱后处理。
++- 容量区间由 `deriveCapacityBand` 推导，`boxSizeMin/Max` 与 `capNormMin/Max` 同步。
++
++## 搜索预算
++
++- 每个高压父状态最多枚举 8 个合法动作，参考动作优先。
++- 每个替代动作最多 `900ms / 3000 nodes / beam16 / branch8`；只接受完整可通关后缀。
++- 每个参考路线最多保留 160 个唯一完整候选；每张图总搜索上限 180 秒。
++- 必须记录每图总墙钟、候选搜索时间 P50/P90、测试候选数、唯一签名数和重复签名数。
++
++## 主指标
++
++每张图至少一条完整路线满足：
++
++1. `finalReplayValid=true`；
++2. `midBuffer34Pct>=50`；
++3. `significantReleaseCount>=1`。
++
++同时保存该路线完整签名、首次显著释压事件、来源路线、分叉位置和是否确实偏离参考动作。
++
++## 保护指标
++
++- 棋盘行列均 `>=6`；
++- 每色像素守恒、`aboveMax=0`、`microCars=0`；
++- 黑块不高于该图 v533 同一基底；
++- 不新增障碍，不改变默认四边产线；
++- 独立回放必须从空状态开始，不能复用分叉时的内存状态；
++- `unknown`/预算耗尽单独记录，不写成失败或成功。
++
++## 通过 / 否决
++
++- 通过：007/006/010 三图各至少 1 条路线满足主指标，且每图墙钟不超过 180 秒。
++- 部分通过：有图成功、有图未达；记录失败阶段，不把成功的图外推为三图通过。
++- 否决：只有 007 成功；或候选必须靠修改障碍/棋盘/容量；或独立回放失败；或单图超过 180 秒仍无结果。
++
++## 回滚点
++
++- 上一版：`fab9f5e`（v534）。
++- 本轮不改变生成器默认路径；若模块成本或泛化失败，移除 UI 加载和实验接线即可回到 v534。
+diff --git a/AGENTS.md b/AGENTS.md
+index 5e3bf14..bd3ed54 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,7 +1,7 @@
+ # AGENTS.md · 毛线汽车（关卡生成器）
+ 
+ > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
+-> 工作日志 **524 节 / 20562 行（约 808 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§524）。
++> 工作日志 **525 节 / 20596 行（约 811 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§525）。
+ 
+ ## 这是什么
+ 
+@@ -13,7 +13,7 @@
+ 1. **容量区间是用户输入**：`boxSizeMin/Max`、`capNormMin/Max` 不许被任何逻辑缩放、对半拆或按"目标车数"拆。
+    踩过两次：v330（变体 ×1.06 把 70 变 74）、v337（`applyFillRatio` 写回 `targetCarCount` 把 60 拆成 30）。
+ 2. **一个会话只走一条产线**：纠偏 `bandFixOnce`、兜底都必须走 `runFlowOnce()`，不许写死 `produceFixed`。
+-3. **交付必须改版本号**：`bin/index.html` 三处（`?v=NNN` 13 处、`<title>`、`<h1>` 徽标）+ `css/style.css?v=NNN`。
++3. **交付必须改版本号**：`bin/index.html` 三处（`?v=NNN` 20 处、`<title>`、`<h1>` 徽标）+ `css/style.css?v=NNN`。
+ 4. **改完先 `node --check`**：`generator.js` / `app.js` / `playersim.js`。
+ 5. **验证必须用真关卡**：先写临时脚本跑出数字（改前 vs 改后），再改代码。单种子对比已误导 ≥5 次。
+ 6. **客户端 bin 目录不要随便动**：桌面端在 `/Users/red/Desktop/ParkPassenger_patched.app/Contents/Resources/bin/`，动之前先备份。
+@@ -31,6 +31,7 @@
+ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ node --check bin/js/generator.js && node --check bin/js/app.js && node --check bin/js/playersim.js
+ node 03_工具/好关评分/产线对比.js --flows new_fixed --seed-list 1001,1002 --cap-scale-plan 1.45,1.15
++node 03_工具/好关评分/释放路线构造多图_v535.js --images=007,006,010
+ node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
+ grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
+ ```
+diff --git a/README.md b/README.md
+index 3c63519..040ebf4 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v534**（释放路线构造正结果；下一步做成多图路线构造模块）。
++> 当前版本 **v535**（释放路线构造已模块化；007/006/010 完整路线均通过，下一步接生成候选与多seed）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看全流程对照图** | [`思维导图_求解器与关卡生产全流程.html`](思维导图_求解器与关卡生产全流程.html)（求解器 → 反解 → 关卡生产，自包含，双击可开） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v534）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v535）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **看详细实验与交付流程** | [`01_交接文档/优质关卡生成_详细工作流程.md`](01_交接文档/优质关卡生成_详细工作流程.md)（已完成/未完成、P0~P6实验卡、验收与回滚） |
+@@ -37,6 +37,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **查某天为什么这么改** | [`01_交接文档/工作日志_20261012.md`](01_交接文档/工作日志_20261012.md)（479 节 / 20195 行，**按 §节号 grep 查，别整份读**） |
+ | **把图片变成目标图 TXT** | `03_工具/像素画工具/图片转像素画.html` |
+ | **对比产线/容量臂** | `node 03_工具/好关评分/产线对比.js --flows new_fixed --cap-scale-plan 1.45,1.15` |
++| **复跑多图释放路线构造** | `node 03_工具/好关评分/释放路线构造多图_v535.js --images=007,006,010` |
+ | **失败关归因** | `node 03_工具/好关评分/归因_v495.js --jsonl <结果.jsonl> --levels <失败关目录>` |
+ | **导进桌面客户端** | 见下方「客户端」 |
+ | **看关键改动的补丁** | `02_工程/补丁/` |

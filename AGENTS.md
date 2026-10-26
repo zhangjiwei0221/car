@@ -1,7 +1,7 @@
 # AGENTS.md · 毛线汽车（关卡生成器）
 
 > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
-> 工作日志 **524 节 / 20562 行（约 808 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§524）。
+> 工作日志 **525 节 / 20596 行（约 811 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§525）。
 
 ## 这是什么
 
@@ -13,7 +13,7 @@
 1. **容量区间是用户输入**：`boxSizeMin/Max`、`capNormMin/Max` 不许被任何逻辑缩放、对半拆或按"目标车数"拆。
    踩过两次：v330（变体 ×1.06 把 70 变 74）、v337（`applyFillRatio` 写回 `targetCarCount` 把 60 拆成 30）。
 2. **一个会话只走一条产线**：纠偏 `bandFixOnce`、兜底都必须走 `runFlowOnce()`，不许写死 `produceFixed`。
-3. **交付必须改版本号**：`bin/index.html` 三处（`?v=NNN` 13 处、`<title>`、`<h1>` 徽标）+ `css/style.css?v=NNN`。
+3. **交付必须改版本号**：`bin/index.html` 三处（`?v=NNN` 20 处、`<title>`、`<h1>` 徽标）+ `css/style.css?v=NNN`。
 4. **改完先 `node --check`**：`generator.js` / `app.js` / `playersim.js`。
 5. **验证必须用真关卡**：先写临时脚本跑出数字（改前 vs 改后），再改代码。单种子对比已误导 ≥5 次。
 6. **客户端 bin 目录不要随便动**：桌面端在 `/Users/red/Desktop/ParkPassenger_patched.app/Contents/Resources/bin/`，动之前先备份。
@@ -31,6 +31,7 @@
 cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
 node --check bin/js/generator.js && node --check bin/js/app.js && node --check bin/js/playersim.js
 node 03_工具/好关评分/产线对比.js --flows new_fixed --seed-list 1001,1002 --cap-scale-plan 1.45,1.15
+node 03_工具/好关评分/释放路线构造多图_v535.js --images=007,006,010
 node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
 grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
 ```
