@@ -132,6 +132,10 @@ function _goalRound() {
   } catch (err) {
     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
   }
+  if (r && !r.level && roundLeft() >= 1000) {
+    try { r = AntSolver.Generator.repairUsableNoCandidate(g.blocks, r, cfg, { timeBudgetMs: roundLeft() }); }
+    catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+  }
   // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
   var tuneLeft = roundLeft();
   if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
@@ -166,6 +170,8 @@ function _goalRound() {
     self.postMessage({ type: 'flow', index: g.index, round: g.rounds,
       text: '目标第' + g.rounds + '轮结果 · ' + (r && r.level ? '有关卡' : '无关卡') +
         (r && !r.level && r.lastFailReason ? ' · ' + r.lastFailReason : '') +
+        (r && !r.level && r.structural && r.structural.reason ? ' · ' + r.structural.reason : '') +
+        (r && r.usableSpaceRepair && r.usableSpaceRepair.applied ? ' · 可用率重试 ' + Math.round(r.usableSpaceRepair.from * 100) + '%→' + Math.round(r.usableSpaceRepair.to * 100) + '%' : '') +
         ' · 可选中位' + (_f && _f.selectMedian != null ? _f.selectMedian : '-') +
         ' · 吃满' + (_f && _f.fullMedian2 != null ? _f.fullMedian2 : '-') +
         ' · partial' + (_f && _f.partialStepPct != null ? _f.partialStepPct + '%' : '-') +
@@ -176,8 +182,12 @@ function _goalRound() {
   if (r) r.goalRound = g.rounds;
   if (!g.best || _goalBetter(r, g.best)) g.best = r;
   if (_goalPassed(r)) { _goalFinish('pass'); return; }
+  // 快速无候选不再数百轮/秒刷日志；重试/正常失败/有关卡不额外延迟。
+  var rapidNoCandidate = !!(r && !r.level && Date.now() - roundT0 < 1000);
+  g.fastFailStreak = rapidNoCandidate ? (g.fastFailStreak || 0) + 1 : 0;
+  var backoffMs = g.fastFailStreak ? Math.min(1000, g.fastFailStreak * 100) : 0;
   // 让出事件循环：这一行之后 worker 才能处理 {cmd:'stop'}
-  g.timer = setTimeout(_goalRound, 0);
+  g.timer = setTimeout(_goalRound, backoffMs);
 }
 
 self.onmessage = function (e) {

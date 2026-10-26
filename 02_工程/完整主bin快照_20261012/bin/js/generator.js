@@ -3583,6 +3583,8 @@ AntSolver.Generator = (function() {
           ok: false, reason: 'usableSpaceDeviation',
           detail: '可用空间 ' + (realUsable * 100).toFixed(1) + '% 偏离目标 ' + (uTarget * 100).toFixed(0) +
             '% 达 ' + devPp.toFixed(1) + 'pp（容差 ' + uTolPp + 'pp）；实际墙' + realBlack + ' 管道' + realPipe + ' 配额' + spaceQuota.quota,
+          usableSpace: { realUsable: realUsable, targetUsable: uTarget, deviationPp: devPp, tolerancePp: uTolPp,
+            rows: rows, cols: cols, realBlack: realBlack, realPipe: realPipe, boxCount: n },
           structureBuildMs: structureBuildMs, obstacleSlotMs: obstacleSlotMs, blackStat: blackStat, pipeStat: pipeStat
         };
       }
@@ -6000,7 +6002,8 @@ AntSolver.Generator = (function() {
     timing.obstacleSlotMs = struct.obstacleSlotMs || 0;
     if (!struct.ok) {
       timing.candidatePrepareMs = Date.now() - tAll; timing.candidateTotalMs = timing.candidatePrepareMs;
-      return { ok: false, reason: struct.reason || 'struct', detail: struct.detail || '', timing: timing, boxCount: n, blackStat: struct.blackStat, pipeStat: struct.pipeStat };
+      return { ok: false, reason: struct.reason || 'struct', detail: struct.detail || '', timing: timing, boxCount: n,
+        usableSpace: struct.usableSpace || null, blackStat: struct.blackStat, pipeStat: struct.pipeStat };
     }
 
     // ③ 填球 + 只绑定预定障碍 + 分阶段守恒
@@ -6199,7 +6202,7 @@ AntSolver.Generator = (function() {
       attempts: 0, success: 0,
       fail: { baseline: 0, struct: 0, structSurplus: 0, structHoles: 0, structReach: 0, structPipeExit: 0, pipeCapacity: 0, pipeDepth: 0, rowTrim: 0, bind: 0, conservation: 0, structuralCheck: 0, access: 0, screen: 0 },
       passHits: { base: 0, noise1: 0, noise2: 0, noise3: 0 },
-      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: []
+      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: [], usableSpaceFailures: []
     };
   }
   function mergeFlowStats(dst, src) {
@@ -6211,6 +6214,7 @@ AntSolver.Generator = (function() {
     dst.failedCandidates = dst.failedCandidates.concat(src.failedCandidates);
     dst.conservationFailures = dst.conservationFailures.concat(src.conservationFailures);
     dst.bindFailures = dst.bindFailures.concat(src.bindFailures);
+    dst.usableSpaceFailures = (dst.usableSpaceFailures || []).concat(src.usableSpaceFailures || []);
     return dst;
   }
   function recordAttempt(stats, res) {
@@ -6227,6 +6231,7 @@ AntSolver.Generator = (function() {
     if (key === 'conservation') stats.conservationFailures.push({ stage: res.stage, reasons: (res.conservation || []).filter(function (x) { return !x.ok; }) });
     if (key === 'bind') stats.bindFailures.push(res.bindStat);
     if (res.failedCandidate) stats.failedCandidates.push(res.failedCandidate);
+    if (key === 'usableSpaceDeviation' && res.usableSpace) stats.usableSpaceFailures.push(res.usableSpace);
   }
 
   /**
@@ -13120,8 +13125,46 @@ AntSolver.Generator = (function() {
     }
     var top = null;
     for (k in f) if (f[k] > 0 && (!top || f[k] > f[top])) top = k;
-    return { reason: 'noCandidate',
-             detail: '候选淘汰主因「' + top + '」' + f[top] + '/' + total + ' 次；全部计数 ' + JSON.stringify(f) };
+    var detail = '候选淘汰主因「' + top + '」' + f[top] + '/' + total + ' 次；全部计数 ' + JSON.stringify(f);
+    var uf = (flowStats && flowStats.usableSpaceFailures) || [];
+    if (uf.length) {
+      var vals = uf.map(function (x) { return x.realUsable; }).filter(function (x) { return x >= 0 && x <= 1; }).sort(function (a, b) { return a - b; });
+      if (vals.length) detail += '；实测可用空间中位 ' + (vals[Math.floor(vals.length / 2)] * 100).toFixed(1) +
+        '%（范围 ' + (vals[0] * 100).toFixed(1) + '~' + (vals[vals.length - 1] * 100).toFixed(1) + '%，n=' + vals.length + '）';
+    }
+    return { reason: 'noCandidate', detail: detail };
+  }
+
+  /** 【v522】目标轮内一次可用率失败重试：实测中位修目标，不放宽容差、不改容量、不换seed。 */
+  function repairUsableNoCandidate(blocks, failed, config, opts) {
+    opts = opts || {};
+    var report = { schema: 'usable-space-repair-v1', applied: false, tested: 0, skipped: null };
+    if (config && config.usableSpaceAutoRepair === false) { report.skipped = 'disabled'; return failed; }
+    var fs = failed && failed.flowStats, failures = fs && fs.usableSpaceFailures || [];
+    var failCounts = fs && fs.fail || {}, total = 0;
+    for (var k in failCounts) total += failCounts[k] || 0;
+    if (!failed || failed.level || failed.lastFailReason !== 'noCandidate' || failures.length < 3 ||
+        !(failCounts.usableSpaceDeviation > 0 && failCounts.usableSpaceDeviation >= total * 0.5)) {
+      report.skipped = 'not_dominant_usable_failure'; return failed;
+    }
+    var budgetMs = opts.timeBudgetMs != null ? +opts.timeBudgetMs : +(config && config.timeBudgetMs);
+    if (!(budgetMs >= 1000)) { report.skipped = 'round_budget_exhausted'; failed.usableSpaceRepair = report; return failed; }
+    var vals = failures.map(function (x) { return +x.realUsable; }).filter(function (x) { return x > 0 && x < 1; }).sort(function (a, b) { return a - b; });
+    if (vals.length < 3) { report.skipped = 'usable_evidence_missing'; failed.usableSpaceRepair = report; return failed; }
+    var median = vals[Math.floor(vals.length / 2)], from = parseFloat(config.usableSpaceTarget);
+    if (!(from > 0) || !(median > 0 && median < 1)) { report.skipped = 'invalid_target'; failed.usableSpaceRepair = report; return failed; }
+    var cfg = Object.assign({}, config, { usableSpaceTarget: +median.toFixed(6), timeBudgetMs: Math.floor(budgetMs), _trace: [] });
+    var t0 = Date.now(), candidate = null;
+    report.from = from; report.to = cfg.usableSpaceTarget; report.failureCount = failures.length;
+    report.capacityUnchanged = cfg.boxSizeMin === config.boxSizeMin && cfg.boxSizeMax === config.boxSizeMax &&
+      cfg.capNormMin === config.capNormMin && cfg.capNormMax === config.capNormMax;
+    try { candidate = produceDispatch(blocks, cfg, opts); report.tested = 1; }
+    catch (e) { report.error = String((e && e.message) || e); }
+    report.elapsedMs = Date.now() - t0; report.hasLevel = !!(candidate && candidate.level);
+    if (candidate && candidate.level && candidate.valid) {
+      report.applied = true; candidate.usableSpaceRepair = report; return candidate;
+    }
+    report.reverted = true; failed.usableSpaceRepair = report; return failed;
   }
 
   /**
@@ -14884,6 +14927,7 @@ AntSolver.Generator = (function() {
         if (vc.capacityAudit && ca && vc.capacityAudit.belowMin > ca.belowMin) continue;
         if (goalExperiencePass(vc, cfg)) {
           vc.capacityTuned = true;
+          if (cand.usableSpaceRepair) vc.usableSpaceRepair = cand.usableSpaceRepair;
           report.applied = true; report.elapsedMs = Date.now() - t0;
           report.base = baseEv.metrics; report.after = vc._experienceFull.metrics;
           vc.capacityTune = report; return vc;
@@ -14958,6 +15002,12 @@ AntSolver.Generator = (function() {
       var r = null;
       try { r = produceDispatch(blocks, cfg, opts); } catch (e) {
         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
+      }
+      var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+        roundBudgetMs - (Date.now() - roundT0));
+      if (r && !r.level && repairLeft >= 1000) {
+        try { r = repairUsableNoCandidate(blocks, r, cfg, { timeBudgetMs: repairLeft, shouldStop: opts.shouldStop }); }
+        catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
       }
       rounds++;
       if (r) r.goalRound = rounds;
@@ -16774,7 +16824,7 @@ AntSolver.Generator = (function() {
     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
     isCurveScore: isCurveScore,
     choiceCurveScore: choiceCurveScore,
-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, repairUsableNoCandidate: repairUsableNoCandidate, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
     exposedBlobByColor: exposedBlobByColor,
     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
     sampleCarCount: sampleCarCount,

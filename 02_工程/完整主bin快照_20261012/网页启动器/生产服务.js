@@ -422,6 +422,7 @@ function persistResult(b, payload) {
     最终结构证据: rec.finalStructureEvidence || null,
     路线分岔证据: rec.experienceRouteEvidence || null,
     容量精调: rec.capacityTune || null,
+    可用率重试: rec.usableSpaceRepair || null,
     容量审计: rec.capacityAudit || null,
     容量参数: rec.appliedParams || null,
     最终体验评价异常: rec.experienceFinalError || null,

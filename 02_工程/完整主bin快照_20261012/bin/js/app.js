@@ -6321,6 +6321,7 @@ AntSolver.App = (function() {
         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
         stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
+      usableSpaceRepair: result.usableSpaceRepair || null,
       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
       qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
       qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
@@ -6471,6 +6472,7 @@ AntSolver.App = (function() {
       experienceEvidence: rec.experienceEvidence || null,
       experienceRouteEvidence: rec.experienceRouteEvidence || null,
       capacityTune: rec.capacityTune || null,
+      usableSpaceRepair: rec.usableSpaceRepair || null,
       capacityAudit: rec.capacityAudit || null, appliedParams: rec.appliedParams || null,
       experienceFinalError: rec.experienceFinalError || null,
       goalBudgetEvidence: rec.goalBudgetEvidence || null,
@@ -7394,7 +7396,7 @@ AntSolver.App = (function() {
    * 不能直接调同步的 Generator.produceGoal —— 主线程被它占满时，点「结束」也处理不了。
    */
   function genRunGoalSync(entry, baseCfg, idx, afterOne) {
-    var per = 20000, best = null, rounds = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
+    var per = 20000, best = null, rounds = 0, fastFailStreak = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
     var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
     function passed(r) {
       try { return AntSolver.Generator.goalAcceptPass(r, baseCfg); } catch (e) { return false; }
@@ -7446,6 +7448,12 @@ AntSolver.App = (function() {
       try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
       }
+      var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+        roundBudgetMs - (Date.now() - roundT0));
+      if (r && !r.level && repairLeft >= 1000) {
+        try { r = AntSolver.Generator.repairUsableNoCandidate(entry.blocks, r, cfg, { timeBudgetMs: repairLeft }); }
+        catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+      }
       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
         roundBudgetMs - (Date.now() - roundT0));
       if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
@@ -7459,7 +7467,9 @@ AntSolver.App = (function() {
       catch (e) { better = score(r) > score(best); }
       if (!best || better) best = r;
       if (passed(r)) return done('pass');
-      setTimeout(round, 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
+      var rapidNoCandidate = !!(r && !r.level && Date.now() - roundT0 < 1000);
+      fastFailStreak = rapidNoCandidate ? fastFailStreak + 1 : 0;
+      setTimeout(round, fastFailStreak ? Math.min(1000, fastFailStreak * 100) : 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
     }
     if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: idx, no: 0 }, p); });
     round();

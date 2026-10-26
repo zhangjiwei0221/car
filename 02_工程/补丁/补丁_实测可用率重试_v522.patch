@@ -1,0 +1,2553 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+index 5df27a6..e66d528 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+@@ -4,7 +4,7 @@
+ > 本文件只描述**当前状态、做过什么、哪些路已证否、下一步**；细节按节号去查工作日志。
+ > 上层文档仍以 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md) 与 [`工程说明.md`](工程说明.md) 为准。
+ >
+-> **后续更新（2026-10-26）**：代码当前为 v521；最终低压力补充验收已通过headless保护，UI因usableSpaceDeviation失控路径待v522修复。目标体验与容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~511。本文件保留 v495~v500 历史基线。
++> **后续更新（2026-10-26）**：代码当前为 v522；最终低压力补充验收与实测可用率重试均已接入，真实UI批次32合格1/1。目标体验与容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~512。本文件保留 v495~v500 历史基线。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index f282dd4..d29bbd9 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -7,7 +7,7 @@
+ > 本文档由 Kimi 整理。文中严格区分 **[用户要求]、[已验证]、[Kimi建议]、[待校准]**。
+ >
+ > 2026-10-26 新实施卡：[`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md)。小色可按解锁贡献承担关键债务，不按面积排除。
+-> 当前结果：代码到v521。v520全局换门被否决后，v521把低压力证据限制在最终验收，内部goalStructPass不变；006/010已知成功与推荐77003最终hash全保持，近失关可最终验收且时间模式不变。真实UI暴露既有usableSpaceDeviation 70/70快速noCandidate，boardOnly无效、targetOnly/cutOnly能出关；v522需做实测可用率驱动的一次重试与快速失败退避，UI验收尚未完成。PlayerSim校准和障碍目标化未完成。
++> 当前结果：代码到v522。v521最终低压力补充与搜索隔离的保护继续成立。v522把usableSpaceDeviation改为实测中位可用率驱动的一次同seed重试，并加快速无候选退避；精确失败70/70后0.86→0.690476出关并完整达标，006已知成功hash不变。真实UI批次32合格1/1、COMPLETED，A/C不再高速空转。下一步多图/独立seed验证重试泛化、release unknown与真人校准；障碍目标化未完成。
+ 
+ ---
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index a5e9a63..be0815e 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20125,3 +20125,38 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 2. 单图三分支长轮可超页面总预算，需在UI可停止性与轮边界继续核查。
+ 3. 墙钟导致旧—旧hash也可能漂移，后续重要对比需保留同对及必要的重复对照。
+ 4. PlayerSim/真人校准、跨色容量规划、目标化障碍仍未完成。
++
++### 512. 【2026-10-26】v522：实测可用率一次重试转化失败关，真实UI合格1/1
++
++#### 512.1 问题（原话）
++
++- “每一次关卡设置验证不达标后，他会怎么修改呢……这决定了一关要生成多久。”
++- “遇到边界以及卡住的地方要记录。”
++
++#### 512.2 证据
++
++- v521 UI精确复现usableSpaceDeviation 70/70，A/C每秒几十至几百轮noCandidate；只换seed没有修原因。boardOnly仍失败，targetOnly/cutOnly可出关，说明需按实测结构反馈修。
++- 首次v522重试未触发：buildOneCandidateAttempt包装时丢失usableSpace字段。补齐后70样本真实中位69.0%，证明不能固定猜0.823或统一放宽容差。
++- 目标轮初版repair被后续容量精调替换候选时丢成null；需在统一精调出口保留审计，避免“关已修但证据消失”。
++
++#### 512.3 改动
++
++- Kimi在结构失败与buildOneCandidateAttempt间透传usableSpace，flowStats汇总并在noCandidate摘要显示中位/范围。
++- 新增 `repairUsableNoCandidate`：主导失败且样本≥3时，按实测中位做一次同seed同 `produceDispatch` 重试；剩余预算、容量不变、不递归、失败保留原结果。produceGoal/worker/主线程目标路径统一调用，时间模式不调用。
++- worker/主线程快速无候选100ms递增至最高1秒；worker显示结构主因、配置和重试目标。
++- 容量精调成功替换候选时保留usableSpaceRepair；app/生产服务落库 `可用率重试`，版本升v522。
++
++#### 512.4 验证（改前后数字）
++
++- 精确006/seed1978235744：原70/70 noCandidate；重试0.86→0.690476，5.296秒出关，capacityUnchanged=true。expose成功控制不触发且hash不变。
++- produceGoal同seed一轮完整pass：66.7%中段3/4、release found、6×6、aboveMax=0；repair深拷贝落盘applied=true。006/1002新旧均pass、hash一致。
++- v522当前近失：基础结构false、最终补充true、完整目标true；时间模式false，freeLow其他失败不可抵消。
++- 真实UI批次32：A/C均86%→69%重试，不再高速空转；B第4轮达标，约111秒，COMPLETED、合格1/1。3/4=52.9%、显著释放2、release found、容量守恒、aboveMax=0。
++- 最终B为base_gate，acceptedByFinalStructure=false、usableSpaceRepair=null，未伪称使用补充门或重试。
++
++#### 512.5 遗留
++
++1. 目前是同图有限seed与一次UI成功，需多图独立seed验证重试不会制造低压/畸形关。
++2. 目标预算仍是轮边界控制，长轮可短时超出；release unknown仍需专门诊断。
++3. PlayerSim仍有0%项，不能把体验曲线通过等同真人好关。
++4. 跨色容量组合、目标化障碍和真人校准未完成，七点不能标全完成。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 84e07c1..5ead6a2 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v521 最终低压力补充验收）　|　当前版本：**v521**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v522 可用率失败重试与UI验收）　|　当前版本：**v522**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~511。v521仅最终验收增加低压力结构证据，内部搜索保持旧门；006/010成功和推荐best均同hash保护。真实UI被usableSpaceDeviation快速noCandidate阻断，v522先修失败驱动重试与退避，当前不能宣称UI验收完成。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~512。v522目标模式在usableSpaceDeviation主导时按实测中位可用率做一次同seed重试，快速无候选退避；精确失败关一轮完整达标，真实UI批次32合格1/1、COMPLETED。v521最终低压力补充口径保持不变。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
+@@ -1193,3 +1193,12 @@ M0 固定基准 + 统一评价与候选口径
+ - 下一项只读实验必须按失败曲线定位车辆，不再重复使用通用debt排序串阶段搜索。
+ - `Simulator.createState`、`outsideReachSeed`、ring与floodFill已兼容内部level缺rows/cols；正常真实关10/10求解签名不变。
+ - 复现：`node 03_工具/好关评分/模拟器尺寸回归_v518.js`；结构实验见 `结构容量精调_预登记_v518.md` 与两份结果JSON。
++
++### 17.45 v521~v522：最终低压力证据与可用率失败驱动重试
++
++- v521只让 `goalResultExperiencePass` 使用低压力补充结构证据；`goalStructPass` 及内部搜索不改。006/010已知成功和推荐77003最终hash保持，时间模式不变。
++- v522在 `usableSpaceDeviation` 占失败多数且样本≥3时，取失败候选 `realUsable` 中位数，同轮同seed同 `produceDispatch` 最多重试一次；不改容量上下界、不递归、不统一放宽容差。`usableSpaceAutoRepair=false` 可关闭。
++- 精确006/seed1978235744：原70/70拒绝，实测中位69.0%；目标0.86→0.690476，一次重试出关。目标轮完整pass，3/4=66.7%、release found、aboveMax=0。
++- worker/主线程快速无候选采用100ms递增、最高1秒退避；容量精调替换候选时保留 `usableSpaceRepair` 审计。
++- 真实UI批次32：A/C均执行86%→69%重试，B第4轮达标；COMPLETED、合格1/1，3/4=52.9%、显著释放2、release found。最终B是基础门通过，repair=null属正常。
++- 边界：仍是同图有限seed与PlayerSim 0%项，不能外推多图或真人好关；长轮预算、release unknown、多图泛化和目标化障碍仍需后续。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index e5b54d7..60681ff 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -224,3 +224,13 @@
+ - 墙钟预算本身可使旧—旧hash漂移，因此结论依据同对保护和代码调用隔离，不夸大为全seed严格确定性。
+ - UI批次24/30因快速noCandidate与长轮未收尾STOPPED 0结果；批次28手动停止并落库1个结构未过。精确headless证明主因usableSpaceDeviation 70/70，boardOnly仍失败，targetOnly/cutOnly分别出关。
+ - v522计划：记录失败候选实测可用率，按中位实测值做一次有界同产线重试；连续快速无候选退避并显示真实原因。通过后再重做v521 UI落库验收。
++
++## 27. v522：实测可用率重试与真实UI通过
++
++- 结构失败现在透传 `realUsable/target/deviation/rows/cols` 并汇入flowStats；失败摘要显示实测中位与范围，不再只有noCandidate。
++- 目标轮仅对usableSpaceDeviation主导且样本≥3的结果，以实测中位做一次同seed同产线重试；不改容量、棋盘范围、障碍或容差，不递归。时间模式不调用。
++- 精确失败基底70个样本中位69.0%，重试0.86→0.690476，5.30秒出关；目标轮一轮完整pass，66.7%中段3/4、release found、容量aboveMax=0。
++- 成功不触发：expose控制同对象同hash；006/1002新旧均pass且最终hash相同。v521近失最终补充和时间模式保护在v522继续通过。
++- 快速无候选采用100ms递增、最高1秒退避；worker补真实结构原因、首轮配置与重试日志。容量精调替换候选时保留repair审计，app/服务落库该字段。
++- 真实UI批次32：A/C均86%→69%重试，B第4轮达标，约111秒，COMPLETED、合格1/1；3/4=52.9%、显著释放2、release found、棋盘6×6、aboveMax=0。
++- 边界：同图有限样本，最终B未用重试所以repair=null；PlayerSim/真人可学习性仍未证明。下一步多图独立seed、release unknown与真人校准，不把一次UI成功外推。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 35ac8ee..bab1fee 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v521 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=521">
++  <title>车接小人 v522 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=522">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v521</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v522</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,27 +773,27 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=521"></script>
+-  <script src="js/utils.js?v=521"></script>
++  <script src="js/zip.js?v=522"></script>
++  <script src="js/utils.js?v=522"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=521"></script>
+-  <script src="js/simulator.js?v=521"></script>
++  <script src="js/color-libs.js?v=522"></script>
++  <script src="js/simulator.js?v=522"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=521"></script>
+-  <script src="js/solver-strategy.js?v=521"></script>
+-  <script src="js/solver.js?v=521"></script>
+-  <script src="js/playersim.js?v=521"></script>
++  <script src="js/anchor-cut.js?v=522"></script>
++  <script src="js/solver-strategy.js?v=522"></script>
++  <script src="js/solver.js?v=522"></script>
++  <script src="js/playersim.js?v=522"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=521"></script>
+-  <script src="js/car-sequencer.js?v=521"></script>
+-  <script src="js/experience-goal.js?v=521"></script>
+-  <script src="js/capacity-tuner.js?v=521"></script>
+-  <script src="js/generator.js?v=521"></script>
+-  <script src="js/source-preflight.js?v=521"></script>
+-  <script src="js/analysis.js?v=521"></script>
++  <script src="js/solver-analysis.js?v=522"></script>
++  <script src="js/car-sequencer.js?v=522"></script>
++  <script src="js/experience-goal.js?v=522"></script>
++  <script src="js/capacity-tuner.js?v=522"></script>
++  <script src="js/generator.js?v=522"></script>
++  <script src="js/source-preflight.js?v=522"></script>
++  <script src="js/analysis.js?v=522"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=521"></script>
+-  <script src="js/app.js?v=521"></script>
++  <script src="js/level-editor.js?v=522"></script>
++  <script src="js/app.js?v=522"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 6728ca6..535f056 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -6321,6 +6321,7 @@ AntSolver.App = (function() {
+         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
+         stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
+         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
++      usableSpaceRepair: result.usableSpaceRepair || null,
+       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+       qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
+       qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
+@@ -6471,6 +6472,7 @@ AntSolver.App = (function() {
+       experienceEvidence: rec.experienceEvidence || null,
+       experienceRouteEvidence: rec.experienceRouteEvidence || null,
+       capacityTune: rec.capacityTune || null,
++      usableSpaceRepair: rec.usableSpaceRepair || null,
+       capacityAudit: rec.capacityAudit || null, appliedParams: rec.appliedParams || null,
+       experienceFinalError: rec.experienceFinalError || null,
+       goalBudgetEvidence: rec.goalBudgetEvidence || null,
+@@ -7394,7 +7396,7 @@ AntSolver.App = (function() {
+    * 不能直接调同步的 Generator.produceGoal —— 主线程被它占满时，点「结束」也处理不了。
+    */
+   function genRunGoalSync(entry, baseCfg, idx, afterOne) {
+-    var per = 20000, best = null, rounds = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
++    var per = 20000, best = null, rounds = 0, fastFailStreak = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
+     var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
+     function passed(r) {
+       try { return AntSolver.Generator.goalAcceptPass(r, baseCfg); } catch (e) { return false; }
+@@ -7446,6 +7448,12 @@ AntSolver.App = (function() {
+       try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
+         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
+       }
++      var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
++        roundBudgetMs - (Date.now() - roundT0));
++      if (r && !r.level && repairLeft >= 1000) {
++        try { r = AntSolver.Generator.repairUsableNoCandidate(entry.blocks, r, cfg, { timeBudgetMs: repairLeft }); }
++        catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
++      }
+       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+         roundBudgetMs - (Date.now() - roundT0));
+       if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
+@@ -7459,7 +7467,9 @@ AntSolver.App = (function() {
+       catch (e) { better = score(r) > score(best); }
+       if (!best || better) best = r;
+       if (passed(r)) return done('pass');
+-      setTimeout(round, 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
++      var rapidNoCandidate = !!(r && !r.level && Date.now() - roundT0 < 1000);
++      fastFailStreak = rapidNoCandidate ? fastFailStreak + 1 : 0;
++      setTimeout(round, fastFailStreak ? Math.min(1000, fastFailStreak * 100) : 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
+     }
+     if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: idx, no: 0 }, p); });
+     round();
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index 6894fa6..c583ae5 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -132,6 +132,10 @@ function _goalRound() {
+   } catch (err) {
+     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
+   }
++  if (r && !r.level && roundLeft() >= 1000) {
++    try { r = AntSolver.Generator.repairUsableNoCandidate(g.blocks, r, cfg, { timeBudgetMs: roundLeft() }); }
++    catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
++  }
+   // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
+   var tuneLeft = roundLeft();
+   if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
+@@ -166,6 +170,8 @@ function _goalRound() {
+     self.postMessage({ type: 'flow', index: g.index, round: g.rounds,
+       text: '目标第' + g.rounds + '轮结果 · ' + (r && r.level ? '有关卡' : '无关卡') +
+         (r && !r.level && r.lastFailReason ? ' · ' + r.lastFailReason : '') +
++        (r && !r.level && r.structural && r.structural.reason ? ' · ' + r.structural.reason : '') +
++        (r && r.usableSpaceRepair && r.usableSpaceRepair.applied ? ' · 可用率重试 ' + Math.round(r.usableSpaceRepair.from * 100) + '%→' + Math.round(r.usableSpaceRepair.to * 100) + '%' : '') +
+         ' · 可选中位' + (_f && _f.selectMedian != null ? _f.selectMedian : '-') +
+         ' · 吃满' + (_f && _f.fullMedian2 != null ? _f.fullMedian2 : '-') +
+         ' · partial' + (_f && _f.partialStepPct != null ? _f.partialStepPct + '%' : '-') +
+@@ -176,8 +182,12 @@ function _goalRound() {
+   if (r) r.goalRound = g.rounds;
+   if (!g.best || _goalBetter(r, g.best)) g.best = r;
+   if (_goalPassed(r)) { _goalFinish('pass'); return; }
++  // 快速无候选不再数百轮/秒刷日志；重试/正常失败/有关卡不额外延迟。
++  var rapidNoCandidate = !!(r && !r.level && Date.now() - roundT0 < 1000);
++  g.fastFailStreak = rapidNoCandidate ? (g.fastFailStreak || 0) + 1 : 0;
++  var backoffMs = g.fastFailStreak ? Math.min(1000, g.fastFailStreak * 100) : 0;
+   // 让出事件循环：这一行之后 worker 才能处理 {cmd:'stop'}
+-  g.timer = setTimeout(_goalRound, 0);
++  g.timer = setTimeout(_goalRound, backoffMs);
+ }
+ 
+ self.onmessage = function (e) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index d991219..aa3fe4f 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -3583,6 +3583,8 @@ AntSolver.Generator = (function() {
+           ok: false, reason: 'usableSpaceDeviation',
+           detail: '可用空间 ' + (realUsable * 100).toFixed(1) + '% 偏离目标 ' + (uTarget * 100).toFixed(0) +
+             '% 达 ' + devPp.toFixed(1) + 'pp（容差 ' + uTolPp + 'pp）；实际墙' + realBlack + ' 管道' + realPipe + ' 配额' + spaceQuota.quota,
++          usableSpace: { realUsable: realUsable, targetUsable: uTarget, deviationPp: devPp, tolerancePp: uTolPp,
++            rows: rows, cols: cols, realBlack: realBlack, realPipe: realPipe, boxCount: n },
+           structureBuildMs: structureBuildMs, obstacleSlotMs: obstacleSlotMs, blackStat: blackStat, pipeStat: pipeStat
+         };
+       }
+@@ -6000,7 +6002,8 @@ AntSolver.Generator = (function() {
+     timing.obstacleSlotMs = struct.obstacleSlotMs || 0;
+     if (!struct.ok) {
+       timing.candidatePrepareMs = Date.now() - tAll; timing.candidateTotalMs = timing.candidatePrepareMs;
+-      return { ok: false, reason: struct.reason || 'struct', detail: struct.detail || '', timing: timing, boxCount: n, blackStat: struct.blackStat, pipeStat: struct.pipeStat };
++      return { ok: false, reason: struct.reason || 'struct', detail: struct.detail || '', timing: timing, boxCount: n,
++        usableSpace: struct.usableSpace || null, blackStat: struct.blackStat, pipeStat: struct.pipeStat };
+     }
+ 
+     // ③ 填球 + 只绑定预定障碍 + 分阶段守恒
+@@ -6199,7 +6202,7 @@ AntSolver.Generator = (function() {
+       attempts: 0, success: 0,
+       fail: { baseline: 0, struct: 0, structSurplus: 0, structHoles: 0, structReach: 0, structPipeExit: 0, pipeCapacity: 0, pipeDepth: 0, rowTrim: 0, bind: 0, conservation: 0, structuralCheck: 0, access: 0, screen: 0 },
+       passHits: { base: 0, noise1: 0, noise2: 0, noise3: 0 },
+-      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: []
++      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: [], usableSpaceFailures: []
+     };
+   }
+   function mergeFlowStats(dst, src) {
+@@ -6211,6 +6214,7 @@ AntSolver.Generator = (function() {
+     dst.failedCandidates = dst.failedCandidates.concat(src.failedCandidates);
+     dst.conservationFailures = dst.conservationFailures.concat(src.conservationFailures);
+     dst.bindFailures = dst.bindFailures.concat(src.bindFailures);
++    dst.usableSpaceFailures = (dst.usableSpaceFailures || []).concat(src.usableSpaceFailures || []);
+     return dst;
+   }
+   function recordAttempt(stats, res) {
+@@ -6227,6 +6231,7 @@ AntSolver.Generator = (function() {
+     if (key === 'conservation') stats.conservationFailures.push({ stage: res.stage, reasons: (res.conservation || []).filter(function (x) { return !x.ok; }) });
+     if (key === 'bind') stats.bindFailures.push(res.bindStat);
+     if (res.failedCandidate) stats.failedCandidates.push(res.failedCandidate);
++    if (key === 'usableSpaceDeviation' && res.usableSpace) stats.usableSpaceFailures.push(res.usableSpace);
+   }
+ 
+   /**
+@@ -13120,8 +13125,46 @@ AntSolver.Generator = (function() {
+     }
+     var top = null;
+     for (k in f) if (f[k] > 0 && (!top || f[k] > f[top])) top = k;
+-    return { reason: 'noCandidate',
+-             detail: '候选淘汰主因「' + top + '」' + f[top] + '/' + total + ' 次；全部计数 ' + JSON.stringify(f) };
++    var detail = '候选淘汰主因「' + top + '」' + f[top] + '/' + total + ' 次；全部计数 ' + JSON.stringify(f);
++    var uf = (flowStats && flowStats.usableSpaceFailures) || [];
++    if (uf.length) {
++      var vals = uf.map(function (x) { return x.realUsable; }).filter(function (x) { return x >= 0 && x <= 1; }).sort(function (a, b) { return a - b; });
++      if (vals.length) detail += '；实测可用空间中位 ' + (vals[Math.floor(vals.length / 2)] * 100).toFixed(1) +
++        '%（范围 ' + (vals[0] * 100).toFixed(1) + '~' + (vals[vals.length - 1] * 100).toFixed(1) + '%，n=' + vals.length + '）';
++    }
++    return { reason: 'noCandidate', detail: detail };
++  }
++
++  /** 【v522】目标轮内一次可用率失败重试：实测中位修目标，不放宽容差、不改容量、不换seed。 */
++  function repairUsableNoCandidate(blocks, failed, config, opts) {
++    opts = opts || {};
++    var report = { schema: 'usable-space-repair-v1', applied: false, tested: 0, skipped: null };
++    if (config && config.usableSpaceAutoRepair === false) { report.skipped = 'disabled'; return failed; }
++    var fs = failed && failed.flowStats, failures = fs && fs.usableSpaceFailures || [];
++    var failCounts = fs && fs.fail || {}, total = 0;
++    for (var k in failCounts) total += failCounts[k] || 0;
++    if (!failed || failed.level || failed.lastFailReason !== 'noCandidate' || failures.length < 3 ||
++        !(failCounts.usableSpaceDeviation > 0 && failCounts.usableSpaceDeviation >= total * 0.5)) {
++      report.skipped = 'not_dominant_usable_failure'; return failed;
++    }
++    var budgetMs = opts.timeBudgetMs != null ? +opts.timeBudgetMs : +(config && config.timeBudgetMs);
++    if (!(budgetMs >= 1000)) { report.skipped = 'round_budget_exhausted'; failed.usableSpaceRepair = report; return failed; }
++    var vals = failures.map(function (x) { return +x.realUsable; }).filter(function (x) { return x > 0 && x < 1; }).sort(function (a, b) { return a - b; });
++    if (vals.length < 3) { report.skipped = 'usable_evidence_missing'; failed.usableSpaceRepair = report; return failed; }
++    var median = vals[Math.floor(vals.length / 2)], from = parseFloat(config.usableSpaceTarget);
++    if (!(from > 0) || !(median > 0 && median < 1)) { report.skipped = 'invalid_target'; failed.usableSpaceRepair = report; return failed; }
++    var cfg = Object.assign({}, config, { usableSpaceTarget: +median.toFixed(6), timeBudgetMs: Math.floor(budgetMs), _trace: [] });
++    var t0 = Date.now(), candidate = null;
++    report.from = from; report.to = cfg.usableSpaceTarget; report.failureCount = failures.length;
++    report.capacityUnchanged = cfg.boxSizeMin === config.boxSizeMin && cfg.boxSizeMax === config.boxSizeMax &&
++      cfg.capNormMin === config.capNormMin && cfg.capNormMax === config.capNormMax;
++    try { candidate = produceDispatch(blocks, cfg, opts); report.tested = 1; }
++    catch (e) { report.error = String((e && e.message) || e); }
++    report.elapsedMs = Date.now() - t0; report.hasLevel = !!(candidate && candidate.level);
++    if (candidate && candidate.level && candidate.valid) {
++      report.applied = true; candidate.usableSpaceRepair = report; return candidate;
++    }
++    report.reverted = true; failed.usableSpaceRepair = report; return failed;
+   }
+ 
+   /**
+@@ -14884,6 +14927,7 @@ AntSolver.Generator = (function() {
+         if (vc.capacityAudit && ca && vc.capacityAudit.belowMin > ca.belowMin) continue;
+         if (goalExperiencePass(vc, cfg)) {
+           vc.capacityTuned = true;
++          if (cand.usableSpaceRepair) vc.usableSpaceRepair = cand.usableSpaceRepair;
+           report.applied = true; report.elapsedMs = Date.now() - t0;
+           report.base = baseEv.metrics; report.after = vc._experienceFull.metrics;
+           vc.capacityTune = report; return vc;
+@@ -14959,6 +15003,12 @@ AntSolver.Generator = (function() {
+       try { r = produceDispatch(blocks, cfg, opts); } catch (e) {
+         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
+       }
++      var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
++        roundBudgetMs - (Date.now() - roundT0));
++      if (r && !r.level && repairLeft >= 1000) {
++        try { r = repairUsableNoCandidate(blocks, r, cfg, { timeBudgetMs: repairLeft, shouldStop: opts.shouldStop }); }
++        catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
++      }
+       rounds++;
+       if (r) r.goalRound = rounds;
+       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+@@ -16774,7 +16824,7 @@ AntSolver.Generator = (function() {
+     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
+     isCurveScore: isCurveScore,
+     choiceCurveScore: choiceCurveScore,
+-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
++    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, repairUsableNoCandidate: repairUsableNoCandidate, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+     exposedBlobByColor: exposedBlobByColor,
+     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
+     sampleCarCount: sampleCarCount,
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+index 1205254..af3b76c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+@@ -422,6 +422,7 @@ function persistResult(b, payload) {
+     最终结构证据: rec.finalStructureEvidence || null,
+     路线分岔证据: rec.experienceRouteEvidence || null,
+     容量精调: rec.capacityTune || null,
++    可用率重试: rec.usableSpaceRepair || null,
+     容量审计: rec.capacityAudit || null,
+     容量参数: rec.appliedParams || null,
+     最终体验评价异常: rec.experienceFinalError || null,
+diff --git "a/02_\345\267\245\347\250\213/\350\241\245\344\270\201/\350\241\245\344\270\201_\345\256\236\346\265\213\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225_v522.patch" "b/02_\345\267\245\347\250\213/\350\241\245\344\270\201/\350\241\245\344\270\201_\345\256\236\346\265\213\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225_v522.patch"
+new file mode 100644
+index 0000000..1ff6322
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\350\241\245\344\270\201/\350\241\245\344\270\201_\345\256\236\346\265\213\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225_v522.patch"
+@@ -0,0 +1,1274 @@
++diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
++index 5df27a6..e66d528 100644
++--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
+++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\272\244\346\216\245\346\221\230\350\246\201_v500_20261025.md"
++@@ -4,7 +4,7 @@
++ > 本文件只描述**当前状态、做过什么、哪些路已证否、下一步**；细节按节号去查工作日志。
++ > 上层文档仍以 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md) 与 [`工程说明.md`](工程说明.md) 为准。
++ >
++-> **后续更新（2026-10-26）**：代码当前为 v521；最终低压力补充验收已通过headless保护，UI因usableSpaceDeviation失控路径待v522修复。目标体验与容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~511。本文件保留 v495~v500 历史基线。
+++> **后续更新（2026-10-26）**：代码当前为 v522；最终低压力补充验收与实测可用率重试均已接入，真实UI批次32合格1/1。目标体验与容量精调见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 及工作日志 §491~512。本文件保留 v495~v500 历史基线。
++ 
++ ---
++ 
++diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++index f282dd4..d29bbd9 100644
++--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++@@ -7,7 +7,7 @@
++ > 本文档由 Kimi 整理。文中严格区分 **[用户要求]、[已验证]、[Kimi建议]、[待校准]**。
++ >
++ > 2026-10-26 新实施卡：[`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md)。小色可按解锁贡献承担关键债务，不按面积排除。
++-> 当前结果：代码到v521。v520全局换门被否决后，v521把低压力证据限制在最终验收，内部goalStructPass不变；006/010已知成功与推荐77003最终hash全保持，近失关可最终验收且时间模式不变。真实UI暴露既有usableSpaceDeviation 70/70快速noCandidate，boardOnly无效、targetOnly/cutOnly能出关；v522需做实测可用率驱动的一次重试与快速失败退避，UI验收尚未完成。PlayerSim校准和障碍目标化未完成。
+++> 当前结果：代码到v522。v521最终低压力补充与搜索隔离的保护继续成立。v522把usableSpaceDeviation改为实测中位可用率驱动的一次同seed重试，并加快速无候选退避；精确失败70/70后0.86→0.690476出关并完整达标，006已知成功hash不变。真实UI批次32合格1/1、COMPLETED，A/C不再高速空转。下一步多图/独立seed验证重试泛化、release unknown与真人校准；障碍目标化未完成。
++ 
++ ---
++ 
++diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++index a5e9a63..be0815e 100644
++--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++@@ -20125,3 +20125,38 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
++ 2. 单图三分支长轮可超页面总预算，需在UI可停止性与轮边界继续核查。
++ 3. 墙钟导致旧—旧hash也可能漂移，后续重要对比需保留同对及必要的重复对照。
++ 4. PlayerSim/真人校准、跨色容量规划、目标化障碍仍未完成。
+++
+++### 512. 【2026-10-26】v522：实测可用率一次重试转化失败关，真实UI合格1/1
+++
+++#### 512.1 问题（原话）
+++
+++- “每一次关卡设置验证不达标后，他会怎么修改呢……这决定了一关要生成多久。”
+++- “遇到边界以及卡住的地方要记录。”
+++
+++#### 512.2 证据
+++
+++- v521 UI精确复现usableSpaceDeviation 70/70，A/C每秒几十至几百轮noCandidate；只换seed没有修原因。boardOnly仍失败，targetOnly/cutOnly可出关，说明需按实测结构反馈修。
+++- 首次v522重试未触发：buildOneCandidateAttempt包装时丢失usableSpace字段。补齐后70样本真实中位69.0%，证明不能固定猜0.823或统一放宽容差。
+++- 目标轮初版repair被后续容量精调替换候选时丢成null；需在统一精调出口保留审计，避免“关已修但证据消失”。
+++
+++#### 512.3 改动
+++
+++- Kimi在结构失败与buildOneCandidateAttempt间透传usableSpace，flowStats汇总并在noCandidate摘要显示中位/范围。
+++- 新增 `repairUsableNoCandidate`：主导失败且样本≥3时，按实测中位做一次同seed同 `produceDispatch` 重试；剩余预算、容量不变、不递归、失败保留原结果。produceGoal/worker/主线程目标路径统一调用，时间模式不调用。
+++- worker/主线程快速无候选100ms递增至最高1秒；worker显示结构主因、配置和重试目标。
+++- 容量精调成功替换候选时保留usableSpaceRepair；app/生产服务落库 `可用率重试`，版本升v522。
+++
+++#### 512.4 验证（改前后数字）
+++
+++- 精确006/seed1978235744：原70/70 noCandidate；重试0.86→0.690476，5.296秒出关，capacityUnchanged=true。expose成功控制不触发且hash不变。
+++- produceGoal同seed一轮完整pass：66.7%中段3/4、release found、6×6、aboveMax=0；repair深拷贝落盘applied=true。006/1002新旧均pass、hash一致。
+++- v522当前近失：基础结构false、最终补充true、完整目标true；时间模式false，freeLow其他失败不可抵消。
+++- 真实UI批次32：A/C均86%→69%重试，不再高速空转；B第4轮达标，约111秒，COMPLETED、合格1/1。3/4=52.9%、显著释放2、release found、容量守恒、aboveMax=0。
+++- 最终B为base_gate，acceptedByFinalStructure=false、usableSpaceRepair=null，未伪称使用补充门或重试。
+++
+++#### 512.5 遗留
+++
+++1. 目前是同图有限seed与一次UI成功，需多图独立seed验证重试不会制造低压/畸形关。
+++2. 目标预算仍是轮边界控制，长轮可短时超出；release unknown仍需专门诊断。
+++3. PlayerSim仍有0%项，不能把体验曲线通过等同真人好关。
+++4. 跨色容量组合、目标化障碍和真人校准未完成，七点不能标全完成。
++diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++index 84e07c1..5ead6a2 100644
++--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++@@ -3,9 +3,9 @@
++ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
++ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
++ >
++-> 最后更新：2026-10-26（v521 最终低压力补充验收）　|　当前版本：**v521**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+++> 最后更新：2026-10-26（v522 可用率失败重试与UI验收）　|　当前版本：**v522**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++ >
++-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~511。v521仅最终验收增加低压力结构证据，内部搜索保持旧门；006/010成功和推荐best均同hash保护。真实UI被usableSpaceDeviation快速noCandidate阻断，v522先修失败驱动重试与退避，当前不能宣称UI验收完成。**
+++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~512。v522目标模式在usableSpaceDeviation主导时按实测中位可用率做一次同seed重试，快速无候选退避；精确失败关一轮完整达标，真实UI批次32合格1/1、COMPLETED。v521最终低压力补充口径保持不变。**
++ >
++ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
++ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
++@@ -1193,3 +1193,12 @@ M0 固定基准 + 统一评价与候选口径
++ - 下一项只读实验必须按失败曲线定位车辆，不再重复使用通用debt排序串阶段搜索。
++ - `Simulator.createState`、`outsideReachSeed`、ring与floodFill已兼容内部level缺rows/cols；正常真实关10/10求解签名不变。
++ - 复现：`node 03_工具/好关评分/模拟器尺寸回归_v518.js`；结构实验见 `结构容量精调_预登记_v518.md` 与两份结果JSON。
+++
+++### 17.45 v521~v522：最终低压力证据与可用率失败驱动重试
+++
+++- v521只让 `goalResultExperiencePass` 使用低压力补充结构证据；`goalStructPass` 及内部搜索不改。006/010已知成功和推荐77003最终hash保持，时间模式不变。
+++- v522在 `usableSpaceDeviation` 占失败多数且样本≥3时，取失败候选 `realUsable` 中位数，同轮同seed同 `produceDispatch` 最多重试一次；不改容量上下界、不递归、不统一放宽容差。`usableSpaceAutoRepair=false` 可关闭。
+++- 精确006/seed1978235744：原70/70拒绝，实测中位69.0%；目标0.86→0.690476，一次重试出关。目标轮完整pass，3/4=66.7%、release found、aboveMax=0。
+++- worker/主线程快速无候选采用100ms递增、最高1秒退避；容量精调替换候选时保留 `usableSpaceRepair` 审计。
+++- 真实UI批次32：A/C均执行86%→69%重试，B第4轮达标；COMPLETED、合格1/1，3/4=52.9%、显著释放2、release found。最终B是基础门通过，repair=null属正常。
+++- 边界：仍是同图有限seed与PlayerSim 0%项，不能外推多图或真人好关；长轮预算、release unknown、多图泛化和目标化障碍仍需后续。
++diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++index e5b54d7..60681ff 100644
++--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++@@ -224,3 +224,13 @@
++ - 墙钟预算本身可使旧—旧hash漂移，因此结论依据同对保护和代码调用隔离，不夸大为全seed严格确定性。
++ - UI批次24/30因快速noCandidate与长轮未收尾STOPPED 0结果；批次28手动停止并落库1个结构未过。精确headless证明主因usableSpaceDeviation 70/70，boardOnly仍失败，targetOnly/cutOnly分别出关。
++ - v522计划：记录失败候选实测可用率，按中位实测值做一次有界同产线重试；连续快速无候选退避并显示真实原因。通过后再重做v521 UI落库验收。
+++
+++## 27. v522：实测可用率重试与真实UI通过
+++
+++- 结构失败现在透传 `realUsable/target/deviation/rows/cols` 并汇入flowStats；失败摘要显示实测中位与范围，不再只有noCandidate。
+++- 目标轮仅对usableSpaceDeviation主导且样本≥3的结果，以实测中位做一次同seed同产线重试；不改容量、棋盘范围、障碍或容差，不递归。时间模式不调用。
+++- 精确失败基底70个样本中位69.0%，重试0.86→0.690476，5.30秒出关；目标轮一轮完整pass，66.7%中段3/4、release found、容量aboveMax=0。
+++- 成功不触发：expose控制同对象同hash；006/1002新旧均pass且最终hash相同。v521近失最终补充和时间模式保护在v522继续通过。
+++- 快速无候选采用100ms递增、最高1秒退避；worker补真实结构原因、首轮配置与重试日志。容量精调替换候选时保留repair审计，app/服务落库该字段。
+++- 真实UI批次32：A/C均86%→69%重试，B第4轮达标，约111秒，COMPLETED、合格1/1；3/4=52.9%、显著释放2、release found、棋盘6×6、aboveMax=0。
+++- 边界：同图有限样本，最终B未用重试所以repair=null；PlayerSim/真人可学习性仍未证明。下一步多图独立seed、release unknown与真人校准，不把一次UI成功外推。
++diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++index 35ac8ee..bab1fee 100644
++--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++@@ -6,13 +6,13 @@
++   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
++   <meta http-equiv="Pragma" content="no-cache">
++   <meta http-equiv="Expires" content="0">
++-  <title>车接小人 v521 · 目标生产全链路</title>
++-  <link rel="stylesheet" href="css/style.css?v=521">
+++  <title>车接小人 v522 · 目标生产全链路</title>
+++  <link rel="stylesheet" href="css/style.css?v=522">
++ </head>
++ <body>
++   <header>
++     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
++-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v521</span></h1>
+++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v522</span></h1>
++     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
++          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
++          退出模拟就自动回到生成器的参数面板。 -->
++@@ -773,27 +773,27 @@
++     </div>
++   </div>
++ 
++-  <script src="js/zip.js?v=521"></script>
++-  <script src="js/utils.js?v=521"></script>
+++  <script src="js/zip.js?v=522"></script>
+++  <script src="js/utils.js?v=522"></script>
++   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
++-  <script src="js/color-libs.js?v=521"></script>
++-  <script src="js/simulator.js?v=521"></script>
+++  <script src="js/color-libs.js?v=522"></script>
+++  <script src="js/simulator.js?v=522"></script>
++   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
++-  <script src="js/anchor-cut.js?v=521"></script>
++-  <script src="js/solver-strategy.js?v=521"></script>
++-  <script src="js/solver.js?v=521"></script>
++-  <script src="js/playersim.js?v=521"></script>
+++  <script src="js/anchor-cut.js?v=522"></script>
+++  <script src="js/solver-strategy.js?v=522"></script>
+++  <script src="js/solver.js?v=522"></script>
+++  <script src="js/playersim.js?v=522"></script>
++   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
++-  <script src="js/solver-analysis.js?v=521"></script>
++-  <script src="js/car-sequencer.js?v=521"></script>
++-  <script src="js/experience-goal.js?v=521"></script>
++-  <script src="js/capacity-tuner.js?v=521"></script>
++-  <script src="js/generator.js?v=521"></script>
++-  <script src="js/source-preflight.js?v=521"></script>
++-  <script src="js/analysis.js?v=521"></script>
+++  <script src="js/solver-analysis.js?v=522"></script>
+++  <script src="js/car-sequencer.js?v=522"></script>
+++  <script src="js/experience-goal.js?v=522"></script>
+++  <script src="js/capacity-tuner.js?v=522"></script>
+++  <script src="js/generator.js?v=522"></script>
+++  <script src="js/source-preflight.js?v=522"></script>
+++  <script src="js/analysis.js?v=522"></script>
++   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
++-  <script src="js/level-editor.js?v=521"></script>
++-  <script src="js/app.js?v=521"></script>
+++  <script src="js/level-editor.js?v=522"></script>
+++  <script src="js/app.js?v=522"></script>
++   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
++     体检报告已生成
++     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
++diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++index 6728ca6..535f056 100644
++--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++@@ -6321,6 +6321,7 @@ AntSolver.App = (function() {
++         curveCandidates: result.capacityTune.curveCandidates, elapsedMs: result.capacityTune.elapsedMs,
++         stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
++         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
+++      usableSpaceRepair: result.usableSpaceRepair || null,
++       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
++       qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
++       qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
++@@ -6471,6 +6472,7 @@ AntSolver.App = (function() {
++       experienceEvidence: rec.experienceEvidence || null,
++       experienceRouteEvidence: rec.experienceRouteEvidence || null,
++       capacityTune: rec.capacityTune || null,
+++      usableSpaceRepair: rec.usableSpaceRepair || null,
++       capacityAudit: rec.capacityAudit || null, appliedParams: rec.appliedParams || null,
++       experienceFinalError: rec.experienceFinalError || null,
++       goalBudgetEvidence: rec.goalBudgetEvidence || null,
++@@ -7394,7 +7396,7 @@ AntSolver.App = (function() {
++    * 不能直接调同步的 Generator.produceGoal —— 主线程被它占满时，点「结束」也处理不了。
++    */
++   function genRunGoalSync(entry, baseCfg, idx, afterOne) {
++-    var per = 20000, best = null, rounds = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
+++    var per = 20000, best = null, rounds = 0, fastFailStreak = 0, t0 = Date.now(), maxMs = +baseCfg.goalMaxMs || 0;
++     var baseSeed = (baseCfg.seed != null && !isNaN(+baseCfg.seed)) ? (+baseCfg.seed) : ((Date.now() & 0x7fffffff) >>> 0);
++     function passed(r) {
++       try { return AntSolver.Generator.goalAcceptPass(r, baseCfg); } catch (e) { return false; }
++@@ -7446,6 +7448,12 @@ AntSolver.App = (function() {
++       try { r = AntSolver.Generator.produce(entry.blocks, cfg); } catch (e) {
++         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
++       }
+++      var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+++        roundBudgetMs - (Date.now() - roundT0));
+++      if (r && !r.level && repairLeft >= 1000) {
+++        try { r = AntSolver.Generator.repairUsableNoCandidate(entry.blocks, r, cfg, { timeBudgetMs: repairLeft }); }
+++        catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+++      }
++       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
++         roundBudgetMs - (Date.now() - roundT0));
++       if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
++@@ -7459,7 +7467,9 @@ AntSolver.App = (function() {
++       catch (e) { better = score(r) > score(best); }
++       if (!best || better) best = r;
++       if (passed(r)) return done('pass');
++-      setTimeout(round, 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
+++      var rapidNoCandidate = !!(r && !r.level && Date.now() - roundT0 < 1000);
+++      fastFailStreak = rapidNoCandidate ? fastFailStreak + 1 : 0;
+++      setTimeout(round, fastFailStreak ? Math.min(1000, fastFailStreak * 100) : 0);   // 让出事件循环：这一行之后「结束」按钮才点得动
++     }
++     if (AntSolver.Generator.setProgressHook) AntSolver.Generator.setProgressHook(function (p) { genSlotProgress({ idx: idx, no: 0 }, p); });
++     round();
++diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++index 6894fa6..c583ae5 100644
++--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++@@ -132,6 +132,10 @@ function _goalRound() {
++   } catch (err) {
++     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
++   }
+++  if (r && !r.level && roundLeft() >= 1000) {
+++    try { r = AntSolver.Generator.repairUsableNoCandidate(g.blocks, r, cfg, { timeBudgetMs: roundLeft() }); }
+++    catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+++  }
++   // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
++   var tuneLeft = roundLeft();
++   if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
++@@ -166,6 +170,8 @@ function _goalRound() {
++     self.postMessage({ type: 'flow', index: g.index, round: g.rounds,
++       text: '目标第' + g.rounds + '轮结果 · ' + (r && r.level ? '有关卡' : '无关卡') +
++         (r && !r.level && r.lastFailReason ? ' · ' + r.lastFailReason : '') +
+++        (r && !r.level && r.structural && r.structural.reason ? ' · ' + r.structural.reason : '') +
+++        (r && r.usableSpaceRepair && r.usableSpaceRepair.applied ? ' · 可用率重试 ' + Math.round(r.usableSpaceRepair.from * 100) + '%→' + Math.round(r.usableSpaceRepair.to * 100) + '%' : '') +
++         ' · 可选中位' + (_f && _f.selectMedian != null ? _f.selectMedian : '-') +
++         ' · 吃满' + (_f && _f.fullMedian2 != null ? _f.fullMedian2 : '-') +
++         ' · partial' + (_f && _f.partialStepPct != null ? _f.partialStepPct + '%' : '-') +
++@@ -176,8 +182,12 @@ function _goalRound() {
++   if (r) r.goalRound = g.rounds;
++   if (!g.best || _goalBetter(r, g.best)) g.best = r;
++   if (_goalPassed(r)) { _goalFinish('pass'); return; }
+++  // 快速无候选不再数百轮/秒刷日志；重试/正常失败/有关卡不额外延迟。
+++  var rapidNoCandidate = !!(r && !r.level && Date.now() - roundT0 < 1000);
+++  g.fastFailStreak = rapidNoCandidate ? (g.fastFailStreak || 0) + 1 : 0;
+++  var backoffMs = g.fastFailStreak ? Math.min(1000, g.fastFailStreak * 100) : 0;
++   // 让出事件循环：这一行之后 worker 才能处理 {cmd:'stop'}
++-  g.timer = setTimeout(_goalRound, 0);
+++  g.timer = setTimeout(_goalRound, backoffMs);
++ }
++ 
++ self.onmessage = function (e) {
++diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++index d991219..aa3fe4f 100644
++--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++@@ -3583,6 +3583,8 @@ AntSolver.Generator = (function() {
++           ok: false, reason: 'usableSpaceDeviation',
++           detail: '可用空间 ' + (realUsable * 100).toFixed(1) + '% 偏离目标 ' + (uTarget * 100).toFixed(0) +
++             '% 达 ' + devPp.toFixed(1) + 'pp（容差 ' + uTolPp + 'pp）；实际墙' + realBlack + ' 管道' + realPipe + ' 配额' + spaceQuota.quota,
+++          usableSpace: { realUsable: realUsable, targetUsable: uTarget, deviationPp: devPp, tolerancePp: uTolPp,
+++            rows: rows, cols: cols, realBlack: realBlack, realPipe: realPipe, boxCount: n },
++           structureBuildMs: structureBuildMs, obstacleSlotMs: obstacleSlotMs, blackStat: blackStat, pipeStat: pipeStat
++         };
++       }
++@@ -6000,7 +6002,8 @@ AntSolver.Generator = (function() {
++     timing.obstacleSlotMs = struct.obstacleSlotMs || 0;
++     if (!struct.ok) {
++       timing.candidatePrepareMs = Date.now() - tAll; timing.candidateTotalMs = timing.candidatePrepareMs;
++-      return { ok: false, reason: struct.reason || 'struct', detail: struct.detail || '', timing: timing, boxCount: n, blackStat: struct.blackStat, pipeStat: struct.pipeStat };
+++      return { ok: false, reason: struct.reason || 'struct', detail: struct.detail || '', timing: timing, boxCount: n,
+++        usableSpace: struct.usableSpace || null, blackStat: struct.blackStat, pipeStat: struct.pipeStat };
++     }
++ 
++     // ③ 填球 + 只绑定预定障碍 + 分阶段守恒
++@@ -6199,7 +6202,7 @@ AntSolver.Generator = (function() {
++       attempts: 0, success: 0,
++       fail: { baseline: 0, struct: 0, structSurplus: 0, structHoles: 0, structReach: 0, structPipeExit: 0, pipeCapacity: 0, pipeDepth: 0, rowTrim: 0, bind: 0, conservation: 0, structuralCheck: 0, access: 0, screen: 0 },
++       passHits: { base: 0, noise1: 0, noise2: 0, noise3: 0 },
++-      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: []
+++      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: [], usableSpaceFailures: []
++     };
++   }
++   function mergeFlowStats(dst, src) {
++@@ -6211,6 +6214,7 @@ AntSolver.Generator = (function() {
++     dst.failedCandidates = dst.failedCandidates.concat(src.failedCandidates);
++     dst.conservationFailures = dst.conservationFailures.concat(src.conservationFailures);
++     dst.bindFailures = dst.bindFailures.concat(src.bindFailures);
+++    dst.usableSpaceFailures = (dst.usableSpaceFailures || []).concat(src.usableSpaceFailures || []);
++     return dst;
++   }
++   function recordAttempt(stats, res) {
++@@ -6227,6 +6231,7 @@ AntSolver.Generator = (function() {
++     if (key === 'conservation') stats.conservationFailures.push({ stage: res.stage, reasons: (res.conservation || []).filter(function (x) { return !x.ok; }) });
++     if (key === 'bind') stats.bindFailures.push(res.bindStat);
++     if (res.failedCandidate) stats.failedCandidates.push(res.failedCandidate);
+++    if (key === 'usableSpaceDeviation' && res.usableSpace) stats.usableSpaceFailures.push(res.usableSpace);
++   }
++ 
++   /**
++@@ -13120,8 +13125,46 @@ AntSolver.Generator = (function() {
++     }
++     var top = null;
++     for (k in f) if (f[k] > 0 && (!top || f[k] > f[top])) top = k;
++-    return { reason: 'noCandidate',
++-             detail: '候选淘汰主因「' + top + '」' + f[top] + '/' + total + ' 次；全部计数 ' + JSON.stringify(f) };
+++    var detail = '候选淘汰主因「' + top + '」' + f[top] + '/' + total + ' 次；全部计数 ' + JSON.stringify(f);
+++    var uf = (flowStats && flowStats.usableSpaceFailures) || [];
+++    if (uf.length) {
+++      var vals = uf.map(function (x) { return x.realUsable; }).filter(function (x) { return x >= 0 && x <= 1; }).sort(function (a, b) { return a - b; });
+++      if (vals.length) detail += '；实测可用空间中位 ' + (vals[Math.floor(vals.length / 2)] * 100).toFixed(1) +
+++        '%（范围 ' + (vals[0] * 100).toFixed(1) + '~' + (vals[vals.length - 1] * 100).toFixed(1) + '%，n=' + vals.length + '）';
+++    }
+++    return { reason: 'noCandidate', detail: detail };
+++  }
+++
+++  /** 【v522】目标轮内一次可用率失败重试：实测中位修目标，不放宽容差、不改容量、不换seed。 */
+++  function repairUsableNoCandidate(blocks, failed, config, opts) {
+++    opts = opts || {};
+++    var report = { schema: 'usable-space-repair-v1', applied: false, tested: 0, skipped: null };
+++    if (config && config.usableSpaceAutoRepair === false) { report.skipped = 'disabled'; return failed; }
+++    var fs = failed && failed.flowStats, failures = fs && fs.usableSpaceFailures || [];
+++    var failCounts = fs && fs.fail || {}, total = 0;
+++    for (var k in failCounts) total += failCounts[k] || 0;
+++    if (!failed || failed.level || failed.lastFailReason !== 'noCandidate' || failures.length < 3 ||
+++        !(failCounts.usableSpaceDeviation > 0 && failCounts.usableSpaceDeviation >= total * 0.5)) {
+++      report.skipped = 'not_dominant_usable_failure'; return failed;
+++    }
+++    var budgetMs = opts.timeBudgetMs != null ? +opts.timeBudgetMs : +(config && config.timeBudgetMs);
+++    if (!(budgetMs >= 1000)) { report.skipped = 'round_budget_exhausted'; failed.usableSpaceRepair = report; return failed; }
+++    var vals = failures.map(function (x) { return +x.realUsable; }).filter(function (x) { return x > 0 && x < 1; }).sort(function (a, b) { return a - b; });
+++    if (vals.length < 3) { report.skipped = 'usable_evidence_missing'; failed.usableSpaceRepair = report; return failed; }
+++    var median = vals[Math.floor(vals.length / 2)], from = parseFloat(config.usableSpaceTarget);
+++    if (!(from > 0) || !(median > 0 && median < 1)) { report.skipped = 'invalid_target'; failed.usableSpaceRepair = report; return failed; }
+++    var cfg = Object.assign({}, config, { usableSpaceTarget: +median.toFixed(6), timeBudgetMs: Math.floor(budgetMs), _trace: [] });
+++    var t0 = Date.now(), candidate = null;
+++    report.from = from; report.to = cfg.usableSpaceTarget; report.failureCount = failures.length;
+++    report.capacityUnchanged = cfg.boxSizeMin === config.boxSizeMin && cfg.boxSizeMax === config.boxSizeMax &&
+++      cfg.capNormMin === config.capNormMin && cfg.capNormMax === config.capNormMax;
+++    try { candidate = produceDispatch(blocks, cfg, opts); report.tested = 1; }
+++    catch (e) { report.error = String((e && e.message) || e); }
+++    report.elapsedMs = Date.now() - t0; report.hasLevel = !!(candidate && candidate.level);
+++    if (candidate && candidate.level && candidate.valid) {
+++      report.applied = true; candidate.usableSpaceRepair = report; return candidate;
+++    }
+++    report.reverted = true; failed.usableSpaceRepair = report; return failed;
++   }
++ 
++   /**
++@@ -14884,6 +14927,7 @@ AntSolver.Generator = (function() {
++         if (vc.capacityAudit && ca && vc.capacityAudit.belowMin > ca.belowMin) continue;
++         if (goalExperiencePass(vc, cfg)) {
++           vc.capacityTuned = true;
+++          if (cand.usableSpaceRepair) vc.usableSpaceRepair = cand.usableSpaceRepair;
++           report.applied = true; report.elapsedMs = Date.now() - t0;
++           report.base = baseEv.metrics; report.after = vc._experienceFull.metrics;
++           vc.capacityTune = report; return vc;
++@@ -14959,6 +15003,12 @@ AntSolver.Generator = (function() {
++       try { r = produceDispatch(blocks, cfg, opts); } catch (e) {
++         r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((e && e.message) || e) };
++       }
+++      var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+++        roundBudgetMs - (Date.now() - roundT0));
+++      if (r && !r.level && repairLeft >= 1000) {
+++        try { r = repairUsableNoCandidate(blocks, r, cfg, { timeBudgetMs: repairLeft, shouldStop: opts.shouldStop }); }
+++        catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+++      }
++       rounds++;
++       if (r) r.goalRound = rounds;
++       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
++@@ -16774,7 +16824,7 @@ AntSolver.Generator = (function() {
++     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
++     isCurveScore: isCurveScore,
++     choiceCurveScore: choiceCurveScore,
++-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+++    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, repairUsableNoCandidate: repairUsableNoCandidate, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
++     exposedBlobByColor: exposedBlobByColor,
++     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
++     sampleCarCount: sampleCarCount,
++diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++index 1205254..af3b76c 100644
++--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
+++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/\347\275\221\351\241\265\345\220\257\345\212\250\345\231\250/\347\224\237\344\272\247\346\234\215\345\212\241.js"
++@@ -422,6 +422,7 @@ function persistResult(b, payload) {
++     最终结构证据: rec.finalStructureEvidence || null,
++     路线分岔证据: rec.experienceRouteEvidence || null,
++     容量精调: rec.capacityTune || null,
+++    可用率重试: rec.usableSpaceRepair || null,
++     容量审计: rec.capacityAudit || null,
++     容量参数: rec.appliedParams || null,
++     最终体验评价异常: rec.experienceFinalError || null,
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.js"
++new file mode 100644
++index 0000000..c9d0cd7
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.js"
++@@ -0,0 +1,31 @@
+++#!/usr/bin/env node
+++/** v522：精确失败基底的一次实测可用率重试与成功不触发保护。 */
+++'use strict';
+++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
+++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js', 'source-preflight.js'];
+++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
+++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
+++const A = sb.AntSolver, G = A.Generator, blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt'), 'utf8'));
+++const base = { seed: 1978235744, goalSharedBudget: true, experienceGoal: true, reviewMix: false, generatorFlow: 'new_fixed',
+++  boxSizeMin: 31, boxSizeMax: 40, capNormMin: 31, capNormMax: 40, capScalePlan: [1.45, 1.15], cutMode: 'layerCut2', candidateCount: 14, fullTime: true, portfolioK: 1,
+++  acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4.8, targetSteadyMin: 0, targetSteadyMax: 100, targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: .25,
+++  boardAllowSquare: true, boardRowsMin: 4, boardRowsMax: 6, boardColsMin: 6, boardColsMax: 8, boardHardRange: true, boardAuto: false,
+++  capacityTuneMs: 5000, capacityTuneCars: 8, capacityTuneVariants: 48, timeBudgetMs: 20000, p7BaseCount: 1, maxPipes: 2, chainByDemand: 4,
+++  semanticObstacles: true, boardFirst: true, boardExpandOnOverflow: true, targetCarCount: 0, usableSpaceTarget: .86, _trace: [] };
+++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
+++function slim(r) { return { hasLevel: !!(r && r.level), valid: !!(r && r.valid), lastFailReason: r && r.lastFailReason || null,
+++  structural: r && r.structural || null, repair: r && r.usableSpaceRepair || null, board: r && r.level && r.level.board ? { rows: r.level.board.rows, cols: r.level.board.cols } : null,
+++  hash: r && r.level ? hash(r.level) : null, stopReason: r && r.perf && r.perf.stopReason || null }; }
+++const t0 = Date.now(), failed = G.produce(blocks, Object.assign({}, base, { _trace: [] })), beforeMs = Date.now() - t0;
+++const failureEvidence = failed.flowStats && { fail: failed.flowStats.fail, usableSamples: failed.flowStats.usableSpaceFailures && failed.flowStats.usableSpaceFailures.length,
+++  realValues: failed.flowStats.usableSpaceFailures && failed.flowStats.usableSpaceFailures.map(x => x.realUsable) };
+++const t1 = Date.now(), repaired = G.repairUsableNoCandidate(blocks, failed, base, { timeBudgetMs: 20000 }), repairWallMs = Date.now() - t1;
+++const success = G.produce(blocks, Object.assign({}, base, { cutMode: 'exposeCut', _trace: [] }));
+++const successBeforeHash = success && success.level ? hash(success.level) : null, successSame = G.repairUsableNoCandidate(blocks, success, base, { timeBudgetMs: 20000 });
+++const out = { schema: 'usable-space-repair-test-v1', date: '2026-10-26', beforeMs, repairWallMs, failureEvidence,
+++  before: slim(failed), after: slim(repaired), successControl: { before: slim(success), sameObject: successSame === success,
+++    repair: successSame && successSame.usableSpaceRepair || null, hashUnchanged: successSame && successSame.level && hash(successSame.level) === successBeforeHash } };
+++fs.writeFileSync(path.join(__dirname, '可用率失败重试_v522.json'), JSON.stringify(out, null, 2) + '\n');
+++console.log(JSON.stringify({ beforeMs, repairWallMs, before: out.before, after: out.after, successControl: out.successControl }, null, 2));
+++if (out.before.hasLevel || !out.after.hasLevel || !out.after.repair || !out.after.repair.applied || !out.after.repair.capacityUnchanged || !out.successControl.sameObject) process.exitCode = 1;
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.json"
++new file mode 100644
++index 0000000..923193c
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.json"
++@@ -0,0 +1,170 @@
+++{
+++  "schema": "usable-space-repair-test-v1",
+++  "date": "2026-10-26",
+++  "beforeMs": 218,
+++  "repairWallMs": 5296,
+++  "failureEvidence": {
+++    "fail": {
+++      "baseline": 0,
+++      "struct": 0,
+++      "structSurplus": 0,
+++      "structHoles": 0,
+++      "structReach": 0,
+++      "structPipeExit": 0,
+++      "pipeCapacity": 0,
+++      "pipeDepth": 0,
+++      "rowTrim": 0,
+++      "bind": 0,
+++      "conservation": 0,
+++      "structuralCheck": 0,
+++      "access": 0,
+++      "screen": 0,
+++      "usableSpaceDeviation": 70
+++    },
+++    "usableSamples": 70,
+++    "realValues": [
+++      0.6904761904761905,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.6904761904761905,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.6904761904761905,
+++      0.6904761904761905,
+++      0.6041666666666666,
+++      0.6904761904761905,
+++      0.6904761904761905,
+++      0.6904761904761905,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.6904761904761905,
+++      0.6904761904761905,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.6904761904761905,
+++      0.6904761904761905,
+++      0.6904761904761905,
+++      0.8055555555555556,
+++      0.6904761904761905,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.6904761904761905,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.6904761904761905,
+++      0.6904761904761905,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.8055555555555556,
+++      0.6041666666666666,
+++      0.8055555555555556,
+++      0.6904761904761905,
+++      0.6041666666666666
+++    ]
+++  },
+++  "before": {
+++    "hasLevel": false,
+++    "valid": false,
+++    "lastFailReason": "noCandidate",
+++    "structural": {
+++      "ok": false,
+++      "reason": "候选淘汰主因「usableSpaceDeviation」70/70 次；全部计数 {\"baseline\":0,\"struct\":0,\"structSurplus\":0,\"structHoles\":0,\"structReach\":0,\"structPipeExit\":0,\"pipeCapacity\":0,\"pipeDepth\":0,\"rowTrim\":0,\"bind\":0,\"conservation\":0,\"structuralCheck\":0,\"access\":0,\"screen\":0,\"usableSpaceDeviation\":70}；实测可用空间中位 69.0%（范围 60.4~80.6%，n=70）",
+++      "failCounts": {
+++        "baseline": 0,
+++        "struct": 0,
+++        "structSurplus": 0,
+++        "structHoles": 0,
+++        "structReach": 0,
+++        "structPipeExit": 0,
+++        "pipeCapacity": 0,
+++        "pipeDepth": 0,
+++        "rowTrim": 0,
+++        "bind": 0,
+++        "conservation": 0,
+++        "structuralCheck": 0,
+++        "access": 0,
+++        "screen": 0,
+++        "usableSpaceDeviation": 70
+++      }
+++    },
+++    "repair": null,
+++    "board": null,
+++    "hash": null,
+++    "stopReason": "no_candidate"
+++  },
+++  "after": {
+++    "hasLevel": true,
+++    "valid": true,
+++    "lastFailReason": null,
+++    "structural": null,
+++    "repair": {
+++      "schema": "usable-space-repair-v1",
+++      "applied": true,
+++      "tested": 1,
+++      "skipped": null,
+++      "from": 0.86,
+++      "to": 0.690476,
+++      "failureCount": 70,
+++      "capacityUnchanged": true,
+++      "elapsedMs": 5296,
+++      "hasLevel": true
+++    },
+++    "board": {
+++      "rows": 6,
+++      "cols": 6
+++    },
+++    "hash": "4b1ee966dec8d6ee5133076593d86f87b801a6b24e703b54c4996f489313d307",
+++    "stopReason": "pass_early_stop"
+++  },
+++  "successControl": {
+++    "before": {
+++      "hasLevel": true,
+++      "valid": true,
+++      "lastFailReason": null,
+++      "structural": null,
+++      "repair": null,
+++      "board": {
+++        "rows": 6,
+++        "cols": 6
+++      },
+++      "hash": "41f45c43f802e865920f66daf5c5305c526265e785d46dc1e392b6defdee94c5",
+++      "stopReason": "pass_early_stop"
+++    },
+++    "sameObject": true,
+++    "repair": null,
+++    "hashUnchanged": true
+++  }
+++}
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_\351\242\204\347\231\273\350\256\260_v522.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_\351\242\204\347\231\273\350\256\260_v522.md"
++new file mode 100644
++index 0000000..f1b7c77
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_\351\242\204\347\231\273\350\256\260_v522.md"
++@@ -0,0 +1,19 @@
+++# 可用率失败驱动重试与快速失败退避 · v522预登记
+++
+++> Kimi。基线 `ed468cd`（v521）。只修目标模式控制器的usableSpaceDeviation，不改时间模式、容量合同或v521最终门。
+++
+++## 实现合同
+++
+++- 结构失败返回真实 `realUsable/target/deviation/rows/cols`，flowStats汇总；不得从70/70主因猜一个固定目标。
+++- 仅usableSpaceDeviation占失败多数且样本≥3时，以真实可用率中位数作为新目标；同轮同seed同 `produceDispatch` 最多重试一次。
+++- 重试使用本轮剩余预算，不修改boxSizeMin/Max、capNormMin/Max、障碍或棋盘范围；失败保留原结果和诊断，不递归。
+++- worker与主线程连续快速无候选采用0.1秒递增、最高1秒退避；有关卡或非快速失败清零。
+++
+++## 通过条件
+++
+++1. v521精确失败seed1978235744：基线noCandidate；一次实测中位重试得到有关卡结果，记录from/to和耗时。
+++2. cutOnly成功臂不触发重试；006已知成功v521/v522最终hash/pass不变。
+++3. v521近失最终门与时间模式保护不变。
+++4. 真实UI不再出现数百轮/秒，能停止并逐关落库；v521最终证据字段正常。
+++5. 任一容量越界、已知成功回退或绕开produceDispatch即否决。
+++
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\346\210\220\345\212\237\344\277\235\346\212\244_006_1002_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\346\210\220\345\212\237\344\277\235\346\212\244_006_1002_v522.json"
++new file mode 100644
++index 0000000..ca0281b
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\346\210\220\345\212\237\344\277\235\346\212\244_006_1002_v522.json"
++@@ -0,0 +1,172 @@
+++{
+++  "schema": "usable-space-repair-generation-ab-v1",
+++  "date": "2026-10-26",
+++  "oldCommit": "ed468cd",
+++  "reviewMix": false,
+++  "summary": {
+++    "seed": 1002,
+++    "budgetMs": 70000,
+++    "roundMs": 20000,
+++    "runs": 2,
+++    "pass": {
+++      "old": 1,
+++      "new": 1
+++    },
+++    "struct": {
+++      "old": 1,
+++      "new": 1
+++    },
+++    "passRegressions": [],
+++    "totalWallMs": {
+++      "old": 17085,
+++      "new": 16671
+++    }
+++  },
+++  "pairs": [
+++    {
+++      "image": "006",
+++      "pass": [
+++        true,
+++        true
+++      ],
+++      "struct": [
+++        true,
+++        true
+++      ],
+++      "wallMs": [
+++        17085,
+++        16671
+++      ],
+++      "rounds": [
+++        1,
+++        1
+++      ],
+++      "distance": [
+++        0,
+++        0
+++      ],
+++      "midBuffer34Pct": [
+++        60,
+++        60
+++      ],
+++      "passRegression": false,
+++      "sameHash": true
+++    }
+++  ],
+++  "rows": [
+++    {
+++      "arm": "old",
+++      "image": "006",
+++      "seed": 1002,
+++      "wallMs": 17085,
+++      "overrunMs": 0,
+++      "rounds": 1,
+++      "stop": "pass",
+++      "valid": true,
+++      "struct": true,
+++      "pass": true,
+++      "distance": 0,
+++      "midBuffer34Pct": 60,
+++      "release": "found",
+++      "gateReasons": [],
+++      "fullMedian2": 1,
+++      "capacity": {
+++        "schema": "capacity-evidence-v1",
+++        "rows": 6,
+++        "cols": 6,
+++        "boardFloorPass": true,
+++        "cars": 34,
+++        "capacitySum": 1225,
+++        "pixels": 1225,
+++        "conserved": true,
+++        "minCap": 25,
+++        "maxCap": 46,
+++        "boxSizeMin": 31,
+++        "boxSizeMax": 46,
+++        "belowMin": 9,
+++        "aboveMax": 0,
+++        "microCarMax": 2,
+++        "microCars": [],
+++        "microCount": 0,
+++        "rangeExactFeasible": false,
+++        "infeasibleColors": [
+++          {
+++            "color": 4,
+++            "total": 61
+++          },
+++          {
+++            "color": 13,
+++            "total": 55
+++          },
+++          {
+++            "color": 34,
+++            "total": 50
+++          }
+++        ],
+++        "row0Cars": 6,
+++        "row0Colors": 4,
+++        "row0MaxSameColor": 2,
+++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+++      },
+++      "hash": "296afc742d30e462deeb5c6c80826cd73deac86316ca9bd5e30b7c1895394b19",
+++      "error": null
+++    },
+++    {
+++      "arm": "new",
+++      "image": "006",
+++      "seed": 1002,
+++      "wallMs": 16671,
+++      "overrunMs": 0,
+++      "rounds": 1,
+++      "stop": "pass",
+++      "valid": true,
+++      "struct": true,
+++      "pass": true,
+++      "distance": 0,
+++      "midBuffer34Pct": 60,
+++      "release": "found",
+++      "gateReasons": [],
+++      "fullMedian2": 1,
+++      "capacity": {
+++        "schema": "capacity-evidence-v1",
+++        "rows": 6,
+++        "cols": 6,
+++        "boardFloorPass": true,
+++        "cars": 34,
+++        "capacitySum": 1225,
+++        "pixels": 1225,
+++        "conserved": true,
+++        "minCap": 25,
+++        "maxCap": 46,
+++        "boxSizeMin": 31,
+++        "boxSizeMax": 46,
+++        "belowMin": 9,
+++        "aboveMax": 0,
+++        "microCarMax": 2,
+++        "microCars": [],
+++        "microCount": 0,
+++        "rangeExactFeasible": false,
+++        "infeasibleColors": [
+++          {
+++            "color": 4,
+++            "total": 61
+++          },
+++          {
+++            "color": 13,
+++            "total": 55
+++          },
+++          {
+++            "color": 34,
+++            "total": 50
+++          }
+++        ],
+++        "row0Cars": 6,
+++        "row0Colors": 4,
+++        "row0MaxSameColor": 2,
+++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+++      },
+++      "hash": "296afc742d30e462deeb5c6c80826cd73deac86316ca9bd5e30b7c1895394b19",
+++      "error": null
+++    }
+++  ]
+++}
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\224\237\346\210\220\345\257\271\347\205\247_v522.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\224\237\346\210\220\345\257\271\347\205\247_v522.js"
++new file mode 100644
++index 0000000..646a991
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\224\237\346\210\220\345\257\271\347\205\247_v522.js"
++@@ -0,0 +1,49 @@
+++#!/usr/bin/env node
+++/** v522：v521 vs 实测可用率重试，同图同seed同预算真实生成。 */
+++'use strict';
+++const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process'), crypto = require('crypto');
+++const ROOT = path.join(__dirname, '..', '..'), REL = '02_工程/完整主bin快照_20261012/bin/js', BIN = path.join(ROOT, REL);
+++const CANDIDATE = BIN;
+++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js', 'source-preflight.js'];
+++function opt(n, d) { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; }
+++const seed = +opt('seed', '77003'), budgetMs = +opt('budget', '45000'), roundMs = +opt('round', '20000'), out = opt('out', ''), only = opt('images', '006,007,recommend').split(','), reviewMix = opt('review-mix', '1') === '1';
+++function load(arm) {
+++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
+++  vm.createContext(sb);
+++  for (const f of FILES) {
+++    const source = arm === 'old' ? cp.execFileSync('git', ['show', 'ed468cd:' + REL + '/' + f], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }) :
+++      fs.readFileSync((f === 'utils.js' || f === 'generator.js') ? path.join(CANDIDATE, f) : path.join(BIN, f), 'utf8');
+++    vm.runInContext(source, sb, { filename: arm + '/' + f });
+++  }
+++  return sb.AntSolver;
+++}
+++const arms = { old: load('old'), new: load('new') };
+++const images = { '006': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt', '007': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt', '010': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_010.txt', recommend: '实验关/已知不可救/推荐_35x35_碎块_20261023.txt' };
+++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
+++function run(arm, id) {
+++  const A = arms[arm], G = A.Generator, file = images[id], blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, file), 'utf8')), band = G.deriveCapacityBand(blocks), t0 = Date.now();
+++  const cfg = { seed, goalPerRoundMs: roundMs, goalMaxMs: budgetMs, goalMaxRounds: 0, goalSharedBudget: true, experienceGoal: true, reviewMix,
+++    generatorFlow: 'new_fixed', boxSizeMin: band.band[0], boxSizeMax: band.band[1], capNormMin: band.band[0], capNormMax: band.band[1], capScalePlan: [1.45, 1.15], cutMode: 'layerCut2', candidateCount: 3, fullTime: true, portfolioK: 1,
+++    acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4.8, targetSteadyMin: 0, targetSteadyMax: 100, targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: .25,
+++    boardAllowSquare: true, boardRowsMin: 6, boardRowsMax: 9, boardColsMin: 6, boardColsMax: 11, boardHardRange: true, boardAuto: false, capacityTuneMs: 5000, capacityTuneCars: 8, capacityTuneVariants: 48 };
+++  let r; try { r = G.produceGoal(blocks, cfg); } catch (e) { r = { level: null, valid: false, error: String(e && e.message || e) }; }
+++  const wallMs = Date.now() - t0, ev = r && r._experienceFull || null, q = r && r.level ? A.Quality.fromGeneration(r) : null, fc = r && r.goodV3 && r.goodV3.fillCurve || {};
+++  const rec = { arm, image: id, seed, wallMs, overrunMs: Math.max(0, wallMs - budgetMs), rounds: r && r.goalRounds || 0, stop: r && r.goalStopReason || null,
+++    valid: !!(r && r.valid), struct: !!(r && r.level && G.goalStructPass(r)), pass: !!(r && r.level && G.goalResultExperiencePass(r, cfg)),
+++    distance: ev && ev.metrics && ev.metrics.distance, midBuffer34Pct: ev && ev.metrics && ev.metrics.midBuffer34Pct, release: ev && ev.releaseDecision && ev.releaseDecision.status,
+++    gateReasons: q && q.gateReasons, fullMedian2: fc.fullMedian2, lowPressureFullMedian: fc.lowPressureFullMedian, lowPressureSteps: fc.lowPressureSteps,
+++    capacity: r && r.level ? A.Quality.capacityEvidence(r.level, r.config || cfg) : null, hash: r && r.level ? hash(r.level) : null, error: r && r.error || null };
+++  console.log(JSON.stringify(rec)); return rec;
+++}
+++const rows = [];
+++for (const id of only) for (const arm of ['old', 'new']) rows.push(run(arm, id));
+++const pairs = only.map(id => { const a = rows.find(x => x.image === id && x.arm === 'old'), b = rows.find(x => x.image === id && x.arm === 'new'); return { image: id,
+++  pass: [a.pass, b.pass], struct: [a.struct, b.struct], wallMs: [a.wallMs, b.wallMs], rounds: [a.rounds, b.rounds], distance: [a.distance, b.distance],
+++  midBuffer34Pct: [a.midBuffer34Pct, b.midBuffer34Pct], passRegression: a.pass && !b.pass, sameHash: a.hash === b.hash }; });
+++const summary = { seed, budgetMs, roundMs, runs: rows.length, pass: Object.fromEntries(['old', 'new'].map(a => [a, rows.filter(x => x.arm === a && x.pass).length])),
+++  struct: Object.fromEntries(['old', 'new'].map(a => [a, rows.filter(x => x.arm === a && x.struct).length])), passRegressions: pairs.filter(x => x.passRegression).map(x => x.image),
+++  totalWallMs: Object.fromEntries(['old', 'new'].map(a => [a, rows.filter(x => x.arm === a).reduce((n, x) => n + x.wallMs, 0)])) };
+++const report = { schema: 'usable-space-repair-generation-ab-v1', date: '2026-10-26', oldCommit: 'ed468cd', reviewMix, summary, pairs, rows };
+++if (out) fs.writeFileSync(path.resolve(ROOT, out), JSON.stringify(report, null, 2) + '\n');
+++console.log(JSON.stringify({ summary, pairs }, null, 2));
+++if (summary.passRegressions.length) process.exitCode = 1;
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.js"
++new file mode 100644
++index 0000000..0974ea4
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.js"
++@@ -0,0 +1,24 @@
+++#!/usr/bin/env node
+++/** v522：produceGoal精确失败seed的一轮实测重试与最终目标复核。 */
+++'use strict';
+++const fs = require('fs'), path = require('path'), vm = require('vm');
+++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js', 'source-preflight.js'];
+++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
+++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
+++const A = sb.AntSolver, G = A.Generator, blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt'), 'utf8'));
+++const cfg = { seed: 1978235744, goalMaxRounds: 1, goalMaxMs: 60000, goalPerRoundMs: 20000, goalSharedBudget: true, experienceGoal: true, reviewMix: false,
+++  generatorFlow: 'new_fixed', boxSizeMin: 31, boxSizeMax: 40, capNormMin: 31, capNormMax: 40, capScalePlan: [1.45, 1.15], cutMode: 'layerCut2', candidateCount: 14, fullTime: true,
+++  acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4.8, targetSteadyMin: 0, targetSteadyMax: 100, targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: .25,
+++  boardAllowSquare: true, boardRowsMin: 4, boardRowsMax: 6, boardColsMin: 6, boardColsMax: 8, boardHardRange: true, boardAuto: false,
+++  capacityTuneMs: 5000, capacityTuneCars: 8, capacityTuneVariants: 48, p7BaseCount: 1, maxPipes: 2, chainByDemand: 4,
+++  semanticObstacles: true, boardFirst: true, boardExpandOnOverflow: true, targetCarCount: 0, usableSpaceTarget: .86 };
+++const t = Date.now(), r = G.produceGoal(blocks, cfg), ev = r && r._experienceFull;
+++const repair = r && r.usableSpaceRepair ? JSON.parse(JSON.stringify(r.usableSpaceRepair)) : null;
+++const out = { schema: 'usable-space-goal-round-v1', date: '2026-10-26', ms: Date.now() - t, hasLevel: !!(r && r.level), valid: !!(r && r.valid), rounds: r && r.goalRounds,
+++  stop: r && r.goalStopReason, struct: !!(r && r.level && G.goalStructPass(r)), pass: !!(r && r.level && G.goalResultExperiencePass(r, cfg)), repair,
+++  experience: ev && { pass: ev.pass, metrics: ev.metrics, release: ev.releaseDecision && ev.releaseDecision.status },
+++  capacity: r && r.level && A.Quality.capacityEvidence(r.level, r.config || cfg), board: r && r.level && { rows: r.level.board.rows, cols: r.level.board.cols } };
+++fs.writeFileSync(path.join(__dirname, '可用率重试目标轮_v522.json'), JSON.stringify(out, null, 2) + '\n');
+++console.log(JSON.stringify(out, null, 2));
+++if (!out.hasLevel || !out.repair || out.repair.applied !== true || out.rounds !== 1 || !out.pass) process.exitCode = 1;
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.json"
++new file mode 100644
++index 0000000..3471d7e
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.json"
++@@ -0,0 +1,72 @@
+++{
+++  "schema": "usable-space-goal-round-v1",
+++  "date": "2026-10-26",
+++  "ms": 16479,
+++  "hasLevel": true,
+++  "valid": true,
+++  "rounds": 1,
+++  "stop": "pass",
+++  "struct": true,
+++  "pass": true,
+++  "repair": {
+++    "schema": "usable-space-repair-v1",
+++    "applied": true,
+++    "tested": 1,
+++    "skipped": null,
+++    "from": 0.86,
+++    "to": 0.690476,
+++    "failureCount": 70,
+++    "capacityUnchanged": true,
+++    "elapsedMs": 5889,
+++    "hasLevel": true
+++  },
+++  "experience": {
+++    "pass": true,
+++    "metrics": {
+++      "midSteps": 15,
+++      "midBuffer34Pct": 66.7,
+++      "midBuffer5Pct": 20,
+++      "maxBuffer5Run": 3,
+++      "significantReleaseCount": 1,
+++      "oscillationCount": 2,
+++      "lateHighPressurePct": 0,
+++      "maxBuffer": 5,
+++      "distance": 0
+++    },
+++    "release": "found"
+++  },
+++  "capacity": {
+++    "schema": "capacity-evidence-v1",
+++    "rows": 6,
+++    "cols": 6,
+++    "boardFloorPass": true,
+++    "cars": 29,
+++    "capacitySum": 1225,
+++    "pixels": 1225,
+++    "conserved": true,
+++    "minCap": 30,
+++    "maxCap": 58,
+++    "boxSizeMin": 31,
+++    "boxSizeMax": 58,
+++    "belowMin": 1,
+++    "aboveMax": 0,
+++    "microCarMax": 2,
+++    "microCars": [],
+++    "microCount": 0,
+++    "rangeExactFeasible": false,
+++    "infeasibleColors": [
+++      {
+++        "color": 4,
+++        "total": 61
+++      }
+++    ],
+++    "row0Cars": 6,
+++    "row0Colors": 4,
+++    "row0MaxSameColor": 2,
+++    "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+++  },
+++  "board": {
+++    "rows": 6,
+++    "cols": 6
+++  }
+++}
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++index 0df9620..64eb1ea 100644
++--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++@@ -52,15 +52,17 @@
++ | v520 全局接入门否决 | 能否直接替换goalStructPass | ❌ 006成功保持，但010/32677旧1→新0；推荐best distance 42.3→72.6；已回退，生产仍v518 | `低压力门生成对照_v520.js` + 三份对照JSON + 否决补丁 | §510 |
++ | v521 最终低压力补充 | 最终验收新口径能否保持搜索不变 | ✅ 近失救援；006/010与推荐best新旧hash全同；时间模式/其他结构失败不放宽 | `最终低压力门_预登记_v521.md` + 复核与三份生成对照 | §511 |
++ | v521 UI无候选诊断 | UI高速noCandidate是否门类引起 | 非门类：精确headless为usableSpaceDeviation 70/70；boardOnly仍败，targetOnly/cutOnly出关；UI验收待v522 | `UI无关卡归因_预登记_v521.md` + `真实UI诊断_v521.json` | §511 |
+++| v522 实测可用率重试 | 能否按失败原因修而非反复换seed | ✅ 70样本中位69.0%，0.86→0.690476一次出关；目标轮66.7%完整pass；006成功hash不变 | `可用率失败重试_预登记_v522.md` + 重试/目标轮/成功保护JSON | §512 |
+++| v522 真实UI | 快速无候选退避与落库是否可用 | ✅ A/C均重试不再空转；B第4轮达标，批次32合格1/1、COMPLETED；最终结构/容量证据完整 | `真实UI验收_v522.json` | §512 |
++ 
++ ## 当前权威产物
++ 
++ | 用途 | 文件 |
++ |---|---|
++ | 生产现状 | `01_交接文档/交接摘要_v500_20261025.md` |
++-| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（通用结构近失精调已否决，下一项按失败曲线定向选车/真人校准） |
+++| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（v522可用率重试与UI已接，下一项多图泛化/release unknown/真人校准） |
++ | 手册/参数 | `01_交接文档/工程说明.md` |
++ | 历史决策 | `01_交接文档/工作日志_20261012.md`（按节号查） |
++ | 结论摘要 | 本目录 `归因_v495.md`、`E5_结果.md`、`E6a_结果.md`、`E6b_结果.md`、`E6c_*.md`、`P4_枚举.md` |
++-| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v518.patch` |
+++| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v522.patch` |
++ | 历史版本 | `git log --oneline`（删除项都在 git 历史里） |
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js"
++index 774e1d9..88d5e9e 100644
++--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js"
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js"
++@@ -3,13 +3,14 @@
++ 'use strict';
++ const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process'), assert = require('assert');
++ const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js'), CAND = path.join(__dirname, '候选最终低压力门_v521');
+++const CURRENT = process.argv.includes('--current'), OUT_NAME = CURRENT ? '最终低压力门近失复核_v522.json' : '最终低压力门近失复核_v521.json';
++ const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js'];
++ function load(arm) {
++   const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++   vm.createContext(sb);
++   for (const f of FILES) {
++     const source = arm === 'old' ? cp.execFileSync('git', ['show', '07f7c11:02_工程/完整主bin快照_20261012/bin/js/' + f], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }) :
++-      fs.readFileSync((f === 'utils.js' || f === 'generator.js') ? path.join(CAND, f) : path.join(BIN, f), 'utf8');
+++      fs.readFileSync((f === 'utils.js' || f === 'generator.js') ? path.join(CURRENT ? BIN : CAND, f) : path.join(BIN, f), 'utf8');
++     vm.runInContext(source, sb, { filename: f });
++   }
++   return sb.AntSolver;
++@@ -36,6 +37,7 @@ const otherFail = { level: A.parseLevel(raw), valid: true, goodV3: { persist: {
++ const evidence = A.Quality.finalStructureFromGeneration(otherFail);
++ assert.strictEqual(evidence.pass, false); assert.ok(evidence.remainingReasons.some(x => x.indexOf('freeLow') >= 0));
++ out.otherGateProtection = { pass: evidence.pass, remainingReasons: evidence.remainingReasons };
++-fs.writeFileSync(path.join(__dirname, '最终低压力门近失复核_v521.json'), JSON.stringify(out, null, 2) + '\n');
+++out.underTest = CURRENT ? 'working-v522' : 'candidate-v521';
+++fs.writeFileSync(path.join(__dirname, OUT_NAME), JSON.stringify(out, null, 2) + '\n');
++ console.log(JSON.stringify({ old: { base: out.old.baseStruct, pass: out.old.resultPass }, new: { base: out.new.baseStruct, final: out.new.finalStruct.pass,
++   pass: out.new.resultPass, timeModePass: out.new.timeModeResultPass, source: out.new.acceptedByFinalStructure ? 'final' : null }, otherGateProtection: out.otherGateProtection }, null, 2));
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\350\277\221\345\244\261\345\244\215\346\240\270_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\350\277\221\345\244\261\345\244\215\346\240\270_v522.json"
++new file mode 100644
++index 0000000..fa74e80
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\350\277\221\345\244\261\345\244\215\346\240\270_v522.json"
++@@ -0,0 +1,105 @@
+++{
+++  "schema": "final-low-pressure-near-verification-v1",
+++  "date": "2026-10-26",
+++  "old": {
+++    "baseStruct": false,
+++    "finalStruct": null,
+++    "resultPass": false,
+++    "timeModeResultPass": false,
+++    "acceptedByVerifiedRoute": false,
+++    "acceptedByFinalStructure": false,
+++    "capacity": {
+++      "schema": "capacity-evidence-v1",
+++      "rows": 9,
+++      "cols": 10,
+++      "boardFloorPass": true,
+++      "cars": 85,
+++      "capacitySum": 1225,
+++      "pixels": 1225,
+++      "conserved": true,
+++      "minCap": 10,
+++      "maxCap": 19,
+++      "boxSizeMin": 13,
+++      "boxSizeMax": 19,
+++      "belowMin": 21,
+++      "aboveMax": 0,
+++      "microCarMax": 2,
+++      "microCars": [],
+++      "microCount": 0,
+++      "rangeExactFeasible": true,
+++      "infeasibleColors": [],
+++      "row0Cars": 10,
+++      "row0Colors": 5,
+++      "row0MaxSameColor": 2,
+++      "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+++    }
+++  },
+++  "new": {
+++    "baseStruct": false,
+++    "finalStruct": {
+++      "pass": true,
+++      "source": "low_pressure_final",
+++      "baseGatePass": false,
+++      "baseGateReasons": [
+++        "吃满中位 4>3"
+++      ],
+++      "remainingReasons": [],
+++      "lowPressureSteps": 33,
+++      "lowPressureFullMedian": 2,
+++      "highPressureSteps": 45,
+++      "highPressureFullMedian": 5,
+++      "fullMedian2": 4
+++    },
+++    "resultPass": true,
+++    "timeModeResultPass": false,
+++    "acceptedByVerifiedRoute": false,
+++    "acceptedByFinalStructure": true,
+++    "experience": {
+++      "pass": true,
+++      "metrics": {
+++        "midSteps": 51,
+++        "midBuffer34Pct": 74.5,
+++        "midBuffer5Pct": 3.9,
+++        "maxBuffer5Run": 2,
+++        "significantReleaseCount": 3,
+++        "oscillationCount": 3,
+++        "lateHighPressurePct": 58.8,
+++        "maxBuffer": 5,
+++        "distance": 0
+++      },
+++      "release": "found"
+++    },
+++    "capacity": {
+++      "schema": "capacity-evidence-v1",
+++      "rows": 9,
+++      "cols": 10,
+++      "boardFloorPass": true,
+++      "cars": 85,
+++      "capacitySum": 1225,
+++      "pixels": 1225,
+++      "conserved": true,
+++      "minCap": 10,
+++      "maxCap": 19,
+++      "boxSizeMin": 13,
+++      "boxSizeMax": 19,
+++      "belowMin": 21,
+++      "aboveMax": 0,
+++      "microCarMax": 2,
+++      "microCars": [],
+++      "microCount": 0,
+++      "rangeExactFeasible": true,
+++      "infeasibleColors": [],
+++      "row0Cars": 10,
+++      "row0Colors": 5,
+++      "row0MaxSameColor": 2,
+++      "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+++    }
+++  },
+++  "otherGateProtection": {
+++    "pass": false,
+++    "remainingReasons": [
+++      "freeLow 45%>30%"
+++    ]
+++  },
+++  "underTest": "working-v522"
+++}
++diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\234\237\345\256\236UI\351\252\214\346\224\266_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\234\237\345\256\236UI\351\252\214\346\224\266_v522.json"
++new file mode 100644
++index 0000000..790fbb2
++--- /dev/null
+++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\234\237\345\256\236UI\351\252\214\346\224\266_v522.json"
++@@ -0,0 +1,91 @@
+++{
+++  "schema": "v522-ui-acceptance-v1",
+++  "date": "2026-10-26",
+++  "batch": 32,
+++  "status": "COMPLETED",
+++  "persisted": 1,
+++  "qualified": 1,
+++  "unqualified": 0,
+++  "errors": 0,
+++  "name": "35x35拼接图纸_006.txt",
+++  "result": "合格",
+++  "classification": "可玩·没岔路",
+++  "structure": "通过",
+++  "goalStop": "pass",
+++  "experience": {
+++    "pass": true,
+++    "metrics": {
+++      "midSteps": 17,
+++      "midBuffer34Pct": 52.9,
+++      "midBuffer5Pct": 0,
+++      "maxBuffer5Run": 0,
+++      "significantReleaseCount": 2,
+++      "oscillationCount": 2,
+++      "lateHighPressurePct": 40,
+++      "maxBuffer": 4,
+++      "distance": 0
+++    },
+++    "release": "found"
+++  },
+++  "finalStructure": {
+++    "pass": true,
+++    "source": "base_gate",
+++    "baseGatePass": true,
+++    "baseGateReasons": [],
+++    "remainingReasons": [],
+++    "lowPressureSteps": 15,
+++    "lowPressureFullMedian": 1,
+++    "highPressureSteps": 11,
+++    "highPressureFullMedian": 1,
+++    "fullMedian2": 1
+++  },
+++  "acceptedByFinalStructure": false,
+++  "usableSpaceRepair": null,
+++  "capacity": {
+++    "schema": "capacity-evidence-v1",
+++    "rows": 6,
+++    "cols": 6,
+++    "boardFloorPass": true,
+++    "cars": 32,
+++    "capacitySum": 1225,
+++    "pixels": 1225,
+++    "conserved": true,
+++    "minCap": 24,
+++    "maxCap": 46,
+++    "boxSizeMin": 31,
+++    "boxSizeMax": 46,
+++    "belowMin": 5,
+++    "aboveMax": 0,
+++    "microCarMax": 2,
+++    "microCars": [],
+++    "microCount": 0,
+++    "rangeExactFeasible": false,
+++    "infeasibleColors": [
+++      {
+++        "color": 4,
+++        "total": 61
+++      },
+++      {
+++        "color": 13,
+++        "total": 55
+++      },
+++      {
+++        "color": 34,
+++        "total": 50
+++      }
+++    ],
+++    "row0Cars": 6,
+++    "row0Colors": 5,
+++    "row0MaxSameColor": 2,
+++    "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+++  },
+++  "board": {
+++    "rows": 6,
+++    "cols": 6
+++  },
+++  "paths": {
+++    "level": "合格关卡/35x35拼接图纸_006.json",
+++    "txt": "txt图/35x35拼接图纸_006.txt",
+++    "debug": "生产文档/关卡数据/35x35拼接图纸_006.json"
+++  }
+++}
++diff --git a/README.md b/README.md
++index 1589105..c4362c1 100644
++--- a/README.md
+++++ b/README.md
++@@ -2,7 +2,7 @@
++ 
++ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
++ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
++-> 当前版本 **v521**（最终低压力补充验收；headless已验证，UI退避修复在v522继续）。
+++> 当前版本 **v522**（实测可用率失败重试与最终低压力补充验收，真实UI已通过）。
++ >
++ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
++ 
++@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
++ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
++ | **看框架图** | [`01_交接文档/框架图_生成流程_动画版.html`](01_交接文档/框架图_生成流程_动画版.html)（五阶段播放 + 详细流程图） |
++ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
++-| **看最新实施与实验（v502~v521）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+++| **看最新实施与实验（v502~v522）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
++ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
++ | **查某天为什么这么改** | [`01_交接文档/工作日志_20261012.md`](01_交接文档/工作日志_20261012.md)（401 节，**按主题索引查，别整份读**） |
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.js"
+new file mode 100644
+index 0000000..c9d0cd7
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.js"
+@@ -0,0 +1,31 @@
++#!/usr/bin/env node
++/** v522：精确失败基底的一次实测可用率重试与成功不触发保护。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js', 'source-preflight.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator, blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt'), 'utf8'));
++const base = { seed: 1978235744, goalSharedBudget: true, experienceGoal: true, reviewMix: false, generatorFlow: 'new_fixed',
++  boxSizeMin: 31, boxSizeMax: 40, capNormMin: 31, capNormMax: 40, capScalePlan: [1.45, 1.15], cutMode: 'layerCut2', candidateCount: 14, fullTime: true, portfolioK: 1,
++  acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4.8, targetSteadyMin: 0, targetSteadyMax: 100, targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: .25,
++  boardAllowSquare: true, boardRowsMin: 4, boardRowsMax: 6, boardColsMin: 6, boardColsMax: 8, boardHardRange: true, boardAuto: false,
++  capacityTuneMs: 5000, capacityTuneCars: 8, capacityTuneVariants: 48, timeBudgetMs: 20000, p7BaseCount: 1, maxPipes: 2, chainByDemand: 4,
++  semanticObstacles: true, boardFirst: true, boardExpandOnOverflow: true, targetCarCount: 0, usableSpaceTarget: .86, _trace: [] };
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function slim(r) { return { hasLevel: !!(r && r.level), valid: !!(r && r.valid), lastFailReason: r && r.lastFailReason || null,
++  structural: r && r.structural || null, repair: r && r.usableSpaceRepair || null, board: r && r.level && r.level.board ? { rows: r.level.board.rows, cols: r.level.board.cols } : null,
++  hash: r && r.level ? hash(r.level) : null, stopReason: r && r.perf && r.perf.stopReason || null }; }
++const t0 = Date.now(), failed = G.produce(blocks, Object.assign({}, base, { _trace: [] })), beforeMs = Date.now() - t0;
++const failureEvidence = failed.flowStats && { fail: failed.flowStats.fail, usableSamples: failed.flowStats.usableSpaceFailures && failed.flowStats.usableSpaceFailures.length,
++  realValues: failed.flowStats.usableSpaceFailures && failed.flowStats.usableSpaceFailures.map(x => x.realUsable) };
++const t1 = Date.now(), repaired = G.repairUsableNoCandidate(blocks, failed, base, { timeBudgetMs: 20000 }), repairWallMs = Date.now() - t1;
++const success = G.produce(blocks, Object.assign({}, base, { cutMode: 'exposeCut', _trace: [] }));
++const successBeforeHash = success && success.level ? hash(success.level) : null, successSame = G.repairUsableNoCandidate(blocks, success, base, { timeBudgetMs: 20000 });
++const out = { schema: 'usable-space-repair-test-v1', date: '2026-10-26', beforeMs, repairWallMs, failureEvidence,
++  before: slim(failed), after: slim(repaired), successControl: { before: slim(success), sameObject: successSame === success,
++    repair: successSame && successSame.usableSpaceRepair || null, hashUnchanged: successSame && successSame.level && hash(successSame.level) === successBeforeHash } };
++fs.writeFileSync(path.join(__dirname, '可用率失败重试_v522.json'), JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify({ beforeMs, repairWallMs, before: out.before, after: out.after, successControl: out.successControl }, null, 2));
++if (out.before.hasLevel || !out.after.hasLevel || !out.after.repair || !out.after.repair.applied || !out.after.repair.capacityUnchanged || !out.successControl.sameObject) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.json"
+new file mode 100644
+index 0000000..923193c
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_v522.json"
+@@ -0,0 +1,170 @@
++{
++  "schema": "usable-space-repair-test-v1",
++  "date": "2026-10-26",
++  "beforeMs": 218,
++  "repairWallMs": 5296,
++  "failureEvidence": {
++    "fail": {
++      "baseline": 0,
++      "struct": 0,
++      "structSurplus": 0,
++      "structHoles": 0,
++      "structReach": 0,
++      "structPipeExit": 0,
++      "pipeCapacity": 0,
++      "pipeDepth": 0,
++      "rowTrim": 0,
++      "bind": 0,
++      "conservation": 0,
++      "structuralCheck": 0,
++      "access": 0,
++      "screen": 0,
++      "usableSpaceDeviation": 70
++    },
++    "usableSamples": 70,
++    "realValues": [
++      0.6904761904761905,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.6904761904761905,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.6904761904761905,
++      0.6904761904761905,
++      0.6041666666666666,
++      0.6904761904761905,
++      0.6904761904761905,
++      0.6904761904761905,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.6904761904761905,
++      0.6904761904761905,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.6904761904761905,
++      0.6904761904761905,
++      0.6904761904761905,
++      0.8055555555555556,
++      0.6904761904761905,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.6904761904761905,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.6904761904761905,
++      0.6904761904761905,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.8055555555555556,
++      0.6041666666666666,
++      0.8055555555555556,
++      0.6904761904761905,
++      0.6041666666666666
++    ]
++  },
++  "before": {
++    "hasLevel": false,
++    "valid": false,
++    "lastFailReason": "noCandidate",
++    "structural": {
++      "ok": false,
++      "reason": "候选淘汰主因「usableSpaceDeviation」70/70 次；全部计数 {\"baseline\":0,\"struct\":0,\"structSurplus\":0,\"structHoles\":0,\"structReach\":0,\"structPipeExit\":0,\"pipeCapacity\":0,\"pipeDepth\":0,\"rowTrim\":0,\"bind\":0,\"conservation\":0,\"structuralCheck\":0,\"access\":0,\"screen\":0,\"usableSpaceDeviation\":70}；实测可用空间中位 69.0%（范围 60.4~80.6%，n=70）",
++      "failCounts": {
++        "baseline": 0,
++        "struct": 0,
++        "structSurplus": 0,
++        "structHoles": 0,
++        "structReach": 0,
++        "structPipeExit": 0,
++        "pipeCapacity": 0,
++        "pipeDepth": 0,
++        "rowTrim": 0,
++        "bind": 0,
++        "conservation": 0,
++        "structuralCheck": 0,
++        "access": 0,
++        "screen": 0,
++        "usableSpaceDeviation": 70
++      }
++    },
++    "repair": null,
++    "board": null,
++    "hash": null,
++    "stopReason": "no_candidate"
++  },
++  "after": {
++    "hasLevel": true,
++    "valid": true,
++    "lastFailReason": null,
++    "structural": null,
++    "repair": {
++      "schema": "usable-space-repair-v1",
++      "applied": true,
++      "tested": 1,
++      "skipped": null,
++      "from": 0.86,
++      "to": 0.690476,
++      "failureCount": 70,
++      "capacityUnchanged": true,
++      "elapsedMs": 5296,
++      "hasLevel": true
++    },
++    "board": {
++      "rows": 6,
++      "cols": 6
++    },
++    "hash": "4b1ee966dec8d6ee5133076593d86f87b801a6b24e703b54c4996f489313d307",
++    "stopReason": "pass_early_stop"
++  },
++  "successControl": {
++    "before": {
++      "hasLevel": true,
++      "valid": true,
++      "lastFailReason": null,
++      "structural": null,
++      "repair": null,
++      "board": {
++        "rows": 6,
++        "cols": 6
++      },
++      "hash": "41f45c43f802e865920f66daf5c5305c526265e785d46dc1e392b6defdee94c5",
++      "stopReason": "pass_early_stop"
++    },
++    "sameObject": true,
++    "repair": null,
++    "hashUnchanged": true
++  }
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_\351\242\204\347\231\273\350\256\260_v522.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_\351\242\204\347\231\273\350\256\260_v522.md"
+new file mode 100644
+index 0000000..b5f65cf
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\345\244\261\350\264\245\351\207\215\350\257\225_\351\242\204\347\231\273\350\256\260_v522.md"
+@@ -0,0 +1,18 @@
++# 可用率失败驱动重试与快速失败退避 · v522预登记
++
++> Kimi。基线 `ed468cd`（v521）。只修目标模式控制器的usableSpaceDeviation，不改时间模式、容量合同或v521最终门。
++
++## 实现合同
++
++- 结构失败返回真实 `realUsable/target/deviation/rows/cols`，flowStats汇总；不得从70/70主因猜一个固定目标。
++- 仅usableSpaceDeviation占失败多数且样本≥3时，以真实可用率中位数作为新目标；同轮同seed同 `produceDispatch` 最多重试一次。
++- 重试使用本轮剩余预算，不修改boxSizeMin/Max、capNormMin/Max、障碍或棋盘范围；失败保留原结果和诊断，不递归。
++- worker与主线程连续快速无候选采用0.1秒递增、最高1秒退避；有关卡或非快速失败清零。
++
++## 通过条件
++
++1. v521精确失败seed1978235744：基线noCandidate；一次实测中位重试得到有关卡结果，记录from/to和耗时。
++2. cutOnly成功臂不触发重试；006已知成功v521/v522最终hash/pass不变。
++3. v521近失最终门与时间模式保护不变。
++4. 真实UI不再出现数百轮/秒，能停止并逐关落库；v521最终证据字段正常。
++5. 任一容量越界、已知成功回退或绕开produceDispatch即否决。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\346\210\220\345\212\237\344\277\235\346\212\244_006_1002_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\346\210\220\345\212\237\344\277\235\346\212\244_006_1002_v522.json"
+new file mode 100644
+index 0000000..ca0281b
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\346\210\220\345\212\237\344\277\235\346\212\244_006_1002_v522.json"
+@@ -0,0 +1,172 @@
++{
++  "schema": "usable-space-repair-generation-ab-v1",
++  "date": "2026-10-26",
++  "oldCommit": "ed468cd",
++  "reviewMix": false,
++  "summary": {
++    "seed": 1002,
++    "budgetMs": 70000,
++    "roundMs": 20000,
++    "runs": 2,
++    "pass": {
++      "old": 1,
++      "new": 1
++    },
++    "struct": {
++      "old": 1,
++      "new": 1
++    },
++    "passRegressions": [],
++    "totalWallMs": {
++      "old": 17085,
++      "new": 16671
++    }
++  },
++  "pairs": [
++    {
++      "image": "006",
++      "pass": [
++        true,
++        true
++      ],
++      "struct": [
++        true,
++        true
++      ],
++      "wallMs": [
++        17085,
++        16671
++      ],
++      "rounds": [
++        1,
++        1
++      ],
++      "distance": [
++        0,
++        0
++      ],
++      "midBuffer34Pct": [
++        60,
++        60
++      ],
++      "passRegression": false,
++      "sameHash": true
++    }
++  ],
++  "rows": [
++    {
++      "arm": "old",
++      "image": "006",
++      "seed": 1002,
++      "wallMs": 17085,
++      "overrunMs": 0,
++      "rounds": 1,
++      "stop": "pass",
++      "valid": true,
++      "struct": true,
++      "pass": true,
++      "distance": 0,
++      "midBuffer34Pct": 60,
++      "release": "found",
++      "gateReasons": [],
++      "fullMedian2": 1,
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 6,
++        "boardFloorPass": true,
++        "cars": 34,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 25,
++        "maxCap": 46,
++        "boxSizeMin": 31,
++        "boxSizeMax": 46,
++        "belowMin": 9,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 4,
++            "total": 61
++          },
++          {
++            "color": 13,
++            "total": 55
++          },
++          {
++            "color": 34,
++            "total": 50
++          }
++        ],
++        "row0Cars": 6,
++        "row0Colors": 4,
++        "row0MaxSameColor": 2,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "hash": "296afc742d30e462deeb5c6c80826cd73deac86316ca9bd5e30b7c1895394b19",
++      "error": null
++    },
++    {
++      "arm": "new",
++      "image": "006",
++      "seed": 1002,
++      "wallMs": 16671,
++      "overrunMs": 0,
++      "rounds": 1,
++      "stop": "pass",
++      "valid": true,
++      "struct": true,
++      "pass": true,
++      "distance": 0,
++      "midBuffer34Pct": 60,
++      "release": "found",
++      "gateReasons": [],
++      "fullMedian2": 1,
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 6,
++        "boardFloorPass": true,
++        "cars": 34,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 25,
++        "maxCap": 46,
++        "boxSizeMin": 31,
++        "boxSizeMax": 46,
++        "belowMin": 9,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 4,
++            "total": 61
++          },
++          {
++            "color": 13,
++            "total": 55
++          },
++          {
++            "color": 34,
++            "total": 50
++          }
++        ],
++        "row0Cars": 6,
++        "row0Colors": 4,
++        "row0MaxSameColor": 2,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "hash": "296afc742d30e462deeb5c6c80826cd73deac86316ca9bd5e30b7c1895394b19",
++      "error": null
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\224\237\346\210\220\345\257\271\347\205\247_v522.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\224\237\346\210\220\345\257\271\347\205\247_v522.js"
+new file mode 100644
+index 0000000..646a991
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\224\237\346\210\220\345\257\271\347\205\247_v522.js"
+@@ -0,0 +1,49 @@
++#!/usr/bin/env node
++/** v522：v521 vs 实测可用率重试，同图同seed同预算真实生成。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..'), REL = '02_工程/完整主bin快照_20261012/bin/js', BIN = path.join(ROOT, REL);
++const CANDIDATE = BIN;
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js', 'source-preflight.js'];
++function opt(n, d) { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; }
++const seed = +opt('seed', '77003'), budgetMs = +opt('budget', '45000'), roundMs = +opt('round', '20000'), out = opt('out', ''), only = opt('images', '006,007,recommend').split(','), reviewMix = opt('review-mix', '1') === '1';
++function load(arm) {
++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++  vm.createContext(sb);
++  for (const f of FILES) {
++    const source = arm === 'old' ? cp.execFileSync('git', ['show', 'ed468cd:' + REL + '/' + f], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }) :
++      fs.readFileSync((f === 'utils.js' || f === 'generator.js') ? path.join(CANDIDATE, f) : path.join(BIN, f), 'utf8');
++    vm.runInContext(source, sb, { filename: arm + '/' + f });
++  }
++  return sb.AntSolver;
++}
++const arms = { old: load('old'), new: load('new') };
++const images = { '006': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt', '007': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt', '010': '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_010.txt', recommend: '实验关/已知不可救/推荐_35x35_碎块_20261023.txt' };
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function run(arm, id) {
++  const A = arms[arm], G = A.Generator, file = images[id], blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, file), 'utf8')), band = G.deriveCapacityBand(blocks), t0 = Date.now();
++  const cfg = { seed, goalPerRoundMs: roundMs, goalMaxMs: budgetMs, goalMaxRounds: 0, goalSharedBudget: true, experienceGoal: true, reviewMix,
++    generatorFlow: 'new_fixed', boxSizeMin: band.band[0], boxSizeMax: band.band[1], capNormMin: band.band[0], capNormMax: band.band[1], capScalePlan: [1.45, 1.15], cutMode: 'layerCut2', candidateCount: 3, fullTime: true, portfolioK: 1,
++    acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4.8, targetSteadyMin: 0, targetSteadyMax: 100, targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: .25,
++    boardAllowSquare: true, boardRowsMin: 6, boardRowsMax: 9, boardColsMin: 6, boardColsMax: 11, boardHardRange: true, boardAuto: false, capacityTuneMs: 5000, capacityTuneCars: 8, capacityTuneVariants: 48 };
++  let r; try { r = G.produceGoal(blocks, cfg); } catch (e) { r = { level: null, valid: false, error: String(e && e.message || e) }; }
++  const wallMs = Date.now() - t0, ev = r && r._experienceFull || null, q = r && r.level ? A.Quality.fromGeneration(r) : null, fc = r && r.goodV3 && r.goodV3.fillCurve || {};
++  const rec = { arm, image: id, seed, wallMs, overrunMs: Math.max(0, wallMs - budgetMs), rounds: r && r.goalRounds || 0, stop: r && r.goalStopReason || null,
++    valid: !!(r && r.valid), struct: !!(r && r.level && G.goalStructPass(r)), pass: !!(r && r.level && G.goalResultExperiencePass(r, cfg)),
++    distance: ev && ev.metrics && ev.metrics.distance, midBuffer34Pct: ev && ev.metrics && ev.metrics.midBuffer34Pct, release: ev && ev.releaseDecision && ev.releaseDecision.status,
++    gateReasons: q && q.gateReasons, fullMedian2: fc.fullMedian2, lowPressureFullMedian: fc.lowPressureFullMedian, lowPressureSteps: fc.lowPressureSteps,
++    capacity: r && r.level ? A.Quality.capacityEvidence(r.level, r.config || cfg) : null, hash: r && r.level ? hash(r.level) : null, error: r && r.error || null };
++  console.log(JSON.stringify(rec)); return rec;
++}
++const rows = [];
++for (const id of only) for (const arm of ['old', 'new']) rows.push(run(arm, id));
++const pairs = only.map(id => { const a = rows.find(x => x.image === id && x.arm === 'old'), b = rows.find(x => x.image === id && x.arm === 'new'); return { image: id,
++  pass: [a.pass, b.pass], struct: [a.struct, b.struct], wallMs: [a.wallMs, b.wallMs], rounds: [a.rounds, b.rounds], distance: [a.distance, b.distance],
++  midBuffer34Pct: [a.midBuffer34Pct, b.midBuffer34Pct], passRegression: a.pass && !b.pass, sameHash: a.hash === b.hash }; });
++const summary = { seed, budgetMs, roundMs, runs: rows.length, pass: Object.fromEntries(['old', 'new'].map(a => [a, rows.filter(x => x.arm === a && x.pass).length])),
++  struct: Object.fromEntries(['old', 'new'].map(a => [a, rows.filter(x => x.arm === a && x.struct).length])), passRegressions: pairs.filter(x => x.passRegression).map(x => x.image),
++  totalWallMs: Object.fromEntries(['old', 'new'].map(a => [a, rows.filter(x => x.arm === a).reduce((n, x) => n + x.wallMs, 0)])) };
++const report = { schema: 'usable-space-repair-generation-ab-v1', date: '2026-10-26', oldCommit: 'ed468cd', reviewMix, summary, pairs, rows };
++if (out) fs.writeFileSync(path.resolve(ROOT, out), JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ summary, pairs }, null, 2));
++if (summary.passRegressions.length) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.js"
+new file mode 100644
+index 0000000..0974ea4
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.js"
+@@ -0,0 +1,24 @@
++#!/usr/bin/env node
++/** v522：produceGoal精确失败seed的一轮实测重试与最终目标复核。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js', 'source-preflight.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator, blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_006.txt'), 'utf8'));
++const cfg = { seed: 1978235744, goalMaxRounds: 1, goalMaxMs: 60000, goalPerRoundMs: 20000, goalSharedBudget: true, experienceGoal: true, reviewMix: false,
++  generatorFlow: 'new_fixed', boxSizeMin: 31, boxSizeMax: 40, capNormMin: 31, capNormMax: 40, capScalePlan: [1.45, 1.15], cutMode: 'layerCut2', candidateCount: 14, fullTime: true,
++  acceptMode: 'target', targetPeakMin: 3.2, targetPeakMax: 4.8, targetSteadyMin: 0, targetSteadyMax: 100, targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: .25,
++  boardAllowSquare: true, boardRowsMin: 4, boardRowsMax: 6, boardColsMin: 6, boardColsMax: 8, boardHardRange: true, boardAuto: false,
++  capacityTuneMs: 5000, capacityTuneCars: 8, capacityTuneVariants: 48, p7BaseCount: 1, maxPipes: 2, chainByDemand: 4,
++  semanticObstacles: true, boardFirst: true, boardExpandOnOverflow: true, targetCarCount: 0, usableSpaceTarget: .86 };
++const t = Date.now(), r = G.produceGoal(blocks, cfg), ev = r && r._experienceFull;
++const repair = r && r.usableSpaceRepair ? JSON.parse(JSON.stringify(r.usableSpaceRepair)) : null;
++const out = { schema: 'usable-space-goal-round-v1', date: '2026-10-26', ms: Date.now() - t, hasLevel: !!(r && r.level), valid: !!(r && r.valid), rounds: r && r.goalRounds,
++  stop: r && r.goalStopReason, struct: !!(r && r.level && G.goalStructPass(r)), pass: !!(r && r.level && G.goalResultExperiencePass(r, cfg)), repair,
++  experience: ev && { pass: ev.pass, metrics: ev.metrics, release: ev.releaseDecision && ev.releaseDecision.status },
++  capacity: r && r.level && A.Quality.capacityEvidence(r.level, r.config || cfg), board: r && r.level && { rows: r.level.board.rows, cols: r.level.board.cols } };
++fs.writeFileSync(path.join(__dirname, '可用率重试目标轮_v522.json'), JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify(out, null, 2));
++if (!out.hasLevel || !out.repair || out.repair.applied !== true || out.rounds !== 1 || !out.pass) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.json"
+new file mode 100644
+index 0000000..3471d7e
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\217\257\347\224\250\347\216\207\351\207\215\350\257\225\347\233\256\346\240\207\350\275\256_v522.json"
+@@ -0,0 +1,72 @@
++{
++  "schema": "usable-space-goal-round-v1",
++  "date": "2026-10-26",
++  "ms": 16479,
++  "hasLevel": true,
++  "valid": true,
++  "rounds": 1,
++  "stop": "pass",
++  "struct": true,
++  "pass": true,
++  "repair": {
++    "schema": "usable-space-repair-v1",
++    "applied": true,
++    "tested": 1,
++    "skipped": null,
++    "from": 0.86,
++    "to": 0.690476,
++    "failureCount": 70,
++    "capacityUnchanged": true,
++    "elapsedMs": 5889,
++    "hasLevel": true
++  },
++  "experience": {
++    "pass": true,
++    "metrics": {
++      "midSteps": 15,
++      "midBuffer34Pct": 66.7,
++      "midBuffer5Pct": 20,
++      "maxBuffer5Run": 3,
++      "significantReleaseCount": 1,
++      "oscillationCount": 2,
++      "lateHighPressurePct": 0,
++      "maxBuffer": 5,
++      "distance": 0
++    },
++    "release": "found"
++  },
++  "capacity": {
++    "schema": "capacity-evidence-v1",
++    "rows": 6,
++    "cols": 6,
++    "boardFloorPass": true,
++    "cars": 29,
++    "capacitySum": 1225,
++    "pixels": 1225,
++    "conserved": true,
++    "minCap": 30,
++    "maxCap": 58,
++    "boxSizeMin": 31,
++    "boxSizeMax": 58,
++    "belowMin": 1,
++    "aboveMax": 0,
++    "microCarMax": 2,
++    "microCars": [],
++    "microCount": 0,
++    "rangeExactFeasible": false,
++    "infeasibleColors": [
++      {
++        "color": 4,
++        "total": 61
++      }
++    ],
++    "row0Cars": 6,
++    "row0Colors": 4,
++    "row0MaxSameColor": 2,
++    "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++  },
++  "board": {
++    "rows": 6,
++    "cols": 6
++  }
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 0df9620..64eb1ea 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -52,15 +52,17 @@
+ | v520 全局接入门否决 | 能否直接替换goalStructPass | ❌ 006成功保持，但010/32677旧1→新0；推荐best distance 42.3→72.6；已回退，生产仍v518 | `低压力门生成对照_v520.js` + 三份对照JSON + 否决补丁 | §510 |
+ | v521 最终低压力补充 | 最终验收新口径能否保持搜索不变 | ✅ 近失救援；006/010与推荐best新旧hash全同；时间模式/其他结构失败不放宽 | `最终低压力门_预登记_v521.md` + 复核与三份生成对照 | §511 |
+ | v521 UI无候选诊断 | UI高速noCandidate是否门类引起 | 非门类：精确headless为usableSpaceDeviation 70/70；boardOnly仍败，targetOnly/cutOnly出关；UI验收待v522 | `UI无关卡归因_预登记_v521.md` + `真实UI诊断_v521.json` | §511 |
++| v522 实测可用率重试 | 能否按失败原因修而非反复换seed | ✅ 70样本中位69.0%，0.86→0.690476一次出关；目标轮66.7%完整pass；006成功hash不变 | `可用率失败重试_预登记_v522.md` + 重试/目标轮/成功保护JSON | §512 |
++| v522 真实UI | 快速无候选退避与落库是否可用 | ✅ A/C均重试不再空转；B第4轮达标，批次32合格1/1、COMPLETED；最终结构/容量证据完整 | `真实UI验收_v522.json` | §512 |
+ 
+ ## 当前权威产物
+ 
+ | 用途 | 文件 |
+ |---|---|
+ | 生产现状 | `01_交接文档/交接摘要_v500_20261025.md` |
+-| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（通用结构近失精调已否决，下一项按失败曲线定向选车/真人校准） |
++| 计划/阶段 | `01_交接文档/优质关卡生成_接管总纲.md`；`目标体验与容量精调_实施计划.md`（v522可用率重试与UI已接，下一项多图泛化/release unknown/真人校准） |
+ | 手册/参数 | `01_交接文档/工程说明.md` |
+ | 历史决策 | `01_交接文档/工作日志_20261012.md`（按节号查） |
+ | 结论摘要 | 本目录 `归因_v495.md`、`E5_结果.md`、`E6a_结果.md`、`E6b_结果.md`、`E6c_*.md`、`P4_枚举.md` |
+-| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v518.patch` |
++| 本轮补丁 | `02_工程/补丁/补丁_*_v495~v522.patch` |
+ | 历史版本 | `git log --oneline`（删除项都在 git 历史里） |
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js"
+index 774e1d9..88d5e9e 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\345\244\215\346\240\270_v521.js"
+@@ -3,13 +3,14 @@
+ 'use strict';
+ const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process'), assert = require('assert');
+ const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js'), CAND = path.join(__dirname, '候选最终低压力门_v521');
++const CURRENT = process.argv.includes('--current'), OUT_NAME = CURRENT ? '最终低压力门近失复核_v522.json' : '最终低压力门近失复核_v521.json';
+ const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js'];
+ function load(arm) {
+   const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
+   vm.createContext(sb);
+   for (const f of FILES) {
+     const source = arm === 'old' ? cp.execFileSync('git', ['show', '07f7c11:02_工程/完整主bin快照_20261012/bin/js/' + f], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }) :
+-      fs.readFileSync((f === 'utils.js' || f === 'generator.js') ? path.join(CAND, f) : path.join(BIN, f), 'utf8');
++      fs.readFileSync((f === 'utils.js' || f === 'generator.js') ? path.join(CURRENT ? BIN : CAND, f) : path.join(BIN, f), 'utf8');
+     vm.runInContext(source, sb, { filename: f });
+   }
+   return sb.AntSolver;
+@@ -36,6 +37,7 @@ const otherFail = { level: A.parseLevel(raw), valid: true, goodV3: { persist: {
+ const evidence = A.Quality.finalStructureFromGeneration(otherFail);
+ assert.strictEqual(evidence.pass, false); assert.ok(evidence.remainingReasons.some(x => x.indexOf('freeLow') >= 0));
+ out.otherGateProtection = { pass: evidence.pass, remainingReasons: evidence.remainingReasons };
+-fs.writeFileSync(path.join(__dirname, '最终低压力门近失复核_v521.json'), JSON.stringify(out, null, 2) + '\n');
++out.underTest = CURRENT ? 'working-v522' : 'candidate-v521';
++fs.writeFileSync(path.join(__dirname, OUT_NAME), JSON.stringify(out, null, 2) + '\n');
+ console.log(JSON.stringify({ old: { base: out.old.baseStruct, pass: out.old.resultPass }, new: { base: out.new.baseStruct, final: out.new.finalStruct.pass,
+   pass: out.new.resultPass, timeModePass: out.new.timeModeResultPass, source: out.new.acceptedByFinalStructure ? 'final' : null }, otherGateProtection: out.otherGateProtection }, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\350\277\221\345\244\261\345\244\215\346\240\270_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\350\277\221\345\244\261\345\244\215\346\240\270_v522.json"
+new file mode 100644
+index 0000000..fa74e80
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\234\200\347\273\210\344\275\216\345\216\213\345\212\233\351\227\250\350\277\221\345\244\261\345\244\215\346\240\270_v522.json"
+@@ -0,0 +1,105 @@
++{
++  "schema": "final-low-pressure-near-verification-v1",
++  "date": "2026-10-26",
++  "old": {
++    "baseStruct": false,
++    "finalStruct": null,
++    "resultPass": false,
++    "timeModeResultPass": false,
++    "acceptedByVerifiedRoute": false,
++    "acceptedByFinalStructure": false,
++    "capacity": {
++      "schema": "capacity-evidence-v1",
++      "rows": 9,
++      "cols": 10,
++      "boardFloorPass": true,
++      "cars": 85,
++      "capacitySum": 1225,
++      "pixels": 1225,
++      "conserved": true,
++      "minCap": 10,
++      "maxCap": 19,
++      "boxSizeMin": 13,
++      "boxSizeMax": 19,
++      "belowMin": 21,
++      "aboveMax": 0,
++      "microCarMax": 2,
++      "microCars": [],
++      "microCount": 0,
++      "rangeExactFeasible": true,
++      "infeasibleColors": [],
++      "row0Cars": 10,
++      "row0Colors": 5,
++      "row0MaxSameColor": 2,
++      "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++    }
++  },
++  "new": {
++    "baseStruct": false,
++    "finalStruct": {
++      "pass": true,
++      "source": "low_pressure_final",
++      "baseGatePass": false,
++      "baseGateReasons": [
++        "吃满中位 4>3"
++      ],
++      "remainingReasons": [],
++      "lowPressureSteps": 33,
++      "lowPressureFullMedian": 2,
++      "highPressureSteps": 45,
++      "highPressureFullMedian": 5,
++      "fullMedian2": 4
++    },
++    "resultPass": true,
++    "timeModeResultPass": false,
++    "acceptedByVerifiedRoute": false,
++    "acceptedByFinalStructure": true,
++    "experience": {
++      "pass": true,
++      "metrics": {
++        "midSteps": 51,
++        "midBuffer34Pct": 74.5,
++        "midBuffer5Pct": 3.9,
++        "maxBuffer5Run": 2,
++        "significantReleaseCount": 3,
++        "oscillationCount": 3,
++        "lateHighPressurePct": 58.8,
++        "maxBuffer": 5,
++        "distance": 0
++      },
++      "release": "found"
++    },
++    "capacity": {
++      "schema": "capacity-evidence-v1",
++      "rows": 9,
++      "cols": 10,
++      "boardFloorPass": true,
++      "cars": 85,
++      "capacitySum": 1225,
++      "pixels": 1225,
++      "conserved": true,
++      "minCap": 10,
++      "maxCap": 19,
++      "boxSizeMin": 13,
++      "boxSizeMax": 19,
++      "belowMin": 21,
++      "aboveMax": 0,
++      "microCarMax": 2,
++      "microCars": [],
++      "microCount": 0,
++      "rangeExactFeasible": true,
++      "infeasibleColors": [],
++      "row0Cars": 10,
++      "row0Colors": 5,
++      "row0MaxSameColor": 2,
++      "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++    }
++  },
++  "otherGateProtection": {
++    "pass": false,
++    "remainingReasons": [
++      "freeLow 45%>30%"
++    ]
++  },
++  "underTest": "working-v522"
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\234\237\345\256\236UI\351\252\214\346\224\266_v522.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\234\237\345\256\236UI\351\252\214\346\224\266_v522.json"
+new file mode 100644
+index 0000000..790fbb2
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\234\237\345\256\236UI\351\252\214\346\224\266_v522.json"
+@@ -0,0 +1,91 @@
++{
++  "schema": "v522-ui-acceptance-v1",
++  "date": "2026-10-26",
++  "batch": 32,
++  "status": "COMPLETED",
++  "persisted": 1,
++  "qualified": 1,
++  "unqualified": 0,
++  "errors": 0,
++  "name": "35x35拼接图纸_006.txt",
++  "result": "合格",
++  "classification": "可玩·没岔路",
++  "structure": "通过",
++  "goalStop": "pass",
++  "experience": {
++    "pass": true,
++    "metrics": {
++      "midSteps": 17,
++      "midBuffer34Pct": 52.9,
++      "midBuffer5Pct": 0,
++      "maxBuffer5Run": 0,
++      "significantReleaseCount": 2,
++      "oscillationCount": 2,
++      "lateHighPressurePct": 40,
++      "maxBuffer": 4,
++      "distance": 0
++    },
++    "release": "found"
++  },
++  "finalStructure": {
++    "pass": true,
++    "source": "base_gate",
++    "baseGatePass": true,
++    "baseGateReasons": [],
++    "remainingReasons": [],
++    "lowPressureSteps": 15,
++    "lowPressureFullMedian": 1,
++    "highPressureSteps": 11,
++    "highPressureFullMedian": 1,
++    "fullMedian2": 1
++  },
++  "acceptedByFinalStructure": false,
++  "usableSpaceRepair": null,
++  "capacity": {
++    "schema": "capacity-evidence-v1",
++    "rows": 6,
++    "cols": 6,
++    "boardFloorPass": true,
++    "cars": 32,
++    "capacitySum": 1225,
++    "pixels": 1225,
++    "conserved": true,
++    "minCap": 24,
++    "maxCap": 46,
++    "boxSizeMin": 31,
++    "boxSizeMax": 46,
++    "belowMin": 5,
++    "aboveMax": 0,
++    "microCarMax": 2,
++    "microCars": [],
++    "microCount": 0,
++    "rangeExactFeasible": false,
++    "infeasibleColors": [
++      {
++        "color": 4,
++        "total": 61
++      },
++      {
++        "color": 13,
++        "total": 55
++      },
++      {
++        "color": 34,
++        "total": 50
++      }
++    ],
++    "row0Cars": 6,
++    "row0Colors": 5,
++    "row0MaxSameColor": 2,
++    "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++  },
++  "board": {
++    "rows": 6,
++    "cols": 6
++  },
++  "paths": {
++    "level": "合格关卡/35x35拼接图纸_006.json",
++    "txt": "txt图/35x35拼接图纸_006.txt",
++    "debug": "生产文档/关卡数据/35x35拼接图纸_006.json"
++  }
++}
+diff --git a/README.md b/README.md
+index 1589105..c4362c1 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v521**（最终低压力补充验收；headless已验证，UI退避修复在v522继续）。
++> 当前版本 **v522**（实测可用率失败重试与最终低压力补充验收，真实UI已通过）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看框架图** | [`01_交接文档/框架图_生成流程_动画版.html`](01_交接文档/框架图_生成流程_动画版.html)（五阶段播放 + 详细流程图） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v521）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v522）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **查某天为什么这么改** | [`01_交接文档/工作日志_20261012.md`](01_交接文档/工作日志_20261012.md)（401 节，**按主题索引查，别整份读**） |
