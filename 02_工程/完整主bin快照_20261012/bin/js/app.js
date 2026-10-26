@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "568";
+var APP_BUILD = "569";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5075,9 +5075,8 @@ AntSolver.App = (function() {
       semanticEarly: false,      // 【v458】不再强求前期无白给
       costlyAlt: true,   // 【v425】生成时预留一个代价替代
       row0FreeMax: 1, row0FreeIce: 1,
-      // 【v499·用户裁决 3（折中）】恢复 1.45 臂，并把"黑块 ≤15%"从硬优先改回结构门之后的比较项：
-      //   先保住"有压力"的关，再在黑块上尽量压。v498 的硬优先把结构门打到 33%，代价过大。
-      capScalePlan: [1.45, 1.15],
+      // v569：用户容量带是硬输入，不再由生产UI派生放大/缩小臂。
+      capScalePlan: null,
       // 【v238】目标车数也随棋盘走
       // 【v313·用户裁决】旧流程不按"目标车数"拆车：它的棋盘是由盒数反推的（chooseBoardDimsFixed），
       //   再把车拆到 _targetCars0（= 行列上限 9×10×0.86 = 77 辆）只会把 30~50 的车对半劈成 12~25。

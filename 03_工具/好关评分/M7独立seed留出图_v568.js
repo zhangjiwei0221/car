@@ -15,6 +15,7 @@ function arg(name, def) {
   return hit ? hit.slice(prefix.length) : def;
 }
 const ARM = arg('arm', 'B');
+const CAP_SCALE = arg('cap-scale', 'off');
 const OUT = path.join(__dirname, arg('out', 'M7独立seed留出图_v568.json'));
 const LEVEL_DIR = path.join(__dirname, arg('levels-dir', 'M7独立seed留出图_v568.levels'));
 const FILES = [
@@ -58,7 +59,7 @@ function cfgFor(blocks, seed) {
     instantPlanBranchCount: 2,
     instantPlanBranchDebtRoots: true,
     instantPlanBranchPrefixDebts: 8,
-    capScalePlan: [1.45, 1.15],
+    capScalePlan: CAP_SCALE === 'off' ? null : [1.45, 1.15],
     boxSizeMin: b[0], boxSizeMax: b[1], capNormMin: b[0], capNormMax: b[1],
     cutMode: ARM === 'A' ? 'layerCut2' : 'exposeCut',
     maxPipes: ARM === 'A' ? 2 : 1,
@@ -99,7 +100,8 @@ function runOne(image, seed) {
   const wallMs = Date.now() - t0;
   const level = r && r.level || null;
   const q = level ? A.Quality.fromGeneration(r) : null;
-  const cap = level ? A.Quality.capacityEvidence(level, r.config || cfg) : null;
+  // 容量合同只能按调用前的原始 cfg 审计；生成器完成后的 config 可能含派生/改写值。
+  const cap = level ? A.Quality.capacityEvidence(level, cfg) : null;
   const ev = level ? A.ExperienceGoal.evaluate(level, Object.assign({}, cfg, {
     solveResult: r.solveResult, decision: false, instantChain: true, bottomOnly: false
   })) : null;
@@ -209,6 +211,7 @@ function main() {
     date: '2026-10-26',
     preregistration: 'M7独立seed留出图_预登记_v568.md',
     arm: ARM,
+    capScale: CAP_SCALE,
     images: IMAGES,
     seeds: SEEDS,
     summary,
