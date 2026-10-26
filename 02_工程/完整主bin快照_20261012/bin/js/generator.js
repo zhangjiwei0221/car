@@ -5981,6 +5981,9 @@ AntSolver.Generator = (function() {
     // ① 盒序列与盒总量预算
     var tBox = Date.now();
     var boxes = pickBoxSplit(blocks, config);   // bottomOnly 时走底部依赖流分支
+    if (boxes && boxes._instantPlayout && boxes._instantPlayout.ok === false) {
+      return { ok: false, reason: 'instantPlayout', detail: JSON.stringify(boxes._instantPlayout), timing: timing, boxCount: 0 };
+    }
     timing.boxBuildMs = Date.now() - tBox;
     var n = boxes.length;
 
@@ -12705,6 +12708,16 @@ AntSolver.Generator = (function() {
       return config.forcedBoxes.map(function (b, i) {
         return { color: b.color, count: b.count, elimSeq: i, trendStart: 0 };
       });
+    }
+    // 【v526】瞬时模式优先使用真实车辆playout；四边/底部模式完全不进入此分支。
+    if (config && config.ruleMode === 'instantChain' && AntSolver.InstantPlayout) {
+      var _ip = AntSolver.InstantPlayout.plan({ blocks: blocks, bufferLimit: config.bufferLimit }, config);
+      config._instantPlayoutStat = _ip && _ip.boxes && _ip.boxes._instantPlayout || null;
+      if (_ip && _ip.ok && _ip.boxes && _ip.boxes.length) return _ip.boxes;
+      var _bad = [];
+      _bad._instantPlayout = Object.assign({}, (config._instantPlayoutStat || {}), { ok: false,
+        reason: _ip && _ip.reason ? _ip.reason : 'instant_playout_unavailable' });
+      return _bad;
     }
     // 【v350·用户裁决】按目标图暴露顺序切车单（配合 boardLayout='rowMajor' 使用）。
     if (!boxes && config && config.cutMode === 'exposeCut') {

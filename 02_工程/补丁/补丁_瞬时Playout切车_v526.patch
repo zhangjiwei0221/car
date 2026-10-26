@@ -1,0 +1,1054 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index 19c1148..6e5e139 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -10,6 +10,7 @@
+ > **完整实验与交付流程：[`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md)。** 包含已完成/未完成、P0~P6实验卡、样本预算、通过否决与回滚。
+ > 当前结果：代码到v522。v521最终低压力补充与搜索隔离的保护继续成立。v522把usableSpaceDeviation改为实测中位可用率驱动的一次同seed重试，并加快速无候选退避；精确失败70/70后0.86→0.690476出关并完整达标，006已知成功hash不变。真实UI批次32合格1/1、COMPLETED，A/C不再高速空转。下一步多图/独立seed验证重试泛化、release unknown与真人校准；障碍目标化未完成。
+ > v525（进行中）：已统一`ruleMode`三态契约，选中瞬时连锁时`instantChain=true`且`elimOrder=instant`；默认四边真实关卡hash不变。下一项把`instantPlayout`接入切车，否则生成仍不能称为按实机瞬时顺序造关。
++> v526：`instantPlayout`已接入瞬时模式切车，按真实最左空槽/FIFO/最近曼哈顿生成每车像素计划；3图端到端结构均过、aboveMax=0、默认四边hash不变。下一步容量计划处理belowMin/2px车。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 600fada..ad0cb98 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20278,3 +20278,35 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. 下一项唯一主线：instantPlayout接切车，默认动态最左空槽，输出每车像素归属/槽位/完成时间。
+ 2. 当前瞬时最小车仍可能低于用户下限；容量计划必须先于体验实验。
+ 3. 未完成切车/摆盘前，不宣称生成器已按实机顺序造关，也不重跑“瞬时模式优于四边”的体验结论。
++
++### 516. 【2026-10-26】v526：instantPlayout接入切车，瞬时模式首次真正改变车单
++
++#### 516.1 问题（原话）
++
++- “好的，按这个实施顺序来。”
++- “你觉得该如何修改生成器的逻辑，才能得到我想要的效果。”
++
++#### 516.2 证据
++
++- v524证明只换`eliminationOrder`对最终关卡no-op；真正差异必须进入“每辆车吃哪些像素”的切车层。
++- v525统一三态契约后，瞬时模式仍沿用旧几何切车；需要用已验证的`instantPlayout`生成容量感知车单。
++
++#### 516.3 改动
++
++- Kimi新增`instant-playout.js`：真实最左空槽、暂存车FIFO、离起点曼哈顿最近、容量封顶、快照批次；记录每车颜色/容量/像素/槽位/进场完成顺序。
++- `pickBoxSplit`在`ruleMode=instantChain`时优先采用playout强制车单，不再进入圈序/几何切法；计划失败直接淘汰并记录`instantPlayout`原因，不回落伪造。
++- index/worker加载新模块；版本升v526。
++
++#### 516.4 验证（改前后数字）
++
++- 计划：006/010/007均覆盖1225/1225、无死锁、unfinished=0、aboveMax=0；分别37/27/46车，bufferEvents=6/3/3，计划耗时约34/9/12ms。
++- 端到端`produceFixed`瞬时模式：006/010/007均level=true、valid=true、structural.ok=true，棋盘7×8/6×7/7×8，耗时约0.76/0.53/0.79s。
++- 瞬时模式最终hash不再等于旧路径（006 `a69b5084...` vs此前`48680c72...`），证明车单计划真正生效；四边006保护hash仍为`48680c72...`。
++- 容量边界：belowMin 006=5、010=1、007=12；007有1辆2px车，尚未满足最终容量要求，进入第3步。
++- `node --check instant-playout/generator/app/gen-worker`与`git diff --check`通过。
++
++#### 516.5 遗留
++
++1. 第3步容量计划：每色先做区间内可行拆分，临界容量围绕可达量/下一波/余量构造有限候选，禁止2px与未声明belowMin。
++2. 第4步要验证最终棋盘按瞬时规则回放能重现playout的主要车序，不仅看“能解”。
++3. 瞬时模式仍未做多seed体验/障碍/真人；默认生产仍四边。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 1991285..25ef453 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v525 瞬时模式规则契约）　|　当前版本：**v525**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v526 瞬时模式 instantPlayout 切车）　|　当前版本：**v526**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~515。v525完成三态规则契约：选中瞬时连锁时生成侧也必须使用瞬时口径；默认四边真实关卡hash不变。切车尚未接入instantPlayout，当前不能声称已按实机顺序造关。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~516。v526把instantPlayout接入瞬时模式切车：006/010/007全覆盖、无死锁、aboveMax=0且端到端出关；默认四边hash不变。下一项容量计划处理006/010/007的5/1/12辆belowMin及007的2px车。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index 0b1b608..02a8e02 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -40,7 +40,7 @@
+ - 验证：三态单测；006默认四边旧/新最终关卡hash相同；瞬时模式候选配置为`instantChain + elimOrder:'instant'`。
+ - 边界：这一步只统一口径，**切车仍没有消费瞬时像素归属**；默认生产仍是四边。
+ 
+-### 第2步：instantPlayout 接入切车（下一项）
++### 第2步：instantPlayout 接入切车（v526 已完成首版）
+ 
+ - 把现有只读 `instantPlayout` 提炼成生成模块，默认使用**真实最左空槽**，而不是固定0号槽。
+ - 输出不是只有`color,count`，而是每车：
+@@ -50,8 +50,11 @@
+ - 接进`pickBoxSplit`的强制车单路径；`eliminationOrder('instant')`只作验证/分析，不能单独充当切车（v524证明是no-op）。
+ - 首轮验收：006/010/007全覆盖、无死锁、同色守恒、无车超过用户上限；每车像素Jaccard与此前原型一致或更好。
+ - 生产保护：默认四边hash不变；瞬时模式先只做实验开关，达到结构/UI门槛后才改默认。
++- **v526结果**：新增`instant-playout.js`，真实最左空槽+FIFO+最近曼哈顿+每车像素轨迹；瞬时模式在切车前优先采用playout，四边/底部不进入该分支。
++- 006/010/007计划均覆盖1225/1225、无死锁、无未完成、aboveMax=0；端到端均生成可解且结构通过关卡，耗时约0.53~0.79s。
++- 默认四边006最终hash仍为`48680c72...`。遗留：低于下限车006=5、010=1、007=12，007最小2px，进入第3步容量计划。
+ 
+-### 第3步：容量计划
++### 第3步：容量计划（下一项）
+ 
+ - 先按颜色求可行车数集合：满足`Σcap=P`且每车在`[boxMin,boxMax]`；无可行解时明确`capacityInfeasible`。
+ - 每辆候选车按进场状态计算：当前可达量`A`、该色剩余量`T`、下一波解锁量`N`。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 524740e..5fafc46 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v525 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=525">
++  <title>车接小人 v526 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=526">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v525</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v526</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,27 +773,28 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=525"></script>
+-  <script src="js/utils.js?v=525"></script>
++  <script src="js/zip.js?v=526"></script>
++  <script src="js/utils.js?v=526"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=525"></script>
+-  <script src="js/simulator.js?v=525"></script>
++  <script src="js/color-libs.js?v=526"></script>
++  <script src="js/simulator.js?v=526"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=525"></script>
+-  <script src="js/solver-strategy.js?v=525"></script>
+-  <script src="js/solver.js?v=525"></script>
+-  <script src="js/playersim.js?v=525"></script>
++  <script src="js/anchor-cut.js?v=526"></script>
++  <script src="js/solver-strategy.js?v=526"></script>
++  <script src="js/solver.js?v=526"></script>
++  <script src="js/playersim.js?v=526"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=525"></script>
+-  <script src="js/car-sequencer.js?v=525"></script>
+-  <script src="js/experience-goal.js?v=525"></script>
+-  <script src="js/capacity-tuner.js?v=525"></script>
+-  <script src="js/generator.js?v=525"></script>
+-  <script src="js/source-preflight.js?v=525"></script>
+-  <script src="js/analysis.js?v=525"></script>
++  <script src="js/solver-analysis.js?v=526"></script>
++  <script src="js/car-sequencer.js?v=526"></script>
++  <script src="js/experience-goal.js?v=526"></script>
++  <script src="js/capacity-tuner.js?v=526"></script>
++  <script src="js/instant-playout.js?v=526"></script>
++  <script src="js/generator.js?v=526"></script>
++  <script src="js/source-preflight.js?v=526"></script>
++  <script src="js/analysis.js?v=526"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=525"></script>
+-  <script src="js/app.js?v=525"></script>
++  <script src="js/level-editor.js?v=526"></script>
++  <script src="js/app.js?v=526"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index c583ae5..0cdc1dd 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -25,7 +25,7 @@ try {
+     'utils.js' + _v, 'simulator.js' + _v, 'solver-strategy.js' + _v,
+     'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
+     'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
+-    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'generator.js' + _v, 'source-preflight.js' + _v
++    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'instant-playout.js' + _v, 'generator.js' + _v, 'source-preflight.js' + _v
+   );
+   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
+ } catch (e) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 254e698..6669352 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -5981,6 +5981,9 @@ AntSolver.Generator = (function() {
+     // ① 盒序列与盒总量预算
+     var tBox = Date.now();
+     var boxes = pickBoxSplit(blocks, config);   // bottomOnly 时走底部依赖流分支
++    if (boxes && boxes._instantPlayout && boxes._instantPlayout.ok === false) {
++      return { ok: false, reason: 'instantPlayout', detail: JSON.stringify(boxes._instantPlayout), timing: timing, boxCount: 0 };
++    }
+     timing.boxBuildMs = Date.now() - tBox;
+     var n = boxes.length;
+ 
+@@ -12706,6 +12709,16 @@ AntSolver.Generator = (function() {
+         return { color: b.color, count: b.count, elimSeq: i, trendStart: 0 };
+       });
+     }
++    // 【v526】瞬时模式优先使用真实车辆playout；四边/底部模式完全不进入此分支。
++    if (config && config.ruleMode === 'instantChain' && AntSolver.InstantPlayout) {
++      var _ip = AntSolver.InstantPlayout.plan({ blocks: blocks, bufferLimit: config.bufferLimit }, config);
++      config._instantPlayoutStat = _ip && _ip.boxes && _ip.boxes._instantPlayout || null;
++      if (_ip && _ip.ok && _ip.boxes && _ip.boxes.length) return _ip.boxes;
++      var _bad = [];
++      _bad._instantPlayout = Object.assign({}, (config._instantPlayoutStat || {}), { ok: false,
++        reason: _ip && _ip.reason ? _ip.reason : 'instant_playout_unavailable' });
++      return _bad;
++    }
+     // 【v350·用户裁决】按目标图暴露顺序切车单（配合 boardLayout='rowMajor' 使用）。
+     if (!boxes && config && config.cutMode === 'exposeCut') {
+       try { var _ec = exposeCut(blocks, config); if (_ec && _ec.length) boxes = _ec; } catch (e) { }
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
+new file mode 100644
+index 0000000..3c5cd80
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
+@@ -0,0 +1,100 @@
++/** v526 · 瞬时连锁生成计划：按真实最左空槽 / 最近曼哈顿 / 容量封顶生成每车像素归属。 */
++var AntSolver = AntSolver || {};
++AntSolver.InstantPlayout = (function () {
++  function parsed(level) { return level && level.rows && level.board ? level : AntSolver.parseLevel(level); }
++  function median(a) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }
++  function startOf(slot, rows, cols, bufferLimit) {
++    return { r: rows - 1, c: Math.min(cols - 1, Math.floor(slot / bufferLimit * cols)) };
++  }
++  function remainingByColor(elim, blocks, rows, cols) {
++    var m = {};
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var v = blocks[r][c]; if (v > 0 && !elim[r][c]) m[v] = (m[v] || 0) + 1;
++    }
++    return m;
++  }
++  /** 当前余量的可行单车容量；低于下限的尾车保留给step3容量规划处理并如实审计。 */
++  function planCap(remain, minCap, maxCap) {
++    if (!(remain > 0)) return 0;
++    if (remain <= maxCap) return remain;
++    var n = Math.ceil(remain / maxCap), cap = Math.ceil(remain / n);
++    if (cap < minCap) cap = minCap;
++    if (cap > maxCap) cap = maxCap;
++    return cap;
++  }
++  function plan(level, config) {
++    var lv = parsed(level), blocks = lv.blocks, rows = lv.rows || blocks.length, cols = lv.cols || (blocks[0] || []).length;
++    var capMin = Math.max(1, parseInt(config && config.boxSizeMin, 10) || 1);
++    var capMax = Math.max(capMin, parseInt(config && config.boxSizeMax, 10) || capMin);
++    var bufferLimit = Math.max(1, parseInt(config && config.bufferLimit, 10) || lv.bufferLimit || 5);
++    var elim = AntSolver.outsideReachSeed(blocks, rows, cols, false);
++    var seq = AntSolver.create2D(rows, cols, 0), slots = [], active = [], cars = [], done = 0, total = 0;
++    for (var rr = 0; rr < rows; rr++) for (var cc = 0; cc < cols; cc++) if (blocks[rr][cc] > 0) total++;
++    function freeSlot() { for (var k = 0; k < bufferLimit; k++) if (!slots[k]) return k; return -1; }
++    function reachableCount(color, start) {
++      var scratch = elim.map(function (row) { return row.slice(); });
++      return AntSolver.Simulator.instantChainEliminate(scratch, blocks, rows, cols, color, Infinity, null, start, null);
++    }
++    function advance(car) {
++      if (!(car.remaining > 0)) return 0;
++      var trace = [];
++      var got = AntSolver.Simulator.instantChainEliminate(elim, blocks, rows, cols, car.color, car.remaining, trace, car.start, null);
++      if (!car.pixels) car.pixels = [];
++      for (var i = 0; i < trace.length; i++) {
++        seq[trace[i][0]][trace[i][1]] = ++done;
++        car.pixels.push(trace[i]);
++      }
++      car.remaining -= got; car.consumed += got;
++      if (car.remaining <= 0) { car.finished = true; car.finishOrder = cars.indexOf(car) + 1; }
++      return got;
++    }
++    var guard = rows * cols * 4 + 100, deadlock = false, deadlockReason = null;
++    while (done < total && guard-- > 0) {
++      var progressed = false;
++      // 实机瞬时连锁对暂存车严格先进先得；槽位只决定该车的消除起点。
++      for (var ai = 0; ai < active.length; ai++) {
++        var ac = active[ai];
++        if (ac.finished) continue;
++        if (advance(ac) > 0) progressed = true;
++        if (ac.finished) { slots[ac.slot] = null; ac.active = false; }
++      }
++      active = active.filter(function (x) { return !x.finished; });
++      if (progressed) continue;
++      var slot = freeSlot();
++      if (slot < 0) { deadlock = true; deadlockReason = 'buffer_full_no_progress'; break; }
++      var start = startOf(slot, rows, cols, bufferLimit), rem = remainingByColor(elim, blocks, rows, cols);
++      var bestColor = null, bestReach = 0;
++      var colors = Object.keys(rem).map(Number).sort(function (a, b) { return a - b; });
++      for (var bi = 0; bi < colors.length; bi++) {
++        var n = reachableCount(colors[bi], start);
++        if (n > bestReach) { bestReach = n; bestColor = colors[bi]; }
++      }
++      if (bestColor == null || bestReach <= 0) { deadlock = true; deadlockReason = 'no_reachable_color'; break; }
++      var cap = planCap(rem[bestColor], capMin, capMax);
++      if (!(cap > 0)) { deadlock = true; deadlockReason = 'capacity_unavailable'; break; }
++      var car = { id: cars.length + 1, color: bestColor, cap: cap, remaining: cap, consumed: 0,
++        slot: slot, start: start, pixels: [], finished: false, active: true, enterOrder: cars.length + 1,
++        bufferBefore: active.length };
++      cars.push(car); slots[slot] = car; active.push(car);
++      if (advance(car) <= 0) { deadlock = true; deadlockReason = 'new_car_no_progress'; break; }
++      if (car.finished) { slots[car.slot] = null; car.active = false; active = active.filter(function (x) { return x !== car; }); }
++      if (done >= total) break;
++    }
++    var unfinished = cars.filter(function (c) { return !c.finished; });
++    var counts = cars.map(function (c) { return c.cap; });
++    var audit = { aboveMax: counts.filter(function (x) { return x > capMax; }).length,
++      belowMin: counts.filter(function (x) { return x < capMin; }).length,
++      unfinished: unfinished.length, covered: done, total: total, deadlock: !!deadlock };
++    var ok = !deadlock && done === total && !unfinished.length && !audit.aboveMax;
++    var boxes = cars.map(function (c, i) {
++      return { color: c.color, count: c.cap, elimSeq: i, instantEnterOrder: c.enterOrder,
++        instantSlot: c.slot, instantPixels: c.pixels };
++    });
++    boxes._instantPlayout = { schema: 'instant-playout-v1', ok: ok, reason: ok ? null : (deadlockReason || 'coverage_incomplete'),
++      cars: cars.length, covered: done, total: total, capRange: [capMin, capMax], audit: audit,
++      bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
++      medianReachableAtEntry: median(cars.map(function (c) { return c.consumed; })) };
++    return { ok: ok, reason: boxes._instantPlayout.reason, boxes: boxes, cars: cars, seq: seq, audit: audit };
++  }
++  return { plan: plan };
++})();
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.js"
+new file mode 100644
+index 0000000..ea73d7a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.js"
+@@ -0,0 +1,40 @@
++#!/usr/bin/env node
++/** v526：instantPlayout进入瞬时模式切车；验证计划自洽、端到端出关、默认四边不变。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator;
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function loadBlocks(id) { return G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_' + id + '.txt'), 'utf8')); }
++function baseCfg(blocks, ruleMode) {
++  const band = G.deriveCapacityBand(blocks);
++  return { seed: 1001, candidateCount: 1, rounds: 0, timeBudgetMs: 12000, ruleMode, generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1], capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: 6, boardRowsMax: 9, boardColsMin: 6, boardColsMax: 11, boardHardRange: true, boardAllowSquare: true, p7BaseCount: 1, pool: 1 };
++}
++const out = { schema: 'instant-playout-production-v526', date: '2026-10-26', plans: {}, instantEndToEnd: {}, fourSideProtection: null };
++for (const id of ['006', '010', '007']) {
++  const blocks = loadBlocks(id), cfg = baseCfg(blocks, 'instantChain');
++  const tp = Date.now(), p = A.InstantPlayout.plan({ blocks, bufferLimit: 5 }, cfg), stat = p.boxes && p.boxes._instantPlayout;
++  out.plans[id] = { ms: Date.now() - tp, ok: p.ok, reason: p.reason, cars: p.cars.length, audit: p.audit,
++    minCap: Math.min(...p.cars.map(x => x.cap)), maxCap: Math.max(...p.cars.map(x => x.cap)),
++    bufferEvents: stat && stat.bufferEvents, hash: hash(p.boxes) };
++  const t = Date.now(), r = G.produceFixed(blocks, cfg);
++  out.instantEndToEnd[id] = { ms: Date.now() - t, level: !!(r && r.level), valid: !!(r && r.valid), structural: r && r.structural,
++    config: r && r.config && { ruleMode: r.config.ruleMode, instantChain: r.config.instantChain, elimOrder: r.config.elimOrder },
++    instant: r && r.config && r.config._instantPlayoutStat || null,
++    capacity: r && r.level ? A.Quality.capacityEvidence(r.level, r.config || cfg) : null,
++    board: r && r.level && r.level.board ? { rows: r.level.board.rows, cols: r.level.board.cols } : null,
++    hash: r && r.level ? hash(r.level) : null, stop: r && r.perf && r.perf.stopReason };
++}
++const pblocks = loadBlocks('006'), pcfg = baseCfg(pblocks, 'fourSide'), pr = G.produceFixed(pblocks, pcfg);
++out.fourSideProtection = { level: !!(pr && pr.level), valid: !!(pr && pr.valid), hash: pr && pr.level ? hash(pr.level) : null,
++  expectedHash: '48680c72a30cbec03784b516c876c25e2ac24588e805b5191dd818f47a87202d',
++  config: pr && pr.config && { ruleMode: pr.config.ruleMode, instantChain: pr.config.instantChain, elimOrder: pr.config.elimOrder } };
++out.pass = Object.values(out.plans).every(x => x.ok) && Object.values(out.instantEndToEnd).every(x => x.level && x.valid && x.structural && x.config && x.config.elimOrder === 'instant' && x.capacity && x.capacity.aboveMax === 0) && out.fourSideProtection.hash === out.fourSideProtection.expectedHash;
++fs.writeFileSync(path.join(__dirname, 'instantPlayout生产接入_v526.json'), JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify({ pass: out.pass, plans: out.plans, instantEndToEnd: out.instantEndToEnd, fourSideProtection: out.fourSideProtection }, null, 2));
++if (!out.pass) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.json"
+new file mode 100644
+index 0000000..720039f
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\224\237\344\272\247\346\216\245\345\205\245_v526.json"
+@@ -0,0 +1,358 @@
++{
++  "schema": "instant-playout-production-v526",
++  "date": "2026-10-26",
++  "plans": {
++    "006": {
++      "ms": 16,
++      "ok": true,
++      "reason": null,
++      "cars": 37,
++      "audit": {
++        "aboveMax": 0,
++        "belowMin": 5,
++        "unfinished": 0,
++        "covered": 1225,
++        "total": 1225,
++        "deadlock": false
++      },
++      "minCap": 10,
++      "maxCap": 38,
++      "bufferEvents": 6,
++      "hash": "866b51be2d5911dd15e746196d084b63967b160b651cd145ab6803552ecd797c"
++    },
++    "010": {
++      "ms": 8,
++      "ok": true,
++      "reason": null,
++      "cars": 27,
++      "audit": {
++        "aboveMax": 0,
++        "belowMin": 1,
++        "unfinished": 0,
++        "covered": 1225,
++        "total": 1225,
++        "deadlock": false
++      },
++      "minCap": 32,
++      "maxCap": 54,
++      "bufferEvents": 3,
++      "hash": "880bc841999a0b500bc27ed82efef7ee01de31b6a35b36e8b83b63b47538de86"
++    },
++    "007": {
++      "ms": 12,
++      "ok": true,
++      "reason": null,
++      "cars": 46,
++      "audit": {
++        "aboveMax": 0,
++        "belowMin": 12,
++        "unfinished": 0,
++        "covered": 1225,
++        "total": 1225,
++        "deadlock": false
++      },
++      "minCap": 2,
++      "maxCap": 31,
++      "bufferEvents": 3,
++      "hash": "a5dbd60a0481cd3c93606fc657318c7b5107fe381e9df66df4f55e56f80dc2e3"
++    }
++  },
++  "instantEndToEnd": {
++    "006": {
++      "ms": 757,
++      "level": true,
++      "valid": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "config": {
++        "ruleMode": "instantChain",
++        "instantChain": true,
++        "elimOrder": "instant"
++      },
++      "instant": {
++        "schema": "instant-playout-v1",
++        "ok": true,
++        "reason": null,
++        "cars": 37,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          31,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 5,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "bufferEvents": 6,
++        "medianReachableAtEntry": 34
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 7,
++        "cols": 8,
++        "boardFloorPass": true,
++        "cars": 37,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 10,
++        "maxCap": 40,
++        "boxSizeMin": 31,
++        "boxSizeMax": 40,
++        "belowMin": 5,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 4,
++            "total": 61
++          },
++          {
++            "color": 13,
++            "total": 55
++          },
++          {
++            "color": 14,
++            "total": 89
++          },
++          {
++            "color": 33,
++            "total": 41
++          },
++          {
++            "color": 34,
++            "total": 50
++          }
++        ],
++        "row0Cars": 8,
++        "row0Colors": 5,
++        "row0MaxSameColor": 3,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "a69b50843862f1c9412e53b10bd44b2d2c8da12ce982b311249b9bc597ffbcf8",
++      "stop": "pass_early_stop"
++    },
++    "010": {
++      "ms": 530,
++      "level": true,
++      "valid": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "config": {
++        "ruleMode": "instantChain",
++        "instantChain": true,
++        "elimOrder": "instant"
++      },
++      "instant": {
++        "schema": "instant-playout-v1",
++        "ok": true,
++        "reason": null,
++        "cars": 27,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          35,
++          54
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 1,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "bufferEvents": 3,
++        "medianReachableAtEntry": 46
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 7,
++        "boardFloorPass": true,
++        "cars": 27,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 32,
++        "maxCap": 54,
++        "boxSizeMin": 35,
++        "boxSizeMax": 54,
++        "belowMin": 1,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 14,
++            "total": 32
++          }
++        ],
++        "row0Cars": 7,
++        "row0Colors": 4,
++        "row0MaxSameColor": 2,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "board": {
++        "rows": 6,
++        "cols": 7
++      },
++      "hash": "4d636dd7e0cda32480afe28bd93944b1671e2f37311e38a4919e60911a532bb2",
++      "stop": "pass_early_stop"
++    },
++    "007": {
++      "ms": 785,
++      "level": true,
++      "valid": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "config": {
++        "ruleMode": "instantChain",
++        "instantChain": true,
++        "elimOrder": "instant"
++      },
++      "instant": {
++        "schema": "instant-playout-v1",
++        "ok": true,
++        "reason": null,
++        "cars": 46,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          31,
++          31
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 12,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "bufferEvents": 3,
++        "medianReachableAtEntry": 31
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 7,
++        "cols": 8,
++        "boardFloorPass": true,
++        "cars": 46,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 2,
++        "maxCap": 31,
++        "boxSizeMin": 31,
++        "boxSizeMax": 31,
++        "belowMin": 12,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [
++          {
++            "r": 4,
++            "c": 7,
++            "color": 14,
++            "count": 2,
++            "inPipe": false
++          }
++        ],
++        "microCount": 1,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 1,
++            "total": 52
++          },
++          {
++            "color": 5,
++            "total": 30
++          },
++          {
++            "color": 13,
++            "total": 37
++          },
++          {
++            "color": 14,
++            "total": 33
++          },
++          {
++            "color": 15,
++            "total": 52
++          },
++          {
++            "color": 16,
++            "total": 70
++          },
++          {
++            "color": 28,
++            "total": 53
++          },
++          {
++            "color": 30,
++            "total": 35
++          },
++          {
++            "color": 31,
++            "total": 58
++          },
++          {
++            "color": 32,
++            "total": 39
++          },
++          {
++            "color": 33,
++            "total": 50
++          },
++          {
++            "color": 34,
++            "total": 282
++          }
++        ],
++        "row0Cars": 8,
++        "row0Colors": 3,
++        "row0MaxSameColor": 5,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "hash": "98a15f4f74334cbfb463ee61d4ac3d952990b82e6c9049447bf148def9a3cf20",
++      "stop": "exhausted"
++    }
++  },
++  "fourSideProtection": {
++    "level": true,
++    "valid": true,
++    "hash": "48680c72a30cbec03784b516c876c25e2ac24588e805b5191dd818f47a87202d",
++    "expectedHash": "48680c72a30cbec03784b516c876c25e2ac24588e805b5191dd818f47a87202d",
++    "config": {
++      "ruleMode": "fourSide",
++      "instantChain": false,
++      "elimOrder": "ring"
++    }
++  },
++  "pass": true
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\253\257\345\210\260\347\253\257_v526.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\253\257\345\210\260\347\253\257_v526.json"
+new file mode 100644
+index 0000000..aaed72a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/instantPlayout\347\253\257\345\210\260\347\253\257_v526.json"
+@@ -0,0 +1,302 @@
++{
++  "schema": "instant-playout-end-to-end-v526",
++  "date": "2026-10-26",
++  "images": {
++    "006": {
++      "ms": 1002,
++      "level": true,
++      "valid": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "config": {
++        "ruleMode": "instantChain",
++        "instantChain": true,
++        "elimOrder": "instant"
++      },
++      "instant": {
++        "schema": "instant-playout-v1",
++        "ok": true,
++        "reason": null,
++        "cars": 37,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          31,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 5,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "bufferEvents": 6,
++        "medianReachableAtEntry": 34
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 7,
++        "cols": 8,
++        "boardFloorPass": true,
++        "cars": 37,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 10,
++        "maxCap": 40,
++        "boxSizeMin": 31,
++        "boxSizeMax": 40,
++        "belowMin": 5,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 4,
++            "total": 61
++          },
++          {
++            "color": 13,
++            "total": 55
++          },
++          {
++            "color": 14,
++            "total": 89
++          },
++          {
++            "color": 33,
++            "total": 41
++          },
++          {
++            "color": 34,
++            "total": 50
++          }
++        ],
++        "row0Cars": 8,
++        "row0Colors": 5,
++        "row0MaxSameColor": 3,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "hash": "a69b50843862f1c9412e53b10bd44b2d2c8da12ce982b311249b9bc597ffbcf8",
++      "perf": {
++        "stop": "pass_early_stop",
++        "candidates": 1,
++        "evaluated": 1
++      }
++    },
++    "010": {
++      "ms": 566,
++      "level": true,
++      "valid": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "config": {
++        "ruleMode": "instantChain",
++        "instantChain": true,
++        "elimOrder": "instant"
++      },
++      "instant": {
++        "schema": "instant-playout-v1",
++        "ok": true,
++        "reason": null,
++        "cars": 27,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          35,
++          54
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 1,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "bufferEvents": 3,
++        "medianReachableAtEntry": 46
++      },
++      "board": {
++        "rows": 6,
++        "cols": 7
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 7,
++        "boardFloorPass": true,
++        "cars": 27,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 32,
++        "maxCap": 54,
++        "boxSizeMin": 35,
++        "boxSizeMax": 54,
++        "belowMin": 1,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 14,
++            "total": 32
++          }
++        ],
++        "row0Cars": 7,
++        "row0Colors": 4,
++        "row0MaxSameColor": 2,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "hash": "4d636dd7e0cda32480afe28bd93944b1671e2f37311e38a4919e60911a532bb2",
++      "perf": {
++        "stop": "pass_early_stop",
++        "candidates": 1,
++        "evaluated": 1
++      }
++    },
++    "007": {
++      "ms": 876,
++      "level": true,
++      "valid": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "config": {
++        "ruleMode": "instantChain",
++        "instantChain": true,
++        "elimOrder": "instant"
++      },
++      "instant": {
++        "schema": "instant-playout-v1",
++        "ok": true,
++        "reason": null,
++        "cars": 46,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          31,
++          31
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 12,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "bufferEvents": 3,
++        "medianReachableAtEntry": 31
++      },
++      "board": {
++        "rows": 7,
++        "cols": 8
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 7,
++        "cols": 8,
++        "boardFloorPass": true,
++        "cars": 46,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 2,
++        "maxCap": 31,
++        "boxSizeMin": 31,
++        "boxSizeMax": 31,
++        "belowMin": 12,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [
++          {
++            "r": 4,
++            "c": 7,
++            "color": 14,
++            "count": 2,
++            "inPipe": false
++          }
++        ],
++        "microCount": 1,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 1,
++            "total": 52
++          },
++          {
++            "color": 5,
++            "total": 30
++          },
++          {
++            "color": 13,
++            "total": 37
++          },
++          {
++            "color": 14,
++            "total": 33
++          },
++          {
++            "color": 15,
++            "total": 52
++          },
++          {
++            "color": 16,
++            "total": 70
++          },
++          {
++            "color": 28,
++            "total": 53
++          },
++          {
++            "color": 30,
++            "total": 35
++          },
++          {
++            "color": 31,
++            "total": 58
++          },
++          {
++            "color": 32,
++            "total": 39
++          },
++          {
++            "color": 33,
++            "total": 50
++          },
++          {
++            "color": 34,
++            "total": 282
++          }
++        ],
++        "row0Cars": 8,
++        "row0Colors": 3,
++        "row0MaxSameColor": 5,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      },
++      "hash": "98a15f4f74334cbfb463ee61d4ac3d952990b82e6c9049447bf148def9a3cf20",
++      "perf": {
++        "stop": "exhausted",
++        "candidates": 1,
++        "evaluated": 1
++      }
++    }
++  }
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 3f2a282..5b4ff03 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -60,6 +60,7 @@
+ | v524 消除序口径 | 生成应按实机「离该车曼哈顿最近、占最左空槽」还是现行圈序 | 已实现 `eliminationOrder` 瞬时模式（默认关，默认路径 hash 不变）；按车切分 Jaccard 0.674~0.763、仅 18~33% 车像素不变；A vs B″ 同色 93.5~100% | `instantPlayout_验证_v524.js` + `instantPlayout_v524.json` | §514 |
+ | v525 三态规则契约 | UI选瞬时但生成侧仍圈序的口径分裂 | ✅ ruleMode派生bottomOnly/instantChain/elimOrder；瞬时固定elimOrder=instant；默认四边006新旧hash相同 | `三态规则契约_v525.js` + `三态规则真实回归_v525.json` | §515 |
+ | 瞬时模式施工计划 | 如何真正按实机顺序造关 | 规则契约已完成；下一步instantPlayout接切车，再容量/摆盘/体验/障碍 | `瞬时模式生成器实施计划_v525.md` | §515 |
++| v526 instantPlayout切车 | 生成器能否按实机车辆像素顺序造车 | ✅ 006/010/007覆盖全覆盖/无死锁/aboveMax=0/端到端结构过；默认四边hash不变；遗留belowMin 5/1/12 | `instantPlayout生产接入_v526.js` + JSON | §516 |
+ 
+ ## 当前权威产物
+ 
+diff --git a/README.md b/README.md
+index f874240..95cb3a0 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v525**（三态规则契约；瞬时模式切车接入进行中）。
++> 当前版本 **v526**（瞬时模式已接入 instantPlayout 切车；容量计划继续）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
