@@ -3759,11 +3759,58 @@ AntSolver.Generator = (function() {
     for (var bi = 0; bi < boxes.length; bi++)
       list.push({
         color: boxes[bi].color, count: boxes[bi].count,
+        instantEntryReach: (boxes[bi].instantEntryReach != null) ? boxes[bi].instantEntryReach : null,
         // 【v298】把切法给出的依赖层带进车单，供 depFill 使用（layerCut 才有这个字段）
         layer: (boxes[bi].layer != null) ? boxes[bi].layer : null,
         _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi)
       });
     list.sort(function (a, b) { return a._seq - b._seq; });
+    // v531实验：有限分支布局。只移动现有黑块，不新增黑块；保留1~3个第0行入口。
+    if (_preserveInstantOrder && config.instantPlanBranchCount >= 2) {
+      var _branchN = Math.max(2, Math.min(3, parseInt(config.instantPlanBranchCount, 10) || 2));
+      var _rootCols = [], _row0Null = [];
+      for (var _bc = 0; _bc < cols; _bc++) if (cells[0][_bc] == null) _row0Null.push(_bc);
+      if (_row0Null.length >= _branchN) {
+        if (_branchN === 2) _rootCols = [_row0Null[0], _row0Null[_row0Null.length - 1]];
+        else { _rootCols = [_row0Null[0], _row0Null[Math.floor(_row0Null.length / 2)], _row0Null[_row0Null.length - 1]]; }
+        var _removed = 0;
+        for (var _rc = 0; _rc < cols; _rc++) {
+          if (_rootCols.indexOf(_rc) < 0 && cells[0][_rc] == null) { cells[0][_rc] = { t: 'black' }; _removed++; }
+        }
+        // 把等量下层黑块换成空位；优先选择贴着空位的黑块，保证新增放车位可接入。
+        var _donors = [];
+        for (var _dr = 1; _dr < rows; _dr++) for (var _dc = 0; _dc < cols; _dc++) {
+          if (!cells[_dr][_dc] || cells[_dr][_dc].t !== 'black') continue;
+          var _near = false, _dd = [[-1,0],[1,0],[0,-1],[0,1]];
+          for (var _di = 0; _di < 4; _di++) {
+            var _nr = _dr + _dd[_di][0], _nc = _dc + _dd[_di][1];
+            if (_nr >= 0 && _nr < rows && _nc >= 0 && _nc < cols && cells[_nr][_nc] == null) { _near = true; break; }
+          }
+          _donors.push({ r: _dr, c: _dc, near: _near });
+        }
+        _donors.sort(function (a, b) { return (b.near ? 1 : 0) - (a.near ? 1 : 0) || a.r - b.r || a.c - b.c; });
+        for (var _di2 = 0; _di2 < _donors.length && _removed > 0; _di2++) {
+          cells[_donors[_di2].r][_donors[_di2].c] = null; _removed--;
+        }
+        if (pipeList) pipeList.length = 0;
+        if (struct.pipeList) struct.pipeList.length = 0;
+        struct.iceSlots = []; struct.questionSlots = []; struct.chainGroups = [];
+        config._instantPlanBranchRoots = _rootCols.slice();
+        if (config.instantPlanBranchDebtRoots === true) {
+          var _debtCars = list.filter(function (b) {
+            return b.instantEntryReach != null && b.count > b.instantEntryReach;
+          }).sort(function (a, b) { return (a.count - a.instantEntryReach) - (b.count - b.instantEntryReach) || a._seq - b._seq; });
+          if (_debtCars.length) {
+            var _chosen = _debtCars.slice(0, _rootCols.length), _chosenSet = {};
+            for (var _ci = 0; _ci < _chosen.length; _ci++) _chosenSet[_chosen[_ci]._seq] = 1;
+            var _rest = list.filter(function (b) { return !_chosenSet[b._seq]; });
+            list = _chosen.concat(_rest);
+            config._instantPlanBranchDebtRoots = _chosen.map(function (b) { return { color: b.color, count: b.count, debt: b.count - b.instantEntryReach }; });
+          }
+        }
+        timing.instantPlanBranch = { count: _rootCols.length, roots: _rootCols.slice(), removedBlackMoved: _donors.length };
+      }
+    }
     // v529实验：单入口路径用于验证“低压绕路”是否由可替代出口造成；默认关，成功后再放开合理分支。
     if (_preserveInstantOrder && config.instantPlanSingleEntry === true) {
       var _singlePath = instantSingleEntryPath(rows, cols, boxes.length);

@@ -1,0 +1,689 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index b8621ad..7ca40b7 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -15,6 +15,7 @@
+ > v528：瞬时计划车单已逐格落盘并可回放通关（006/010/007的37/27/46车均全过）；参考路线maxBuffer仅1/1/2，说明“按实机顺序造出来”已成立，但“造出好压力”尚未成立。下一步完整体验筛选和债务/释放规划。
+ > v529：`targetBuffer=4`债务策略让三图计划路线全过体验（52.2/75/78.6%，maxBuffer均4，release found）；但求解器最佳路线仍0/3，下一步约束实际可选路线/多路线压力底线。
+ > v530：单入口隔行走廊可让plan/solver三图全过，但黑块43.8~53.8%，只作为路线约束上界证据，不接默认；下一步有限分支迷宫，兼顾高压与观感。
++> v531：有限2/3分支原型黑块降到11.1~25%，但plan仅2/6、solver0/6；下一步优化分支级车序与首个分岔，不增加分支数量。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index d25afa5..3fcf5a6 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20435,3 +20435,33 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. 实现有限分支迷宫：目标保留1~3条可解释分支，各分支压力不低于目标下限，同时黑块回到可接受范围。
+ 2. 优先用少量黑墙/空位形成瓶颈，不用末段冰链；后续障碍只做功能补充。
+ 3. 在多路线报告里加入“低压路线”最低压力，不再只接受一条高压参考路线。
++
++### 521. 【2026-10-26】v531：有限分支把黑块压低，但分支车序仍未形成全高压路线
++
++#### 521.1 问题（原话）
++
++- “保留 1～3 条可解释分支，不一定要用黑块强制只能通过一条线走。”
++
++#### 521.2 证据
++
++- 普通棋盘 target4 计划路线可高压，但约10条求解路线大多低压；单入口可强制高压，却黑块43.8~53.8%。
++- 2/3入口+入口债务车原型：006黑块11.1%、010黑块25%，说明不必新增大量黑块也能保留分支。
++- 但2/3分支计划路线只有2/6通过，solver 0/6；007使用6×6时5/5候选pipeCapacity失败，盘型也需要保护。
++
++#### 521.3 改动
++
++- Kimi增加实验开关`instantPlanBranchCount=2/3`与`instantPlanBranchDebtRoots`：第0行保留入口，等量移动下层黑块，入口优先放债务车；默认全关。
++- 新增`瞬时有限分支_v531.js`，记录分支数、入口债务车、黑块、plan/solver体验、容量与盘型。
++- 不把有限分支接默认生产。
++
++#### 521.4 验证（改前后数字）
++
++- 006 2/3分支：plan路线85.7%/60%但release unknown/求解0%，黑块11.1%；010 plan76.5%但solver0%，黑块25%；007在小盘全灭。
++- 入口债务车、计划格和容量守恒可记录；黑块显著低于单入口上界，这是正结果。
++- `node --check`与`git diff --check`通过。
++
++#### 521.5 遗留
++
++1. 下一步优化分支内部车序：每个分支要有自己的短债→释放片段，避免共同的低压自由车。
++2. 分支路线评价必须记录首次分岔、低压路线和全部合法分支，不只记录计划路线。
++3. 007盘型需在分支实验前做pipe capacity/棋盘下限保护。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index cc92ee1..8dbe0b7 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v530 瞬时路线约束上界）　|　当前版本：**v530**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v531 瞬时有限分支原型）　|　当前版本：**v531**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~520。v530单入口约束证明三条路线隔离可让plan/solver全过，但黑块43.8~53.8%，不接默认；下一步做有限分支迷宫，在保留高压路线同时压回黑块。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~521。v531有限分支原型把黑块压到11.1~25%，但plan仅2/6、solver0/6，007在小盘撞管道；下一步优化分支内部车序与分支选择。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index 6e90d0e..28c24cc 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -90,6 +90,7 @@
+ - 目标模式有总预算；连续快速无候选必须退避并记录真实原因。
+ - **v529~v530边界**：target4债务计划路线三图全过，但普通盘面存在低压绕路；单入口隔行走廊可让plan/solver三图全过，代价是黑块43.8~53.8%、盘面偏大，不能接受。
+ - 下一项不是继续单入口，而是保留1~3条有限高压力分支；以路线压力下限和黑块/盘面两个保护指标筛选。
++- **v531结果**：2/3入口+入口债务车原型黑块11.1%~25%，但plan路线2/6通过、solver0/6；007在6×6上pipeCapacity全灭。分支拓扑可行，分支内部车序/分支选择未成立。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index bb9409d..870fbdd 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v530 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=530">
++  <title>车接小人 v531 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=531">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v530</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v531</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,28 +773,28 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=530"></script>
+-  <script src="js/utils.js?v=530"></script>
++  <script src="js/zip.js?v=531"></script>
++  <script src="js/utils.js?v=531"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=530"></script>
+-  <script src="js/simulator.js?v=530"></script>
++  <script src="js/color-libs.js?v=531"></script>
++  <script src="js/simulator.js?v=531"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=530"></script>
+-  <script src="js/solver-strategy.js?v=530"></script>
+-  <script src="js/solver.js?v=530"></script>
+-  <script src="js/playersim.js?v=530"></script>
++  <script src="js/anchor-cut.js?v=531"></script>
++  <script src="js/solver-strategy.js?v=531"></script>
++  <script src="js/solver.js?v=531"></script>
++  <script src="js/playersim.js?v=531"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=530"></script>
+-  <script src="js/car-sequencer.js?v=530"></script>
+-  <script src="js/experience-goal.js?v=530"></script>
+-  <script src="js/capacity-tuner.js?v=530"></script>
+-  <script src="js/instant-playout.js?v=530"></script>
+-  <script src="js/generator.js?v=530"></script>
+-  <script src="js/source-preflight.js?v=530"></script>
+-  <script src="js/analysis.js?v=530"></script>
++  <script src="js/solver-analysis.js?v=531"></script>
++  <script src="js/car-sequencer.js?v=531"></script>
++  <script src="js/experience-goal.js?v=531"></script>
++  <script src="js/capacity-tuner.js?v=531"></script>
++  <script src="js/instant-playout.js?v=531"></script>
++  <script src="js/generator.js?v=531"></script>
++  <script src="js/source-preflight.js?v=531"></script>
++  <script src="js/analysis.js?v=531"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=530"></script>
+-  <script src="js/app.js?v=530"></script>
++  <script src="js/level-editor.js?v=531"></script>
++  <script src="js/app.js?v=531"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 0d22a1a..a6c9cdb 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -3759,11 +3759,58 @@ AntSolver.Generator = (function() {
+     for (var bi = 0; bi < boxes.length; bi++)
+       list.push({
+         color: boxes[bi].color, count: boxes[bi].count,
++        instantEntryReach: (boxes[bi].instantEntryReach != null) ? boxes[bi].instantEntryReach : null,
+         // 【v298】把切法给出的依赖层带进车单，供 depFill 使用（layerCut 才有这个字段）
+         layer: (boxes[bi].layer != null) ? boxes[bi].layer : null,
+         _seq: (boxes[bi].elimSeq != null ? boxes[bi].elimSeq : bi)
+       });
+     list.sort(function (a, b) { return a._seq - b._seq; });
++    // v531实验：有限分支布局。只移动现有黑块，不新增黑块；保留1~3个第0行入口。
++    if (_preserveInstantOrder && config.instantPlanBranchCount >= 2) {
++      var _branchN = Math.max(2, Math.min(3, parseInt(config.instantPlanBranchCount, 10) || 2));
++      var _rootCols = [], _row0Null = [];
++      for (var _bc = 0; _bc < cols; _bc++) if (cells[0][_bc] == null) _row0Null.push(_bc);
++      if (_row0Null.length >= _branchN) {
++        if (_branchN === 2) _rootCols = [_row0Null[0], _row0Null[_row0Null.length - 1]];
++        else { _rootCols = [_row0Null[0], _row0Null[Math.floor(_row0Null.length / 2)], _row0Null[_row0Null.length - 1]]; }
++        var _removed = 0;
++        for (var _rc = 0; _rc < cols; _rc++) {
++          if (_rootCols.indexOf(_rc) < 0 && cells[0][_rc] == null) { cells[0][_rc] = { t: 'black' }; _removed++; }
++        }
++        // 把等量下层黑块换成空位；优先选择贴着空位的黑块，保证新增放车位可接入。
++        var _donors = [];
++        for (var _dr = 1; _dr < rows; _dr++) for (var _dc = 0; _dc < cols; _dc++) {
++          if (!cells[_dr][_dc] || cells[_dr][_dc].t !== 'black') continue;
++          var _near = false, _dd = [[-1,0],[1,0],[0,-1],[0,1]];
++          for (var _di = 0; _di < 4; _di++) {
++            var _nr = _dr + _dd[_di][0], _nc = _dc + _dd[_di][1];
++            if (_nr >= 0 && _nr < rows && _nc >= 0 && _nc < cols && cells[_nr][_nc] == null) { _near = true; break; }
++          }
++          _donors.push({ r: _dr, c: _dc, near: _near });
++        }
++        _donors.sort(function (a, b) { return (b.near ? 1 : 0) - (a.near ? 1 : 0) || a.r - b.r || a.c - b.c; });
++        for (var _di2 = 0; _di2 < _donors.length && _removed > 0; _di2++) {
++          cells[_donors[_di2].r][_donors[_di2].c] = null; _removed--;
++        }
++        if (pipeList) pipeList.length = 0;
++        if (struct.pipeList) struct.pipeList.length = 0;
++        struct.iceSlots = []; struct.questionSlots = []; struct.chainGroups = [];
++        config._instantPlanBranchRoots = _rootCols.slice();
++        if (config.instantPlanBranchDebtRoots === true) {
++          var _debtCars = list.filter(function (b) {
++            return b.instantEntryReach != null && b.count > b.instantEntryReach;
++          }).sort(function (a, b) { return (a.count - a.instantEntryReach) - (b.count - b.instantEntryReach) || a._seq - b._seq; });
++          if (_debtCars.length) {
++            var _chosen = _debtCars.slice(0, _rootCols.length), _chosenSet = {};
++            for (var _ci = 0; _ci < _chosen.length; _ci++) _chosenSet[_chosen[_ci]._seq] = 1;
++            var _rest = list.filter(function (b) { return !_chosenSet[b._seq]; });
++            list = _chosen.concat(_rest);
++            config._instantPlanBranchDebtRoots = _chosen.map(function (b) { return { color: b.color, count: b.count, debt: b.count - b.instantEntryReach }; });
++          }
++        }
++        timing.instantPlanBranch = { count: _rootCols.length, roots: _rootCols.slice(), removedBlackMoved: _donors.length };
++      }
++    }
+     // v529实验：单入口路径用于验证“低压绕路”是否由可替代出口造成；默认关，成功后再放开合理分支。
+     if (_preserveInstantOrder && config.instantPlanSingleEntry === true) {
+       var _singlePath = instantSingleEntryPath(rows, cols, boxes.length);
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index e3e2204..287035d 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -65,6 +65,7 @@
+ | v528 计划可回放落位 | 最终棋盘能否重演plan主车序 | ✅ 3图计划格逐项匹配、计划路线37/27/46步全部通关；maxBuffer仅1/1/2，转体验筛选 | `瞬时计划回放一致性_v528.js` + JSON | §518 |
+ | v529 瞬时债务策略 | 计划路线能否达到中段3/4并释放 | ✅ target4+debt24/40让3图计划路线全过（52.2/75/78.6%，max4，release found）；solver最佳路线仍0/3 | `瞬时债务策略_v529.js` + JSON | §519 |
+ | v530 单入口路线隔离 | 封死替代路线能否让solver也高压 | ✅ plan/solver 3/3全过；但黑块43.8~53.8%、盘面偏大，拒绝默认，转有限分支 | `瞬时单入口约束_v530.js` + JSON | §520 |
++| v531 有限分支原型 | 不用新增黑块能否保留高压分支 | 黑块11.1~25%，但plan 2/6、solver 0/6；007小盘pipeCapacity全灭，下一步分支级车序 | `瞬时有限分支_v531.js` + JSON | §521 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\346\234\211\351\231\220\345\210\206\346\224\257_v531.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\346\234\211\351\231\220\345\210\206\346\224\257_v531.js"
+new file mode 100644
+index 0000000..5ae3089
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\346\234\211\351\231\220\345\210\206\346\224\257_v531.js"
+@@ -0,0 +1,40 @@
++#!/usr/bin/env node
++/** v531：2/3分支入口 + 分支入口债务车的只读原型，记录黑块与plan/solver差异。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator;
++function routeOf(level) { return level.board.instantPlanCells.map((p, i) => ({ r: p.r, c: p.c, color: p.color, count: p.count, step: i, chainIndex: 0 })); }
++function ev(level, route) { return A.ExperienceGoal.evaluate(level, { solveResult: { pickOrder: route, completed: true }, decision: true, instantChain: true }); }
++const out = { schema: 'instant-branching-v1', date: '2026-10-26', rows: [] };
++for (const s of [{ id: '006', debt: 40 }, { id: '010', debt: 40 }, { id: '007', debt: 40 }]) {
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_' + s.id + '.txt'), 'utf8'));
++  const band = G.deriveCapacityBand(blocks);
++  for (const branch of [2, 3]) {
++    const cfg = { seed: 1001, candidateCount: 1, rounds: 0, timeBudgetMs: 12000, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++      boxSizeMin: band.band[0], boxSizeMax: band.band[1], capNormMin: band.band[0], capNormMax: band.band[1],
++      boardRowsMin: 6, boardRowsMax: 9, boardColsMin: 6, boardColsMax: 11, boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++      p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1, instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++      instantPlanMaxDebt: s.debt, instantPlanBranchCount: branch, instantPlanBranchDebtRoots: true };
++    const t = Date.now(), r = G.produceFixed(blocks, cfg), route = r && r.level ? routeOf(r.level) : [];
++    const pe = r && r.level ? ev(r.level, route) : null, se = r && r.level ? ev(r.level, r.solveResult.pickOrder) : null;
++    let cellCount = 0, black = 0;
++    if (r && r.level) { cellCount = r.level.board.rows * r.level.board.cols; black = r.level.board.cells.flat().filter(x => x && x.t === 'black').length; }
++    out.rows.push({ image: s.id, branch, ms: Date.now() - t, level: !!(r && r.level), structural: r && r.structural, reason: r && r.lastFailReason,
++      board: r && r.level ? { rows: r.level.board.rows, cols: r.level.board.cols } : null, black, blackPct: cellCount ? +(black / cellCount * 100).toFixed(1) : null,
++      roots: r && r.config && r.config._instantPlanBranchDebtRoots || null,
++      plan: pe && { pass: pe.pass, mid: pe.metrics && pe.metrics.midBuffer34Pct, max: pe.metrics && pe.metrics.maxBuffer, release: pe.releaseDecision && pe.releaseDecision.status },
++      solver: se && { pass: se.pass, mid: se.metrics && se.metrics.midBuffer34Pct, max: se.metrics && se.metrics.maxBuffer, release: se.releaseDecision && se.releaseDecision.status },
++      capacity: r && r.level ? A.Quality.capacityEvidence(r.level, r.config || cfg) : null });
++    console.log(JSON.stringify(out.rows[out.rows.length - 1]));
++  }
++}
++out.summary = { rows: out.rows.length, planPass: out.rows.filter(x => x.plan && x.plan.pass).length,
++  solverPass: out.rows.filter(x => x.solver && x.solver.pass).length,
++  maxBlackPct: Math.max.apply(null, out.rows.map(x => x.blackPct || 0)),
++  decision: '分支入口+入口债务车能保持黑块较低，但仍存在低压求解绕路；下一项做分支级车序/路线选择。' };
++fs.writeFileSync(path.join(__dirname, '瞬时有限分支_v531.json'), JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify(out.summary, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\346\234\211\351\231\220\345\210\206\346\224\257_v531.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\346\234\211\351\231\220\345\210\206\346\224\257_v531.json"
+new file mode 100644
+index 0000000..5e633c2
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\347\236\254\346\227\266\346\234\211\351\231\220\345\210\206\346\224\257_v531.json"
+@@ -0,0 +1,403 @@
++{
++  "schema": "instant-branching-v1",
++  "date": "2026-10-26",
++  "rows": [
++    {
++      "image": "006",
++      "branch": 2,
++      "ms": 2913,
++      "level": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "board": {
++        "rows": 6,
++        "cols": 6
++      },
++      "black": 4,
++      "blackPct": 11.1,
++      "roots": [
++        {
++          "color": 15,
++          "count": 43,
++          "debt": 7
++        },
++        {
++          "color": 21,
++          "count": 36,
++          "debt": 9
++        }
++      ],
++      "plan": {
++        "pass": false,
++        "mid": 85.7,
++        "max": 4,
++        "release": "unknown_within_budget"
++      },
++      "solver": {
++        "pass": false,
++        "mid": 0,
++        "max": 2,
++        "release": "no_high_pressure_state"
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 6,
++        "boardFloorPass": true,
++        "cars": 32,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 20,
++        "maxCap": 45,
++        "boxSizeMin": 35,
++        "boxSizeMax": 45,
++        "belowMin": 6,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 4,
++            "total": 61
++          },
++          {
++            "color": 5,
++            "total": 103
++          },
++          {
++            "color": 13,
++            "total": 55
++          },
++          {
++            "color": 28,
++            "total": 69
++          },
++          {
++            "color": 34,
++            "total": 50
++          }
++        ],
++        "row0Cars": 2,
++        "row0Colors": 2,
++        "row0MaxSameColor": 1,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      }
++    },
++    {
++      "image": "006",
++      "branch": 3,
++      "ms": 2923,
++      "level": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "board": {
++        "rows": 6,
++        "cols": 6
++      },
++      "black": 4,
++      "blackPct": 11.1,
++      "roots": [
++        {
++          "color": 15,
++          "count": 43,
++          "debt": 7
++        },
++        {
++          "color": 21,
++          "count": 36,
++          "debt": 9
++        },
++        {
++          "color": 15,
++          "count": 42,
++          "debt": 17
++        }
++      ],
++      "plan": {
++        "pass": false,
++        "mid": 60,
++        "max": 5,
++        "release": "unknown_within_budget"
++      },
++      "solver": {
++        "pass": false,
++        "mid": 9.5,
++        "max": 3,
++        "release": "found"
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 6,
++        "boardFloorPass": true,
++        "cars": 32,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 20,
++        "maxCap": 45,
++        "boxSizeMin": 35,
++        "boxSizeMax": 45,
++        "belowMin": 6,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 4,
++            "total": 61
++          },
++          {
++            "color": 5,
++            "total": 103
++          },
++          {
++            "color": 13,
++            "total": 55
++          },
++          {
++            "color": 28,
++            "total": 69
++          },
++          {
++            "color": 34,
++            "total": 50
++          }
++        ],
++        "row0Cars": 3,
++        "row0Colors": 2,
++        "row0MaxSameColor": 2,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      }
++    },
++    {
++      "image": "010",
++      "branch": 2,
++      "ms": 1488,
++      "level": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "board": {
++        "rows": 6,
++        "cols": 6
++      },
++      "black": 9,
++      "blackPct": 25,
++      "roots": [
++        {
++          "color": 34,
++          "count": 39,
++          "debt": 7
++        },
++        {
++          "color": 30,
++          "count": 53,
++          "debt": 9
++        }
++      ],
++      "plan": {
++        "pass": true,
++        "mid": 76.5,
++        "max": 5,
++        "release": "found"
++      },
++      "solver": {
++        "pass": false,
++        "mid": 0,
++        "max": 2,
++        "release": "no_high_pressure_state"
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 6,
++        "boardFloorPass": true,
++        "cars": 27,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 32,
++        "maxCap": 54,
++        "boxSizeMin": 35,
++        "boxSizeMax": 54,
++        "belowMin": 1,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 14,
++            "total": 32
++          }
++        ],
++        "row0Cars": 2,
++        "row0Colors": 2,
++        "row0MaxSameColor": 1,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      }
++    },
++    {
++      "image": "010",
++      "branch": 3,
++      "ms": 1352,
++      "level": true,
++      "structural": {
++        "ok": true,
++        "reason": ""
++      },
++      "board": {
++        "rows": 6,
++        "cols": 6
++      },
++      "black": 9,
++      "blackPct": 25,
++      "roots": [
++        {
++          "color": 34,
++          "count": 39,
++          "debt": 7
++        },
++        {
++          "color": 30,
++          "count": 53,
++          "debt": 9
++        },
++        {
++          "color": 32,
++          "count": 49,
++          "debt": 18
++        }
++      ],
++      "plan": {
++        "pass": true,
++        "mid": 76.5,
++        "max": 5,
++        "release": "found"
++      },
++      "solver": {
++        "pass": false,
++        "mid": 0,
++        "max": 1,
++        "release": "no_high_pressure_state"
++      },
++      "capacity": {
++        "schema": "capacity-evidence-v1",
++        "rows": 6,
++        "cols": 6,
++        "boardFloorPass": true,
++        "cars": 27,
++        "capacitySum": 1225,
++        "pixels": 1225,
++        "conserved": true,
++        "minCap": 32,
++        "maxCap": 54,
++        "boxSizeMin": 35,
++        "boxSizeMax": 54,
++        "belowMin": 1,
++        "aboveMax": 0,
++        "microCarMax": 2,
++        "microCars": [],
++        "microCount": 0,
++        "rangeExactFeasible": false,
++        "infeasibleColors": [
++          {
++            "color": 14,
++            "total": 32
++          }
++        ],
++        "row0Cars": 3,
++        "row0Colors": 3,
++        "row0MaxSameColor": 1,
++        "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
++      }
++    },
++    {
++      "image": "007",
++      "branch": 2,
++      "ms": 197,
++      "level": false,
++      "structural": {
++        "ok": false,
++        "reason": "候选淘汰主因「pipeCapacity」5/5 次；全部计数 {\"baseline\":0,\"struct\":0,\"structSurplus\":0,\"structHoles\":0,\"structReach\":0,\"structPipeExit\":0,\"pipeCapacity\":5,\"pipeDepth\":0,\"rowTrim\":0,\"bind\":0,\"conservation\":0,\"structuralCheck\":0,\"access\":0,\"screen\":0}",
++        "failCounts": {
++          "baseline": 0,
++          "struct": 0,
++          "structSurplus": 0,
++          "structHoles": 0,
++          "structReach": 0,
++          "structPipeExit": 0,
++          "pipeCapacity": 5,
++          "pipeDepth": 0,
++          "rowTrim": 0,
++          "bind": 0,
++          "conservation": 0,
++          "structuralCheck": 0,
++          "access": 0,
++          "screen": 0
++        }
++      },
++      "reason": "noCandidate",
++      "board": null,
++      "black": 0,
++      "blackPct": null,
++      "roots": null,
++      "plan": null,
++      "solver": null,
++      "capacity": null
++    },
++    {
++      "image": "007",
++      "branch": 3,
++      "ms": 196,
++      "level": false,
++      "structural": {
++        "ok": false,
++        "reason": "候选淘汰主因「pipeCapacity」5/5 次；全部计数 {\"baseline\":0,\"struct\":0,\"structSurplus\":0,\"structHoles\":0,\"structReach\":0,\"structPipeExit\":0,\"pipeCapacity\":5,\"pipeDepth\":0,\"rowTrim\":0,\"bind\":0,\"conservation\":0,\"structuralCheck\":0,\"access\":0,\"screen\":0}",
++        "failCounts": {
++          "baseline": 0,
++          "struct": 0,
++          "structSurplus": 0,
++          "structHoles": 0,
++          "structReach": 0,
++          "structPipeExit": 0,
++          "pipeCapacity": 5,
++          "pipeDepth": 0,
++          "rowTrim": 0,
++          "bind": 0,
++          "conservation": 0,
++          "structuralCheck": 0,
++          "access": 0,
++          "screen": 0
++        }
++      },
++      "reason": "noCandidate",
++      "board": null,
++      "black": 0,
++      "blackPct": null,
++      "roots": null,
++      "plan": null,
++      "solver": null,
++      "capacity": null
++    }
++  ],
++  "summary": {
++    "rows": 6,
++    "planPass": 2,
++    "solverPass": 0,
++    "maxBlackPct": 25,
++    "decision": "分支入口+入口债务车能保持黑块较低，但仍存在低压求解绕路；下一项做分支级车序/路线选择。"
++  }
++}
+diff --git a/README.md b/README.md
+index 1cd0779..edf0b5b 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v530**（瞬时路线约束上界已验证；有限分支迷宫继续）。
++> 当前版本 **v531**（瞬时有限分支原型已验证；分支车序继续）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
