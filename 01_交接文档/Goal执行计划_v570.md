@@ -299,7 +299,7 @@ P2c 已完成结果：
 - PlayerSim 仍是进度 2%、4 次拾取即高压停止；
 - targetBuffer 族参数停止，不再试 2/5。
 
-### P2d. 006 供给时间线重归因 · ⏭ 当前唯一下一步
+### P2d. 006 供给时间线重归因 · ✅ 已完成
 
 只读比较 `shortDebt`、`targetBuffer4`、`targetBuffer3`：
 
@@ -311,6 +311,26 @@ P2c 已完成结果：
 6. 区分真实债务与“当步即还”的假债务。
 
 本轮不改生产代码、不生成新 seed、不试新 policy。归因结束后才能提出下一项单因素。
+
+已完成结果：
+
+- shortDebt 37 次拾取中 28 次当步完成，实际只有 9 辆债务车；
+- 9 辆债务车全部可追踪，最长等待 21 步；
+- step9 一次完成两辆早债车并消除 119px，step10 最后一辆完成，buffer 从 3→0；
+- step23~26 的 14 个低压力状态均没有“提高到 3 且保留完整后缀”的动作；
+- targetBuffer3/4 实际债务车更多，但分布为开局或末段，不是中段；
+- 结论：需要改变计划中的债务车时间分布，下一项选分支前缀债务 8→6。
+
+### P2e. 006 分支前缀债务 8→6 · ⏭ 当前唯一下一步
+
+唯一变量：
+
+```text
+instantPlanPolicy = shortDebt
+instantPlanBranchPrefixDebts: 8 → 6
+```
+
+固定图、seed、容量、配方、棋盘和目标门。假设减少前移债务候选可降低 step1~3 的早债堆积，并把部分债务留到 step23~31。
 
 ### P3. 006 开发集复核与生产化
 
@@ -409,12 +429,13 @@ P2c 已完成结果：
 
 ## 8. 当前唯一下一步
 
-执行 **P2d：006/1001 供给时间线重归因**。
+执行 **P2e：006/1001 分支前缀债务 8→6**。
 
 唯一变量：
 
 ```text
-只读比较 shortDebt、targetBuffer4、targetBuffer3
+instantPlanPolicy = shortDebt
+instantPlanBranchPrefixDebts: 8 vs 6
 ```
 
-固定现有三组真实关卡与路线，不重新生成。输出计划债务、实际债务生命周期、低压力区间的合法动作和候选债务窗口。本轮只解释根因，不修改生产，也不混入新实验。
+固定图、seed1001、容量带、配方、棋盘、`instantPlanTargetBuffer=4`、`instantPlanMaxDebt=40` 和目标阈值。只跑 prefix6 两次，并与已稳定复现的 prefix8 baseline 对照。目标是中段 `>=50%`、显著释放、PlayerSim 通关，同时不把压力推到末段。
