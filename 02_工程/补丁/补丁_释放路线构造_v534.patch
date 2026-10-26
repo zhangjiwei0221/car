@@ -1,0 +1,5025 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index 52f43aa..f0564ec 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -18,6 +18,7 @@
+ > v531：有限2/3分支原型黑块降到11.1~25%，但plan仅2/6、solver0/6；下一步优化分支级车序与首个分岔，不增加分支数量。
+ > v532：2分支入口位置扫描12组，plan4/12、solver0/12、solver低压12/12；入口拓扑不是主因，下一步分支内部债务序列/释放序列。
+ > v533：分支前缀债务让007求解器中段3/4达52%/72%，但release unknown；下一步专项释放动作搜索，不继续加前缀债务。
++> v534：把007高压父状态的可执行释压动作拼回完整路线并独立回放；40/117候选同时达中段3/4≥50%+显著释放，最佳46步80%/max4/释放1/黑块17.9%。单图单seed正结果，下一步做成多图路线构造模块，不接默认生产。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+@@ -41,6 +42,7 @@
+ - v496 首个进入生产的质量修复：容量上沿做成候选臂（`capScalePlan [1.45,1.15]`）。三图 5 seed 结构门 **9/15 → 14/15**，留出 seed 8/9；代价是最多多一次生成。
+ - v499 收口：结构门优先、黑块只在结构门之后压（≤30% 挡极端、≤15% 偏好）。生产集 5 seed **15/15**、留出 **7/9**；黑块中位 14~19%、最大 28%。
+ - 图集管理：推荐图（m=3）与好图（15% 黑块下白给≥15）已移出生产图集，见日志 §465/§478。
++- v524~v534 已切到“瞬时连锁生成”专项：真实最左空槽+最近曼哈顿切车、计划可回放落位、目标债务与有限分支已成立；v534首次得到“完整高压路线 + 显著释放 + 最终通关”同一条可回放签名，但仍只有007单图单seed，未接默认。
+ - 以下「下一步」仍是多图主产线基准，但产线现在与代码一致，口径不再分叉。
+ - 下一步不是继续堆模块，而是：**默认主产线多图基准 → 只读归因 → 针对最高频失败项做单变量实验。**
+ 
+@@ -653,6 +655,10 @@ for obstacle in candidates:
+ 
+ ## 6. 当前下一步：严格按此顺序
+ 
++> **2026-10-26 v534 后的实际施工位置：** 当前不再回到通用“下一步 A”从头跑。先把 v534 的单图脚本做成路线构造模块，要求输出完整 `pickOrder`、释压动作和独立回放证据；再用 006/010 同口径复跑；三图成立后才接生成候选选择。P4 目标化障碍继续暂停，不能在路线泛化前加冰链。
++>
++> 下一轮唯一主实验（v535）：固定 007 成功样本做模块复现，同时跑 006/010；主指标仍是 `finalReplayValid + midBuffer34Pct>=50 + significantReleaseCount>=1`，保护指标为守恒、aboveMax=0、无micro、黑块不增加。记录墙钟、候选数、重复签名和 P50/P90，防止路线构造把单关拖到数小时。
++
+ ### 下一步 A：多图主产线基准（先做）
+ 
+ - [ ] 固定当前 commit 和 `new_fixed` 配置。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+index f532e97..784cde9 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+@@ -1,6 +1,6 @@
+ # 优质关卡生成 · 详细实验与交付工作流程
+ 
+-> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新对照：**v523 已跑完、本文档同步登记**。
++> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v534 释放路线构造，单图正结果、尚未接生产**。
+ > 本文是唯一“已做什么 → 剩什么 → 如何实验 → 何时算完成”的执行流程；算法细节回查 `优质关卡生成_接管总纲.md`，历史数字回查工作日志对应节号。
+ > 瞬时模式的具体施工顺序见 [`瞬时模式生成器实施计划_v525.md`](瞬时模式生成器实施计划_v525.md)，它是本文 P0~P3 的技术分支，不替代本文验收框架。
+ 
+@@ -51,6 +51,7 @@
+ | 快速失败退避 | worker/主线程100ms递增到最高1秒，日志带真实原因 | UI不再数百轮/秒刷noCandidate |
+ | UI与落库 | v522批次32：COMPLETED、合格1/1、52.9%中段3/4、2次显著释放 | 真实链路已跑通，但样本仍有限 |
+ | Git与实验留痕 | 预登记、前后数字、补丁、日志、版本、回退点 | 后续必须继续执行，不能口头改参数 |
++| 瞬时完整释放路线 | v534 把高压父状态的释压动作拼回完整 `pickOrder`，007得到46步、中段3/4=80%、max4、显著释放1、回放通关 | 证明路线级可行性；仍是单图单seed，未做模块化、多图或生产接线 |
+ 
+ ### 2.1 关键正结果
+ 
+@@ -58,6 +59,7 @@
+ - v514容量臂归一化：目标通过 **1/5→4/5**，修复的是boxMax与capNormMax不一致，不是放宽用户区间。
+ - v522精确失败基底：70个失败候选的真实可用率中位 **69.0%**，目标`0.86→0.690476`后一次出关；目标轮完整通过 **66.7% + release found**。
+ - v522真实UI：A/C均执行可用率重试，B第4轮达标，约111秒，**合格1/1、COMPLETED**。
++- v534瞬时路线构造：007 117个候选里40个同时满足中段3/4≥50%与显著释放；最佳路线80%/max4/释放1/独立回放通关，黑块17.9%，证明不再是“只有单步释放证据”。
+ 
+ ### 2.2 已验证、不能再走的弯路
+ 
+@@ -90,7 +92,7 @@
+ | 剩余项 | 当前卡点 | 下一步主实验 |
+ |---|---|---|
+ | 容量合同漏网 | 推荐图aboveMax=1 | 容量越界谱系追踪，先硬合同后体验 |
+-| release unknown | 有3/4曲线但有限预算未验证释压动作 | 状态覆盖、动作排序、预算分配三项分开实验 |
++| 路线释放证据 | 007已有完整高压+释放+通关正结果；006/010和成本统计未做 | 先做多图路线构造模块，记录墙钟/去重/P50/P90，再接生产 |
+ | 远/近压力不足 | 010/推荐仍有低压基底 | 近失局部修、远失换基底；不做统一容量加减 |
+ | 每色容量组合规划 | 目前主要同色转移，缺全局联合目标 | 每色候选集→全局Pareto组合→重解评价 |
+ | 车序与首行观感 | 双时间线有测量，稳定生成策略不足 | 局部交换、首行同色run、释放顺序联合评价 |
+@@ -317,7 +319,8 @@
+ ## 6. 推荐执行顺序（不要跳步）
+ 
+ ```text
+-v523结果归档
++v534路线构造模块化与多图复跑
++→ 路线选择/生成接线
+ → P0容量越界谱系追踪（硬合同）
+ → 多图失败分布基线
+ → P1 release unknown评价覆盖
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 910811f..3700b1a 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20527,3 +20527,36 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. 下一步专项构造包含释放动作的完整高压路线，而不是只搜索单步替代动作。
+ 2. 把释放动作写入路线证据并重新回放整条路线，要求significantReleaseCount≥1。
+ 3. 不在释放路线未成立前继续加前缀债务或随机障碍。
++
++### 524. 【2026-10-26】v534：完整高压路线同时具备显著释放与最终通关
++
++#### 524.1 问题（原话）
++
++- “好的，下一步。”
++- 用户目标不是只有高压曲线或单步释压提示，而是玩家能在中段承受暂存3/4压力，靠可解释动作释放，并最终通关。
++
++#### 524.2 证据
++
++- v533的007 prefix8求解器路线已达到中段3/4=72%、maxBuffer=4，但`release unknown`；单步替代动作能找到，不代表整条参考路线具有显著释放。
++- v534在007高压父状态枚举当前合法动作，最多取8个，每个动作最多搜索`900ms / 3000 nodes`的可通关后缀；把“参考前缀+替代动作+可通关后缀”拼成完整`pickOrder`后，从空状态独立回放并重新计算压力曲线。
++- 共测试117个完整路线候选：有显著释放68个，中段3/4≥50%共58个，两者同时成立40个。最佳候选为46步，中段3/4=80%、maxBuffer=4、显著释放1、`finalReplayValid=true`；释压点在第30步`(2,2)`，颜色31。
++
++#### 524.3 改动
++
++- Kimi新增只读工具`03_工具/好关评分/释放路线构造_v534.js`和JSON结果，保存完整46步签名及全部候选；新增`释放路线构造_预登记_v534.md`补档当时口径。
++- 独立复核只使用保存的签名重新回放：46步完整通关，指标同为80%/max4/释放1；不是依赖脚本内部残留状态。
++- 版本升至v534，同步工程说明、接管总纲、详细工作流程、瞬时模式施工计划、目标体验计划和实验索引。
++- 不修改生成器默认路径，不新增障碍，不切默认四边生产；只把“单步释放搜索”推进为“完整路线级释放证据”。
++
++#### 524.4 验证（改前后数字）
++
++- 改前v533：007 prefix8 solver路线中段3/4=72%、maxBuffer=4、`release unknown`，不能通过完整体验。
++- 改后v534：同一生成口径下最佳完整路线中段3/4=80%、maxBuffer=4、显著释放1、独立回放通关。
++- 保护指标：棋盘7×8、黑块17.9%、每色容量守恒、aboveMax=0、microCars=0；最小车16px。`belowMin=26`仍是该图颜色总量与容量区间不可精确整除造成的余量，不伪装成全部容量都在区间内。
++- 边界：只有007/seed1001；117个候选中来自同一基底的重复签名未去重，工具未记录整轮墙钟，因此不能据此宣称命中率、P50/P90或泛化能力。
++
++#### 524.5 遗留
++
++1. v535把实验脚本改成可复用路线构造模块，必须输出完整`pickOrder`、释压证据、`finalReplayValid`，不能只返回一个动作或指标。
++2. 同口径复跑006/010；记录生成耗时、候选总数、唯一签名数、P50/P90，先解决成本再谈接线。
++3. 三图均有完整高压释放路线后，再讨论如何把路线证据接入生成候选选择；当前不进入目标化冰链障碍，也不把007单图结果当默认生产成功。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 098e0a6..419895c 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v533 分支前缀债务实验）　|　当前版本：**v533**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v534 释放路线构造实验）　|　当前版本：**v534**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~523。v533前缀债务实验：007 prefix6/8求解器中段3/4达52%/72%，但release unknown；下一步专项做高压路线释放动作搜索。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~524。v534把高压状态发现的释压动作拼回完整路线：007最佳46步中段3/4=80%、maxBuffer=4、显著释放1、独立回放通关、黑块17.9%；下一步做成可复用的多图路线构造模块。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+ > **跨会话接管请先读 [`优质关卡生成_接管总纲.md`](优质关卡生成_接管总纲.md)**：需求、数学模型、当前真实进度、逐阶段实验方法、验收和下一步执行卡都在那里。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index a7e596b..edd612e 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -241,3 +241,11 @@
+ - 三组均未触发可用率重试，所以结果只证明这些样本不受v522影响，不证明重试泛化有效。
+ - 推荐图旧新均1辆26px超过上限19，aboveMax=1；是已有漏网路径，下一项必须先做容量谱系追踪，不得被其他指标掩盖。
+ - 已全部实验步骤、已完成/未完成、P0~P6执行卡和最终冻结条件整理到 [`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md)。顺序：P0容量合同→P1释放评价→P2容量组合→P3车序观感→P4障碍→P5多图UI→P6真人校准。
++
++## 29. v524~v534：瞬时规则落地与完整释放路线
++
++- v524~v528完成实机规则口径、`instantPlayout`切车、每色容量计划与计划车单逐格回放；006/010/007计划路线分别37/27/46步均可通关，证明“按实机顺序造出来”成立。
++- v529~v533先用`targetBuffer=4`债务让计划路线达到3/4压力，再用有限分支和分支前缀债务压低黑块、推高求解器压力；007 prefix8达到中段3/4=72%、max4，但`release unknown`，说明压力仍不能单独验收。
++- v534首次把高压父状态发现的释压动作拼回完整路线并从头回放。007共测试117候选：显著释放68、中段3/4≥50%共58、两者同时成立40；最佳完整路线46步，中段3/4=80%、maxBuffer=4、显著释放1、`finalReplayValid=true`，释压点在第30步`(2,2)`颜色31，棋盘7×8、黑块17.9%、容量守恒/aboveMax=0/micro=0。
++- 该结果证明“完整高压+真实释放+最终通关”可以共存，不再只是`release found`单步证据；但它只覆盖007/seed1001，脚本未记录整轮墙钟和重复签名，未接生成器，也未验证玩家可学习性。
++- 下一步`v535`把脚本改成路线构造模块：输入同规则关卡和参考解，输出完整`pickOrder`、释压证据、`midBuffer34Pct/significantReleaseCount/finalReplayValid`；先复现007，再同口径跑006/010，并记录候选数、唯一路线数、墙钟与P50/P90。三图成立后才讨论接候选选择，仍不进入冰链障碍。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index 9578772..e4b52cc 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -93,6 +93,8 @@
+ - **v531结果**：2/3入口+入口债务车原型黑块11.1%~25%，但plan路线2/6通过、solver0/6；007在6×6上pipeCapacity全灭。分支拓扑可行，分支内部车序/分支选择未成立。
+ - **v532结果**：扫描2分支的4组入口位置（006/010/007共12组），plan 4/12、solver 0/12、solver低压路线12/12；006/007计划路线可到85.7%/81.5%，但release unknown，010计划路线76.5%但solver仍0。下一步不再扩大入口搜索，改分支内部债务序列。
+ - **v533结果**：2分支前缀债务prefix2~8扫描；007 prefix6/8求解器中段3/4达52%/72%，但release仍unknown；006 prefix6计划路线57.9%通过但solver10%。下一步锁定高压路线，专项搜索可执行释放动作。
++- **v534结果**：007 prefix8高压父状态枚举117个完整路线候选，68个有显著释放、58个中段3/4≥50%、40个两者同时成立；最佳46步，中段3/4=80%、maxBuffer=4、显著释放1、独立回放通关，黑块17.9%、容量aboveMax=0/micro=0。证明“完整高压+释放+通关”可共存在一条路线。
++- **v534边界**：只有007/seed1001；脚本未记录整轮墙钟和去重，尚未接生成器。下一项先做多图路线构造模块与成本收口，不进入障碍。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 1f00696..358462c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v533 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=533">
++  <title>车接小人 v534 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=534">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v533</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v534</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -773,28 +773,28 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=533"></script>
+-  <script src="js/utils.js?v=533"></script>
++  <script src="js/zip.js?v=534"></script>
++  <script src="js/utils.js?v=534"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=533"></script>
+-  <script src="js/simulator.js?v=533"></script>
++  <script src="js/color-libs.js?v=534"></script>
++  <script src="js/simulator.js?v=534"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=533"></script>
+-  <script src="js/solver-strategy.js?v=533"></script>
+-  <script src="js/solver.js?v=533"></script>
+-  <script src="js/playersim.js?v=533"></script>
++  <script src="js/anchor-cut.js?v=534"></script>
++  <script src="js/solver-strategy.js?v=534"></script>
++  <script src="js/solver.js?v=534"></script>
++  <script src="js/playersim.js?v=534"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=533"></script>
+-  <script src="js/car-sequencer.js?v=533"></script>
+-  <script src="js/experience-goal.js?v=533"></script>
+-  <script src="js/capacity-tuner.js?v=533"></script>
+-  <script src="js/instant-playout.js?v=533"></script>
+-  <script src="js/generator.js?v=533"></script>
+-  <script src="js/source-preflight.js?v=533"></script>
+-  <script src="js/analysis.js?v=533"></script>
++  <script src="js/solver-analysis.js?v=534"></script>
++  <script src="js/car-sequencer.js?v=534"></script>
++  <script src="js/experience-goal.js?v=534"></script>
++  <script src="js/capacity-tuner.js?v=534"></script>
++  <script src="js/instant-playout.js?v=534"></script>
++  <script src="js/generator.js?v=534"></script>
++  <script src="js/source-preflight.js?v=534"></script>
++  <script src="js/analysis.js?v=534"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=533"></script>
+-  <script src="js/app.js?v=533"></script>
++  <script src="js/level-editor.js?v=534"></script>
++  <script src="js/app.js?v=534"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index a92a744..03bbe89 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -68,6 +68,7 @@
+ | v531 有限分支原型 | 不用新增黑块能否保留高压分支 | 黑块11.1~25%，但plan 2/6、solver 0/6；007小盘pipeCapacity全灭，下一步分支级车序 | `瞬时有限分支_v531.js` + JSON | §521 |
+ | v532 分支入口车序 | 入口位置/入口债务车是否足够 | ❌ 12组plan4/12、solver0/12、solver低压12/12；入口拓扑不是主因，转分支内部债务序列 | `瞬时分支车序_v532.js` + JSON | §522 |
+ | v533 分支前缀债务 | 分支前几辆车全部做短债能否制造solver高压 | 007 prefix6/8 solver mid52/72%但release unknown；006 prefix6 plan57.9% pass；下一步释放搜索 | `瞬时分支前缀债务_v533.js` + JSON | §523 |
++| v534 释放路线构造 | 单步释压动作能否拼回完整高压且最终可回放的通关路线 | ✅ 007测试117候选，40条同时达中段3/4≥50%+显著释放；最佳46步、80%/max4/释放1、独立回放通关、黑块17.9%；仅单图单seed，尚未接线 | `释放路线构造_v534.js` + JSON + 预登记 | §524 |
+ 
+ ## 当前权威产物
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_v534.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_v534.js"
+new file mode 100644
+index 0000000..934d7bb
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_v534.js"
+@@ -0,0 +1,61 @@
++#!/usr/bin/env node
++/** v534：把高压状态发现的可执行释放动作拼回完整路线，验证整条路线是否真正有显著释放。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm');
++const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js'];
++const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++vm.createContext(sb); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++const A = sb.AntSolver, G = A.Generator, S = A.Simulator, SA = A.SolverAnalysis, EG = A.ExperienceGoal;
++function makeLevel() {
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt'), 'utf8'));
++  const band = G.deriveCapacityBand(blocks), cfg = { seed: 1001, candidateCount: 1, rounds: 0, timeBudgetMs: 12000, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: band.band[0], boxSizeMax: band.band[1], capNormMin: band.band[0], capNormMax: band.band[1],
++    boardRowsMin: 7, boardRowsMax: 7, boardColsMin: 8, boardColsMax: 8, boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1, instantPlanPolicy: 'targetBuffer', instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanBranchCount: 2, instantPlanBranchDebtRoots: true, instantPlanBranchPrefixDebts: 8 };
++  return G.produceFixed(blocks, cfg);
++}
++function replayFull(level, actions) {
++  const lv = A.parseLevel(level), start = S.createState(lv, { useSlotStart: true, instantChain: true });
++  return SA.replayFromState(start, actions);
++}
++const r = makeLevel(), lv = A.parseLevel(r.level), route = r.solveResult, actions = SA.normalizeActions(route);
++const start = S.createState(lv, { useSlotStart: true, instantChain: true });
++const candidates = [];
++for (let i = 0; i < actions.length; i++) {
++  if (start.gameWon || start.gameOver) break;
++  const ref = actions[i];
++  const progress = start.totalPixels ? start.eliminatedPixels / start.totalPixels : 0;
++  if (start.buffer.length >= 3 && progress >= 0.2 && progress <= 0.85) {
++    const moves = S.listMoves(start).filter(m => !m.blocked);
++    moves.sort((a, b) => (a.r === ref.r && a.c === ref.c ? 0 : 1) - (b.r === ref.r && b.c === ref.c ? 0 : 1));
++    for (const m of moves.slice(0, 8)) {
++      const after = A.SolverStrategy.cloneState(start);
++      S.applyPick(after, m.r, m.c);
++      if (after.eliminatedPixels >= after.totalPixels) { after.gameWon = true; after.gameOver = true; }
++      const searched = SA.searchFromState(after, { timeBudgetMs: 900, maxNodes: 3000, beamWidth: 16, branchWidth: 8, maxRoutes: 1 });
++      if (!searched.routes.length) continue;
++      const full = actions.slice(0, i).concat([{ r: m.r, c: m.c, color: m.antBox && m.antBox.color, count: m.antBox && m.antBox.count }]).concat(searched.routes[0].actions);
++      const replayed = replayFull(r.level, full);
++      if (!replayed.completed) continue;
++      const curve = EG.curveFromTrace(replayed.trace, replayed.totalPixels, replayed.state ? replayed.state.bufferLimit : 5, { instantChain: true });
++      const candidate = { step: i + 1, progress: +progress.toFixed(3), action: { r: m.r, c: m.c, color: m.antBox && m.antBox.color },
++        fullSteps: full.length, midBuffer34Pct: curve.midBuffer34Pct, maxBuffer: curve.pressure.maxBuffer,
++        significantReleaseCount: curve.pressure.significantReleaseCount, finalReplayValid: true,
++        fullSig: full.map(x => x.r + ',' + x.c).join(' ') };
++      candidates.push(candidate);
++    }
++  }
++  S.applyPick(start, ref.r, ref.c);
++  if (start.eliminatedPixels >= start.totalPixels) { start.gameWon = true; start.gameOver = true; }
++}
++candidates.sort((a, b) => (b.significantReleaseCount - a.significantReleaseCount) || (b.midBuffer34Pct - a.midBuffer34Pct));
++const out = { schema: 'release-route-construction-v1', date: '2026-10-26', base: { mid: r.solveResult && r.solveResult.pressureSamples ? null : null,
++  actions: actions.length, board: r.level.board, level: r.level }, candidates, summary: { tested: candidates.length,
++  withRelease: candidates.filter(x => x.significantReleaseCount >= 1).length,
++  withMid50: candidates.filter(x => x.midBuffer34Pct >= 50).length,
++  both: candidates.filter(x => x.significantReleaseCount >= 1 && x.midBuffer34Pct >= 50).length,
++  best: candidates[0] || null } };
++fs.writeFileSync(path.join(__dirname, '释放路线构造_v534.json'), JSON.stringify(out, null, 2) + '\n');
++console.log(JSON.stringify({ summary: out.summary, candidates: candidates.slice(0, 8) }, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_v534.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_v534.json"
+new file mode 100644
+index 0000000..eea0332
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_v534.json"
+@@ -0,0 +1,4614 @@
++{
++  "schema": "release-route-construction-v1",
++  "date": "2026-10-26",
++  "base": {
++    "mid": null,
++    "actions": 46,
++    "board": {
++      "rows": 7,
++      "cols": 8,
++      "cells": [
++        [
++          {
++            "t": "box",
++            "color": 5,
++            "count": 30,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          }
++        ],
++        [
++          {
++            "t": "box",
++            "color": 28,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 1,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 15,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 32,
++            "count": 20,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          }
++        ],
++        [
++          {
++            "t": "box",
++            "color": 28,
++            "count": 22,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 34,
++            "count": 29,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 31,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 15,
++            "count": 21,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          }
++        ],
++        [
++          {
++            "t": "box",
++            "color": 34,
++            "count": 29,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 33,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          }
++        ],
++        [
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 16,
++            "count": 23,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 32,
++            "count": 19,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 30,
++            "count": 17,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 14,
++            "count": 17,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          }
++        ],
++        [
++          {
++            "t": "box",
++            "color": 19,
++            "count": 31,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 16,
++            "count": 24,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 16,
++            "count": 23,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 14,
++            "count": 16,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 13,
++            "count": 18,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 1,
++            "count": 21,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 30,
++            "count": 18,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          }
++        ],
++        [
++          {
++            "t": "box",
++            "color": 34,
++            "count": 28,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "black"
++          },
++          {
++            "t": "box",
++            "color": 31,
++            "count": 27,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 33,
++            "count": 19,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          },
++          {
++            "t": "box",
++            "color": 13,
++            "count": 19,
++            "chain": 0,
++            "q": false,
++            "numice": 0
++          }
++        ]
++      ],
++      "instantPlanCells": [
++        {
++          "r": 0,
++          "c": 0,
++          "seq": 0,
++          "color": 5,
++          "count": 30
++        },
++        {
++          "r": 0,
++          "c": 7,
++          "seq": 1,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 1,
++          "c": 0,
++          "seq": 2,
++          "color": 28,
++          "count": 31
++        },
++        {
++          "r": 1,
++          "c": 7,
++          "seq": 3,
++          "color": 32,
++          "count": 20
++        },
++        {
++          "r": 2,
++          "c": 0,
++          "seq": 4,
++          "color": 28,
++          "count": 22
++        },
++        {
++          "r": 1,
++          "c": 1,
++          "seq": 5,
++          "color": 1,
++          "count": 31
++        },
++        {
++          "r": 2,
++          "c": 7,
++          "seq": 6,
++          "color": 15,
++          "count": 21
++        },
++        {
++          "r": 1,
++          "c": 6,
++          "seq": 7,
++          "color": 15,
++          "count": 31
++        },
++        {
++          "r": 3,
++          "c": 0,
++          "seq": 8,
++          "color": 34,
++          "count": 29
++        },
++        {
++          "r": 2,
++          "c": 1,
++          "seq": 9,
++          "color": 34,
++          "count": 29
++        },
++        {
++          "r": 1,
++          "c": 2,
++          "seq": 10,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 3,
++          "c": 7,
++          "seq": 11,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 2,
++          "c": 6,
++          "seq": 12,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 1,
++          "c": 5,
++          "seq": 13,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 4,
++          "c": 0,
++          "seq": 14,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 3,
++          "c": 1,
++          "seq": 15,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 2,
++          "c": 2,
++          "seq": 16,
++          "color": 31,
++          "count": 31
++        },
++        {
++          "r": 1,
++          "c": 3,
++          "seq": 17,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 4,
++          "c": 7,
++          "seq": 18,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 3,
++          "c": 6,
++          "seq": 19,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 2,
++          "c": 5,
++          "seq": 20,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 1,
++          "c": 4,
++          "seq": 21,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 5,
++          "c": 0,
++          "seq": 22,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 4,
++          "c": 1,
++          "seq": 23,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 3,
++          "c": 2,
++          "seq": 24,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 2,
++          "c": 3,
++          "seq": 25,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 5,
++          "c": 7,
++          "seq": 26,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 4,
++          "c": 6,
++          "seq": 27,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 3,
++          "c": 5,
++          "seq": 28,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 2,
++          "c": 4,
++          "seq": 29,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 6,
++          "c": 0,
++          "seq": 30,
++          "color": 34,
++          "count": 28
++        },
++        {
++          "r": 5,
++          "c": 1,
++          "seq": 31,
++          "color": 16,
++          "count": 24
++        },
++        {
++          "r": 4,
++          "c": 2,
++          "seq": 32,
++          "color": 16,
++          "count": 23
++        },
++        {
++          "r": 3,
++          "c": 3,
++          "seq": 33,
++          "color": 33,
++          "count": 31
++        },
++        {
++          "r": 6,
++          "c": 7,
++          "seq": 34,
++          "color": 13,
++          "count": 19
++        },
++        {
++          "r": 5,
++          "c": 6,
++          "seq": 35,
++          "color": 30,
++          "count": 18
++        },
++        {
++          "r": 4,
++          "c": 5,
++          "seq": 36,
++          "color": 14,
++          "count": 17
++        },
++        {
++          "r": 3,
++          "c": 4,
++          "seq": 37,
++          "color": 19,
++          "count": 31
++        },
++        {
++          "r": 5,
++          "c": 2,
++          "seq": 38,
++          "color": 16,
++          "count": 23
++        },
++        {
++          "r": 4,
++          "c": 3,
++          "seq": 39,
++          "color": 32,
++          "count": 19
++        },
++        {
++          "r": 6,
++          "c": 6,
++          "seq": 40,
++          "color": 33,
++          "count": 19
++        },
++        {
++          "r": 5,
++          "c": 5,
++          "seq": 41,
++          "color": 1,
++          "count": 21
++        },
++        {
++          "r": 4,
++          "c": 4,
++          "seq": 42,
++          "color": 30,
++          "count": 17
++        },
++        {
++          "r": 5,
++          "c": 3,
++          "seq": 43,
++          "color": 14,
++          "count": 16
++        },
++        {
++          "r": 6,
++          "c": 5,
++          "seq": 44,
++          "color": 31,
++          "count": 27
++        },
++        {
++          "r": 5,
++          "c": 4,
++          "seq": 45,
++          "color": 13,
++          "count": 18
++        }
++      ],
++      "narrowStat": {
++        "enabled": true,
++        "prob": 1,
++        "hit": true,
++        "gaps": 3,
++        "applied": true,
++        "source": "legacy:narrowPathProb",
++        "byChokeType": false,
++        "gapsMin": 2,
++        "gapsMax": 3
++      },
++      "spaceQuota": null,
++      "pipeStat": {
++        "want": 0,
++        "placed": 0,
++        "overflowPlanned": 0,
++        "overflowActual": 0,
++        "capacityPerPipe": 4,
++        "coords": [],
++        "floorCount": 2,
++        "floorDepth": 2
++      }
++    },
++    "level": {
++      "blocks": [
++        [
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          15,
++          15,
++          15,
++          15,
++          15,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          15,
++          15,
++          28,
++          28,
++          30,
++          30,
++          5,
++          5,
++          15,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          15,
++          1,
++          28,
++          28,
++          30,
++          31,
++          30,
++          30,
++          5,
++          5,
++          14,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          15,
++          1,
++          28,
++          28,
++          31,
++          5,
++          31,
++          30,
++          5,
++          5,
++          14,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          32,
++          32,
++          32,
++          15,
++          1,
++          1,
++          28,
++          28,
++          30,
++          31,
++          5,
++          30,
++          5,
++          5,
++          14,
++          14,
++          15,
++          32,
++          32,
++          32,
++          32,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          15,
++          1,
++          1,
++          28,
++          28,
++          30,
++          5,
++          28,
++          5,
++          5,
++          5,
++          14,
++          14,
++          15,
++          34,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          15,
++          1,
++          1,
++          28,
++          28,
++          30,
++          28,
++          5,
++          28,
++          5,
++          5,
++          14,
++          14,
++          15,
++          34,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          15,
++          1,
++          1,
++          28,
++          28,
++          30,
++          30,
++          28,
++          30,
++          5,
++          5,
++          14,
++          14,
++          15,
++          34,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          19,
++          15,
++          1,
++          28,
++          28,
++          30,
++          30,
++          30,
++          30,
++          5,
++          5,
++          14,
++          15,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          19,
++          19,
++          15,
++          1,
++          28,
++          28,
++          30,
++          30,
++          5,
++          5,
++          14,
++          15,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          19,
++          19,
++          19,
++          15,
++          15,
++          28,
++          30,
++          30,
++          5,
++          15,
++          15,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          15,
++          5,
++          5,
++          5,
++          5,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          15,
++          5,
++          15,
++          15,
++          5,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          19,
++          15,
++          15,
++          15,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          34,
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          15,
++          28,
++          14,
++          28,
++          14,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          32,
++          33,
++          33,
++          34,
++          19,
++          19,
++          19,
++          19,
++          15,
++          14,
++          14,
++          14,
++          14,
++          15,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          33,
++          1,
++          1,
++          33,
++          19,
++          19,
++          19,
++          15,
++          28,
++          28,
++          14,
++          28,
++          14,
++          28,
++          15,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          33,
++          1,
++          1,
++          1,
++          1,
++          33,
++          19,
++          19,
++          19,
++          15,
++          15,
++          15,
++          15,
++          15,
++          15,
++          19,
++          19,
++          19,
++          16,
++          16,
++          16,
++          16,
++          34,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          33,
++          31,
++          31,
++          31,
++          31,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          31,
++          31,
++          31,
++          31,
++          16,
++          32,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          33,
++          1,
++          31,
++          14,
++          14,
++          31,
++          1,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          31,
++          31,
++          31,
++          31,
++          13,
++          31,
++          16,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          33,
++          31,
++          14,
++          14,
++          31,
++          14,
++          31,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          31,
++          31,
++          13,
++          13,
++          31,
++          31,
++          13,
++          31,
++          16,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          33,
++          1,
++          14,
++          31,
++          13,
++          14,
++          1,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          31,
++          13,
++          13,
++          13,
++          13,
++          31,
++          13,
++          31,
++          16,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          33,
++          31,
++          14,
++          13,
++          31,
++          14,
++          31,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          31,
++          13,
++          13,
++          13,
++          13,
++          13,
++          13,
++          31,
++          16,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          33,
++          1,
++          1,
++          14,
++          14,
++          14,
++          14,
++          1,
++          1,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          13,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          13,
++          16,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          33,
++          1,
++          33,
++          31,
++          31,
++          31,
++          31,
++          31,
++          31,
++          33,
++          1,
++          33,
++          19,
++          19,
++          19,
++          19,
++          16,
++          31,
++          16,
++          28,
++          28,
++          13,
++          28,
++          28,
++          13,
++          28,
++          28,
++          16,
++          31,
++          16,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          33,
++          1,
++          33,
++          1,
++          1,
++          1,
++          1,
++          1,
++          1,
++          33,
++          1,
++          33,
++          34,
++          34,
++          34,
++          16,
++          28,
++          31,
++          31,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          31,
++          31,
++          28,
++          16,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          33,
++          1,
++          33,
++          1,
++          1,
++          1,
++          1,
++          1,
++          1,
++          33,
++          1,
++          33,
++          34,
++          34,
++          16,
++          28,
++          13,
++          13,
++          28,
++          28,
++          31,
++          31,
++          28,
++          28,
++          31,
++          31,
++          28,
++          28,
++          13,
++          13,
++          28,
++          16,
++          34
++        ],
++        [
++          34,
++          34,
++          33,
++          33,
++          34,
++          1,
++          34,
++          1,
++          34,
++          1,
++          34,
++          1,
++          33,
++          33,
++          34,
++          34,
++          16,
++          13,
++          13,
++          16,
++          28,
++          31,
++          31,
++          31,
++          28,
++          28,
++          31,
++          31,
++          31,
++          28,
++          16,
++          13,
++          13,
++          16,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          33,
++          33,
++          33,
++          33,
++          33,
++          33,
++          33,
++          33,
++          32,
++          32,
++          32,
++          32,
++          32,
++          16,
++          16,
++          28,
++          13,
++          28,
++          13,
++          13,
++          13,
++          13,
++          13,
++          13,
++          28,
++          13,
++          28,
++          16,
++          16,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          33,
++          30,
++          30,
++          30,
++          30,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          33,
++          1,
++          30,
++          30,
++          1,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          30,
++          30,
++          30,
++          30,
++          30,
++          30,
++          30,
++          30,
++          16,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          33,
++          1,
++          1,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          16,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          19,
++          19,
++          19,
++          19,
++          19,
++          33,
++          33,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          19,
++          34,
++          34
++        ],
++        [
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34,
++          34
++        ]
++      ],
++      "bufferLimit": 5,
++      "board": {
++        "rows": 7,
++        "cols": 8,
++        "cells": [
++          [
++            {
++              "t": "box",
++              "color": 5,
++              "count": 30,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            }
++          ],
++          [
++            {
++              "t": "box",
++              "color": 28,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 1,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 15,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 32,
++              "count": 20,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            }
++          ],
++          [
++            {
++              "t": "box",
++              "color": 28,
++              "count": 22,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 34,
++              "count": 29,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 31,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 15,
++              "count": 21,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            }
++          ],
++          [
++            {
++              "t": "box",
++              "color": 34,
++              "count": 29,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 33,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            }
++          ],
++          [
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 16,
++              "count": 23,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 32,
++              "count": 19,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 30,
++              "count": 17,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 14,
++              "count": 17,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            }
++          ],
++          [
++            {
++              "t": "box",
++              "color": 19,
++              "count": 31,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 16,
++              "count": 24,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 16,
++              "count": 23,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 14,
++              "count": 16,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 13,
++              "count": 18,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 1,
++              "count": 21,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 30,
++              "count": 18,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            }
++          ],
++          [
++            {
++              "t": "box",
++              "color": 34,
++              "count": 28,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "black"
++            },
++            {
++              "t": "box",
++              "color": 31,
++              "count": 27,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 33,
++              "count": 19,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            },
++            {
++              "t": "box",
++              "color": 13,
++              "count": 19,
++              "chain": 0,
++              "q": false,
++              "numice": 0
++            }
++          ]
++        ],
++        "instantPlanCells": [
++          {
++            "r": 0,
++            "c": 0,
++            "seq": 0,
++            "color": 5,
++            "count": 30
++          },
++          {
++            "r": 0,
++            "c": 7,
++            "seq": 1,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 1,
++            "c": 0,
++            "seq": 2,
++            "color": 28,
++            "count": 31
++          },
++          {
++            "r": 1,
++            "c": 7,
++            "seq": 3,
++            "color": 32,
++            "count": 20
++          },
++          {
++            "r": 2,
++            "c": 0,
++            "seq": 4,
++            "color": 28,
++            "count": 22
++          },
++          {
++            "r": 1,
++            "c": 1,
++            "seq": 5,
++            "color": 1,
++            "count": 31
++          },
++          {
++            "r": 2,
++            "c": 7,
++            "seq": 6,
++            "color": 15,
++            "count": 21
++          },
++          {
++            "r": 1,
++            "c": 6,
++            "seq": 7,
++            "color": 15,
++            "count": 31
++          },
++          {
++            "r": 3,
++            "c": 0,
++            "seq": 8,
++            "color": 34,
++            "count": 29
++          },
++          {
++            "r": 2,
++            "c": 1,
++            "seq": 9,
++            "color": 34,
++            "count": 29
++          },
++          {
++            "r": 1,
++            "c": 2,
++            "seq": 10,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 3,
++            "c": 7,
++            "seq": 11,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 2,
++            "c": 6,
++            "seq": 12,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 1,
++            "c": 5,
++            "seq": 13,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 4,
++            "c": 0,
++            "seq": 14,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 3,
++            "c": 1,
++            "seq": 15,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 2,
++            "c": 2,
++            "seq": 16,
++            "color": 31,
++            "count": 31
++          },
++          {
++            "r": 1,
++            "c": 3,
++            "seq": 17,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 4,
++            "c": 7,
++            "seq": 18,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 3,
++            "c": 6,
++            "seq": 19,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 2,
++            "c": 5,
++            "seq": 20,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 1,
++            "c": 4,
++            "seq": 21,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 5,
++            "c": 0,
++            "seq": 22,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 4,
++            "c": 1,
++            "seq": 23,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 3,
++            "c": 2,
++            "seq": 24,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 2,
++            "c": 3,
++            "seq": 25,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 5,
++            "c": 7,
++            "seq": 26,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 4,
++            "c": 6,
++            "seq": 27,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 3,
++            "c": 5,
++            "seq": 28,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 2,
++            "c": 4,
++            "seq": 29,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 6,
++            "c": 0,
++            "seq": 30,
++            "color": 34,
++            "count": 28
++          },
++          {
++            "r": 5,
++            "c": 1,
++            "seq": 31,
++            "color": 16,
++            "count": 24
++          },
++          {
++            "r": 4,
++            "c": 2,
++            "seq": 32,
++            "color": 16,
++            "count": 23
++          },
++          {
++            "r": 3,
++            "c": 3,
++            "seq": 33,
++            "color": 33,
++            "count": 31
++          },
++          {
++            "r": 6,
++            "c": 7,
++            "seq": 34,
++            "color": 13,
++            "count": 19
++          },
++          {
++            "r": 5,
++            "c": 6,
++            "seq": 35,
++            "color": 30,
++            "count": 18
++          },
++          {
++            "r": 4,
++            "c": 5,
++            "seq": 36,
++            "color": 14,
++            "count": 17
++          },
++          {
++            "r": 3,
++            "c": 4,
++            "seq": 37,
++            "color": 19,
++            "count": 31
++          },
++          {
++            "r": 5,
++            "c": 2,
++            "seq": 38,
++            "color": 16,
++            "count": 23
++          },
++          {
++            "r": 4,
++            "c": 3,
++            "seq": 39,
++            "color": 32,
++            "count": 19
++          },
++          {
++            "r": 6,
++            "c": 6,
++            "seq": 40,
++            "color": 33,
++            "count": 19
++          },
++          {
++            "r": 5,
++            "c": 5,
++            "seq": 41,
++            "color": 1,
++            "count": 21
++          },
++          {
++            "r": 4,
++            "c": 4,
++            "seq": 42,
++            "color": 30,
++            "count": 17
++          },
++          {
++            "r": 5,
++            "c": 3,
++            "seq": 43,
++            "color": 14,
++            "count": 16
++          },
++          {
++            "r": 6,
++            "c": 5,
++            "seq": 44,
++            "color": 31,
++            "count": 27
++          },
++          {
++            "r": 5,
++            "c": 4,
++            "seq": 45,
++            "color": 13,
++            "count": 18
++          }
++        ],
++        "narrowStat": {
++          "enabled": true,
++          "prob": 1,
++          "hit": true,
++          "gaps": 3,
++          "applied": true,
++          "source": "legacy:narrowPathProb",
++          "byChokeType": false,
++          "gapsMin": 2,
++          "gapsMax": 3
++        },
++        "spaceQuota": null,
++        "pipeStat": {
++          "want": 0,
++          "placed": 0,
++          "overflowPlanned": 0,
++          "overflowActual": 0,
++          "capacityPerPipe": 4,
++          "coords": [],
++          "floorCount": 2,
++          "floorDepth": 2
++        }
++      }
++    }
++  },
++  "candidates": [
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 80,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 2,2 4,6 1,6 4,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 4,
++        "c": 4,
++        "color": 30
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 80,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 4,4 4,6 1,6 2,2 4,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 5,3"
++    },
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 4,
++        "c": 6,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 80,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 4,6 2,2 1,6 4,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 4,
++        "c": 7,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 80,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 4,7 2,2 1,6 4,6 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 4,
++        "c": 5,
++        "color": 14
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 76,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 4,5 4,6 1,6 2,2 4,7 3,7 4,2 2,7 5,7 5,2 5,5 6,5 6,6 6,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 4,
++        "c": 5,
++        "color": 14
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 76,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 4,5 1,6 2,2 4,6 4,7 4,2 2,7 5,7 5,2 5,5 6,5 6,6 6,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 3,
++        "c": 6,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 2,2 1,6 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 5,5 2,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 2,2 3,6 1,6 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 5,5 2,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 4,
++        "c": 4,
++        "color": 30
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 4,4 3,6 1,6 2,2 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 2,7 5,5 5,4 5,6 5,3"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 4,
++        "c": 5,
++        "color": 14
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 4,5 4,6 1,6 2,2 4,7 3,6 4,2 2,7 3,7 5,7 5,2 5,5 6,5 6,6 6,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 2,2 1,6 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 5,5 2,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 4,
++        "c": 4,
++        "color": 30
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 4,4 1,6 2,2 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 2,7 5,5 5,4 5,6 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 2,
++        "c": 7,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 2,7 3,6 2,2 4,6 4,2 1,6 4,7 3,4 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 4,
++        "c": 4,
++        "color": 30
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 4,4 1,6 2,2 3,6 4,6 4,7 3,4 4,2 2,7 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 4,
++        "c": 5,
++        "color": 14
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 4,5 1,6 2,2 4,6 4,7 4,2 5,3 3,4 3,6 3,7 5,7 5,2 5,5 6,5 2,7 6,6 6,7 5,4 5,6 4,4"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 1,6 2,2 3,6 4,6 4,7 4,2 2,7 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 2,
++        "c": 7,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 2,7 2,2 3,6 4,2 1,6 4,6 4,7 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 3,
++        "c": 5,
++        "color": 34
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 64,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 2,2 1,6 3,6 4,6 4,7 3,4 4,2 2,7 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 64,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,4 1,6 2,2 3,6 4,6 4,7 3,7 4,2 2,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 3,
++        "c": 6,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 64,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,6 1,6 2,2 4,6 4,7 3,4 3,7 4,2 2,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 4,
++        "c": 4,
++        "color": 30
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 64,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 4,4 1,6 2,2 3,6 4,6 4,7 3,4 3,7 4,2 2,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 64,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 1,6 2,2 3,6 4,6 4,7 3,4 4,2 2,7 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 64,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 2,2 1,6 3,6 4,6 4,7 3,4 4,2 2,7 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 2,2 1,6 3,6 4,6 4,7 3,4 4,2 2,7 3,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 3,4 1,6 2,2 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 3,
++        "c": 6,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 3,6 1,6 2,2 4,6 3,4 4,7 3,7 5,2 2,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 1,6 2,2 3,6 4,6 4,7 3,4 3,7 4,2 2,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 2,2 1,6 4,2 3,6 4,6 4,7 2,7 3,4 3,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 2,
++        "c": 7,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 2,7 2,2 3,6 4,6 4,7 3,4 3,7 1,6 4,2 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 2,
++        "c": 6,
++        "color": 34
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 56,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 2,2 1,6 3,6 4,6 3,4 5,2 2,7 4,7 3,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 56,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 3,4 1,6 2,2 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 3,
++        "c": 5,
++        "color": 34
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 56,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 3,5 2,2 1,6 3,6 4,6 3,4 5,2 2,7 4,7 3,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 56,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 4,3 2,2 1,6 3,5 3,6 4,6 4,7 3,4 4,2 2,7 3,7 5,7 2,6 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 56,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 2,2 1,6 3,6 4,6 3,4 5,2 2,7 4,7 3,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 2,
++        "c": 7,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 56,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 2,7 2,2 3,6 4,6 4,7 5,2 1,6 3,4 3,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 52,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,2 1,6 3,5 3,6 4,6 3,4 5,2 2,7 4,7 3,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 52,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 3,4 1,6 2,2 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 52,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 4,3 2,2 1,6 2,6 3,6 4,6 4,7 4,2 2,7 3,4 3,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 1,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 52,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,2 1,6 3,5 3,6 4,6 3,4 4,7 5,2 2,7 3,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 2,
++        "c": 7,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 52,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,7 2,2 3,7 4,7 4,6 3,4 3,6 1,6 5,2 5,7 2,6 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 2,
++        "c": 5,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 2,2 1,6 2,6 3,6 4,6 3,4 4,7 5,2 2,7 3,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 1,7 2,2 1,6 2,6 3,6 4,6 3,4 4,7 2,5 5,2 2,7 3,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,2 3,4 1,6 2,6 3,6 4,6 4,7 2,5 5,2 2,7 3,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 3,4 2,2 1,6 2,6 3,6 4,6 4,7 2,5 5,2 2,7 3,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 4,3 2,2 1,6 2,6 3,6 4,6 4,7 2,5 3,4 4,2 2,7 3,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 1,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 2,2 1,6 2,6 3,6 4,6 3,4 4,7 5,2 2,7 3,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 2,
++        "c": 6,
++        "color": 34
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 2,6 1,6 2,2 3,6 4,6 3,4 4,7 3,7 5,2 2,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 3,
++        "c": 5,
++        "color": 34
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 3,5 1,6 2,2 3,6 3,7 3,4 4,6 4,7 5,2 2,7 5,7 2,6 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 2,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 44,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,2 1,6 3,4 2,5 1,7 3,5 3,6 4,6 4,7 5,2 2,7 3,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 44,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 1,7 2,2 1,6 3,4 3,5 3,6 4,6 4,7 2,4 2,5 5,2 2,7 3,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 2,
++        "c": 5,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 44,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,5 2,2 1,6 3,4 2,4 1,7 3,5 3,6 4,6 4,7 5,2 2,7 3,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 44,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 3,4 2,2 1,6 2,4 2,5 1,7 3,5 3,6 4,6 4,7 5,2 2,7 3,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 44,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 4,3 2,2 1,6 2,6 3,6 4,6 4,7 2,4 2,5 3,4 4,2 2,7 3,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 1,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 1,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,6 2,2 1,1 3,4 2,4 2,5 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 5,6 6,6 5,5 4,5 6,7 6,5 1,7 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 1,
++        "c": 5,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,6 2,2 1,1 3,4 2,4 2,5 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 1,7 5,6 6,6 5,5 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 1,
++        "c": 1,
++        "color": 1
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,2 1,6 3,4 2,4 2,5 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,5 6,5 4,3 6,7 5,4 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,6 2,2 1,1 3,4 2,4 2,5 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,2 1,6 3,4 2,4 2,5 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 1,
++        "c": 1,
++        "color": 1
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,1 5,2 1,4 1,5 1,6 2,2 3,4 1,2 2,6 3,6 4,6 4,7 2,4 2,5 3,7 5,7 3,5 4,2 2,7 5,6 6,6 5,5 1,7 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 1,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,4 1,5 1,6 2,2 1,1 3,4 1,2 2,4 2,5 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,5 6,5 4,3 6,7 5,4 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 1,
++        "c": 1,
++        "color": 1
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,1 1,5 1,6 2,2 3,4 2,4 2,6 3,6 4,6 4,7 2,5 3,7 5,2 2,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 5,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 2,2 3,4 1,6 1,1 2,4 2,5 2,6 3,6 4,6 4,7 5,2 2,7 3,7 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 1,
++        "c": 1,
++        "color": 1
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,1 1,7 1,6 2,2 5,2 3,4 1,5 1,4 3,5 3,6 4,6 4,7 2,4 2,5 3,7 2,7 5,7 2,6 4,2 5,6 6,6 5,5 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,7 1,1 1,6 2,2 5,2 3,4 1,5 1,4 3,5 3,6 4,6 4,7 2,4 2,5 3,7 2,7 5,7 2,6 4,2 5,6 6,6 5,5 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 5,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 2,2 1,5 3,4 1,6 1,1 2,4 2,5 2,6 3,6 4,6 4,7 5,2 2,7 3,7 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 28,
++      "maxBuffer": 5,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 2,2 3,4 1,7 1,6 1,1 3,5 3,6 4,6 4,7 1,4 1,5 2,4 2,5 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 24,
++      "maxBuffer": 5,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 2,2 2,4 3,4 1,7 1,6 1,1 1,2 1,4 1,5 2,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 16,
++      "progress": 0.279,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 20,
++      "maxBuffer": 5,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 2,2 2,4 1,2 3,4 1,7 1,6 1,1 1,3 1,4 1,5 2,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 2,
++        "c": 7,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 80,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 2,7 1,6 2,2 4,6 4,2 4,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 80,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 4,2 4,6 1,6 5,2 4,7 2,7 2,2 5,7 6,7 6,6 6,5 4,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 3,
++        "c": 7,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 76,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 4,6 1,6 2,2 4,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 2,
++        "c": 7,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 76,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 2,7 1,6 2,2 4,2 4,6 4,7 3,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 4,
++        "c": 6,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 76,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 4,6 3,7 1,6 2,2 4,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 4,2 1,6 4,6 4,7 5,2 3,7 2,7 2,2 5,7 6,7 6,6 6,5 4,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 72,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 1,6 2,2 2,7 4,6 4,2 4,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 1,6 2,2 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 5,5 2,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 3,
++        "c": 6,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,6 3,4 1,6 2,2 4,6 4,7 3,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 4,2 1,6 2,2 3,6 4,6 4,7 5,2 2,7 3,7 5,7 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 28,
++      "progress": 0.567,
++      "action": {
++        "r": 5,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 5,2 1,6 2,2 3,6 4,6 4,7 4,2 2,7 3,7 5,7 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 29,
++      "progress": 0.593,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 68,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 1,6 2,2 4,2 4,5 4,6 4,7 3,7 5,7 5,2 6,7 6,6 6,5 5,5 2,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 27,
++      "progress": 0.542,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 64,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 4,2 1,6 2,2 3,6 4,6 4,7 3,4 5,2 2,7 3,7 5,7 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 3,
++        "c": 5,
++        "color": 34
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 3,5 1,6 2,2 4,3 3,6 4,6 4,7 3,4 3,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,2 3,6 1,6 2,2 4,6 3,4 4,7 5,2 2,7 3,7 5,7 3,5 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 26,
++      "progress": 0.519,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 60,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 4,2 1,6 2,2 3,6 4,6 4,7 3,4 5,2 2,7 3,7 5,7 3,5 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 52,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 4,2 1,6 2,2 3,5 3,6 4,6 3,4 4,7 3,7 5,2 2,7 5,7 2,6 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 25,
++      "progress": 0.504,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 52,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 1,6 2,2 3,6 4,6 3,4 4,7 3,7 5,2 2,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 4,2 3,4 1,6 2,2 2,6 3,6 4,6 4,7 2,5 3,7 2,7 5,2 5,7 3,5 6,7 6,6 4,5 6,5 5,5 1,7 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 5,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 5,2 3,4 1,6 2,2 2,6 3,6 4,6 4,7 2,5 3,7 5,7 4,2 2,7 3,5 6,7 6,6 4,5 6,5 5,5 1,7 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 4,2 1,6 2,2 2,6 3,6 4,6 3,4 4,7 3,7 2,7 5,2 5,7 3,5 6,7 6,6 4,5 6,5 5,5 1,7 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 24,
++      "progress": 0.481,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 48,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 1,6 2,2 3,5 3,6 4,6 3,4 4,7 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 23,
++      "progress": 0.464,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 44,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,6 2,2 2,6 3,6 4,6 3,4 4,7 3,7 5,2 2,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 4,2 1,4 1,5 1,6 3,4 2,2 1,2 2,4 2,6 3,6 4,6 4,7 2,5 3,7 5,7 3,5 5,2 2,7 1,1 1,7 5,6 6,6 5,5 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 2,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 2,4 1,5 1,6 2,2 5,2 3,4 2,5 2,6 3,6 4,6 4,7 3,7 2,7 1,1 5,7 3,5 4,2 1,7 5,6 6,6 5,5 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 3,4 1,5 1,6 2,2 5,2 2,4 2,5 2,6 3,6 4,6 4,7 3,7 2,7 1,1 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 4,2 1,5 1,6 2,2 3,4 1,1 2,4 2,6 3,6 4,6 4,7 2,5 3,7 2,7 5,2 5,7 3,5 5,6 6,6 5,5 4,5 6,7 6,5 1,7 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,7 3,4 1,6 2,2 1,1 2,4 2,5 3,5 3,6 4,6 4,7 5,2 2,7 3,7 5,7 2,6 4,2 5,6 6,6 5,5 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 2,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 2,4 1,6 2,2 5,2 3,4 2,5 2,6 3,6 4,6 4,7 3,7 2,7 1,1 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 2,
++        "c": 5,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 2,5 1,6 2,2 5,2 3,4 2,4 2,6 3,6 4,6 4,7 3,7 2,7 1,1 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 3,4 1,6 2,2 5,2 2,4 2,5 2,6 3,6 4,6 4,7 3,7 2,7 1,1 5,7 3,5 4,2 5,6 6,6 5,5 1,7 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 20,
++      "progress": 0.386,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 4,2 1,6 2,2 3,4 1,1 2,4 2,6 3,6 4,6 4,7 2,5 3,7 2,7 5,2 5,7 3,5 5,6 6,6 5,5 1,7 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 4,2 1,6 2,2 3,4 2,4 2,5 2,6 3,6 4,6 4,7 3,7 2,7 5,2 5,7 3,5 6,7 6,6 4,5 6,5 5,5 1,7 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 22,
++      "progress": 0.439,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 40,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 1,6 2,2 3,4 2,5 1,7 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 4,
++        "c": 2,
++        "color": 16
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 4,2 1,7 1,6 1,1 2,2 3,4 1,5 1,4 3,5 3,6 4,6 4,7 2,4 2,5 3,7 5,7 5,2 2,7 2,6 5,6 6,6 5,5 4,3 4,5 6,7 6,5 5,4 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 4,3 1,4 1,5 1,6 2,2 1,1 2,6 3,6 4,6 4,7 2,4 2,5 3,4 3,7 4,2 2,7 5,7 3,5 5,2 5,6 6,6 5,5 4,5 6,7 6,5 1,7 5,4 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 4,3 1,5 1,6 2,2 1,1 2,6 3,6 4,6 4,7 2,4 2,5 3,4 3,7 4,2 2,7 5,7 3,5 5,2 6,7 6,6 4,5 6,5 5,5 1,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 21,
++      "progress": 0.414,
++      "action": {
++        "r": 1,
++        "c": 6,
++        "color": 15
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 36,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 1,6 2,2 3,4 2,4 2,5 2,6 3,6 4,6 4,7 3,7 5,2 2,7 5,7 3,5 4,2 1,7 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 1,
++        "c": 2,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,7 1,6 1,1 5,2 2,2 3,4 1,5 1,4 3,5 3,6 4,6 4,7 2,4 2,5 3,7 5,7 4,2 2,7 2,6 5,6 6,6 5,5 4,5 6,7 6,5 4,3 5,4 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 2,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 2,4 2,5 1,7 1,6 2,2 1,1 3,4 1,2 1,4 1,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 5,6 6,6 5,5 4,5 6,5 4,3 6,7 5,4 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 3,4 1,4 1,7 1,6 2,2 1,1 1,5 1,2 2,4 2,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 5,6 6,6 5,5 4,5 6,5 4,3 6,7 5,4 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 2,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 2,4 1,7 1,6 2,2 1,1 3,4 1,4 1,5 2,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 18,
++      "progress": 0.331,
++      "action": {
++        "r": 3,
++        "c": 4,
++        "color": 19
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 3,4 1,7 1,6 2,2 1,1 3,5 3,6 4,6 4,7 1,4 1,5 2,4 2,5 3,7 5,2 2,7 5,7 2,6 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 19,
++      "progress": 0.359,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 32,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,7 1,6 2,2 1,1 2,6 3,6 4,6 3,4 4,7 1,5 2,4 2,5 3,7 5,2 2,7 5,7 3,5 4,2 6,7 6,6 4,5 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 15,
++      "progress": 0.254,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 28,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 4,3 3,4 2,4 1,4 4,2 2,2 1,5 1,6 1,1 1,2 1,3 2,6 3,6 4,6 4,7 2,3 2,5 3,7 5,7 2,7 6,7 3,5 6,6 6,5 5,5 4,5 5,2 1,7 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 17,
++      "progress": 0.304,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 28,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,7 2,4 2,5 1,6 2,2 1,1 3,4 1,2 1,4 1,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 4,5 6,7 6,6 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 16,
++      "progress": 0.279,
++      "action": {
++        "r": 4,
++        "c": 3,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 24,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 4,3 2,4 2,5 1,5 1,6 2,6 2,2 1,1 3,6 4,6 4,7 1,2 1,3 1,4 3,4 4,2 2,7 3,7 5,7 3,5 5,2 5,6 6,6 5,5 4,5 6,5 1,7 6,7 5,4 4,4 5,3"
++    },
++    {
++      "step": 16,
++      "progress": 0.279,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 20,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,7 2,4 2,5 1,6 2,2 1,1 3,4 1,2 1,3 1,4 1,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 4,5 6,7 6,6 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    },
++    {
++      "step": 15,
++      "progress": 0.254,
++      "action": {
++        "r": 1,
++        "c": 7,
++        "color": 32
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 16,
++      "maxBuffer": 5,
++      "significantReleaseCount": 0,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 1,7 2,3 2,4 2,5 1,6 2,2 1,1 3,4 1,2 1,3 1,4 1,5 3,5 3,6 4,6 4,7 3,7 5,2 2,7 5,7 2,6 4,2 4,5 6,7 6,6 6,5 5,5 4,3 5,4 5,6 4,4 5,3"
++    }
++  ],
++  "summary": {
++    "tested": 117,
++    "withRelease": 68,
++    "withMid50": 58,
++    "both": 40,
++    "best": {
++      "step": 30,
++      "progress": 0.618,
++      "action": {
++        "r": 2,
++        "c": 2,
++        "color": 31
++      },
++      "fullSteps": 46,
++      "midBuffer34Pct": 80,
++      "maxBuffer": 4,
++      "significantReleaseCount": 1,
++      "finalReplayValid": true,
++      "fullSig": "0,7 0,0 1,0 2,0 2,1 3,0 3,1 4,1 3,2 4,0 5,0 6,0 5,1 3,3 2,3 1,3 1,2 1,4 1,5 1,1 2,4 2,5 1,7 2,6 4,3 3,5 3,4 3,6 3,7 2,2 4,6 1,6 4,7 4,2 2,7 5,7 5,2 6,7 6,6 4,5 6,5 5,5 5,4 5,6 4,4 5,3"
++    }
++  }
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_\351\242\204\347\231\273\350\256\260_v534.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_\351\242\204\347\231\273\350\256\260_v534.md"
+new file mode 100644
+index 0000000..cbfa241
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\351\207\212\346\224\276\350\267\257\347\272\277\346\236\204\351\200\240_\351\242\204\347\231\273\350\256\260_v534.md"
+@@ -0,0 +1,53 @@
++# 释放路线构造 · v534 实验登记（执行前口径补档）
++
++> Kimi 方法建议。原实验在交接前已直接执行；本卡按当时的唯一变量、预算和判据补齐，未根据结果改判。后续 `v535+` 必须先写预登记再运行。
++
++## 假设
++
++v533 已证明 007 的高压参考路线能找到一个可执行释压动作，但原路线自身 `significantReleaseCount=0`。若把高压父状态发现的替代动作与后续可通关后缀拼回整条 `pickOrder`，再从头独立回放，则“中段高压”和“真实显著释放”可以同时成立。
++
++## 范围与唯一变量
++
++- 图：007；seed `1001`；棋盘固定 `7×8`。
++- 规则：四方向瞬时连锁（`instantChain`，真实最左空槽、最近曼哈顿优先）。
++- 生成配置：2 分支、`instantPlanPolicy=targetBuffer`、`targetBuffer=4`、`maxDebt=40`、`instantPlanBranchPrefixDebts=8`。
++- 容量：`deriveCapacityBand` 推导值，`boxSizeMin/Max` 与 `capNormMin/Max` 同步；不加、不拆、不缩放用户容量区间。
++- 障碍：固定棋盘，不新增冰、链、问号或管道；不靠末段锁关键色。
++- 唯一变量：在参考解的高压父状态枚举当前合法动作（最多 8 个），每个动作最多 `900ms / 3000 nodes` 搜索可通关后缀；把“前缀 + 替代动作 + 后缀”重新组成完整路线并独立回放。不是继续增加分支前缀债务。
++
++## 主指标
++
++完整路线必须同时满足：
++
++1. `finalReplayValid=true`，即从空状态按保存签名完整通关；
++2. `midBuffer34Pct >= 50`；
++3. `significantReleaseCount >= 1`。
++
++## 保护指标
++
++- 棋盘行列均 `>=6`；
++- 每色像素守恒，`aboveMax=0`，容量上限不被突破；
++- `microCarMax=2` 且实际 `microCars=0`；
++- 不新增障碍或黑块；
++- 黑块仅作观感保护记录，不用百分比直接定义难度；
++- 该实验只读，不改变默认四边产线。
++
++## 通过 / 否决
++
++- 通过：至少 1 条完整签名同时满足三项主指标，并能保存路线的具体释压位置、颜色和前后压力。
++- 否决：只能找到单步替代动作但整条路线释放仍为 unknown；或拼回路线后无法独立回放；或靠新增障碍/缩盘/末段锁色达标。
++
++## 预算与记录
++
++- 生成 1 个 007 基底；每个高压候选动作最多 0.9 秒后缀搜索。
++- 保存候选总数、release/mid/both 数量、最佳完整签名、最终回放指标。
++- 本轮脚本未记录整次墙钟和重复路线去重；这是 `v535` 路线构造模块必须补的性能证据。
++
++## 回滚点
++
++- v534 开始前提交：`17536f5`（v533）。
++- v534 不修改生成器默认路径，回滚只需停用实验工具和文档版本记录。
++
++## 结果边界
++
++单图、单 seed 的“存在一条完整高压释放路线”只证明该方法可行，不证明 006/010 可泛化，也不证明玩家能学会、关卡已可交付。进入生产前必须在多图、独立 seed 和真实 UI 中重跑。
+diff --git a/AGENTS.md b/AGENTS.md
+index 379986e..5e3bf14 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,7 +1,7 @@
+ # AGENTS.md · 毛线汽车（关卡生成器）
+ 
+ > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
+-> 工作日志 **479 节 / 20195 行（约 783 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§513）。
++> 工作日志 **524 节 / 20562 行（约 808 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§524）。
+ 
+ ## 这是什么
+ 
+diff --git a/README.md b/README.md
+index b0bdcc5..3c63519 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v533**（有限分支前缀债务实验；释放路线搜索继续）。
++> 当前版本 **v534**（释放路线构造正结果；下一步做成多图路线构造模块）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看全流程对照图** | [`思维导图_求解器与关卡生产全流程.html`](思维导图_求解器与关卡生产全流程.html)（求解器 → 反解 → 关卡生产，自包含，双击可开） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v522）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v534）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **看详细实验与交付流程** | [`01_交接文档/优质关卡生成_详细工作流程.md`](01_交接文档/优质关卡生成_详细工作流程.md)（已完成/未完成、P0~P6实验卡、验收与回滚） |
