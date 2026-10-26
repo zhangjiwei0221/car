@@ -79,6 +79,7 @@ function _goalFinish(stopReason) {
   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
   if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
   try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
+  try { AntSolver.Generator.markFinalStructureAccept(best, g.config); } catch (e) {}
   best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: g.maxMs, perRoundMs: g.perMs,
     sharedCapBudget: g.config.goalSharedBudget !== false, rounds: g.rounds, stopReason: best.goalStopReason || null,
     searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - g.t0,
@@ -109,6 +110,16 @@ function _goalRound() {
   cfg.capBudgetShared = g.config.goalSharedBudget !== false;
   cfg.seed = (g.baseSeed + (g.config.reviewMix === true ? Math.floor(g.rounds / 2) : g.rounds) * 7919) >>> 0;
   cfg._trace = [];
+  if (g.rounds === 0) {
+    self.postMessage({ type: 'flow', index: g.index, round: 0, text: '目标配置诊断 · ' + JSON.stringify({
+      cutMode: cfg.cutMode || null, boardLayout: cfg.boardLayout || null,
+      rows: [cfg.boardRowsMin, cfg.boardRowsMax], cols: [cfg.boardColsMin, cfg.boardColsMax],
+      cap: [cfg.boxSizeMin, cfg.boxSizeMax], capNorm: [cfg.capNormMin, cfg.capNormMax], capScalePlan: cfg.capScalePlan || null,
+      candidateCount: cfg.candidateCount, portfolioK: cfg.portfolioK, fullTime: !!cfg.fullTime, timeBudgetMs: cfg.timeBudgetMs,
+      maxPipes: cfg.maxPipes, iceForceSteps: cfg.iceForceSteps, chainByDemand: cfg.chainByDemand,
+      semanticObstacles: !!cfg.semanticObstacles, boardFirst: !!cfg.boardFirst, boardExpandOnOverflow: !!cfg.boardExpandOnOverflow,
+      targetCarCount: cfg.targetCarCount, usableSpaceTarget: cfg.usableSpaceTarget }) });
+  }
   self.postMessage({ type: 'flow', index: g.index, round: g.rounds + 1,
     text: '目标第' + (g.rounds + 1) + '轮开始 · seed ' + cfg.seed });
   var r = null, roundT0 = Date.now();
@@ -154,6 +165,7 @@ function _goalRound() {
     var _p = r && r.goodV3 && r.goodV3.persist, _q = _p && _p.quality, _f = r && r.goodV3 && r.goodV3.fillCurve;
     self.postMessage({ type: 'flow', index: g.index, round: g.rounds,
       text: '目标第' + g.rounds + '轮结果 · ' + (r && r.level ? '有关卡' : '无关卡') +
+        (r && !r.level && r.lastFailReason ? ' · ' + r.lastFailReason : '') +
         ' · 可选中位' + (_f && _f.selectMedian != null ? _f.selectMedian : '-') +
         ' · 吃满' + (_f && _f.fullMedian2 != null ? _f.fullMedian2 : '-') +
         ' · partial' + (_f && _f.partialStepPct != null ? _f.partialStepPct + '%' : '-') +

@@ -5853,7 +5853,11 @@ AntSolver.App = (function() {
       row('R 后悔率', (qm && qm.R != null) ? (qm.R + 'pp（最优−10局平均进度）') : '未测') +
       row('U 废牌率', (qm && qm.U != null) ? (qm.U + '%（10局没碰过的盒）') : '未测') +
       row('J 公平度', jTxt) +
-      row('结构门', rec.qGatePass === false ? ('未过：' + ((rec.qGateReasons || []).join('；') || '未知')) : '通过') +
+      row('结构门', rec.qGatePass === false ? ('未过：' + ((rec.qGateReasons || []).join('；') || '未知')) :
+        (rec.finalStructureEvidence && rec.finalStructureEvidence.source === 'low_pressure_final' ? '通过（低压力最终补充；基础门未过）' : '通过')) +
+      (rec.finalStructureEvidence && rec.finalStructureEvidence.source === 'low_pressure_final' ?
+        row('最终结构证据', '低压力吃满 ' + rec.finalStructureEvidence.lowPressureFullMedian + ' / 步骤 ' + rec.finalStructureEvidence.lowPressureSteps +
+          ' · 高压吃满 ' + rec.finalStructureEvidence.highPressureFullMedian + ' · 全程 ' + rec.finalStructureEvidence.fullMedian2) : '') +
       row('质量未过项', qualityFails.length ? qualityFails.join('；') : '无') +
       '</table>' +
       sec('旧判据（goodV3，仅供参考）') +
@@ -6239,6 +6243,9 @@ AntSolver.App = (function() {
       white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null), partialStepPct: (_fc ? _fc.partialStepPct : null),
       earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null)
     });
+    // 【v521】搜索结构门保持旧口径；只有目标模式最终验收可补低压力证据。
+    var _finalStruct = AntSolver.Quality.finalStructureFromGeneration ? AntSolver.Quality.finalStructureFromGeneration(result) : null;
+    var _useFinalStruct = !!(result.goalMode && result.config && result.config.experienceGoal === true && _finalStruct);
     // 【v471】结构门过：不再把 fallback 当交付否决
     var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
     return {
@@ -6306,6 +6313,8 @@ AntSolver.App = (function() {
           releaseDecision: result._experienceFull.releaseDecision } : null;
       })(),
       acceptedByVerifiedRoute: !!result.acceptedByVerifiedRoute,
+      acceptedByFinalStructure: !!result.acceptedByFinalStructure,
+      finalStructureEvidence: _finalStruct,
       sourcePreflight: sourcePreflight,
       experienceRouteEvidence: result.experienceRouteEvidence || null,
       capacityTune: result.capacityTune ? { applied: !!result.capacityTune.applied, tested: result.capacityTune.tested,
@@ -6313,7 +6322,9 @@ AntSolver.App = (function() {
         stopped: result.capacityTune.stopped || null, skipped: result.capacityTune.skipped || null,
         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
-      qGatePass: _qv.gatePass, qGateReasons: _qv.gateReasons,
+      qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
+      qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
+      baseGatePass: _qv.gatePass, baseGateReasons: _qv.gateReasons,
       fullTime: !!(result.config && result.config.fullTime),
       trapPost: result.trapPost || null,
       p7: result.p7 || null, a3d: result.a3d || null, readyStats: result.readyStats || null,
@@ -6453,6 +6464,10 @@ AntSolver.App = (function() {
       goalMode: !!rec.goalMode, experienceGoal: !!rec.experienceGoal,
       goalStopReason: rec.goalStopReason || null, goalTargetMiss: !!rec.goalTargetMiss,
       acceptedByVerifiedRoute: !!rec.acceptedByVerifiedRoute,
+      acceptedByFinalStructure: !!rec.acceptedByFinalStructure,
+      finalStructureEvidence: rec.finalStructureEvidence || null,
+      baseGatePass: rec.baseGatePass === true ? true : (rec.baseGatePass === false ? false : null),
+      baseGateReasons: rec.baseGateReasons || null,
       experienceEvidence: rec.experienceEvidence || null,
       experienceRouteEvidence: rec.experienceRouteEvidence || null,
       capacityTune: rec.capacityTune || null,
@@ -7406,6 +7421,7 @@ AntSolver.App = (function() {
       best.goalElapsedMs = Date.now() - t0;
       if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, baseCfg); } catch (e) {} }
       try { AntSolver.Generator.markVerifiedRouteAccept(best, baseCfg); } catch (e) {}
+      try { AntSolver.Generator.markFinalStructureAccept(best, baseCfg); } catch (e) {}
       best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: per,
         sharedCapBudget: baseCfg.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
         searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - t0,

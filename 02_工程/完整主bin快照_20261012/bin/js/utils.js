@@ -882,7 +882,25 @@ AntSolver.Quality = (function () {
     return out;
   }
 
-  return { schema: SCHEMA, verdict: verdict, gateDistance: gateDistance, fromGeneration: fromGeneration };
+  // 【v521候选】只供最终验收补充证据，不改qGate、搜索早停或候选排序。
+  // 原门唯一失败项必须是全程吃满中位；其他结构失败不能被低压力指标抵消。
+  function finalStructureFromGeneration(result) {
+    var base = fromGeneration(result), g = result && (result.goodV3 || (result.generationEval && result.generationEval.goodV3)) || {};
+    var fc = g.fillCurve || {}, steps = fc.steps || [];
+    var low = steps.filter(function (s) { return s.free >= 3; }), high = steps.filter(function (s) { return s.free <= 2; });
+    function med(a) { if (!a.length) return null; var b = a.slice().sort(function (x, y) { return x - y; }); return b[Math.floor(b.length / 2)]; }
+    var lowMed = med(low.map(function (s) { return s.full; })), highMed = med(high.map(function (s) { return s.full; }));
+    var remaining = (base.gateReasons || []).filter(function (x) { return x.indexOf('吃满中位 ') !== 0; });
+    var supplemental = !base.gatePass && remaining.length === 0 && (base.gateReasons || []).some(function (x) { return x.indexOf('吃满中位 ') === 0; }) &&
+      low.length >= 3 && lowMed != null && lowMed <= 3;
+    return { pass: base.gatePass || supplemental, source: base.gatePass ? 'base_gate' : (supplemental ? 'low_pressure_final' : 'failed'),
+      baseGatePass: base.gatePass, baseGateReasons: base.gateReasons || [], remainingReasons: remaining,
+      lowPressureSteps: low.length, lowPressureFullMedian: lowMed,
+      highPressureSteps: high.length, highPressureFullMedian: highMed,
+      fullMedian2: fc.fullMedian2 != null ? fc.fullMedian2 : null };
+  }
+
+  return { schema: SCHEMA, verdict: verdict, gateDistance: gateDistance, fromGeneration: fromGeneration, finalStructureFromGeneration: finalStructureFromGeneration };
 })();
 
 // ==================== 求解证据质量向量（v489~v490，只读） ====================

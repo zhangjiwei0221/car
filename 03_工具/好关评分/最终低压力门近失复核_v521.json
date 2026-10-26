@@ -1,0 +1,104 @@
+{
+  "schema": "final-low-pressure-near-verification-v1",
+  "date": "2026-10-26",
+  "old": {
+    "baseStruct": false,
+    "finalStruct": null,
+    "resultPass": false,
+    "timeModeResultPass": false,
+    "acceptedByVerifiedRoute": false,
+    "acceptedByFinalStructure": false,
+    "capacity": {
+      "schema": "capacity-evidence-v1",
+      "rows": 9,
+      "cols": 10,
+      "boardFloorPass": true,
+      "cars": 85,
+      "capacitySum": 1225,
+      "pixels": 1225,
+      "conserved": true,
+      "minCap": 10,
+      "maxCap": 19,
+      "boxSizeMin": 13,
+      "boxSizeMax": 19,
+      "belowMin": 21,
+      "aboveMax": 0,
+      "microCarMax": 2,
+      "microCars": [],
+      "microCount": 0,
+      "rangeExactFeasible": true,
+      "infeasibleColors": [],
+      "row0Cars": 10,
+      "row0Colors": 5,
+      "row0MaxSameColor": 2,
+      "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+    }
+  },
+  "new": {
+    "baseStruct": false,
+    "finalStruct": {
+      "pass": true,
+      "source": "low_pressure_final",
+      "baseGatePass": false,
+      "baseGateReasons": [
+        "吃满中位 4>3"
+      ],
+      "remainingReasons": [],
+      "lowPressureSteps": 33,
+      "lowPressureFullMedian": 2,
+      "highPressureSteps": 45,
+      "highPressureFullMedian": 5,
+      "fullMedian2": 4
+    },
+    "resultPass": true,
+    "timeModeResultPass": false,
+    "acceptedByVerifiedRoute": false,
+    "acceptedByFinalStructure": true,
+    "experience": {
+      "pass": true,
+      "metrics": {
+        "midSteps": 51,
+        "midBuffer34Pct": 74.5,
+        "midBuffer5Pct": 3.9,
+        "maxBuffer5Run": 2,
+        "significantReleaseCount": 3,
+        "oscillationCount": 3,
+        "lateHighPressurePct": 58.8,
+        "maxBuffer": 5,
+        "distance": 0
+      },
+      "release": "found"
+    },
+    "capacity": {
+      "schema": "capacity-evidence-v1",
+      "rows": 9,
+      "cols": 10,
+      "boardFloorPass": true,
+      "cars": 85,
+      "capacitySum": 1225,
+      "pixels": 1225,
+      "conserved": true,
+      "minCap": 10,
+      "maxCap": 19,
+      "boxSizeMin": 13,
+      "boxSizeMax": 19,
+      "belowMin": 21,
+      "aboveMax": 0,
+      "microCarMax": 2,
+      "microCars": [],
+      "microCount": 0,
+      "rangeExactFeasible": true,
+      "infeasibleColors": [],
+      "row0Cars": 10,
+      "row0Colors": 5,
+      "row0MaxSameColor": 2,
+      "note": "belowMin 不自动等于 microCar；容量区间数学不可精确满足时，必须守恒并记录余量，不能伪造全在区间。"
+    }
+  },
+  "otherGateProtection": {
+    "pass": false,
+    "remainingReasons": [
+      "freeLow 45%>30%"
+    ]
+  }
+}
