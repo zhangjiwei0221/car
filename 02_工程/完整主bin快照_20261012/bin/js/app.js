@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "561";
+var APP_BUILD = "565";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5009,6 +5009,7 @@ AntSolver.App = (function() {
       genLog('棋盘：行 ' + _norm.rowsMin + '~' + _norm.rowsMax + ' · 列 ' + _norm.colsMin + '~' + _norm.colsMax +
         (_boardAuto ? '（棋盘自适应：开，将自动换尺寸）' : '（棋盘自适应：关，严格用此范围）'), 'gen-log-ok');
       genLog('目标模式棋盘偏好：候选优先行列都 ≥7；6×6/6×7/7×6 仅在候选搜索失败时兜底。', 'gen-log-ok');
+      genLog('目标模式局部修复：结构近失时最多两对换车，上限8秒；超预算保留原候选。', 'gen-log-ok');
     } catch (e) {}
     // 【v234】棋盘自动选：只有勾了「自适应」才用自动尺寸列表；不勾则严格用你填的行列范围
     if (_boardAuto) {
@@ -5057,6 +5058,13 @@ AntSolver.App = (function() {
       boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: true,
       // v560：只作用于目标模式候选；时间模式仍保持原尺寸选择行为。
       boardPrefer7: true,
+      // v565：目标模式结构近失的有界局部交换修复；time模式不走produceGoal。
+      localSwapRepair: true,
+      localSwapRepairMaxMs: 8000,
+      localSwapStage1Pairs: 32,
+      localSwapStage1Ms: 4000,
+      localSwapStage2Pairs: 64,
+      localSwapStage2Ms: 4000,
       boardExpandOnOverflow: true, boardFirst: true,
       p7Repair: true, p7BaseCount: 3,
       semanticObstacles: (function () {
@@ -6309,6 +6317,7 @@ AntSolver.App = (function() {
         candidateCount: result.config.candidateCount, portfolioK: result.config.portfolioK,
         boardPrefer7: !!result.config.boardPrefer7,
         boardPreferredPlan: result.config._boardPrefer7 || null,
+        localSwapRepair: result.localSwapRepair || null,
         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime
       } : null,
       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）

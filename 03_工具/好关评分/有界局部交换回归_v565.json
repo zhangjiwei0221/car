@@ -1,0 +1,78 @@
+{
+  "schema": "bounded-local-swap-regression-v565",
+  "date": "2026-10-26",
+  "checks": {
+    "pageVersion": true,
+    "cacheVersion20": true,
+    "appBuild565": true,
+    "targetRepairEnabled": true,
+    "generatorHasRepair": true,
+    "abComplete": true,
+    "bStruct6": true,
+    "bGoal6": true,
+    "aStruct2": true,
+    "noGoalRegression": true,
+    "hardCapacityOk": true,
+    "repairsAtLeast5": true,
+    "overheadMedianAtMost8s": true,
+    "overheadMaxAtMost8s": true,
+    "knownProtection": true,
+    "timeModeHash": true
+  },
+  "evidence": {
+    "a": {
+      "arm": "A",
+      "runs": 6,
+      "struct": 2,
+      "goal": 2,
+      "repairs": 0,
+      "aboveMax": 0,
+      "perColorFail": 0,
+      "wallMedianMs": 23569.5,
+      "wallMaxMs": 25460
+    },
+    "b": {
+      "arm": "B",
+      "runs": 6,
+      "struct": 6,
+      "goal": 6,
+      "repairs": 5,
+      "aboveMax": 0,
+      "perColorFail": 0,
+      "wallMedianMs": 15812.5,
+      "wallMaxMs": 25852
+    },
+    "repairCount": 5,
+    "overheadMedianMs": 5643,
+    "overheadMaxMs": 7119,
+    "protection": {
+      "targetRows": 3,
+      "targetValid": 3,
+      "configOk": true,
+      "v547HashMatches": [
+        1002,
+        32677
+      ],
+      "structuralSignificantFound": [
+        1002,
+        32677
+      ],
+      "sample1001Status": "found",
+      "wholeGoalPass": [
+        1002,
+        32677
+      ],
+      "timeMode": {
+        "valid": true,
+        "hash": "0f5310dd5cbae645b8857bae89ccf28364708ee0b791a320f31d06bc157646de",
+        "expectedHash": "0f5310dd5cbae645b8857bae89ccf28364708ee0b791a320f31d06bc157646de",
+        "hashMatch": true,
+        "config": {},
+        "elapsedMs": 801
+      },
+      "pass": true,
+      "decision": "目标体验配置包接入正确，两个结构样本达到完整目标通过；1001虽有显著释放但结构门未过、goalPass=false；时间模式hash不变。"
+    }
+  },
+  "pass": true
+}
