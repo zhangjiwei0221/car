@@ -272,7 +272,7 @@ P2b 已完成结果：
 - 压力主体被推到 72% 之后，中段反而更空；
 - 该策略方向否决，不再继续扫 supply/mixedDebt。
 
-### P2c. 006 targetBuffer 4→3 单参数 · ⏭ 当前唯一下一步
+### P2c. 006 targetBuffer 4→3 单参数 · ❌ 已否决
 
 唯一变量：
 
@@ -290,6 +290,27 @@ instantPlanTargetBuffer: 4 → 3
 - 路线、结构、容量、逐色守恒、显著释放和 PlayerSim 全部通过。
 
 若 targetBuffer3 仍失败，停止该族参数，不继续逐一试 2、5。
+
+P2c 已完成结果：
+
+- targetBuffer3 两次 hash 均为 `691e6cd9...`；
+- 有效、路线、结构、容量均通过；
+- 中段仍为 17.4%，显著释放降为 0；
+- PlayerSim 仍是进度 2%、4 次拾取即高压停止；
+- targetBuffer 族参数停止，不再试 2/5。
+
+### P2d. 006 供给时间线重归因 · ⏭ 当前唯一下一步
+
+只读比较 `shortDebt`、`targetBuffer4`、`targetBuffer3`：
+
+1. 计划层面的债务车数与 `entryReach/cap`；
+2. 实际路线的债务车进场、完成、等待；
+3. 开局为什么形成高压；
+4. step9~10 为什么同时偿还；
+5. step23~26 哪些合法动作可以留下第三债务且不阻断后缀；
+6. 区分真实债务与“当步即还”的假债务。
+
+本轮不改生产代码、不生成新 seed、不试新 policy。归因结束后才能提出下一项单因素。
 
 ### P3. 006 开发集复核与生产化
 
@@ -388,13 +409,12 @@ instantPlanTargetBuffer: 4 → 3
 
 ## 8. 当前唯一下一步
 
-执行 **P2c：006/1001 targetBuffer 4→3**。
+执行 **P2d：006/1001 供给时间线重归因**。
 
 唯一变量：
 
 ```text
-instantPlanPolicy = targetBuffer
-instantPlanTargetBuffer: 4 vs 3
+只读比较 shortDebt、targetBuffer4、targetBuffer3
 ```
 
-固定源图、seed1001、容量带、棋盘、配方、`instantPlanMaxDebt=40`、分支参数和目标阈值。targetBuffer4 已两次稳定复现，本轮只跑 targetBuffer3 两次。目标仍是中段 3/4 `>=50%`、原计划路线完整、结构/容量/逐色守恒、显著释放和 PlayerSim 全部通过。单 seed 命中后仍不进入生产。
+固定现有三组真实关卡与路线，不重新生成。输出计划债务、实际债务生命周期、低压力区间的合法动作和候选债务窗口。本轮只解释根因，不修改生产，也不混入新实验。
