@@ -2199,7 +2199,9 @@ AntSolver.Generator = (function() {
     return Object.assign({}, config, {
       boardRowsMin: pick.rows, boardRowsMax: pick.rows,
       boardColsMin: pick.cols, boardColsMax: pick.cols,
-      boardHardRange: true, boardAuto: false, boardAllowSquare: true,
+      // v573：优先尺寸不是硬锁。若优先盘会因车太少产生大面积补位黑块，
+      // 允许 chooseBoardDimsFixed 向下回退到合法的小盘（最小仍为 6×6）。
+      boardHardRange: false, boardAuto: false, boardAllowSquare: true,
       boardExpandOnOverflow: false,
       _boardPrefer7: {
         schema: 'board-prefer7-v1',
@@ -2221,6 +2223,20 @@ AntSolver.Generator = (function() {
     var cMin = Math.max(6, clampInt(config.boardColsMin, AntSolver.BOARD_COLS_MIN, 3, 30));
     var cMax = Math.max(cMin, clampInt(config.boardColsMax, AntSolver.BOARD_COLS_MAX, cMin, 30));
     var bp = config.blackPercent || 0;
+    var hardBlackMaxPct = (config.hardBlackMaxPct != null)
+      ? Math.max(0, Math.min(100, +config.hardBlackMaxPct))
+      : 30;
+    function dimBlackPct(d) {
+      if (!d) return 100;
+      var q = d.q || {};
+      var cap = (d.rows || 0) * (d.cols || 0);
+      if (!cap) return 100;
+      var finalBlack = q.blackTarget != null ? q.blackTarget : (d.blackTarget || 0);
+      if (q.overflow != null) finalBlack += Math.max(0, -q.overflow);
+      else if (d.ov != null) finalBlack += Math.max(0, -d.ov);
+      return finalBlack / cap * 100;
+    }
+    function dimBlackOk(d) { return dimBlackPct(d) <= hardBlackMaxPct + 1e-9; }
     // 允许进管道的溢出上限：管道条数未定时按经验给一个温和的窗口，
     // 目的只是「别把几十个盒全推进管道」，真正的管道容量仍由后续 pipeCapacity 检查把关。
     var pipeRoom = (config && config.boardFirst) ? 0 : Math.max(3, Math.round(n * 0.25));
@@ -2324,13 +2340,13 @@ AntSolver.Generator = (function() {
         var _ov0 = function (d) { return (d.q && d.q.overflow || 0); };
         // 【v393】先 board 后 pipe 的硬顺序：先找 overflow≤0 的尺寸，不塞管道。
         // 范围本身能装下就先用；范围装不下才用 +1 行/列扩展盘；都没有才允许带管道。
-        var _fitIn = allDims.filter(function (d) { return !d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0; });
+        var _fitIn = allDims.filter(function (d) { return !d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0 && dimBlackOk(d); });
         if (_fitIn.length) return emitUsable(pickRandom(_fitIn), false, allDims.length);
-        var _fitExp = allDims.filter(function (d) { return d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0; });
+        var _fitExp = allDims.filter(function (d) { return d.expanded && _ov0(d) <= 0 && (d.q.breachLevel || 0) === 0 && dimBlackOk(d); });
         if (_fitExp.length) return emitUsable(pickRandom(_fitExp), false, allDims.length);
         // ① 优先「干净」尺寸（保管道 + 不突破墙上限），并取【缩小量最小】的那一级 → 只缩到刚好不突破，
         //    同一级内随机（保留尺寸多样性）。这直接实现用户「缩到不触发墙超限兜底为止」。
-        var clean = allDims.filter(isClean);
+        var clean = allDims.filter(function (d) { return isClean(d) && dimBlackOk(d); });
         if (clean.length) {
           var minSh = Math.min.apply(null, clean.map(function (d) { return d.shrinkDist; }));
           var pool = clean.filter(function (d) { return d.shrinkDist === minSh; });
@@ -2353,7 +2369,7 @@ AntSolver.Generator = (function() {
           return emitUsable(pickRandom(pool), minSh > 0, allDims.length);
         }
         // ② 没有完全不突破的 → 退而求其次：在能保住管道的尺寸里，取突破级别最低、其次缩小量最小者。
-        var keep = allDims.filter(keepsPipe);
+        var keep = allDims.filter(function (d) { return keepsPipe(d) && dimBlackOk(d); });
         if (keep.length) {
           keep.sort(function (a, b) {
             return (a.q.breachLevel || 0) - (b.q.breachLevel || 0) || a.shrinkDist - b.shrinkDist;
@@ -2363,8 +2379,15 @@ AntSolver.Generator = (function() {
           return emitUsable(pickRandom(pool2), bestSh > 0, allDims.length);
         }
         // ③ 全都要丢管道 → 回落范围内可行尺寸随机（原行为，墙偏多，如实标记 pipeDroppedPick）
-        var inR = allDims.filter(function (d) { return d.shrinkDist === 0; });
-        return emitUsable(pickRandom(inR.length ? inR : allDims), false, allDims.length);
+        var inR = allDims.filter(function (d) { return d.shrinkDist === 0 && dimBlackOk(d); });
+        var blackSafe = allDims.filter(dimBlackOk);
+        if (inR.length) return emitUsable(pickRandom(inR), false, allDims.length);
+        if (blackSafe.length) {
+          blackSafe.sort(function (a, b) { return dimBlackPct(a) - dimBlackPct(b) || a.shrinkDist - b.shrinkDist; });
+          return emitUsable(blackSafe[0], blackSafe[0].shrinkDist > 0, allDims.length);
+        }
+        allDims.sort(function (a, b) { return dimBlackPct(a) - dimBlackPct(b); });
+        return emitUsable(allDims[0], allDims[0].shrinkDist > 0, allDims.length);
       }
       // 一个可行尺寸都没有 → 落回原逻辑，并由结构候选层与验证脚本如实暴露（不静默假装达标）
     }
@@ -2420,6 +2443,8 @@ AntSolver.Generator = (function() {
     function byOvAsc(a, b) { return a.ov - b.ov; }
     function bySurplusAsc(a, b) { return a.surplus - b.surplus || a.ov - b.ov; }
     function pickFrom(list) {
+      var blackSafe = list.filter(dimBlackOk);
+      if (blackSafe.length) list = blackSafe;
       // ===== 管道数量下限（用户 2026-08-04：管道太少，确保不低于 4 个）=====
       // 管道数由守恒反推：溢出盒 ov 对应管道数 P∈[⌈ov/5⌉,⌊ov/3⌋]，故「P ≥ minPipes」等价于「ov ≥ minPipes×5」。
       // 原逻辑总是在溢出窗口内挑 ov 最小的尺寸（byOvAsc 取首个），这正是管道偏少的原因——

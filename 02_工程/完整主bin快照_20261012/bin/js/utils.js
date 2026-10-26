@@ -823,6 +823,7 @@ AntSolver.Quality = (function () {
     if (o.freePct != null && o.freePct > 50) r.push('免费步' + o.freePct + '%>50%');
     if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
     if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
+    if (o.blackPct != null && o.blackPct > 30) r.push('黑块' + o.blackPct + '%>30%');
     var pass = r.length === 0;
 
     // qGate：交付结构门，阈值独立于 qPass。
@@ -834,6 +835,7 @@ AntSolver.Quality = (function () {
     if (o.fullMed2 != null && o.fullMed2 > 3) g.push('吃满中位 ' + o.fullMed2 + '>3');
     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
     if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
+    if (o.blackPct != null && o.blackPct > 30) g.push('黑块 ' + o.blackPct + '%>30%');
     var board = o.level && o.level.board;
     if (board && (board.rows < 6 || board.cols < 6)) g.push('棋盘 ' + board.rows + '×' + board.cols + ' 行列<6');
     var gatePass = g.length === 0;
@@ -872,6 +874,15 @@ AntSolver.Quality = (function () {
     var p = g.persist || {}, fc = g.fillCurve || {}, q = p.quality || {};
     var dc = p.deathCauses || {}, dt = 0, dh = 0;
     for (var k in dc) { dt += dc[k]; if (k === '管道' || k === '问号') dh += dc[k]; }
+    var blackCells = 0, boardCells = 0;
+    if (level && level.board && level.board.cells) {
+      for (var br = 0; br < level.board.rows; br++) for (var bc = 0; bc < level.board.cols; bc++) {
+        boardCells++;
+        var bcell = level.board.cells[br] && level.board.cells[br][bc];
+        if (bcell && bcell.t === 'black') blackCells++;
+      }
+    }
+    var blackPct = boardCells ? +(blackCells / boardCells * 100).toFixed(1) : null;
     var input = {
       valid: !!r.valid, level: level,
       learned: p.learnedPassPct != null ? p.learnedPassPct : null,
@@ -885,7 +896,8 @@ AntSolver.Quality = (function () {
       freePct: fc.freePct != null ? fc.freePct : null,
       freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
       freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
-      partialStepPct: fc.partialStepPct != null ? fc.partialStepPct : null
+      partialStepPct: fc.partialStepPct != null ? fc.partialStepPct : null,
+      blackPct: blackPct
     };
     var out = verdict(input);
     // 与旧 goalStructPass 一致：没有完整 persist/fillCurve 时，结构门是“未测不通过”，

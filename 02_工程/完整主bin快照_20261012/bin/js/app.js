@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "572";
+var APP_BUILD = "573";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -6254,6 +6254,10 @@ AntSolver.App = (function() {
     var _ps = (result.goodV3 && result.goodV3.persist) || {};
     var _fc = (result.goodV3 && result.goodV3.fillCurve) || null;
     var _q = _ps.quality || {};
+    var _boardTarget0 = (result.sampledConfig && result.sampledConfig.usableSpaceTarget != null)
+      ? result.sampledConfig.usableSpaceTarget
+      : (result.config ? result.config.usableSpaceTarget : null);
+    var _boardStat0 = boardStructStat(result.level, parsed, _boardTarget0);
     var _dc0 = _ps.deathCauses || {}, _dt0 = 0, _dh0 = 0;
     for (var _dk0 in _dc0) { _dt0 += _dc0[_dk0]; if (_dk0 === '管道' || _dk0 === '问号') _dh0 += _dc0[_dk0]; }
     var _hidden0 = _dt0 ? Math.round(_dh0 / _dt0 * 100) : null;
@@ -6273,7 +6277,8 @@ AntSolver.App = (function() {
       learned: _ps.learnedPassPct, look: _ps.lookaheadPassPct,
       wMed: _wMed0, wLow: _wLow0, t: (_q.T != null ? _q.T : null), r: (_q.R != null ? _q.R : null), hidden: _hidden0,
       white: _white0, freePct: (_fc ? _fc.freePct : null), freeRunMax: (_fc ? _fc.freeRunMax : null), freeLowPct: (_fc ? _fc.freeLowPct : null), selectMed: (_fc ? _fc.selectMedian : null), fullMed2: (_fc ? _fc.fullMedian2 : null), forcedPct: (_fc ? _fc.forcedPct : null), partialStepPct: (_fc ? _fc.partialStepPct : null),
-      earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null)
+      earlyFree10: (_fc ? _fc.earlyFree10 : null), earlyPeak10: (_fc ? _fc.earlyPeak10 : null),
+      blackPct: _boardStat0.blackPct
     });
     // 【v521】搜索结构门保持旧口径；只有目标模式最终验收可补低压力证据。
     var _finalStruct = AntSolver.Quality.finalStructureFromGeneration ? AntSolver.Quality.finalStructureFromGeneration(result) : null;
@@ -6408,10 +6413,7 @@ AntSolver.App = (function() {
       //   同时记管道藏盒数与占比：管道里的球计入全局进度但玩家看不见，是进度感偏移的来源（同轮卡点窗口改动的依据）。
       //   目标值优先取本关实际采样到的 usableSpaceTarget（v115 起可按区间随机，每候选不同），
       //   拿不到才退回 config 里的单值 —— 用错目标会算出错误的偏差。
-      boardStat: boardStructStat(result.level, parsed,
-        (result.sampledConfig && result.sampledConfig.usableSpaceTarget != null)
-          ? result.sampledConfig.usableSpaceTarget
-          : (result.config ? result.config.usableSpaceTarget : null)),
+      boardStat: _boardStat0,
       // 【v145】棋盘自适应：本关用的行列是反推来的、还是手填范围兜底来的，随记录带走（只进生产侧记录）
       _autoBoardRange: (result.config && result.config._autoBoardRange) || null,
       _autoPipeClamp: (result.config && result.config._autoPipeClamp) || null,   // 【v149】管道下限被降级的记录
