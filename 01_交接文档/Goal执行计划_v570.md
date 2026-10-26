@@ -236,7 +236,7 @@ P2 已完成结果：
 - 截断曲线上的 50% 不能作为通过证据；
 - 按预登记否决，不追加第二对交换。
 
-### P2b. 006 供给计划策略单因素 · ⏭ 当前唯一下一步
+### P2b. 006 供给计划策略单因素 · ❌ 已否决
 
 唯一变量：
 
@@ -263,6 +263,33 @@ instantPlanPolicy: shortDebt → targetBuffer
 - 与 shortDebt baseline 做同预算单因素对照。
 
 若 targetBuffer 仍失败，不连续尝试更多 policy；先记录失败分类，再决定是否需要重新设计供给时间线。
+
+P2b 已完成结果：
+
+- `shortDebt` 两次 hash 均为 `f91d8cf7...`，中段 39.1%，PlayerSim 2/2 通关；
+- `targetBuffer4` 两次 hash 均为 `630928f9...`，中段 17.4%，PlayerSim 0/2 通关；
+- targetBuffer 开局 4 步内形成高压，普通玩家进度仅 2% 即停止；
+- 压力主体被推到 72% 之后，中段反而更空；
+- 该策略方向否决，不再继续扫 supply/mixedDebt。
+
+### P2c. 006 targetBuffer 4→3 单参数 · ⏭ 当前唯一下一步
+
+唯一变量：
+
+```text
+instantPlanPolicy = targetBuffer
+instantPlanTargetBuffer: 4 → 3
+```
+
+其余参数保持 P2b 固定值。只新增 targetBuffer3 两次重复，与已稳定复现的 targetBuffer4 对照。
+
+重点验证：
+
+- 20% 前不再出现导致 PlayerSim 早死的 buffer4；
+- 中段 3/4 `>=50%`；
+- 路线、结构、容量、逐色守恒、显著释放和 PlayerSim 全部通过。
+
+若 targetBuffer3 仍失败，停止该族参数，不继续逐一试 2、5。
 
 ### P3. 006 开发集复核与生产化
 
@@ -361,12 +388,13 @@ instantPlanPolicy: shortDebt → targetBuffer
 
 ## 8. 当前唯一下一步
 
-执行 **P2b：006/1001 供给计划策略对照**。
+执行 **P2c：006/1001 targetBuffer 4→3**。
 
 唯一变量：
 
 ```text
-instantPlanPolicy: shortDebt vs targetBuffer
+instantPlanPolicy = targetBuffer
+instantPlanTargetBuffer: 4 vs 3
 ```
 
-固定源图、seed1001、容量带、棋盘、配方和目标阈值，只比较两个 policy 的真实生成结果。目标仍是中段 3/4 `>=50%`、原计划路线完整、结构/容量/逐色守恒与显著释放不退化。单 seed 命中后仍不进入生产。
+固定源图、seed1001、容量带、棋盘、配方、`instantPlanMaxDebt=40`、分支参数和目标阈值。targetBuffer4 已两次稳定复现，本轮只跑 targetBuffer3 两次。目标仍是中段 3/4 `>=50%`、原计划路线完整、结构/容量/逐色守恒、显著释放和 PlayerSim 全部通过。单 seed 命中后仍不进入生产。
