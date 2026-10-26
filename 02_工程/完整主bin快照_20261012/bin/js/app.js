@@ -6206,10 +6206,10 @@ AntSolver.App = (function() {
     // 【v514】最终best可能来自较早轮次，尚未附完整体验评价；只在此处补一次，报告/分类共用同一证据。
     if (result.goalMode && result.valid && result.config && result.config.experienceGoal === true && !result._experienceFull && AntSolver.ExperienceGoal) {
       try {
-        result._experienceFull = AntSolver.ExperienceGoal.evaluate(result.level, {
+        result._experienceFull = AntSolver.ExperienceGoal.evaluate(result.level, Object.assign({}, result.config, {
           solveResult: result.solveResult, decision: true,
           bottomOnly: !!result.config.bottomOnly, instantChain: !!result.config.instantChain
-        });
+        }));
         result._experienceFull.diagnosis = AntSolver.ExperienceGoal.diagnose(result._experienceFull, AntSolver.Generator.goalStructPass(result));
       } catch (e) { result.experienceFinalError = String((e && e.message) || e); }
     }

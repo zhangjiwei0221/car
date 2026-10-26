@@ -6,10 +6,55 @@ AntSolver.ExperienceGoal = (function () {
     midLo: 0.20, midHi: 0.85, minBuffer34Pct: 50,
     minSignificantReleases: 1, releaseWindow: 4, minReleaseAmplitude: 1,
     maxDecisionStates: 2, maxAlternativesPerState: 3,
-    altTimeMs: 350, altMaxNodes: 1200
+    altTimeMs: 350, altMaxNodes: 1200, stateSampleMode: 'sequential'
   };
   function cfg(opts) { return Object.assign({}, DEFAULTS, opts || {}); }
   function parsed(level) { return level && level.rows && level.totalPixels != null && level.board ? level : AntSolver.parseLevel(level); }
+  /** v556：目标体验可选中段分层采样；默认仍按路线顺序，不影响其他调用方。 */
+  function sampledDecisionStates(lv, route, o) {
+    if (o.stateSampleMode !== 'midStratified') return null;
+    var actions = SA.normalizeActions(route);
+    var s = Sim.createState(lv, { useSlotStart: true, bottomOnly: !!o.bottomOnly, instantChain: !!o.instantChain });
+    var states = [];
+    for (var i = 0; i < actions.length; i++) {
+      if (s.gameWon || s.gameOver) break;
+      var a = actions[i];
+      if (!Sim.isPickable(s, a.r, a.c)) break;
+      var progress = s.totalPixels ? s.eliminatedPixels / s.totalPixels : 0;
+      if (s.buffer.length >= 3 && progress >= o.midLo && progress <= o.midHi) {
+        states.push({ actionIndex: i, step: i + 1, progress: progress, buffer: s.buffer.length });
+      }
+      Sim.applyPick(s, a.r, a.c);
+      if (s.eliminatedPixels >= s.totalPixels) { s.gameWon = true; s.gameOver = true; }
+    }
+    var limit = Math.max(1, parseInt(o.maxDecisionStates, 10) || 8);
+    var bins = [[], [], [], []], span = Math.max(1e-9, o.midHi - o.midLo);
+    for (var si = 0; si < states.length; si++) {
+      var bin = Math.floor((states[si].progress - o.midLo) / span * 4);
+      bin = Math.max(0, Math.min(3, bin));
+      bins[bin].push(states[si]);
+    }
+    function rank(x, y) {
+      if (x.buffer !== y.buffer) return y.buffer - x.buffer;
+      if (x.progress !== y.progress) return y.progress - x.progress;
+      return x.actionIndex - y.actionIndex;
+    }
+    var picked = [], seen = {};
+    for (var bi = 0; bi < bins.length; bi++) {
+      bins[bi].sort(rank);
+      for (var bj = 0; bj < bins[bi].length && bj < 2 && picked.length < limit; bj++) {
+        picked.push(bins[bi][bj]); seen[bins[bi][bj].actionIndex] = true;
+      }
+    }
+    var rest = states.filter(function (x) { return !seen[x.actionIndex]; }).sort(rank);
+    for (var ri = 0; ri < rest.length && picked.length < limit; ri++) {
+      picked.push(rest[ri]); seen[rest[ri].actionIndex] = true;
+    }
+    picked.sort(function (x, y) { return x.actionIndex - y.actionIndex; });
+    var map = {};
+    for (var pi = 0; pi < picked.length; pi++) map[picked[pi].actionIndex] = true;
+    return { map: map, selected: picked };
+  }
   function curveFromTrace(trace, totalPixels, bufferLimit, options) {
     var o = cfg(options), mid34 = 0, mid5 = 0, midN = 0, max5Run = 0, run5 = 0;
     var series = (trace || []).map(function (t) {
@@ -32,8 +77,10 @@ AntSolver.ExperienceGoal = (function () {
     var o = cfg(opts), lv = parsed(level), t0 = Date.now();
     var actions = SA.normalizeActions(route), s = Sim.createState(lv, { useSlotStart: true,
       bottomOnly: !!o.bottomOnly, instantChain: !!o.instantChain });
+    var sampling = sampledDecisionStates(lv, route, o);
     var stats = { status: 'not_found_within_budget', found: false, decisionsTried: 0, alternativesTried: 0,
-      solvedNoRelease: 0, unknownAlternatives: 0, highPressureStates: 0, searchLimited: true, evidence: null };
+      solvedNoRelease: 0, unknownAlternatives: 0, highPressureStates: 0, searchLimited: true, evidence: null,
+      sampling: sampling ? { mode: o.stateSampleMode, selected: sampling.selected } : null };
     function evidenceAt(after, futureActions, beforeBuffer, m, step, progress, source) {
       var replayed = SA.replayFromState(after, futureActions || []);
       if (!replayed.completed) return { completed: false };
@@ -50,7 +97,9 @@ AntSolver.ExperienceGoal = (function () {
       var a = actions[i];
       if (!Sim.isPickable(s, a.r, a.c)) { stats.status = 'invalid_reference'; return stats; }
       var progress = s.totalPixels ? s.eliminatedPixels / s.totalPixels : 0;
-      if (s.buffer.length >= 3 && progress >= o.midLo && progress <= o.midHi && stats.decisionsTried < o.maxDecisionStates) {
+      var isEligibleState = s.buffer.length >= 3 && progress >= o.midLo && progress <= o.midHi;
+      var isSelectedState = !sampling || !!sampling.map[i];
+      if (isEligibleState && isSelectedState && stats.decisionsTried < o.maxDecisionStates) {
         stats.highPressureStates++; stats.decisionsTried++;
         var beforeBuffer = s.buffer.length, moves = Sim.listMoves(s).filter(function (m) { return !m.blocked; });
         // 先验参考动作：后续 suffix 已知可通关，不必再花一次全图搜索。
@@ -120,7 +169,8 @@ AntSolver.ExperienceGoal = (function () {
       status: pass ? 'pass' : (unknown ? 'unknown' : 'fail'), reasons: reasons,
       target: { midLo: o.midLo, midHi: o.midHi, minBuffer34Pct: o.minBuffer34Pct,
         minSignificantReleases: o.minSignificantReleases, releaseWindow: o.releaseWindow,
-        minReleaseAmplitude: o.minReleaseAmplitude },
+        minReleaseAmplitude: o.minReleaseAmplitude, maxDecisionStates: o.maxDecisionStates,
+        stateSampleMode: o.stateSampleMode },
       metrics: { midSteps: curve.midSteps, midBuffer34Pct: curve.midBuffer34Pct,
         midBuffer5Pct: curve.midBuffer5Pct, maxBuffer5Run: curve.maxBuffer5Run,
         significantReleaseCount: curve.pressure.significantReleaseCount,

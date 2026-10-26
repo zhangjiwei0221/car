@@ -6672,6 +6672,13 @@ AntSolver.Generator = (function() {
     o.instantChain = mode === 'instantChain';
     o.bottomOnly = mode === 'bottomOnly';
     o.elimOrder = o.instantChain ? 'instant' : 'ring';
+    // v556：仅“瞬时连锁 + 目标体验 + 目标模式”启用已验证的显著释放评价包。
+    // 时间模式和其他玩法保持原口径。
+    if (o.instantChain && o.experienceGoal === true && o.acceptMode === 'target') {
+      if (o.minReleaseAmplitude == null) o.minReleaseAmplitude = 2;
+      if (o.maxDecisionStates == null) o.maxDecisionStates = 8;
+      if (o.stateSampleMode == null) o.stateSampleMode = 'midStratified';
+    }
     return o;
   }
 
@@ -15209,7 +15216,10 @@ AntSolver.Generator = (function() {
       var r = AntSolver.ExperienceGoal.evaluateRoutes(cand.level, {
         solveResult: cand.solveResult, multiTimeMs: (config && config.experienceRouteMs) || 2000,
         multiNodes: (config && config.experienceRouteNodes) || 4000, maxRoutes: 4,
-        bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain)
+        bottomOnly: !!(config && config.bottomOnly), instantChain: !!(config && config.instantChain),
+        minReleaseAmplitude: config && config.minReleaseAmplitude,
+        maxDecisionStates: config && config.maxDecisionStates,
+        stateSampleMode: config && config.stateSampleMode
       });
       var best = r.bestVerified;
       cand.experienceRouteEvidence = { schema: 'goal-route-evidence-v1', pass: r.pass,
