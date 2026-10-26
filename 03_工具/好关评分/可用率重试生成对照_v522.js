@@ -31,6 +31,8 @@ function run(arm, id) {
   const rec = { arm, image: id, seed, wallMs, overrunMs: Math.max(0, wallMs - budgetMs), rounds: r && r.goalRounds || 0, stop: r && r.goalStopReason || null,
     valid: !!(r && r.valid), struct: !!(r && r.level && G.goalStructPass(r)), pass: !!(r && r.level && G.goalResultExperiencePass(r, cfg)),
     distance: ev && ev.metrics && ev.metrics.distance, midBuffer34Pct: ev && ev.metrics && ev.metrics.midBuffer34Pct, release: ev && ev.releaseDecision && ev.releaseDecision.status,
+    usableSpaceRepair: r && r.usableSpaceRepair ? { applied: !!r.usableSpaceRepair.applied, tested: r.usableSpaceRepair.tested,
+      from: r.usableSpaceRepair.from, to: r.usableSpaceRepair.to, elapsedMs: r.usableSpaceRepair.elapsedMs, skipped: r.usableSpaceRepair.skipped || null } : null,
     gateReasons: q && q.gateReasons, fullMedian2: fc.fullMedian2, lowPressureFullMedian: fc.lowPressureFullMedian, lowPressureSteps: fc.lowPressureSteps,
     capacity: r && r.level ? A.Quality.capacityEvidence(r.level, r.config || cfg) : null, hash: r && r.level ? hash(r.level) : null, error: r && r.error || null };
   console.log(JSON.stringify(rec)); return rec;
