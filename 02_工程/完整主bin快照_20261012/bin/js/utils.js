@@ -442,6 +442,13 @@ AntSolver.outsideReachSeed = function(blocks, rows, cols, bottomOnly) {
  *   true       ：仅底边开口(上/左/右封闭)，对齐【仅底部入口】玩法。消除仍是底→上、
  *                仍按同一"可达最多色逐轮剥离"依赖启发，差别只是开局可达区少了上/左/右三个方向。
  *                供生成器底部模式的依赖顺序分支(baseFillBoxesBottom)取像素流用。
+ * @param {object} [options] 【v524】消除口径扩展，默认不传 = 与改动前逐像素一致。
+ *   options.instantChain=true 时改走瞬时连锁（四方向 + 离暂存起点曼哈顿距离近优先 + 快照整批），
+ *   与实机一致：一辆车占【从左侧数第一个空槽】。生成侧暂用 slotModel:'fixed0'（固定 0 号槽，
+ *   等价于"绝大多数车进场时缓冲为空"的实测形态）；占位模型留待压力起来后再切。
+ *   options.slot       车进入的槽位（默认 0）
+ *   options.bufferLimit 槽数（默认 5，只用于起点列映射）
+ *   options.slotModel  目前只支持 'fixed0'；后续 'real'（最左空槽）需配合回放占用模型
  *
  * 返回：
  *   seq[r][c]     每个彩色像素的【全局消除序号】(1..N)；背景(<=0)为 0。
@@ -454,9 +461,19 @@ AntSolver.outsideReachSeed = function(blocks, rows, cols, bottomOnly) {
  *      调用方需要"全图可达"保证时应先跑 Generator.checkBottomEntryFeasibility。
  * 用途：识别目标图的强依赖消除顺序，指导后续棋盘铺盒。
  */
-AntSolver.eliminationOrder = function (blocks, rows, cols, bottomOnly) {
+AntSolver.eliminationOrder = function (blocks, rows, cols, bottomOnly, options) {
   var Sim = AntSolver.Simulator;
   bottomOnly = !!bottomOnly;
+  options = options || {};
+  var instantChain = !!(options.instantChain && Sim.instantChainEliminate);
+  var _buffer = Math.max(1, parseInt(options.bufferLimit, 10) || 5);
+  var _slot = Math.max(0, Math.min(_buffer - 1, (options.slot == null ? 0 : parseInt(options.slot, 10) || 0)));
+  var _start = instantChain ? { r: rows - 1, c: Math.min(cols - 1, Math.floor(_slot / _buffer * cols)) } : null;
+  // 消除口径唯一分发点：instantChain → 瞬时连锁；否则 → 原圈序（默认路径逐字节不变）
+  function elimFn(mat, color, maxCount, trace) {
+    if (instantChain) return Sim.instantChainEliminate(mat, blocks, rows, cols, color, maxCount, trace, _start, null);
+    return Sim.floodFillEliminate(mat, blocks, rows, cols, color, maxCount, trace, null, bottomOnly);
+  }
   // 四边开口(默认版口径) / bottomOnly 时仅底边开口
   var eliminated = AntSolver.outsideReachSeed(blocks, rows, cols, bottomOnly);
   var seq = AntSolver.create2D(rows, cols, 0);        // 全局消除序(参考)
@@ -483,13 +500,13 @@ AntSolver.eliminationOrder = function (blocks, rows, cols, bottomOnly) {
     for (var i = 0; i < colors.length; i++) {
       var scratch = [];
       for (var sr = 0; sr < rows; sr++) scratch.push(eliminated[sr].slice());
-      var n = Sim.floodFillEliminate(scratch, blocks, rows, cols, parseInt(colors[i], 10), Infinity, null, null, bottomOnly);
+      var n = elimFn(scratch, parseInt(colors[i], 10), Infinity, null);
       if (n > bestReach) { bestReach = n; bestColor = parseInt(colors[i], 10); }
     }
     if (bestColor === null || bestReach <= 0) break;
     // 一次性消除该色【当前全部可达像素】(=该色本段/本区域)，trace 记录消除次序(最底最左)
     var trace = [];
-    Sim.floodFillEliminate(eliminated, blocks, rows, cols, bestColor, Infinity, trace, null, bottomOnly);
+    elimFn(eliminated, bestColor, Infinity, trace);
     rnd++;
     var seg = (colorSegCount[bestColor] = (colorSegCount[bestColor] || 0) + 1); // 该色第几段(区域)
     for (var t = 0; t < trace.length; t++) {
