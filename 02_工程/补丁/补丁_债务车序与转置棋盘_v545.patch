@@ -1,0 +1,7389 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+index 8462437..0e97ee6 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\346\216\245\347\256\241\346\200\273\347\272\262.md"
+@@ -30,6 +30,7 @@
+ > v542：7×9上`blackPercent` 10→0没有改变实际黑块（17/63=27%，hash不变），黑块主要是棋盘补位；黑块不是独立旋钮可解的问题，下一步回到P0容量/棋盘可行性。
+ > v543：007四臂矩阵A7×8[31,31]、B7×7[20,40]、C7×8[20,40]、D7×9[20,40]；[20,40]三臂实际仍只有36 boxes，黑块26.5%~42.9%，targetCarCount 41/46/52未落地。A臂黑块17.9%但结构0/3；没有臂同时达到黑块≤20%和完整目标通过，下一步先修目标车数落位。
+ > v544：修复瞬时`InstantPlayout`目标车数分配；B/C/D三臂9/9达到41/46/52 boxes，容量全在[20,40]、belowMin/aboveMax=0，黑块≤17.9%；但highPressure=0/9、结构0/9、目标0/9。P0落位成功，下一步改压力/债务。
++> v545：7×9与9×7转置矩阵中，targetBuffer 6/6达到52 boxes、黑块17.5%、容量合同通过；mixedDebt/shortDebt 12/12无效。两方向中段3/4仍约17%、结构/目标0/6，下一步拆解债务策略失效原因。
+ > v523（88001）三图旧新均1/3通过、6/6同hash且未触发重试；推荐图旧新均aboveMax=1，下一步按详细流程先P0容量越界归因，再P1 release unknown，不能跳去堆障碍。
+ 
+ ---
+@@ -63,6 +64,7 @@
+ - v542完成黑块补位探针：`blackPercent`10→0后007两seed仍为17块黑、27%，hash不变；planned仅5/6，surplus补位11/12。黑块由棋盘占格与容量可行性决定，下一步转P0容量/棋盘合同。
+ - v543完成棋盘×容量矩阵：[20,40]三臂实际仍36 boxes，黑块26.5%~42.9%，targetCarCount41/46/52未落地；只有A 7×8保持17.9%黑块但结构0/3。下一步先修目标车数落位，再讨论6×6/6×7/7×6。
+ - v544修复瞬时模式目标车数落位：B/C/D 9/9达到41/46/52 boxes，容量全在[20,40]、belowMin/aboveMax=0，黑块均≤17.9%；但pressure0/9、结构0/9、目标0/9。下一步转P2债务/车序。
++- v545测试7×9/9×7转置形态：targetBuffer两种方向均6/6达到52 boxes、17.5%黑块、容量合同通过；mixedDebt/shortDebt全部无效。中段3/4仍约17%、结构/目标0/6；下一步只拆解债务策略失效。
+ - 以下「下一步」仍是多图主产线基准，但产线现在与代码一致，口径不再分叉。
+ - 下一步不是继续堆模块，而是：**默认主产线多图基准 → 只读归因 → 针对最高频失败项做单变量实验。**
+ 
+@@ -690,9 +692,9 @@ for obstacle in candidates:
+ 
+ ## 6. 当前下一步：严格按此顺序
+ 
+-> **2026-10-26 v544 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。目标车数和容量合同已在实验中落地，黑块也能压低；当前阻塞转到P2/P3——小容量多车后没有形成可持续高压和结构合格。
++> **2026-10-26 v545 后的实际施工位置：** 唯一验收骨架仍是 `优质关卡生成_详细工作流程.md` 的 P0～P6。7×9/9×7的目标车数、黑块和容量合同已落地；当前阻塞是债务策略无法形成持续压力，且`mixedDebt/shortDebt`直接无效。
+ >
+-> 下一轮唯一主实验（v545）：只改瞬时计划的债务/车序，不改目标车数、容量带、棋盘和障碍；先用7×9/52车作为基底，比较当前计划与强化短债前缀/分支排序，目标是把solver中段3/4拉回≥50%并保留黑块≤20%、belowMin/aboveMax=0。不得用新增障碍代替车序修复。
++> 下一轮唯一主实验（v546）：只拆解`mixedDebt/shortDebt`无效原因，固定7×9/9×7、52车、[20,40]和targetBuffer控制臂；先确认是规划死锁、目标车数分配还是结构筛选失败，再做一次局部债务顺序修复。不得同时改容量、棋盘或障碍。
+ 
+ ### 下一步 A：多图主产线基准（先做）
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+index e49ac74..b739b6e 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\344\274\230\350\264\250\345\205\263\345\215\241\347\224\237\346\210\220_\350\257\246\347\273\206\345\267\245\344\275\234\346\265\201\347\250\213.md"
+@@ -2,7 +2,7 @@
+ 
+ > **唯一验收骨架：本文件的 P0～P6。** `优质关卡生成_接管总纲.md` 中保留的历史实现卡和旧编号只能作为实现细节参考，不是第二套验收阶段。
+ 
+-> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v544 targetCarCount落位成功，但压力/结构仍0/9**。
++> 2026-10-26 / Kimi 整理。生产基线：**v522 / `b0f3b15`**；最新实验：**v545 7×9/9×7目标车数与黑块成立，但债务压力仍0/6**。
+ > 本文是唯一“已做什么 → 剩什么 → 如何实验 → 何时算完成”的执行流程；算法细节回查 `优质关卡生成_接管总纲.md`，历史数字回查工作日志对应节号。
+ > 瞬时模式的具体施工顺序见 [`瞬时模式生成器实施计划_v525.md`](瞬时模式生成器实施计划_v525.md)，它是本文 P0~P3 的技术分支，不替代本文验收框架。
+ 
+@@ -20,7 +20,7 @@
+ 4. 玩家能通过思考释放暂存压力，最后通关；
+ 5. 生成不能靠无限局部搜索耗数小时。
+ 
+-> **棋盘尺寸新要求（用户确认，2026-10-26）**：行列均不得小于6；6×6、6×7、7×6是最低允许形态；优先考虑行列都≥7；行列最大为9。尺寸可行性与容量带/车位占用联合判定，不能为了尺寸或黑块自动放宽容量。
++> **棋盘尺寸新要求（用户确认，2026-10-26）**：行列均不得小于6；6×6、6×7、7×6是最低允许形态；优先考虑行列都≥7；行列最大为9。**行列交换是独立形态**：7×8/8×7、7×9/9×7都要纳入矩阵，不能只测横版。尺寸可行性与容量带/车位占用联合判定，不能为了尺寸或黑块自动放宽容量。
+ 
+ ### 1.2 不把什么当成功
+ 
+@@ -65,6 +65,7 @@
+ | 黑块补位探针 | v542 blackPercent10→0后黑块仍17/63=27%、hash不变；planned 5/6、surplus 11/12 | 黑块不是独立旋钮；回到P0容量/棋盘可行性 |
+ | 棋盘×容量矩阵 | v543 [20,40]三臂实际36 boxes、targetCarCount未落地；A 7×8黑块17.9%但结构0/3 | 目标车数落位链优先 |
+ | 目标车数落位 | v544 B/C/D 9/9达到41/46/52 boxes、容量[20,40]合同通过、黑块≤17.9%；但高压0/9、结构0/9 | P0/占格已解决，转P2债务/车序 |
++| 债务车序×转置 | v545 7×9/9×7的targetBuffer 6/6达52 boxes/17.5%黑/容量合同；mixedDebt/shortDebt无效；高压0/6 | 只拆解债务策略失效 |
+ 
+ ### 2.1 关键正结果
+ 
+@@ -82,6 +83,7 @@
+ - v542黑块补位探针：`blackPercent`10→0后两seed黑块仍为27%、hash不变，planned 5/6、surplus 11/12；必须回到P0容量/棋盘可行性，不能继续调黑块百分比。
+ - v543棋盘×容量矩阵：[20,40]三臂实际36 boxes、targetCarCount 41/46/52未落地；A 7×8黑块17.9%但结构0/3。
+ - v544目标车数落位：B/C/D 9/9达到41/46/52 boxes，容量全在[20,40]、belowMin/aboveMax=0，黑块≤17.9%；但highPressure0/9、结构0/9、目标0/9。
++- v545债务车序×转置：7×9/9×7的targetBuffer各3/3达52 boxes、17.5%黑、容量合同；mixedDebt/shortDebt 12/12无效；高压0/6、结构0/6、目标0/6。
+ 
+ ### 2.2 已验证、不能再走的弯路
+ 
+@@ -114,7 +116,7 @@
+ | 剩余项 | 当前卡点 | 下一步主实验 |
+ |---|---|---|
+ | 容量合同漏网 | 推荐图aboveMax=1 | 容量越界谱系追踪，先硬合同后体验 |
+-| 路线释放证据 | v544已完成P0目标车数/黑块落位；高压和结构未成立 | v545只改瞬时计划债务/车序；006另立后续 |
++| 路线释放证据 | v545已完成P0目标车数/黑块落位和转置验证；债务策略高压未成立 | v546拆解mixed/short无效原因；006另立后续 |
+ | 远/近压力不足 | 010/推荐仍有低压基底 | 近失局部修、远失换基底；不做统一容量加减 |
+ | 每色容量组合规划 | 目前主要同色转移，缺全局联合目标 | 每色候选集→全局Pareto组合→重解评价 |
+ | 车序与首行观感 | 双时间线有测量，稳定生成策略不足 | 局部交换、首行同色run、释放顺序联合评价 |
+@@ -341,8 +343,8 @@
+ ## 6. 推荐执行顺序（不要跳步）
+ 
+ ```text
+-v544目标车数落位已完成
+-→ v545：007债务/车序修复
++v545债务车序×转置已完成
++→ v546：拆解mixed/short policy无效原因
+ → P0容量越界谱系追踪（硬合同）
+ → 多图失败分布基线
+ → P1 release unknown评价覆盖
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index 88cefe6..10648c4 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -20868,3 +20868,33 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. v545只改瞬时计划债务/车序，固定7×9/52车、[20,40]、棋盘和障碍。
+ 2. 目标：solver中段3/4≥50%，同时保持黑块≤20%、belowMin/aboveMax=0、结构门和完整回放。
+ 3. 6×6/6×7/7×6仍待尺寸可行性测试；不自动改默认容量。
++
++### 535. 【2026-10-26】v545：转置棋盘落位成立，mixed/short债务策略无效
++
++#### 535.1 问题（原话）
++
++- “另外你一直说7×8，7×9，也要有8×7，9×7的情况，也就是行列交换。”
++- 需要在目标车数/容量/黑块落位成立后，只测试债务车序能否形成压力，并覆盖转置棋盘。
++
++#### 535.2 证据
++
++- 7×9与9×7两种形态，targetBuffer各3 seed：6/6实际52 boxes、黑块17.5%、容量belowMin/aboveMax=0、无micro。
++- 两种方向的targetBuffer中段3/4均约17%，结构/目标0/6；方向交换没有解决压力问题。
++- mixedDebt与shortDebt在7×9/9×7共12/12无有效关卡；不能把无效当成低压或无压力证据。
++
++#### 535.3 改动
++
++- 新增`债务车序与转置棋盘_v545.js`、JSON和预登记；只修改`instantPlanPolicy`，不改目标车数、容量、棋盘占格或障碍。
++- 明确将`7×8/8×7`、`7×9/9×7`作为独立形态纳入后续矩阵。
++
++#### 535.4 验证（前后数字）
++
++- 7×9 targetBuffer：boxes 52、黑块17.5%、容量[20,39]、中段3/4约17.2%～18.5%。
++- 9×7 targetBuffer：boxes 52、黑块17.5%、容量[20,39]、中段3/4约17.2%。
++- mixed/short：12/12无效；没有产生任何可评价的关卡。
++
++#### 535.5 遗留
++
++1. v546只拆解mixed/short策略为什么直接无效，固定targetBuffer控制臂和两种棋盘方向。
++2. 不继续改容量、目标车数或增加障碍；先区分规划死锁、目标车数分配、结构筛选三个失败阶段。
++3. 6×6/6×7/7×6仍待尺寸可行性测试，但必须先解决债务策略。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index e5ee592..9fcd413 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,9 +3,9 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-26（v544 目标车数落位）　|　当前版本：**v544**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-26（v545 债务车序与转置棋盘）　|　当前版本：**v545**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+-> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~534。v544修复瞬时`InstantPlayout`的目标车数分配：B/C/D三臂9/9达到41/46/52 boxes，容量全在[20,40]、belowMin/aboveMax=0，黑块均≤17.9%；但highPressure=0/9、结构0/9、目标0/9。目标车数落位成功，压力/车序仍未成立。**
++> **最新实验见 [`目标体验与容量精调_实施计划.md`](目标体验与容量精调_实施计划.md) 和工作日志 §491~535。v545在7×9与9×7两种转置形态上验证：targetBuffer均6/6达到52 boxes、黑块17.5%、容量合同通过；mixedDebt/shortDebt全部无效。两方向的中段3/4仍约17%，结构/目标0/6；下一步拆解债务策略为何失效。**
+ >
+ > **编号约定：验收阶段只有 P0～P6，以 [`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md) 为准。代码和历史文档中的 P7、P8、P9、P10 是实现名、旧编号或历史索引，不是额外验收阶段。**
+ >
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+index 7e87fa1..ff28616 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\233\256\346\240\207\344\275\223\351\252\214\344\270\216\345\256\271\351\207\217\347\262\276\350\260\203_\345\256\236\346\226\275\350\256\241\345\210\222.md"
+@@ -314,3 +314,10 @@
+ - B/C/D三臂共9次：实际boxes均精确达到41/46/52；每车容量均在[20,40]，belowMin/aboveMax=0，无micro；黑块分别约16.3%/17.9%/17.5%。
+ - 但highPressure=0/9、结构0/9、目标通过0/9；B/C多数为0%中段3/4，D约17%~18%，免费连反而变长。默认targetCarCount为空时7×8 hash保持`261c...`不变。
+ - 结论：P0目标车数/黑块落位已解决；小容量多车没有自动形成债务压力，下一步只改瞬时计划债务/车序。
++
++## 39. v545：转置棋盘与债务车序
++
++- 用户要求覆盖行列交换：7×9与9×7均作为独立形态测试，固定52车、`[20,40]`、prefix debts=8、无障碍。
++- targetBuffer：两种方向各3 seed，6/6实际达到52 boxes、黑块17.5%、容量belowMin/aboveMax=0；但中段3/4约17%，结构/目标0/6。
++- mixedDebt/shortDebt：两种方向共12次全部无有效关卡；当前不能判断其压力效果，先记录为策略无效。
++- 结论：转置棋盘和P0落位成立；目标Buffer只产生低压路线，下一步拆解mixed/short策略无效原因或改一个债务顺序因素。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+index e6c8018..0ef9d16 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\347\236\254\346\227\266\346\250\241\345\274\217\347\224\237\346\210\220\345\231\250\345\256\236\346\226\275\350\256\241\345\210\222_v525.md"
+@@ -113,6 +113,8 @@
+ - **v543边界**：下一轮只修[20,40]下targetCarCount到实际boxes的落位链，固定棋盘/seed/障碍；修好后再评估6×6/6×7/7×6和7×7以上。
+ - **v544结果**：`InstantPlayout`不再在targetCarCount存在时绕过目标车数。B/C/D三臂9/9实际达到41/46/52 boxes，每车容量全在[20,40]、belowMin/aboveMax=0，黑块分别≤17.9%；默认targetCarCount为空时7×8 hash保持不变。highPressure=0/9、结构0/9、目标0/9。
+ - **v544边界**：目标车数/黑块/P0落位已解决，但小容量多车导致压力消失。下一步只改债务/车序，不改容量、棋盘或障碍。
++- **v545结果**：7×9/9×7各3 seed，targetBuffer两种方向均6/6达到52 boxes、黑块17.5%、容量belowMin/aboveMax=0；中段3/4约17%，结构/目标0/6。mixedDebt/shortDebt 12/12无有效关卡。
++- **v545边界**：转置棋盘和P0落位成立；债务策略选择仍无效，下一步只拆解mixed/short policy失败原因，不继续加障碍或容量。
+ 
+ ### 第7步：目标化障碍
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_v545.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_v545.js"
+new file mode 100644
+index 0000000..1882ff7
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_v545.js"
+@@ -0,0 +1,139 @@
++#!/usr/bin/env node
++/** v545：固定[20,40]/52车，测试债务车序策略和7×9/9×7转置棋盘。 */
++'use strict';
++const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
++const ROOT = path.join(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
++  'capacity-tuner.js', 'instant-playout.js', 'generator.js', 'source-preflight.js'];
++const IMAGE = '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt';
++const SHAPES = [{ id: '7x9', rows: 7, cols: 9 }, { id: '9x7', rows: 9, cols: 7 }];
++const POLICIES = [
++  { id: 'targetBuffer', value: 'targetBuffer' },
++  { id: 'mixedDebt', value: 'mixedDebt' },
++  { id: 'shortDebt', value: 'shortDebt' }
++];
++const SEEDS = [1001, 1002, 32677];
++const OUT = path.resolve(ROOT, '03_工具/好关评分/债务车序与转置棋盘_v545.json');
++function load() {
++  const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++function hash(x) { return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'); }
++function cfgFor(G, seed, shape, policy) {
++  return {
++    seed, ruleMode: 'instantChain', generatorFlow: 'new_fixed',
++    boxSizeMin: 20, boxSizeMax: 40, capNormMin: 20, capNormMax: 40,
++    boardRowsMin: shape.rows, boardRowsMax: shape.rows,
++    boardColsMin: shape.cols, boardColsMax: shape.cols,
++    boardHardRange: true, boardAuto: false, boardAllowSquare: true, boardFitGuard: 'warn',
++    p7BaseCount: 0, p7Repair: false, trapPost: false, pool: 1,
++    instantPlanPolicy: policy.value, instantPlanTargetBuffer: 4,
++    instantPlanMaxDebt: 40, instantPlanDebtEvery: 2,
++    instantPlanBranchCount: 2, instantPlanBranchDebtRoots: true,
++    instantPlanBranchPrefixDebts: 8, targetCarCount: 52, blackPercent: 10,
++    experienceGoal: true, instantReleaseRoute: false,
++    goalPerRoundMs: 20000, goalMaxMs: 30000, goalMaxRounds: 2,
++    goalSharedBudget: true, candidateCount: 1, acceptMode: 'target',
++    targetBand3Min: 0, targetBand4Min: 0, targetPlayerPassMin: 0
++  };
++}
++function blackPct(level) {
++  let n = 0, black = 0;
++  for (const row of level.board.cells) for (const x of row) {
++    n++;
++    if (x && x.t === 'black') black++;
++  }
++  return n ? +(black / n * 100).toFixed(1) : null;
++}
++function countBoxes(level) {
++  let n = 0;
++  for (const row of level.board.cells) for (const x of row) if (x && x.t === 'box') n++;
++  return n;
++}
++function run(A, seed, shape, policy) {
++  const G = A.Generator, EG = A.ExperienceGoal;
++  const blocks = G.blocksFromTXT(fs.readFileSync(path.join(ROOT, IMAGE), 'utf8'));
++  const cfg = cfgFor(G, seed, shape, policy);
++  const t0 = Date.now();
++  let r = null;
++  try { r = G.produceGoal(blocks, cfg); }
++  catch (e) { r = { level: null, valid: false, error: String((e && e.message) || e) }; }
++  const level = r && r.level || null;
++  const q = level ? A.Quality.fromGeneration(r) : null;
++  const ca = level ? A.Quality.capacityEvidence(level, r.config || cfg) : null;
++  const ev = r && r._experienceFull || (level ? EG.evaluate(level, {
++    solveResult: r.solveResult, decision: false, instantChain: true
++  }) : null);
++  const fc = r && r.goodV3 && r.goodV3.fillCurve || {};
++  const rec = {
++    shape: shape.id, seed, policy: policy.id,
++    actualBoard: level ? { rows: level.board.rows, cols: level.board.cols } : null,
++    targetCars: 52, actualBoxes: level ? countBoxes(level) : null,
++    exactTarget: !!(level && countBoxes(level) === 52),
++    blackPct: level ? blackPct(level) : null,
++    wallMs: Date.now() - t0, valid: !!(r && r.valid),
++    rounds: r && r.goalRounds || 0, stop: r && r.goalStopReason || null,
++    freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
++    freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
++    midBuffer34Pct: ev && ev.metrics && ev.metrics.midBuffer34Pct,
++    maxBuffer: ev && ev.metrics && ev.metrics.maxBuffer,
++    significantReleaseCount: ev && ev.metrics && ev.metrics.significantReleaseCount,
++    solverRelease: ev && ev.releaseDecision && ev.releaseDecision.status,
++    struct: !!(level && G.goalStructPass(r)),
++    pass: !!(level && G.goalResultExperiencePass(r, cfg)),
++    qGateReasons: q && q.gateReasons || [],
++    qReasons: q && q.reasons || [],
++    capacity: ca && {
++      conserved: ca.conserved, aboveMax: ca.aboveMax, belowMin: ca.belowMin,
++      microCars: ca.microCars, minCap: ca.minCap, maxCap: ca.maxCap,
++      boardFloorPass: ca.boardFloorPass
++    },
++    instantPlan: r && r.config && r.config._instantPlayoutStat || null,
++    hash: level ? hash(level) : null,
++    error: r && r.error || null
++  };
++  console.log(JSON.stringify(rec));
++  return rec;
++}
++const A = load();
++const rows = [];
++for (const shape of SHAPES) for (const policy of POLICIES) for (const seed of SEEDS) rows.push(run(A, seed, shape, policy));
++const byCell = {};
++for (const shape of SHAPES) for (const policy of POLICIES) {
++  const a = rows.filter(x => x.shape === shape.id && x.policy === policy.id);
++  byCell[shape.id + '/' + policy.id] = {
++    runs: a.length, exactTarget: a.filter(x => x.exactTarget).length,
++    exactCapacity: a.filter(x => x.capacity && x.capacity.conserved && x.capacity.aboveMax === 0 && x.capacity.belowMin === 0).length,
++    black20: a.filter(x => x.blackPct != null && x.blackPct <= 20).length,
++    mid50: a.filter(x => x.midBuffer34Pct != null && x.midBuffer34Pct >= 50).length,
++    struct: a.filter(x => x.struct).length, pass: a.filter(x => x.pass).length,
++    mid: a.map(x => x.midBuffer34Pct), freeRun: a.map(x => x.freeRunMax),
++    black: a.map(x => x.blackPct)
++  };
++}
++const candidates = rows.filter(x => x.exactTarget && x.capacity && x.capacity.conserved &&
++  x.capacity.aboveMax === 0 && x.capacity.belowMin === 0 && x.blackPct <= 20 && x.midBuffer34Pct >= 50);
++const summary = {
++  image: '007', shapes: SHAPES.map(x => x.id), policies: POLICIES.map(x => x.id), seeds: SEEDS,
++  rows: rows.length, valid: rows.filter(x => x.valid).length,
++  exactTarget: rows.filter(x => x.exactTarget).length,
++  capacityOk: rows.filter(x => x.capacity && x.capacity.conserved && x.capacity.aboveMax === 0 && x.capacity.belowMin === 0).length,
++  black20: rows.filter(x => x.blackPct != null && x.blackPct <= 20).length,
++  highPressure: rows.filter(x => x.midBuffer34Pct != null && x.midBuffer34Pct >= 50).length,
++  struct: rows.filter(x => x.struct).length, targetPass: rows.filter(x => x.pass).length,
++  byCell,
++  candidateSamples: candidates.map(x => x.shape + '/' + x.policy + '/' + x.seed),
++  decision: candidates.length
++    ? '出现目标车数/黑块/容量/高压同时成立的样本，可扩大样本并比较转置稳定性。'
++    : '车数/黑块/容量已成立，但债务策略仍未形成中段3/4高压；继续拆解债务形成。'
++};
++const report = { schema: 'debt-order-transpose-v1', date: '2026-10-26',
++  preregistration: '债务车序与转置棋盘_预登记_v545.md', summary, rows };
++fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ summary }, null, 2));
++if (summary.capacityOk !== rows.length) process.exitCode = 1;
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_v545.json" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_v545.json"
+new file mode 100644
+index 0000000..9797991
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_v545.json"
+@@ -0,0 +1,6959 @@
++{
++  "schema": "debt-order-transpose-v1",
++  "date": "2026-10-26",
++  "preregistration": "债务车序与转置棋盘_预登记_v545.md",
++  "summary": {
++    "image": "007",
++    "shapes": [
++      "7x9",
++      "9x7"
++    ],
++    "policies": [
++      "targetBuffer",
++      "mixedDebt",
++      "shortDebt"
++    ],
++    "seeds": [
++      1001,
++      1002,
++      32677
++    ],
++    "rows": 18,
++    "valid": 6,
++    "exactTarget": 6,
++    "capacityOk": 6,
++    "black20": 6,
++    "highPressure": 0,
++    "struct": 0,
++    "targetPass": 0,
++    "byCell": {
++      "7x9/targetBuffer": {
++        "runs": 3,
++        "exactTarget": 3,
++        "exactCapacity": 3,
++        "black20": 3,
++        "mid50": 0,
++        "struct": 0,
++        "pass": 0,
++        "mid": [
++          17.2,
++          18.5,
++          17.2
++        ],
++        "freeRun": [
++          23,
++          27,
++          23
++        ],
++        "black": [
++          17.5,
++          17.5,
++          17.5
++        ]
++      },
++      "7x9/mixedDebt": {
++        "runs": 3,
++        "exactTarget": 0,
++        "exactCapacity": 0,
++        "black20": 0,
++        "mid50": 0,
++        "struct": 0,
++        "pass": 0,
++        "mid": [
++          null,
++          null,
++          null
++        ],
++        "freeRun": [
++          null,
++          null,
++          null
++        ],
++        "black": [
++          null,
++          null,
++          null
++        ]
++      },
++      "7x9/shortDebt": {
++        "runs": 3,
++        "exactTarget": 0,
++        "exactCapacity": 0,
++        "black20": 0,
++        "mid50": 0,
++        "struct": 0,
++        "pass": 0,
++        "mid": [
++          null,
++          null,
++          null
++        ],
++        "freeRun": [
++          null,
++          null,
++          null
++        ],
++        "black": [
++          null,
++          null,
++          null
++        ]
++      },
++      "9x7/targetBuffer": {
++        "runs": 3,
++        "exactTarget": 3,
++        "exactCapacity": 3,
++        "black20": 3,
++        "mid50": 0,
++        "struct": 0,
++        "pass": 0,
++        "mid": [
++          17.2,
++          17.2,
++          17.2
++        ],
++        "freeRun": [
++          21,
++          23,
++          22
++        ],
++        "black": [
++          17.5,
++          17.5,
++          17.5
++        ]
++      },
++      "9x7/mixedDebt": {
++        "runs": 3,
++        "exactTarget": 0,
++        "exactCapacity": 0,
++        "black20": 0,
++        "mid50": 0,
++        "struct": 0,
++        "pass": 0,
++        "mid": [
++          null,
++          null,
++          null
++        ],
++        "freeRun": [
++          null,
++          null,
++          null
++        ],
++        "black": [
++          null,
++          null,
++          null
++        ]
++      },
++      "9x7/shortDebt": {
++        "runs": 3,
++        "exactTarget": 0,
++        "exactCapacity": 0,
++        "black20": 0,
++        "mid50": 0,
++        "struct": 0,
++        "pass": 0,
++        "mid": [
++          null,
++          null,
++          null
++        ],
++        "freeRun": [
++          null,
++          null,
++          null
++        ],
++        "black": [
++          null,
++          null,
++          null
++        ]
++      }
++    },
++    "candidateSamples": [],
++    "decision": "车数/黑块/容量已成立，但债务策略仍未形成中段3/4高压；继续拆解债务形成。"
++  },
++  "rows": [
++    {
++      "shape": "7x9",
++      "seed": 1001,
++      "policy": "targetBuffer",
++      "actualBoard": {
++        "rows": 7,
++        "cols": 9
++      },
++      "targetCars": 52,
++      "actualBoxes": 52,
++      "exactTarget": true,
++      "blackPct": 17.5,
++      "wallMs": 23234,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": 23,
++      "freeLowPct": 38,
++      "midBuffer34Pct": 17.2,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "吃满中位 5>3",
++        "freeLow 38%>30%",
++        "最长免费连 23>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位5>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连23步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 20,
++        "maxCap": 39,
++        "boardFloorPass": true
++      },
++      "instantPlan": {
++        "schema": "instant-playout-v2",
++        "ok": true,
++        "reason": null,
++        "policy": "targetBuffer",
++        "cars": 52,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          20,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 0,
++          "microCount": 0,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "targetCars": 52,
++        "minTotalCars": 36,
++        "maxTotalCars": 53,
++        "targetCarsFeasible": true,
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 5,
++            "total": 30,
++            "caps": [
++              30
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 13,
++            "total": 37,
++            "caps": [
++              37
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 14,
++            "total": 33,
++            "caps": [
++              33
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 15,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 16,
++            "total": 70,
++            "caps": [
++              24,
++              23,
++              23
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 19,
++            "total": 434,
++            "caps": [
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              21,
++              21,
++              21,
++              21,
++              21,
++              21
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 53,
++            "caps": [
++              27,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 31,
++            "total": 58,
++            "caps": [
++              29,
++              29
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 32,
++            "total": 39,
++            "caps": [
++              39
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 50,
++            "caps": [
++              25,
++              25
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 34,
++            "total": 282,
++            "caps": [
++              21,
++              21,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20
++            ],
++            "exact": true,
++            "reason": null
++          }
++        ],
++        "exactCapacityColors": 13,
++        "infeasibleCapacityColors": 0,
++        "bufferEvents": 30,
++        "debtCars": 8,
++        "maxBuffer": 5,
++        "medianEntryReach": 85,
++        "medianConsumed": 22,
++        "carSequence": [
++          {
++            "id": 1,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 1,
++            "finishOrder": 1,
++            "entryReach": 200,
++            "colorRemaining": 282,
++            "consumed": 21,
++            "debt": -179
++          },
++          {
++            "id": 2,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 2,
++            "finishOrder": 2,
++            "entryReach": 179,
++            "colorRemaining": 261,
++            "consumed": 21,
++            "debt": -158
++          },
++          {
++            "id": 3,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 3,
++            "finishOrder": 3,
++            "entryReach": 185,
++            "colorRemaining": 434,
++            "consumed": 22,
++            "debt": -163
++          },
++          {
++            "id": 4,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 4,
++            "finishOrder": 4,
++            "entryReach": 163,
++            "colorRemaining": 412,
++            "consumed": 22,
++            "debt": -141
++          },
++          {
++            "id": 5,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 5,
++            "finishOrder": 5,
++            "entryReach": 158,
++            "colorRemaining": 240,
++            "consumed": 20,
++            "debt": -138
++          },
++          {
++            "id": 6,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 6,
++            "finishOrder": 6,
++            "entryReach": 141,
++            "colorRemaining": 390,
++            "consumed": 22,
++            "debt": -119
++          },
++          {
++            "id": 7,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 7,
++            "finishOrder": 7,
++            "entryReach": 138,
++            "colorRemaining": 220,
++            "consumed": 20,
++            "debt": -118
++          },
++          {
++            "id": 8,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 8,
++            "finishOrder": 8,
++            "entryReach": 119,
++            "colorRemaining": 368,
++            "consumed": 22,
++            "debt": -97
++          },
++          {
++            "id": 9,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 9,
++            "finishOrder": 9,
++            "entryReach": 118,
++            "colorRemaining": 200,
++            "consumed": 20,
++            "debt": -98
++          },
++          {
++            "id": 10,
++            "color": 32,
++            "cap": 39,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 10,
++            "finishOrder": 10,
++            "entryReach": 5,
++            "colorRemaining": 39,
++            "consumed": 39,
++            "debt": 34
++          },
++          {
++            "id": 11,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 11,
++            "finishOrder": 11,
++            "entryReach": 105,
++            "colorRemaining": 180,
++            "consumed": 20,
++            "debt": -85
++          },
++          {
++            "id": 12,
++            "color": 19,
++            "cap": 22,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 12,
++            "finishOrder": 12,
++            "entryReach": 97,
++            "colorRemaining": 346,
++            "consumed": 22,
++            "debt": -75
++          },
++          {
++            "id": 13,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 13,
++            "finishOrder": 13,
++            "entryReach": 85,
++            "colorRemaining": 160,
++            "consumed": 20,
++            "debt": -65
++          },
++          {
++            "id": 14,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 14,
++            "finishOrder": 14,
++            "entryReach": 6,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 20
++          },
++          {
++            "id": 15,
++            "color": 30,
++            "cap": 35,
++            "slot": 2,
++            "start": {
++              "r": 34,
++              "c": 14
++            },
++            "enterOrder": 15,
++            "finishOrder": 15,
++            "entryReach": 6,
++            "colorRemaining": 35,
++            "consumed": 35,
++            "debt": 29
++          },
++          {
++            "id": 16,
++            "color": 31,
++            "cap": 29,
++            "slot": 3,
++            "start": {
++              "r": 34,
++              "c": 21
++            },
++            "enterOrder": 16,
++            "finishOrder": 16,
++            "entryReach": 2,
++            "colorRemaining": 58,
++            "consumed": 29,
++            "debt": 27
++          },
++          {
++            "id": 17,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 17,
++            "finishOrder": 17,
++            "entryReach": 195,
++            "colorRemaining": 324,
++            "consumed": 22,
++            "debt": -173
++          },
++          {
++            "id": 18,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 18,
++            "finishOrder": 18,
++            "entryReach": 302,
++            "colorRemaining": 302,
++            "consumed": 22,
++            "debt": -280
++          },
++          {
++            "id": 19,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 19,
++            "finishOrder": 19,
++            "entryReach": 280,
++            "colorRemaining": 280,
++            "consumed": 22,
++            "debt": -258
++          },
++          {
++            "id": 20,
++            "color": 14,
++            "cap": 33,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 20,
++            "finishOrder": 20,
++            "entryReach": 11,
++            "colorRemaining": 33,
++            "consumed": 33,
++            "debt": 22
++          },
++          {
++            "id": 21,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 21,
++            "finishOrder": 21,
++            "entryReach": 4,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 22
++          },
++          {
++            "id": 22,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 22,
++            "finishOrder": 22,
++            "entryReach": 258,
++            "colorRemaining": 258,
++            "consumed": 22,
++            "debt": -236
++          },
++          {
++            "id": 23,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 23,
++            "finishOrder": 23,
++            "entryReach": 236,
++            "colorRemaining": 236,
++            "consumed": 22,
++            "debt": -214
++          },
++          {
++            "id": 24,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 24,
++            "finishOrder": 24,
++            "entryReach": 214,
++            "colorRemaining": 214,
++            "consumed": 22,
++            "debt": -192
++          },
++          {
++            "id": 25,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 25,
++            "finishOrder": 25,
++            "entryReach": 192,
++            "colorRemaining": 192,
++            "consumed": 22,
++            "debt": -170
++          },
++          {
++            "id": 26,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 26,
++            "finishOrder": 26,
++            "entryReach": 170,
++            "colorRemaining": 170,
++            "consumed": 22,
++            "debt": -148
++          },
++          {
++            "id": 27,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 27,
++            "finishOrder": 27,
++            "entryReach": 148,
++            "colorRemaining": 148,
++            "consumed": 22,
++            "debt": -126
++          },
++          {
++            "id": 28,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 28,
++            "finishOrder": 28,
++            "entryReach": 136,
++            "colorRemaining": 140,
++            "consumed": 20,
++            "debt": -116
++          },
++          {
++            "id": 29,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 29,
++            "finishOrder": 29,
++            "entryReach": 126,
++            "colorRemaining": 126,
++            "consumed": 21,
++            "debt": -105
++          },
++          {
++            "id": 30,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 30,
++            "finishOrder": 30,
++            "entryReach": 116,
++            "colorRemaining": 120,
++            "consumed": 20,
++            "debt": -96
++          },
++          {
++            "id": 31,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 31,
++            "finishOrder": 31,
++            "entryReach": 105,
++            "colorRemaining": 105,
++            "consumed": 21,
++            "debt": -84
++          },
++          {
++            "id": 32,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 32,
++            "finishOrder": 32,
++            "entryReach": 96,
++            "colorRemaining": 100,
++            "consumed": 20,
++            "debt": -76
++          },
++          {
++            "id": 33,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 33,
++            "finishOrder": 33,
++            "entryReach": 84,
++            "colorRemaining": 84,
++            "consumed": 21,
++            "debt": -63
++          },
++          {
++            "id": 34,
++            "color": 1,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 34,
++            "finishOrder": 34,
++            "entryReach": 12,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 14
++          },
++          {
++            "id": 35,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 35,
++            "finishOrder": 35,
++            "entryReach": 76,
++            "colorRemaining": 80,
++            "consumed": 20,
++            "debt": -56
++          },
++          {
++            "id": 36,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 36,
++            "finishOrder": 36,
++            "entryReach": 63,
++            "colorRemaining": 63,
++            "consumed": 21,
++            "debt": -42
++          },
++          {
++            "id": 37,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 37,
++            "finishOrder": 37,
++            "entryReach": 56,
++            "colorRemaining": 60,
++            "consumed": 20,
++            "debt": -36
++          },
++          {
++            "id": 38,
++            "color": 16,
++            "cap": 24,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 38,
++            "finishOrder": 38,
++            "entryReach": 50,
++            "colorRemaining": 70,
++            "consumed": 24,
++            "debt": -26
++          },
++          {
++            "id": 39,
++            "color": 33,
++            "cap": 25,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 39,
++            "finishOrder": 39,
++            "entryReach": 44,
++            "colorRemaining": 50,
++            "consumed": 25,
++            "debt": -19
++          },
++          {
++            "id": 40,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 40,
++            "finishOrder": 40,
++            "entryReach": 43,
++            "colorRemaining": 46,
++            "consumed": 23,
++            "debt": -20
++          },
++          {
++            "id": 41,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 41,
++            "finishOrder": 41,
++            "entryReach": 42,
++            "colorRemaining": 42,
++            "consumed": 21,
++            "debt": -21
++          },
++          {
++            "id": 42,
++            "color": 28,
++            "cap": 27,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 42,
++            "finishOrder": 42,
++            "entryReach": 41,
++            "colorRemaining": 53,
++            "consumed": 27,
++            "debt": -14
++          },
++          {
++            "id": 43,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 43,
++            "finishOrder": 43,
++            "entryReach": 38,
++            "colorRemaining": 40,
++            "consumed": 20,
++            "debt": -18
++          },
++          {
++            "id": 44,
++            "color": 31,
++            "cap": 29,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 44,
++            "finishOrder": 44,
++            "entryReach": 29,
++            "colorRemaining": 29,
++            "consumed": 29,
++            "debt": 0
++          },
++          {
++            "id": 45,
++            "color": 1,
++            "cap": 26,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 45,
++            "finishOrder": 45,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          },
++          {
++            "id": 46,
++            "color": 33,
++            "cap": 25,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 46,
++            "finishOrder": 46,
++            "entryReach": 25,
++            "colorRemaining": 25,
++            "consumed": 25,
++            "debt": 0
++          },
++          {
++            "id": 47,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 47,
++            "finishOrder": 47,
++            "entryReach": 23,
++            "colorRemaining": 23,
++            "consumed": 23,
++            "debt": 0
++          },
++          {
++            "id": 48,
++            "color": 13,
++            "cap": 37,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 48,
++            "finishOrder": 48,
++            "entryReach": 37,
++            "colorRemaining": 37,
++            "consumed": 37,
++            "debt": 0
++          },
++          {
++            "id": 49,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 49,
++            "finishOrder": 49,
++            "entryReach": 21,
++            "colorRemaining": 21,
++            "consumed": 21,
++            "debt": 0
++          },
++          {
++            "id": 50,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 50,
++            "finishOrder": 50,
++            "entryReach": 20,
++            "colorRemaining": 20,
++            "consumed": 20,
++            "debt": 0
++          },
++          {
++            "id": 51,
++            "color": 5,
++            "cap": 30,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 51,
++            "finishOrder": 51,
++            "entryReach": 29,
++            "colorRemaining": 30,
++            "consumed": 30,
++            "debt": 1
++          },
++          {
++            "id": 52,
++            "color": 28,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 52,
++            "finishOrder": 52,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          }
++        ]
++      },
++      "hash": "9da0ef5e3fa44ebecb43b6a1ac0d1c8e7c0830d267d1ff43ad37dc57be023473",
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 1002,
++      "policy": "targetBuffer",
++      "actualBoard": {
++        "rows": 7,
++        "cols": 9
++      },
++      "targetCars": 52,
++      "actualBoxes": 52,
++      "exactTarget": true,
++      "blackPct": 17.5,
++      "wallMs": 17837,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": 27,
++      "freeLowPct": 46,
++      "midBuffer34Pct": 18.5,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "吃满中位 7>3",
++        "freeLow 46%>30%",
++        "最长免费连 27>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位7>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "免费步52%>50%",
++        "最长免费连27步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 20,
++        "maxCap": 39,
++        "boardFloorPass": true
++      },
++      "instantPlan": {
++        "schema": "instant-playout-v2",
++        "ok": true,
++        "reason": null,
++        "policy": "targetBuffer",
++        "cars": 52,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          20,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 0,
++          "microCount": 0,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "targetCars": 52,
++        "minTotalCars": 36,
++        "maxTotalCars": 53,
++        "targetCarsFeasible": true,
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 5,
++            "total": 30,
++            "caps": [
++              30
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 13,
++            "total": 37,
++            "caps": [
++              37
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 14,
++            "total": 33,
++            "caps": [
++              33
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 15,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 16,
++            "total": 70,
++            "caps": [
++              24,
++              23,
++              23
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 19,
++            "total": 434,
++            "caps": [
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              21,
++              21,
++              21,
++              21,
++              21,
++              21
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 53,
++            "caps": [
++              27,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 31,
++            "total": 58,
++            "caps": [
++              29,
++              29
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 32,
++            "total": 39,
++            "caps": [
++              39
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 50,
++            "caps": [
++              25,
++              25
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 34,
++            "total": 282,
++            "caps": [
++              21,
++              21,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20
++            ],
++            "exact": true,
++            "reason": null
++          }
++        ],
++        "exactCapacityColors": 13,
++        "infeasibleCapacityColors": 0,
++        "bufferEvents": 30,
++        "debtCars": 8,
++        "maxBuffer": 5,
++        "medianEntryReach": 85,
++        "medianConsumed": 22,
++        "carSequence": [
++          {
++            "id": 1,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 1,
++            "finishOrder": 1,
++            "entryReach": 200,
++            "colorRemaining": 282,
++            "consumed": 21,
++            "debt": -179
++          },
++          {
++            "id": 2,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 2,
++            "finishOrder": 2,
++            "entryReach": 179,
++            "colorRemaining": 261,
++            "consumed": 21,
++            "debt": -158
++          },
++          {
++            "id": 3,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 3,
++            "finishOrder": 3,
++            "entryReach": 185,
++            "colorRemaining": 434,
++            "consumed": 22,
++            "debt": -163
++          },
++          {
++            "id": 4,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 4,
++            "finishOrder": 4,
++            "entryReach": 163,
++            "colorRemaining": 412,
++            "consumed": 22,
++            "debt": -141
++          },
++          {
++            "id": 5,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 5,
++            "finishOrder": 5,
++            "entryReach": 158,
++            "colorRemaining": 240,
++            "consumed": 20,
++            "debt": -138
++          },
++          {
++            "id": 6,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 6,
++            "finishOrder": 6,
++            "entryReach": 141,
++            "colorRemaining": 390,
++            "consumed": 22,
++            "debt": -119
++          },
++          {
++            "id": 7,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 7,
++            "finishOrder": 7,
++            "entryReach": 138,
++            "colorRemaining": 220,
++            "consumed": 20,
++            "debt": -118
++          },
++          {
++            "id": 8,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 8,
++            "finishOrder": 8,
++            "entryReach": 119,
++            "colorRemaining": 368,
++            "consumed": 22,
++            "debt": -97
++          },
++          {
++            "id": 9,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 9,
++            "finishOrder": 9,
++            "entryReach": 118,
++            "colorRemaining": 200,
++            "consumed": 20,
++            "debt": -98
++          },
++          {
++            "id": 10,
++            "color": 32,
++            "cap": 39,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 10,
++            "finishOrder": 10,
++            "entryReach": 5,
++            "colorRemaining": 39,
++            "consumed": 39,
++            "debt": 34
++          },
++          {
++            "id": 11,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 11,
++            "finishOrder": 11,
++            "entryReach": 105,
++            "colorRemaining": 180,
++            "consumed": 20,
++            "debt": -85
++          },
++          {
++            "id": 12,
++            "color": 19,
++            "cap": 22,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 12,
++            "finishOrder": 12,
++            "entryReach": 97,
++            "colorRemaining": 346,
++            "consumed": 22,
++            "debt": -75
++          },
++          {
++            "id": 13,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 13,
++            "finishOrder": 13,
++            "entryReach": 85,
++            "colorRemaining": 160,
++            "consumed": 20,
++            "debt": -65
++          },
++          {
++            "id": 14,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 14,
++            "finishOrder": 14,
++            "entryReach": 6,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 20
++          },
++          {
++            "id": 15,
++            "color": 30,
++            "cap": 35,
++            "slot": 2,
++            "start": {
++              "r": 34,
++              "c": 14
++            },
++            "enterOrder": 15,
++            "finishOrder": 15,
++            "entryReach": 6,
++            "colorRemaining": 35,
++            "consumed": 35,
++            "debt": 29
++          },
++          {
++            "id": 16,
++            "color": 31,
++            "cap": 29,
++            "slot": 3,
++            "start": {
++              "r": 34,
++              "c": 21
++            },
++            "enterOrder": 16,
++            "finishOrder": 16,
++            "entryReach": 2,
++            "colorRemaining": 58,
++            "consumed": 29,
++            "debt": 27
++          },
++          {
++            "id": 17,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 17,
++            "finishOrder": 17,
++            "entryReach": 195,
++            "colorRemaining": 324,
++            "consumed": 22,
++            "debt": -173
++          },
++          {
++            "id": 18,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 18,
++            "finishOrder": 18,
++            "entryReach": 302,
++            "colorRemaining": 302,
++            "consumed": 22,
++            "debt": -280
++          },
++          {
++            "id": 19,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 19,
++            "finishOrder": 19,
++            "entryReach": 280,
++            "colorRemaining": 280,
++            "consumed": 22,
++            "debt": -258
++          },
++          {
++            "id": 20,
++            "color": 14,
++            "cap": 33,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 20,
++            "finishOrder": 20,
++            "entryReach": 11,
++            "colorRemaining": 33,
++            "consumed": 33,
++            "debt": 22
++          },
++          {
++            "id": 21,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 21,
++            "finishOrder": 21,
++            "entryReach": 4,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 22
++          },
++          {
++            "id": 22,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 22,
++            "finishOrder": 22,
++            "entryReach": 258,
++            "colorRemaining": 258,
++            "consumed": 22,
++            "debt": -236
++          },
++          {
++            "id": 23,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 23,
++            "finishOrder": 23,
++            "entryReach": 236,
++            "colorRemaining": 236,
++            "consumed": 22,
++            "debt": -214
++          },
++          {
++            "id": 24,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 24,
++            "finishOrder": 24,
++            "entryReach": 214,
++            "colorRemaining": 214,
++            "consumed": 22,
++            "debt": -192
++          },
++          {
++            "id": 25,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 25,
++            "finishOrder": 25,
++            "entryReach": 192,
++            "colorRemaining": 192,
++            "consumed": 22,
++            "debt": -170
++          },
++          {
++            "id": 26,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 26,
++            "finishOrder": 26,
++            "entryReach": 170,
++            "colorRemaining": 170,
++            "consumed": 22,
++            "debt": -148
++          },
++          {
++            "id": 27,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 27,
++            "finishOrder": 27,
++            "entryReach": 148,
++            "colorRemaining": 148,
++            "consumed": 22,
++            "debt": -126
++          },
++          {
++            "id": 28,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 28,
++            "finishOrder": 28,
++            "entryReach": 136,
++            "colorRemaining": 140,
++            "consumed": 20,
++            "debt": -116
++          },
++          {
++            "id": 29,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 29,
++            "finishOrder": 29,
++            "entryReach": 126,
++            "colorRemaining": 126,
++            "consumed": 21,
++            "debt": -105
++          },
++          {
++            "id": 30,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 30,
++            "finishOrder": 30,
++            "entryReach": 116,
++            "colorRemaining": 120,
++            "consumed": 20,
++            "debt": -96
++          },
++          {
++            "id": 31,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 31,
++            "finishOrder": 31,
++            "entryReach": 105,
++            "colorRemaining": 105,
++            "consumed": 21,
++            "debt": -84
++          },
++          {
++            "id": 32,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 32,
++            "finishOrder": 32,
++            "entryReach": 96,
++            "colorRemaining": 100,
++            "consumed": 20,
++            "debt": -76
++          },
++          {
++            "id": 33,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 33,
++            "finishOrder": 33,
++            "entryReach": 84,
++            "colorRemaining": 84,
++            "consumed": 21,
++            "debt": -63
++          },
++          {
++            "id": 34,
++            "color": 1,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 34,
++            "finishOrder": 34,
++            "entryReach": 12,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 14
++          },
++          {
++            "id": 35,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 35,
++            "finishOrder": 35,
++            "entryReach": 76,
++            "colorRemaining": 80,
++            "consumed": 20,
++            "debt": -56
++          },
++          {
++            "id": 36,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 36,
++            "finishOrder": 36,
++            "entryReach": 63,
++            "colorRemaining": 63,
++            "consumed": 21,
++            "debt": -42
++          },
++          {
++            "id": 37,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 37,
++            "finishOrder": 37,
++            "entryReach": 56,
++            "colorRemaining": 60,
++            "consumed": 20,
++            "debt": -36
++          },
++          {
++            "id": 38,
++            "color": 16,
++            "cap": 24,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 38,
++            "finishOrder": 38,
++            "entryReach": 50,
++            "colorRemaining": 70,
++            "consumed": 24,
++            "debt": -26
++          },
++          {
++            "id": 39,
++            "color": 33,
++            "cap": 25,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 39,
++            "finishOrder": 39,
++            "entryReach": 44,
++            "colorRemaining": 50,
++            "consumed": 25,
++            "debt": -19
++          },
++          {
++            "id": 40,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 40,
++            "finishOrder": 40,
++            "entryReach": 43,
++            "colorRemaining": 46,
++            "consumed": 23,
++            "debt": -20
++          },
++          {
++            "id": 41,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 41,
++            "finishOrder": 41,
++            "entryReach": 42,
++            "colorRemaining": 42,
++            "consumed": 21,
++            "debt": -21
++          },
++          {
++            "id": 42,
++            "color": 28,
++            "cap": 27,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 42,
++            "finishOrder": 42,
++            "entryReach": 41,
++            "colorRemaining": 53,
++            "consumed": 27,
++            "debt": -14
++          },
++          {
++            "id": 43,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 43,
++            "finishOrder": 43,
++            "entryReach": 38,
++            "colorRemaining": 40,
++            "consumed": 20,
++            "debt": -18
++          },
++          {
++            "id": 44,
++            "color": 31,
++            "cap": 29,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 44,
++            "finishOrder": 44,
++            "entryReach": 29,
++            "colorRemaining": 29,
++            "consumed": 29,
++            "debt": 0
++          },
++          {
++            "id": 45,
++            "color": 1,
++            "cap": 26,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 45,
++            "finishOrder": 45,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          },
++          {
++            "id": 46,
++            "color": 33,
++            "cap": 25,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 46,
++            "finishOrder": 46,
++            "entryReach": 25,
++            "colorRemaining": 25,
++            "consumed": 25,
++            "debt": 0
++          },
++          {
++            "id": 47,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 47,
++            "finishOrder": 47,
++            "entryReach": 23,
++            "colorRemaining": 23,
++            "consumed": 23,
++            "debt": 0
++          },
++          {
++            "id": 48,
++            "color": 13,
++            "cap": 37,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 48,
++            "finishOrder": 48,
++            "entryReach": 37,
++            "colorRemaining": 37,
++            "consumed": 37,
++            "debt": 0
++          },
++          {
++            "id": 49,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 49,
++            "finishOrder": 49,
++            "entryReach": 21,
++            "colorRemaining": 21,
++            "consumed": 21,
++            "debt": 0
++          },
++          {
++            "id": 50,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 50,
++            "finishOrder": 50,
++            "entryReach": 20,
++            "colorRemaining": 20,
++            "consumed": 20,
++            "debt": 0
++          },
++          {
++            "id": 51,
++            "color": 5,
++            "cap": 30,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 51,
++            "finishOrder": 51,
++            "entryReach": 29,
++            "colorRemaining": 30,
++            "consumed": 30,
++            "debt": 1
++          },
++          {
++            "id": 52,
++            "color": 28,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 52,
++            "finishOrder": 52,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          }
++        ]
++      },
++      "hash": "18227d0f14aa4d01c7f5f4fa5d84f364d5aeb49be8cc7996a8759503cd368207",
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 32677,
++      "policy": "targetBuffer",
++      "actualBoard": {
++        "rows": 7,
++        "cols": 9
++      },
++      "targetCars": 52,
++      "actualBoxes": 52,
++      "exactTarget": true,
++      "blackPct": 17.5,
++      "wallMs": 21913,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": 23,
++      "freeLowPct": 38,
++      "midBuffer34Pct": 17.2,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "吃满中位 6>3",
++        "freeLow 38%>30%",
++        "最长免费连 23>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位6>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连23步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 20,
++        "maxCap": 39,
++        "boardFloorPass": true
++      },
++      "instantPlan": {
++        "schema": "instant-playout-v2",
++        "ok": true,
++        "reason": null,
++        "policy": "targetBuffer",
++        "cars": 52,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          20,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 0,
++          "microCount": 0,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "targetCars": 52,
++        "minTotalCars": 36,
++        "maxTotalCars": 53,
++        "targetCarsFeasible": true,
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 5,
++            "total": 30,
++            "caps": [
++              30
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 13,
++            "total": 37,
++            "caps": [
++              37
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 14,
++            "total": 33,
++            "caps": [
++              33
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 15,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 16,
++            "total": 70,
++            "caps": [
++              24,
++              23,
++              23
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 19,
++            "total": 434,
++            "caps": [
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              21,
++              21,
++              21,
++              21,
++              21,
++              21
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 53,
++            "caps": [
++              27,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 31,
++            "total": 58,
++            "caps": [
++              29,
++              29
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 32,
++            "total": 39,
++            "caps": [
++              39
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 50,
++            "caps": [
++              25,
++              25
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 34,
++            "total": 282,
++            "caps": [
++              21,
++              21,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20
++            ],
++            "exact": true,
++            "reason": null
++          }
++        ],
++        "exactCapacityColors": 13,
++        "infeasibleCapacityColors": 0,
++        "bufferEvents": 30,
++        "debtCars": 8,
++        "maxBuffer": 5,
++        "medianEntryReach": 85,
++        "medianConsumed": 22,
++        "carSequence": [
++          {
++            "id": 1,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 1,
++            "finishOrder": 1,
++            "entryReach": 200,
++            "colorRemaining": 282,
++            "consumed": 21,
++            "debt": -179
++          },
++          {
++            "id": 2,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 2,
++            "finishOrder": 2,
++            "entryReach": 179,
++            "colorRemaining": 261,
++            "consumed": 21,
++            "debt": -158
++          },
++          {
++            "id": 3,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 3,
++            "finishOrder": 3,
++            "entryReach": 185,
++            "colorRemaining": 434,
++            "consumed": 22,
++            "debt": -163
++          },
++          {
++            "id": 4,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 4,
++            "finishOrder": 4,
++            "entryReach": 163,
++            "colorRemaining": 412,
++            "consumed": 22,
++            "debt": -141
++          },
++          {
++            "id": 5,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 5,
++            "finishOrder": 5,
++            "entryReach": 158,
++            "colorRemaining": 240,
++            "consumed": 20,
++            "debt": -138
++          },
++          {
++            "id": 6,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 6,
++            "finishOrder": 6,
++            "entryReach": 141,
++            "colorRemaining": 390,
++            "consumed": 22,
++            "debt": -119
++          },
++          {
++            "id": 7,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 7,
++            "finishOrder": 7,
++            "entryReach": 138,
++            "colorRemaining": 220,
++            "consumed": 20,
++            "debt": -118
++          },
++          {
++            "id": 8,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 8,
++            "finishOrder": 8,
++            "entryReach": 119,
++            "colorRemaining": 368,
++            "consumed": 22,
++            "debt": -97
++          },
++          {
++            "id": 9,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 9,
++            "finishOrder": 9,
++            "entryReach": 118,
++            "colorRemaining": 200,
++            "consumed": 20,
++            "debt": -98
++          },
++          {
++            "id": 10,
++            "color": 32,
++            "cap": 39,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 10,
++            "finishOrder": 10,
++            "entryReach": 5,
++            "colorRemaining": 39,
++            "consumed": 39,
++            "debt": 34
++          },
++          {
++            "id": 11,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 11,
++            "finishOrder": 11,
++            "entryReach": 105,
++            "colorRemaining": 180,
++            "consumed": 20,
++            "debt": -85
++          },
++          {
++            "id": 12,
++            "color": 19,
++            "cap": 22,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 12,
++            "finishOrder": 12,
++            "entryReach": 97,
++            "colorRemaining": 346,
++            "consumed": 22,
++            "debt": -75
++          },
++          {
++            "id": 13,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 13,
++            "finishOrder": 13,
++            "entryReach": 85,
++            "colorRemaining": 160,
++            "consumed": 20,
++            "debt": -65
++          },
++          {
++            "id": 14,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 14,
++            "finishOrder": 14,
++            "entryReach": 6,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 20
++          },
++          {
++            "id": 15,
++            "color": 30,
++            "cap": 35,
++            "slot": 2,
++            "start": {
++              "r": 34,
++              "c": 14
++            },
++            "enterOrder": 15,
++            "finishOrder": 15,
++            "entryReach": 6,
++            "colorRemaining": 35,
++            "consumed": 35,
++            "debt": 29
++          },
++          {
++            "id": 16,
++            "color": 31,
++            "cap": 29,
++            "slot": 3,
++            "start": {
++              "r": 34,
++              "c": 21
++            },
++            "enterOrder": 16,
++            "finishOrder": 16,
++            "entryReach": 2,
++            "colorRemaining": 58,
++            "consumed": 29,
++            "debt": 27
++          },
++          {
++            "id": 17,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 17,
++            "finishOrder": 17,
++            "entryReach": 195,
++            "colorRemaining": 324,
++            "consumed": 22,
++            "debt": -173
++          },
++          {
++            "id": 18,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 18,
++            "finishOrder": 18,
++            "entryReach": 302,
++            "colorRemaining": 302,
++            "consumed": 22,
++            "debt": -280
++          },
++          {
++            "id": 19,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 19,
++            "finishOrder": 19,
++            "entryReach": 280,
++            "colorRemaining": 280,
++            "consumed": 22,
++            "debt": -258
++          },
++          {
++            "id": 20,
++            "color": 14,
++            "cap": 33,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 20,
++            "finishOrder": 20,
++            "entryReach": 11,
++            "colorRemaining": 33,
++            "consumed": 33,
++            "debt": 22
++          },
++          {
++            "id": 21,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 21,
++            "finishOrder": 21,
++            "entryReach": 4,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 22
++          },
++          {
++            "id": 22,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 22,
++            "finishOrder": 22,
++            "entryReach": 258,
++            "colorRemaining": 258,
++            "consumed": 22,
++            "debt": -236
++          },
++          {
++            "id": 23,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 23,
++            "finishOrder": 23,
++            "entryReach": 236,
++            "colorRemaining": 236,
++            "consumed": 22,
++            "debt": -214
++          },
++          {
++            "id": 24,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 24,
++            "finishOrder": 24,
++            "entryReach": 214,
++            "colorRemaining": 214,
++            "consumed": 22,
++            "debt": -192
++          },
++          {
++            "id": 25,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 25,
++            "finishOrder": 25,
++            "entryReach": 192,
++            "colorRemaining": 192,
++            "consumed": 22,
++            "debt": -170
++          },
++          {
++            "id": 26,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 26,
++            "finishOrder": 26,
++            "entryReach": 170,
++            "colorRemaining": 170,
++            "consumed": 22,
++            "debt": -148
++          },
++          {
++            "id": 27,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 27,
++            "finishOrder": 27,
++            "entryReach": 148,
++            "colorRemaining": 148,
++            "consumed": 22,
++            "debt": -126
++          },
++          {
++            "id": 28,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 28,
++            "finishOrder": 28,
++            "entryReach": 136,
++            "colorRemaining": 140,
++            "consumed": 20,
++            "debt": -116
++          },
++          {
++            "id": 29,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 29,
++            "finishOrder": 29,
++            "entryReach": 126,
++            "colorRemaining": 126,
++            "consumed": 21,
++            "debt": -105
++          },
++          {
++            "id": 30,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 30,
++            "finishOrder": 30,
++            "entryReach": 116,
++            "colorRemaining": 120,
++            "consumed": 20,
++            "debt": -96
++          },
++          {
++            "id": 31,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 31,
++            "finishOrder": 31,
++            "entryReach": 105,
++            "colorRemaining": 105,
++            "consumed": 21,
++            "debt": -84
++          },
++          {
++            "id": 32,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 32,
++            "finishOrder": 32,
++            "entryReach": 96,
++            "colorRemaining": 100,
++            "consumed": 20,
++            "debt": -76
++          },
++          {
++            "id": 33,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 33,
++            "finishOrder": 33,
++            "entryReach": 84,
++            "colorRemaining": 84,
++            "consumed": 21,
++            "debt": -63
++          },
++          {
++            "id": 34,
++            "color": 1,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 34,
++            "finishOrder": 34,
++            "entryReach": 12,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 14
++          },
++          {
++            "id": 35,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 35,
++            "finishOrder": 35,
++            "entryReach": 76,
++            "colorRemaining": 80,
++            "consumed": 20,
++            "debt": -56
++          },
++          {
++            "id": 36,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 36,
++            "finishOrder": 36,
++            "entryReach": 63,
++            "colorRemaining": 63,
++            "consumed": 21,
++            "debt": -42
++          },
++          {
++            "id": 37,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 37,
++            "finishOrder": 37,
++            "entryReach": 56,
++            "colorRemaining": 60,
++            "consumed": 20,
++            "debt": -36
++          },
++          {
++            "id": 38,
++            "color": 16,
++            "cap": 24,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 38,
++            "finishOrder": 38,
++            "entryReach": 50,
++            "colorRemaining": 70,
++            "consumed": 24,
++            "debt": -26
++          },
++          {
++            "id": 39,
++            "color": 33,
++            "cap": 25,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 39,
++            "finishOrder": 39,
++            "entryReach": 44,
++            "colorRemaining": 50,
++            "consumed": 25,
++            "debt": -19
++          },
++          {
++            "id": 40,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 40,
++            "finishOrder": 40,
++            "entryReach": 43,
++            "colorRemaining": 46,
++            "consumed": 23,
++            "debt": -20
++          },
++          {
++            "id": 41,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 41,
++            "finishOrder": 41,
++            "entryReach": 42,
++            "colorRemaining": 42,
++            "consumed": 21,
++            "debt": -21
++          },
++          {
++            "id": 42,
++            "color": 28,
++            "cap": 27,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 42,
++            "finishOrder": 42,
++            "entryReach": 41,
++            "colorRemaining": 53,
++            "consumed": 27,
++            "debt": -14
++          },
++          {
++            "id": 43,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 43,
++            "finishOrder": 43,
++            "entryReach": 38,
++            "colorRemaining": 40,
++            "consumed": 20,
++            "debt": -18
++          },
++          {
++            "id": 44,
++            "color": 31,
++            "cap": 29,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 44,
++            "finishOrder": 44,
++            "entryReach": 29,
++            "colorRemaining": 29,
++            "consumed": 29,
++            "debt": 0
++          },
++          {
++            "id": 45,
++            "color": 1,
++            "cap": 26,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 45,
++            "finishOrder": 45,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          },
++          {
++            "id": 46,
++            "color": 33,
++            "cap": 25,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 46,
++            "finishOrder": 46,
++            "entryReach": 25,
++            "colorRemaining": 25,
++            "consumed": 25,
++            "debt": 0
++          },
++          {
++            "id": 47,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 47,
++            "finishOrder": 47,
++            "entryReach": 23,
++            "colorRemaining": 23,
++            "consumed": 23,
++            "debt": 0
++          },
++          {
++            "id": 48,
++            "color": 13,
++            "cap": 37,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 48,
++            "finishOrder": 48,
++            "entryReach": 37,
++            "colorRemaining": 37,
++            "consumed": 37,
++            "debt": 0
++          },
++          {
++            "id": 49,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 49,
++            "finishOrder": 49,
++            "entryReach": 21,
++            "colorRemaining": 21,
++            "consumed": 21,
++            "debt": 0
++          },
++          {
++            "id": 50,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 50,
++            "finishOrder": 50,
++            "entryReach": 20,
++            "colorRemaining": 20,
++            "consumed": 20,
++            "debt": 0
++          },
++          {
++            "id": 51,
++            "color": 5,
++            "cap": 30,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 51,
++            "finishOrder": 51,
++            "entryReach": 29,
++            "colorRemaining": 30,
++            "consumed": 30,
++            "debt": 1
++          },
++          {
++            "id": 52,
++            "color": 28,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 52,
++            "finishOrder": 52,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          }
++        ]
++      },
++      "hash": "48d30b32de14b07714c12d7d04b3bbff43a643e53cbb089e6c9910db95ef0eee",
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 1001,
++      "policy": "mixedDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 876,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 1002,
++      "policy": "mixedDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 522,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 32677,
++      "policy": "mixedDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 618,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 1001,
++      "policy": "shortDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 175,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 1002,
++      "policy": "shortDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 188,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "7x9",
++      "seed": 32677,
++      "policy": "shortDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 199,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 1001,
++      "policy": "targetBuffer",
++      "actualBoard": {
++        "rows": 9,
++        "cols": 7
++      },
++      "targetCars": 52,
++      "actualBoxes": 52,
++      "exactTarget": true,
++      "blackPct": 17.5,
++      "wallMs": 19336,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": 21,
++      "freeLowPct": 42,
++      "midBuffer34Pct": 17.2,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "吃满中位 7>3",
++        "freeLow 42%>30%",
++        "最长免费连 21>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位7>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连21步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 20,
++        "maxCap": 39,
++        "boardFloorPass": true
++      },
++      "instantPlan": {
++        "schema": "instant-playout-v2",
++        "ok": true,
++        "reason": null,
++        "policy": "targetBuffer",
++        "cars": 52,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          20,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 0,
++          "microCount": 0,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "targetCars": 52,
++        "minTotalCars": 36,
++        "maxTotalCars": 53,
++        "targetCarsFeasible": true,
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 5,
++            "total": 30,
++            "caps": [
++              30
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 13,
++            "total": 37,
++            "caps": [
++              37
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 14,
++            "total": 33,
++            "caps": [
++              33
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 15,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 16,
++            "total": 70,
++            "caps": [
++              24,
++              23,
++              23
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 19,
++            "total": 434,
++            "caps": [
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              21,
++              21,
++              21,
++              21,
++              21,
++              21
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 53,
++            "caps": [
++              27,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 31,
++            "total": 58,
++            "caps": [
++              29,
++              29
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 32,
++            "total": 39,
++            "caps": [
++              39
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 50,
++            "caps": [
++              25,
++              25
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 34,
++            "total": 282,
++            "caps": [
++              21,
++              21,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20
++            ],
++            "exact": true,
++            "reason": null
++          }
++        ],
++        "exactCapacityColors": 13,
++        "infeasibleCapacityColors": 0,
++        "bufferEvents": 30,
++        "debtCars": 8,
++        "maxBuffer": 5,
++        "medianEntryReach": 85,
++        "medianConsumed": 22,
++        "carSequence": [
++          {
++            "id": 1,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 1,
++            "finishOrder": 1,
++            "entryReach": 200,
++            "colorRemaining": 282,
++            "consumed": 21,
++            "debt": -179
++          },
++          {
++            "id": 2,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 2,
++            "finishOrder": 2,
++            "entryReach": 179,
++            "colorRemaining": 261,
++            "consumed": 21,
++            "debt": -158
++          },
++          {
++            "id": 3,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 3,
++            "finishOrder": 3,
++            "entryReach": 185,
++            "colorRemaining": 434,
++            "consumed": 22,
++            "debt": -163
++          },
++          {
++            "id": 4,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 4,
++            "finishOrder": 4,
++            "entryReach": 163,
++            "colorRemaining": 412,
++            "consumed": 22,
++            "debt": -141
++          },
++          {
++            "id": 5,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 5,
++            "finishOrder": 5,
++            "entryReach": 158,
++            "colorRemaining": 240,
++            "consumed": 20,
++            "debt": -138
++          },
++          {
++            "id": 6,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 6,
++            "finishOrder": 6,
++            "entryReach": 141,
++            "colorRemaining": 390,
++            "consumed": 22,
++            "debt": -119
++          },
++          {
++            "id": 7,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 7,
++            "finishOrder": 7,
++            "entryReach": 138,
++            "colorRemaining": 220,
++            "consumed": 20,
++            "debt": -118
++          },
++          {
++            "id": 8,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 8,
++            "finishOrder": 8,
++            "entryReach": 119,
++            "colorRemaining": 368,
++            "consumed": 22,
++            "debt": -97
++          },
++          {
++            "id": 9,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 9,
++            "finishOrder": 9,
++            "entryReach": 118,
++            "colorRemaining": 200,
++            "consumed": 20,
++            "debt": -98
++          },
++          {
++            "id": 10,
++            "color": 32,
++            "cap": 39,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 10,
++            "finishOrder": 10,
++            "entryReach": 5,
++            "colorRemaining": 39,
++            "consumed": 39,
++            "debt": 34
++          },
++          {
++            "id": 11,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 11,
++            "finishOrder": 11,
++            "entryReach": 105,
++            "colorRemaining": 180,
++            "consumed": 20,
++            "debt": -85
++          },
++          {
++            "id": 12,
++            "color": 19,
++            "cap": 22,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 12,
++            "finishOrder": 12,
++            "entryReach": 97,
++            "colorRemaining": 346,
++            "consumed": 22,
++            "debt": -75
++          },
++          {
++            "id": 13,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 13,
++            "finishOrder": 13,
++            "entryReach": 85,
++            "colorRemaining": 160,
++            "consumed": 20,
++            "debt": -65
++          },
++          {
++            "id": 14,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 14,
++            "finishOrder": 14,
++            "entryReach": 6,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 20
++          },
++          {
++            "id": 15,
++            "color": 30,
++            "cap": 35,
++            "slot": 2,
++            "start": {
++              "r": 34,
++              "c": 14
++            },
++            "enterOrder": 15,
++            "finishOrder": 15,
++            "entryReach": 6,
++            "colorRemaining": 35,
++            "consumed": 35,
++            "debt": 29
++          },
++          {
++            "id": 16,
++            "color": 31,
++            "cap": 29,
++            "slot": 3,
++            "start": {
++              "r": 34,
++              "c": 21
++            },
++            "enterOrder": 16,
++            "finishOrder": 16,
++            "entryReach": 2,
++            "colorRemaining": 58,
++            "consumed": 29,
++            "debt": 27
++          },
++          {
++            "id": 17,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 17,
++            "finishOrder": 17,
++            "entryReach": 195,
++            "colorRemaining": 324,
++            "consumed": 22,
++            "debt": -173
++          },
++          {
++            "id": 18,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 18,
++            "finishOrder": 18,
++            "entryReach": 302,
++            "colorRemaining": 302,
++            "consumed": 22,
++            "debt": -280
++          },
++          {
++            "id": 19,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 19,
++            "finishOrder": 19,
++            "entryReach": 280,
++            "colorRemaining": 280,
++            "consumed": 22,
++            "debt": -258
++          },
++          {
++            "id": 20,
++            "color": 14,
++            "cap": 33,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 20,
++            "finishOrder": 20,
++            "entryReach": 11,
++            "colorRemaining": 33,
++            "consumed": 33,
++            "debt": 22
++          },
++          {
++            "id": 21,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 21,
++            "finishOrder": 21,
++            "entryReach": 4,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 22
++          },
++          {
++            "id": 22,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 22,
++            "finishOrder": 22,
++            "entryReach": 258,
++            "colorRemaining": 258,
++            "consumed": 22,
++            "debt": -236
++          },
++          {
++            "id": 23,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 23,
++            "finishOrder": 23,
++            "entryReach": 236,
++            "colorRemaining": 236,
++            "consumed": 22,
++            "debt": -214
++          },
++          {
++            "id": 24,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 24,
++            "finishOrder": 24,
++            "entryReach": 214,
++            "colorRemaining": 214,
++            "consumed": 22,
++            "debt": -192
++          },
++          {
++            "id": 25,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 25,
++            "finishOrder": 25,
++            "entryReach": 192,
++            "colorRemaining": 192,
++            "consumed": 22,
++            "debt": -170
++          },
++          {
++            "id": 26,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 26,
++            "finishOrder": 26,
++            "entryReach": 170,
++            "colorRemaining": 170,
++            "consumed": 22,
++            "debt": -148
++          },
++          {
++            "id": 27,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 27,
++            "finishOrder": 27,
++            "entryReach": 148,
++            "colorRemaining": 148,
++            "consumed": 22,
++            "debt": -126
++          },
++          {
++            "id": 28,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 28,
++            "finishOrder": 28,
++            "entryReach": 136,
++            "colorRemaining": 140,
++            "consumed": 20,
++            "debt": -116
++          },
++          {
++            "id": 29,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 29,
++            "finishOrder": 29,
++            "entryReach": 126,
++            "colorRemaining": 126,
++            "consumed": 21,
++            "debt": -105
++          },
++          {
++            "id": 30,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 30,
++            "finishOrder": 30,
++            "entryReach": 116,
++            "colorRemaining": 120,
++            "consumed": 20,
++            "debt": -96
++          },
++          {
++            "id": 31,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 31,
++            "finishOrder": 31,
++            "entryReach": 105,
++            "colorRemaining": 105,
++            "consumed": 21,
++            "debt": -84
++          },
++          {
++            "id": 32,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 32,
++            "finishOrder": 32,
++            "entryReach": 96,
++            "colorRemaining": 100,
++            "consumed": 20,
++            "debt": -76
++          },
++          {
++            "id": 33,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 33,
++            "finishOrder": 33,
++            "entryReach": 84,
++            "colorRemaining": 84,
++            "consumed": 21,
++            "debt": -63
++          },
++          {
++            "id": 34,
++            "color": 1,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 34,
++            "finishOrder": 34,
++            "entryReach": 12,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 14
++          },
++          {
++            "id": 35,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 35,
++            "finishOrder": 35,
++            "entryReach": 76,
++            "colorRemaining": 80,
++            "consumed": 20,
++            "debt": -56
++          },
++          {
++            "id": 36,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 36,
++            "finishOrder": 36,
++            "entryReach": 63,
++            "colorRemaining": 63,
++            "consumed": 21,
++            "debt": -42
++          },
++          {
++            "id": 37,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 37,
++            "finishOrder": 37,
++            "entryReach": 56,
++            "colorRemaining": 60,
++            "consumed": 20,
++            "debt": -36
++          },
++          {
++            "id": 38,
++            "color": 16,
++            "cap": 24,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 38,
++            "finishOrder": 38,
++            "entryReach": 50,
++            "colorRemaining": 70,
++            "consumed": 24,
++            "debt": -26
++          },
++          {
++            "id": 39,
++            "color": 33,
++            "cap": 25,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 39,
++            "finishOrder": 39,
++            "entryReach": 44,
++            "colorRemaining": 50,
++            "consumed": 25,
++            "debt": -19
++          },
++          {
++            "id": 40,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 40,
++            "finishOrder": 40,
++            "entryReach": 43,
++            "colorRemaining": 46,
++            "consumed": 23,
++            "debt": -20
++          },
++          {
++            "id": 41,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 41,
++            "finishOrder": 41,
++            "entryReach": 42,
++            "colorRemaining": 42,
++            "consumed": 21,
++            "debt": -21
++          },
++          {
++            "id": 42,
++            "color": 28,
++            "cap": 27,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 42,
++            "finishOrder": 42,
++            "entryReach": 41,
++            "colorRemaining": 53,
++            "consumed": 27,
++            "debt": -14
++          },
++          {
++            "id": 43,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 43,
++            "finishOrder": 43,
++            "entryReach": 38,
++            "colorRemaining": 40,
++            "consumed": 20,
++            "debt": -18
++          },
++          {
++            "id": 44,
++            "color": 31,
++            "cap": 29,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 44,
++            "finishOrder": 44,
++            "entryReach": 29,
++            "colorRemaining": 29,
++            "consumed": 29,
++            "debt": 0
++          },
++          {
++            "id": 45,
++            "color": 1,
++            "cap": 26,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 45,
++            "finishOrder": 45,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          },
++          {
++            "id": 46,
++            "color": 33,
++            "cap": 25,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 46,
++            "finishOrder": 46,
++            "entryReach": 25,
++            "colorRemaining": 25,
++            "consumed": 25,
++            "debt": 0
++          },
++          {
++            "id": 47,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 47,
++            "finishOrder": 47,
++            "entryReach": 23,
++            "colorRemaining": 23,
++            "consumed": 23,
++            "debt": 0
++          },
++          {
++            "id": 48,
++            "color": 13,
++            "cap": 37,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 48,
++            "finishOrder": 48,
++            "entryReach": 37,
++            "colorRemaining": 37,
++            "consumed": 37,
++            "debt": 0
++          },
++          {
++            "id": 49,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 49,
++            "finishOrder": 49,
++            "entryReach": 21,
++            "colorRemaining": 21,
++            "consumed": 21,
++            "debt": 0
++          },
++          {
++            "id": 50,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 50,
++            "finishOrder": 50,
++            "entryReach": 20,
++            "colorRemaining": 20,
++            "consumed": 20,
++            "debt": 0
++          },
++          {
++            "id": 51,
++            "color": 5,
++            "cap": 30,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 51,
++            "finishOrder": 51,
++            "entryReach": 29,
++            "colorRemaining": 30,
++            "consumed": 30,
++            "debt": 1
++          },
++          {
++            "id": 52,
++            "color": 28,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 52,
++            "finishOrder": 52,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          }
++        ]
++      },
++      "hash": "417bc0e1023aa238718f5d481cc05630d44fc53c40e8d40e7b13be6da2e53cf3",
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 1002,
++      "policy": "targetBuffer",
++      "actualBoard": {
++        "rows": 9,
++        "cols": 7
++      },
++      "targetCars": 52,
++      "actualBoxes": 52,
++      "exactTarget": true,
++      "blackPct": 17.5,
++      "wallMs": 30707,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": 23,
++      "freeLowPct": 29,
++      "midBuffer34Pct": 17.2,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "吃满中位 6>3",
++        "最长免费连 23>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位6>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连23步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 20,
++        "maxCap": 39,
++        "boardFloorPass": true
++      },
++      "instantPlan": {
++        "schema": "instant-playout-v2",
++        "ok": true,
++        "reason": null,
++        "policy": "targetBuffer",
++        "cars": 52,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          20,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 0,
++          "microCount": 0,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "targetCars": 52,
++        "minTotalCars": 36,
++        "maxTotalCars": 53,
++        "targetCarsFeasible": true,
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 5,
++            "total": 30,
++            "caps": [
++              30
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 13,
++            "total": 37,
++            "caps": [
++              37
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 14,
++            "total": 33,
++            "caps": [
++              33
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 15,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 16,
++            "total": 70,
++            "caps": [
++              24,
++              23,
++              23
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 19,
++            "total": 434,
++            "caps": [
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              21,
++              21,
++              21,
++              21,
++              21,
++              21
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 53,
++            "caps": [
++              27,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 31,
++            "total": 58,
++            "caps": [
++              29,
++              29
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 32,
++            "total": 39,
++            "caps": [
++              39
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 50,
++            "caps": [
++              25,
++              25
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 34,
++            "total": 282,
++            "caps": [
++              21,
++              21,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20
++            ],
++            "exact": true,
++            "reason": null
++          }
++        ],
++        "exactCapacityColors": 13,
++        "infeasibleCapacityColors": 0,
++        "bufferEvents": 30,
++        "debtCars": 8,
++        "maxBuffer": 5,
++        "medianEntryReach": 85,
++        "medianConsumed": 22,
++        "carSequence": [
++          {
++            "id": 1,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 1,
++            "finishOrder": 1,
++            "entryReach": 200,
++            "colorRemaining": 282,
++            "consumed": 21,
++            "debt": -179
++          },
++          {
++            "id": 2,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 2,
++            "finishOrder": 2,
++            "entryReach": 179,
++            "colorRemaining": 261,
++            "consumed": 21,
++            "debt": -158
++          },
++          {
++            "id": 3,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 3,
++            "finishOrder": 3,
++            "entryReach": 185,
++            "colorRemaining": 434,
++            "consumed": 22,
++            "debt": -163
++          },
++          {
++            "id": 4,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 4,
++            "finishOrder": 4,
++            "entryReach": 163,
++            "colorRemaining": 412,
++            "consumed": 22,
++            "debt": -141
++          },
++          {
++            "id": 5,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 5,
++            "finishOrder": 5,
++            "entryReach": 158,
++            "colorRemaining": 240,
++            "consumed": 20,
++            "debt": -138
++          },
++          {
++            "id": 6,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 6,
++            "finishOrder": 6,
++            "entryReach": 141,
++            "colorRemaining": 390,
++            "consumed": 22,
++            "debt": -119
++          },
++          {
++            "id": 7,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 7,
++            "finishOrder": 7,
++            "entryReach": 138,
++            "colorRemaining": 220,
++            "consumed": 20,
++            "debt": -118
++          },
++          {
++            "id": 8,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 8,
++            "finishOrder": 8,
++            "entryReach": 119,
++            "colorRemaining": 368,
++            "consumed": 22,
++            "debt": -97
++          },
++          {
++            "id": 9,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 9,
++            "finishOrder": 9,
++            "entryReach": 118,
++            "colorRemaining": 200,
++            "consumed": 20,
++            "debt": -98
++          },
++          {
++            "id": 10,
++            "color": 32,
++            "cap": 39,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 10,
++            "finishOrder": 10,
++            "entryReach": 5,
++            "colorRemaining": 39,
++            "consumed": 39,
++            "debt": 34
++          },
++          {
++            "id": 11,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 11,
++            "finishOrder": 11,
++            "entryReach": 105,
++            "colorRemaining": 180,
++            "consumed": 20,
++            "debt": -85
++          },
++          {
++            "id": 12,
++            "color": 19,
++            "cap": 22,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 12,
++            "finishOrder": 12,
++            "entryReach": 97,
++            "colorRemaining": 346,
++            "consumed": 22,
++            "debt": -75
++          },
++          {
++            "id": 13,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 13,
++            "finishOrder": 13,
++            "entryReach": 85,
++            "colorRemaining": 160,
++            "consumed": 20,
++            "debt": -65
++          },
++          {
++            "id": 14,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 14,
++            "finishOrder": 14,
++            "entryReach": 6,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 20
++          },
++          {
++            "id": 15,
++            "color": 30,
++            "cap": 35,
++            "slot": 2,
++            "start": {
++              "r": 34,
++              "c": 14
++            },
++            "enterOrder": 15,
++            "finishOrder": 15,
++            "entryReach": 6,
++            "colorRemaining": 35,
++            "consumed": 35,
++            "debt": 29
++          },
++          {
++            "id": 16,
++            "color": 31,
++            "cap": 29,
++            "slot": 3,
++            "start": {
++              "r": 34,
++              "c": 21
++            },
++            "enterOrder": 16,
++            "finishOrder": 16,
++            "entryReach": 2,
++            "colorRemaining": 58,
++            "consumed": 29,
++            "debt": 27
++          },
++          {
++            "id": 17,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 17,
++            "finishOrder": 17,
++            "entryReach": 195,
++            "colorRemaining": 324,
++            "consumed": 22,
++            "debt": -173
++          },
++          {
++            "id": 18,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 18,
++            "finishOrder": 18,
++            "entryReach": 302,
++            "colorRemaining": 302,
++            "consumed": 22,
++            "debt": -280
++          },
++          {
++            "id": 19,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 19,
++            "finishOrder": 19,
++            "entryReach": 280,
++            "colorRemaining": 280,
++            "consumed": 22,
++            "debt": -258
++          },
++          {
++            "id": 20,
++            "color": 14,
++            "cap": 33,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 20,
++            "finishOrder": 20,
++            "entryReach": 11,
++            "colorRemaining": 33,
++            "consumed": 33,
++            "debt": 22
++          },
++          {
++            "id": 21,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 21,
++            "finishOrder": 21,
++            "entryReach": 4,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 22
++          },
++          {
++            "id": 22,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 22,
++            "finishOrder": 22,
++            "entryReach": 258,
++            "colorRemaining": 258,
++            "consumed": 22,
++            "debt": -236
++          },
++          {
++            "id": 23,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 23,
++            "finishOrder": 23,
++            "entryReach": 236,
++            "colorRemaining": 236,
++            "consumed": 22,
++            "debt": -214
++          },
++          {
++            "id": 24,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 24,
++            "finishOrder": 24,
++            "entryReach": 214,
++            "colorRemaining": 214,
++            "consumed": 22,
++            "debt": -192
++          },
++          {
++            "id": 25,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 25,
++            "finishOrder": 25,
++            "entryReach": 192,
++            "colorRemaining": 192,
++            "consumed": 22,
++            "debt": -170
++          },
++          {
++            "id": 26,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 26,
++            "finishOrder": 26,
++            "entryReach": 170,
++            "colorRemaining": 170,
++            "consumed": 22,
++            "debt": -148
++          },
++          {
++            "id": 27,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 27,
++            "finishOrder": 27,
++            "entryReach": 148,
++            "colorRemaining": 148,
++            "consumed": 22,
++            "debt": -126
++          },
++          {
++            "id": 28,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 28,
++            "finishOrder": 28,
++            "entryReach": 136,
++            "colorRemaining": 140,
++            "consumed": 20,
++            "debt": -116
++          },
++          {
++            "id": 29,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 29,
++            "finishOrder": 29,
++            "entryReach": 126,
++            "colorRemaining": 126,
++            "consumed": 21,
++            "debt": -105
++          },
++          {
++            "id": 30,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 30,
++            "finishOrder": 30,
++            "entryReach": 116,
++            "colorRemaining": 120,
++            "consumed": 20,
++            "debt": -96
++          },
++          {
++            "id": 31,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 31,
++            "finishOrder": 31,
++            "entryReach": 105,
++            "colorRemaining": 105,
++            "consumed": 21,
++            "debt": -84
++          },
++          {
++            "id": 32,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 32,
++            "finishOrder": 32,
++            "entryReach": 96,
++            "colorRemaining": 100,
++            "consumed": 20,
++            "debt": -76
++          },
++          {
++            "id": 33,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 33,
++            "finishOrder": 33,
++            "entryReach": 84,
++            "colorRemaining": 84,
++            "consumed": 21,
++            "debt": -63
++          },
++          {
++            "id": 34,
++            "color": 1,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 34,
++            "finishOrder": 34,
++            "entryReach": 12,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 14
++          },
++          {
++            "id": 35,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 35,
++            "finishOrder": 35,
++            "entryReach": 76,
++            "colorRemaining": 80,
++            "consumed": 20,
++            "debt": -56
++          },
++          {
++            "id": 36,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 36,
++            "finishOrder": 36,
++            "entryReach": 63,
++            "colorRemaining": 63,
++            "consumed": 21,
++            "debt": -42
++          },
++          {
++            "id": 37,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 37,
++            "finishOrder": 37,
++            "entryReach": 56,
++            "colorRemaining": 60,
++            "consumed": 20,
++            "debt": -36
++          },
++          {
++            "id": 38,
++            "color": 16,
++            "cap": 24,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 38,
++            "finishOrder": 38,
++            "entryReach": 50,
++            "colorRemaining": 70,
++            "consumed": 24,
++            "debt": -26
++          },
++          {
++            "id": 39,
++            "color": 33,
++            "cap": 25,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 39,
++            "finishOrder": 39,
++            "entryReach": 44,
++            "colorRemaining": 50,
++            "consumed": 25,
++            "debt": -19
++          },
++          {
++            "id": 40,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 40,
++            "finishOrder": 40,
++            "entryReach": 43,
++            "colorRemaining": 46,
++            "consumed": 23,
++            "debt": -20
++          },
++          {
++            "id": 41,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 41,
++            "finishOrder": 41,
++            "entryReach": 42,
++            "colorRemaining": 42,
++            "consumed": 21,
++            "debt": -21
++          },
++          {
++            "id": 42,
++            "color": 28,
++            "cap": 27,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 42,
++            "finishOrder": 42,
++            "entryReach": 41,
++            "colorRemaining": 53,
++            "consumed": 27,
++            "debt": -14
++          },
++          {
++            "id": 43,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 43,
++            "finishOrder": 43,
++            "entryReach": 38,
++            "colorRemaining": 40,
++            "consumed": 20,
++            "debt": -18
++          },
++          {
++            "id": 44,
++            "color": 31,
++            "cap": 29,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 44,
++            "finishOrder": 44,
++            "entryReach": 29,
++            "colorRemaining": 29,
++            "consumed": 29,
++            "debt": 0
++          },
++          {
++            "id": 45,
++            "color": 1,
++            "cap": 26,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 45,
++            "finishOrder": 45,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          },
++          {
++            "id": 46,
++            "color": 33,
++            "cap": 25,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 46,
++            "finishOrder": 46,
++            "entryReach": 25,
++            "colorRemaining": 25,
++            "consumed": 25,
++            "debt": 0
++          },
++          {
++            "id": 47,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 47,
++            "finishOrder": 47,
++            "entryReach": 23,
++            "colorRemaining": 23,
++            "consumed": 23,
++            "debt": 0
++          },
++          {
++            "id": 48,
++            "color": 13,
++            "cap": 37,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 48,
++            "finishOrder": 48,
++            "entryReach": 37,
++            "colorRemaining": 37,
++            "consumed": 37,
++            "debt": 0
++          },
++          {
++            "id": 49,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 49,
++            "finishOrder": 49,
++            "entryReach": 21,
++            "colorRemaining": 21,
++            "consumed": 21,
++            "debt": 0
++          },
++          {
++            "id": 50,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 50,
++            "finishOrder": 50,
++            "entryReach": 20,
++            "colorRemaining": 20,
++            "consumed": 20,
++            "debt": 0
++          },
++          {
++            "id": 51,
++            "color": 5,
++            "cap": 30,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 51,
++            "finishOrder": 51,
++            "entryReach": 29,
++            "colorRemaining": 30,
++            "consumed": 30,
++            "debt": 1
++          },
++          {
++            "id": 52,
++            "color": 28,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 52,
++            "finishOrder": 52,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          }
++        ]
++      },
++      "hash": "91bf31bb12095016656ada732a16b02e361c2905f81723e8027a29ee4e642849",
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 32677,
++      "policy": "targetBuffer",
++      "actualBoard": {
++        "rows": 9,
++        "cols": 7
++      },
++      "targetCars": 52,
++      "actualBoxes": 52,
++      "exactTarget": true,
++      "blackPct": 17.5,
++      "wallMs": 33800,
++      "valid": true,
++      "rounds": 2,
++      "stop": "goalTimeUp",
++      "freeRunMax": 22,
++      "freeLowPct": 25,
++      "midBuffer34Pct": 17.2,
++      "maxBuffer": 4,
++      "significantReleaseCount": 0,
++      "solverRelease": "found",
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [
++        "吃满中位 6>3",
++        "最长免费连 22>6"
++      ],
++      "qReasons": [
++        "学会后100%>85%（一学就会）",
++        "前瞻100%>85%（一眼看穿）",
++        "吃满中位6>2（太白给）",
++        "T陷阱0%<10%（没压力）",
++        "R后悔0pp<15（没岔路）",
++        "最长免费连22步>5"
++      ],
++      "capacity": {
++        "conserved": true,
++        "aboveMax": 0,
++        "belowMin": 0,
++        "microCars": [],
++        "minCap": 20,
++        "maxCap": 39,
++        "boardFloorPass": true
++      },
++      "instantPlan": {
++        "schema": "instant-playout-v2",
++        "ok": true,
++        "reason": null,
++        "policy": "targetBuffer",
++        "cars": 52,
++        "covered": 1225,
++        "total": 1225,
++        "capRange": [
++          20,
++          40
++        ],
++        "audit": {
++          "aboveMax": 0,
++          "belowMin": 0,
++          "microCount": 0,
++          "unfinished": 0,
++          "covered": 1225,
++          "total": 1225,
++          "deadlock": false
++        },
++        "targetCars": 52,
++        "minTotalCars": 36,
++        "maxTotalCars": 53,
++        "targetCarsFeasible": true,
++        "capacityPlans": [
++          {
++            "color": 1,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 5,
++            "total": 30,
++            "caps": [
++              30
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 13,
++            "total": 37,
++            "caps": [
++              37
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 14,
++            "total": 33,
++            "caps": [
++              33
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 15,
++            "total": 52,
++            "caps": [
++              26,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 16,
++            "total": 70,
++            "caps": [
++              24,
++              23,
++              23
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 19,
++            "total": 434,
++            "caps": [
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              22,
++              21,
++              21,
++              21,
++              21,
++              21,
++              21
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 28,
++            "total": 53,
++            "caps": [
++              27,
++              26
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 30,
++            "total": 35,
++            "caps": [
++              35
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 31,
++            "total": 58,
++            "caps": [
++              29,
++              29
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 32,
++            "total": 39,
++            "caps": [
++              39
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 33,
++            "total": 50,
++            "caps": [
++              25,
++              25
++            ],
++            "exact": true,
++            "reason": null
++          },
++          {
++            "color": 34,
++            "total": 282,
++            "caps": [
++              21,
++              21,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20,
++              20
++            ],
++            "exact": true,
++            "reason": null
++          }
++        ],
++        "exactCapacityColors": 13,
++        "infeasibleCapacityColors": 0,
++        "bufferEvents": 30,
++        "debtCars": 8,
++        "maxBuffer": 5,
++        "medianEntryReach": 85,
++        "medianConsumed": 22,
++        "carSequence": [
++          {
++            "id": 1,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 1,
++            "finishOrder": 1,
++            "entryReach": 200,
++            "colorRemaining": 282,
++            "consumed": 21,
++            "debt": -179
++          },
++          {
++            "id": 2,
++            "color": 34,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 2,
++            "finishOrder": 2,
++            "entryReach": 179,
++            "colorRemaining": 261,
++            "consumed": 21,
++            "debt": -158
++          },
++          {
++            "id": 3,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 3,
++            "finishOrder": 3,
++            "entryReach": 185,
++            "colorRemaining": 434,
++            "consumed": 22,
++            "debt": -163
++          },
++          {
++            "id": 4,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 4,
++            "finishOrder": 4,
++            "entryReach": 163,
++            "colorRemaining": 412,
++            "consumed": 22,
++            "debt": -141
++          },
++          {
++            "id": 5,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 5,
++            "finishOrder": 5,
++            "entryReach": 158,
++            "colorRemaining": 240,
++            "consumed": 20,
++            "debt": -138
++          },
++          {
++            "id": 6,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 6,
++            "finishOrder": 6,
++            "entryReach": 141,
++            "colorRemaining": 390,
++            "consumed": 22,
++            "debt": -119
++          },
++          {
++            "id": 7,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 7,
++            "finishOrder": 7,
++            "entryReach": 138,
++            "colorRemaining": 220,
++            "consumed": 20,
++            "debt": -118
++          },
++          {
++            "id": 8,
++            "color": 19,
++            "cap": 22,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 8,
++            "finishOrder": 8,
++            "entryReach": 119,
++            "colorRemaining": 368,
++            "consumed": 22,
++            "debt": -97
++          },
++          {
++            "id": 9,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 9,
++            "finishOrder": 9,
++            "entryReach": 118,
++            "colorRemaining": 200,
++            "consumed": 20,
++            "debt": -98
++          },
++          {
++            "id": 10,
++            "color": 32,
++            "cap": 39,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 10,
++            "finishOrder": 10,
++            "entryReach": 5,
++            "colorRemaining": 39,
++            "consumed": 39,
++            "debt": 34
++          },
++          {
++            "id": 11,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 11,
++            "finishOrder": 11,
++            "entryReach": 105,
++            "colorRemaining": 180,
++            "consumed": 20,
++            "debt": -85
++          },
++          {
++            "id": 12,
++            "color": 19,
++            "cap": 22,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 12,
++            "finishOrder": 12,
++            "entryReach": 97,
++            "colorRemaining": 346,
++            "consumed": 22,
++            "debt": -75
++          },
++          {
++            "id": 13,
++            "color": 34,
++            "cap": 20,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 13,
++            "finishOrder": 13,
++            "entryReach": 85,
++            "colorRemaining": 160,
++            "consumed": 20,
++            "debt": -65
++          },
++          {
++            "id": 14,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 14,
++            "finishOrder": 14,
++            "entryReach": 6,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 20
++          },
++          {
++            "id": 15,
++            "color": 30,
++            "cap": 35,
++            "slot": 2,
++            "start": {
++              "r": 34,
++              "c": 14
++            },
++            "enterOrder": 15,
++            "finishOrder": 15,
++            "entryReach": 6,
++            "colorRemaining": 35,
++            "consumed": 35,
++            "debt": 29
++          },
++          {
++            "id": 16,
++            "color": 31,
++            "cap": 29,
++            "slot": 3,
++            "start": {
++              "r": 34,
++              "c": 21
++            },
++            "enterOrder": 16,
++            "finishOrder": 16,
++            "entryReach": 2,
++            "colorRemaining": 58,
++            "consumed": 29,
++            "debt": 27
++          },
++          {
++            "id": 17,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 17,
++            "finishOrder": 17,
++            "entryReach": 195,
++            "colorRemaining": 324,
++            "consumed": 22,
++            "debt": -173
++          },
++          {
++            "id": 18,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 18,
++            "finishOrder": 18,
++            "entryReach": 302,
++            "colorRemaining": 302,
++            "consumed": 22,
++            "debt": -280
++          },
++          {
++            "id": 19,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 19,
++            "finishOrder": 19,
++            "entryReach": 280,
++            "colorRemaining": 280,
++            "consumed": 22,
++            "debt": -258
++          },
++          {
++            "id": 20,
++            "color": 14,
++            "cap": 33,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 20,
++            "finishOrder": 20,
++            "entryReach": 11,
++            "colorRemaining": 33,
++            "consumed": 33,
++            "debt": 22
++          },
++          {
++            "id": 21,
++            "color": 15,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 21,
++            "finishOrder": 21,
++            "entryReach": 4,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 22
++          },
++          {
++            "id": 22,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 22,
++            "finishOrder": 22,
++            "entryReach": 258,
++            "colorRemaining": 258,
++            "consumed": 22,
++            "debt": -236
++          },
++          {
++            "id": 23,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 23,
++            "finishOrder": 23,
++            "entryReach": 236,
++            "colorRemaining": 236,
++            "consumed": 22,
++            "debt": -214
++          },
++          {
++            "id": 24,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 24,
++            "finishOrder": 24,
++            "entryReach": 214,
++            "colorRemaining": 214,
++            "consumed": 22,
++            "debt": -192
++          },
++          {
++            "id": 25,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 25,
++            "finishOrder": 25,
++            "entryReach": 192,
++            "colorRemaining": 192,
++            "consumed": 22,
++            "debt": -170
++          },
++          {
++            "id": 26,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 26,
++            "finishOrder": 26,
++            "entryReach": 170,
++            "colorRemaining": 170,
++            "consumed": 22,
++            "debt": -148
++          },
++          {
++            "id": 27,
++            "color": 19,
++            "cap": 22,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 27,
++            "finishOrder": 27,
++            "entryReach": 148,
++            "colorRemaining": 148,
++            "consumed": 22,
++            "debt": -126
++          },
++          {
++            "id": 28,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 28,
++            "finishOrder": 28,
++            "entryReach": 136,
++            "colorRemaining": 140,
++            "consumed": 20,
++            "debt": -116
++          },
++          {
++            "id": 29,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 29,
++            "finishOrder": 29,
++            "entryReach": 126,
++            "colorRemaining": 126,
++            "consumed": 21,
++            "debt": -105
++          },
++          {
++            "id": 30,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 30,
++            "finishOrder": 30,
++            "entryReach": 116,
++            "colorRemaining": 120,
++            "consumed": 20,
++            "debt": -96
++          },
++          {
++            "id": 31,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 31,
++            "finishOrder": 31,
++            "entryReach": 105,
++            "colorRemaining": 105,
++            "consumed": 21,
++            "debt": -84
++          },
++          {
++            "id": 32,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 32,
++            "finishOrder": 32,
++            "entryReach": 96,
++            "colorRemaining": 100,
++            "consumed": 20,
++            "debt": -76
++          },
++          {
++            "id": 33,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 33,
++            "finishOrder": 33,
++            "entryReach": 84,
++            "colorRemaining": 84,
++            "consumed": 21,
++            "debt": -63
++          },
++          {
++            "id": 34,
++            "color": 1,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 34,
++            "finishOrder": 34,
++            "entryReach": 12,
++            "colorRemaining": 52,
++            "consumed": 26,
++            "debt": 14
++          },
++          {
++            "id": 35,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 35,
++            "finishOrder": 35,
++            "entryReach": 76,
++            "colorRemaining": 80,
++            "consumed": 20,
++            "debt": -56
++          },
++          {
++            "id": 36,
++            "color": 19,
++            "cap": 21,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 36,
++            "finishOrder": 36,
++            "entryReach": 63,
++            "colorRemaining": 63,
++            "consumed": 21,
++            "debt": -42
++          },
++          {
++            "id": 37,
++            "color": 34,
++            "cap": 20,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 37,
++            "finishOrder": 37,
++            "entryReach": 56,
++            "colorRemaining": 60,
++            "consumed": 20,
++            "debt": -36
++          },
++          {
++            "id": 38,
++            "color": 16,
++            "cap": 24,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 38,
++            "finishOrder": 38,
++            "entryReach": 50,
++            "colorRemaining": 70,
++            "consumed": 24,
++            "debt": -26
++          },
++          {
++            "id": 39,
++            "color": 33,
++            "cap": 25,
++            "slot": 4,
++            "start": {
++              "r": 34,
++              "c": 28
++            },
++            "enterOrder": 39,
++            "finishOrder": 39,
++            "entryReach": 44,
++            "colorRemaining": 50,
++            "consumed": 25,
++            "debt": -19
++          },
++          {
++            "id": 40,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 40,
++            "finishOrder": 40,
++            "entryReach": 43,
++            "colorRemaining": 46,
++            "consumed": 23,
++            "debt": -20
++          },
++          {
++            "id": 41,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 41,
++            "finishOrder": 41,
++            "entryReach": 42,
++            "colorRemaining": 42,
++            "consumed": 21,
++            "debt": -21
++          },
++          {
++            "id": 42,
++            "color": 28,
++            "cap": 27,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 42,
++            "finishOrder": 42,
++            "entryReach": 41,
++            "colorRemaining": 53,
++            "consumed": 27,
++            "debt": -14
++          },
++          {
++            "id": 43,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 43,
++            "finishOrder": 43,
++            "entryReach": 38,
++            "colorRemaining": 40,
++            "consumed": 20,
++            "debt": -18
++          },
++          {
++            "id": 44,
++            "color": 31,
++            "cap": 29,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 44,
++            "finishOrder": 44,
++            "entryReach": 29,
++            "colorRemaining": 29,
++            "consumed": 29,
++            "debt": 0
++          },
++          {
++            "id": 45,
++            "color": 1,
++            "cap": 26,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 45,
++            "finishOrder": 45,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          },
++          {
++            "id": 46,
++            "color": 33,
++            "cap": 25,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 46,
++            "finishOrder": 46,
++            "entryReach": 25,
++            "colorRemaining": 25,
++            "consumed": 25,
++            "debt": 0
++          },
++          {
++            "id": 47,
++            "color": 16,
++            "cap": 23,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 47,
++            "finishOrder": 47,
++            "entryReach": 23,
++            "colorRemaining": 23,
++            "consumed": 23,
++            "debt": 0
++          },
++          {
++            "id": 48,
++            "color": 13,
++            "cap": 37,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 48,
++            "finishOrder": 48,
++            "entryReach": 37,
++            "colorRemaining": 37,
++            "consumed": 37,
++            "debt": 0
++          },
++          {
++            "id": 49,
++            "color": 19,
++            "cap": 21,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 49,
++            "finishOrder": 49,
++            "entryReach": 21,
++            "colorRemaining": 21,
++            "consumed": 21,
++            "debt": 0
++          },
++          {
++            "id": 50,
++            "color": 34,
++            "cap": 20,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 50,
++            "finishOrder": 50,
++            "entryReach": 20,
++            "colorRemaining": 20,
++            "consumed": 20,
++            "debt": 0
++          },
++          {
++            "id": 51,
++            "color": 5,
++            "cap": 30,
++            "slot": 0,
++            "start": {
++              "r": 34,
++              "c": 0
++            },
++            "enterOrder": 51,
++            "finishOrder": 51,
++            "entryReach": 29,
++            "colorRemaining": 30,
++            "consumed": 30,
++            "debt": 1
++          },
++          {
++            "id": 52,
++            "color": 28,
++            "cap": 26,
++            "slot": 1,
++            "start": {
++              "r": 34,
++              "c": 7
++            },
++            "enterOrder": 52,
++            "finishOrder": 52,
++            "entryReach": 26,
++            "colorRemaining": 26,
++            "consumed": 26,
++            "debt": 0
++          }
++        ]
++      },
++      "hash": "974c54197f91e804d81ff542316b4f055c044d407e8dedc9e669df12004ade77",
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 1001,
++      "policy": "mixedDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 324,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 1002,
++      "policy": "mixedDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 313,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 32677,
++      "policy": "mixedDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 511,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 1001,
++      "policy": "shortDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 161,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 1002,
++      "policy": "shortDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 128,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    },
++    {
++      "shape": "9x7",
++      "seed": 32677,
++      "policy": "shortDebt",
++      "actualBoard": null,
++      "targetCars": 52,
++      "actualBoxes": null,
++      "exactTarget": false,
++      "blackPct": null,
++      "wallMs": 135,
++      "valid": false,
++      "rounds": 2,
++      "stop": "goalMaxRounds",
++      "freeRunMax": null,
++      "freeLowPct": null,
++      "midBuffer34Pct": null,
++      "maxBuffer": null,
++      "significantReleaseCount": null,
++      "solverRelease": null,
++      "struct": false,
++      "pass": false,
++      "qGateReasons": [],
++      "qReasons": [],
++      "capacity": null,
++      "instantPlan": null,
++      "hash": null,
++      "error": null
++    }
++  ]
++}
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_\351\242\204\347\231\273\350\256\260_v545.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_\351\242\204\347\231\273\350\256\260_v545.md"
+new file mode 100644
+index 0000000..02ee9bf
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\350\275\246\345\272\217\344\270\216\350\275\254\347\275\256\346\243\213\347\233\230_\351\242\204\347\231\273\350\256\260_v545.md"
+@@ -0,0 +1,46 @@
++# 债务车序 × 转置棋盘 · v545 预登记
++
++> Kimi 方法建议。唯一验收骨架为 `优质关卡生成_详细工作流程.md` 的 P0～P6。
++
++## 背景
++
++v544 已证明 `[20,40]` + targetCarCount 可以把 7×7/7×8/7×9 的目标车数、黑块和容量合同落地，但高压0/9。当前需要只改瞬时计划的债务车序，不改变目标车数、容量、棋盘占格或障碍。同时棋盘方向必须覆盖转置形态：7×9 与 9×7。
++
++## 实验臂
++
++- 棋盘：7×9、9×7（行列为交换形态）。
++- 图：007。
++- seed：1001、1002、32677。
++- 容量：显式实验带 `[20,40]`，targetCarCount=52。
++- 固定：瞬时四方向、prefix debts=8、`targetBuffer=4`、`maxDebt=40`、2分支、无障碍、无P7、无陷阱后处理。
++- 唯一变量：`instantPlanPolicy`：
++  - A：`targetBuffer`（v544 控制臂）
++  - B：`mixedDebt`
++  - C：`shortDebt`
++
++## 主指标
++
++- 实际boxes=52；
++- 每车容量在 `[20,40]`、belowMin/aboveMax=0；
++- solver中段3/4≥50%；
++- 黑块≤20%；
++- 结构门、完整释放和最终回放。
++
++## 保护指标
++
++- 7×9/9×7 实际尺寸正确；
++- 每色守恒；
++- 不改变容量带和目标车数；
++- 不新增障碍；
++- 记录方向转置后的hash、空槽/债务车和maxBuffer。
++
++## 通过 / 否决
++
++- 通过：至少一个转置方向、一个债务策略在3 seed中产生boxes=52、黑块≤20%、mid3/4≥50%的样本。
++- 部分通过：车数/黑块/容量成立但高压仍未成立。
++- 否决：债务策略导致容量/目标车数失效；或转置方向明显劣化且没有方向证据。
++
++## 回滚点
++
++- 上一版：`7307dcd`（v544）。
++- 本步只用实验策略参数，不改变默认UI。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+index 221f8d1..6d50421 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\256\236\351\252\214\347\264\242\345\274\225.md"
+@@ -79,6 +79,7 @@
+ | v542 黑块补位探针 | blackPercent能否消掉7×9补位黑块 | ❌ 10→0后两seed仍17/63=27%、hash不变；planned5/6、surplus11/12；黑块由棋盘补位决定 | `黑块补位探针_v542.js` + JSON + 预登记 | §532 |
+ | v543 棋盘×容量矩阵 | [20,40]能否在7×7/7×8/7×9填车降黑块并保高压 | ❌ A 7×8黑块17.9%但结构0/3；B/C/D实际均36 boxes、targetCarCount41/46/52未落地，黑块26.5%~42.9%；无臂同时达黑块≤20%+完整通过 | `棋盘容量矩阵_v543.js` + JSON + 预登记 | §533 |
+ | v544 目标车数落位 | InstantPlayout能否真正按41/46/52车落位并保持容量/黑块 | ✅ B/C/D 9/9精确达到41/46/52 boxes、容量[20,40]合同通过、黑块≤17.9%；但高压0/9、结构0/9、目标0/9；默认无target时hash不变 | `目标车数落位_v544.js` + JSON + 预登记 | §534 |
++| v545 债务车序×转置 | 7×9/9×7转置下债务策略能否形成高压 | targetBuffer 6/6达52 boxes、17.5%黑、容量合同，但高压0/6；mixedDebt/shortDebt 12/12无效 | `债务车序与转置棋盘_v545.js` + JSON + 预登记 | §535 |
+ 
+ ## 当前权威产物
+ 
+diff --git a/AGENTS.md b/AGENTS.md
+index 70ece22..e734a82 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,7 +1,7 @@
+ # AGENTS.md · 毛线汽车（关卡生成器）
+ 
+ > 给所有 AI 会话的常驻须知。**先读 `01_交接文档/工程说明.md`**（全工程说明书），本文件只放"不看就会犯错"的红线。
+-> 工作日志 **534 节 / 20870 行（约 827 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§534）。
++> 工作日志 **535 节 / 20900 行（约 829 KB）**，**不要整份读**——按 `### 节号` grep 定位到某一节再读（顶部主题索引只覆盖早期章节，最新节在 §491~§535）。
+ 
+ ## 这是什么
+ 
+@@ -41,6 +41,7 @@ node 03_工具/好关评分/棋盘余量7x9_v541.js
+ node 03_工具/好关评分/黑块补位探针_v542.js
+ node 03_工具/好关评分/棋盘容量矩阵_v543.js
+ node 03_工具/好关评分/目标车数落位_v544.js
++node 03_工具/好关评分/债务车序与转置棋盘_v545.js
+ node 03_工具/好关评分/归因_v495.js --jsonl <对比结果.jsonl> --levels <失败关目录>
+ grep -n "^### 246" 01_交接文档/工作日志_20261012.md   # 按节号查日志
+ ```
+diff --git a/README.md b/README.md
+index 86c0da7..287d2c4 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ > 给游戏「车接小人」（蚂蚁拿块玩法）**批量生产可玩关卡**的工程。
+ > 前身是前辈交接的「主bin生产流程交接包」，现已接手维护并改名为 **毛线汽车**。
+-> 当前版本 **v544**（targetCarCount已落地、黑块下降，但高压/结构仍为0/9）。
++> 当前版本 **v545**（7×9/9×7目标车数与黑块落位通过，但债务策略压力仍为0/6）。
+ >
+ > 🤖 如果你是 AI 会话：先看 [`AGENTS.md`](AGENTS.md)（红线）→ [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（全貌）。
+ 
+@@ -29,7 +29,7 @@ cd 02_工程/完整主bin快照_20261012 && python3 -m http.server 8060
+ | **搞懂整条流程** | [`01_交接文档/流程详解.md`](01_交接文档/流程详解.md)（9 节，对着代码看） |
+ | **看全流程对照图** | [`思维导图_求解器与关卡生产全流程.html`](思维导图_求解器与关卡生产全流程.html)（求解器 → 反解 → 关卡生产，自包含，双击可开） |
+ | **知道工程全貌** | [`01_交接文档/工程说明.md`](01_交接文档/工程说明.md)（架构/格式/参数/已知问题/命令） |
+-| **看最新实施与实验（v502~v544）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
++| **看最新实施与实验（v502~v545）** | [`01_交接文档/目标体验与容量精调_实施计划.md`](01_交接文档/目标体验与容量精调_实施计划.md) |
+ | **看本轮状态（v495~v500）** | [`01_交接文档/交接摘要_v500_20261025.md`](01_交接文档/交接摘要_v500_20261025.md) |
+ | **看下一阶段计划** | [`工程说明.md` §15.8](01_交接文档/工程说明.md)（失败驱动修复 / debtValue / 30 分钟预算） |
+ | **看详细实验与交付流程** | [`01_交接文档/优质关卡生成_详细工作流程.md`](01_交接文档/优质关卡生成_详细工作流程.md)（已完成/未完成、P0~P6实验卡、验收与回滚） |
