@@ -119,6 +119,9 @@ AntSolver.Simulator = (function() {
    */
   function createState(level, opts) {
     var board = level.board || { rows: 0, cols: 0, cells: [] };
+    // 【v518】部分兜底内部level缺rows/cols；从blocks补齐，禁止NaN尺寸污染ring缓存。
+    var levelRows = level.rows || (level.blocks && level.blocks.length) || 0;
+    var levelCols = level.cols || (level.blocks && level.blocks[0] && level.blocks[0].length) || 0;
     var s = {
       level: level,
       useSlotStart: !!(opts && opts.useSlotStart), // 起点距离优先消除(手动游玩)；默认关(求解器/生成)
@@ -128,9 +131,9 @@ AntSolver.Simulator = (function() {
       // 开启后【全链路同一口径】：结算走 instantChainEliminate(快照批次 + 起点距离优先)、
       // 暂存推进严格按进入顺序(先进先得)、全知求解与玩家模拟共用这一套结算。
       instantChain: !!(opts && opts.instantChain),
-      rows: level.rows, cols: level.cols,
+      rows: levelRows, cols: levelCols,
       blocks: AntSolver.deepClone(level.blocks),
-      eliminated: AntSolver.create2D(level.rows, level.cols, false),
+      eliminated: AntSolver.create2D(levelRows, levelCols, false),
       totalPixels: level.totalPixels,
       eliminatedPixels: 0,
       bufferLimit: level.bufferLimit || 5,
@@ -166,7 +169,7 @@ AntSolver.Simulator = (function() {
     // 瞬时连锁模式固定四方向：即使调用方误传 bottomOnly 也强制关掉，避免出现「四方向模式却按底部播种」。
     if (s.instantChain && s.bottomOnly) s.bottomOnly = false;
     // 初始可达空格：仅与棋盘外部连通的空格（对齐 ColonyFlow computeReach，封闭空腔不可达）
-    s.eliminated = AntSolver.outsideReachSeed(level.blocks, level.rows, level.cols, s.bottomOnly);
+    s.eliminated = AntSolver.outsideReachSeed(level.blocks, levelRows, levelCols, s.bottomOnly);
 
     initBoardObstacles(s);
     checkPipeRelease(s);
@@ -401,7 +404,12 @@ AntSolver.Simulator = (function() {
   //   结果“已经露出来”的格子会被算成更深的圈、很晚才轮到（用户实测到的偏差）。
   var _ringScratch = null, _ringScratchN = 0;
   function ringMaskOf(eliminated, blocks, rows, cols, bottomOnly) {
+    // 【v518】缺失尺寸从blocks恢复；NaN缓存绝不复用，否则零长度ring会让BFS无限入队。
+    if (!(rows > 0 && cols > 0) && blocks && blocks.length) {
+      rows = blocks.length; cols = blocks[0] && blocks[0].length || 0;
+    }
     var N = rows * cols;
+    if (!(N > 0 && isFinite(N))) return [];
     if (!_ringScratch || _ringScratchN < N) { _ringScratch = new Int32Array(N); _ringScratchN = N; }
     var ring = _ringScratch; ring.fill(-1, 0, N);
     var dirs4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
@@ -441,6 +449,9 @@ AntSolver.Simulator = (function() {
   // 每次取盒均按像素级动态依赖波消除：底→左→右→顶的入口优先；消一格即刷新其解锁区域。
   // start 提供时（手动游玩）额外以离盒起点的曼哈顿距离为最高优先级，平手再用动态依赖波。
   function floodFillEliminate(eliminated, blocks, rows, cols, colorId, maxCount, trace, start, bottomOnly) {
+    if (!(rows > 0 && cols > 0) && blocks && blocks.length) {
+      rows = blocks.length; cols = blocks[0] && blocks[0].length || 0;
+    }
     if (maxCount <= 0) return 0;
     var dirs = [[-1,0],[1,0],[0,-1],[0,1]];
     var AREA = rows * cols;

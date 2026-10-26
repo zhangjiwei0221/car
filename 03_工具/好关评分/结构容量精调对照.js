@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+/** v518：有真实容量边界的结构近失精调，先结构评价，不要求先过体验曲线。 */
+'use strict';
+const fs=require('fs'),path=require('path'),vm=require('vm'),crypto=require('crypto');
+const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js'),FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','generator.js'];
+const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON,setTimeout,clearTimeout,Infinity};vm.createContext(sb);for(const f of FILES)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver,G=A.Generator;
+function opt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?process.argv[i+1]:d;}const budget=+opt('budget','20000'),out=opt('out',''),only=opt('levels','recommend_32677').split(',');
+const sources={recommend_32677_near:{report:'独立回归_32677_v516.json',image:'recommend',level:'推荐32677_近失变体_v518.json'},recommend_32677:{report:'独立回归_32677_v516.json',image:'recommend',level:'独立回归关卡_v516/recommend_32677.json'},recommend_1002:{report:'独立回归_1002_v516.json',image:'recommend',level:'独立回归关卡_v516/recommend_1002.json'},good_32677:{report:'独立回归_32677_v516.json',image:'good',level:'独立回归关卡_v516/good_32677.json'}};
+function hash(x){return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');}
+function cand(level,ev,cfg){return {level,valid:!!(ev&&ev.valid),solveResult:ev&&ev.solveResult,audit:ev&&ev.audit,goodV3:ev&&ev.goodV3,config:cfg};}
+function measure(level,ev,cfg){const c=cand(level,ev,cfg),q=A.Quality.fromGeneration(c),fc=c.goodV3&&c.goodV3.fillCurve||{},ca=A.Quality.capacityEvidence(level,cfg);return {valid:c.valid,struct:G.goalStructPass(c),gateReasons:q.gateReasons||[],gateDistance:q.gateDistance,freeLowPct:fc.freeLowPct,freeRunMax:fc.freeRunMax,selectMedian:fc.selectMedian,pressurePct3:fc.pressurePct3,capacity:{conserved:ca.conserved,boardFloorPass:ca.boardFloorPass,aboveMax:ca.aboveMax,belowMin:ca.belowMin}};}
+function protectedOk(m,b){return m.valid&&m.capacity.conserved&&m.capacity.boardFloorPass&&m.capacity.aboveMax===0&&m.capacity.belowMin<=b.capacity.belowMin;}
+function better(a,b){if(!b)return true;if(!!a.struct!==!!b.struct)return a.struct;if(a.gateReasons.length!==b.gateReasons.length)return a.gateReasons.length<b.gateReasons.length;return (a.gateDistance==null?1e9:a.gateDistance)<(b.gateDistance==null?1e9:b.gateDistance);}
+function run(id){const s=sources[id],report=JSON.parse(fs.readFileSync(path.join(ROOT,'03_工具/好关评分',s.report),'utf8')),rr=report.rows.find(x=>x.image===s.image),rawLevel=JSON.parse(fs.readFileSync(path.join(ROOT,'03_工具/好关评分',s.level),'utf8')),level=A.parseLevel(rawLevel),cfg=Object.assign({},G.DEFAULT_CONFIG,{trapEvalMs:1500,boxSizeMin:rr.capacity.boxSizeMin,boxSizeMax:rr.capacity.boxSizeMax,capNormMin:rr.capacity.boxSizeMin,capNormMax:rr.capacity.boxSizeMax});
+ const t0=Date.now(),sr=A.Solver.solve(level,{timeBudgetMs:1500,capturePreviewStats:true}),ev0=G.evaluateLevel(level,cfg),base=measure(level,ev0,cfg),rec={id,baseHash:hash(level),capRange:[cfg.boxSizeMin,cfg.boxSizeMax],base,tested:0,protectedRejected:0,variants:[],best:null};
+ const made=A.CapacityTuner.variants(level,sr,{capMin:cfg.boxSizeMin,capMax:cfg.boxSizeMax,maxCars:8,maxVariants:48});rec.keyCars=made.keyCars;
+ for(const v of made.variants){if(Date.now()-t0>=budget){rec.stopped='budget_exhausted';break;}const t=Date.now(),ev=G.evaluateLevel(v.level,cfg),m=measure(v.level,ev,cfg),row={meta:v.meta,ms:Date.now()-t,after:m,hash:hash(v.level)};rec.tested++;rec.variants.push(row);
+  if(!protectedOk(m,base)){rec.protectedRejected++;continue;}if(better(m,rec.best&&rec.best.after))rec.best=row;
+  if(m.struct){const full=A.ExperienceGoal.evaluate(v.level,{solveResult:ev.solveResult,decision:true});row.experienceFull=full&&{pass:full.pass,status:full.status,reasons:full.reasons,metrics:full.metrics,release:full.releaseDecision&&full.releaseDecision.status};
+   if(full&&!full.pass){const cc=cand(v.level,ev,cfg);G.attachExperienceRouteEvidence(cc,cfg);row.route=cc.experienceRouteEvidence&&{pass:cc.experienceRouteEvidence.pass,best:cc.experienceRouteEvidence.bestVerified};}
+  }
+ }
+ rec.elapsedMs=Date.now()-t0;console.log(JSON.stringify({id,tested:rec.tested,ms:rec.elapsedMs,before:{struct:base.struct,reasons:base.gateReasons,distance:base.gateDistance},best:rec.best&&{struct:rec.best.after.struct,reasons:rec.best.after.gateReasons,distance:rec.best.after.gateDistance,freeLow:rec.best.after.freeLowPct,freeRun:rec.best.after.freeRunMax,target:rec.best.experienceFull&&rec.best.experienceFull.pass,route:rec.best.route&&rec.best.route.pass}}));return rec;
+}
+const rows=[];for(const id of only){if(sources[id])rows.push(run(id));}
+const summary={samples:rows.length,tested:rows.reduce((n,r)=>n+r.tested,0),structConversions:rows.filter(r=>r.best&&r.best.after.struct).length,targetPasses:rows.filter(r=>r.best&&r.best.experienceFull&&r.best.experienceFull.pass).length,routePasses:rows.filter(r=>r.best&&r.best.route&&r.best.route.pass).length,protectedRejected:rows.reduce((n,r)=>n+r.protectedRejected,0),totalMs:rows.reduce((n,r)=>n+r.elapsedMs,0)};
+const report={schema:'structure-capacity-tuning-v1',config:{budgetPerBaseMs:budget,maxCars:8,maxVariants:48,deltas:[1,2,4,-1,-2,-4]},summary,rows};if(out)fs.writeFileSync(path.resolve(ROOT,out),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(summary,null,2));
