@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** v574：复现 32 盒/9×9/四行黑块，并验证合规回退优先更大棋盘。 */
+/** v575：复现黑块长墙，并验证补位分散、瞬时分支回滚与最终形态硬门。 */
 'use strict';
 
 const fs = require('fs');
@@ -9,11 +9,13 @@ const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
+const IMAGE = process.env.IMAGE || '关卡00199_原图039-056-023-038_分图3色_40x40.txt';
+const INPUT = path.join(ROOT, '关卡', IMAGE);
+const IMAGE_LABEL = (IMAGE.match(/(\d{5})/) || [null, '199'])[1];
 const OLD_DIR = path.join(ROOT, '02_工程', '完整主bin快照_20261012', '输出文件', 'unnamed-10-27-3', '生产文档', '关卡数据');
 const OLD_LEVEL = path.join(OLD_DIR, '关卡00199_原图039-056-023-038_分图3色_40x40.json');
-const OUT = path.join(__dirname, '黑块棋盘回退_v574.json');
-const LEVEL_DIR = path.join(__dirname, '黑块棋盘回退_v574.levels');
+const OUT = path.join(__dirname, '黑块形态硬门_v575_' + IMAGE_LABEL + '.json');
+const LEVEL_DIR = path.join(__dirname, '黑块形态硬门_v575.levels');
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
@@ -21,7 +23,7 @@ const FILES = [
   'source-preflight.js'
 ];
 const OPTIONS = { instantChain: true, bottomOnly: false };
-const SEEDS = [1001, 1002];
+const SEEDS = String(process.env.SEEDS || '1001,1002').split(',').map(Number).filter(Number.isFinite);
 
 function load() {
   const sb = {
@@ -94,7 +96,7 @@ function configFor(blocks, seed) {
     pool: 1,
     semanticObstacles: false,
     usableSpaceTarget: 0,
-    blackPercent: 0,
+    blackPercent: Number(process.env.BLACK_PERCENT || 0),
     narrowPath: false,
     minPipes: 0,
     pipeFloorCount: 2,
@@ -179,6 +181,12 @@ function runOne(seed) {
     valid: !!(r && r.valid && raw),
     error: r && r.error || null,
     failReason: r && r.lastFailReason || null,
+    failDetail: r && r.lastFailDetail || null,
+    structural: r && r.structural || null,
+    flowStats: r && r.flowStats || null,
+    lastSurplusStat: r && r.lastSurplusStat || null,
+    blackShapeFailures: r && r.flowStats && r.flowStats.blackShapeFailures || null,
+    candidateTiming: r && r.candidateTiming || null,
     goalPass: !!(raw && A.Generator.goalResultExperiencePass(r, cfg)),
     goalStopReason: r && r.goalStopReason || null,
     board: raw ? raw.board.rows + 'x' + raw.board.cols : null,
@@ -192,7 +200,7 @@ function runOne(seed) {
   };
   if (raw) {
     fs.mkdirSync(LEVEL_DIR, { recursive: true });
-    const stem = '199_' + seed;
+    const stem = IMAGE_LABEL + '_' + seed;
     fs.writeFileSync(path.join(LEVEL_DIR, stem + '.json'), JSON.stringify(raw, null, 2) + '\n');
     fs.writeFileSync(path.join(LEVEL_DIR, stem + '.route.json'), JSON.stringify(route, null, 2) + '\n');
   }
@@ -219,7 +227,7 @@ function main() {
     gatePasses: rows.filter(x => x.quality && x.quality.gatePass).length
   };
   fs.writeFileSync(OUT, JSON.stringify({
-    schema: 'black-board-fallback-v574', date: '2026-10-27',
+    schema: 'black-shape-gate-v575', date: '2026-10-27',
     old, summary, rows
   }, null, 2) + '\n');
   console.log(JSON.stringify({ summary, old, out: path.relative(ROOT, OUT) }, null, 2));

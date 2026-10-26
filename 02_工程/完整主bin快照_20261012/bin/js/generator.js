@@ -1873,11 +1873,15 @@ AntSolver.Generator = (function() {
   function placeDispersedBlackReal(cells, rows, cols, extraBlack, gapProtect, config) {
     var stat = { planned: extraBlack, placed: 0, shapeRejected: 0, reachRejected: 0, coords: [] };
     if (extraBlack <= 0) return stat;
-    // 【v256】先按用户要求压到最底层
+    var totalNeed = extraBlack;
+    // 【v256】先按历史要求压到最底层；【v575】落位后必须按最终形态规则重排。
     if (config && config.wallBottomFirst !== false) {
       var bw = placeBottomWalls(cells, rows, cols, extraBlack, gapProtect);
       stat.placed = bw.placed; stat.coords = bw.coords; stat.bottomFirst = bw.placed;
-      if (stat.placed >= extraBlack) return stat;
+      if (stat.placed >= extraBlack) {
+        redistributeBlackCoords(cells, rows, cols, stat, gapProtect);
+        return stat;
+      }
       extraBlack -= bw.placed;
     }
     function wallNbrCount(r, c) {
@@ -1896,7 +1900,7 @@ AntSolver.Generator = (function() {
     var looseNeed = extraBlack * (2 - wd);
     var cand = (looseCand.length >= looseNeed) ? looseCand : looseCand.concat(tightCand);
     var sel = pickDispersed(cand, extraBlack * 2, 2);
-    for (var s = 0; s < sel.length && stat.placed < extraBlack; s++) {
+    for (var s = 0; s < sel.length && stat.placed < totalNeed; s++) {
       var p = sel[s];
       if (cells[p.r][p.c] != null) continue;
       if (wouldViolateWall(cells, rows, cols, p.r, p.c)) { stat.shapeRejected++; continue; }
@@ -1904,6 +1908,7 @@ AntSolver.Generator = (function() {
       if (!nullCellsReachable(cells, rows, cols)) { cells[p.r][p.c] = null; stat.reachRejected++; continue; }
       stat.placed++; stat.coords.push({ r: p.r, c: p.c });
     }
+    redistributeBlackCoords(cells, rows, cols, stat, gapProtect);
     return stat;
   }
 
@@ -1912,15 +1917,15 @@ AntSolver.Generator = (function() {
     var stat = { need: surplus, filled: 0, coords: [] };
     if (surplus <= 0) return stat;
     var cap = Math.floor(rows * cols * 0.45);
-    // 【v256】补位墙也先压最底层（用户要求），放不下再走分散逻辑
+    // 先保证结构候选满盘；补位位置随后由 redistributeBlackCoords 再分散。
     var _bw2 = placeBottomWalls(cells, rows, cols, surplus, gapProtect);
     stat.filled = _bw2.placed; stat.coords = _bw2.coords;
     surplus -= _bw2.placed;
     if (surplus <= 0) return stat;
-    // 【v255·用户反馈"路径很窄"】补位的墙先挑**四邻没有墙**的格子：
+    // 补位的墙先挑**四邻没有墙**的格子：
     //   原来所有空格一锅端随机撒，墙容易连成一条，把棋盘切出窄走廊。
     var cand = [], candLoose = [];
-    for (var r = 1; r < rows - 1; r++) for (var c = 0; c < cols; c++) {
+    for (var r = 1; r < rows; r++) for (var c = 0; c < cols; c++) {
       if (cells[r][c] != null || gapProtect[r + ',' + c]) continue;
       var nb = 0;
       if (isWallAt(cells, rows, cols, r - 1, c)) nb++;
@@ -1930,7 +1935,7 @@ AntSolver.Generator = (function() {
       if (nb === 0) candLoose.push({ r: r, c: c }); else cand.push({ r: r, c: c });
     }
     var sel = pickDispersed(candLoose, candLoose.length, 2).concat(pickDispersed(cand, cand.length, 2));
-    for (var i = 0; i < sel.length && stat.filled < surplus; i++) {
+    for (var i = 0; i < sel.length && stat.filled < _bw2.placed + surplus; i++) {
       var p = sel[i];
       if (cells[p.r][p.c] != null) continue;
       if (countCellsOfType(cells, 'black') >= cap) break;
@@ -1940,6 +1945,60 @@ AntSolver.Generator = (function() {
       stat.filled++; stat.coords.push({ r: p.r, c: p.c });
     }
     return stat;
+  }
+
+  /**
+   * v575：把一批“可移动”黑块按最终形态规则重新分散。
+   * 窄路等固定墙不在 coords 中；只移动调用方明确交给本函数的黑块。
+   */
+  function redistributeBlackCoords(cells, rows, cols, blackStat, gapProtect) {
+    if (!blackStat || !blackStat.coords || !blackStat.coords.length) return blackStat;
+    var original = blackStat.coords.map(function (p) { return { r: p.r, c: p.c }; });
+    for (var oi = 0; oi < original.length; oi++) cells[original[oi].r][original[oi].c] = null;
+    var need = original.length;
+    var placed = [];
+    var attempts = Math.max(16, Math.min(120, need * 10));
+    for (var at = 0; at < attempts; at++) {
+      placed = [];
+      var rowBlack = [], colBlack = [];
+      for (var rr = 0; rr < rows; rr++) rowBlack[rr] = 0;
+      for (var cc = 0; cc < cols; cc++) colBlack[cc] = 0;
+      for (var br = 0; br < rows; br++) for (var bc = 0; bc < cols; bc++) {
+        if (isWallAt(cells, rows, cols, br, bc)) { rowBlack[br]++; colBlack[bc]++; }
+      }
+      var ok = true;
+      for (var left = need; left > 0; left--) {
+        var best = null, bestScore = Infinity;
+        for (var r = 1; r < rows; r++) for (var c = 0; c < cols; c++) {
+          if (cells[r][c] != null || gapProtect[r + ',' + c]) continue;
+          if (rowBlack[r] >= 3) continue;
+          if (wouldViolateWall(cells, rows, cols, r, c)) continue;
+          cells[r][c] = { t: 'black' };
+          var reachable = nullCellsReachable(cells, rows, cols);
+          cells[r][c] = null;
+          if (!reachable) continue;
+          var score = rowBlack[r] * 100000 + colBlack[c] * 1000 + (rows - r) + rnd() * 8;
+          if (score < bestScore) { bestScore = score; best = { r: r, c: c }; }
+        }
+        if (!best) { ok = false; break; }
+        cells[best.r][best.c] = { t: 'black' };
+        rowBlack[best.r]++; colBlack[best.c]++; placed.push(best);
+      }
+      var shape = AntSolver.boardBlackShapeAudit({ rows: rows, cols: cols, cells: cells });
+      if (ok && placed.length === need && shape && shape.valid) {
+        blackStat.coords = placed;
+        blackStat.redistributed = true;
+        blackStat.redistributeAttempts = at + 1;
+        blackStat.shape = shape;
+        return blackStat;
+      }
+      for (var pi = 0; pi < placed.length; pi++) cells[placed[pi].r][placed[pi].c] = null;
+    }
+    for (var ri = 0; ri < original.length; ri++) cells[original[ri].r][original[ri].c] = { t: 'black' };
+    blackStat.redistributed = false;
+    blackStat.redistributeAttempts = attempts;
+    blackStat.shape = AntSolver.boardBlackShapeAudit({ rows: rows, cols: cols, cells: cells });
+    return blackStat;
   }
 
   /**
@@ -2493,14 +2552,15 @@ AntSolver.Generator = (function() {
 
     // ①②③：方案范围内的合法形态
     var r1 = pickFrom(inRange);
-    // 只有「范围内最好的结果仍会产生余格黑块」时，才尝试向下缩小
-    if (r1 && r1.tier !== 'surplus') {
+    // 优先尺寸必须同时通过黑块比例硬门。若 8×9 之类的“大盘”需要 55% 黑块补位，
+    // 即使它能装下全部车，也不能挡在合规的 6×7 前面。
+    if (r1 && r1.tier !== 'surplus' && dimBlackOk(r1.e)) {
       chosen = r1;
     } else {
       var r2 = pickFrom(shrunk);
-      if (r2 && r2.tier !== 'surplus') { chosen = r2; shrinkUsed = true; }
-      else if (r1) { chosen = r1; }
-      else if (r2) { chosen = r2; shrinkUsed = true; }
+      if (r2 && r2.tier !== 'surplus' && dimBlackOk(r2.e)) { chosen = r2; shrinkUsed = true; }
+      else if (r1 && dimBlackOk(r1.e)) { chosen = r1; }
+      else if (r2 && dimBlackOk(r2.e)) { chosen = r2; shrinkUsed = true; }
     }
 
     // ⑤ 没有任何合法形态可用 → 退回原行为并如实标记
@@ -3476,13 +3536,15 @@ AntSolver.Generator = (function() {
         surplusWant = Math.max(0, Math.min(surplusWant, room1));
       }
       surplusStat = fillSurplusWithBlack(cells, rows, cols, surplusWant, gapProtect);
+      redistributeBlackCoords(cells, rows, cols, surplusStat, gapProtect);
       blackStat.surplusFilled = surplusStat.filled;
       blackStat.actualTotal = countCellsOfType(cells, 'black');
       nullNow = 0;
       for (var r3 = 0; r3 < rows; r3++) for (var c3 = 0; c3 < cols; c3++) if (cells[r3][c3] == null) nullNow++;
       if (nullNow > n) {
         if (!config.blackAsCapOnly) {
-          return { ok: false, reason: 'structSurplus', detail: '空格' + nullNow + ' > 盒数' + n + '，多余空格无法全部转黑块', structureBuildMs: Date.now() - tStruct, blackStat: blackStat };
+          return { ok: false, reason: 'structSurplus', detail: '空格' + nullNow + ' > 盒数' + n + '，多余空格无法全部转黑块',
+            structureBuildMs: Date.now() - tStruct, blackStat: blackStat, surplusStat: surplusStat };
         }
         // 【v167】墙当上限模式下，多出来的空格**合法保留为空位**（不淘汰候选）
         blackStat.emptyLeft = nullNow - n;
@@ -3694,6 +3756,16 @@ AntSolver.Generator = (function() {
         };
       }
       spaceQuota.realBlack = realBlack; spaceQuota.realPipe = realPipe; spaceQuota.realUsable = realUsable;
+    }
+    var blackShape = AntSolver.boardBlackShapeAudit({ rows: rows, cols: cols, cells: cells });
+    blackStat.shape = blackShape;
+    if (!blackShape || !blackShape.valid) {
+      return {
+        ok: false, reason: 'blackShape',
+        detail: blackShape ? blackShape.violations.join('；') : '黑块形态审计失败',
+        structureBuildMs: structureBuildMs, obstacleSlotMs: obstacleSlotMs,
+        blackStat: blackStat, pipeStat: pipeStat, surplusStat: surplusStat
+      };
     }
     return {
       ok: true, rows: rows, cols: cols, cells: cells, pipeList: pipeList,
@@ -3978,8 +4050,13 @@ AntSolver.Generator = (function() {
           else { _rootCols = [_row0Null[0], _row0Null[Math.floor(_row0Null.length / 2)], _row0Null[_row0Null.length - 1]]; }
         }
         var _removed = 0;
+        var _branchAdded = [];
         for (var _rc = 0; _rc < cols; _rc++) {
-          if (_rootCols.indexOf(_rc) < 0 && cells[0][_rc] == null) { cells[0][_rc] = { t: 'black' }; _removed++; }
+          if (_rootCols.indexOf(_rc) < 0 && cells[0][_rc] == null) {
+            cells[0][_rc] = { t: 'black' };
+            _branchAdded.push({ r: 0, c: _rc });
+            _removed++;
+          }
         }
         // 把等量下层黑块换成空位；优先选择贴着空位的黑块，保证新增放车位可接入。
         var _donors = [];
@@ -3993,27 +4070,41 @@ AntSolver.Generator = (function() {
           _donors.push({ r: _dr, c: _dc, near: _near });
         }
         _donors.sort(function (a, b) { return (b.near ? 1 : 0) - (a.near ? 1 : 0) || a.r - b.r || a.c - b.c; });
+        var _removedDonors = [];
         for (var _di2 = 0; _di2 < _donors.length && _removed > 0; _di2++) {
           cells[_donors[_di2].r][_donors[_di2].c] = null; _removed--;
+          _removedDonors.push(_donors[_di2]);
         }
-        if (pipeList) pipeList.length = 0;
-        if (struct.pipeList) struct.pipeList.length = 0;
-        struct.iceSlots = []; struct.questionSlots = []; struct.chainGroups = [];
-        config._instantPlanBranchRoots = _rootCols.slice();
-        if (config.instantPlanBranchDebtRoots === true) {
-          var _debtCars = list.filter(function (b) {
-            return b.instantEntryReach != null && b.count > b.instantEntryReach;
-          }).sort(function (a, b) { return (a.count - a.instantEntryReach) - (b.count - b.instantEntryReach) || a._seq - b._seq; });
-          if (_debtCars.length) {
-            var _prefixN = Math.max(_rootCols.length, Math.min(12, parseInt(config.instantPlanBranchPrefixDebts, 10) || _rootCols.length));
-            var _chosen = _debtCars.slice(0, _prefixN), _chosenSet = {};
-            for (var _ci = 0; _ci < _chosen.length; _ci++) _chosenSet[_chosen[_ci]._seq] = 1;
-            var _rest = list.filter(function (b) { return !_chosenSet[b._seq]; });
-            list = _chosen.concat(_rest);
-            config._instantPlanBranchDebtRoots = _chosen.map(function (b) { return { color: b.color, count: b.count, debt: b.count - b.instantEntryReach }; });
+        var _branchShape = AntSolver.boardBlackShapeAudit({ rows: rows, cols: cols, cells: cells });
+        if (_branchShape && _branchShape.valid) {
+          if (pipeList) pipeList.length = 0;
+          if (struct.pipeList) struct.pipeList.length = 0;
+          struct.iceSlots = []; struct.questionSlots = []; struct.chainGroups = [];
+          config._instantPlanBranchRoots = _rootCols.slice();
+          if (config.instantPlanBranchDebtRoots === true) {
+            var _debtCars = list.filter(function (b) {
+              return b.instantEntryReach != null && b.count > b.instantEntryReach;
+            }).sort(function (a, b) { return (a.count - a.instantEntryReach) - (b.count - b.instantEntryReach) || a._seq - b._seq; });
+            if (_debtCars.length) {
+              var _prefixN = Math.max(_rootCols.length, Math.min(12, parseInt(config.instantPlanBranchPrefixDebts, 10) || _rootCols.length));
+              var _chosen = _debtCars.slice(0, _prefixN), _chosenSet = {};
+              for (var _ci = 0; _ci < _chosen.length; _ci++) _chosenSet[_chosen[_ci]._seq] = 1;
+              var _rest = list.filter(function (b) { return !_chosenSet[b._seq]; });
+              list = _chosen.concat(_rest);
+              config._instantPlanBranchDebtRoots = _chosen.map(function (b) { return { color: b.color, count: b.count, debt: b.count - b.instantEntryReach }; });
+            }
           }
+          timing.instantPlanBranch = { count: _rootCols.length, roots: _rootCols.slice(), removedBlackMoved: _removedDonors.length };
+        } else {
+          for (var _ba = 0; _ba < _branchAdded.length; _ba++) cells[_branchAdded[_ba].r][_branchAdded[_ba].c] = null;
+          for (var _bd2 = 0; _bd2 < _removedDonors.length; _bd2++) {
+            cells[_removedDonors[_bd2].r][_removedDonors[_bd2].c] = { t: 'black' };
+          }
+          timing.instantPlanBranch = {
+            skipped: 'blackShape', roots: _rootCols.slice(),
+            shape: _branchShape
+          };
         }
-        timing.instantPlanBranch = { count: _rootCols.length, roots: _rootCols.slice(), removedBlackMoved: _donors.length };
       }
     }
     // v529实验：单入口路径用于验证“低压绕路”是否由可替代出口造成；默认关，成功后再放开合理分支。
@@ -6368,7 +6459,8 @@ AntSolver.Generator = (function() {
     if (!struct.ok) {
       timing.candidatePrepareMs = Date.now() - tAll; timing.candidateTotalMs = timing.candidatePrepareMs;
       return { ok: false, reason: struct.reason || 'struct', detail: struct.detail || '', timing: timing, boxCount: n,
-        usableSpace: struct.usableSpace || null, blackStat: struct.blackStat, pipeStat: struct.pipeStat };
+        usableSpace: struct.usableSpace || null, blackStat: struct.blackStat, pipeStat: struct.pipeStat,
+        surplusStat: struct.surplusStat || null };
     }
 
     // ③ 填球 + 只绑定预定障碍 + 分阶段守恒
@@ -6386,6 +6478,8 @@ AntSolver.Generator = (function() {
     // 只供生产报告与验证观测，不参与任何生成决策，也不进官方关卡格式（toGameFormat 只取协议字段）。
     board.narrowStat = struct.narrowStat || null;
     board.spaceQuota = struct.spaceQuota || null;
+    board.blackStat = struct.blackStat || null;
+    board.surplusStat = struct.surplusStat || null;
     // 管道落位与兜底状态（ANT-GEN-PIPE-DEPTH-FALLBACK-20260825）：want/placed/capacityPerPipe
     // 以及 fallback* 标记。兜底是行为变更，必须可观测——否则"管道为什么只有 2 条"无从追溯。
     board.pipeStat = struct.pipeStat || null;
@@ -6603,9 +6697,9 @@ AntSolver.Generator = (function() {
   function newFlowStats() {
     return {
       attempts: 0, success: 0,
-      fail: { baseline: 0, struct: 0, structSurplus: 0, structHoles: 0, structReach: 0, structPipeExit: 0, pipeCapacity: 0, pipeDepth: 0, rowTrim: 0, bind: 0, conservation: 0, structuralCheck: 0, access: 0, screen: 0 },
+      fail: { baseline: 0, struct: 0, structSurplus: 0, blackShape: 0, structHoles: 0, structReach: 0, structPipeExit: 0, pipeCapacity: 0, pipeDepth: 0, rowTrim: 0, bind: 0, conservation: 0, structuralCheck: 0, access: 0, screen: 0 },
       passHits: { base: 0, noise1: 0, noise2: 0, noise3: 0 },
-      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: [], usableSpaceFailures: []
+      timings: [], failedCandidates: [], conservationFailures: [], bindFailures: [], usableSpaceFailures: [], structSurplusFailures: [], blackShapeFailures: []
     };
   }
   function mergeFlowStats(dst, src) {
@@ -6618,6 +6712,8 @@ AntSolver.Generator = (function() {
     dst.conservationFailures = dst.conservationFailures.concat(src.conservationFailures);
     dst.bindFailures = dst.bindFailures.concat(src.bindFailures);
     dst.usableSpaceFailures = (dst.usableSpaceFailures || []).concat(src.usableSpaceFailures || []);
+    dst.structSurplusFailures = (dst.structSurplusFailures || []).concat(src.structSurplusFailures || []);
+    dst.blackShapeFailures = (dst.blackShapeFailures || []).concat(src.blackShapeFailures || []);
     return dst;
   }
   function recordAttempt(stats, res) {
@@ -6635,6 +6731,13 @@ AntSolver.Generator = (function() {
     if (key === 'bind') stats.bindFailures.push(res.bindStat);
     if (res.failedCandidate) stats.failedCandidates.push(res.failedCandidate);
     if (key === 'usableSpaceDeviation' && res.usableSpace) stats.usableSpaceFailures.push(res.usableSpace);
+    if (key === 'structSurplus') stats.structSurplusFailures.push({
+      detail: res.detail || null, blackStat: res.blackStat || null, surplusStat: res.surplusStat || null
+    });
+    if (key === 'blackShape') stats.blackShapeFailures.push({
+      detail: res.detail || null, blackStat: res.blackStat || null,
+      surplusStat: res.surplusStat || null, pipeStat: res.pipeStat || null
+    });
   }
 
   /**
@@ -6752,7 +6855,10 @@ AntSolver.Generator = (function() {
       difficulty: null, config: config, retries: maxRetries,
       structural: { ok: false, reason: last ? ('候选淘汰：' + last.reason + (last.detail ? '(' + last.detail + ')' : '')) : '无有效候选' },
       flow: 'new_fixed', flowStats: stats, candidateTiming: last ? last.timing : null,
-      lastFailReason: last ? last.reason : null
+      lastFailReason: last ? last.reason : null,
+      lastFailDetail: last ? last.detail || null : null,
+      lastSurplusStat: last ? last.surplusStat || null : null,
+      structSurplusFailures: stats.structSurplusFailures
     };
   }
 

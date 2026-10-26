@@ -188,6 +188,63 @@ AntSolver.normBoard = function(board) {
 };
 
 /**
+ * 最终棋盘黑块形态审计（black-shape-v1）。
+ * 只读实测棋盘，不信任生成阶段的计划值。
+ * 门限按用户观感要求固定为：同一行最多 3 块，水平/垂直连续最多 3 块。
+ */
+AntSolver.boardBlackShapeAudit = function (source, maxAllowed) {
+  var board = (source && source.board) ? source.board : source;
+  var cells = board && board.cells;
+  if (!cells || !cells.length) return null;
+  var rows = parseInt(board.rows, 10) || cells.length;
+  var cols = parseInt(board.cols, 10) || (cells[0] ? cells[0].length : 0);
+  var limit = parseInt(maxAllowed, 10);
+  if (!(limit > 0)) limit = 3;
+  var rowBlack = [], colBlack = [], black = 0;
+  for (var r = 0; r < rows; r++) rowBlack[r] = 0;
+  for (var c = 0; c < cols; c++) colBlack[c] = 0;
+  for (var br = 0; br < rows; br++) for (var bc = 0; bc < cols; bc++) {
+    var cell = cells[br] && cells[br][bc];
+    if (cell && cell.t === 'black') {
+      black++;
+      rowBlack[br]++;
+      colBlack[bc]++;
+    }
+  }
+  function isBlack(r0, c0) {
+    var x = cells[r0] && cells[r0][c0];
+    return !!(x && x.t === 'black');
+  }
+  var maxRowBlack = 0, maxHorizontalRun = 0, maxVerticalRun = 0;
+  for (var rr = 0; rr < rows; rr++) {
+    if (rowBlack[rr] > maxRowBlack) maxRowBlack = rowBlack[rr];
+    var hrun = 0;
+    for (var hc = 0; hc < cols; hc++) {
+      hrun = isBlack(rr, hc) ? hrun + 1 : 0;
+      if (hrun > maxHorizontalRun) maxHorizontalRun = hrun;
+    }
+  }
+  for (var vc = 0; vc < cols; vc++) {
+    var vrun = 0;
+    for (var vr = 0; vr < rows; vr++) {
+      vrun = isBlack(vr, vc) ? vrun + 1 : 0;
+      if (vrun > maxVerticalRun) maxVerticalRun = vrun;
+    }
+  }
+  var violations = [];
+  if (maxRowBlack > limit) violations.push('同行黑块' + maxRowBlack + '>' + limit);
+  if (maxHorizontalRun > limit) violations.push('水平黑块连' + maxHorizontalRun + '>' + limit);
+  if (maxVerticalRun > limit) violations.push('垂直黑块连' + maxVerticalRun + '>' + limit);
+  return {
+    schema: 'black-shape-v1', rows: rows, cols: cols, cells: rows * cols, black: black,
+    maxAllowed: limit, maxRowBlack: maxRowBlack,
+    maxHorizontalRun: maxHorizontalRun, maxVerticalRun: maxVerticalRun,
+    rowBlack: rowBlack, colBlack: colBlack,
+    valid: violations.length === 0, violations: violations
+  };
+};
+
+/**
  * 解析关卡数据
  */
 AntSolver.parseLevel = function(json) {
@@ -802,6 +859,7 @@ AntSolver.Quality = (function () {
     var r = [];
     if (!o || !o.level) return { pass: false, label: '无关卡', reasons: ['无关卡'] };
     if (!o.valid) return { pass: false, label: '不可解', reasons: ['全知未通关'] };
+    var bs = o.blackShape;
 
     // qPass：质量报告门。首通不在这里卡交付；learned/look/T/R 仍是代理指标。
     if (o.learned == null) r.push('学会后未测');
@@ -824,6 +882,9 @@ AntSolver.Quality = (function () {
     if (o.freeRunMax != null && o.freeRunMax > 5) r.push('最长免费连' + o.freeRunMax + '步>5');
     if (o.partialStepPct != null && o.partialStepPct < 20) r.push('partial步' + o.partialStepPct + '%<20');
     if (o.blackPct != null && o.blackPct > 30) r.push('黑块' + o.blackPct + '%>30%');
+    if (bs && bs.maxRowBlack > bs.maxAllowed) r.push('黑块同行' + bs.maxRowBlack + '>' + bs.maxAllowed);
+    if (bs && bs.maxHorizontalRun > bs.maxAllowed) r.push('黑块横连' + bs.maxHorizontalRun + '>' + bs.maxAllowed);
+    if (bs && bs.maxVerticalRun > bs.maxAllowed) r.push('黑块竖连' + bs.maxVerticalRun + '>' + bs.maxAllowed);
     var pass = r.length === 0;
 
     // qGate：交付结构门，阈值独立于 qPass。
@@ -836,6 +897,9 @@ AntSolver.Quality = (function () {
     if (o.freeLowPct != null && o.freeLowPct > 30) g.push('freeLow ' + o.freeLowPct + '%>30%');
     if (o.freeRunMax != null && o.freeRunMax > 6) g.push('最长免费连 ' + o.freeRunMax + '>6');
     if (o.blackPct != null && o.blackPct > 30) g.push('黑块 ' + o.blackPct + '%>30%');
+    if (bs && bs.maxRowBlack > bs.maxAllowed) g.push('黑块同行 ' + bs.maxRowBlack + '>' + bs.maxAllowed);
+    if (bs && bs.maxHorizontalRun > bs.maxAllowed) g.push('黑块横连 ' + bs.maxHorizontalRun + '>' + bs.maxAllowed);
+    if (bs && bs.maxVerticalRun > bs.maxAllowed) g.push('黑块竖连 ' + bs.maxVerticalRun + '>' + bs.maxAllowed);
     var board = o.level && o.level.board;
     if (board && (board.rows < 6 || board.cols < 6)) g.push('棋盘 ' + board.rows + '×' + board.cols + ' 行列<6');
     var gatePass = g.length === 0;
@@ -864,6 +928,11 @@ AntSolver.Quality = (function () {
     if (o.partialStepPct != null && o.partialStepPct < 20) d += 20 - o.partialStepPct;
     if (o.forcedPct != null && o.forcedPct > 20) d += o.forcedPct - 20;
     if (o.fullMed2 != null && o.fullMed2 > 3) d += (o.fullMed2 - 3) * 10;
+    if (o.blackShape) {
+      d += Math.max(0, o.blackShape.maxRowBlack - o.blackShape.maxAllowed) * 10;
+      d += Math.max(0, o.blackShape.maxHorizontalRun - o.blackShape.maxAllowed) * 10;
+      d += Math.max(0, o.blackShape.maxVerticalRun - o.blackShape.maxAllowed) * 10;
+    }
     return d;
   }
 
@@ -883,6 +952,7 @@ AntSolver.Quality = (function () {
       }
     }
     var blackPct = boardCells ? +(blackCells / boardCells * 100).toFixed(1) : null;
+    var blackShape = AntSolver.boardBlackShapeAudit(level);
     var input = {
       valid: !!r.valid, level: level,
       learned: p.learnedPassPct != null ? p.learnedPassPct : null,
@@ -897,9 +967,10 @@ AntSolver.Quality = (function () {
       freeRunMax: fc.freeRunMax != null ? fc.freeRunMax : null,
       freeLowPct: fc.freeLowPct != null ? fc.freeLowPct : null,
       partialStepPct: fc.partialStepPct != null ? fc.partialStepPct : null,
-      blackPct: blackPct
+      blackPct: blackPct, blackShape: blackShape
     };
     var out = verdict(input);
+    out.blackShape = blackShape;
     // 与旧 goalStructPass 一致：没有完整 persist/fillCurve 时，结构门是“未测不通过”，
     // 不能把 null 指标当成全部合格。qPass 文案仍由 verdict 按缺项报告。
     if (!g.persist || !g.fillCurve) {
