@@ -321,7 +321,7 @@ P2c 已完成结果：
 - targetBuffer3/4 实际债务车更多，但分布为开局或末段，不是中段；
 - 结论：需要改变计划中的债务车时间分布，下一项选分支前缀债务 8→6。
 
-### P2e. 006 分支前缀债务 8→6 · ⏭ 当前唯一下一步
+### P2e. 006 分支前缀债务 8→6 · ❌ 已否决
 
 唯一变量：
 
@@ -331,6 +331,31 @@ instantPlanBranchPrefixDebts: 8 → 6
 ```
 
 固定图、seed、容量、配方、棋盘和目标门。假设减少前移债务候选可降低 step1~3 的早债堆积，并把部分债务留到 step23~31。
+
+P2e 已完成结果：
+
+- prefix6 两次 hash 均为 `53f65d11...`；
+- 中段从 39.1% 降到 8.3%；
+- 最长连续低压力从 7 增到 22；
+- 20% 前峰值从 3 升到 4；
+- 末段高压从 0% 升到 25%；
+- PlayerSim 两次均为 0% 停止；
+- branchPrefixDebts 旋钮否决，不再试 4/10。
+
+### P2f. 006 `midBandDebt3` 实验策略 · ⏭ 当前唯一下一步
+
+新策略只在实验脚本中通过内存替换 `InstantPlayout` 验证，先不改生产默认：
+
+```text
+progress < 20%       → 优先 debt<=0 的供给车
+20% <= progress <85% → active debt <3 时选最小正债务车
+active debt >=3      → 优先供给，不继续加第4债车
+progress >=85%       → 优先供给
+```
+
+固定 006/1001、容量、棋盘、配方、预算和目标门。通过与 shortDebt 原计划路线、结构、容量、显著释放和 PlayerSim 对照。
+
+只有实验通过后，才把同一逻辑接到生产 `InstantPlayout`，并按规定升版本、写补丁和日志。
 
 ### P3. 006 开发集复核与生产化
 
@@ -429,13 +454,14 @@ instantPlanBranchPrefixDebts: 8 → 6
 
 ## 8. 当前唯一下一步
 
-执行 **P2e：006/1001 分支前缀债务 8→6**。
+执行 **P2f：006/1001 `midBandDebt3` 内存实验策略**。
 
 唯一变量：
 
 ```text
-instantPlanPolicy = shortDebt
-instantPlanBranchPrefixDebts: 8 vs 6
+shortDebt baseline
+vs
+midBandDebt3：20%前供给、20%~85%维持3辆短债、85%后供给
 ```
 
-固定图、seed1001、容量带、配方、棋盘、`instantPlanTargetBuffer=4`、`instantPlanMaxDebt=40` 和目标阈值。只跑 prefix6 两次，并与已稳定复现的 prefix8 baseline 对照。目标是中段 `>=50%`、显著释放、PlayerSim 通关，同时不把压力推到末段。
+先只做内存源码替换实验，不修改生产文件。目标是中段 `>=50%`、20% 前峰值不高于3、末段不高于3、显著释放与 PlayerSim 通过；失败则不把策略接生产。
