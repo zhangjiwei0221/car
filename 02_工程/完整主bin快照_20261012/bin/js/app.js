@@ -1854,9 +1854,6 @@ AntSolver.App = (function() {
       // 生成器侧会据此贯通盒切分、候选筛选、卡点、全知求解、玩家模拟、审核与难度。
       bottomOnly: ((document.getElementById('gen-bottom-only') || {}).value === '1'),
       instantChain: ((document.getElementById('gen-bottom-only') || {}).value === '2'),
-      // 【v524·实验开关】生成侧消除口径：'ring'（默认，与改动前逐像素一致）| 'instant'（实机瞬时连锁）。
-      //   目前没有 UI 控件，只能脚本/调试面板传；切生产前必须先跑 A/B（见工作日志 §514）。
-      elimOrder: 'ring',
       // ===== 【v137】切盒方式（用户 2026-10-14 批准）=====
       // 'anchor' = 锚点切盒（双锚点分成 A/B 两片，A 片整车先出、B 片后出；用来把暂存压力顶起来）
       // 其余/缺控件 = 'trend'（现有几何趋势切）——不选它，生产口径与本次改动前逐字节一致。

@@ -5310,33 +5310,11 @@ AntSolver.Generator = (function() {
    *   返回按邻接次数降序的颜色数组（最多 4 个）。纯静态，只读 blocks + eliminationOrder。
    *   用途：定向冰要挂在"会提前打开 c"的车上，而不是 c 自己车上（v187 的教训）。
    */
-  // 【v524】生成侧消除口径分发（默认关）。
-  //   config.elimOrder==='instant' → 实机瞬时连锁：四方向可达 + 离该车暂存起点曼哈顿最近 + 快照整批。
-  //   实机「一辆车占从左侧数第一个空位」；生成侧暂固定 0 号槽——实测 90% 的车进场时缓冲为空，
-  //   0 号槽与真实最左空槽的同色车一致率 93.5%~100%（见 工作日志 §514）。
-  //   不传/其它值 → null，走原圈序，产出与改动前逐像素一致。
-  //   ⚠ 2026-10-26 实测（3 图 × 4 种切法 + produceFixed 端到端）：**本开关当前对最终关卡没有任何影响**。
-  //   原因：切球只消费 eo.round / 色序 / 每轮数量，而这两套口径下逐轮完全相同；差异只在"同色内部像素谁先"，
-  //   要让它生效，必须把【容量感知的车批次（instantPlayout）】接进切球，而不是只换 order 源。见工作日志 §514.6。
-  function elimOrderOpts(config) {
-    if (!config || config.elimOrder !== 'instant') return null;
-    return { instantChain: true, slot: 0, bufferLimit: Math.max(1, parseInt(config.bufferLimit, 10) || 5) };
-  }
-  /** 生成期单次消除（按车容量，不是整色）：instant → 起点距离序；ring → 原圈序。 */
-  function elimPixels(config, elim, blocks, rows, cols, color, maxCount, trace) {
-    var o = elimOrderOpts(config);
-    if (o) {
-      var start = { r: rows - 1, c: Math.min(cols - 1, Math.floor(o.slot / o.bufferLimit * cols)) };
-      return AntSolver.Simulator.instantChainEliminate(elim, blocks, rows, cols, color, maxCount, trace, start, null);
-    }
-    return AntSolver.Simulator.floodFillEliminate(elim, blocks, rows, cols, color, maxCount, trace, null, !!(config && config.bottomOnly));
-  }
-
-  function shellColorsOf(blocks, color, cache, config) {
+  function shellColorsOf(blocks, color, cache) {
     if (cache && cache[color]) return cache[color];
     var rows = blocks.length, cols = blocks[0].length;
     var eo;
-    try { eo = AntSolver.eliminationOrder(blocks, rows, cols, false, elimOrderOpts(config)); } catch (e) { eo = null; }
+    try { eo = AntSolver.eliminationOrder(blocks, rows, cols, false); } catch (e) { eo = null; }
     var rd = eo ? eo.round : null;
     var cnt = {};
     var D4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
@@ -5390,7 +5368,7 @@ AntSolver.Generator = (function() {
         //   理由（v187 实测）：冰挂债车 → 车点不动 → 债根本不形成；要拖慢的是"解药"。
         var targetCell = null, targetColor = p.debtColor, why = '';
         if (config.iceTarget === 'cure' && blocks) {
-          var shells = shellColorsOf(blocks, p.debtColor, {}, config);
+          var shells = shellColorsOf(blocks, p.debtColor, {});
           for (var si = 0; si < shells.length && !targetCell; si++) {
             var sb = boxesOf(shells[si]);
             for (var sj = 0; sj < sb.length; sj++) {
@@ -5713,7 +5691,7 @@ AntSolver.Generator = (function() {
     //   轮次 1~2 = 早出（玩家开局就能吃到），≥3 = 深埋。
     var minRound = {};
     try {
-      var eo = AntSolver.eliminationOrder(blocks, blocks.length, blocks[0].length, !!config.bottomOnly, elimOrderOpts(config));
+      var eo = AntSolver.eliminationOrder(blocks, blocks.length, blocks[0].length, !!config.bottomOnly);
       if (eo && eo.round) {
         for (var er = 0; er < blocks.length; er++) for (var ec = 0; ec < blocks[0].length; ec++) {
           var ecol = blocks[er][ec]; if (ecol <= 0) continue;
@@ -5868,7 +5846,7 @@ AntSolver.Generator = (function() {
     var MAXR = (config.strangleRepairMax != null) ? Math.max(1, parseInt(config.strangleRepairMax, 10)) : 3;
     for (var di = 0; di < b0.details.length && removed < MAXR; di++) {
       var c = b0.details[di].color;
-      var shells = shellColorsOf(blocks, c, cache, config);
+      var shells = shellColorsOf(blocks, c, cache);
       for (var si = 0; si < shells.length && removed < MAXR; si++) {
         var d = shells[si], did = false;
         // 先拆冰（最便宜、可逆）
@@ -8902,12 +8880,10 @@ AntSolver.Generator = (function() {
   //   若只以 blocks 作键，先跑过的模式会把结果串给另一模式（一批只用一种模式时不显形，混用时静默出错）。
   var _gatewayCache = (typeof WeakMap !== 'undefined') ? new WeakMap() : null;
   var _gatewayCacheBottom = (typeof WeakMap !== 'undefined') ? new WeakMap() : null;
-  function gatewayColorRank(blocks, bottomOnly, config) {
+  function gatewayColorRank(blocks, bottomOnly) {
     if (!blocks || !blocks.length || !blocks[0]) return [];
     bottomOnly = !!bottomOnly;
-    // instant 模式下解锁贡献会变，不能复用圈序缓存（否则同图跨模式串味）
-    var _instant = !!(config && config.elimOrder === 'instant');
-    var cache = _instant ? null : (bottomOnly ? _gatewayCacheBottom : _gatewayCache);
+    var cache = bottomOnly ? _gatewayCacheBottom : _gatewayCache;
     if (cache && cache.has(blocks)) return cache.get(blocks);
     // 维度取【目标图本身】(blocks 是 55×55 目标图，非小棋盘)——此前误传棋盘维度只扫到图左上角，网关识别失效。
     var rows = blocks.length, cols = blocks[0].length;
@@ -8930,7 +8906,7 @@ AntSolver.Generator = (function() {
     for (var cs in colorSet) {
       var col = +cs, before = reachOther(base, col);
       var elim = []; for (var r1 = 0; r1 < rows; r1++) elim.push(base[r1].slice());
-      elimPixels(config, elim, blocks, rows, cols, col, Infinity, null);
+      AntSolver.Simulator.floodFillEliminate(elim, blocks, rows, cols, col, Infinity, null, null, bottomOnly);
       rank.push({ color: col, unlock: reachOther(elim, col) - before });
     }
     rank.sort(function (a, b) { return b.unlock - a.unlock; });
@@ -9146,7 +9122,7 @@ AntSolver.Generator = (function() {
     //   仅当抽中卡点类型 rareColorKey 时生效；未抽中则完全不执行，行为与本功能引入前一致。
     var rareSwapped = chokeRareColorKeyPlace(board, config, blocks, usedT);
     // 1) 网关色 → 关键盒(优先前期段属网关色的无障碍盒；不足则全盘找；再不足退回前期大盒 keystone)
-    var rank = blocks ? gatewayColorRank(blocks, config && config.bottomOnly, config) : [];
+    var rank = blocks ? gatewayColorRank(blocks, config && config.bottomOnly) : [];
     var keyColor = {}; for (var g = 0; g < Math.min(4, rank.length); g++) if (rank[g].unlock > 0) keyColor[rank[g].color] = 1;
     var keyBoxes = [], seenKey = {};
     function pushKey(r, c, b) { var k = r + ',' + c; if (seenKey[k]) return; seenKey[k] = 1; keyBoxes.push({ r: r, c: c, box: b }); }
@@ -9974,7 +9950,7 @@ AntSolver.Generator = (function() {
     var n = Math.max(0, Math.min(12, parseInt(config && config.repairSwap, 10) || 0));
     if (n <= 0) return null;
     var rank = [];
-    try { rank = gatewayColorRank(blocks, config && config.bottomOnly, config) || []; } catch (e) { rank = []; }
+    try { rank = gatewayColorRank(blocks, config && config.bottomOnly) || []; } catch (e) { rank = []; }
     var played = [], used = {};
     for (var k = 0; k < rank.length && played.length < n; k++) {
       var col = rank[k].color;
@@ -10981,7 +10957,7 @@ AntSolver.Generator = (function() {
     while (guard-- > 0) {
       var cap = pickCap();
       // 统计每种颜色当前可达的像素数（用flood-fill模拟；上限用 boxMax 以正确比较各色规模）
-      var colorReach = countReachableByColor(eliminated, blocks, rows, cols, boxMax, bottomOnly, config);
+      var colorReach = countReachableByColor(eliminated, blocks, rows, cols, boxMax, bottomOnly);
       var colors = Object.keys(colorReach);
       if (colors.length === 0) break; // 全部消除完毕
 
@@ -10996,7 +10972,7 @@ AntSolver.Generator = (function() {
       if (bestColor === null) break;
 
       // 消除一个盒容量的量（本盒随机容量 cap，守恒由循环持续消除保证）
-      var consumed = elimPixels(config, eliminated, blocks, rows, cols, bestColor, cap, null);
+      var consumed = Sim.floodFillEliminate(eliminated, blocks, rows, cols, bestColor, cap, null, null, bottomOnly);
       if (consumed <= 0) break; // 无法继续（不应发生）
 
       boxes.push({ color: bestColor, count: consumed });
@@ -11744,7 +11720,7 @@ AntSolver.Generator = (function() {
   function layerAwareBoxes(blocks, config) {
     var R = blocks.length, C = blocks[0].length;
     var eo = null;
-    try { eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly, elimOrderOpts(config)); } catch (e) { eo = null; }
+    try { eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly); } catch (e) { eo = null; }
     if (!eo || !eo.round) return null;
     var bmin = parseInt(config.boxSizeMin, 10) || 24;
     var bmax = parseInt(config.boxSizeMax, 10) || 36;
@@ -11831,7 +11807,7 @@ AntSolver.Generator = (function() {
     // 【v220】扫描序号：eliminationOrder.seq 是"每轮按扫描顺序的像素 id 列表"，
     //   展平后得到每个像素的出厂先后；每块取它最早的像素序号。
     try {
-      var _eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly, elimOrderOpts(config));
+      var _eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly);
       if (_eo && _eo.seq) {
         var _ord = 0;
         for (var _ri = 0; _ri < _eo.seq.length; _ri++) {
@@ -12411,7 +12387,7 @@ AntSolver.Generator = (function() {
   function roundCut(blocks, config) {
     var R = blocks.length, C = blocks[0].length;
     var eo = null;
-    try { eo = AntSolver.eliminationOrder(blocks, R, C, false, elimOrderOpts(config)); } catch (e) { return null; }
+    try { eo = AntSolver.eliminationOrder(blocks, R, C, false); } catch (e) { return null; }
     if (!eo || !eo.round || !eo.rounds) return null;
     var rd = eo.round, rounds = eo.rounds;
     var groups = {}, total = 0;
@@ -12620,7 +12596,7 @@ AntSolver.Generator = (function() {
     if (!total) return null;
 
     var eo;
-    try { eo = AntSolver.eliminationOrder(blocks, rows, cols, !!config.bottomOnly, elimOrderOpts(config)); }
+    try { eo = AntSolver.eliminationOrder(blocks, rows, cols, !!config.bottomOnly); }
     catch (e) { return null; }
     if (!eo || !eo.order || !eo.order.length) return null;
 
@@ -13276,7 +13252,7 @@ AntSolver.Generator = (function() {
     // 消除轮次（长期隔断判定 + 碎色深度）。失败则退化为不做长期隔断过滤，不阻断生产。
     var roundOf = null, roundsTotal = 0, colorFirst = {};
     try {
-      var eo = AntSolver.eliminationOrder(blocks, rows, cols, false, elimOrderOpts(cfg));
+      var eo = AntSolver.eliminationOrder(blocks, rows, cols, false);
       roundOf = eo.round; roundsTotal = eo.rounds;
       for (r = 0; r < rows; r++) for (c = 0; c < cols; c++) {
         var rd = roundOf[r][c] || 0, cv = blocks[r][c];
@@ -13509,7 +13485,7 @@ AntSolver.Generator = (function() {
   /**
    * 统计每种颜色当前可达的像素数（不修改eliminated）
    */
-  function countReachableByColor(eliminated, blocks, rows, cols, maxPerColor, bottomOnly, config) {
+  function countReachableByColor(eliminated, blocks, rows, cols, maxPerColor, bottomOnly) {
     var Sim = AntSolver.Simulator;
     bottomOnly = !!bottomOnly;
     var result = {};
@@ -13523,7 +13499,7 @@ AntSolver.Generator = (function() {
       // 复制eliminated，模拟消除该色
       var scratch = [];
       for (var r = 0; r < rows; r++) scratch.push(eliminated[r].slice());
-      var reach = elimPixels(config, scratch, blocks, rows, cols, parseInt(colorId), maxPerColor, null);
+      var reach = Sim.floodFillEliminate(scratch, blocks, rows, cols, parseInt(colorId), maxPerColor, null, null, bottomOnly);
       if (reach > 0) result[colorId] = reach;
     }
     return result;
@@ -13853,7 +13829,7 @@ AntSolver.Generator = (function() {
     if (!boxes || !boxes.length) return boxes;
     var R = blocks.length, C = blocks[0].length;
     var eo = null;
-    try { eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly, elimOrderOpts(config)); } catch (e) { return boxes; }
+    try { eo = AntSolver.eliminationOrder(blocks, R, C, !!config.bottomOnly); } catch (e) { return boxes; }
     if (!eo || !eo.round) return boxes;
     var stat = {}, shCap = (config.layerSplitShallow != null) ? Math.max(1, parseInt(config.layerSplitShallow, 10) || 2) : 2;
     for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
