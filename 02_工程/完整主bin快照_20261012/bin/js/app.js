@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "558";
+var APP_BUILD = "560";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -5008,6 +5008,7 @@ AntSolver.App = (function() {
     try {
       genLog('棋盘：行 ' + _norm.rowsMin + '~' + _norm.rowsMax + ' · 列 ' + _norm.colsMin + '~' + _norm.colsMax +
         (_boardAuto ? '（棋盘自适应：开，将自动换尺寸）' : '（棋盘自适应：关，严格用此范围）'), 'gen-log-ok');
+      genLog('目标模式棋盘偏好：候选优先行列都 ≥7；6×6/6×7/7×6 仅在候选搜索失败时兜底。', 'gen-log-ok');
     } catch (e) {}
     // 【v234】棋盘自动选：只有勾了「自适应」才用自动尺寸列表；不勾则严格用你填的行列范围
     if (_boardAuto) {
@@ -5054,6 +5055,8 @@ AntSolver.App = (function() {
       // 【v497·用户裁决】运行时允许 6×6 方盘：放开正方形后，车少时可以用 36 格替 42 格，
       //   少 6 个补位黑块（26 车：6×7=16 黑/38% → 6×6=10 黑/28%）。形态仍守 列−行 ∈ [0,2]。
       boardHardRange: !_boardAuto, boardAuto: false, boardAllowSquare: true,
+      // v560：只作用于目标模式候选；时间模式仍保持原尺寸选择行为。
+      boardPrefer7: true,
       boardExpandOnOverflow: true, boardFirst: true,
       p7Repair: true, p7BaseCount: 3,
       semanticObstacles: (function () {
@@ -6304,6 +6307,8 @@ AntSolver.App = (function() {
         cutPolicy: result.config.cutPolicy || 'auto',
         semanticObstacles: !!result.config.semanticObstacles,
         candidateCount: result.config.candidateCount, portfolioK: result.config.portfolioK,
+        boardPrefer7: !!result.config.boardPrefer7,
+        boardPreferredPlan: result.config._boardPrefer7 || null,
         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime
       } : null,
       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）

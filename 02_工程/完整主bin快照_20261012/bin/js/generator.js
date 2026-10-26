@@ -267,6 +267,9 @@ AntSolver.Generator = (function() {
     boardRowsMax: 9,
     boardColsMin: 7,
     boardColsMax: 10,
+    // v560：无界面调用默认关闭；app 目标模式显式开启，避免改变旧脚本。
+    boardPrefer7: false,
+    boardPrefer7Dims: null,
     // 交错随机铺盒参数（对齐 bin 毛线生成器）
     singleColorExtractPercent: 5,   // 单色抽取比例（散布制造交错/暂存压力）
     firstRowRangeMultiplier: 1,     // 首行候选窗口倍数
@@ -2157,6 +2160,53 @@ AntSolver.Generator = (function() {
     };
   }
 
+  // 【v560·实验】生产棋盘尺寸偏好。
+  // 不扩大为“固定只产某一种盘”：候选按数据排序轮换，仍保留 7×7 与转置方向；
+  // 真正的兜底由后续候选/轮次继续尝试，未通过 A/B 前不得默认开启。
+  var BOARD_PREFER7_DEFAULT = ['8x9', '7x8', '9x9', '9x7', '7x9', '8x8', '8x7', '7x7'];
+  function boardPrefer7Plan(config) {
+    var raw = config && config.boardPrefer7Dims;
+    if (!raw || !raw.length) raw = BOARD_PREFER7_DEFAULT;
+    var out = [], seen = {};
+    for (var i = 0; i < raw.length; i++) {
+      var m = /^(\d+)x(\d+)$/.exec(String(raw[i]));
+      if (!m) continue;
+      var r = parseInt(m[1], 10), c = parseInt(m[2], 10);
+      if (!(r >= 7 && c >= 7 && r <= 9 && c <= 9)) continue;
+      if (!boardShapeOk(r, c, true)) continue;
+      var key = r + 'x' + c;
+      if (seen[key]) continue;
+      seen[key] = true;
+      out.push({ rows: r, cols: c, dims: key });
+    }
+    return out;
+  }
+  function applyPreferredBoardDim(config, candidateIndex, goalRound) {
+    var plan = boardPrefer7Plan(config);
+    if (!plan.length) return config;
+    var k = Math.max(0, parseInt(candidateIndex, 10) || 0);
+    var nr = Math.max(0, parseInt(goalRound, 10) || 0);
+    var K = Math.max(1, parseInt(config.candidateCount, 10) || 1);
+    var idx = (nr * K + k) % plan.length;
+    var pick = plan[idx];
+    return Object.assign({}, config, {
+      boardRowsMin: pick.rows, boardRowsMax: pick.rows,
+      boardColsMin: pick.cols, boardColsMax: pick.cols,
+      boardHardRange: true, boardAuto: false, boardAllowSquare: true,
+      boardExpandOnOverflow: false,
+      _boardPrefer7: {
+        schema: 'board-prefer7-v1',
+        enabled: true,
+        candidateIndex: k,
+        candidateCount: K,
+        goalRound: nr,
+        planIndex: idx,
+        picked: pick.dims,
+        plan: plan.map(function (p) { return p.dims; })
+      }
+    });
+  }
+
   function chooseBoardDimsFixed(n, config) {
     // 【v470】行列最小 6
     var rMin = Math.max(6, clampInt(config.boardRowsMin, AntSolver.BOARD_ROWS, 3, 20));
@@ -2220,7 +2270,8 @@ AntSolver.Generator = (function() {
             quota: fq.quota, pipeWant: fq.pipeWant, overflow: fq.overflow,
             blackBreachLevel: fq.breachLevel,     // 0=未突破，1/2=用掉的突破预算次数
             pipeDroppedPick: !keepsPipe(dpick),   // 本次采用的尺寸是否仍是「去管道」解（③ 兜底才为 true）
-            feasibleDimCount: feasCount
+            feasibleDimCount: feasCount,
+            prefer7: config._boardPrefer7 || null
           }
         };
       }
@@ -2420,7 +2471,8 @@ AntSolver.Generator = (function() {
         finalBlack: pick.finalBlack, finalBlackPct: Math.round(pick.finalBlackPct * 10) / 10,
         shrinkUsed: shrinkUsed, shapeRelaxed: shapeRelaxed,
         shapeDiff: pick.cols - pick.rows,
-        rangeGiven: { rowsMin: rMin, rowsMax: rMax, colsMin: cMin, colsMax: cMax }
+        rangeGiven: { rowsMin: rMin, rowsMax: rMax, colsMin: cMin, colsMax: cMax },
+        prefer7: config._boardPrefer7 || null
       }
     };
   }
@@ -6843,6 +6895,10 @@ AntSolver.Generator = (function() {
       // 目的是解决「当前批次关卡都是同样的参数，输出的关卡结构会同质化」。
       // 未设区间时 sampleRangedConfig 逐字段退回单值，故默认行为与 v114 逐值一致。
       var kCfg = sampleRangedConfig(config);
+      // v560 实验：只影响目标模式的候选尺寸，时间模式仍走原范围。
+      if (config.boardPrefer7 === true && config.acceptMode === 'target') {
+        kCfg = applyPreferredBoardDim(kCfg, k, config._goalRound || 0);
+      }
       var base = tagAudit(generateFromBlocksFixed(blocks, kCfg, {
         inputId: opts.inputId || null, candidateId: 'K' + (k + 1), onScreenFail: opts.onScreenFail
       }));
@@ -15270,6 +15326,7 @@ AntSolver.Generator = (function() {
         timeBudgetMs: roundBudgetMs,
         capBudgetShared: config.goalSharedBudget !== false,
         seed: (baseSeed + (config.reviewMix === true ? Math.floor(rounds / 2) : rounds) * 7919) >>> 0,
+        _goalRound: rounds,
         _trace: []
       });
       var r = null;
