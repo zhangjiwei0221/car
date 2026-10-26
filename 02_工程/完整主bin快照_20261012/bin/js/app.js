@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "479";
+var APP_BUILD = "558";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -2775,20 +2775,25 @@ AntSolver.App = (function() {
     var frameEl = document.getElementById('target-container');
     var frameW = frameEl ? frameEl.clientWidth : 0;
     if (!frameW || frameW < 100) frameW = 480;
-    var gap = 6, pad = 8;
-    var csz = Math.floor((frameW - pad * 2 - gap * (bcols - 1)) / bcols);
+    // 【v545·用户要求】模拟棋盘整体缩到原来的 0.8：外框宽度、格间距、内边距、高度上限、
+    // 格子上下限一起乘 BOARD_SCALE —— 只缩格子不缩外框会留一圈大片空白，不算"整体缩小"。
+    // 车（格子里的颜色/载客量/冰/锁链角标）字号都按 --csz 比例走，所以随格子同步缩。
+    var BOARD_SCALE = 0.8;
+    var gap = 6 * BOARD_SCALE, pad = 8 * BOARD_SCALE;
+    var boardW = Math.round(frameW * BOARD_SCALE);
+    var csz = Math.floor((boardW - pad * 2 - gap * (bcols - 1)) / bcols);
     // 电梯棋盘可能很高(行数多) → 同时按高度约束，保证整体可见
-    var maxH = 540;
+    var maxH = 540 * BOARD_SCALE;
     var cszH = Math.floor((maxH - pad * 2 - gap * (brows - 1)) / Math.max(1, brows));
     if (cszH < csz) csz = cszH;
-    if (csz < 14) csz = 14;
-    if (csz > 80) csz = 80;
+    if (csz < Math.round(14 * BOARD_SCALE)) csz = Math.round(14 * BOARD_SCALE);
+    if (csz > Math.round(80 * BOARD_SCALE)) csz = Math.round(80 * BOARD_SCALE);
 
     var reviveActive = reviveHighlight && reviveHighlight.until > Date.now();
     var reviveCellKey = {};
     if (reviveActive) for (var rc = 0; rc < reviveHighlight.cells.length; rc++) { var rcc = reviveHighlight.cells[rc]; reviveCellKey[rcc.r + ',' + rcc.c] = true; }
 
-    var html = '<div class="ant-board" style="width:' + frameW + 'px;justify-content:center;grid-template-columns:repeat(' + bcols + ',var(--csz));--csz:' + csz + 'px;--cgap:' + gap + 'px">';
+    var html = '<div class="ant-board" style="width:' + boardW + 'px;padding:' + pad + 'px;justify-content:center;grid-template-columns:repeat(' + bcols + ',var(--csz));--csz:' + csz + 'px;--cgap:' + gap + 'px">';
     for (var r = 0; r < brows; r++) {
       for (var c = 0; c < bcols; c++) {
         var cell = cells[r][c];
