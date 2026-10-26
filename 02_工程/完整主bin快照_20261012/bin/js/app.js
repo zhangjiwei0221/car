@@ -1846,14 +1846,18 @@ AntSolver.App = (function() {
   }
 
   function getGenConfig() {
+    var _ruleSel = (document.getElementById('gen-bottom-only') || {}).value;
+    var _ruleMode = _ruleSel === '2' ? 'instantChain' : (_ruleSel === '1' ? 'bottomOnly' : 'fourSide');
     return {
       // 目标图消除入口模式（三态单选，整批统一）：
       //   '1' = 仅底部入口（上/左/右封闭）
       //   '2' = 四方向瞬时连锁消除（v99 新增第三种玩法，与仅底部入口互斥）
       //   其余/缺控件 = 四边入口（默认，v95 行为）
       // 生成器侧会据此贯通盒切分、候选筛选、卡点、全知求解、玩家模拟、审核与难度。
-      bottomOnly: ((document.getElementById('gen-bottom-only') || {}).value === '1'),
-      instantChain: ((document.getElementById('gen-bottom-only') || {}).value === '2'),
+      ruleMode: _ruleMode,
+      bottomOnly: _ruleMode === 'bottomOnly',
+      instantChain: _ruleMode === 'instantChain',
+      elimOrder: _ruleMode === 'instantChain' ? 'instant' : 'ring',
       // ===== 【v137】切盒方式（用户 2026-10-14 批准）=====
       // 'anchor' = 锚点切盒（双锚点分成 A/B 两片，A 片整车先出、B 片后出；用来把暂存压力顶起来）
       // 其余/缺控件 = 'trend'（现有几何趋势切）——不选它，生产口径与本次改动前逐字节一致。

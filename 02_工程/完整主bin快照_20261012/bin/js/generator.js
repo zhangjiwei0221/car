@@ -324,6 +324,7 @@ AntSolver.Generator = (function() {
     //   结算差异只在「怎么选像素」：每轮快照当前可达同色全集，按离该订单暂存起点的距离近优先，
     //   消到订单剩余容量为止，目标图整体刷新后再重扫下一轮（详见 simulator.instantChainEliminate）。
     instantChain: false,
+    elimOrder: 'ring',      // 生成侧分析序：由 ruleMode 派生；instantChain 固定 instant
     // ===== 生产前置碎色闸门（任务 ANT-GEN-FRAGMENT-GATE-20260824，用户 2026-08-24 批准）=====
     // fragmentMaxRate：目标图碎色率上限。**0 = 关闭**（默认，行为与本参数引入前完全一致）。
     //   >0 时在 produceFixed 生成候选【之前】判定：碎色率超过该值 → 直接跳过该源图，
@@ -6521,9 +6522,28 @@ AntSolver.Generator = (function() {
     return o;
   }
 
+  /**
+   * 【v525】三态规则契约：一个 ruleMode 派生 bottomOnly / instantChain / elimOrder。
+   * 避免 UI 选瞬时连锁，但生成侧 elimOrder 仍为 ring，导致“造关按一套、验关按另一套”。
+   * 兼容旧脚本：未传 ruleMode 时从 instantChain / bottomOnly 推导；冲突时 instantChain 优先并强制关闭 bottomOnly。
+   */
+  function normalizeRuleConfig(config) {
+    var o = Object.assign({}, config || {});
+    var mode = o.ruleMode;
+    if (mode === 'fourSideInstantChain' || mode === 'instantChain') mode = 'instantChain';
+    if (mode !== 'fourSide' && mode !== 'bottomOnly' && mode !== 'instantChain') {
+      mode = o.instantChain ? 'instantChain' : (o.bottomOnly ? 'bottomOnly' : 'fourSide');
+    }
+    o.ruleMode = mode;
+    o.instantChain = mode === 'instantChain';
+    o.bottomOnly = mode === 'bottomOnly';
+    o.elimOrder = o.instantChain ? 'instant' : 'ring';
+    return o;
+  }
+
   function produceFixed(blocks, config, opts) {
     seedRng(config && config.seed);
-    config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
+    config = normalizeRuleConfig(normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {})));
     // 【v239】需求日程按图算一次（与候选无关），供 fillStructureFixed 按需求序铺盘。
     if (!config._demandCurve) { try { config._demandCurve = demandCurveOf(blocks); } catch (e) { config._demandCurve = null; } }
     opts = opts || {};
@@ -8050,7 +8070,7 @@ AntSolver.Generator = (function() {
 
   function produce(blocks, config) {
     seedRng(config && config.seed);
-    config = normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {}));
+    config = normalizeRuleConfig(normalizeBoardFloor(Object.assign({}, DEFAULT_CONFIG, config || {})));
     if (config.roleSchedule === 'compare') return produceRoleCompare(blocks, config);
     if (config.roleSchedule === 'timelineCompare') return produceTimelineCompare(blocks, config);
     // 【v334】生成轨迹：每次评估一条，供界面"生成过程"面板回放
@@ -14965,7 +14985,7 @@ AntSolver.Generator = (function() {
 
   function produceGoal(blocks, config, opts) {
     opts = opts || {};
-    config = Object.assign({}, DEFAULT_CONFIG, config || {});
+    config = normalizeRuleConfig(Object.assign({}, DEFAULT_CONFIG, config || {}));
     // v503：目标模式默认使用用户确认的压力体验门；experienceGoal=false 仅用于旧口径回归。
     // 时间模式仍走 produce，不受此默认值影响。
     if (config.experienceGoal == null) config.experienceGoal = true;
@@ -15087,7 +15107,7 @@ AntSolver.Generator = (function() {
     // 【v495·第2步】容量上限合同：把用户最初输入的容量区间钉成快照，后续所有“按棋盘反推 / 溢出救援 /
     //   管道深度补救”的容量缩放都读这个快照，不许越过用户上限（踩过：v238 反推、管道 +12%、管道 +3）。
     //   v496 注意：_userCapMin 为 null 表示"本档的上沿已由 capScalePlan 显式给定，需要重新快照"。
-    config = (config && typeof config === 'object') ? config : {};
+    config = normalizeRuleConfig((config && typeof config === 'object') ? config : {});
     if (config._userCapMin == null) {
       var _ucMn = parseInt(config.boxSizeMin, 10) || 0, _ucMx = parseInt(config.boxSizeMax, 10) || 0;
       if (_ucMn > 0 && _ucMx >= _ucMn) config = Object.assign({}, config, { _userCapMin: _ucMn, _userCapMax: _ucMx });
@@ -16896,6 +16916,6 @@ AntSolver.Generator = (function() {
     generateTargetMap: generateTargetMap,
     blocksFromTXT: blocksFromTXT,
     getColorPalette: getColorPalette,
-    DEFAULT_CONFIG: DEFAULT_CONFIG
+    DEFAULT_CONFIG: DEFAULT_CONFIG, normalizeRuleConfig: normalizeRuleConfig
   };
 })();
