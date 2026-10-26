@@ -14999,6 +14999,67 @@ AntSolver.Generator = (function() {
     ev.diagnosis = AntSolver.ExperienceGoal.diagnose(ev, goalStructPass(cand));
     cand[cacheKey] = ev; return ev;
   }
+  /**
+   * v536：把完整释放路线作为候选证据。默认关闭；瞬时模式显式开启后，
+   * 只读取候选已有棋盘，不改关卡、不改求解器路线、不改变量区间。
+   */
+  function instantReleaseRouteEvidenceOf(cand, config) {
+    if (!cand || !cand.level || !cand.valid || !cand.solveResult ||
+        !config || config.instantReleaseRoute !== true || !config.instantChain ||
+        !AntSolver.ReleaseRouteConstructor) return null;
+    // 路线证据只能在结构/容量已经合格时救“缺释放”；不能把结构失败洗成通过。
+    if (!goalStructPass(cand) || !experienceCapacityOk(cand, config)) return null;
+    if (cand._instantReleaseRouteEvidence) return cand._instantReleaseRouteEvidence;
+    var t0 = Date.now();
+    try {
+      var sources = [{ name: 'solver', pickOrder: cand.solveResult.pickOrder || [] }];
+      var plan = cand.level.board && cand.level.board.instantPlanCells;
+      if (plan && plan.length) {
+        sources.push({ name: 'plan', pickOrder: plan.map(function (p, i) {
+          return { r: p.r, c: p.c, color: p.color, count: p.count, step: i, chainIndex: 0 };
+        }) });
+      }
+      var built = AntSolver.ReleaseRouteConstructor.construct(cand.level, sources, {
+        overallTimeBudgetMs: Math.max(100, parseInt(config.instantReleaseRouteMs, 10) || 180000),
+        maxUniqueCandidates: Math.max(1, parseInt(config.instantReleaseRouteCandidates, 10) || 160),
+        timePerAlternativeMs: Math.max(50, parseInt(config.instantReleaseRouteAltMs, 10) || 900),
+        maxNodes: Math.max(200, parseInt(config.instantReleaseRouteNodes, 10) || 3000),
+        stopAfterFirstPass: true
+      });
+      var best = built.summary && built.summary.best;
+      var evidence = {
+        schema: 'instant-release-route-evidence-v1',
+        pass: !!(best && best.pass),
+        status: best && best.pass ? 'pass' : (built.summary.budgetExhausted ? 'unknown' : 'fail'),
+        sources: sources.map(function (s) { return s.name; }),
+        summary: {
+          tested: built.summary.tested, unique: built.summary.unique,
+          duplicates: built.summary.duplicates, highPressureStates: built.summary.highPressureStates,
+          withRelease: built.summary.withRelease, withMid50: built.summary.withMid50,
+          passCount: built.summary.pass, searchMs: built.summary.wallMs,
+          searchMsP50: built.summary.searchMsP50, searchMsP90: built.summary.searchMsP90,
+          budgetExhausted: built.summary.budgetExhausted
+        },
+        best: best ? {
+          source: best.source, fullSteps: best.fullSteps, fullSig: best.fullSig,
+          finalReplayValid: best.finalReplayValid, midBuffer34Pct: best.midBuffer34Pct,
+          maxBuffer: best.maxBuffer, significantReleaseCount: best.significantReleaseCount,
+          firstSignificantRelease: best.firstSignificantRelease,
+          step: best.step, action: best.action, referenceAction: best.referenceAction,
+          changedAction: best.changedAction, divergence: best.divergence
+        } : null,
+        elapsedMs: Date.now() - t0
+      };
+      cand.instantReleaseRouteEvidence = evidence;
+      return evidence;
+    } catch (e) {
+      cand.instantReleaseRouteEvidence = {
+        schema: 'instant-release-route-evidence-v1', pass: false,
+        status: 'error', error: String((e && e.message) || e), elapsedMs: Date.now() - t0
+      };
+      return cand.instantReleaseRouteEvidence;
+    }
+  }
   function experienceCapacityOk(cand, config) {
     var ca = cand && cand.capacityAudit;
     if (!ca && cand && cand.level && AntSolver.Quality) {
@@ -15011,8 +15072,17 @@ AntSolver.Generator = (function() {
     var ev = experienceEvalOfCand(cand, config, true);
     return !!(ev && ev.pass);
   }
+  function instantReleaseRouteAccept(cand, config) {
+    if (!cand || !cand.valid || !goalStructPass(cand) || !experienceCapacityOk(cand, config)) return false;
+    var ev = instantReleaseRouteEvidenceOf(cand, config);
+    return !!(ev && ev.pass === true && ev.best && ev.best.finalReplayValid === true &&
+      ev.best.midBuffer34Pct >= 50 && ev.best.significantReleaseCount >= 1);
+  }
   function goalAcceptPass(cand, config) {
-    return config && config.experienceGoal === true ? goalExperiencePass(cand, config) : goalStructPass(cand);
+    if (config && config.experienceGoal === true) {
+      return goalExperiencePass(cand, config) || instantReleaseRouteAccept(cand, config);
+    }
+    return goalStructPass(cand);
   }
   function verifiedRouteAccept(cand) {
     var rt = cand && cand.experienceRouteEvidence, best = rt && rt.bestVerified, rd = best && best.releaseDecision;
@@ -15027,6 +15097,7 @@ AntSolver.Generator = (function() {
     if (goalExperiencePass(cand, config)) return true;
     var full = experienceEvalOfCand(cand, config, true);
     if (full && full.pass) return true;
+    if (instantReleaseRouteAccept(cand, config)) return true;
     return verifiedRouteAccept(cand);
   }
   function markVerifiedRouteAccept(cand, config) {
@@ -15036,6 +15107,12 @@ AntSolver.Generator = (function() {
     if (full && full.pass) return false; // 参考路线本身已过，不冒充“替代路线救回”
     if (cand.goalStopReason !== 'pass') cand.goalStopReason = 'pass_verified_route';
     cand.acceptedByVerifiedRoute = true;
+    return true;
+  }
+  function markReleaseRouteAccept(cand, config) {
+    if (!instantReleaseRouteAccept(cand, config)) return false;
+    if (cand.goalStopReason !== 'pass') cand.goalStopReason = 'pass_release_route';
+    cand.acceptedByReleaseRoute = true;
     return true;
   }
   function markFinalStructureAccept(cand, config) {
@@ -15052,6 +15129,16 @@ AntSolver.Generator = (function() {
     var a = portfolioTuple(cand), b = portfolioTuple(reference);
     if (!!a.ok !== !!b.ok) return !!a.ok;
     if ((a.qg || 0) !== (b.qg || 0)) return (a.qg || 0) > (b.qg || 0);
+    var ra = instantReleaseRouteAccept(cand, config), rb = instantReleaseRouteAccept(reference, config);
+    if (ra !== rb) return ra;
+    if (ra && rb) {
+      var ea0 = cand.instantReleaseRouteEvidence.best, eb0 = reference.instantReleaseRouteEvidence.best;
+      if (ea0.maxBuffer !== eb0.maxBuffer) return ea0.maxBuffer < eb0.maxBuffer;
+      if ((ea0.midBuffer34Pct || 0) !== (eb0.midBuffer34Pct || 0))
+        return (ea0.midBuffer34Pct || 0) > (eb0.midBuffer34Pct || 0);
+      if ((ea0.significantReleaseCount || 0) !== (eb0.significantReleaseCount || 0))
+        return (ea0.significantReleaseCount || 0) > (eb0.significantReleaseCount || 0);
+    }
     if (config && config.experienceGoal === true) {
       var ea = experienceEvalOfCand(cand, config, true), eb = experienceEvalOfCand(reference, config, true);
       var da = ea && ea.metrics && ea.metrics.distance != null ? ea.metrics.distance : null;
@@ -15194,6 +15281,11 @@ AntSolver.Generator = (function() {
         try { r = tuneExperienceCandidate(r, tuneCfg); r.goalRound = rounds; }
         catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
       }
+      if (config.instantReleaseRoute === true && r && r.level && r.valid && r.solveResult &&
+          goalStructPass(r) && experienceCapacityOk(r, cfg)) {
+        try { instantReleaseRouteEvidenceOf(r, Object.assign({}, cfg, config)); }
+        catch (e) { r.instantReleaseRouteEvidence = { schema: 'instant-release-route-evidence-v1', pass: false, status: 'error', error: String((e && e.message) || e) }; }
+      }
       if (!best || goalCandidateBetter(r, best, config)) best = r;
       if (passed(r)) break;
     }
@@ -15206,6 +15298,7 @@ AntSolver.Generator = (function() {
     }
     if (best && best.level) attachExperienceRouteEvidence(best, config);
     if (best) markVerifiedRouteAccept(best, config);
+    if (best) markReleaseRouteAccept(best, config);
     if (best) markFinalStructureAccept(best, config);
     if (best) best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: perMs,
       sharedCapBudget: config.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
@@ -16998,7 +17091,7 @@ AntSolver.Generator = (function() {
     setCurveScore: setCurveScore,           // 【v151】曲线评分开关（默认关）
     isCurveScore: isCurveScore,
     choiceCurveScore: choiceCurveScore,
-    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, repairUsableNoCandidate: repairUsableNoCandidate, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
+    evaluateLevel: evaluateLevel, trapPostProcess: trapPostProcess, p7RepairLevel: p7RepairLevel, repairUsableNoCandidate: repairUsableNoCandidate, goalCandidateBetter: goalCandidateBetter, goalResultExperiencePass: goalResultExperiencePass, markVerifiedRouteAccept: markVerifiedRouteAccept, markReleaseRouteAccept: markReleaseRouteAccept, markFinalStructureAccept: markFinalStructureAccept, goalStructPass: goalStructPass, goalExperiencePass: goalExperiencePass, goalAcceptPass: goalAcceptPass, instantReleaseRouteEvidenceOf: instantReleaseRouteEvidenceOf, instantReleaseRouteAccept: instantReleaseRouteAccept, tuneExperienceCandidate: tuneExperienceCandidate, attachExperienceRouteEvidence: attachExperienceRouteEvidence, sampleReadyStats: sampleReadyStats, debugBoardDims: debugBoardDims,
     exposedBlobByColor: exposedBlobByColor,
     // 【v145】棋盘自适应：车数采样 / 由车数反推范围 / 把范围写进 config 副本
     sampleCarCount: sampleCarCount,
