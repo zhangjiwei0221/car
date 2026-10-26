@@ -18,9 +18,15 @@ AntSolver.InstantPlayout = (function () {
    * 若 P < 车数×min（区间数学不可分），仍取均衡解以最大化最小车容量并如实标记；
    * 不把余数塞成 1~2px 尾车，也不越过用户上限。
    */
-  function capacityPlanForColor(total, minCap, maxCap) {
+  function capacityPlanForColor(total, minCap, maxCap, targetCars) {
     if (!(total > 0)) return { total: total, caps: [], exact: true, reason: 'empty' };
-    var n = Math.max(1, Math.ceil(total / maxCap));
+    var minCars = Math.max(1, Math.ceil(total / maxCap));
+    var maxCars = Math.max(1, Math.floor(total / minCap));
+    var n = targetCars == null ? minCars : Math.max(1, parseInt(targetCars, 10) || minCars);
+    if (targetCars != null && (n < minCars || n > maxCars)) {
+      return { total: total, caps: [], exact: false, reason: 'target_car_count_unpartitionable',
+        minCars: minCars, maxCars: maxCars, targetCars: n, cars: 0, average: null };
+    }
     var base = Math.floor(total / n), rem = total - base * n;
     var caps = [];
     if (total >= n * minCap) {
@@ -40,20 +46,62 @@ AntSolver.InstantPlayout = (function () {
     caps.sort(function (a, b) { return b - a; });
     var exact = caps.every(function (c) { return c >= minCap && c <= maxCap; });
     var reason = exact ? null : (total < minCap ? 'color_below_min' : 'no_exact_partition');
-    return { total: total, caps: caps, exact: exact, reason: reason, average: total / n, cars: n };
+    return { total: total, caps: caps, exact: exact, reason: reason, average: total / n, cars: n,
+      minCars: minCars, maxCars: maxCars, targetCars: n };
   }
-  function buildCapacityQueues(blocks, rows, cols, minCap, maxCap) {
+  function buildCapacityQueues(blocks, rows, cols, minCap, maxCap, targetCars) {
     var totals = {};
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
       var v = blocks[r][c]; if (v > 0) totals[v] = (totals[v] || 0) + 1;
     }
     var queues = {}, plans = [];
     var colors = Object.keys(totals).map(Number).sort(function (a, b) { return a - b; });
+    var target = targetCars == null ? null : parseInt(targetCars, 10);
+    var minTotal = 0, maxTotal = 0, colorRanges = {};
+    for (var ti = 0; ti < colors.length; ti++) {
+      var tc = colors[ti], tn = totals[tc];
+      var lo = Math.max(1, Math.ceil(tn / maxCap));
+      var hi = Math.max(1, Math.floor(tn / minCap));
+      if (hi < lo) {
+        if (target != null) return { queues: {}, plans: [], ok: false, reason: 'capacity_band_unpartitionable',
+          minTotalCars: null, maxTotalCars: null, targetCars: target, colorRanges: colorRanges };
+        // 目标车数为空时保留历史“近似分区”路径，由 capacityPlanForColor 自行均衡并标记 exact=false。
+        colorRanges[tc] = { min: lo, max: hi, total: tn, nonExactHistory: true };
+        minTotal += lo; maxTotal += Math.max(lo, hi);
+        continue;
+      }
+      colorRanges[tc] = { min: lo, max: hi, total: tn };
+      minTotal += lo; maxTotal += hi;
+    }
+    if (target != null && (target < minTotal || target > maxTotal)) {
+      return { queues: {}, plans: [], ok: false, reason: 'target_car_count_infeasible',
+        minTotalCars: minTotal, maxTotalCars: maxTotal, targetCars: target, colorRanges: colorRanges };
+    }
+    var perColorTarget = {};
+    for (var ci = 0; ci < colors.length; ci++) perColorTarget[colors[ci]] = colorRanges[colors[ci]].min;
+    if (target != null) {
+      var extra = target - minTotal;
+      // 优先把额外车辆给大色块，避免把总量小的颜色拆成细碎尾车。
+      var order = colors.slice().sort(function (a, b) {
+        return (colorRanges[b].total - colorRanges[a].total) || a - b;
+      });
+      while (extra > 0) {
+        var progressed = false;
+        for (var oi = 0; oi < order.length && extra > 0; oi++) {
+          var oc = order[oi], r = colorRanges[oc];
+          if (perColorTarget[oc] < r.max) { perColorTarget[oc]++; extra--; progressed = true; }
+        }
+        if (!progressed) break;
+      }
+      if (extra > 0) return { queues: {}, plans: [], ok: false, reason: 'target_car_allocation_failed',
+        minTotalCars: minTotal, maxTotalCars: maxTotal, targetCars: target, colorRanges: colorRanges };
+    }
     for (var i = 0; i < colors.length; i++) {
-      var col = colors[i], p = capacityPlanForColor(totals[col], minCap, maxCap);
+      var col = colors[i], p = capacityPlanForColor(totals[col], minCap, maxCap, target == null ? null : perColorTarget[col]);
       queues[col] = p.caps.slice(); plans.push({ color: col, total: p.total, caps: p.caps, exact: p.exact, reason: p.reason });
     }
-    return { queues: queues, plans: plans };
+    return { queues: queues, plans: plans, ok: true, minTotalCars: minTotal, maxTotalCars: maxTotal,
+      targetCars: target, colorRanges: colorRanges, targetCarsFeasible: target == null || true };
   }
   function plan(level, config, opts) {
     opts = opts || {};
@@ -63,7 +111,16 @@ AntSolver.InstantPlayout = (function () {
     var capMax = Math.max(capMin, parseInt(config && config.boxSizeMax, 10) || capMin);
     var bufferLimit = Math.max(1, parseInt(config && config.bufferLimit, 10) || lv.bufferLimit || 5);
     var elim = AntSolver.outsideReachSeed(blocks, rows, cols, false);
-    var capBuilt = buildCapacityQueues(blocks, rows, cols, capMin, capMax), capQueues = capBuilt.queues, capIndex = {};
+    var targetCars = config && config.targetCarCount != null && +config.targetCarCount > 0 ? +config.targetCarCount : null;
+    var capBuilt = buildCapacityQueues(blocks, rows, cols, capMin, capMax, targetCars), capQueues = capBuilt.queues, capIndex = {};
+    if (capBuilt.ok === false) {
+      var badBoxes = [];
+      badBoxes._instantPlayout = { schema: 'instant-playout-v2', ok: false, reason: capBuilt.reason,
+        policy: policy, capRange: [capMin, capMax], targetCars: targetCars,
+        minTotalCars: capBuilt.minTotalCars, maxTotalCars: capBuilt.maxTotalCars,
+        targetCarsFeasible: false, capacityPlans: capBuilt.plans || [] };
+      return { ok: false, reason: capBuilt.reason, boxes: badBoxes, cars: [], seq: null, audit: { targetCarsFeasible: false } };
+    }
     var seq = AntSolver.create2D(rows, cols, 0), slots = [], active = [], cars = [], done = 0, total = 0;
     for (var rr = 0; rr < rows; rr++) for (var cc = 0; cc < cols; cc++) if (blocks[rr][cc] > 0) total++;
     function freeSlot() { for (var k = 0; k < bufferLimit; k++) if (!slots[k]) return k; return -1; }
@@ -158,6 +215,8 @@ AntSolver.InstantPlayout = (function () {
     var maxBuffer = Math.max.apply(null, cars.map(function (c) { return c.bufferBefore + 1; }).concat([0]));
     boxes._instantPlayout = { schema: 'instant-playout-v2', ok: ok, reason: ok ? null : (deadlockReason || 'coverage_incomplete'), policy: policy,
       cars: cars.length, covered: done, total: total, capRange: [capMin, capMax], audit: audit,
+      targetCars: targetCars, minTotalCars: capBuilt.minTotalCars, maxTotalCars: capBuilt.maxTotalCars,
+      targetCarsFeasible: capBuilt.ok !== false,
       capacityPlans: capBuilt.plans, exactCapacityColors: capBuilt.plans.filter(function (x) { return x.exact; }).length,
       infeasibleCapacityColors: capBuilt.plans.filter(function (x) { return !x.exact; }).length,
       bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
