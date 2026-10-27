@@ -1,0 +1,593 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index ddf681f..bdb4c4a 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v575 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=575">
++  <title>车接小人 v613 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=613">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v575</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v613</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -406,6 +406,10 @@
+         <label><input type="checkbox" id="gen-semantic-obstacles" checked> 语义障碍（ready 重放冰/链）</label>
+         <span class="gen-hint">关掉 = 纯基线</span>
+       </div>
++      <div class="gen-row" style="margin-top:6px" title="实验功能：对最终候选沿真实路线识别免费段，追加少量链/冰后重新求解；严格优于原候选才替换。默认关闭。">
++        <label><input type="checkbox" id="gen-route-obstacle"> 路线障碍实验（默认关闭）</label>
++        <span class="gen-hint">仅瞬时模式；最多6次重解，不合格自动回退原关</span>
++      </div>
+       <div class="gen-row" style="margin-top:6px" title="容量在 deriveCapacityBand 推导出的带内选择。自动=带；下沿/上沿=固定到带的两端；中值=固定到 chosen。">
+         <label>容量策略</label>
+         <select id="gen-cap-profile" style="width:130px">
+@@ -772,29 +776,30 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=575"></script>
+-  <script src="js/utils.js?v=575"></script>
++  <script src="js/zip.js?v=613"></script>
++  <script src="js/utils.js?v=613"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=575"></script>
+-  <script src="js/simulator.js?v=575"></script>
++  <script src="js/color-libs.js?v=613"></script>
++  <script src="js/simulator.js?v=613"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=575"></script>
+-  <script src="js/solver-strategy.js?v=575"></script>
+-  <script src="js/solver.js?v=575"></script>
+-  <script src="js/playersim.js?v=575"></script>
++  <script src="js/anchor-cut.js?v=613"></script>
++  <script src="js/solver-strategy.js?v=613"></script>
++  <script src="js/solver.js?v=613"></script>
++  <script src="js/playersim.js?v=613"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=575"></script>
+-  <script src="js/car-sequencer.js?v=575"></script>
+-  <script src="js/experience-goal.js?v=575"></script>
+-  <script src="js/release-route-constructor.js?v=575"></script>
+-  <script src="js/capacity-tuner.js?v=575"></script>
+-  <script src="js/instant-playout.js?v=575"></script>
+-  <script src="js/generator.js?v=575"></script>
+-  <script src="js/source-preflight.js?v=575"></script>
+-  <script src="js/analysis.js?v=575"></script>
++  <script src="js/solver-analysis.js?v=613"></script>
++  <script src="js/car-sequencer.js?v=613"></script>
++  <script src="js/experience-goal.js?v=613"></script>
++  <script src="js/release-route-constructor.js?v=613"></script>
++  <script src="js/capacity-tuner.js?v=613"></script>
++  <script src="js/instant-playout.js?v=613"></script>
++  <script src="js/generator.js?v=613"></script>
++  <script src="js/route-obstacle-planner.js?v=613"></script>
++  <script src="js/source-preflight.js?v=613"></script>
++  <script src="js/analysis.js?v=613"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=575"></script>
+-  <script src="js/app.js?v=575"></script>
++  <script src="js/level-editor.js?v=613"></script>
++  <script src="js/app.js?v=613"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 5901d04..55aad72 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "575";
++var APP_BUILD = "613";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -4887,6 +4887,7 @@ AntSolver.App = (function() {
+     var _coverMin = 0;
+     var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
+     var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
++    var _routeObstacle = !!((document.getElementById('gen-route-obstacle') || {}).checked);
+     var _searchPlan = (function () {
+       var el = document.getElementById('gen-search-min');
+       var m = parseInt(el && el.value, 10);
+@@ -5036,6 +5037,12 @@ AntSolver.App = (function() {
+     //   下面这组参数继续沿用原生产口径（_legacyParams 保持 true），否则棋盘范围 / 管道数 / 目标车数
+     //   会跟着一起变，没法把改前后差异归因到产线。参数随产线重调留给下一个单变量实验。
+     out.generatorFlow = 'new_fixed';
++    if (_routeObstacle) {
++      out.routeObstaclePlan = 'v1';
++      out.routeObstaclePlanMaxAttempts = 6;
++      out.routeObstaclePlanMaxMs = 20000;
++      out.routeObstaclePlayerSeeds = [7, 1009, 2027];
++    }
+     // 【v316·用户裁决】上限放宽到 6 行 × 8 列：原来写死 5×7，车一多就只能往管道里塞。
+     //   具体挑哪个尺寸仍由「可用率配额 + 装得下优先」决定，不会无脑选最大的。
+     // 【v338·用户裁决】范围下探到 4 行 / 6 列：原来大图最小只能 5×7=35 格，
+@@ -5921,6 +5928,10 @@ AntSolver.App = (function() {
+       row('目标轮', rec.goalMode ? (rec.goalRounds || 1) : '按时间') +
+       row('跑满时间', rec.fullTime ? '开（不早停）' : '关') +
+       row('陷阱后处理', rec.trapPost ? (rec.trapPost.applied ? ('命中 / +' + Math.round((rec.trapPost.ms || 0) / 1000) + 's') : ('未命中（' + (rec.trapPost.reason || rec.trapPost.error || '无') + '）')) : '未开') +
++      row('路线障碍实验', rec.routeObstaclePlan ? (rec.routeObstaclePlan.accepted
++        ? ('采用 / ' + (rec.routeObstaclePlan.added || []).length + ' 个单元 / ' +
++          Math.round((rec.routeObstaclePlan.wallElapsedMs || rec.routeObstaclePlan.elapsedMs || 0) / 1000) + 's')
++        : ('未采用（' + (rec.routeObstaclePlan.reason || '无改善') + '）')) : '未开') +
+       row('P7修复', rec.p7 ? ('试' + (rec.p7.tried || 0) + ' / 收' + (rec.p7.accepted || 0) +
+         '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
+         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
+@@ -6373,6 +6384,7 @@ AntSolver.App = (function() {
+       baseGatePass: _qv.gatePass, baseGateReasons: _qv.gateReasons,
+       fullTime: !!(result.config && result.config.fullTime),
+       trapPost: result.trapPost || null,
++      routeObstaclePlan: result.routeObstaclePlan || null,
+       p7: result.p7 || null, a3d: result.a3d || null, readyStats: result.readyStats || null,
+       playerPassPct: (_ps.playerPassPct != null ? _ps.playerPassPct : null),
+       learnedPassPct: (_ps.learnedPassPct != null ? _ps.learnedPassPct : null),
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index 30a7337..d2bc50d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -25,7 +25,8 @@ try {
+     'utils.js' + _v, 'simulator.js' + _v, 'solver-strategy.js' + _v,
+     'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
+     'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
+-    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'instant-playout.js' + _v, 'generator.js' + _v, 'source-preflight.js' + _v
++    'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'instant-playout.js' + _v, 'generator.js' + _v,
++    'route-obstacle-planner.js' + _v, 'source-preflight.js' + _v
+   );
+   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
+ } catch (e) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index c8d8c31..a2ba976 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -7319,6 +7319,55 @@ AntSolver.Generator = (function() {
+       out.perf.playerSim = (AntSolver.PlayerSim && AntSolver.PlayerSim.getPerf) ? AntSolver.PlayerSim.getPerf() : null;
+       out.perf.evaluatedPositions = evaluated;
+       out.perf.config = { candidateCount: K, chokeBranches: B, rounds: N, timeBudgetMs: budget, requireHardPass: requireHard };
++      // 【v613·实验】路线障碍规划器：默认关闭；只对最终候选追加链/冰，
++      // 修改后完整重解并重算体验，只有严格优于原候选才替换。
++      if (out && out.level && config.routeObstaclePlan === 'v1') {
++        var _ropT0 = Date.now();
++        try {
++          var _rop = AntSolver.RouteObstaclePlanner;
++          if (!_rop || !_rop.apply) {
++            out.routeObstaclePlan = { schema: 'route-obstacle-plan-v1', applied: false, accepted: false, reason: 'planner-not-loaded' };
++          } else {
++            var _ropLeft = deadlineAt ? Math.max(0, deadlineAt - Date.now()) : null;
++            if (_ropLeft != null && _ropLeft < 1000) {
++              out.routeObstaclePlan = { schema: 'route-obstacle-plan-v1', applied: false, accepted: false, reason: 'insufficient-budget', elapsedMs: 0 };
++            } else {
++              var _ropMax = Math.max(1000, parseInt(config.routeObstaclePlanMaxMs, 10) || 20000);
++              var _ropCfg = Object.assign({}, config);
++              if (_ropLeft != null) _ropCfg.routeObstaclePlanMaxMs = Math.min(_ropMax, _ropLeft);
++              var _planned = _rop.apply(out, blocks, _ropCfg, { deadlineAt: deadlineAt });
++              var _planEv = _planned && _planned.evidence || { schema: 'route-obstacle-plan-v1', applied: true, accepted: false, reason: 'no-result' };
++              _planEv.wallElapsedMs = Date.now() - _ropT0;
++              if (_planned && _planned.accepted && _planned.candidate) {
++                var _pc = _planned.candidate;
++                _pc.timedOut = out.timedOut;
++                _pc.elapsedMs = out.elapsedMs;
++                _pc.config = config;
++                _pc.sampledConfig = out.sampledConfig;
++                var _pout = finalizeProduce(_pc, K, evaluated + (_planEv.attempts || 0));
++                if (_pout) {
++                  _pout.flow = 'new_fixed';
++                  _pout.chokePlan = out.chokePlan;
++                  _pout.boardFit = out.boardFit;
++                  _pout.flowStats = out.flowStats;
++                  _pout.perf = getGenPerf();
++                  _pout.perf.solver = (AntSolver.Solver && AntSolver.Solver.getPerf) ? AntSolver.Solver.getPerf() : null;
++                  _pout.perf.playerSim = (AntSolver.PlayerSim && AntSolver.PlayerSim.getPerf) ? AntSolver.PlayerSim.getPerf() : null;
++                  _pout.perf.evaluatedPositions = evaluated + (_planEv.attempts || 0);
++                  _pout.perf.config = out.perf && out.perf.config;
++                  _pout.routeObstaclePlan = _planEv;
++                  out = _pout;
++                }
++              } else {
++                out.routeObstaclePlan = _planEv;
++              }
++            }
++          }
++        } catch (e) {
++          out.routeObstaclePlan = { schema: 'route-obstacle-plan-v1', applied: true, accepted: false,
++            reason: 'planner-error', error: String(e && e.message || e), wallElapsedMs: Date.now() - _ropT0 };
++        }
++      }
+       return out;
+     }
+     for (var k = 0; k < K; k++) {
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/route-obstacle-planner.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/route-obstacle-planner.js"
+new file mode 100644
+index 0000000..55115c1
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/route-obstacle-planner.js"
+@@ -0,0 +1,378 @@
++/**
++ * 路线障碍规划器 v1（实验）
++ *
++ * 输入一关已经求解的候选，沿其真实路线定位免费段，逐次尝试在免费段
++ * 的开始/中点加入一组双锁链或一个数字冰。每个变体都重新求解并重新
++ * 计算容量与体验，只有严格优于当前候选才保留，否则回退。
++ *
++ * 默认由 Generator 的显式开关 routeObstaclePlan==='v1' 调用。
++ * 本模块不修改切球、容量、棋盘和初始摆车。
++ */
++var AntSolver = AntSolver || {};
++
++AntSolver.RouteObstaclePlanner = (function () {
++  var DEFAULTS = {
++    version: 'v1',
++    maxAttempts: 6,
++    maxMs: 20000,
++    attemptsPerRound: 3,
++    playerSeeds: [7, 1009, 2027]
++  };
++
++  function copy(obj) {
++    return Object.assign({}, obj || {});
++  }
++
++  function median(xs) {
++    var a = (xs || []).filter(function (x) { return typeof x === 'number' && isFinite(x); })
++      .sort(function (a, b) { return a - b; });
++    if (!a.length) return null;
++    var m = Math.floor(a.length / 2);
++    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
++  }
++
++  function maxChainId(level) {
++    var max = 0, cells = level && level.board && level.board.cells || [];
++    for (var r = 0; r < cells.length; r++) {
++      for (var c = 0; c < cells[r].length; c++) {
++        var x = cells[r][c];
++        if (x && x.t === 'box' && x.chain > max) max = x.chain;
++      }
++    }
++    return max;
++  }
++
++  function chainGroupCount(level) {
++    var ids = {}, cells = level && level.board && level.board.cells || [];
++    for (var r = 0; r < cells.length; r++) {
++      for (var c = 0; c < cells[r].length; c++) {
++        var x = cells[r][c];
++        if (x && x.t === 'box' && x.chain > 0) ids[x.chain] = 1;
++      }
++    }
++    return Object.keys(ids).length;
++  }
++
++  function obstacleBudget(level, config) {
++    var rows = level && level.board && level.board.rows || 0;
++    var cols = level && level.board && level.board.cols || 0;
++    var small = rows * cols <= 56;
++    return {
++      maxChains: config.routeObstacleMaxChains != null
++        ? Math.max(0, parseInt(config.routeObstacleMaxChains, 10) || 0)
++        : (small ? 3 : 5),
++      maxIce: config.routeObstacleMaxIce != null
++        ? Math.max(0, parseInt(config.routeObstacleMaxIce, 10) || 0)
++        : (small ? 4 : 2)
++    };
++  }
++
++  function freeRuns(level, solveResult, config) {
++    if (!AntSolver.Generator || !AntSolver.Generator.choiceCurve) return [];
++    var parsed;
++    try { parsed = AntSolver.parseLevel(level); } catch (e) { return []; }
++    var curve;
++    try {
++      curve = AntSolver.Generator.choiceCurve(parsed, {
++        completed: true,
++        pickOrder: solveResult && solveResult.pickOrder || []
++      }, {
++        instantChain: !!(config && config.instantChain),
++        bottomOnly: !!(config && config.bottomOnly)
++      });
++    } catch (e) { return []; }
++    var steps = curve && curve.steps || [], runs = [], start = null;
++    for (var i = 0; i <= steps.length; i++) {
++      var s = steps[i];
++      var free = s && s.full >= 2 && s.free >= 3;
++      if (free && start == null) start = i;
++      if (!free && start != null) {
++        runs.push({ start: start, end: i - 1, len: i - start, steps: steps.slice(start, i) });
++        start = null;
++      }
++    }
++    runs.sort(function (a, b) { return b.len - a.len; });
++    return runs;
++  }
++
++  function plainForChain(cell) {
++    return cell && cell.t === 'box' && !cell.chain && !cell.q;
++  }
++
++  function plainForIce(cell) {
++    return cell && cell.t === 'box' && !cell.chain && !cell.q && !(cell.numice > 0);
++  }
++
++  function chainUnits(level, run, maxUnits) {
++    var out = [], seen = {}, cells = level.board.cells;
++    var positions = [0, Math.floor(Math.max(0, run.len - 1) / 2)];
++    for (var pi = 0; pi < positions.length; pi++) {
++      var step = run.steps[positions[pi]];
++      if (!step || !step.pick) continue;
++      var p = step.pick, own = cells[p.r] && cells[p.r][p.c];
++      if (!plainForChain(own)) continue;
++      for (var d = 0; d < 4; d++) {
++        var dr = [-1, 1, 0, 0][d], dc = [0, 0, -1, 1][d];
++        var r = p.r + dr, c = p.c + dc;
++        if (r < 0 || r >= level.board.rows || c < 0 || c >= level.board.cols) continue;
++        var other = cells[r][c];
++        if (!plainForChain(other)) continue;
++        if (Math.min(own.count, other.count) > (level.board.rows * level.board.cols <= 56 ? 18 : 22)) continue;
++        var a = { r: p.r, c: p.c }, b = { r: r, c: c };
++        var key = [a.r, a.c, b.r, b.c].join(',');
++        if (seen[key]) continue;
++        seen[key] = 1;
++        out.push({
++          type: 'chain',
++          cells: [a, b],
++          minCap: Math.min(own.count, other.count),
++          sumCap: own.count + other.count,
++          sourceStep: step.step || (run.start + 1)
++        });
++      }
++    }
++    out.sort(function (a, b) { return a.minCap - b.minCap || a.sumCap - b.sumCap; });
++    return out.slice(0, maxUnits);
++  }
++
++  function iceUnits(level, run, maxUnits) {
++    var out = [], seen = {}, cells = level.board.cells;
++    var positions = [0, Math.floor(Math.max(0, run.len - 1) / 2)];
++    for (var pi = 0; pi < positions.length; pi++) {
++      var step = run.steps[positions[pi]];
++      if (!step || !step.pick) continue;
++      var p = step.pick, cell = cells[p.r] && cells[p.r][p.c];
++      if (!plainForIce(cell)) continue;
++      var key = p.r + ',' + p.c;
++      if (seen[key]) continue;
++      seen[key] = 1;
++      var stepNo = step.step || (run.start + 1);
++      out.push({
++        type: 'ice',
++        cell: { r: p.r, c: p.c },
++        sourceStep: stepNo,
++        value: Math.min(48, Math.max(4, stepNo + 6))
++      });
++    }
++    return out.slice(0, maxUnits);
++  }
++
++  function metricsOf(level, config) {
++    var G = AntSolver.Generator;
++    if (!G || !G.evaluateLevel) return null;
++    var evalCfg = copy(config);
++    evalCfg.routeObstaclePlan = false;
++    evalCfg.routeObstaclePlanV1 = false;
++    var ev = null;
++    try { ev = G.evaluateLevel(level, evalCfg); } catch (e) { return null; }
++    if (!ev || !ev.valid || !ev.level || !ev.goodV3) return null;
++    var quality = null;
++    try { quality = AntSolver.Quality.fromGeneration(ev); } catch (e) { quality = null; }
++    var curve = ev.goodV3.fillCurve || null;
++    var exp = null;
++    if (AntSolver.ExperienceGoal && ev.solveResult) {
++      try {
++        exp = AntSolver.ExperienceGoal.evaluate(ev.level, {
++          solveResult: ev.solveResult,
++          decision: false,
++          instantChain: !!config.instantChain,
++          maxDecisionStates: config.maxDecisionStates,
++          stateSampleMode: config.stateSampleMode,
++          minReleaseAmplitude: config.minReleaseAmplitude
++        });
++      } catch (e) { exp = null; }
++    }
++    var cap = null;
++    try { cap = AntSolver.Quality.capacityEvidence(ev.level, config); } catch (e) { cap = null; }
++    var seeds = Array.isArray(config.routeObstaclePlayerSeeds)
++      ? config.routeObstaclePlayerSeeds : DEFAULTS.playerSeeds;
++    var parsed = null;
++    try { parsed = AntSolver.parseLevel(ev.level); } catch (e) {}
++    var players = [];
++    if (parsed && AntSolver.PlayerSim && AntSolver.PlayerSim.run) {
++      for (var i = 0; i < seeds.length; i++) {
++        try {
++          var ps = AntSolver.PlayerSim.run(parsed, {
++            seed: seeds[i],
++            instantChain: !!config.instantChain,
++            bottomOnly: !!config.bottomOnly
++          });
++          players.push({ seed: seeds[i], won: !!(ps && ps.won), peak: ps && ps.bufferPeak });
++        } catch (e) {
++          players.push({ seed: seeds[i], won: false, peak: null, error: String(e && e.message || e) });
++        }
++      }
++    }
++    return {
++      ev: ev,
++      parsed: parsed,
++      quality: quality,
++      curve: curve,
++      experience: exp,
++      capacity: cap,
++      players: players,
++      allPlayersWon: players.length === seeds.length && players.every(function (p) { return p.won; })
++    };
++  }
++
++  function scoreOf(m) {
++    if (!m || !m.ev || !m.allPlayersWon) return -1e15;
++    var cap = m.capacity || {};
++    if (!cap.conserved || !cap.perColorConserved || cap.aboveMax > 0 || !cap.boardFloorPass) return -1e15;
++    var qPass = m.quality && m.quality.gatePass ? 1 : 0;
++    var gateFails = m.quality && m.quality.gateReasons ? m.quality.gateReasons.length : 9;
++    var expPass = m.experience && m.experience.pass ? 1 : 0;
++    var expMetrics = m.experience && m.experience.metrics || {};
++    var freeLow = m.curve && m.curve.freeLowPct != null ? m.curve.freeLowPct : 100;
++    var freeRun = m.curve && m.curve.freeRunMax != null ? m.curve.freeRunMax : 100;
++    var fullMedian = m.curve && m.curve.fullMedian2 != null ? m.curve.fullMedian2 : 99;
++    var maxBuffer = expMetrics.maxBuffer || 0;
++    var mid = expMetrics.midBuffer34Pct || 0;
++    var sig = expMetrics.significantReleaseCount || 0;
++    return qPass * 1e9 + expPass * 3e6 + (8 - gateFails) * 1e5 +
++      Math.min(maxBuffer, 5) * 2e4 + mid * 1e3 + sig * 5e3 -
++      freeLow * 120 - freeRun * 60 - Math.max(0, fullMedian - 3) * 2e4;
++  }
++
++  function applyUnit(level, unit, chainId) {
++    var out = JSON.parse(JSON.stringify(level));
++    if (unit.type === 'chain') {
++      for (var i = 0; i < unit.cells.length; i++) {
++        var c = unit.cells[i], cell = out.board.cells[c.r] && out.board.cells[c.r][c.c];
++        if (!cell || cell.t !== 'box') return null;
++        cell.chain = chainId;
++      }
++    } else {
++      var ice = out.board.cells[unit.cell.r] && out.board.cells[unit.cell.r][unit.cell.c];
++      if (!ice || ice.t !== 'box') return null;
++      ice.numice = unit.value;
++    }
++    return out;
++  }
++
++  function apply(candidate, blocks, config, opts) {
++    var t0 = Date.now();
++    if (!candidate || !candidate.level || !candidate.solveResult) {
++      return { accepted: false, candidate: candidate, evidence: { applied: false, reason: 'missing-candidate' } };
++    }
++    var rows = candidate.level.board && candidate.level.board.rows || 0;
++    var cols = candidate.level.board && candidate.level.board.cols || 0;
++    if (!rows || !cols || rows > 9 || cols > 9) {
++      return { accepted: false, candidate: candidate, evidence: { applied: false, reason: 'board-over-9' } };
++    }
++    if (!config.instantChain) {
++      return { accepted: false, candidate: candidate, evidence: { applied: false, reason: 'instant-chain-only' } };
++    }
++    var maxAttempts = Math.max(1, parseInt(config.routeObstaclePlanMaxAttempts, 10) || DEFAULTS.maxAttempts);
++    var maxMs = Math.max(1000, parseInt(config.routeObstaclePlanMaxMs, 10) || DEFAULTS.maxMs);
++    var budget = obstacleBudget(candidate.level, config);
++    var currentLevel = candidate.level;
++    var current = metricsOf(currentLevel, config);
++    if (!current) {
++      return { accepted: false, candidate: candidate, evidence: { applied: true, accepted: false, reason: 'baseline-eval-failed', ms: Date.now() - t0 } };
++    }
++    var beforeMetrics = {
++      qGate: !!(current.quality && current.quality.gatePass),
++      freeLowPct: current.curve ? current.curve.freeLowPct : null,
++      freeRunMax: current.curve ? current.curve.freeRunMax : null,
++      maxBuffer: current.experience && current.experience.metrics ? current.experience.metrics.maxBuffer : null
++    };
++    var currentScore = scoreOf(current);
++    var added = [], attempts = [], rounds = [];
++    var chainCount = chainGroupCount(currentLevel);
++    var iceCount = 0;
++    var cells = currentLevel.board.cells;
++    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
++      var x = cells[r][c];
++      if (x && x.t === 'box' && x.numice > 0) iceCount++;
++    }
++    var nextChainId = maxChainId(currentLevel) + 1;
++    for (var round = 0; round < maxAttempts && Date.now() - t0 < maxMs; round++) {
++      var runs = freeRuns(currentLevel, current.ev.solveResult, config);
++      if (!runs.length) break;
++      var run = runs[0];
++      var units = [];
++      if (chainCount < budget.maxChains) {
++        units = units.concat(chainUnits(currentLevel, run, DEFAULTS.attemptsPerRound));
++      }
++      if (iceCount < budget.maxIce) {
++        units = units.concat(iceUnits(currentLevel, run, Math.max(1, DEFAULTS.attemptsPerRound - units.length)));
++      }
++      if (!units.length) break;
++      var best = null, bestScore = currentScore;
++      for (var i = 0; i < units.length && Date.now() - t0 < maxMs; i++) {
++        var lv = applyUnit(currentLevel, units[i], nextChainId + round);
++        if (!lv) continue;
++        var m = metricsOf(lv, config);
++        var sc = scoreOf(m);
++        attempts.push({
++          type: units[i].type,
++          target: units[i].cells || units[i].cell,
++          value: units[i].value || null,
++          sourceStep: units[i].sourceStep,
++          score: sc,
++          valid: !!m,
++          qGate: !!(m && m.quality && m.quality.gatePass),
++          freeLowPct: m && m.curve ? m.curve.freeLowPct : null,
++          freeRunMax: m && m.curve ? m.curve.freeRunMax : null,
++          maxBuffer: m && m.experience && m.experience.metrics ? m.experience.metrics.maxBuffer : null,
++          midBuffer34Pct: m && m.experience && m.experience.metrics ? m.experience.metrics.midBuffer34Pct : null,
++          playerWins: m ? m.players.filter(function (p) { return p.won; }).length : 0
++        });
++        if (sc > bestScore) { bestScore = sc; best = { unit: units[i], level: lv, metrics: m }; }
++      }
++      rounds.push({ round: round + 1, run: { start: run.start + 1, end: run.end + 1, len: run.len }, units: units.length, accepted: !!best });
++      if (!best) break;
++      currentLevel = best.level;
++      current = best.metrics;
++      currentScore = bestScore;
++      if (best.unit.type === 'chain') chainCount++;
++      else iceCount++;
++      added.push({
++        type: best.unit.type,
++        target: best.unit.cells || best.unit.cell,
++        value: best.unit.value || null,
++        sourceStep: best.unit.sourceStep,
++        score: bestScore
++      });
++    }
++    var evidence = {
++      schema: 'route-obstacle-plan-v1',
++      applied: true,
++      accepted: added.length > 0,
++      attempts: attempts.length,
++      added: added,
++      rounds: rounds,
++      elapsedMs: Date.now() - t0,
++      reason: added.length ? null : (rounds.length ? 'no-improvement' : 'no-eligible-free-run'),
++      before: beforeMetrics
++    };
++    if (!added.length) return { accepted: false, candidate: candidate, evidence: evidence };
++    var result = {
++      level: current.ev.level,
++      solveResult: current.ev.solveResult,
++      audit: current.ev.audit,
++      goodV3: current.ev.goodV3,
++      valid: true,
++      config: config
++    };
++    evidence.after = {
++      qGate: !!(current.quality && current.quality.gatePass),
++      gateReasons: current.quality ? current.quality.gateReasons : null,
++      freeLowPct: current.curve ? current.curve.freeLowPct : null,
++      freeRunMax: current.curve ? current.curve.freeRunMax : null,
++      maxBuffer: current.experience && current.experience.metrics ? current.experience.metrics.maxBuffer : null,
++      midBuffer34Pct: current.experience && current.experience.metrics ? current.experience.metrics.midBuffer34Pct : null,
++      significantReleaseCount: current.experience && current.experience.metrics ? current.experience.metrics.significantReleaseCount : null,
++      players: current.players
++    };
++    return { accepted: true, candidate: result, evidence: evidence };
++  }
++
++  return {
++    apply: apply,
++    freeRuns: freeRuns,
++    scoreOf: scoreOf,
++    DEFAULTS: DEFAULTS
++  };
++})();

@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "575";
+var APP_BUILD = "613";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -4887,6 +4887,7 @@ AntSolver.App = (function() {
     var _coverMin = 0;
     var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
     var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
+    var _routeObstacle = !!((document.getElementById('gen-route-obstacle') || {}).checked);
     var _searchPlan = (function () {
       var el = document.getElementById('gen-search-min');
       var m = parseInt(el && el.value, 10);
@@ -5036,6 +5037,12 @@ AntSolver.App = (function() {
     //   下面这组参数继续沿用原生产口径（_legacyParams 保持 true），否则棋盘范围 / 管道数 / 目标车数
     //   会跟着一起变，没法把改前后差异归因到产线。参数随产线重调留给下一个单变量实验。
     out.generatorFlow = 'new_fixed';
+    if (_routeObstacle) {
+      out.routeObstaclePlan = 'v1';
+      out.routeObstaclePlanMaxAttempts = 6;
+      out.routeObstaclePlanMaxMs = 20000;
+      out.routeObstaclePlayerSeeds = [7, 1009, 2027];
+    }
     // 【v316·用户裁决】上限放宽到 6 行 × 8 列：原来写死 5×7，车一多就只能往管道里塞。
     //   具体挑哪个尺寸仍由「可用率配额 + 装得下优先」决定，不会无脑选最大的。
     // 【v338·用户裁决】范围下探到 4 行 / 6 列：原来大图最小只能 5×7=35 格，
@@ -5921,6 +5928,10 @@ AntSolver.App = (function() {
       row('目标轮', rec.goalMode ? (rec.goalRounds || 1) : '按时间') +
       row('跑满时间', rec.fullTime ? '开（不早停）' : '关') +
       row('陷阱后处理', rec.trapPost ? (rec.trapPost.applied ? ('命中 / +' + Math.round((rec.trapPost.ms || 0) / 1000) + 's') : ('未命中（' + (rec.trapPost.reason || rec.trapPost.error || '无') + '）')) : '未开') +
+      row('路线障碍实验', rec.routeObstaclePlan ? (rec.routeObstaclePlan.accepted
+        ? ('采用 / ' + (rec.routeObstaclePlan.added || []).length + ' 个单元 / ' +
+          Math.round((rec.routeObstaclePlan.wallElapsedMs || rec.routeObstaclePlan.elapsedMs || 0) / 1000) + 's')
+        : ('未采用（' + (rec.routeObstaclePlan.reason || '无改善') + '）')) : '未开') +
       row('P7修复', rec.p7 ? ('试' + (rec.p7.tried || 0) + ' / 收' + (rec.p7.accepted || 0) +
         '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
@@ -6373,6 +6384,7 @@ AntSolver.App = (function() {
       baseGatePass: _qv.gatePass, baseGateReasons: _qv.gateReasons,
       fullTime: !!(result.config && result.config.fullTime),
       trapPost: result.trapPost || null,
+      routeObstaclePlan: result.routeObstaclePlan || null,
       p7: result.p7 || null, a3d: result.a3d || null, readyStats: result.readyStats || null,
       playerPassPct: (_ps.playerPassPct != null ? _ps.playerPassPct : null),
       learnedPassPct: (_ps.learnedPassPct != null ? _ps.learnedPassPct : null),

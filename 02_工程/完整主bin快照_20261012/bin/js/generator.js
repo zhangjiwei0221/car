@@ -7319,6 +7319,55 @@ AntSolver.Generator = (function() {
       out.perf.playerSim = (AntSolver.PlayerSim && AntSolver.PlayerSim.getPerf) ? AntSolver.PlayerSim.getPerf() : null;
       out.perf.evaluatedPositions = evaluated;
       out.perf.config = { candidateCount: K, chokeBranches: B, rounds: N, timeBudgetMs: budget, requireHardPass: requireHard };
+      // 【v613·实验】路线障碍规划器：默认关闭；只对最终候选追加链/冰，
+      // 修改后完整重解并重算体验，只有严格优于原候选才替换。
+      if (out && out.level && config.routeObstaclePlan === 'v1') {
+        var _ropT0 = Date.now();
+        try {
+          var _rop = AntSolver.RouteObstaclePlanner;
+          if (!_rop || !_rop.apply) {
+            out.routeObstaclePlan = { schema: 'route-obstacle-plan-v1', applied: false, accepted: false, reason: 'planner-not-loaded' };
+          } else {
+            var _ropLeft = deadlineAt ? Math.max(0, deadlineAt - Date.now()) : null;
+            if (_ropLeft != null && _ropLeft < 1000) {
+              out.routeObstaclePlan = { schema: 'route-obstacle-plan-v1', applied: false, accepted: false, reason: 'insufficient-budget', elapsedMs: 0 };
+            } else {
+              var _ropMax = Math.max(1000, parseInt(config.routeObstaclePlanMaxMs, 10) || 20000);
+              var _ropCfg = Object.assign({}, config);
+              if (_ropLeft != null) _ropCfg.routeObstaclePlanMaxMs = Math.min(_ropMax, _ropLeft);
+              var _planned = _rop.apply(out, blocks, _ropCfg, { deadlineAt: deadlineAt });
+              var _planEv = _planned && _planned.evidence || { schema: 'route-obstacle-plan-v1', applied: true, accepted: false, reason: 'no-result' };
+              _planEv.wallElapsedMs = Date.now() - _ropT0;
+              if (_planned && _planned.accepted && _planned.candidate) {
+                var _pc = _planned.candidate;
+                _pc.timedOut = out.timedOut;
+                _pc.elapsedMs = out.elapsedMs;
+                _pc.config = config;
+                _pc.sampledConfig = out.sampledConfig;
+                var _pout = finalizeProduce(_pc, K, evaluated + (_planEv.attempts || 0));
+                if (_pout) {
+                  _pout.flow = 'new_fixed';
+                  _pout.chokePlan = out.chokePlan;
+                  _pout.boardFit = out.boardFit;
+                  _pout.flowStats = out.flowStats;
+                  _pout.perf = getGenPerf();
+                  _pout.perf.solver = (AntSolver.Solver && AntSolver.Solver.getPerf) ? AntSolver.Solver.getPerf() : null;
+                  _pout.perf.playerSim = (AntSolver.PlayerSim && AntSolver.PlayerSim.getPerf) ? AntSolver.PlayerSim.getPerf() : null;
+                  _pout.perf.evaluatedPositions = evaluated + (_planEv.attempts || 0);
+                  _pout.perf.config = out.perf && out.perf.config;
+                  _pout.routeObstaclePlan = _planEv;
+                  out = _pout;
+                }
+              } else {
+                out.routeObstaclePlan = _planEv;
+              }
+            }
+          }
+        } catch (e) {
+          out.routeObstaclePlan = { schema: 'route-obstacle-plan-v1', applied: true, accepted: false,
+            reason: 'planner-error', error: String(e && e.message || e), wallElapsedMs: Date.now() - _ropT0 };
+        }
+      }
       return out;
     }
     for (var k = 0; k < K; k++) {
