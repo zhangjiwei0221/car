@@ -1,0 +1,7485 @@
+{
+  "schema": "choke-structure-audit-v595",
+  "date": "2026-10-27",
+  "note": "只读审计；生产参考门沿用 CHOKE_V2_GATES，未修改 v575。",
+  "scope": {
+    "versions": [
+      "v588",
+      "v589",
+      "v590",
+      "v591",
+      "v592",
+      "v593",
+      "v594"
+    ],
+    "sourceRule": "all recorded maxBuffer>=3 candidates with saved level+route",
+    "candidates": 27,
+    "audited": 27,
+    "missing": 0
+  },
+  "gates": {
+    "bridgeMax": 1,
+    "r9Min": 12,
+    "noGoodMax": 3,
+    "hiBefore70PctMax": 10,
+    "early34MinPct": 20,
+    "midLatePeakMin": 3.5
+  },
+  "byVersion": {
+    "v588": {
+      "total": 1,
+      "missing": 0,
+      "pass": 0
+    },
+    "v589": {
+      "total": 7,
+      "missing": 0,
+      "pass": 0
+    },
+    "v590": {
+      "total": 4,
+      "missing": 0,
+      "pass": 0
+    },
+    "v592": {
+      "total": 3,
+      "missing": 0,
+      "pass": 0
+    },
+    "v593": {
+      "total": 6,
+      "missing": 0,
+      "pass": 0
+    },
+    "v594": {
+      "total": 6,
+      "missing": 0,
+      "pass": 0
+    }
+  },
+  "summary": {
+    "referencePass": 0,
+    "playerHasEarlyChoke": 0,
+    "playerHasMultiDecision": 1,
+    "playerHasMidLatePeak": 0,
+    "playerHasRelease": 0,
+    "playerHasEarlyAndMulti": 0,
+    "playerHasMultiAndPeak": 0,
+    "noObstacleCandidates": 27,
+    "allSixPlayerGates": 0,
+    "bestByPassedGates": {
+      "version": "v594",
+      "id": "3_0__3_3",
+      "maxBuffer": 3,
+      "failures": [
+        "预算判断点仅7处",
+        "前期限压仅0%",
+        "中后期峰窗仅2（< 3.5）"
+      ],
+      "passedGateCount": 3,
+      "worst": {
+        "bridges": 0,
+        "maxRun": 1,
+        "noGood": 2,
+        "hiBefore70Pct": 0,
+        "early34Pct": 0,
+        "r9": 7,
+        "minPick": 1,
+        "greedyPads": 8,
+        "greedyPipeBets": 0,
+        "pipeBetBufMax": 0,
+        "pipeBetWhileFull": 0,
+        "greedyWon": true,
+        "greedyCoveragePct": 100,
+        "midLatePeakOmni": 3,
+        "midLatePeakPlayer": 2,
+        "midLatePeak": 2,
+        "midLatePeakGreedy": 2
+      },
+      "player": {
+        "steps": 49,
+        "bridges": 0,
+        "bridgeAt": [],
+        "maxRun": 1,
+        "soft": 0,
+        "r9": 9,
+        "r9At": [
+          22,
+          31,
+          63,
+          65,
+          65,
+          67,
+          71,
+          71,
+          94
+        ],
+        "minPick": 1,
+        "buf34Pct": 14,
+        "buf4Pct": 2,
+        "hiBefore70Pct": 0,
+        "noGood": 2,
+        "earlySteps": 15,
+        "early34": 0,
+        "early34Pct": 0,
+        "significantReleases": 0,
+        "maxReleaseAmplitude": 0
+      }
+    },
+    "bestByPlayerR9": {
+      "version": "v594",
+      "id": "3_0__3_5",
+      "maxBuffer": 3,
+      "failures": [
+        "预算判断点仅6处",
+        "无满解5步",
+        "前期限压仅0%",
+        "中后期峰窗仅2（< 3.5）"
+      ],
+      "passedGateCount": 2,
+      "worst": {
+        "bridges": 0,
+        "maxRun": 1,
+        "noGood": 5,
+        "hiBefore70Pct": 3,
+        "early34Pct": 0,
+        "r9": 6,
+        "minPick": 1,
+        "greedyPads": 3,
+        "greedyPipeBets": 0,
+        "pipeBetBufMax": 0,
+        "pipeBetWhileFull": 0,
+        "greedyWon": true,
+        "greedyCoveragePct": 100,
+        "midLatePeakOmni": 3,
+        "midLatePeakPlayer": 2,
+        "midLatePeak": 2,
+        "midLatePeakGreedy": 1
+      },
+      "player": {
+        "steps": 49,
+        "bridges": 0,
+        "bridgeAt": [],
+        "maxRun": 1,
+        "soft": 0,
+        "r9": 14,
+        "r9At": [
+          22,
+          29,
+          31,
+          35,
+          35,
+          37,
+          39,
+          67,
+          67,
+          71,
+          73,
+          90,
+          92,
+          94
+        ],
+        "minPick": 1,
+        "buf34Pct": 8,
+        "buf4Pct": 0,
+        "hiBefore70Pct": 0,
+        "noGood": 1,
+        "earlySteps": 15,
+        "early34": 0,
+        "early34Pct": 0,
+        "significantReleases": 0,
+        "maxReleaseAmplitude": 0
+      }
+    },
+    "bestByPlayerPeak": {
+      "version": "v594",
+      "id": "3_0__3_3",
+      "maxBuffer": 3,
+      "failures": [
+        "预算判断点仅7处",
+        "前期限压仅0%",
+        "中后期峰窗仅2（< 3.5）"
+      ],
+      "passedGateCount": 3,
+      "worst": {
+        "bridges": 0,
+        "maxRun": 1,
+        "noGood": 2,
+        "hiBefore70Pct": 0,
+        "early34Pct": 0,
+        "r9": 7,
+        "minPick": 1,
+        "greedyPads": 8,
+        "greedyPipeBets": 0,
+        "pipeBetBufMax": 0,
+        "pipeBetWhileFull": 0,
+        "greedyWon": true,
+        "greedyCoveragePct": 100,
+        "midLatePeakOmni": 3,
+        "midLatePeakPlayer": 2,
+        "midLatePeak": 2,
+        "midLatePeakGreedy": 2
+      },
+      "player": {
+        "steps": 49,
+        "bridges": 0,
+        "bridgeAt": [],
+        "maxRun": 1,
+        "soft": 0,
+        "r9": 9,
+        "r9At": [
+          22,
+          31,
+          63,
+          65,
+          65,
+          67,
+          71,
+          71,
+          94
+        ],
+        "minPick": 1,
+        "buf34Pct": 14,
+        "buf4Pct": 2,
+        "hiBefore70Pct": 0,
+        "noGood": 2,
+        "earlySteps": 15,
+        "early34": 0,
+        "early34Pct": 0,
+        "significantReleases": 0,
+        "maxReleaseAmplitude": 0
+      }
+    },
+    "maxPlayerR9": 14,
+    "maxPlayerMidLatePeak": 2
+  },
+  "rows": [
+    {
+      "version": "v588",
+      "id": "1001",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/债务策略AB_v588_shortDebt.levels/1001.json",
+      "routeFile": "03_工具/好关评分/债务策略AB_v588_shortDebt.levels/1001.route.json",
+      "raw": {
+        "policy": "shortDebt",
+        "id": null,
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 88%>30%",
+            "最长免费连 29>6"
+          ]
+        },
+        "curve": {
+          "freeLowPct": 88,
+          "freeRunMax": 29,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": null,
+        "levelHash": "201d841582da3c12e63f2e3db4a3028dc514fcf45b23710042b7c97d0facfdbf"
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅1处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            16,
+            22,
+            76
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 2,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            20,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 2,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 1,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            16,
+            18,
+            22,
+            76
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 30,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            18,
+            18,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 82,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 484
+    },
+    {
+      "version": "v589",
+      "id": "2_4__3_0",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_v589.levels/2_4__3_0.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_v589.levels/2_4__3_0.route.json",
+      "raw": {
+        "policy": null,
+        "id": "2_4__3_0",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 88%>30%",
+            "最长免费连 29>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 88,
+          "freeRunMax": 29,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅1处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            16,
+            22,
+            76,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 3,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            20,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 3,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 1,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            18,
+            22,
+            76,
+            80,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 5,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 78,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            18,
+            18,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 82,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 442
+    },
+    {
+      "version": "v589",
+      "id": "2_4__4_3",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_v589.levels/2_4__4_3.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_v589.levels/2_4__4_3.route.json",
+      "raw": {
+        "policy": null,
+        "id": "2_4__4_3",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 88%>30%",
+            "最长免费连 29>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 88,
+          "freeRunMax": 29,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅1处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            16,
+            22,
+            76,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 3,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            20,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 3,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 1,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            18,
+            22,
+            76,
+            80,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 5,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 78,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            16,
+            18,
+            18,
+            31,
+            33,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 7,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 82,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 391
+    },
+    {
+      "version": "v589",
+      "id": "2_2__5_2",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_v589.levels/2_2__5_2.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_v589.levels/2_2__5_2.route.json",
+      "raw": {
+        "policy": null,
+        "id": "2_2__5_2",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 82%>30%",
+            "最长免费连 28>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 82,
+          "freeRunMax": 28,
+          "fullMedian2": 3,
+          "selectMedian": 10,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 6,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            24,
+            27
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 6,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            69,
+            69,
+            84,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            16,
+            73,
+            78,
+            80,
+            86,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 6,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 6,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 4,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            24,
+            27,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            69,
+            71,
+            78,
+            80,
+            84
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 82,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 12,
+          "r9At": [
+            16,
+            18,
+            18,
+            69,
+            73,
+            78,
+            80,
+            80,
+            80,
+            88,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 52,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 411
+    },
+    {
+      "version": "v589",
+      "id": "2_2__3_0",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_v589.levels/2_2__3_0.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_v589.levels/2_2__3_0.route.json",
+      "raw": {
+        "policy": null,
+        "id": "2_2__3_0",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 88%>30%",
+            "最长免费连 29>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 88,
+          "freeRunMax": 29,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅1处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            16,
+            22,
+            76
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 2,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            20,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 2,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 1,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            16,
+            18,
+            22,
+            76
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 30,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            18,
+            18,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 82,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 412
+    },
+    {
+      "version": "v589",
+      "id": "2_2__4_3",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_v589.levels/2_2__4_3.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_v589.levels/2_2__4_3.route.json",
+      "raw": {
+        "policy": null,
+        "id": "2_2__4_3",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 90%>30%",
+            "最长免费连 29>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 90,
+          "freeRunMax": 29,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 4,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅1处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            24
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            80,
+            82,
+            90,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            16,
+            88
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 4,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 1,
+          "peakBuf": 1
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 1,
+          "minPick": 1,
+          "greedyPads": 4,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 1
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            24
+          ],
+          "minPick": 1,
+          "noGood": 0,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            80,
+            82,
+            88,
+            90,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 82,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            16,
+            88
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 76,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 305
+    },
+    {
+      "version": "v589",
+      "id": "1_4__3_0",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_v589.levels/1_4__3_0.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_v589.levels/1_4__3_0.route.json",
+      "raw": {
+        "policy": null,
+        "id": "1_4__3_0",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 88%>30%",
+            "最长免费连 29>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 88,
+          "freeRunMax": 29,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅1处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            16,
+            22,
+            76
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 2,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            20,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 2,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 1,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            22
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            16,
+            18,
+            22,
+            76
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 30,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            18,
+            18,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 82,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 391
+    },
+    {
+      "version": "v589",
+      "id": "1_4__4_3",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_v589.levels/1_4__4_3.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_v589.levels/1_4__4_3.route.json",
+      "raw": {
+        "policy": null,
+        "id": "1_4__4_3",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 90%>30%",
+            "最长免费连 29>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 90,
+          "freeRunMax": 29,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅1处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            24
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            18,
+            24,
+            73,
+            76,
+            76,
+            78,
+            80
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 3,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            18,
+            22,
+            76,
+            78,
+            88
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 3,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 1,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 3,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 1,
+          "r9At": [
+            24
+          ],
+          "minPick": 1,
+          "noGood": 0,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            18,
+            20,
+            24,
+            73,
+            76,
+            78
+          ],
+          "minPick": 1,
+          "noGood": 5,
+          "earlySteps": 16,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 76,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 10,
+          "r9At": [
+            18,
+            20,
+            20,
+            31,
+            33,
+            53,
+            76,
+            78,
+            88,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 7,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 80,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 481
+    },
+    {
+      "version": "v590",
+      "id": "3_3__1_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/3_3__1_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/3_3__1_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_3__1_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 78%>30%",
+            "最长免费连 17>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 78,
+          "freeRunMax": 17,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            76,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            22,
+            78
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            22,
+            39,
+            43,
+            71,
+            76,
+            78,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            78,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            18,
+            22,
+            67,
+            69,
+            78
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 70,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 76,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 464
+    },
+    {
+      "version": "v590",
+      "id": "5_2__1_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/5_2__1_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/5_2__1_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "5_2__1_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 82%>30%",
+            "最长免费连 28>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 82,
+          "freeRunMax": 28,
+          "fullMedian2": 3,
+          "selectMedian": 10,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 6,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            24,
+            27
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 6,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            16,
+            69,
+            69,
+            69,
+            71,
+            76,
+            78,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            16,
+            73,
+            78,
+            80,
+            86,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 6,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 6,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 4,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            24,
+            27,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 9,
+          "r9At": [
+            16,
+            69,
+            71,
+            76,
+            82,
+            84,
+            86,
+            88,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 84,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 12,
+          "r9At": [
+            16,
+            18,
+            18,
+            69,
+            73,
+            78,
+            80,
+            80,
+            80,
+            88,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 52,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 477
+    },
+    {
+      "version": "v590",
+      "id": "5_2__5_1",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/5_2__5_1.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/5_2__5_1.route.json",
+      "raw": {
+        "policy": null,
+        "id": "5_2__5_1",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 82%>30%",
+            "最长免费连 28>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 82,
+          "freeRunMax": 28,
+          "fullMedian2": 4,
+          "selectMedian": 10,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 6,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            24,
+            27
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 6,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            16,
+            76,
+            84,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            78,
+            80,
+            86,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 6,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 6,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 4,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            24,
+            27,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            16,
+            71,
+            73,
+            76,
+            78,
+            80,
+            84
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 82,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 10,
+          "r9At": [
+            16,
+            18,
+            18,
+            78,
+            80,
+            80,
+            80,
+            88,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 52,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 446
+    },
+    {
+      "version": "v590",
+      "id": "6_0__6_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/6_0__6_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第二轮_v590.levels/6_0__6_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "6_0__6_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "吃满中位 4>3",
+            "freeLow 82%>30%",
+            "最长免费连 28>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 82,
+          "freeRunMax": 28,
+          "fullMedian2": 4,
+          "selectMedian": 11,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 6,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            24,
+            27
+          ],
+          "minPick": 1,
+          "buf34Pct": 12,
+          "buf4Pct": 6,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            16,
+            69,
+            69,
+            84,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            16,
+            73,
+            76,
+            78,
+            80,
+            86,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 6,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 6,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 4,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            24,
+            27,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 80,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            16,
+            69,
+            71,
+            78,
+            80,
+            84
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 82,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 12,
+          "r9At": [
+            16,
+            18,
+            18,
+            67,
+            76,
+            76,
+            80,
+            80,
+            80,
+            88,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 52,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 415
+    },
+    {
+      "version": "v592",
+      "id": "3_5__4_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_受限穷举_v592.levels/3_5__4_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_受限穷举_v592.levels/3_5__4_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_5__4_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 80%>30%",
+            "最长免费连 22>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 80,
+          "freeRunMax": 22,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            22,
+            78
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            22,
+            39,
+            43,
+            71,
+            76,
+            78,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            18,
+            22,
+            49,
+            51,
+            67,
+            78
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 68,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 76,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 458
+    },
+    {
+      "version": "v592",
+      "id": "3_5__2_6",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_受限穷举_v592.levels/3_5__2_6.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_受限穷举_v592.levels/3_5__2_6.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_5__2_6",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 78%>30%",
+            "最长免费连 22>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 78,
+          "freeRunMax": 22,
+          "fullMedian2": 3,
+          "selectMedian": 10,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            22,
+            78
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            39,
+            43,
+            76,
+            78,
+            82,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            22,
+            31,
+            37,
+            39
+          ],
+          "minPick": 1,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 39,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            18,
+            22,
+            45,
+            65,
+            67,
+            78
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 68,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 76,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 484
+    },
+    {
+      "version": "v592",
+      "id": "5_3__4_6",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_受限穷举_v592.levels/5_3__4_6.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_受限穷举_v592.levels/5_3__4_6.route.json",
+      "raw": {
+        "policy": null,
+        "id": "5_3__4_6",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 76%>30%",
+            "最长免费连 15>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 76,
+          "freeRunMax": 15,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            71,
+            73,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            22,
+            78
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            39,
+            71,
+            76,
+            78,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            73,
+            73,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            18,
+            22,
+            67,
+            69,
+            78
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 70,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 76,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 480
+    },
+    {
+      "version": "v593",
+      "id": "3_4__4_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_4__4_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_4__4_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_4__4_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 80%>30%",
+            "最长免费连 22>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 80,
+          "freeRunMax": 22,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 10,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            22,
+            78
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            39,
+            76,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 12,
+          "buf4Pct": 6,
+          "hiBefore70Pct": 0,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 10,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 4,
+          "peakBuf": 4
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 10,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 4
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            18,
+            22,
+            67,
+            69,
+            78
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 70,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 76,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 461
+    },
+    {
+      "version": "v593",
+      "id": "3_0__1_3",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_0__1_3.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_0__1_3.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_0__1_3",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 76%>30%",
+            "最长免费连 15>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 76,
+          "freeRunMax": 15,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅4处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            71,
+            73,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            22,
+            69,
+            69,
+            86
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            73,
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 4,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            73,
+            73,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            18,
+            22,
+            69,
+            84,
+            96
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 72,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            78,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 82,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 412
+    },
+    {
+      "version": "v593",
+      "id": "3_4__4_6",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_4__4_6.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_4__4_6.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_4__4_6",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 76%>30%",
+            "最长免费连 15>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 76,
+          "freeRunMax": 15,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅3处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            69,
+            71,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 2,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            22,
+            76,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            39,
+            71,
+            76,
+            78,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 3,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 2,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            73,
+            73,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 9,
+          "r9At": [
+            18,
+            22,
+            65,
+            67,
+            69,
+            73,
+            78,
+            82,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 68,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 76,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 434
+    },
+    {
+      "version": "v593",
+      "id": "6_0__5_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/6_0__5_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/6_0__5_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "6_0__5_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 80%>30%",
+            "最长免费连 22>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 80,
+          "freeRunMax": 22,
+          "fullMedian2": 3,
+          "selectMedian": 10,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅4处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            22,
+            73,
+            73,
+            78
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            39,
+            71,
+            76,
+            80,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 12,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 4,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 1,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            18,
+            22,
+            71,
+            73,
+            78,
+            80
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 74,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 1,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            71,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 74,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 398
+    },
+    {
+      "version": "v593",
+      "id": "6_0__4_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/6_0__4_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/6_0__4_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "6_0__4_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 80%>30%",
+            "最长免费连 22>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 80,
+          "freeRunMax": 22,
+          "fullMedian2": 3,
+          "selectMedian": 10,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅4处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            22,
+            76,
+            80,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            39,
+            76,
+            78,
+            82,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 3,
+          "peakBuf": 3
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 0,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 4,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 1,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 3
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 31,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            18,
+            22,
+            71,
+            73,
+            78,
+            82,
+            94,
+            96
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 74,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            20,
+            22,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 10,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 5,
+          "midLateAt": 76,
+          "peakBuf": 5,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        }
+      },
+      "elapsedMs": 475
+    },
+    {
+      "version": "v593",
+      "id": "3_4__6_6",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_4__6_6.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第四轮_v593.levels/3_4__6_6.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_4__6_6",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 69%>30%",
+            "最长免费连 13>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 69,
+          "freeRunMax": 13,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 8,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅3处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            69,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            22,
+            67,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 10,
+          "r9At": [
+            22,
+            39,
+            61,
+            63,
+            65,
+            71,
+            73,
+            78,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 2,
+          "peakBuf": 2
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 3,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 3,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 2
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 1,
+            "maxReleaseAmplitude": 2,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 9,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            67,
+            67,
+            73,
+            76,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 70,
+          "peakBuf": 3,
+          "significantReleases": 1,
+          "maxReleaseAmplitude": 2
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            18,
+            22,
+            63,
+            65,
+            67,
+            69,
+            78,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 70,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            20,
+            22,
+            71,
+            76,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 3,
+          "midLatePeak": 3,
+          "midLateAt": 60,
+          "peakBuf": 3,
+          "significantReleases": 1,
+          "maxReleaseAmplitude": 2
+        }
+      },
+      "elapsedMs": 418
+    },
+    {
+      "version": "v594",
+      "id": "3_0__3_3",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/3_0__3_3.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/3_0__3_3.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_0__3_3",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 69%>30%",
+            "最长免费连 13>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 69,
+          "freeRunMax": 13,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 8,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅7处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            69,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 9,
+          "r9At": [
+            22,
+            31,
+            63,
+            65,
+            65,
+            67,
+            71,
+            71,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 14,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            22,
+            63,
+            65,
+            71,
+            73,
+            78,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 2,
+          "peakBuf": 2
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 2,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 7,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 3,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 2
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 1,
+            "maxReleaseAmplitude": 2,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 9,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            67,
+            67,
+            73,
+            76,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 70,
+          "peakBuf": 3,
+          "significantReleases": 1,
+          "maxReleaseAmplitude": 2
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            18,
+            22,
+            31,
+            69,
+            71,
+            76,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 4,
+          "midLateAt": 74,
+          "peakBuf": 4,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            20,
+            22,
+            69,
+            69,
+            71,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 11,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 4,
+          "midLateAt": 76,
+          "peakBuf": 4,
+          "significantReleases": 1,
+          "maxReleaseAmplitude": 2
+        }
+      },
+      "elapsedMs": 398
+    },
+    {
+      "version": "v594",
+      "id": "3_0__1_3",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/3_0__1_3.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/3_0__1_3.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_0__1_3",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 69%>30%",
+            "最长免费连 13>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 69,
+          "freeRunMax": 13,
+          "fullMedian2": 2,
+          "selectMedian": 9,
+          "pressurePct3": 8,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 7,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅7处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            69,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            63,
+            65,
+            65,
+            67,
+            71,
+            90
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            73,
+            80,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 7,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 7,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 2,
+          "peakBuf": 2
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 7,
+          "minPick": 1,
+          "greedyPads": 7,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 3,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 2
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 1,
+            "maxReleaseAmplitude": 2,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 9,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            67,
+            67,
+            73,
+            76,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 70,
+          "peakBuf": 3,
+          "significantReleases": 1,
+          "maxReleaseAmplitude": 2
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            18,
+            22,
+            69,
+            71,
+            73,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 5,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 78,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            80,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 7,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 82,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 470
+    },
+    {
+      "version": "v594",
+      "id": "3_0__3_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/3_0__3_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/3_0__3_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "3_0__3_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 63%>30%",
+            "最长免费连 22>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 63,
+          "freeRunMax": 22,
+          "fullMedian2": 3,
+          "selectMedian": 10,
+          "pressurePct3": 8,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 3,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅6处",
+          "无满解5步",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 2,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            29,
+            31,
+            31,
+            39,
+            41
+          ],
+          "minPick": 1,
+          "buf34Pct": 12,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 3,
+          "noGood": 5,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 14,
+          "r9At": [
+            22,
+            29,
+            31,
+            35,
+            35,
+            37,
+            39,
+            67,
+            67,
+            71,
+            73,
+            90,
+            92,
+            94
+          ],
+          "minPick": 1,
+          "buf34Pct": 8,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            29,
+            31,
+            86,
+            90,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 3,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 1,
+          "peakBuf": 1
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 5,
+          "hiBefore70Pct": 3,
+          "early34Pct": 0,
+          "r9": 6,
+          "minPick": 1,
+          "greedyPads": 3,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 3,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 1
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            29,
+            33,
+            39,
+            41
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 39,
+          "peakBuf": 3,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 1
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 13,
+          "r9At": [
+            18,
+            22,
+            29,
+            33,
+            37,
+            39,
+            41,
+            69,
+            71,
+            73,
+            88,
+            90,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 74,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            20,
+            22,
+            31,
+            84,
+            88,
+            90
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 74,
+          "peakBuf": 3,
+          "significantReleases": 1,
+          "maxReleaseAmplitude": 2
+        }
+      },
+      "elapsedMs": 406
+    },
+    {
+      "version": "v594",
+      "id": "6_2__6_5",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/6_2__6_5.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/6_2__6_5.route.json",
+      "raw": {
+        "policy": null,
+        "id": "6_2__6_5",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 80%>30%",
+            "最长免费连 19>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 80,
+          "freeRunMax": 19,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 9,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅3处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39
+          ],
+          "minPick": 1,
+          "buf34Pct": 4,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            22,
+            65,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 10,
+          "r9At": [
+            22,
+            39,
+            61,
+            63,
+            65,
+            67,
+            71,
+            78,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 10,
+          "buf4Pct": 4,
+          "hiBefore70Pct": 3,
+          "noGood": 9,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 9,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 4,
+          "peakBuf": 4
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 3,
+          "minPick": 1,
+          "greedyPads": 9,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 3,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 4
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 1,
+            "maxReleaseAmplitude": 2,
+            "oscillationCount": 1
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 4,
+          "r9At": [
+            22,
+            31,
+            37,
+            39
+          ],
+          "minPick": 1,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 76,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 10,
+          "r9At": [
+            18,
+            22,
+            63,
+            65,
+            67,
+            69,
+            73,
+            82,
+            84,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 5,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 68,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            20,
+            22,
+            71,
+            73,
+            76,
+            76,
+            84,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 56,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 531
+    },
+    {
+      "version": "v594",
+      "id": "5_4__3_4",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/5_4__3_4.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/5_4__3_4.route.json",
+      "raw": {
+        "policy": null,
+        "id": "5_4__3_4",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 67%>30%",
+            "最长免费连 17>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 67,
+          "freeRunMax": 17,
+          "fullMedian2": 2,
+          "selectMedian": 9,
+          "pressurePct3": 2,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 8,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅2处",
+          "前期限压仅0%",
+          "中后期峰窗仅1（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 6,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 14,
+          "buf4Pct": 2,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 2,
+          "r9At": [
+            22,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            39,
+            61,
+            71,
+            76,
+            82,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 8,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 8,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 2,
+          "peakBuf": 2
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 2,
+          "minPick": 1,
+          "greedyPads": 8,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 3,
+          "midLatePeakPlayer": 1,
+          "midLatePeak": 1,
+          "midLatePeakGreedy": 2
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 1,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            73,
+            82,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 2,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 70,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 10,
+          "r9At": [
+            18,
+            22,
+            65,
+            67,
+            69,
+            73,
+            76,
+            78,
+            82,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 4,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 1,
+          "midLateAt": 66,
+          "peakBuf": 1,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            20,
+            22,
+            71,
+            82,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 7,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 3,
+          "midLatePeak": 2,
+          "midLateAt": 54,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 453
+    },
+    {
+      "version": "v594",
+      "id": "5_4__4_3",
+      "missing": false,
+      "levelFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/5_4__4_3.json",
+      "routeFile": "03_工具/好关评分/短债单车交换_第五轮_v594.levels/5_4__4_3.route.json",
+      "raw": {
+        "policy": null,
+        "id": "5_4__4_3",
+        "maxBuffer": 3,
+        "quality": {
+          "gatePass": false,
+          "gateReasons": [
+            "freeLow 69%>30%",
+            "最长免费连 13>6"
+          ],
+          "label": "可玩·待评"
+        },
+        "curve": {
+          "freeLowPct": 69,
+          "freeRunMax": 13,
+          "fullMedian2": 3,
+          "selectMedian": 9,
+          "pressurePct3": 8,
+          "pressurePeak": 3
+        },
+        "experiencePass": false,
+        "levelHash": null
+      },
+      "structure": {
+        "board": "7x7",
+        "cars": 49,
+        "capacityMin": 7,
+        "capacityMax": 40,
+        "anchor40": 12,
+        "small6to18": 6,
+        "obstacles": {}
+      },
+      "playerSim": {
+        "won": true,
+        "picks": 49
+      },
+      "greedyRun": {
+        "won": true,
+        "coveragePct": 100,
+        "pads": 7,
+        "pipeBets": 0
+      },
+      "reference": {
+        "pass": false,
+        "failures": [
+          "预算判断点仅3处",
+          "前期限压仅0%",
+          "中后期峰窗仅2（< 3.5）"
+        ],
+        "gateCount": 6,
+        "passedGateCount": 3,
+        "omni": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 7,
+          "r9At": [
+            22,
+            31,
+            35,
+            35,
+            39,
+            69,
+            96
+          ],
+          "minPick": 1,
+          "buf34Pct": 6,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 0,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "player": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 3,
+          "r9At": [
+            22,
+            67,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 1,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            22,
+            39,
+            43,
+            61,
+            71,
+            76,
+            82,
+            92
+          ],
+          "minPick": 1,
+          "buf34Pct": 0,
+          "buf4Pct": 0,
+          "hiBefore70Pct": 0,
+          "noGood": 7,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0
+        },
+        "greedyRun": {
+          "won": true,
+          "steps": 49,
+          "coveragePct": 100,
+          "pads": 7,
+          "pipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "midLatePeak": 2,
+          "peakBuf": 2
+        },
+        "worst": {
+          "bridges": 0,
+          "maxRun": 1,
+          "noGood": 1,
+          "hiBefore70Pct": 0,
+          "early34Pct": 0,
+          "r9": 3,
+          "minPick": 1,
+          "greedyPads": 7,
+          "greedyPipeBets": 0,
+          "pipeBetBufMax": 0,
+          "pipeBetWhileFull": 0,
+          "greedyWon": true,
+          "greedyCoveragePct": 100,
+          "midLatePeakOmni": 3,
+          "midLatePeakPlayer": 2,
+          "midLatePeak": 2,
+          "midLatePeakGreedy": 2
+        },
+        "release": {
+          "omni": {
+            "significantReleases": 1,
+            "maxReleaseAmplitude": 2,
+            "oscillationCount": 1
+          },
+          "player": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          },
+          "greedy": {
+            "significantReleases": 0,
+            "maxReleaseAmplitude": 0,
+            "oscillationCount": 0
+          }
+        }
+      },
+      "instant": {
+        "omni": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 9,
+          "r9At": [
+            22,
+            31,
+            37,
+            39,
+            67,
+            67,
+            73,
+            76,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 3,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 3,
+          "midLateAt": 70,
+          "peakBuf": 3,
+          "significantReleases": 1,
+          "maxReleaseAmplitude": 2
+        },
+        "player": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 8,
+          "r9At": [
+            18,
+            22,
+            63,
+            65,
+            67,
+            69,
+            78,
+            94
+          ],
+          "minPick": 1,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 0,
+          "midLatePeak": 2,
+          "midLateAt": 70,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        },
+        "greedy": {
+          "steps": 49,
+          "completedBoxes": 49,
+          "totalBoxes": 49,
+          "won": true,
+          "bridges": 0,
+          "bridgeAt": [],
+          "maxRun": 1,
+          "soft": 0,
+          "r9": 5,
+          "r9At": [
+            20,
+            22,
+            71,
+            82,
+            92
+          ],
+          "minPick": 1,
+          "noGood": 6,
+          "earlySteps": 15,
+          "early34": 0,
+          "early34Pct": 0,
+          "hiBefore70Pct": 3,
+          "midLatePeak": 2,
+          "midLateAt": 56,
+          "peakBuf": 2,
+          "significantReleases": 0,
+          "maxReleaseAmplitude": 0
+        }
+      },
+      "elapsedMs": 440
+    }
+  ]
+}
