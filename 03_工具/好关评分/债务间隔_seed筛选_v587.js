@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** v587：同配置四个seed，筛选真实债务候选最接近的7×7基底。 */
+/** v587：同配置多seed筛选真实债务间隔；PLAN_POLICY 可切换v588债务策略AB。 */
 'use strict';
 
 const fs = require('fs');
@@ -9,9 +9,17 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
 const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
-const OUT = path.join(__dirname, '债务间隔_seed筛选_v587.json');
-const LEVEL_DIR = path.join(__dirname, '债务间隔_seed筛选_v587.levels');
-const SEEDS = [1001, 1002, 32677, 88001];
+const PLAN_POLICY = process.env.PLAN_POLICY === 'shortDebt' ? 'shortDebt' : 'targetBuffer';
+const AB_MODE = process.env.AB_MODE === 'v588';
+const OUT = path.join(__dirname, AB_MODE
+  ? '债务策略AB_v588_' + PLAN_POLICY + '.json'
+  : '债务间隔_seed筛选_v587.json');
+const LEVEL_DIR = path.join(__dirname, AB_MODE
+  ? '债务策略AB_v588_' + PLAN_POLICY + '.levels'
+  : '债务间隔_seed筛选_v587.levels');
+const SEEDS = process.env.SEEDS
+  ? process.env.SEEDS.split(',').map(Number).filter(Number.isFinite)
+  : [1001, 1002, 32677, 88001];
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
@@ -36,7 +44,7 @@ const blocks = A.Generator.blocksFromTXT(fs.readFileSync(INPUT, 'utf8'));
 function configFor(seed) {
   return {
     seed, generatorFlow: 'new_fixed', ruleMode: 'instantChain', instantChain: true,
-    bottomOnly: false, elimOrder: 'instant', instantPlanPolicy: 'targetBuffer',
+    bottomOnly: false, elimOrder: 'instant', instantPlanPolicy: PLAN_POLICY,
     instantPlanTargetBuffer: 3, instantPlanMaxDebt: 40, instantPlanDebtEvery: 4,
     instantPlanBranchCount: 0, boxSizeMin: 6, boxSizeMax: 40, capNormMin: 6, capNormMax: 40,
     capacityMix: {
@@ -176,7 +184,8 @@ for (const seed of SEEDS) {
     'ms=' + rec.elapsedMs);
 }
 const report = {
-  schema: 'debt-gap-seed-screen-v587', date: '2026-10-27', seeds: SEEDS, rows,
+  schema: AB_MODE ? 'debt-policy-ab-v588' : 'debt-gap-seed-screen-v587',
+  date: '2026-10-27', policy: PLAN_POLICY, seeds: SEEDS, rows,
   summary: {
     valid: rows.filter(x => x.valid).length,
     bySeed: rows.map(x => ({ seed: x.seed, minGap: x.debt && x.debt.minGap,

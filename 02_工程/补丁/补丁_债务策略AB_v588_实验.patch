@@ -1,0 +1,306 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+index 8d67e69..e35c214 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+@@ -1,6 +1,6 @@
+ # 毛线汽车 · Goal 执行计划
+ 
+-> 状态：**v587 四seed同hash；Goal 质量收口仍暂停**
++> 状态：**v588 shortDebt首次形成maxBuffer3；Goal 质量收口仍暂停**
+ >
+ > 建表日期：2026-10-26
+ >
+@@ -8,7 +8,7 @@
+ >
+ > 开发分支：`codex/kimi-quality-framework`
+ >
+-> 基线生产提交：v570 `b4eb449`；v571 障碍修复见 `56d4af5`；v572 落库热修见 `73080c4`；v573 黑块硬门见 `654df42`；v574 合规回退尺寸排序见 `0b9030d`；v575 黑块形态硬门见 `7a492d0`；v576 混合容量见 `73806be`；v577 软锚点闸门见 `da62432`；v578 两行交错与真实债务审计见 `bd78a20`；v579 开局供时收紧见 `1502086`；v580 真实债务单锚点见 `aee9dd4`；v581 单供给数字冰见 `512c7bb`；v582 单冰窗口扫描见 `34b5015`；v583 第28步单冰实测见 `ecd8f4e`；v584 单冰时长扫描见 `3a3618a`；v585 第二把定时冰见 `306b95b`；v586 双供给锁见 `65c6ffe`；v587 债务间隔seed筛选见本轮提交
++> 基线生产提交：v570 `b4eb449`；v571 障碍修复见 `56d4af5`；v572 落库热修见 `73080c4`；v573 黑块硬门见 `654df42`；v574 合规回退尺寸排序见 `0b9030d`；v575 黑块形态硬门见 `7a492d0`；v576 混合容量见 `73806be`；v577 软锚点闸门见 `da62432`；v578 两行交错与真实债务审计见 `bd78a20`；v579 开局供时收紧见 `1502086`；v580 真实债务单锚点见 `aee9dd4`；v581 单供给数字冰见 `512c7bb`；v582 单冰窗口扫描见 `34b5015`；v583 第28步单冰实测见 `ecd8f4e`；v584 单冰时长扫描见 `3a3618a`；v585 第二把定时冰见 `306b95b`；v586 双供给锁见 `65c6ffe`；v587 债务间隔seed筛选见 `5cbd17f`；v588债务策略AB见本轮提交
+ >
+ > 执行入口：本文件。旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录；如用户给出新裁决，以新裁决为准并同步更新本文件。
+ 
+@@ -723,6 +723,22 @@ P2f 已完成结果：
+ - 下一轮只比较`shortDebt`与`targetBuffer3`两个上游债务顺序策略；
+ - 不增加障碍，保持7×7和0黑块目标。
+ 
++### P2y. v588 targetBuffer3 vs shortDebt · ✅ 找到maxBuffer3基底
++
++固定7×7、49车、`[6,40]`、0黑块和第1行5锚点：
++
++| 策略 | 债务候选 | 间隔 | maxBuffer | freeLow | 免费连 | qGate |
++|---|---:|---:|---:|---:|---:|---:|
++| targetBuffer3 | 4 | 1 | 1 | 90% | 21 | 否 |
++| shortDebt | 9 | 0 | 3 | 88% | 29 | 否 |
++
++结论：
++
++- 两策略hash不同，配置实际生效；
++- shortDebt首次形成maxBuffer3和9个真实债务候选；
++- shortDebt成为当前唯一微调主线；
++- 剩余主问题为freeLow88%、免费连29、吃满中位4。
++
+ ### P3. 006 开发集复核与生产化
+ 
+ 仅在 P2 命中后执行。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index c0f52b6..26f4115 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -24034,6 +24034,43 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 2. 下一轮只比较`shortDebt`与`targetBuffer3`两个上游债务顺序策略。
+ 3. 不增加障碍，不偏离7×7/0黑块目标。
+ 
++### 595. 【2026-10-27】v588实验：shortDebt生成首个maxBuffer=3基底
++
++#### 595.1 问题（原话）
++
++- 好的，下一步
++
++#### 595.2 证据
++
++- v587四seed同hash，seed不能提供新基底；
++- targetBuffer3仍maxBuffer1、债务候选4；
++- 需要只改变上游债务选择顺序。
++
++#### 595.3 改动
++
++- A保持`targetBuffer3`；
++- B改为`shortDebt`，`instantPlanDebtEvery=4`；
++- 其余7×7/49车/`[6,40]`/0黑块/5锚点全部固定。
++
++#### 595.4 验证（改前/改后数字）
++
++- A：4债务候选、间隔1、maxBuffer1、freeLow90%、免费连21；
++- B：9债务候选、间隔0、maxBuffer3、freeLow88%、免费连29；
++- B两辆债务车同一步出现；
++- B吃满中位4，qGate仍未过。
++- 工作成就：
++  - 首次在不加障碍的7×7、49车、0黑块基底上达到maxBuffer3；
++  - 证明上游债务顺序是关键因素。
++- 工作困难：
++  - 压力峰值有了，但中段只2%，freeLow88%和免费连29仍严重；
++  - 新基底尚不具备交付质量。
++
++#### 595.5 遗留
++
++1. 以shortDebt为当前唯一主线基底。
++2. 下一轮局部微调只改免费连或吃满中位之一。
++3. 不增加容量、黑块、管道或第二策略变量。
++
+ ### 586. 【2026-10-27】新增“一关如何诞生”九站滚动动画网页
+ 
+ #### 586.1 问题（原话）
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 2a4e466..f9912d2 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-27（v587 债务间隔seed筛选）　|　当前生产代码版本：**v575**；最新实验版本：**v587**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-27（v588 债务策略AB）　|　当前生产代码版本：**v575**；最新实验版本：**v588**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **当前执行入口是 [`Goal执行计划.md`](Goal执行计划.md)，旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录。工作日志最新见 §552~582。v571修复障碍落地，v572修复落库作用域，v573加入黑块>30%硬门，v574修正合规回退排序，v575新增最终棋盘黑块形态硬门：同行≤3、横连≤3、竖连≤3，并修复补位与瞬时双入口整行黑墙。00199 seed1001/1002/32677均稳定为6×7、10黑、23.81%且qGate通过。目标体验仍未全部通过。**
+ >
+@@ -371,6 +371,7 @@ python3 -m http.server 8060        # 本工程固定用 8060
+ | 26 | **逐车追加第二冰会触发新的绕行** | v585第二冰臂maxBuffer1/2，第二债务仍到93%以后 | 停止追加冰，下一步同时放置两辆可点债务 |
+ | 27 | **同时冻结两辆供给仍停在buffer2** | v586 freeLow降至67%，maxBuffer仍2，第二债务到96%以后 | 下一步判断是否存在可保留第二债务窗口，否则换基底 |
+ | 28 | **seed筛选被确定性规划收敛为同一关** | v587四seed关卡与路线hash完全相同 | 停止seed筛选，下一轮只比较债务顺序策略 |
++| 29 | **shortDebt形成maxBuffer3但freeLow仍高** | v588 9债务候选、间隔0、maxBuffer3、freeLow88%、免费连29 | 只对shortDebt做局部微调 |
+ 
+ ---
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588.js"
+new file mode 100644
+index 0000000..511a87e
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588.js"
+@@ -0,0 +1,51 @@
++#!/usr/bin/env node
++/** v588：固定全部条件，只比较targetBuffer3与shortDebt。 */
++'use strict';
++
++const fs = require('fs');
++const path = require('path');
++const cp = require('child_process');
++const crypto = require('crypto');
++
++const HERE = __dirname;
++const SCRIPT = path.join(HERE, '债务间隔_seed筛选_v587.js');
++const OUT = path.join(HERE, '债务策略AB_v588.json');
++const POLICIES = ['targetBuffer', 'shortDebt'];
++const rows = [];
++function hashFile(p) {
++  return fs.existsSync(p) ? crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex') : null;
++}
++
++for (const policy of POLICIES) {
++  const outFile = path.join(HERE, '债务策略AB_v588_' + policy + '.json');
++  const run = cp.spawnSync(process.execPath, [SCRIPT], {
++    env: Object.assign({}, process.env, { PLAN_POLICY: policy, SEEDS: '1001', AB_MODE: 'v588' }),
++    encoding: 'utf8'
++  });
++  if (run.status !== 0) throw new Error(policy + ' failed: ' + (run.stderr || run.stdout));
++  process.stdout.write(run.stdout);
++  const rec = JSON.parse(fs.readFileSync(outFile, 'utf8')).rows[0];
++  const levelFile = path.join(HERE, '债务策略AB_v588_' + policy + '.levels', '1001.json');
++  rows.push({
++    policy, valid: rec.valid, failReason: rec.failReason, board: rec.board,
++    cars: rec.cars, debt: rec.debt, quality: rec.quality, curve: rec.curve,
++    maxBuffer: rec.maxBuffer, levelHash: hashFile(levelFile),
++    source: path.relative(HERE, outFile)
++  });
++}
++
++const sameHash = rows.length === 2 && rows[0].levelHash && rows[0].levelHash === rows[1].levelHash;
++const report = {
++  schema: 'debt-policy-ab-v588', date: '2026-10-27', seed: 1001, policies: POLICIES, rows,
++  summary: {
++    valid: rows.filter(x => x.valid).length,
++    sameHash,
++    debtCandidates: rows.map(x => x.debt && x.debt.candidates.length),
++    minGaps: rows.map(x => x.debt && x.debt.minGap),
++    maxBuffers: rows.map(x => x.maxBuffer),
++    freeLow: rows.map(x => x.curve && x.curve.freeLowPct),
++    freeRun: rows.map(x => x.curve && x.curve.freeRunMax)
++  }
++};
++fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ out: path.relative(process.cwd(), OUT), summary: report.summary }, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588_\345\206\263\347\255\226.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588_\345\206\263\347\255\226.md"
+new file mode 100644
+index 0000000..3f2eea2
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588_\345\206\263\347\255\226.md"
+@@ -0,0 +1,33 @@
++# v588 决策：shortDebt生成首个maxBuffer=3基底
++
++日期：2026-10-27
++
++## 结果
++
++固定7×7、49车、容量`[6,40]`、0黑块和第1行5锚点，只比较两种债务顺序：
++
++| 策略 | hash不同 | 债务候选 | 最小首现间隔 | maxBuffer | freeLow | 免费连 | 吃满中位 | qGate |
++|---|---:|---:|---:|---:|---:|---:|---:|---:|
++| targetBuffer3 | 基线 | 4 | 1 | 1 | 90% | 21 | 4 | 否 |
++| shortDebt | 是 | 9 | 0 | **3** | 88% | 29 | 4 | 否 |
++
++## 正向证据
++
++- 两策略hash不同，说明配置已实际生效；
++- shortDebt实际债务候选从4增到9；
++- 两辆债务车 `(1,2)`、`(1,3)` 在同一步、同一进度首次可点；
++- 实际maxBuffer达到3，压力窗口已出现。
++
++## 剩余失败
++
++- freeLow 88%仍高；
++- 最长免费连29；
++- 吃满中位4；
++- qGate和完整体验未通过。
++
++## 决策
++
++- shortDebt作为当前唯一具备微调价值的新基底；
++- targetBuffer3不再作为主线；
++- 下一步只针对shortDebt做局部微调，变量限定在免费连或吃满中位之一；
++- 容量、7×7、0黑块与全局容量分布保持不变。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588_\351\242\204\347\231\273\350\256\260.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588_\351\242\204\347\231\273\350\256\260.md"
+new file mode 100644
+index 0000000..ef67982
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\347\255\226\347\225\245AB_v588_\351\242\204\347\231\273\350\256\260.md"
+@@ -0,0 +1,40 @@
++# v588 预登记：targetBuffer3 vs shortDebt
++
++日期：2026-10-27
++
++## 固定项
++
++- 00199，seed1001；
++- 7×7、49车；
++- 容量`[6,40]`；
++- 0黑块、0管道、0冰、0链、0问号；
++- 第1行5锚点软闸门；
++- 不启用P7、容量精调和局部交换。
++
++## A/B
++
++### A：targetBuffer3
++
++- `instantPlanPolicy=targetBuffer`；
++- `instantPlanTargetBuffer=3`。
++
++### B：shortDebt
++
++- `instantPlanPolicy=shortDebt`；
++- `instantPlanDebtEvery=4`；
++- 其余完全一致。
++
++## 比较
++
++- 关卡与路线hash；
++- 有效性与容量守恒；
++- 唯一债务候选数量；
++- 债务候选最小首现间隔；
++- 每个债务窗口的bufferBefore和完全供给数；
++- maxBuffer、freeLow、免费连、吃满中位、qGate。
++
++## 判定
++
++- shortDebt产生不同hash且存在更近的双债窗口：以它为下一基底；
++- 指标不优于targetBuffer3：停止策略切换，回到图/依赖结构；
++- 两臂同hash：说明策略被实现层覆盖，先查配置接线。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\351\227\264\351\232\224_seed\347\255\233\351\200\211_v587.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\351\227\264\351\232\224_seed\347\255\233\351\200\211_v587.js"
+index 3662395..7b15de1 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\351\227\264\351\232\224_seed\347\255\233\351\200\211_v587.js"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\200\272\345\212\241\351\227\264\351\232\224_seed\347\255\233\351\200\211_v587.js"
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env node
+-/** v587：同配置四个seed，筛选真实债务候选最接近的7×7基底。 */
++/** v587：同配置多seed筛选真实债务间隔；PLAN_POLICY 可切换v588债务策略AB。 */
+ 'use strict';
+ 
+ const fs = require('fs');
+@@ -9,9 +9,17 @@ const vm = require('vm');
+ const ROOT = path.resolve(__dirname, '..', '..');
+ const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+ const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
+-const OUT = path.join(__dirname, '债务间隔_seed筛选_v587.json');
+-const LEVEL_DIR = path.join(__dirname, '债务间隔_seed筛选_v587.levels');
+-const SEEDS = [1001, 1002, 32677, 88001];
++const PLAN_POLICY = process.env.PLAN_POLICY === 'shortDebt' ? 'shortDebt' : 'targetBuffer';
++const AB_MODE = process.env.AB_MODE === 'v588';
++const OUT = path.join(__dirname, AB_MODE
++  ? '债务策略AB_v588_' + PLAN_POLICY + '.json'
++  : '债务间隔_seed筛选_v587.json');
++const LEVEL_DIR = path.join(__dirname, AB_MODE
++  ? '债务策略AB_v588_' + PLAN_POLICY + '.levels'
++  : '债务间隔_seed筛选_v587.levels');
++const SEEDS = process.env.SEEDS
++  ? process.env.SEEDS.split(',').map(Number).filter(Number.isFinite)
++  : [1001, 1002, 32677, 88001];
+ const FILES = [
+   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
+   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
+@@ -36,7 +44,7 @@ const blocks = A.Generator.blocksFromTXT(fs.readFileSync(INPUT, 'utf8'));
+ function configFor(seed) {
+   return {
+     seed, generatorFlow: 'new_fixed', ruleMode: 'instantChain', instantChain: true,
+-    bottomOnly: false, elimOrder: 'instant', instantPlanPolicy: 'targetBuffer',
++    bottomOnly: false, elimOrder: 'instant', instantPlanPolicy: PLAN_POLICY,
+     instantPlanTargetBuffer: 3, instantPlanMaxDebt: 40, instantPlanDebtEvery: 4,
+     instantPlanBranchCount: 0, boxSizeMin: 6, boxSizeMax: 40, capNormMin: 6, capNormMax: 40,
+     capacityMix: {
+@@ -176,7 +184,8 @@ for (const seed of SEEDS) {
+     'ms=' + rec.elapsedMs);
+ }
+ const report = {
+-  schema: 'debt-gap-seed-screen-v587', date: '2026-10-27', seeds: SEEDS, rows,
++  schema: AB_MODE ? 'debt-policy-ab-v588' : 'debt-gap-seed-screen-v587',
++  date: '2026-10-27', policy: PLAN_POLICY, seeds: SEEDS, rows,
+   summary: {
+     valid: rows.filter(x => x.valid).length,
+     bySeed: rows.map(x => ({ seed: x.seed, minGap: x.debt && x.debt.minGap,
