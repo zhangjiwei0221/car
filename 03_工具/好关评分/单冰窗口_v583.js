@@ -10,8 +10,13 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
 const BASE_LEVEL = path.join(__dirname, '真实债务单锚点_v580.levels', 'v4_25_22_6_2.json');
 const ICE_VALUE = Number(process.env.ICE_VALUE || 29);
-const OUT = path.join(__dirname, ICE_VALUE === 29 ? '单冰窗口_v583.json' : '单冰时长_v584_' + ICE_VALUE + '.json');
-const LEVEL_DIR = path.join(__dirname, ICE_VALUE === 29 ? '单冰窗口_v583.levels' : '单冰时长_v584.levels');
+const EXTRA_ICE = process.env.EXTRA_ICE_CELL ? process.env.EXTRA_ICE_CELL.split(',').map(Number) : null;
+const EXTRA_VALUE = Number(process.env.EXTRA_ICE_VALUE || 0);
+const OUT = path.join(__dirname, EXTRA_ICE
+  ? '双定时冰_v585_' + EXTRA_ICE[0] + '_' + EXTRA_ICE[1] + '.json'
+  : (ICE_VALUE === 29 ? '单冰窗口_v583.json' : '单冰时长_v584_' + ICE_VALUE + '.json'));
+const LEVEL_DIR = path.join(__dirname, EXTRA_ICE ? '双定时冰_v585.levels'
+  : (ICE_VALUE === 29 ? '单冰窗口_v583.levels' : '单冰时长_v584.levels'));
 const ICE_CELL = { r: 4, c: 3 };
 const TARGETS = [{ r: 3, c: 6 }, { r: 5, c: 2 }];
 const FILES = [
@@ -38,6 +43,11 @@ const level = A.deepClone(base);
 const iceBox = level.board.cells[ICE_CELL.r] && level.board.cells[ICE_CELL.r][ICE_CELL.c];
 if (!iceBox || iceBox.t !== 'box') throw new Error('v583 ice target is not a box');
 iceBox.numice = ICE_VALUE;
+if (EXTRA_ICE) {
+  const extra = level.board.cells[EXTRA_ICE[0]] && level.board.cells[EXTRA_ICE[0]][EXTRA_ICE[1]];
+  if (!extra || extra.t !== 'box') throw new Error('extra ice target is not a box');
+  extra.numice = EXTRA_VALUE;
+}
 
 function leftmostFreeSlot(s) {
   const used = {};
@@ -68,6 +78,7 @@ function auditCells(solveResult) {
   const watch = {};
   for (const t of TARGETS) watch[t.r + ',' + t.c] = 'debt';
   watch[ICE_CELL.r + ',' + ICE_CELL.c] = 'ice';
+  if (EXTRA_ICE) watch[EXTRA_ICE[0] + ',' + EXTRA_ICE[1]] = 'extraIce';
   const seen = {}, out = [];
   for (let i = 0; i < actions.length; i++) {
     const a = actions[i], k = a.r + ',' + a.c;
@@ -116,6 +127,7 @@ const watches = ev && ev.valid ? auditCells(ev.solveResult) : [];
 const record = {
   schema: 'single-ice-window-v583', date: '2026-10-27',
   base: path.relative(ROOT, BASE_LEVEL), iceCell: ICE_CELL, iceValue: ICE_VALUE,
+  extraIce: EXTRA_ICE ? { r: EXTRA_ICE[0], c: EXTRA_ICE[1], value: EXTRA_VALUE } : null,
   targets: TARGETS, valid: !!(ev && ev.valid), watches,
   quality: q ? { gatePass: !!q.gatePass, gateReasons: q.gateReasons || [], pass: !!q.pass, label: q.label } : null,
   curve: curve ? {
