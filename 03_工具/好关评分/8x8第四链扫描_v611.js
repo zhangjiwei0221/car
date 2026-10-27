@@ -9,12 +9,19 @@ const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const BASE_LEVEL = path.join(__dirname, '8x8三段结构_v610.levels', 'low_chains.json');
-const OUT = path.join(__dirname, '8x8第四链扫描_v611.json');
-const LEVEL_DIR = path.join(__dirname, '8x8第四链扫描_v611.levels');
+const BASE_LEVEL = process.env.TASK_BASE_LEVEL
+  ? path.resolve(ROOT, process.env.TASK_BASE_LEVEL)
+  : path.join(__dirname, '8x8三段结构_v610.levels', 'low_chains.json');
+const OUT = path.join(__dirname, process.env.TASK_OUTPUT || '8x8第四链扫描_v611.json');
+const LEVEL_DIR = path.join(__dirname, process.env.TASK_LEVEL_DIR || '8x8第四链扫描_v611.levels');
 const SEEDS = [7, 1009, 2027];
-const WINDOW = [24, 34];
-const CHAIN_ID = 3101;
+const WINDOW = [
+  Number(process.env.TASK_WINDOW_START || 24),
+  Number(process.env.TASK_WINDOW_END || 34)
+];
+const CHAIN_ID = Number(process.env.TASK_CHAIN_ID || 3101);
+const MID_FLOOR = Number(process.env.TASK_MID_FLOOR || 18.2);
+const SCHEMA = process.env.TASK_SCHEMA || 'eight-by-eight-fourth-chain-v611';
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
@@ -156,18 +163,24 @@ rows.sort((a, b) => {
   const aw = a.players && a.players.every(p => p.won) ? 1 : 0;
   const bw = b.players && b.players.every(p => p.won) ? 1 : 0;
   if (aw !== bw) return bw - aw;
+  const aePass = a.experience && a.experience.pass ? 1 : 0;
+  const bePass = b.experience && b.experience.pass ? 1 : 0;
+  if (aePass !== bePass) return bePass - aePass;
   const am = a.experience && a.experience.maxBuffer || 0;
   const bm = b.experience && b.experience.maxBuffer || 0;
   if (am !== bm) return bm - am;
+  const alp = a.curve && a.curve.freeLowPct != null ? a.curve.freeLowPct : 999;
+  const blp = b.curve && b.curve.freeLowPct != null ? b.curve.freeLowPct : 999;
+  if (alp !== blp) return alp - blp;
+  const ar = a.curve && a.curve.freeRunMax != null ? a.curve.freeRunMax : 999;
+  const br = b.curve && b.curve.freeRunMax != null ? b.curve.freeRunMax : 999;
+  if (ar !== br) return ar - br;
   const amid = a.experience && a.experience.midBuffer34Pct || 0;
   const bmid = b.experience && b.experience.midBuffer34Pct || 0;
   if (amid !== bmid) return bmid - amid;
   const as = a.experience && a.experience.significantReleaseCount || 0;
   const bs = b.experience && b.experience.significantReleaseCount || 0;
-  if (as !== bs) return bs - as;
-  const ar = a.curve && a.curve.freeRunMax != null ? a.curve.freeRunMax : 999;
-  const br = b.curve && b.curve.freeRunMax != null ? b.curve.freeRunMax : 999;
-  return ar - br;
+  return bs - as;
 });
 for (const row of rows) {
   console.log('[v611]', row.id,
@@ -192,7 +205,7 @@ for (const row of rows.slice(0, 8)) {
 for (const row of rows) delete row._level;
 
 const report = {
-  schema: 'eight-by-eight-fourth-chain-v611',
+  schema: SCHEMA,
   date: '2026-10-27',
   base: path.relative(ROOT, BASE_LEVEL),
   window: WINDOW,
@@ -203,7 +216,7 @@ const report = {
     valid: rows.filter(x => x.valid).length,
     allSeedsWin: rows.filter(x => x.players && x.players.every(p => p.won)).length,
     maxBuffer3Plus: rows.filter(x => x.experience && x.experience.maxBuffer >= 3).length,
-    midNotWorse: rows.filter(x => x.experience && x.experience.midBuffer34Pct >= 18.2).length,
+    midNotWorse: rows.filter(x => x.experience && x.experience.midBuffer34Pct >= MID_FLOOR).length,
     releaseImproved: rows.filter(x => x.experience && x.experience.significantReleaseCount > 0).length,
     qGate: rows.filter(x => x.quality && x.quality.gatePass).length,
     best: rows[0] || null
