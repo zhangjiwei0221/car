@@ -8,10 +8,13 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const LEVEL = path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.json');
+const ROUND2 = process.env.ROUND === 'v590';
+const LEVEL = ROUND2
+  ? path.join(__dirname, '短债单车交换_v589.levels', '2_2__5_2.json')
+  : path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.json');
 const ROUTE = path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.route.json');
-const OUT = path.join(__dirname, '短债单车交换_v589.json');
-const LEVEL_DIR = path.join(__dirname, '短债单车交换_v589.levels');
+const OUT = path.join(__dirname, ROUND2 ? '短债单车交换_第二轮_v590.json' : '短债单车交换_v589.json');
+const LEVEL_DIR = path.join(__dirname, ROUND2 ? '短债单车交换_第二轮_v590.levels' : '短债单车交换_v589.levels');
 const MAX_PAIRS = Number(process.env.MAX_PAIRS || 12);
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
@@ -33,7 +36,9 @@ function load() {
 
 const A = load();
 const base = JSON.parse(fs.readFileSync(LEVEL, 'utf8'));
-const route = JSON.parse(fs.readFileSync(ROUTE, 'utf8'));
+const route = ROUND2
+  ? JSON.parse(fs.readFileSync(path.join(__dirname, '短债单车交换_v589.levels', '2_2__5_2.route.json'), 'utf8'))
+  : JSON.parse(fs.readFileSync(ROUTE, 'utf8'));
 const parsed = A.parseLevel(base);
 const baseCurve = A.Generator.choiceCurve(parsed, { completed: true, pickOrder: route },
   { instantChain: true, bottomOnly: false });
@@ -48,7 +53,15 @@ for (let i = 0; i <= steps.length; i++) {
 }
 runs.sort((a, b) => b.len - a.len);
 const longest = runs[0];
-const hotSteps = [14, 20, 30, 37].map(n => steps[n - 1]).filter(Boolean);
+const hotIndices = ROUND2
+  ? Array.from(new Set([
+      longest.start,
+      longest.start + Math.floor(longest.len * 0.25),
+      longest.start + Math.floor(longest.len * 0.5),
+      longest.start + Math.floor(longest.len * 0.75)
+    ]))
+  : [13, 19, 29, 36];
+const hotSteps = hotIndices.map(i => steps[i]).filter(Boolean);
 const donorSteps = steps.slice(longest.end + 1).filter(s => s && s.pick);
 
 const pairs = [];
@@ -140,7 +153,8 @@ for (const p of selected) {
 }
 
 const report = {
-  schema: 'short-debt-local-swap-v589', date: '2026-10-27',
+  schema: ROUND2 ? 'short-debt-local-swap-v590' : 'short-debt-local-swap-v589',
+  date: '2026-10-27',
   base: path.relative(ROOT, LEVEL),
   longestRun: { start: longest.start + 1, end: longest.end + 1, len: longest.len },
   candidateCount: pairs.length, selectedCount: selected.length,
