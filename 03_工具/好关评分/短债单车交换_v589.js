@@ -12,7 +12,10 @@ const ROUND2 = process.env.ROUND === 'v590';
 const ROUND3 = process.env.ROUND === 'v591';
 const ROUND4 = process.env.ROUND === 'v592';
 const ROUND5 = process.env.ROUND === 'v593';
-const LEVEL = ROUND5
+const ROUND6 = process.env.ROUND === 'v594';
+const LEVEL = ROUND6
+  ? path.join(__dirname, '短债单车交换_第四轮_v593.levels', '3_4__6_6.json')
+  : ROUND5
   ? path.join(__dirname, '短债单车交换_受限穷举_v592.levels', '5_3__4_6.json')
   : ((ROUND3 || ROUND4)
   ? path.join(__dirname, '短债单车交换_第二轮_v590.levels', '3_3__1_5.json')
@@ -20,11 +23,13 @@ const LEVEL = ROUND5
     ? path.join(__dirname, '短债单车交换_v589.levels', '2_2__5_2.json')
     : path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.json')));
 const ROUTE = path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.route.json');
-const OUT = path.join(__dirname, ROUND5 ? '短债单车交换_第四轮_v593.json'
+const OUT = path.join(__dirname, ROUND6 ? '短债单车交换_第五轮_v594.json'
+  : ROUND5 ? '短债单车交换_第四轮_v593.json'
   : ROUND4 ? '短债单车交换_受限穷举_v592.json'
   : (ROUND3 ? '短债单车交换_第三轮_v591.json'
     : (ROUND2 ? '短债单车交换_第二轮_v590.json' : '短债单车交换_v589.json')));
-const LEVEL_DIR = path.join(__dirname, ROUND5 ? '短债单车交换_第四轮_v593.levels'
+const LEVEL_DIR = path.join(__dirname, ROUND6 ? '短债单车交换_第五轮_v594.levels'
+  : ROUND5 ? '短债单车交换_第四轮_v593.levels'
   : ROUND4 ? '短债单车交换_受限穷举_v592.levels'
   : (ROUND3 ? '短债单车交换_第三轮_v591.levels'
     : (ROUND2 ? '短债单车交换_第二轮_v590.levels' : '短债单车交换_v589.levels')));
@@ -49,7 +54,9 @@ function load() {
 
 const A = load();
 const base = JSON.parse(fs.readFileSync(LEVEL, 'utf8'));
-const route = ROUND5
+const route = ROUND6
+  ? JSON.parse(fs.readFileSync(path.join(__dirname, '短债单车交换_第四轮_v593.levels', '3_4__6_6.route.json'), 'utf8'))
+  : ROUND5
   ? JSON.parse(fs.readFileSync(path.join(__dirname, '短债单车交换_受限穷举_v592.levels', '5_3__4_6.route.json'), 'utf8'))
   : ((ROUND3 || ROUND4)
   ? JSON.parse(fs.readFileSync(path.join(__dirname, '短债单车交换_第二轮_v590.levels', '3_3__1_5.route.json'), 'utf8'))
@@ -70,7 +77,7 @@ for (let i = 0; i <= steps.length; i++) {
 }
 runs.sort((a, b) => b.len - a.len);
 const longest = runs[0];
-const hotIndices = (ROUND2 || ROUND3 || ROUND4 || ROUND5)
+const hotIndices = (ROUND2 || ROUND3 || ROUND4 || ROUND5 || ROUND6)
   ? Array.from(new Set([
       longest.start,
       longest.start + Math.floor(longest.len * 0.25),
@@ -170,7 +177,8 @@ for (const p of selected) {
 }
 
 const report = {
-  schema: ROUND5 ? 'short-debt-bounded-swap-v593'
+  schema: ROUND6 ? 'short-debt-bounded-swap-v594'
+    : ROUND5 ? 'short-debt-bounded-swap-v593'
     : ROUND4 ? 'short-debt-bounded-swap-v592'
     : (ROUND3 ? 'short-debt-local-swap-v591'
       : (ROUND2 ? 'short-debt-local-swap-v590' : 'short-debt-local-swap-v589')),
