@@ -9,12 +9,17 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
 const ROUND2 = process.env.ROUND === 'v590';
-const LEVEL = ROUND2
-  ? path.join(__dirname, '短债单车交换_v589.levels', '2_2__5_2.json')
-  : path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.json');
+const ROUND3 = process.env.ROUND === 'v591';
+const LEVEL = ROUND3
+  ? path.join(__dirname, '短债单车交换_第二轮_v590.levels', '3_3__1_5.json')
+  : (ROUND2
+    ? path.join(__dirname, '短债单车交换_v589.levels', '2_2__5_2.json')
+    : path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.json'));
 const ROUTE = path.join(__dirname, '债务策略AB_v588_shortDebt.levels', '1001.route.json');
-const OUT = path.join(__dirname, ROUND2 ? '短债单车交换_第二轮_v590.json' : '短债单车交换_v589.json');
-const LEVEL_DIR = path.join(__dirname, ROUND2 ? '短债单车交换_第二轮_v590.levels' : '短债单车交换_v589.levels');
+const OUT = path.join(__dirname, ROUND3 ? '短债单车交换_第三轮_v591.json'
+  : (ROUND2 ? '短债单车交换_第二轮_v590.json' : '短债单车交换_v589.json'));
+const LEVEL_DIR = path.join(__dirname, ROUND3 ? '短债单车交换_第三轮_v591.levels'
+  : (ROUND2 ? '短债单车交换_第二轮_v590.levels' : '短债单车交换_v589.levels'));
 const MAX_PAIRS = Number(process.env.MAX_PAIRS || 12);
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
@@ -36,9 +41,11 @@ function load() {
 
 const A = load();
 const base = JSON.parse(fs.readFileSync(LEVEL, 'utf8'));
-const route = ROUND2
-  ? JSON.parse(fs.readFileSync(path.join(__dirname, '短债单车交换_v589.levels', '2_2__5_2.route.json'), 'utf8'))
-  : JSON.parse(fs.readFileSync(ROUTE, 'utf8'));
+const route = ROUND3
+  ? JSON.parse(fs.readFileSync(path.join(__dirname, '短债单车交换_第二轮_v590.levels', '3_3__1_5.route.json'), 'utf8'))
+  : (ROUND2
+    ? JSON.parse(fs.readFileSync(path.join(__dirname, '短债单车交换_v589.levels', '2_2__5_2.route.json'), 'utf8'))
+    : JSON.parse(fs.readFileSync(ROUTE, 'utf8')));
 const parsed = A.parseLevel(base);
 const baseCurve = A.Generator.choiceCurve(parsed, { completed: true, pickOrder: route },
   { instantChain: true, bottomOnly: false });
@@ -53,7 +60,7 @@ for (let i = 0; i <= steps.length; i++) {
 }
 runs.sort((a, b) => b.len - a.len);
 const longest = runs[0];
-const hotIndices = ROUND2
+const hotIndices = (ROUND2 || ROUND3)
   ? Array.from(new Set([
       longest.start,
       longest.start + Math.floor(longest.len * 0.25),
@@ -153,7 +160,8 @@ for (const p of selected) {
 }
 
 const report = {
-  schema: ROUND2 ? 'short-debt-local-swap-v590' : 'short-debt-local-swap-v589',
+  schema: ROUND3 ? 'short-debt-local-swap-v591'
+    : (ROUND2 ? 'short-debt-local-swap-v590' : 'short-debt-local-swap-v589'),
   date: '2026-10-27',
   base: path.relative(ROOT, LEVEL),
   longestRun: { start: longest.start + 1, end: longest.end + 1, len: longest.len },
