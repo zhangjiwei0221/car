@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "613";
+var APP_BUILD = "614";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -4888,6 +4888,12 @@ AntSolver.App = (function() {
     var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
     var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
     var _routeObstacle = !!((document.getElementById('gen-route-obstacle') || {}).checked);
+    var _capacityMix = !!((document.getElementById('gen-capacity-mix') || {}).checked);
+    var _capacityMixMin = parseInt((document.getElementById('gen-capacity-mix-min') || {}).value, 10) || 6;
+    var _capacityMixMax = parseInt((document.getElementById('gen-capacity-mix-max') || {}).value, 10) || 40;
+    if (_capacityMixMin < 2) _capacityMixMin = 2;
+    if (_capacityMixMax > 80) _capacityMixMax = 80;
+    if (_capacityMixMax < _capacityMixMin) _capacityMixMax = _capacityMixMin;
     var _searchPlan = (function () {
       var el = document.getElementById('gen-search-min');
       var m = parseInt(el && el.value, 10);
@@ -4928,6 +4934,45 @@ AntSolver.App = (function() {
     var _cellsAll = _norm.rowsMax * _norm.colsMax;
     var _pxAll = 0;
     for (var _r0 = 0; _r0 < R; _r0++) for (var _c0 = 0; _c0 < C; _c0++) if (blocks[_r0][_c0] > 0) _pxAll++;
+    // 【v614·实验】混合容量填盘：先按容量上限算最少需要多少辆车，再在 7×7~9×9
+    // 的合法方盘/竖盘中选“装得下且最小”的棋盘。选中后固定棋盘、目标车数=格数，
+    // 由 InstantPlayout 精确拆成 40 锚点 + 6~18 小车，避免车少后补黑块。
+    var _capacityMixBoardPlan = null;
+    var _capacityMixBoardError = null;
+    if (_capacityMix) {
+      var _cmNeedCars = Math.max(1, Math.ceil(_pxAll / _capacityMixMax));
+      var _cmMaxCars = Math.max(1, Math.floor(_pxAll / _capacityMixMin));
+      var _cmDims = [];
+      for (var _cmR = 7; _cmR <= 9; _cmR++) {
+        for (var _cmC = 7; _cmC <= 9; _cmC++) {
+          var _cmCells = _cmR * _cmC;
+          if (_cmC < _cmR || _cmC - _cmR > 2) continue;
+          if (_cmCells < _cmNeedCars || _cmCells > _cmMaxCars) continue;
+          _cmDims.push({ rows: _cmR, cols: _cmC, cells: _cmCells });
+        }
+      }
+      _cmDims.sort(function (a, b) {
+        return (a.cells - b.cells) || (Math.abs(a.rows - a.cols) - Math.abs(b.rows - b.cols)) ||
+          (a.rows - b.rows) || (a.cols - b.cols);
+      });
+      if (_cmDims.length) {
+        var _cmPick = _cmDims[0];
+        _capacityMixBoardPlan = {
+          schema: 'capacity-mix-board-select-v1',
+          mode: 'auto-min-fit',
+          sourcePixels: _pxAll,
+          capacityRange: [_capacityMixMin, _capacityMixMax],
+          minCarsByCapacity: _cmNeedCars,
+          maxCarsByCapacity: _cmMaxCars,
+          rows: _cmPick.rows, cols: _cmPick.cols, cells: _cmPick.cells,
+          blackCells: 0, targetCars: _cmPick.cells,
+          consideredDims: _cmDims
+        };
+      } else {
+        _capacityMixBoardError = '没有 7×7~9×9 合法棋盘能同时容纳 ' +
+          _cmNeedCars + '~' + _cmMaxCars + ' 辆车';
+      }
+    }
     var _usable0 = 0.86;   // v290 回退：方案 A 造成 96 的大车与第一行同色，恢复到 0.86
     var _targetCars0 = Math.max(6, Math.round(_cellsAll * _usable0));
     var _capAvg = Math.max(14, Math.min(72, Math.round(_pxAll / _targetCars0)));
@@ -5252,6 +5297,47 @@ AntSolver.App = (function() {
     // 【2026-10-22·用户裁决】把“自动选了什么”写进日志，结果条也会显示。
     // 【v509·真实UI复核】必须在最终参数日志之前钉回 new_fixed，旧预设内含 generatorFlow:'old'。
     out.generatorFlow = 'new_fixed';
+    // 【v614·实验】这一步必须放在全部预设合并之后，否则旧的容量、棋盘和黑块参数会覆盖实验值。
+    if (_capacityMixBoardPlan) {
+      var _cmBoard = _capacityMixBoardPlan;
+      Object.assign(out, {
+        boxSizeMin: _capacityMixMin,
+        boxSizeMax: _capacityMixMax,
+        capNormMin: _capacityMixMin,
+        capNormMax: _capacityMixMax,
+        capacityMix: {
+          enabled: true,
+          rows: _cmBoard.rows,
+          cols: _cmBoard.cols,
+          blackCells: 0,
+          smallMax: Math.max(_capacityMixMin, Math.min(18, _capacityMixMax)),
+          anchorRatio: 0.3,
+          queueOrder: 'desc',
+          autoBoard: true
+        },
+        _capacityMixBoardPlan: _cmBoard,
+        targetCarCount: _cmBoard.targetCars,
+        boardRowsMin: _cmBoard.rows, boardRowsMax: _cmBoard.rows,
+        boardColsMin: _cmBoard.cols, boardColsMax: _cmBoard.cols,
+        boardHardRange: true, boardAuto: false, boardAllowSquare: true,
+        boardExpandOnOverflow: false, boardPrefer7: false,
+        usableSpaceTarget: 0, carFillRatio: 1,
+        blackPercent: 0, blackPercentMin: 0, blackPercentMax: 0,
+        blackAsCapOnly: true, blackPercentCapPct: 0,
+        hardBlackMaxPct: 0, wallBottomFirst: false,
+        narrowPath: false, narrowPathProb: 0,
+        maxPipes: 0, minPipes: 0, pipeFloorCount: 0, pipeFallbackCount: 0,
+        p7Repair: false, p7BaseCount: 0,
+        capacityTuneMs: 0, capacityTuneCars: 0, capacityTuneVariants: 0
+      });
+      try {
+        genLog('混合容量填盘：源像素 ' + _pxAll + '，容量 ' + _capacityMixMin + '~' + _capacityMixMax +
+          ' → 至少 ' + _cmNeedCars + ' 辆车；选盘 ' + _cmBoard.rows + '×' + _cmBoard.cols +
+          '（' + _cmBoard.cells + ' 车 / 0 黑块）', 'gen-log-ok');
+      } catch (e) {}
+    } else if (_capacityMix) {
+      try { genLog('混合容量填盘未启用：' + (_capacityMixBoardError || '无法选盘'), 'gen-log-warn'); } catch (e) {}
+    }
     try {
       genLog('切法策略 ' + _cutPolicy + '：' + (_cutMode === 'exposeCut' ? '暴露序+行优先' : '按依赖层') +
         '（前沿 ' + (_frontAvg == null ? '?' : _frontAvg) + '）· 容量 ' + out.boxSizeMin + '~' + out.boxSizeMax +
@@ -5259,7 +5345,8 @@ AntSolver.App = (function() {
           (_autoCap.feasible ? '可压到≤2' : '压不下来，建议冰/改图') + '）' : ''), 'gen-log-ok');
     } catch (e) {}
     try {
-      genLog('本关：容量 ' + out.boxSizeMin + '~' + out.boxSizeMax + ' · 目标 ' + (_boardAuto ? 36 : _targetCars0) +
+      genLog('本关：容量 ' + out.boxSizeMin + '~' + out.boxSizeMax + ' · 目标 ' +
+        (_capacityMixBoardPlan ? _capacityMixBoardPlan.targetCars : (_boardAuto ? 36 : _targetCars0)) +
         ' 辆 · 冰锁最大色(10步) · 管道≤2', 'gen-log-warn');
     } catch (e) {}
     try {
@@ -5932,6 +6019,13 @@ AntSolver.App = (function() {
         ? ('采用 / ' + (rec.routeObstaclePlan.added || []).length + ' 个单元 / ' +
           Math.round((rec.routeObstaclePlan.wallElapsedMs || rec.routeObstaclePlan.elapsedMs || 0) / 1000) + 's')
         : ('未采用（' + (rec.routeObstaclePlan.reason || '无改善') + '）')) : '未开') +
+      row('混合容量填盘', rec.capacityMixPlan
+        ? ((rec.capacityMixPlan.rows || '?') + '×' + (rec.capacityMixPlan.cols || '?') + ' / ' +
+          (rec.capacityMixPlan.actualCars != null ? rec.capacityMixPlan.actualCars : '?') + ' 车 / 目标 ' +
+          (rec.capacityMixPlan.targetCars != null ? rec.capacityMixPlan.targetCars : '?') + ' / 容量 ' +
+          (rec.capacityMixPlan.capMin != null ? rec.capacityMixPlan.capMin : '?') + '~' +
+          (rec.capacityMixPlan.capMax != null ? rec.capacityMixPlan.capMax : '?'))
+        : '未开') +
       row('P7修复', rec.p7 ? ('试' + (rec.p7.tried || 0) + ' / 收' + (rec.p7.accepted || 0) +
         '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
@@ -6342,7 +6436,9 @@ AntSolver.App = (function() {
         boardPrefer7: !!result.config.boardPrefer7,
         boardPreferredPlan: result.config._boardPrefer7 || null,
         localSwapRepair: result.localSwapRepair || null,
-        p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime
+        p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime,
+        capacityMix: result.config.capacityMix || null,
+        capacityMixBoard: result.config._capacityMixBoardPlan || null
       } : null,
       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
       cutInfo: (result.config && result.config._cutAuto) || null,
@@ -6385,6 +6481,7 @@ AntSolver.App = (function() {
       fullTime: !!(result.config && result.config.fullTime),
       trapPost: result.trapPost || null,
       routeObstaclePlan: result.routeObstaclePlan || null,
+      capacityMixPlan: result.capacityMixPlan || null,
       p7: result.p7 || null, a3d: result.a3d || null, readyStats: result.readyStats || null,
       playerPassPct: (_ps.playerPassPct != null ? _ps.playerPassPct : null),
       learnedPassPct: (_ps.learnedPassPct != null ? _ps.learnedPassPct : null),
@@ -7253,6 +7350,9 @@ AntSolver.App = (function() {
       taskCfg.goalMaxRounds = 0;
       taskCfg.experienceGoal = genExperienceGoalEnabled();
       taskCfg.capacityTuneMs = 5000; taskCfg.capacityTuneCars = 8; taskCfg.capacityTuneVariants = 48;
+      if (taskCfg.capacityMix && taskCfg.capacityMix.enabled) {
+        taskCfg.capacityTuneMs = 0; taskCfg.capacityTuneCars = 0; taskCfg.capacityTuneVariants = 0;
+      }
     }
     taskCfg._build = APP_BUILD;
     slot.w.postMessage({
@@ -7404,6 +7504,10 @@ AntSolver.App = (function() {
         timeBudgetMs: 20000, seed: (baseSeed + bi * 7919) >>> 0,
         _build: APP_BUILD
       });
+      if (cfg.capacityMix && cfg.capacityMix.enabled) {
+        cfg.capacityTuneMs = 0; cfg.capacityTuneCars = 0; cfg.capacityTuneVariants = 0;
+        cfg.p7BaseCount = 0; cfg.p7Repair = false;
+      }
       w.onmessage = function (e) {
         var d = e.data || {};
         if (d.type === 'ready') { w.postMessage({ cmd: 'produceGoal', index: idx, blocks: entry.blocks, config: cfg }); return; }

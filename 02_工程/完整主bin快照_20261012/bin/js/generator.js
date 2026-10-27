@@ -7319,6 +7319,45 @@ AntSolver.Generator = (function() {
       out.perf.playerSim = (AntSolver.PlayerSim && AntSolver.PlayerSim.getPerf) ? AntSolver.PlayerSim.getPerf() : null;
       out.perf.evaluatedPositions = evaluated;
       out.perf.config = { candidateCount: K, chokeBranches: B, rounds: N, timeBudgetMs: budget, requireHardPass: requireHard };
+      // 【v614·实验证据】混合容量填盘的实际规划与容量构成，随最终结果一起落库。
+      if (config.capacityMix && config.capacityMix.enabled) {
+        try {
+          var _cmPlanned = config._instantPlayoutStat || {};
+          var _cmPlans = _cmPlanned.capacityPlans || [];
+          var _cmCaps = [];
+          for (var _cmp = 0; _cmp < _cmPlans.length; _cmp++) {
+            var _cmCapsRow = _cmPlans[_cmp].caps || [];
+            for (var _cmci = 0; _cmci < _cmCapsRow.length; _cmci++) _cmCaps.push(_cmCapsRow[_cmci]);
+          }
+          var _cmParsed = out.level ? AntSolver.parseLevel(out.level) : null;
+          out.capacityMixPlan = {
+            schema: 'capacity-mix-production-v1',
+            enabled: true,
+            request: {
+              capacityRange: [config.boxSizeMin, config.boxSizeMax],
+              min: config.boxSizeMin, max: config.boxSizeMax,
+              smallMax: config.capacityMix.smallMax, anchorRatio: config.capacityMix.anchorRatio,
+              queueOrder: config.capacityMix.queueOrder
+            },
+            board: config._capacityMixBoardPlan || null,
+            rows: out.level && out.level.board ? out.level.board.rows : null,
+            cols: out.level && out.level.board ? out.level.board.cols : null,
+            targetCars: config.targetCarCount,
+            actualCars: _cmParsed ? _cmParsed.totalBoxes : _cmCaps.length,
+            plannedCars: _cmCaps.length,
+            capMin: _cmCaps.length ? Math.min.apply(null, _cmCaps) : null,
+            capMax: _cmCaps.length ? Math.max.apply(null, _cmCaps) : null,
+            anchors40: _cmCaps.filter(function (x) { return x === config.boxSizeMax; }).length,
+            small: _cmCaps.filter(function (x) { return x >= config.boxSizeMin && x <= config.capacityMix.smallMax; }).length,
+            exactColors: _cmPlans.filter(function (x) { return x.exact; }).length,
+            totalColors: _cmPlans.length,
+            capacityPlans: _cmPlans
+          };
+        } catch (eCm) {
+          out.capacityMixPlan = { schema: 'capacity-mix-production-v1', enabled: true,
+            error: String(eCm && eCm.message || eCm) };
+        }
+      }
       // 【v613·实验】路线障碍规划器：默认关闭；只对最终候选追加链/冰，
       // 修改后完整重解并重算体验，只有严格优于原候选才替换。
       if (out && out.level && config.routeObstaclePlan === 'v1') {
