@@ -284,7 +284,6 @@ AntSolver.InstantPlayout = (function () {
       cars: cars.length, covered: done, total: total, capRange: [capMin, capMax], audit: audit,
       targetCars: targetCars, minTotalCars: capBuilt.minTotalCars, maxTotalCars: capBuilt.maxTotalCars,
       targetCarsFeasible: capBuilt.ok !== false,
-      capacityMix: capBuilt.capacityMix || null,
       capacityPlans: capBuilt.plans, exactCapacityColors: capBuilt.plans.filter(function (x) { return x.exact; }).length,
       infeasibleCapacityColors: capBuilt.plans.filter(function (x) { return !x.exact; }).length,
       bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
@@ -295,6 +294,7 @@ AntSolver.InstantPlayout = (function () {
       carSequence: cars.map(function (c) { return { id: c.id, color: c.color, cap: c.cap, slot: c.slot,
         start: c.start, enterOrder: c.enterOrder, finishOrder: c.finishOrder || null, entryReach: c.entryReach,
         colorRemaining: c.colorRemaining, consumed: c.consumed, debt: c.debt }; }) };
+    if (capBuilt.capacityMix) boxes._instantPlayout.capacityMix = capBuilt.capacityMix;
     return { ok: ok, reason: boxes._instantPlayout.reason, boxes: boxes, cars: cars, seq: seq, audit: audit };
   }
   return { plan: plan, capacityPlanForColor: capacityPlanForColor };

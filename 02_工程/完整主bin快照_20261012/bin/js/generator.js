@@ -6580,7 +6580,7 @@ AntSolver.Generator = (function() {
     board.spaceQuota = struct.spaceQuota || null;
     board.blackStat = struct.blackStat || null;
     board.surplusStat = struct.surplusStat || null;
-    board.gatePlan = config._instantGatePlanStat || null;
+    if (config._instantGatePlanStat) board.gatePlan = config._instantGatePlanStat;
     // 管道落位与兜底状态（ANT-GEN-PIPE-DEPTH-FALLBACK-20260825）：want/placed/capacityPerPipe
     // 以及 fallback* 标记。兜底是行为变更，必须可观测——否则"管道为什么只有 2 条"无从追溯。
     board.pipeStat = struct.pipeStat || null;

@@ -1,0 +1,90 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+index ee71ae0..25797b6 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+@@ -11,6 +11,8 @@
+ > 基线生产提交：v570 `b4eb449`；v571 障碍修复见 `56d4af5`；v572 落库热修见 `73080c4`；v573 黑块硬门见 `654df42`；v574 合规回退尺寸排序见 `0b9030d`；v575 黑块形态硬门见 `7a492d0`；v576 混合容量见 `73806be`；v577 软锚点闸门见 `da62432`；v578 两行交错与真实债务审计见 `bd78a20`；v579 开局供时收紧见 `1502086`；v580 真实债务单锚点见 `aee9dd4`；v581 单供给数字冰见 `512c7bb`；v582 单冰窗口扫描见 `34b5015`；v583 第28步单冰实测见 `ecd8f4e`；v584 单冰时长扫描见 `3a3618a`；v585 第二把定时冰见 `306b95b`；v586 双供给锁见 `65c6ffe`；v587 债务间隔seed筛选见 `5cbd17f`；v588债务策略AB见 `1569b6b`；v589短债单对交换见 `c90baa7`；v590第二轮单对交换见 `e5955d7`；v591第三轮单对交换见本轮提交
+ >
+ > 执行入口：本文件。旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录；如用户给出新裁决，以新裁决为准并同步更新本文件。
++>
++> **稳定基线：v575，标签`stable-v575`；后续实验不得改变默认UI链路。**
+ 
+ ## 0. Goal 目标
+ 
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/v575\347\250\263\345\256\232\345\237\272\347\272\277\345\206\273\347\273\223.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/v575\347\250\263\345\256\232\345\237\272\347\272\277\345\206\273\347\273\223.md"
+new file mode 100644
+index 0000000..f88c82d
+--- /dev/null
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/v575\347\250\263\345\256\232\345\237\272\347\272\277\345\206\273\347\273\223.md"
+@@ -0,0 +1,25 @@
++# v575 稳定基线冻结
++
++日期：2026-10-27
++
++## 冻结对象
++
++- 稳定标签：`stable-v575`
++- 提交：`7a492d0`
++- 页面版本：v575
++- 默认入口：`bin/index.html?v=575`
++
++## 当前实验隔离规则
++
++1. `capacityMix`、`gatePlan` 等实验配置不得出现在 `app.js` 默认配置中；
++2. 实验工具可以显式传入这些参数，但默认 UI 不传；
++3. 不因实验而修改 v575 的容量区间、消除规则、棋盘选择、质量门或默认候选排序；
++4. 实验代码只能走显式开关分支，默认数据不得新增行为字段；
++5. 任何准备进入默认产线的改动，必须先作为独立版本完成真关卡、UI/worker、容量和回归验证。
++
++## 当前状态
++
++- v575默认链路未切换；
++- app.js 与 index.html 不引用 `capacityMix` 或 `gatePlan`；
++- v576~v591均为实验记录；
++- 需要回退时使用标签 `stable-v575`。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 6637b6d..42aad7f 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -7,6 +7,8 @@
+ >
+ > **当前执行入口是 [`Goal执行计划.md`](Goal执行计划.md)，旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录。工作日志最新见 §552~582。v571修复障碍落地，v572修复落库作用域，v573加入黑块>30%硬门，v574修正合规回退排序，v575新增最终棋盘黑块形态硬门：同行≤3、横连≤3、竖连≤3，并修复补位与瞬时双入口整行黑墙。00199 seed1001/1002/32677均稳定为6×7、10黑、23.81%且qGate通过。目标体验仍未全部通过。**
+ >
++> **v575已冻结为稳定基线：Git标签`stable-v575`，默认UI不注入`capacityMix/gatePlan`实验开关。实验不得改变v575默认容量、棋盘、消除规则、质量门或候选排序。详见[`v575稳定基线冻结.md`](v575稳定基线冻结.md)。**
++>
+ > **编号约定：验收阶段只有 P0～P6，以 [`优质关卡生成_详细工作流程.md`](优质关卡生成_详细工作流程.md) 为准。代码和历史文档中的 P7、P8、P9、P10 是实现名、旧编号或历史索引，不是额外验收阶段。**
+ >
+ > **本轮（v495~v500）整体状态见 [`交接摘要_v500_20261025.md`](交接摘要_v500_20261025.md)**：生产配置、12 个负结果、已知限制、回退方式都在那一份里。
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index d5160e0..c8d8c31 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -6580,7 +6580,7 @@ AntSolver.Generator = (function() {
+     board.spaceQuota = struct.spaceQuota || null;
+     board.blackStat = struct.blackStat || null;
+     board.surplusStat = struct.surplusStat || null;
+-    board.gatePlan = config._instantGatePlanStat || null;
++    if (config._instantGatePlanStat) board.gatePlan = config._instantGatePlanStat;
+     // 管道落位与兜底状态（ANT-GEN-PIPE-DEPTH-FALLBACK-20260825）：want/placed/capacityPerPipe
+     // 以及 fallback* 标记。兜底是行为变更，必须可观测——否则"管道为什么只有 2 条"无从追溯。
+     board.pipeStat = struct.pipeStat || null;
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
+index c525c45..299214d 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/instant-playout.js"
+@@ -284,7 +284,6 @@ AntSolver.InstantPlayout = (function () {
+       cars: cars.length, covered: done, total: total, capRange: [capMin, capMax], audit: audit,
+       targetCars: targetCars, minTotalCars: capBuilt.minTotalCars, maxTotalCars: capBuilt.maxTotalCars,
+       targetCarsFeasible: capBuilt.ok !== false,
+-      capacityMix: capBuilt.capacityMix || null,
+       capacityPlans: capBuilt.plans, exactCapacityColors: capBuilt.plans.filter(function (x) { return x.exact; }).length,
+       infeasibleCapacityColors: capBuilt.plans.filter(function (x) { return !x.exact; }).length,
+       bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
+@@ -295,6 +294,7 @@ AntSolver.InstantPlayout = (function () {
+       carSequence: cars.map(function (c) { return { id: c.id, color: c.color, cap: c.cap, slot: c.slot,
+         start: c.start, enterOrder: c.enterOrder, finishOrder: c.finishOrder || null, entryReach: c.entryReach,
+         colorRemaining: c.colorRemaining, consumed: c.consumed, debt: c.debt }; }) };
++    if (capBuilt.capacityMix) boxes._instantPlayout.capacityMix = capBuilt.capacityMix;
+     return { ok: ok, reason: boxes._instantPlayout.reason, boxes: boxes, cars: cars, seq: seq, audit: audit };
+   }
+   return { plan: plan, capacityPlanForColor: capacityPlanForColor };
