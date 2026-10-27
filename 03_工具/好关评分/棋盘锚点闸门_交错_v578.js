@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** v578：两行交错软锚点 + 实际取车时真实债务审计。 */
+/** v578：两行交错软锚点 + 实际取车时真实债务审计；ARMSET=v579 时测试开局供给收紧。 */
 'use strict';
 
 const fs = require('fs');
@@ -9,8 +9,9 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
 const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
-const OUT = path.join(__dirname, '棋盘锚点闸门_交错_v578.json');
-const LEVEL_DIR = path.join(__dirname, '棋盘锚点闸门_交错_v578.levels');
+const ARMSET = process.env.ARMSET === 'v579' ? 'v579' : 'v578';
+const OUT = path.join(__dirname, ARMSET === 'v579' ? '棋盘供时闸门_v579.json' : '棋盘锚点闸门_交错_v578.json');
+const LEVEL_DIR = path.join(__dirname, ARMSET === 'v579' ? '棋盘供时闸门_v579.levels' : '棋盘锚点闸门_交错_v578.levels');
 const SEED = Number(process.env.SEED || 1001);
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
@@ -18,7 +19,7 @@ const FILES = [
   'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js',
   'source-preflight.js'
 ];
-const ARMS = [
+const ARMS_V578 = [
   {
     id: 'A_row1_gate',
     gatePlan: {
@@ -34,6 +35,18 @@ const ARMS = [
     }
   }
 ];
+const ARMS_V579 = [
+  ARMS_V578[0],
+  {
+    id: 'B_row0_one_supply',
+    gatePlan: {
+      enabled: true, row: 0, anchorCars: 6, anchorMinCap: 32, minDebt: 1,
+      cells: [[0,1],[0,2],[0,3],[0,4],[0,5],[0,6]],
+      row0Supply: 1
+    }
+  }
+];
+const ARMS = ARMSET === 'v579' ? ARMS_V579 : ARMS_V578;
 
 function load() {
   const sb = {
@@ -246,7 +259,8 @@ function runArm(arm) {
 
 const rows = ARMS.map(runArm);
 const report = {
-  schema: 'staggered-anchor-gate-v578', date: '2026-10-27', seed: SEED,
+  schema: ARMSET === 'v579' ? 'anchor-supply-timing-v579' : 'staggered-anchor-gate-v578',
+  date: '2026-10-27', seed: SEED,
   input: path.relative(ROOT, INPUT),
   fixed: { board: '7x7', cars: 49, capRange: [6, 40], black: 0 },
   arms: rows,
