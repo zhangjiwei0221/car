@@ -1,0 +1,533 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+index cb772ca..563c2b0 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+@@ -1,6 +1,6 @@
+ # 毛线汽车 · Goal 执行计划
+ 
+-> 状态：**v577 软锚点闸门位置有效；Goal 质量收口仍暂停**
++> 状态：**v578 锚点位置族停止；Goal 质量收口仍暂停**
+ >
+ > 建表日期：2026-10-26
+ >
+@@ -8,7 +8,7 @@
+ >
+ > 开发分支：`codex/kimi-quality-framework`
+ >
+-> 基线生产提交：v570 `b4eb449`；v571 障碍修复见 `56d4af5`；v572 落库热修见 `73080c4`；v573 黑块硬门见 `654df42`；v574 合规回退尺寸排序见 `0b9030d`；v575 黑块形态硬门见 `7a492d0`；v576 混合容量见 `73806be`；v577 软锚点闸门见 `da62432`
++> 基线生产提交：v570 `b4eb449`；v571 障碍修复见 `56d4af5`；v572 落库热修见 `73080c4`；v573 黑块硬门见 `654df42`；v574 合规回退尺寸排序见 `0b9030d`；v575 黑块形态硬门见 `7a492d0`；v576 混合容量见 `73806be`；v577 软锚点闸门见 `da62432`；v578 两行交错与真实债务审计见本轮提交
+ >
+ > 执行入口：本文件。旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录；如用户给出新裁决，以新裁决为准并同步更新本文件。
+ 
+@@ -560,6 +560,24 @@ P2f 已完成结果：
+ - 但锚点选到时颜色已经足够供给，预计算债务没有兑现成真实暂存压力；
+ - 不接生产，不进入微调；下一轮只测跨第1~2行交错缺口。
+ 
++### P2o. v578 两行交错与真实债务审计 · ⛔ 位置族停止
++
++改动：
++
++- 锚点闸门支持显式坐标；
++- 独立回放记录取车前真实可达、容量、债务和取车后buffer。
++
++结果：
++
++- 第1行5锚点：5/5进入路线，但真实债务≥2为0，maxBuffer1；
++- 第1~2行6锚点：6/6进入路线，仅1辆真实债务2，maxBuffer1，免费连反而21→35。
++
++结论：
++
++- 停止锚点位置、行数、缺口数量这一族；
++- 下一轮只研究供给时序和颜色露出时点；
++- 规划`instantEntryReach`不得再当作实际债务证据。
++
+ ### P3. 006 开发集复核与生产化
+ 
+ 仅在 P2 命中后执行。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index ee331ec..6a84ec1 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -23653,3 +23653,46 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 1. 不接默认生产，不增加随机冰/黑块。
+ 2. 下一唯一变量：把第1行闸门扩展为第1~2行交错缺口，阻止单列免费逃逸。
+ 3. 只有基底出现至少一次真实buffer≥3后，才允许局部微调释放。
++
++### 585. 【2026-10-27】v578实验：两行交错闸门失败，计划债务不是实际债务
++
++#### 585.1 问题（原话）
++
++- 试试
++
++#### 585.2 证据
++
++- v577第1行软闸门已做到5/5锚点进入路线，最长免费连34→21，但maxBuffer仍只有1。
++- 因此v578只比较A第1行5锚点与B第1~2行交错6锚点，并用独立回放记录实际取车前的同色可达像素。
++- v577使用的`instantEntryReach`是规划时快照，不能直接当真实债务。
++
++#### 585.3 改动
++
++- `gatePlan`支持显式锚点坐标；
++- 新增v578预登记、A/B实验脚本和独立回放债务审计；
++- 每个锚点记录实际可达、容量、真实债务、取车前/后buffer、步骤与进度；
++- 默认生产、容量集合、棋盘和障碍全部不变。
++
++#### 585.4 验证（改前/改后数字）
++
++- A第1行5锚点：
++  - 5/5进入实际路线；
++  - 实际债务为-37/-1/-4/1/0，真实债务≥2为0；
++  - freeLow90%、免费连21、maxBuffer1、qGate否。
++- B第1~2行交错6锚点：
++  - 6/6进入实际路线；
++  - 只有1辆真实债务2，buffer≥3为0；
++  - freeLow88%、免费连35、maxBuffer1、qGate否。
++- 工作成就：
++  - 建立真实债务审计，纠正了规划债务高估；
++  - 证明软闸门可以强制选择锚点，但选择时颜色已经充分露出。
++- 工作困难：
++  - 两行交错比第1行单闸门更差；
++  - 继续调位置只是在移动一个已经能装满的车；
++  - 基底仍远离目标，不能微调。
++
++#### 585.5 遗留
++
++1. 停止锚点位置/行数/缺口数这一族。
++2. 下一轮只研究供给时序：让锚点颜色在实际取出前仍保持可达不足。
++3. 不再使用规划`instantEntryReach`作为债务证据，必须用独立回放。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index 2431795..8639459 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-27（v577 软锚点闸门实验）　|　当前生产代码版本：**v575**；最新实验版本：**v577**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-27（v578 两行交错闸门与真实债务审计）　|　当前生产代码版本：**v575**；最新实验版本：**v578**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **当前执行入口是 [`Goal执行计划.md`](Goal执行计划.md)，旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录。工作日志最新见 §552~582。v571修复障碍落地，v572修复落库作用域，v573加入黑块>30%硬门，v574修正合规回退排序，v575新增最终棋盘黑块形态硬门：同行≤3、横连≤3、竖连≤3，并修复补位与瞬时双入口整行黑墙。00199 seed1001/1002/32677均稳定为6×7、10黑、23.81%且qGate通过。目标体验仍未全部通过。**
+ >
+@@ -360,6 +360,7 @@ python3 -m http.server 8060        # 本工程固定用 8060
+ | 16 | **32盒无法同时满足≥7行列与黑块≤30%** | 7×7至少17黑、34.7% | 保持6×7兜底，不为了行列牺牲观感 |
+ | 17 | **混合容量能填满大棋盘，但压力塌陷** | v576四臂无黑块，qGate/体验0/4，freeLow 89%~97% | 下一轮只研究锚点车如何成为必经债务，不直接接生产 |
+ | 18 | **软闸门能强制选中锚点，但债务不兑现** | v577第1行5/5锚点进路线，免费连34→21，但maxBuffer仍1 | 下一轮只测跨两行交错缺口，不进入微调 |
++| 19 | **实际取车时计划债务已消失** | v578真实回放多为负债务；两行交错无buffer≥3 | 停止位置族，下一轮只改供给时序 |
+ 
+ ---
+ 
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 26abb44..d5160e0 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -4543,16 +4543,27 @@ AntSolver.Generator = (function() {
+           var _gateAnchors = _anchorPool.slice(0, _gateAnchorN);
+           var _assigned = new Array(order.length);
+           var _row0 = [], _gateCells = [], _restCells = [];
++          var _gateTargetSet = null;
++          if (Array.isArray(_gate.cells)) {
++            _gateTargetSet = {};
++            for (var _gt = 0; _gt < _gate.cells.length; _gt++) {
++              var _gcell = _gate.cells[_gt];
++              if (Array.isArray(_gcell) && _gcell.length >= 2) {
++                _gateTargetSet[parseInt(_gcell[0], 10) + ',' + parseInt(_gcell[1], 10)] = 1;
++              }
++            }
++          }
+           for (var _gci = 0; _gci < order.length; _gci++) {
+-            if (order[_gci][0] === _gateRow) _gateCells.push(_gci);
++            var _gck = order[_gci][0] + ',' + order[_gci][1];
++            if (_gateTargetSet ? !!_gateTargetSet[_gck] : order[_gci][0] === _gateRow) _gateCells.push(_gci);
+             else if (order[_gci][0] === 0) _row0.push(_gci);
+             else _restCells.push(_gci);
+           }
+           _gateCells.sort(function (a, b) { return order[a][1] - order[b][1]; });
+           var _gapSet = {};
+-          var _gaps = Array.isArray(_gate.gapCols) ? _gate.gapCols : [0, cols - 1];
++          var _gaps = _gateTargetSet ? [] : (Array.isArray(_gate.gapCols) ? _gate.gapCols : [0, cols - 1]);
+           for (var _gpi = 0; _gpi < _gaps.length; _gpi++) _gapSet[parseInt(_gaps[_gpi], 10)] = 1;
+-          var _anchorCells = _gateCells.filter(function (ci) { return !_gapSet[order[ci][1]]; });
++          var _anchorCells = _gateCells.filter(function (ci) { return _gateTargetSet || !_gapSet[order[ci][1]]; });
+           var _supplyForRow0 = _supplyPool.slice(0, _gateRow === 0 ? 0 : _row0.length);
+           var _si = 0;
+           for (var _r0i = 0; _r0i < _row0.length && _si < _supplyForRow0.length; _r0i++, _si++) {
+@@ -4587,6 +4598,7 @@ AntSolver.Generator = (function() {
+             list = _assigned;
+             config._instantGatePlanStat = {
+               schema: 'instant-gate-plan-v1', enabled: true, row: _gateRow,
++              cellsMode: !!_gateTargetSet,
+               row0Cells: _row0.length, gateCells: _gateCells.length,
+               anchorsPlanned: _gateAnchors.length, anchorsPlaced: Math.min(_anchorCells.length, _gateAnchors.length),
+               supplyRow0: Math.min(_row0.length, _supplyForRow0.length), gaps: _gaps,
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578.js"
+new file mode 100644
+index 0000000..777a611
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578.js"
+@@ -0,0 +1,263 @@
++#!/usr/bin/env node
++/** v578：两行交错软锚点 + 实际取车时真实债务审计。 */
++'use strict';
++
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
++const OUT = path.join(__dirname, '棋盘锚点闸门_交错_v578.json');
++const LEVEL_DIR = path.join(__dirname, '棋盘锚点闸门_交错_v578.levels');
++const SEED = Number(process.env.SEED || 1001);
++const FILES = [
++  'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
++  'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js',
++  'source-preflight.js'
++];
++const ARMS = [
++  {
++    id: 'A_row1_gate',
++    gatePlan: {
++      enabled: true, row: 1, anchorCars: 5, anchorMinCap: 32, minDebt: 1,
++      cells: [[1,1],[1,2],[1,3],[1,4],[1,5]]
++    }
++  },
++  {
++    id: 'B_staggered_rows1_2',
++    gatePlan: {
++      enabled: true, row: 1, anchorCars: 6, anchorMinCap: 32, minDebt: 1,
++      cells: [[1,1],[1,2],[1,3],[1,4],[1,5],[2,0]]
++    }
++  }
++];
++
++function load() {
++  const sb = {
++    console: { log() {}, warn() {}, error() {} },
++    module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity
++  };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++
++const A = load();
++const blocks = A.Generator.blocksFromTXT(fs.readFileSync(INPUT, 'utf8'));
++
++function configFor(gatePlan) {
++  return {
++    seed: SEED,
++    generatorFlow: 'new_fixed',
++    ruleMode: 'instantChain',
++    instantChain: true,
++    bottomOnly: false,
++    elimOrder: 'instant',
++    instantPlanPolicy: 'targetBuffer',
++    instantPlanTargetBuffer: 3,
++    instantPlanMaxDebt: 40,
++    instantPlanDebtEvery: 4,
++    instantPlanBranchCount: 0,
++    boxSizeMin: 6,
++    boxSizeMax: 40,
++    capNormMin: 6,
++    capNormMax: 40,
++    capacityMix: {
++      enabled: true, rows: 7, cols: 7, blackCells: 0,
++      smallMax: 18, anchorRatio: 0.3, queueOrder: 'desc',
++      gatePlan
++    },
++    targetCarCount: 49,
++    cutMode: 'exposeCut',
++    maxPipes: 0,
++    minPipes: 0,
++    pipeFloorCount: 0,
++    pipeFloorDepth: 0,
++    candidateCount: 1,
++    chokeBranches: 1,
++    rounds: 0,
++    maxRetries: 1,
++    boardRowsMin: 7, boardRowsMax: 7,
++    boardColsMin: 7, boardColsMax: 7,
++    boardHardRange: true,
++    boardAuto: false,
++    boardAllowSquare: true,
++    boardExpandOnOverflow: false,
++    boardFirst: true,
++    boardFitGuard: 'warn',
++    boardPrefer7: false,
++    boardPrefer7Dims: null,
++    hardBlackMaxPct: 30,
++    p7BaseCount: 0,
++    p7Repair: false,
++    trapPost: false,
++    pool: 1,
++    semanticObstacles: false,
++    usableSpaceTarget: 0,
++    blackPercent: 0,
++    blackAsCapOnly: true,
++    blackPercentCapPct: 0,
++    narrowPath: false,
++    icePercent: 0,
++    iceSchedule: false,
++    chainCount: 0,
++    questionPercent: 0,
++    experienceGoal: false,
++    acceptMode: 'time',
++    timeBudgetMs: Number(process.env.BUDGET_MS || 30000),
++    localSwapRepair: false,
++    capacityTuneMs: 0,
++    maxDecisionStates: 8,
++    stateSampleMode: 'midStratified',
++    minReleaseAmplitude: 2
++  };
++}
++
++function leftmostFreeSlot(s) {
++  const used = {};
++  for (const item of s.buffer || []) if (item.slot != null) used[item.slot] = 1;
++  for (let i = 0; i < s.bufferLimit; i++) if (!used[i]) return i;
++  return -1;
++}
++
++function slotStartCoord(slot, rows, cols, bufferLimit) {
++  return { r: rows - 1, c: Math.min(cols - 1, Math.floor(slot / bufferLimit * cols)) };
++}
++
++function reachablePixelsAt(s, color, start, rows, cols) {
++  const scratch = s.eliminated.map(row => row.slice());
++  try {
++    return A.Simulator.instantChainEliminate(
++      scratch, blocks, rows, cols, color, Infinity, null, start, null
++    );
++  } catch (e) { return null; }
++}
++
++function actualAnchorAudit(raw, solveResult) {
++  if (!raw || !solveResult || !solveResult.pickOrder) return [];
++  const gate = raw.board && raw.board.gatePlan;
++  const anchorMap = {};
++  for (const a of ((gate && gate.anchors) || [])) anchorMap[a.r + ',' + a.c] = a;
++  if (!Object.keys(anchorMap).length) return [];
++  const level = A.parseLevel(raw);
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true, bottomOnly: false, instantChain: true, capturePreviewStats: false
++  });
++  const actions = A.SolverAnalysis.normalizeActions(solveResult.pickOrder);
++  const audit = [], seen = {};
++  for (let i = 0; i < actions.length; i++) {
++    const a = actions[i], k = a.r + ',' + a.c;
++    const planned = anchorMap[k];
++    if (planned && !seen[k]) {
++      seen[k] = 1;
++      const cell = state.cells[a.r] && state.cells[a.r][a.c];
++      const slot = leftmostFreeSlot(state);
++      const start = slot >= 0 ? slotStartCoord(slot, state.rows, state.cols, state.bufferLimit) : null;
++      const actualReach = cell && cell.t === 'box' && start
++        ? reachablePixelsAt(state, cell.color, start, state.rows, state.cols)
++        : null;
++      audit.push({
++        step: i + 1, pickIndex: i, r: a.r, c: a.c,
++        color: cell && cell.color, capacity: cell && cell.count,
++        slot,
++        plannedReach: planned.reach, plannedDebt: planned.debt,
++        actualReach, actualDebt: (cell && actualReach != null) ? cell.count - actualReach : null,
++        bufferBefore: state.buffer.length,
++        eliminatedBefore: state.eliminatedPixels,
++        progressBefore: state.totalPixels ? +(state.eliminatedPixels / state.totalPixels).toFixed(4) : null
++      });
++    }
++    A.Simulator.applyPick(state, a.r, a.c);
++    if (planned && audit.length && audit[audit.length - 1].step === i + 1) {
++      audit[audit.length - 1].bufferAfter = state.buffer.length;
++      audit[audit.length - 1].eliminatedAfter = state.eliminatedPixels;
++    }
++  }
++  return audit;
++}
++
++function runArm(arm) {
++  const cfg = configFor(arm.gatePlan);
++  const t0 = Date.now();
++  let result = null, error = null;
++  try { result = A.Generator.produceFixed(blocks, cfg); }
++  catch (e) { error = String(e && e.message || e); }
++  const raw = result && result.level || null;
++  const parsed = raw ? A.parseLevel(raw) : null;
++  const q = raw ? A.Quality.fromGeneration(result) : null;
++  const curve = result && result.goodV3 && result.goodV3.fillCurve || null;
++  let exp = null;
++  if (raw && result.solveResult) {
++    try {
++      exp = A.ExperienceGoal.evaluate(raw, {
++        solveResult: result.solveResult, decision: true, instantChain: true,
++        maxDecisionStates: 8, stateSampleMode: 'midStratified', minReleaseAmplitude: 2
++      });
++    } catch (e) { exp = { error: String(e && e.message || e) }; }
++  }
++  const anchorAudit = raw ? actualAnchorAudit(raw, result.solveResult) : [];
++  const positiveDebt = anchorAudit.filter(x => x.actualDebt != null && x.actualDebt >= 2);
++  const buffer3 = anchorAudit.filter(x => x.bufferAfter != null && x.bufferAfter >= 3);
++  const rec = {
++    id: arm.id, gatePlan: arm.gatePlan, valid: !!(result && result.valid && raw), error,
++    failReason: result && result.lastFailReason || null,
++    structuralReason: result && result.structural && result.structural.reason || null,
++    board: raw ? raw.board.rows + 'x' + raw.board.cols : null,
++    cars: parsed ? parsed.totalBoxes : null,
++    gate: raw && raw.board && raw.board.gatePlan || null,
++    anchorAudit, positiveDebtAnchors: positiveDebt.length, buffer3Anchors: buffer3.length,
++    quality: q ? {
++      gatePass: !!q.gatePass, gateReasons: q.gateReasons || [],
++      pass: !!q.pass, reasons: q.reasons || [], label: q.label, blackShape: q.blackShape
++    } : null,
++    curve: curve ? {
++      freeLowPct: curve.freeLowPct, freeRunMax: curve.freeRunMax,
++      fullMedian2: curve.fullMedian2, selectMedian: curve.selectMedian,
++      pressurePct3: curve.pressurePct3, pressurePeak: curve.pressurePeak
++    } : null,
++    experience: exp ? {
++      pass: !!exp.pass, curvePass: !!exp.curvePass,
++      metrics: exp.metrics || null, diagnosis: exp.diagnosis || null,
++      releaseDecision: exp.releaseDecision || null
++    } : null,
++    elapsedMs: Date.now() - t0
++  };
++  if (raw) {
++    fs.mkdirSync(LEVEL_DIR, { recursive: true });
++    fs.writeFileSync(path.join(LEVEL_DIR, arm.id + '_' + SEED + '.json'), JSON.stringify(raw, null, 2) + '\n');
++    fs.writeFileSync(path.join(LEVEL_DIR, arm.id + '_' + SEED + '.route.json'),
++      JSON.stringify(result.solveResult && result.solveResult.pickOrder || [], null, 2) + '\n');
++  }
++  console.log('[v578]', arm.id, 'valid=' + rec.valid,
++    'anchors=' + anchorAudit.length,
++    'debt>=2=' + positiveDebt.length,
++    'buffer>=3=' + buffer3.length,
++    'freeLow=' + (curve && curve.freeLowPct),
++    'freeRun=' + (curve && curve.freeRunMax),
++    'maxBuffer=' + (exp && exp.metrics && exp.metrics.maxBuffer),
++    'qGate=' + (q && q.gatePass),
++    'ms=' + rec.elapsedMs);
++  return rec;
++}
++
++const rows = ARMS.map(runArm);
++const report = {
++  schema: 'staggered-anchor-gate-v578', date: '2026-10-27', seed: SEED,
++  input: path.relative(ROOT, INPUT),
++  fixed: { board: '7x7', cars: 49, capRange: [6, 40], black: 0 },
++  arms: rows,
++  summary: {
++    valid: rows.filter(x => x.valid).length,
++    qGate: rows.filter(x => x.quality && x.quality.gatePass).length,
++    experience: rows.filter(x => x.experience && x.experience.pass).length,
++    anchors: rows.map(x => x.anchorAudit.length),
++    actualDebt2: rows.map(x => x.positiveDebtAnchors),
++    buffer3: rows.map(x => x.buffer3Anchors)
++  }
++};
++fs.writeFileSync(OUT, JSON.stringify(report, null, 2) + '\n');
++console.log(JSON.stringify({ out: path.relative(ROOT, OUT), summary: report.summary }, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578_\345\206\263\347\255\226.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578_\345\206\263\347\255\226.md"
+new file mode 100644
+index 0000000..c026571
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578_\345\206\263\347\255\226.md"
+@@ -0,0 +1,33 @@
++# v578 决策：两行交错闸门与实际债务审计
++
++日期：2026-10-27
++
++## 结论
++
++停止“只调锚点位置”这一族。普通车格闸门可以让锚点进入路线，但到实际取车时，同色可达像素已经增加，计划债务无法兑现。
++
++## 结果
++
++| 臂 | 锚点 | 实际债务≥2 | 取车后buffer≥3 | freeLow | 最长免费连 | maxBuffer | qGate |
++|---|---:|---:|---:|---:|---:|---:|---:|
++| A 第1行5锚点 | 5 | 0 | 0 | 90% | 21 | 1 | 否 |
++| B 第1~2行交错6锚点 | 6 | 1 | 0 | 88% | 35 | 1 | 否 |
++
++## 真实债务证据
++
++A的5个锚点到实际取车时：
++
++- 实际可达为74、41、44、39、34；
++- 对应容量为37、40、40、40、34；
++- 实际债务为-37、-1、-4、1、0。
++
++预计算的计划债务曾显示3、33、24、11、28，但独立回放证明这些数字不能作为实际压力证据。
++
++B虽然有1个实际债务2，但没有形成buffer≥3，且最长免费连从21恶化到35。
++
++## 决策
++
++- 不接默认生产；
++- 不再扫描锚点行数、缺口数量等位置参数；
++- 不进入P7或局部交换，因为基础压力仍为far-from-target；
++- 下一方向必须改变供给时序或真实可达状态，不能只改棋盘位置。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578_\351\242\204\347\231\273\350\256\260.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578_\351\242\204\347\231\273\350\256\260.md"
+new file mode 100644
+index 0000000..6064aa1
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\346\243\213\347\233\230\351\224\232\347\202\271\351\227\270\351\227\250_\344\272\244\351\224\231_v578_\351\242\204\347\231\273\350\256\260.md"
+@@ -0,0 +1,58 @@
++# v578 实验预登记：两行交错软锚点与真实债务审计
++
++日期：2026-10-27
++
++## 目标
++
++v577 已证明第1行软闸门可以让5/5锚点进入路线，并把最长免费连从34降到21，但真实压力仍为0。v578只验证两件事：
++
++1. 锚点被实际选中时，当前状态究竟还剩多少可达像素、留下多少真实债务；
++2. 把锚点从单行扩展成两行交错缺口，能否阻止单列免费逃逸。
++
++## 固定项
++
++- 00199，seed1001；
++- 7×7，49车；
++- 容量 `[6,40]`，容量集合与v577完全相同；
++- 黑块、管道、冰、链、问号均为0；
++- 不启用P7、容量精调和局部交换。
++
++## A/B
++
++### A：v577第1行单闸门
++
++锚点格：
++
++```text
++(1,1) (1,2) (1,3) (1,4) (1,5)
++```
++
++### B：两行交错闸门
++
++在A的5辆锚点之外，只增加第2行的1个正债务锚点：
++
++```text
++(1,1) (1,2) (1,3) (1,4) (1,5)
++(2,0)
++```
++
++若正债务锚点不足，按实际可用数量落下，并如实记录。
++
++## 真实债务审计
++
++使用独立回放逐步执行实际解路线。对每个锚点，在 `applyPick` 前记录：
++
++- 当前实际可达像素；
++- 当前车容量；
++- `真实债务 = 容量 - 实际可达像素`；
++- 取车前暂存数量；
++- 取车后暂存数量；
++- 取车步骤与进度。
++
++预计算 `instantEntryReach` 只作对照，不作为真实债务证据。
++
++## 判定
++
++- 任一锚点出现真实债务≥2，且取车后buffer≥3：机制成立；
++- 锚点进入路线但真实债务均<2：位置有效、容量时序无效；
++- B没有比A增加真实债务或压力：两行交错也否决，停止该族。

@@ -4543,16 +4543,27 @@ AntSolver.Generator = (function() {
           var _gateAnchors = _anchorPool.slice(0, _gateAnchorN);
           var _assigned = new Array(order.length);
           var _row0 = [], _gateCells = [], _restCells = [];
+          var _gateTargetSet = null;
+          if (Array.isArray(_gate.cells)) {
+            _gateTargetSet = {};
+            for (var _gt = 0; _gt < _gate.cells.length; _gt++) {
+              var _gcell = _gate.cells[_gt];
+              if (Array.isArray(_gcell) && _gcell.length >= 2) {
+                _gateTargetSet[parseInt(_gcell[0], 10) + ',' + parseInt(_gcell[1], 10)] = 1;
+              }
+            }
+          }
           for (var _gci = 0; _gci < order.length; _gci++) {
-            if (order[_gci][0] === _gateRow) _gateCells.push(_gci);
+            var _gck = order[_gci][0] + ',' + order[_gci][1];
+            if (_gateTargetSet ? !!_gateTargetSet[_gck] : order[_gci][0] === _gateRow) _gateCells.push(_gci);
             else if (order[_gci][0] === 0) _row0.push(_gci);
             else _restCells.push(_gci);
           }
           _gateCells.sort(function (a, b) { return order[a][1] - order[b][1]; });
           var _gapSet = {};
-          var _gaps = Array.isArray(_gate.gapCols) ? _gate.gapCols : [0, cols - 1];
+          var _gaps = _gateTargetSet ? [] : (Array.isArray(_gate.gapCols) ? _gate.gapCols : [0, cols - 1]);
           for (var _gpi = 0; _gpi < _gaps.length; _gpi++) _gapSet[parseInt(_gaps[_gpi], 10)] = 1;
-          var _anchorCells = _gateCells.filter(function (ci) { return !_gapSet[order[ci][1]]; });
+          var _anchorCells = _gateCells.filter(function (ci) { return _gateTargetSet || !_gapSet[order[ci][1]]; });
           var _supplyForRow0 = _supplyPool.slice(0, _gateRow === 0 ? 0 : _row0.length);
           var _si = 0;
           for (var _r0i = 0; _r0i < _row0.length && _si < _supplyForRow0.length; _r0i++, _si++) {
@@ -4587,6 +4598,7 @@ AntSolver.Generator = (function() {
             list = _assigned;
             config._instantGatePlanStat = {
               schema: 'instant-gate-plan-v1', enabled: true, row: _gateRow,
+              cellsMode: !!_gateTargetSet,
               row0Cells: _row0.length, gateCells: _gateCells.length,
               anchorsPlanned: _gateAnchors.length, anchorsPlaced: Math.min(_anchorCells.length, _gateAnchors.length),
               supplyRow0: Math.min(_row0.length, _supplyForRow0.length), gaps: _gaps,
