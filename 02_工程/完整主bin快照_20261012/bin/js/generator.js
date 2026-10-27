@@ -4513,6 +4513,94 @@ AntSolver.Generator = (function() {
       if (_preserveInstantOrder) {
         order = instantPlanCellOrder(cells, rows, cols);
         timing.instantPlanCellOrder = { n: order.length, mode: 'reachable-bfs' };
+        // v577实验：用普通车格组成软闸门。只重排现有车单，不增删车、容量、障碍或管道。
+        var _gate = config && config.capacityMix && config.capacityMix.gatePlan;
+        if (_gate && _gate.enabled) {
+          var _originalList = list;
+          var _gateRow = Math.max(0, Math.min(rows - 1, parseInt(_gate.row, 10) || 0));
+          var _gateAnchorN = Math.max(1, parseInt(_gate.anchorCars, 10) || 5);
+          var _gateAnchorMin = Math.max(1, parseInt(_gate.anchorMinCap, 10) || 32);
+          var _gateDebtMin = Math.max(1, parseInt(_gate.minDebt, 10) || 1);
+          var _gateByCell = {};
+          for (var _goi = 0; _goi < order.length; _goi++) {
+            _gateByCell[order[_goi][0] + ',' + order[_goi][1]] = _goi;
+          }
+          var _supplyPool = [], _anchorPool = [], _used = {};
+          for (var _gli = 0; _gli < list.length; _gli++) {
+            var _gb = list[_gli];
+            if (_gb.instantEntryReach == null) continue;
+            var _gdebt = _gb.count - _gb.instantEntryReach;
+            if (_gdebt <= 0 && _gb.instantEntryReach >= _gb.count) _supplyPool.push({ at: _gli, debt: _gdebt });
+            if (_gb.count >= _gateAnchorMin && _gdebt >= _gateDebtMin) _anchorPool.push({ at: _gli, debt: _gdebt });
+          }
+          _supplyPool.sort(function (a, b) {
+            return list[b.at].instantEntryReach - list[a.at].instantEntryReach ||
+              list[b.at].count - list[a.at].count || a.at - b.at;
+          });
+          _anchorPool.sort(function (a, b) {
+            return a.debt - b.debt || list[b.at].count - list[a.at].count || a.at - b.at;
+          });
+          var _gateAnchors = _anchorPool.slice(0, _gateAnchorN);
+          var _assigned = new Array(order.length);
+          var _row0 = [], _gateCells = [], _restCells = [];
+          for (var _gci = 0; _gci < order.length; _gci++) {
+            if (order[_gci][0] === _gateRow) _gateCells.push(_gci);
+            else if (order[_gci][0] === 0) _row0.push(_gci);
+            else _restCells.push(_gci);
+          }
+          _gateCells.sort(function (a, b) { return order[a][1] - order[b][1]; });
+          var _gapSet = {};
+          var _gaps = Array.isArray(_gate.gapCols) ? _gate.gapCols : [0, cols - 1];
+          for (var _gpi = 0; _gpi < _gaps.length; _gpi++) _gapSet[parseInt(_gaps[_gpi], 10)] = 1;
+          var _anchorCells = _gateCells.filter(function (ci) { return !_gapSet[order[ci][1]]; });
+          var _supplyForRow0 = _supplyPool.slice(0, _gateRow === 0 ? 0 : _row0.length);
+          var _si = 0;
+          for (var _r0i = 0; _r0i < _row0.length && _si < _supplyForRow0.length; _r0i++, _si++) {
+            _assigned[_row0[_r0i]] = list[_supplyForRow0[_si].at];
+            _used[_supplyForRow0[_si].at] = 1;
+          }
+          var _ai = 0;
+          var _placedGateAnchors = [];
+          for (var _aci = 0; _aci < _anchorCells.length && _ai < _gateAnchors.length; _aci++, _ai++) {
+            _assigned[_anchorCells[_aci]] = list[_gateAnchors[_ai].at];
+            _used[_gateAnchors[_ai].at] = 1;
+            _placedGateAnchors.push({
+              r: order[_anchorCells[_aci]][0], c: order[_anchorCells[_aci]][1],
+              id: list[_gateAnchors[_ai].at] && list[_gateAnchors[_ai].at].instantEnterOrder,
+              color: list[_gateAnchors[_ai].at] && list[_gateAnchors[_ai].at].color,
+              cap: list[_gateAnchors[_ai].at] && list[_gateAnchors[_ai].at].count,
+              reach: list[_gateAnchors[_ai].at] && list[_gateAnchors[_ai].at].instantEntryReach,
+              debt: _gateAnchors[_ai].debt
+            });
+          }
+          var _restList = [];
+          for (var _rli = 0; _rli < list.length; _rli++) if (!_used[_rli]) _restList.push(list[_rli]);
+          var _ri = 0;
+          var _allCellOrder = _row0.concat(_gateCells, _restCells);
+          for (var _aoi = 0; _aoi < _allCellOrder.length; _aoi++) {
+            var _idx = _allCellOrder[_aoi];
+            if (!_assigned[_idx]) _assigned[_idx] = _restList[_ri++];
+          }
+          var _missing = 0;
+          for (var _ami = 0; _ami < _assigned.length; _ami++) if (!_assigned[_ami]) _missing++;
+          if (!_missing) {
+            list = _assigned;
+            config._instantGatePlanStat = {
+              schema: 'instant-gate-plan-v1', enabled: true, row: _gateRow,
+              row0Cells: _row0.length, gateCells: _gateCells.length,
+              anchorsPlanned: _gateAnchors.length, anchorsPlaced: Math.min(_anchorCells.length, _gateAnchors.length),
+              supplyRow0: Math.min(_row0.length, _supplyForRow0.length), gaps: _gaps,
+              anchors: _placedGateAnchors,
+              anchorCandidates: _anchorPool.map(function (x) {
+                return { id: _originalList[x.at] && _originalList[x.at].instantEnterOrder, color: _originalList[x.at] && _originalList[x.at].color,
+                  cap: _originalList[x.at] && _originalList[x.at].count, reach: _originalList[x.at] && _originalList[x.at].instantEntryReach, debt: x.debt };
+              })
+            };
+            timing.instantGatePlan = config._instantGatePlanStat;
+          } else {
+            timing.instantGatePlan = { skipped: 'assignment_incomplete', missing: _missing };
+          }
+        }
       }
       // ===== 【v297·用户设计B】依赖层铺盘（`depFill`，默认关） =====
       // 用户 2026-10-20：「把依赖层用在铺盘上——第 L 层的格子只放 L_min ≤ L 的车，
@@ -6480,6 +6568,7 @@ AntSolver.Generator = (function() {
     board.spaceQuota = struct.spaceQuota || null;
     board.blackStat = struct.blackStat || null;
     board.surplusStat = struct.surplusStat || null;
+    board.gatePlan = config._instantGatePlanStat || null;
     // 管道落位与兜底状态（ANT-GEN-PIPE-DEPTH-FALLBACK-20260825）：want/placed/capacityPerPipe
     // 以及 fallback* 标记。兜底是行为变更，必须可观测——否则"管道为什么只有 2 条"无从追溯。
     board.pipeStat = struct.pipeStat || null;
