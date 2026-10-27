@@ -5041,7 +5041,17 @@ AntSolver.Generator = (function() {
     try { bindStat.repairInflate = _preserveInstantOrder ? null : repairInflate(cells, rows, cols, config); } catch (e) { bindStat.repairInflate = null; }
     try { bindStat.row0Diversify = _preserveInstantOrder ? null : diversifyRow0(cells, rows, cols, config); } catch (e) { bindStat.row0Diversify = null; }
     // 【v277】锁链按"大色块 × 小色块"配对（铺完之后才做，因为要看真实的颜色/容量）
-    try { bindStat.chainByDemand = _preserveInstantOrder ? null : pairChainsByDemand(cells, rows, cols, config); } catch (e) { bindStat.chainByDemand = null; }
+    try {
+      var _chainThickenTarget = parseInt(config && config.chainThickenTarget, 10) || 0;
+      bindStat.chainByDemand = (_preserveInstantOrder && _chainThickenTarget <= 0)
+        ? null : pairChainsByDemand(cells, rows, cols, config);
+    } catch (e) { bindStat.chainByDemand = null; }
+    if (config.obstacleThicken) {
+      try { bindStat.chainThicken = thickenSmallCarChains(cells, rows, cols, config); }
+      catch (e) { bindStat.chainThicken = { error: String(e && e.message || e) }; }
+      try { bindStat.iceThicken = thickenIceCells(cells, rows, cols, config); }
+      catch (e) { bindStat.iceThicken = { error: String(e && e.message || e) }; }
+    }
     enforceTopObstacleCap(cells, rows, cols, config);
     var afterTop = { ice: 0, q: 0, chain: 0, black: 0 };
     for (var tr2 = 0; tr2 < Math.min(2, rows); tr2++) for (var tc2 = 0; tc2 < cols; tc2++) {
@@ -7356,6 +7366,33 @@ AntSolver.Generator = (function() {
         } catch (eCm) {
           out.capacityMixPlan = { schema: 'capacity-mix-production-v1', enabled: true,
             error: String(eCm && eCm.message || eCm) };
+        }
+      }
+      // 【v615·实验证据】障碍加厚后的实际冰/锁链统计，以及小容量锁链组数。
+      if (config.obstacleThicken) {
+        try {
+          var _otIce = 0, _otGroups = {}, _otSmallGroups = {};
+          var _otCells = out.level && out.level.board && out.level.board.cells || [];
+          for (var _otr = 0; _otr < _otCells.length; _otr++) {
+            for (var _otc = 0; _otc < _otCells[_otr].length; _otc++) {
+              var _otx = _otCells[_otr][_otc];
+              if (!_otx || _otx.t !== 'box') continue;
+              if (_otx.numice > 0) _otIce++;
+              if (_otx.chain > 0) {
+                _otGroups[_otx.chain] = 1;
+                if (_otx.count <= config.chainSmallMax) _otSmallGroups[_otx.chain] = 1;
+              }
+            }
+          }
+          out.obstacleThicken = Object.assign({}, config.obstacleThicken, {
+            actualIce: _otIce,
+            actualChains: Object.keys(_otGroups).length,
+            smallCarChains: Object.keys(_otSmallGroups).length
+          });
+        } catch (eOt) {
+          out.obstacleThicken = Object.assign({}, config.obstacleThicken, {
+            error: String(eOt && eOt.message || eOt)
+          });
         }
       }
       // 【v613·实验】路线障碍规划器：默认关闭；只对最终候选追加链/冰，
@@ -10231,6 +10268,9 @@ AntSolver.Generator = (function() {
     var dc = config && config._demandCurve;
     if (!config || !config.iceSchedule || !dc || !dc.startExposed) return { count:0, debug:'missing', hasCfg:!!(config&&config.iceSchedule), hasDc:!!dc, hasSE:!!(dc&&dc.startExposed) };
     var N = Math.max(1, Math.min(8, parseInt(config.iceScheduleCount, 10) || 3));
+    // v615：障碍加厚模式允许一次放 9~20 个冰，但仍保留上限，避免配置失控。
+    if (config.obstacleThicken) N = Math.max(1, Math.min(20, parseInt(config.iceScheduleCount, 10) || N));
+    var iceMinRow = Math.max(0, parseInt(config.iceMinRow, 10) || 0);
     var _instantSchedule = !!(config.instantChain || config.ruleMode === 'instantChain');
     if (_instantSchedule && config.instantIceMax != null) {
       N = Math.min(N, Math.max(1, parseInt(config.instantIceMax, 10) || 1));
@@ -10289,6 +10329,7 @@ AntSolver.Generator = (function() {
     if (config.iceByReadyTime) {
       var _rt = [];
       for (var _rr2 = 0; _rr2 < rows; _rr2++) for (var _rc2 = 0; _rc2 < cols; _rc2++) {
+        if (_rr2 < iceMinRow) continue;
         var _rb = cells[_rr2][_rc2];
         if (!_rb || _rb.t !== 'box' || _rb.numice > 0 || _rb.chain > 0 || _rb.q) continue;
         var _need2 = 1;
@@ -10511,6 +10552,122 @@ AntSolver.Generator = (function() {
     return { frozen: frozen, count: frozen.length, band: [bandLo, bandHi] };
   }
 
+  /**
+   * v615：加厚冰。readyTime 模式找不到足够“有时差”的颜色时，从第2行起
+   * 按棋盘进度均匀补齐到目标数量。只增加可消冰的厚度，不改车、颜色和容量。
+   */
+  function thickenIceCells(cells, rows, cols, config) {
+    var target = Math.max(0, Math.min(20, parseInt(config && config.iceScheduleCount, 10) || 0));
+    if (!(target > 0)) return { target: target, before: 0, added: 0, actual: 0 };
+    var minRow = Math.max(0, parseInt(config && config.iceMinRow, 10) || 0);
+    var iced = {}, count = 0, cand = [];
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      var b = cells[r][c];
+      if (!b || b.t !== 'box') continue;
+      if (b.numice > 0) {
+        count++;
+        iced[b.color] = 1;
+        continue;
+      }
+      if (r < minRow || b.chain > 0 || b.q) continue;
+      cand.push({ r: r, c: c, cell: b, seq: b._seq != null ? b._seq : (r * cols + c) });
+    }
+    var before = count;
+    cand.sort(function (a, b) { return a.seq - b.seq; });
+    var need = Math.max(0, target - count);
+    var added = [];
+    for (var i = 0; i < need && cand.length; i++) {
+      var idx = Math.min(cand.length - 1, Math.floor((i + 0.5) / Math.max(1, need) * cand.length));
+      var pick = null;
+      for (var scan = 0; scan < cand.length; scan++) {
+        var ii = idx + scan;
+        if (ii >= cand.length) ii = idx - scan;
+        if (ii < 0 || ii >= cand.length) continue;
+        var x = cand[ii];
+        if (iced[x.cell.color]) continue;
+        pick = x; break;
+      }
+      if (!pick) pick = cand[Math.min(cand.length - 1, idx)];
+      cand.splice(cand.indexOf(pick), 1);
+      var prog = (rows * cols) > 1 ? ((pick.r * cols + pick.c) / (rows * cols - 1)) : 0;
+      pick.cell.numice = Math.max(4, Math.min(12, Math.round(prog * 8) + 4));
+      iced[pick.cell.color] = 1;
+      added.push({ r: pick.r, c: pick.c, color: pick.cell.color, count: pick.cell.count,
+        numice: pick.cell.numice, source: 'thickenFallback' });
+      count++;
+    }
+    return { target: target, before: before, added: added.length, actual: count, cells: added };
+  }
+
+  /**
+   * v615：自然需求配对不足时，继续补“至少一头是小容量车”的相邻锁链。
+   * 这只是厚度补位，最终仍由完整求解、PlayerSim 和体验门决定是否交付。
+   */
+  function thickenSmallCarChains(cells, rows, cols, config) {
+    var target = Math.max(0, Math.min(8, parseInt(config && config.chainThickenTarget, 10) || 0));
+    if (!(target > 0)) return { target: target, before: 0, added: 0, actual: 0 };
+    var minRow = Math.max(0, parseInt(config && config.chainMinRow, 10) || 0);
+    var smallMax = Math.max(1, parseInt(config && config.chainSmallMax, 10) || 18);
+    var groups = {}, maxId = 0;
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      var b = cells[r][c];
+      if (!b || b.t !== 'box' || !(b.chain > 0)) continue;
+      groups[b.chain] = 1;
+      if (b.chain > maxId) maxId = b.chain;
+    }
+    var before = Object.keys(groups).length;
+    var need = Math.max(0, target - before);
+    if (!need) return { target: target, before: before, added: 0, actual: before };
+    var cands = [], bands = [[], [], []];
+    function plain(x) { return x && x.t === 'box' && !(x.numice > 0) && !(x.chain > 0) && !x.q; }
+    for (var rr = Math.max(0, minRow); rr < rows; rr++) {
+      for (var cc = 0; cc < cols; cc++) {
+        var a = cells[rr][cc];
+        if (!plain(a)) continue;
+        var pairDirs = [[0, 1], [1, 0]];
+        for (var pd = 0; pd < pairDirs.length; pd++) {
+          var nr = rr + pairDirs[pd][0], nc = cc + pairDirs[pd][1];
+          if (nr >= rows || nc >= cols) continue;
+          var b2 = cells[nr][nc];
+          if (!plain(b2)) continue;
+          var smallCount = (a.count <= smallMax ? 1 : 0) + (b2.count <= smallMax ? 1 : 0);
+          if (smallCount < 1) continue;
+          var seq = ((a._seq != null ? a._seq : rr * cols + cc) +
+                     (b2._seq != null ? b2._seq : nr * cols + nc)) / 2;
+          var band = Math.min(2, Math.max(0, Math.floor(seq / Math.max(1, rows * cols) * 3)));
+          cands.push({ a: { r: rr, c: cc }, b: { r: nr, c: nc }, smallCount: smallCount,
+            minCap: Math.min(a.count, b2.count), sumCap: a.count + b2.count, band: band });
+        }
+      }
+    }
+    cands.sort(function (x, y) {
+      return (y.smallCount - x.smallCount) || (x.minCap - y.minCap) || (x.sumCap - y.sumCap);
+    });
+    for (var ci = 0; ci < cands.length; ci++) bands[cands[ci].band].push(cands[ci]);
+    var added = [], gid = maxId + 1;
+    for (var pass = 0; pass < 12 && added.length < need; pass++) {
+      var progressed = false;
+      for (var band = 0; band < 3 && added.length < need; band++) {
+        while (bands[band].length) {
+          var q = bands[band].shift();
+          progressed = true;
+          var members = [q.a, q.b];
+          if (!config.chainAllowAdjacent && typeof chainGroupConflict === 'function' &&
+              chainGroupConflict(cells, rows, cols, members, gid)) continue;
+          if (typeof chainActivatable === 'function' && !chainActivatable(cells, rows, cols, members)) continue;
+          cells[q.a.r][q.a.c].chain = gid;
+          cells[q.b.r][q.b.c].chain = gid;
+          added.push({ group: gid, members: members, minCap: q.minCap, band: band, source: 'smallFallback' });
+          gid++;
+          break;
+        }
+      }
+      if (!progressed) break;
+    }
+    return { target: target, before: before, added: added.length, actual: before + added.length,
+      smallMax: smallMax, groups: added };
+  }
+
 
   /**
    * 【v260·修正版】闸门借车必须在**铺完盘之后**做。
@@ -10578,23 +10735,39 @@ AntSolver.Generator = (function() {
    *        两格都要在 25%~85% 进度带内（避免开局/收尾），不与冰/问号/已有链重叠。
    */
   function pairChainsByDemand(cells, rows, cols, config) {
-    var K = Math.max(0, Math.min(6, parseInt(config && config.chainByDemand, 10) || 0));
+    var K = Math.max(0, Math.min(8,
+      parseInt(config && config.chainThickenTarget, 10) ||
+      parseInt(config && config.chainByDemand, 10) || 0));
     if (K <= 0) return null;
     var dc = config._demandCurve;
     if (!dc || !dc.curve) return null;
     var lo = (config.chainBandLo != null) ? +config.chainBandLo : 0.25;
     var hi = (config.chainBandHi != null) ? +config.chainBandHi : 0.85;
+    var minRow = Math.max(0, parseInt(config.chainMinRow, 10) || 0);
+    var requireSmall = !!config.chainRequireSmall;
+    var preferSmall = !!config.chainPreferSmall;
+    var smallMax = Math.max(1, parseInt(config.chainSmallMax, 10) || 18);
     var boxes = [];
+    var existingGroups = {};
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
       var b = cells[r][c];
       if (!b || b.t !== 'box') continue;
-      if (b.chain > 0 || b.question) continue;
+      if (b.chain > 0) { existingGroups[b.chain] = 1; continue; }
+      if (b.q || (config.obstacleThicken && b.numice > 0)) continue;
       var need = -1;
       try { need = demandAt(dc, b.color, b.count); } catch (e) { need = -1; }
       if (!(need >= 0)) continue;
       var seq = (b._seq != null) ? b._seq : (r * cols + c);
       boxes.push({ r: r, c: c, cell: b, need: need, seq: seq });
     }
+    var existingCount = Object.keys(existingGroups).length;
+    var gid = config._chainGroupSeed || 1;
+    for (var eg in existingGroups) {
+      var egid = parseInt(eg, 10) || 0;
+      if (egid >= gid) gid = egid + 1;
+    }
+    if (Number(config.chainThickenTarget) > 0) K = Math.max(0, K - existingCount);
+    if (K <= 0) return { groups: 0, existing: existingCount, why: 'target-met' };
     if (boxes.length < 4) return null;
     var total = boxes.length;
     var byKey = {};
@@ -10603,19 +10776,25 @@ AntSolver.Generator = (function() {
     var cands = [];
     for (var j = 0; j < boxes.length; j++) {
       var a = boxes[j];
+      if (a.r < minRow) continue;
       var pa = progOf(a);
       if (pa < lo || pa > hi) continue;
       var nbs = [[a.r, a.c + 1], [a.r + 1, a.c]];
       for (var d = 0; d < 2; d++) {
         var nb = byKey[nbs[d][0] + ',' + nbs[d][1]];
         if (!nb) continue;
+        if (nb.r < minRow) continue;
         var pb = progOf(nb);
         if (pb < lo || pb > hi) continue;
+        var smallCount = (a.cell.count <= smallMax ? 1 : 0) + (nb.cell.count <= smallMax ? 1 : 0);
+        if (requireSmall && smallCount < 1) continue;
         var gap = Math.abs(a.need - nb.need);
         if (gap < 0.25) continue;
         var low = Math.min(a.need, nb.need), high = Math.max(a.need, nb.need);
         if (!(low <= 0.45 && high >= 0.55)) continue;
-        cands.push({ a: a, b: nb, gap: gap, low: low, high: high });
+        cands.push({ a: a, b: nb, gap: gap, low: low, high: high, smallCount: smallCount,
+          minCap: Math.min(a.cell.count, nb.cell.count),
+          band: Math.min(2, Math.floor(((pa + pb) / 2) * 3)) });
       }
     }
     // 【v278·用户批准】自然配对凑不够时**主动凑对**：
@@ -10689,23 +10868,46 @@ AntSolver.Generator = (function() {
       }
       return { groups: 0, why: 'noPair', boxes: boxes.length };
     }
-    cands.sort(function (x, y) { return y.gap - x.gap; });
+    cands.sort(function (x, y) {
+      return (preferSmall ? (y.smallCount - x.smallCount) || (x.minCap - y.minCap) : 0) ||
+        (y.gap - x.gap);
+    });
     var used = {}, groups = [];
-    var gid = (config._chainGroupSeed || 1);
-    for (var q = 0; q < cands.length && groups.length < K; q++) {
-      var cd2 = cands[q];
+    function tryAdd(cd2) {
       var k1 = cd2.a.r + ',' + cd2.a.c, k2 = cd2.b.r + ',' + cd2.b.c;
-      if (used[k1] || used[k2]) continue;
+      if (used[k1] || used[k2]) return false;
       var members = [{ r: cd2.a.r, c: cd2.a.c }, { r: cd2.b.r, c: cd2.b.c }];
-      if (typeof chainActivatable === 'function' && !chainActivatable(cells, rows, cols, members)) continue;
+      if (!config.chainAllowAdjacent && typeof chainGroupConflict === 'function' &&
+          chainGroupConflict(cells, rows, cols, members, gid)) return false;
+      if (typeof chainActivatable === 'function' && !chainActivatable(cells, rows, cols, members)) return false;
       used[k1] = 1; used[k2] = 1;
       var g = gid++;
       cells[cd2.a.r][cd2.a.c].chain = g;
       cells[cd2.b.r][cd2.b.c].chain = g;
       groups.push({ group: g, low: +cd2.low.toFixed(2), high: +cd2.high.toFixed(2), gap: +cd2.gap.toFixed(2),
-                    members: members });
+                    smallCount: cd2.smallCount, minCap: cd2.minCap, band: cd2.band, members: members });
+      return true;
     }
-    return { groups: groups.length, items: groups, cands: cands.length };
+    if (preferSmall) {
+      // 三个进度带轮转取点，避免新增锁链全挤在同一段。
+      var bandQueues = [[], [], []];
+      for (var cq = 0; cq < cands.length; cq++) bandQueues[cands[cq].band].push(cands[cq]);
+      for (var pass = 0; pass < 16 && groups.length < K; pass++) {
+        var progressed = false;
+        for (var band = 0; band < 3 && groups.length < K; band++) {
+          while (bandQueues[band].length) {
+            var cd2 = bandQueues[band].shift();
+            progressed = true;
+            if (tryAdd(cd2)) break;
+          }
+        }
+        if (!progressed) break;
+      }
+    } else {
+      for (var q = 0; q < cands.length && groups.length < K; q++) tryAdd(cands[q]);
+    }
+    return { groups: groups.length, existing: existingCount, items: groups, cands: cands.length,
+      requireSmall: requireSmall, smallMax: smallMax };
   }
 
   /**

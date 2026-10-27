@@ -17,8 +17,9 @@ const SEEDS = String(process.env.SEEDS || '1001,1002')
 const ROUND_MS = Math.max(5000, Number(process.env.ROUND_MS || 20000));
 const ROUNDS = Math.max(1, Number(process.env.ROUNDS || 2));
 const ARMS = process.env.ARMS === 'both' ? 'both' : (process.env.ARMS === 'control' ? 'control' : 'mix');
-const OUT = path.join(__dirname, '容量混合生产接入_v614.json');
-const LEVEL_DIR = path.join(__dirname, '容量混合生产接入_v614.levels');
+const THICKEN = process.env.THICKEN === '1';
+const OUT = path.join(__dirname, THICKEN ? '障碍加厚_v615_' + IMAGE_LABEL + '.json' : '容量混合生产接入_v614.json');
+const LEVEL_DIR = path.join(__dirname, THICKEN ? '障碍加厚_v615.levels' : '容量混合生产接入_v614.levels');
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
@@ -169,6 +170,26 @@ function configFor(blocks, seed, mix) {
       capacityRange: [6, 40], rows: 7, cols: 7, cells: 49,
       blackCells: 0, targetCars: 49
     };
+    if (THICKEN) {
+      Object.assign(base, {
+        obstacleThicken: {
+          schema: 'obstacle-thicken-v1', iceTarget: 12, chainTarget: 6,
+          chainSmallMax: 18, iceMinRow: 2
+        },
+        iceSchedule: true,
+        iceByReadyTime: true,
+        iceReadyBuckets: 4,
+        iceReadyPerBucket: 3,
+        iceScheduleCount: 12,
+        iceMinRow: 2,
+        chainThickenTarget: 6,
+        chainPreferSmall: true,
+        chainRequireSmall: true,
+        chainSmallMax: 18,
+        chainMinRow: 2,
+        chainAllowAdjacent: true
+      });
+    }
   }
   return base;
 }
@@ -215,7 +236,7 @@ function runOne(seed, mix) {
   const exp = result && result._experienceFull || null;
   const black = raw ? boardStats(raw) : null;
   const rec = {
-    arm: mix ? 'mix7' : 'control',
+    arm: mix ? (THICKEN ? 'mix7-thick' : 'mix7') : 'control',
     seed,
     mix,
     valid: !!(result && result.valid && raw),
@@ -236,6 +257,7 @@ function runOne(seed, mix) {
       releaseDecision: exp.releaseDecision || null
     } : null,
     capacityMixPlan: result && result.capacityMixPlan || null,
+    obstacleThicken: result && result.obstacleThicken || null,
     capacityAudit: raw ? A.Quality.capacityEvidence(parsed, cfg) : null,
     levelHash: raw ? hash(raw) : null,
     wallMs: Date.now() - t0

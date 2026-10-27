@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "614";
+var APP_BUILD = "615";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -4894,6 +4894,13 @@ AntSolver.App = (function() {
     if (_capacityMixMin < 2) _capacityMixMin = 2;
     if (_capacityMixMax > 80) _capacityMixMax = 80;
     if (_capacityMixMax < _capacityMixMin) _capacityMixMax = _capacityMixMin;
+    var _obstacleThicken = !!((document.getElementById('gen-obstacle-thicken') || {}).checked);
+    var _iceTarget = parseInt((document.getElementById('gen-ice-target') || {}).value, 10) || 12;
+    var _chainTarget = parseInt((document.getElementById('gen-chain-target') || {}).value, 10) || 6;
+    var _chainSmallMax = parseInt((document.getElementById('gen-chain-small-max') || {}).value, 10) || 18;
+    _iceTarget = Math.max(3, Math.min(20, _iceTarget));
+    _chainTarget = Math.max(1, Math.min(8, _chainTarget));
+    _chainSmallMax = Math.max(6, Math.min(40, _chainSmallMax));
     var _searchPlan = (function () {
       var el = document.getElementById('gen-search-min');
       var m = parseInt(el && el.value, 10);
@@ -5337,6 +5344,36 @@ AntSolver.App = (function() {
       } catch (e) {}
     } else if (_capacityMix) {
       try { genLog('混合容量填盘未启用：' + (_capacityMixBoardError || '无法选盘'), 'gen-log-warn'); } catch (e) {}
+    }
+    // 【v615·实验】在最终铺车后加厚障碍。数字冰避开前两行，避免被顶部密度上限削掉；
+    // 锁链由 pairChainsByDemand 补齐到目标总组数，并要求至少一头是小容量车。
+    if (_obstacleThicken) {
+      Object.assign(out, {
+        obstacleThicken: {
+          schema: 'obstacle-thicken-v1',
+          iceTarget: _iceTarget,
+          chainTarget: _chainTarget,
+          chainSmallMax: _chainSmallMax,
+          iceMinRow: 2
+        },
+        iceSchedule: true,
+        iceByReadyTime: true,
+        iceReadyBuckets: 4,
+        iceReadyPerBucket: Math.max(1, Math.ceil(_iceTarget / 4)),
+        iceScheduleCount: _iceTarget,
+        iceMinRow: 2,
+        iceBandMode: true,
+        chainThickenTarget: _chainTarget,
+        chainPreferSmall: true,
+        chainRequireSmall: true,
+        chainSmallMax: _chainSmallMax,
+        chainMinRow: 2,
+        chainAllowAdjacent: true
+      });
+      try {
+        genLog('障碍加厚：目标冰 ' + _iceTarget + ' 个（第2行起）· 锁链补到 ' + _chainTarget +
+          ' 组 · 每组至少一辆≤' + _chainSmallMax + 'px 小车', 'gen-log-ok');
+      } catch (e) {}
     }
     try {
       genLog('切法策略 ' + _cutPolicy + '：' + (_cutMode === 'exposeCut' ? '暴露序+行优先' : '按依赖层') +
@@ -6026,6 +6063,14 @@ AntSolver.App = (function() {
           (rec.capacityMixPlan.capMin != null ? rec.capacityMixPlan.capMin : '?') + '~' +
           (rec.capacityMixPlan.capMax != null ? rec.capacityMixPlan.capMax : '?'))
         : '未开') +
+      row('障碍加厚实验', rec.obstacleThicken
+        ? ('冰 ' + (rec.obstacleThicken.actualIce != null ? rec.obstacleThicken.actualIce : '?') +
+          '/' + rec.obstacleThicken.iceTarget + ' · 锁链 ' +
+          (rec.obstacleThicken.actualChains != null ? rec.obstacleThicken.actualChains : '?') +
+          '/' + rec.obstacleThicken.chainTarget + ' 组 · 小链 ' +
+          (rec.obstacleThicken.smallCarChains != null ? rec.obstacleThicken.smallCarChains : '?') +
+          ' 组（阈值≤' + rec.obstacleThicken.chainSmallMax + '）')
+        : '未开') +
       row('P7修复', rec.p7 ? ('试' + (rec.p7.tried || 0) + ' / 收' + (rec.p7.accepted || 0) +
         '　' + (rec.p7.ms != null ? (rec.p7.ms + 'ms') : '') + '　J ' + (rec.p7.fromJ == null ? '-' : rec.p7.fromJ) + '→' + (rec.p7.toJ == null ? '-' : rec.p7.toJ) +
         '　free ' + (rec.p7.fromFreePct == null ? '-' : rec.p7.fromFreePct) + '→' + (rec.p7.toFreePct == null ? '-' : rec.p7.toFreePct) +
@@ -6438,7 +6483,8 @@ AntSolver.App = (function() {
         localSwapRepair: result.localSwapRepair || null,
         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime,
         capacityMix: result.config.capacityMix || null,
-        capacityMixBoard: result.config._capacityMixBoardPlan || null
+        capacityMixBoard: result.config._capacityMixBoardPlan || null,
+        obstacleThicken: result.config.obstacleThicken || null
       } : null,
       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
       cutInfo: (result.config && result.config._cutAuto) || null,
@@ -6482,6 +6528,20 @@ AntSolver.App = (function() {
       trapPost: result.trapPost || null,
       routeObstaclePlan: result.routeObstaclePlan || null,
       capacityMixPlan: result.capacityMixPlan || null,
+      obstacleThicken: (function () {
+        var req = (result.config && result.config.obstacleThicken) || result.obstacleThicken || null;
+        if (!req) return null;
+        var st = result.actualObstacleStat || {};
+        var groups = st.chainGroups || [];
+        var small = groups.filter(function (g) {
+          return (g.members || []).some(function (m) { return m.count <= req.chainSmallMax; });
+        }).length;
+        return Object.assign({}, req, {
+          actualIce: st.iceCount != null ? st.iceCount : (req.actualIce != null ? req.actualIce : null),
+          actualChains: st.chainGroupCount != null ? st.chainGroupCount : (req.actualChains != null ? req.actualChains : null),
+          smallCarChains: groups.length ? small : (req.smallCarChains != null ? req.smallCarChains : null)
+        });
+      })(),
       p7: result.p7 || null, a3d: result.a3d || null, readyStats: result.readyStats || null,
       playerPassPct: (_ps.playerPassPct != null ? _ps.playerPassPct : null),
       learnedPassPct: (_ps.learnedPassPct != null ? _ps.learnedPassPct : null),
