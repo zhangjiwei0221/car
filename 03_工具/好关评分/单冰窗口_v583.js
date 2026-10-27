@@ -9,10 +9,10 @@ const vm = require('vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
 const BASE_LEVEL = path.join(__dirname, '真实债务单锚点_v580.levels', 'v4_25_22_6_2.json');
-const OUT = path.join(__dirname, '单冰窗口_v583.json');
-const LEVEL_DIR = path.join(__dirname, '单冰窗口_v583.levels');
+const ICE_VALUE = Number(process.env.ICE_VALUE || 29);
+const OUT = path.join(__dirname, ICE_VALUE === 29 ? '单冰窗口_v583.json' : '单冰时长_v584_' + ICE_VALUE + '.json');
+const LEVEL_DIR = path.join(__dirname, ICE_VALUE === 29 ? '单冰窗口_v583.levels' : '单冰时长_v584.levels');
 const ICE_CELL = { r: 4, c: 3 };
-const ICE_VALUE = 29;
 const TARGETS = [{ r: 3, c: 6 }, { r: 5, c: 2 }];
 const FILES = [
   'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
