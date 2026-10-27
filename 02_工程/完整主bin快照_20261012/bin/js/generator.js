@@ -13275,6 +13275,21 @@ AntSolver.Generator = (function() {
     }
     // 【v526】瞬时模式优先使用真实车辆playout；四边/底部模式完全不进入此分支。
     if (config && config.ruleMode === 'instantChain' && AntSolver.InstantPlayout) {
+      // v576 实验：棋盘优先。显式 capacityMix 时先用目标盘面格数反推目标车数，
+      // 再让 InstantPlayout 按混合容量精确拆分。默认不设置该开关，行为不变。
+      if (config.capacityMix && config.capacityMix.enabled) {
+        var _cmRows = parseInt(config.capacityMix.rows || config.boardRowsMin, 10) || 0;
+        var _cmCols = parseInt(config.capacityMix.cols || config.boardColsMin, 10) || 0;
+        var _cmBlack = Math.max(0, parseInt(config.capacityMix.blackCells, 10) || 0);
+        if (_cmRows > 0 && _cmCols > 0) {
+          config.targetCarCount = Math.max(1, _cmRows * _cmCols - _cmBlack);
+          config._capacityMixBoardPlan = {
+            schema: 'capacity-mix-board-plan-v1',
+            rows: _cmRows, cols: _cmCols, cells: _cmRows * _cmCols,
+            blackCells: _cmBlack, targetCars: config.targetCarCount
+          };
+        }
+      }
       var _ip = AntSolver.InstantPlayout.plan({ blocks: blocks, bufferLimit: config.bufferLimit }, config);
       config._instantPlayoutStat = _ip && _ip.boxes && _ip.boxes._instantPlayout || null;
       if (_ip && _ip.ok && _ip.boxes && _ip.boxes.length) {

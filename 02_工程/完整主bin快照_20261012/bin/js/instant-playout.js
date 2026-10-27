@@ -49,7 +49,58 @@ AntSolver.InstantPlayout = (function () {
     return { total: total, caps: caps, exact: exact, reason: reason, average: total / n, cars: n,
       minCars: minCars, maxCars: maxCars, targetCars: n };
   }
-  function buildCapacityQueues(blocks, rows, cols, minCap, maxCap, targetCars) {
+
+  /**
+   * v576 实验：长尾容量拆分。
+   * 优先保留少量 maxCap 锚点车，其余车辆落入 [minCap, smallMax]。
+   * 找不到精确的“锚点 + 小车”组合时，退回现有区间内均衡拆分。
+   */
+  function mixedCapacityPlanForColor(total, minCap, maxCap, targetCars, opts) {
+    var n = Math.max(1, parseInt(targetCars, 10) || 1);
+    var smallMax = Math.max(minCap, Math.min(maxCap, (opts && opts.smallMax) || 18));
+    var anchorRatio = (opts && opts.anchorRatio != null) ? +opts.anchorRatio : 0.3;
+    var queueOrder = (opts && opts.queueOrder === 'asc') ? 'asc' : 'desc';
+    if (!(anchorRatio >= 0 && anchorRatio <= 1)) anchorRatio = 0.3;
+    var best = null;
+    for (var anchors = 0; anchors <= n; anchors++) {
+      var smalls = n - anchors, rest = total - anchors * maxCap;
+      if (smalls === 0) {
+        if (rest !== 0) continue;
+      } else if (!(rest >= smalls * minCap && rest <= smalls * smallMax)) {
+        continue;
+      }
+      var score = Math.abs(anchors / n - anchorRatio);
+      if (!best || score < best.score || (score === best.score && smalls > best.smalls)) {
+        best = { anchors: anchors, smalls: smalls, rest: rest, score: score };
+      }
+    }
+    if (!best) {
+      var fallback = capacityPlanForColor(total, minCap, maxCap, n);
+      fallback.mix = { mode: 'balanced-fallback', smallMax: smallMax, anchorRatio: anchorRatio };
+      return fallback;
+    }
+    var caps = [];
+    for (var ai = 0; ai < best.anchors; ai++) caps.push(maxCap);
+    if (best.smalls > 0) {
+      var base = Math.floor(best.rest / best.smalls), rem = best.rest - base * best.smalls;
+      for (var si = 0; si < best.smalls; si++) caps.push(base + (si < rem ? 1 : 0));
+    }
+    caps.sort(queueOrder === 'asc'
+      ? function (a, b) { return a - b; }
+      : function (a, b) { return b - a; });
+    var exact = caps.length === n && caps.every(function (c) { return c >= minCap && c <= maxCap; });
+    return {
+      total: total, caps: caps, exact: exact, reason: exact ? null : 'mixed_partition_failed',
+      average: total / n, cars: n,
+      minCars: Math.max(1, Math.ceil(total / maxCap)),
+      maxCars: Math.max(1, Math.floor(total / minCap)),
+      targetCars: n,
+      mix: { mode: 'anchor-small', anchors: best.anchors, smalls: best.smalls,
+        smallMax: smallMax, anchorCap: maxCap, anchorRatio: anchorRatio, queueOrder: queueOrder }
+    };
+  }
+
+  function buildCapacityQueues(blocks, rows, cols, minCap, maxCap, targetCars, mixOpts) {
     var totals = {};
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
       var v = blocks[r][c]; if (v > 0) totals[v] = (totals[v] || 0) + 1;
@@ -97,11 +148,18 @@ AntSolver.InstantPlayout = (function () {
         minTotalCars: minTotal, maxTotalCars: maxTotal, targetCars: target, colorRanges: colorRanges };
     }
     for (var i = 0; i < colors.length; i++) {
-      var col = colors[i], p = capacityPlanForColor(totals[col], minCap, maxCap, target == null ? null : perColorTarget[col]);
+      var col = colors[i];
+      var p = mixOpts
+        ? mixedCapacityPlanForColor(totals[col], minCap, maxCap, target == null ? null : perColorTarget[col], mixOpts)
+        : capacityPlanForColor(totals[col], minCap, maxCap, target == null ? null : perColorTarget[col]);
       queues[col] = p.caps.slice(); plans.push({ color: col, total: p.total, caps: p.caps, exact: p.exact, reason: p.reason });
+      if (mixOpts) plans[plans.length - 1].mix = p.mix || null;
     }
     return { queues: queues, plans: plans, ok: true, minTotalCars: minTotal, maxTotalCars: maxTotal,
-      targetCars: target, colorRanges: colorRanges, targetCarsFeasible: target == null || true };
+      targetCars: target, colorRanges: colorRanges, targetCarsFeasible: target == null || true,
+      capacityMix: mixOpts ? { enabled: true, smallMax: mixOpts.smallMax || 18,
+        anchorRatio: mixOpts.anchorRatio != null ? +mixOpts.anchorRatio : 0.3,
+        queueOrder: mixOpts.queueOrder || 'desc' } : null };
   }
   function plan(level, config, opts) {
     opts = opts || {};
@@ -112,7 +170,13 @@ AntSolver.InstantPlayout = (function () {
     var bufferLimit = Math.max(1, parseInt(config && config.bufferLimit, 10) || lv.bufferLimit || 5);
     var elim = AntSolver.outsideReachSeed(blocks, rows, cols, false);
     var targetCars = config && config.targetCarCount != null && +config.targetCarCount > 0 ? +config.targetCarCount : null;
-    var capBuilt = buildCapacityQueues(blocks, rows, cols, capMin, capMax, targetCars), capQueues = capBuilt.queues, capIndex = {};
+    var _mix = config && config.capacityMix;
+    var mixOpts = _mix && _mix.enabled ? {
+      smallMax: _mix.smallMax != null ? +_mix.smallMax : 18,
+      anchorRatio: _mix.anchorRatio != null ? +_mix.anchorRatio : 0.3,
+      queueOrder: _mix.queueOrder === 'asc' ? 'asc' : 'desc'
+    } : null;
+    var capBuilt = buildCapacityQueues(blocks, rows, cols, capMin, capMax, targetCars, mixOpts), capQueues = capBuilt.queues, capIndex = {};
     if (capBuilt.ok === false) {
       var badBoxes = [];
       badBoxes._instantPlayout = { schema: 'instant-playout-v2', ok: false, reason: capBuilt.reason,
@@ -220,6 +284,7 @@ AntSolver.InstantPlayout = (function () {
       cars: cars.length, covered: done, total: total, capRange: [capMin, capMax], audit: audit,
       targetCars: targetCars, minTotalCars: capBuilt.minTotalCars, maxTotalCars: capBuilt.maxTotalCars,
       targetCarsFeasible: capBuilt.ok !== false,
+      capacityMix: capBuilt.capacityMix || null,
       capacityPlans: capBuilt.plans, exactCapacityColors: capBuilt.plans.filter(function (x) { return x.exact; }).length,
       infeasibleCapacityColors: capBuilt.plans.filter(function (x) { return !x.exact; }).length,
       bufferEvents: cars.filter(function (c) { return c.bufferBefore > 0; }).length,
