@@ -1,0 +1,325 @@
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+index 98f1eba..fe73e69 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/Goal\346\211\247\350\241\214\350\256\241\345\210\222.md"
+@@ -1,6 +1,6 @@
+ # 毛线汽车 · Goal 执行计划
+ 
+-> 状态：**v582 单冰理论上限仅为2；Goal 质量收口仍暂停**
++> 状态：**v583 最佳单冰窗口命中但债务未持续；Goal 质量收口仍暂停**
+ >
+ > 建表日期：2026-10-26
+ >
+@@ -8,7 +8,7 @@
+ >
+ > 开发分支：`codex/kimi-quality-framework`
+ >
+-> 基线生产提交：v570 `b4eb449`；v571 障碍修复见 `56d4af5`；v572 落库热修见 `73080c4`；v573 黑块硬门见 `654df42`；v574 合规回退尺寸排序见 `0b9030d`；v575 黑块形态硬门见 `7a492d0`；v576 混合容量见 `73806be`；v577 软锚点闸门见 `da62432`；v578 两行交错与真实债务审计见 `bd78a20`；v579 开局供时收紧见 `1502086`；v580 真实债务单锚点见 `aee9dd4`；v581 单供给数字冰见 `512c7bb`；v582 单冰窗口扫描见本轮提交
++> 基线生产提交：v570 `b4eb449`；v571 障碍修复见 `56d4af5`；v572 落库热修见 `73080c4`；v573 黑块硬门见 `654df42`；v574 合规回退尺寸排序见 `0b9030d`；v575 黑块形态硬门见 `7a492d0`；v576 混合容量见 `73806be`；v577 软锚点闸门见 `da62432`；v578 两行交错与真实债务审计见 `bd78a20`；v579 开局供时收紧见 `1502086`；v580 真实债务单锚点见 `aee9dd4`；v581 单供给数字冰见 `512c7bb`；v582 单冰窗口扫描见 `34b5015`；v583 第28步单冰实测见本轮提交
+ >
+ > 执行入口：本文件。旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录；如用户给出新裁决，以新裁决为准并同步更新本文件。
+ 
+@@ -626,7 +626,7 @@ P2f 已完成结果：
+ - 需要联合约束锚点出现时点与供给时点，或更换目标颜色依赖结构；
+ - 当前不进入微调和多seed。
+ 
+-### P2s. v582 单冰窗口扫描 · ⛔ 理论上限2
++### P2s. v582 单冰窗口扫描 · 🟡 找到唯一供给窗口
+ 
+ 扫描v580 v4路线：
+ 
+@@ -641,6 +641,22 @@ P2f 已完成结果：
+ - 后续只能是“两笔同时债务”或“重建基础颜色依赖”二选一；
+ - 不通过第二个冰掩盖上限不足。
+ 
++### P2t. v583 第28步单冰实测 · 🟡 窗口命中，债务未持续
++
++在第28步只冻结唯一完全供给 `(4,3)`：
++
++- 债务车 `(3,6)` 第28步被选，实际债务3；
++- bufferBefore1、bufferAfter1；
++- 第二债务车直到第42步才被选；
++- freeLow86→82、免费连20→18、吃满中位3；
++- maxBuffer仍1，qGate仍否。
++
++结论：
++
++- v582“单冰绝对上限2”需修正为“已测窗口未形成持续债务”；
++- 窗口选择有效，但债务与已有暂存同步结算；
++- 下一轮只研究两辆债务在同一窗口同时保留。
++
+ ### P3. 006 开发集复核与生产化
+ 
+ 仅在 P2 命中后执行。
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+index bc6bb62..72dbd6d 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\344\275\234\346\227\245\345\277\227_20261012.md"
+@@ -23845,6 +23845,42 @@ S4不能只靠headless：必须实际导入TXT、跑目标模式、验证停止
+ 2. 下一轮只允许“两笔同时债务”或“基础颜色依赖重建”，二选一预登记。
+ 3. 不进入微调、不多seed、不接生产。
+ 
++### 590. 【2026-10-27】v583实验：第28步单冰命中债务但仍未持续
++
++#### 590.1 问题（原话）
++
++- 下一步
++
++#### 590.2 证据
++
++- v582扫描中，第28步有两个真实债务候选，只有1辆完全供给；
++- v582“单冰上限2”的表达式未考虑同一窗口可连续逼入两辆债务，因此需要实测。
++
++#### 590.3 改动
++
++- 固定v580 v4；
++- 只冻结第28步唯一完全供给 `(4,3)`，`numice=29`；
++- 跟踪两辆债务候选 `(3,6)`、`(5,2)` 与冰车 `(4,3)` 的实际回放状态。
++
++#### 590.4 验证（改前/改后数字）
++
++- 债务车 `(3,6)` 恰在第28步被选：容量38、实际可达35、债务3、bufferBefore1、bufferAfter1；
++- 第二债务车 `(5,2)` 到第42步才被选，债务0；
++- freeLow86%→82%，免费连20→18，吃满中位保持3；
++- maxBuffer仍1、qGate仍否。
++- 工作成就：
++  - 单冰确实命中目标时点和债务窗口；
++  - 同时改善freeLow和免费连，证明窗口选择有效。
++- 工作困难：
++  - 新债务与已有暂存同时结算，没有留下持续占用；
++  - 第二辆债务没有在有效窗口同时进入。
++
++#### 590.5 遗留
++
++1. 不继续扫描单个冰位置。
++2. 下一轮只研究两辆债务在同一中段窗口同时保留。
++3. 不进入微调，直到maxBuffer≥3。
++
+ ### 586. 【2026-10-27】新增“一关如何诞生”九站滚动动画网页
+ 
+ #### 586.1 问题（原话）
+diff --git "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md" "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+index ff40618..2fdd337 100644
+--- "a/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
++++ "b/01_\344\272\244\346\216\245\346\226\207\346\241\243/\345\267\245\347\250\213\350\257\264\346\230\216.md"
+@@ -3,7 +3,7 @@
+ > 本文件是**整个工程的说明书**：做什么、怎么组织、怎么跑、参数含义、产物格式、约定与已知问题。
+ > 换窗口/换人接手，读这一份就够；需要"当初为什么这么改"再去查 `工作日志_20261012.md` 的对应节。
+ >
+-> 最后更新：2026-10-27（v582 单冰窗口扫描）　|　当前生产代码版本：**v575**；最新实验版本：**v582**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
++> 最后更新：2026-10-27（v583 第28步单冰实测）　|　当前生产代码版本：**v575**；最新实验版本：**v583**（codex/kimi-quality-framework）　|　项目代号：**毛线汽车**（原名「主bin生产流程交接包_20261012」，前辈交接）
+ >
+ > **当前执行入口是 [`Goal执行计划.md`](Goal执行计划.md)，旧版 [`生产收口执行计划_v559.md`](生产收口执行计划_v559.md) 保留为历史记录。工作日志最新见 §552~582。v571修复障碍落地，v572修复落库作用域，v573加入黑块>30%硬门，v574修正合规回退排序，v575新增最终棋盘黑块形态硬门：同行≤3、横连≤3、竖连≤3，并修复补位与瞬时双入口整行黑墙。00199 seed1001/1002/32677均稳定为6×7、10黑、23.81%且qGate通过。目标体验仍未全部通过。**
+ >
+@@ -365,7 +365,8 @@ python3 -m http.server 8060        # 本工程固定用 8060
+ | 20 | **减少开局供给仍不能制造债务** | v579第0行仅1火种，6锚点全选中但仍无真实债务，免费连48 | 下一轮按实际回放状态选择债务2~4的锚点颜色 |
+ | 21 | **真实债务车换入闸门后债务也消失** | v580四个真实债务2~4候选换位后均无buffer≥3 | 停止位置族，下一轮只测最小数字冰延迟一个供给 |
+ | 22 | **单个数字冰只能移动债务时点** | v581目标车均被取但实际债务为负、buffer0 | 不追加第二个冰；需联合约束或更换颜色依赖结构 |
+-| 23 | **单冰的buffer理论上限只有2** | v582三个单冰窗口bufferBefore为1/1/0 | 停止单冰；只考虑两笔同时债务或基础依赖重建 |
++| 23 | **单冰窗口需要精确实测** | v582找到3个唯一供给窗口；单窗口可能有2~3辆债务候选 | v583只测第28步唯一供给，不把bufferBefore+1直接当上限 |
++| 24 | **最佳单冰窗口能命中但债务同步结算** | v583债务3在bufferBefore1时进入，bufferAfter仍1；freeLow/免费连改善 | 下一轮只研究两笔债务同时保留 |
+ 
+ ---
+ 
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243_v583.js" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243_v583.js"
+new file mode 100644
+index 0000000..eb43720
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243_v583.js"
+@@ -0,0 +1,143 @@
++#!/usr/bin/env node
++/** v583：只冻结v4路线第28步唯一的完全供给，测试两笔债务是否同时保留。 */
++'use strict';
++
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const BASE_LEVEL = path.join(__dirname, '真实债务单锚点_v580.levels', 'v4_25_22_6_2.json');
++const OUT = path.join(__dirname, '单冰窗口_v583.json');
++const LEVEL_DIR = path.join(__dirname, '单冰窗口_v583.levels');
++const ICE_CELL = { r: 4, c: 3 };
++const ICE_VALUE = 29;
++const TARGETS = [{ r: 3, c: 6 }, { r: 5, c: 2 }];
++const FILES = [
++  'utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
++  'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js',
++  'experience-goal.js', 'capacity-tuner.js', 'instant-playout.js', 'generator.js',
++  'source-preflight.js'
++];
++
++function load() {
++  const sb = {
++    console: { log() {}, warn() {}, error() {} },
++    module: { exports: {} },
++    WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity
++  };
++  vm.createContext(sb);
++  for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
++  return sb.AntSolver;
++}
++
++const A = load();
++const base = JSON.parse(fs.readFileSync(BASE_LEVEL, 'utf8'));
++const level = A.deepClone(base);
++const iceBox = level.board.cells[ICE_CELL.r] && level.board.cells[ICE_CELL.r][ICE_CELL.c];
++if (!iceBox || iceBox.t !== 'box') throw new Error('v583 ice target is not a box');
++iceBox.numice = ICE_VALUE;
++
++function leftmostFreeSlot(s) {
++  const used = {};
++  for (const b of s.buffer || []) if (b.slot != null) used[b.slot] = 1;
++  for (let i = 0; i < s.bufferLimit; i++) if (!used[i]) return i;
++  return -1;
++}
++function slotStartCoord(slot, rows, cols, bufferLimit) {
++  return { r: rows - 1, c: Math.min(cols - 1, Math.floor(slot / bufferLimit * cols)) };
++}
++function reachablePixels(state, color) {
++  const slot = leftmostFreeSlot(state);
++  if (slot < 0) return null;
++  const start = slotStartCoord(slot, state.rows, state.cols, state.bufferLimit);
++  const scratch = state.eliminated.map(row => row.slice());
++  try {
++    return A.Simulator.instantChainEliminate(
++      scratch, level.blocks, state.rows, state.cols, color, Infinity, null, start, null
++    );
++  } catch (e) { return null; }
++}
++function auditCells(solveResult) {
++  const parsed = A.parseLevel(level);
++  const state = A.Simulator.createState(parsed, {
++    useSlotStart: true, bottomOnly: false, instantChain: true, capturePreviewStats: false
++  });
++  const actions = A.SolverAnalysis.normalizeActions(solveResult && solveResult.pickOrder);
++  const watch = {};
++  for (const t of TARGETS) watch[t.r + ',' + t.c] = 'debt';
++  watch[ICE_CELL.r + ',' + ICE_CELL.c] = 'ice';
++  const seen = {}, out = [];
++  for (let i = 0; i < actions.length; i++) {
++    const a = actions[i], k = a.r + ',' + a.c;
++    if (watch[k] && !seen[k]) {
++      seen[k] = 1;
++      const cell = state.cells[a.r] && state.cells[a.r][a.c];
++      const reach = cell && cell.t === 'box' ? reachablePixels(state, cell.color) : null;
++      const before = state.buffer.length;
++      A.Simulator.applyPick(state, a.r, a.c);
++      out.push({
++        role: watch[k], step: i + 1, r: a.r, c: a.c, color: cell && cell.color,
++        capacity: cell && cell.count, actualReach: reach,
++        actualDebt: cell && reach != null ? cell.count - reach : null,
++        bufferBefore: before, bufferAfter: state.buffer.length,
++        progressBefore: state.totalPixels ? +(state.eliminatedPixels / state.totalPixels).toFixed(4) : null
++      });
++    } else {
++      A.Simulator.applyPick(state, a.r, a.c);
++    }
++  }
++  return out;
++}
++
++const cfg = {
++  seed: 1001, ruleMode: 'instantChain', instantChain: true, bottomOnly: false, elimOrder: 'instant',
++  boxSizeMin: 6, boxSizeMax: 40, capNormMin: 6, capNormMax: 40,
++  boardRowsMin: 7, boardRowsMax: 7, boardColsMin: 7, boardColsMax: 7,
++  boardHardRange: true, boardAuto: false, p7Repair: false, trapPost: false,
++  localSwapRepair: false, experienceGoal: false, maxDecisionStates: 8,
++  stateSampleMode: 'midStratified', minReleaseAmplitude: 2
++};
++const t0 = Date.now();
++const ev = A.Generator.evaluateLevel(level, cfg);
++const q = ev && ev.valid ? A.Quality.fromGeneration(ev) : null;
++const curve = ev && ev.goodV3 && ev.goodV3.fillCurve || null;
++let exp = null;
++if (ev && ev.valid && ev.solveResult) {
++  try {
++    exp = A.ExperienceGoal.evaluate(ev.level, {
++      solveResult: ev.solveResult, decision: true, instantChain: true,
++      maxDecisionStates: 8, stateSampleMode: 'midStratified', minReleaseAmplitude: 2
++    });
++  } catch (e) { exp = { error: String(e && e.message || e) }; }
++}
++const watches = ev && ev.valid ? auditCells(ev.solveResult) : [];
++const record = {
++  schema: 'single-ice-window-v583', date: '2026-10-27',
++  base: path.relative(ROOT, BASE_LEVEL), iceCell: ICE_CELL, iceValue: ICE_VALUE,
++  targets: TARGETS, valid: !!(ev && ev.valid), watches,
++  quality: q ? { gatePass: !!q.gatePass, gateReasons: q.gateReasons || [], pass: !!q.pass, label: q.label } : null,
++  curve: curve ? {
++    freeLowPct: curve.freeLowPct, freeRunMax: curve.freeRunMax,
++    fullMedian2: curve.fullMedian2, selectMedian: curve.selectMedian,
++    pressurePct3: curve.pressurePct3, pressurePeak: curve.pressurePeak
++  } : null,
++  experience: exp ? {
++    pass: !!exp.pass, curvePass: !!exp.curvePass,
++    metrics: exp.metrics || null, releaseDecision: exp.releaseDecision || null
++  } : null,
++  elapsedMs: Date.now() - t0
++};
++if (ev && ev.level) {
++  fs.mkdirSync(LEVEL_DIR, { recursive: true });
++  fs.writeFileSync(path.join(LEVEL_DIR, 'ice_4_3.json'), JSON.stringify(ev.level, null, 2) + '\n');
++  fs.writeFileSync(path.join(LEVEL_DIR, 'ice_4_3.route.json'),
++    JSON.stringify(ev.solveResult && ev.solveResult.pickOrder || [], null, 2) + '\n');
++}
++fs.writeFileSync(OUT, JSON.stringify(record, null, 2) + '\n');
++console.log(JSON.stringify({
++  out: path.relative(ROOT, OUT), valid: record.valid, watches,
++  quality: record.quality, curve: record.curve,
++  maxBuffer: record.experience && record.experience.metrics && record.experience.metrics.maxBuffer
++}, null, 2));
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243_v583_\351\242\204\347\231\273\350\256\260.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243_v583_\351\242\204\347\231\273\350\256\260.md"
+new file mode 100644
+index 0000000..b07ce2d
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243_v583_\351\242\204\347\231\273\350\256\260.md"
+@@ -0,0 +1,33 @@
++# v583 预登记：精确冻结第28步唯一供给
++
++日期：2026-10-27
++
++## 纠正
++
++v582扫描原先把“单冰上限”按每冰只逼入一辆债务车计算，得到2；但第28步同时存在两辆真实债务候选，因此单冰可能连续保留两笔债务，理论上限应为3。
++
++## 基底与窗口
++
++- v580 v4；
++- 7×7、49车、`[6,40]`、0黑块。
++
++第28步：
++
++- 取车前buffer：1；
++- 完全供给只有 `(4,3)`，颜色18、容量14；
++- 真实债务候选：
++  - `(3,6)` 颜色26、容量38、可达35、债务3；
++  - `(5,2)` 颜色25、容量23、可达21、债务2。
++
++## 唯一改动
++
++只给唯一完全供给 `(4,3)` 加数字冰 `numice=29`，使其在第28步仍锁定。
++
++不冻结债务车、不移动车辆、不改变容量、棋盘或车数。
++
++## 判定
++
++- 两辆债务候选依次进入，buffer达到3：单冰机制成立；
++- buffer达到2但未到3：说明仍需第二锁或释放时序；
++- 债务候选仍被绕开：单冰机制失败；
++- 不可解或结构失败：该窗口否决。
+diff --git "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243\346\211\253\346\217\217_v582_\345\206\263\347\255\226.md" "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243\346\211\253\346\217\217_v582_\345\206\263\347\255\226.md"
+index 6834eb7..10601a4 100644
+--- "a/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243\346\211\253\346\217\217_v582_\345\206\263\347\255\226.md"
++++ "b/03_\345\267\245\345\205\267/\345\245\275\345\205\263\350\257\204\345\210\206/\345\215\225\345\206\260\347\252\227\345\217\243\346\211\253\346\217\217_v582_\345\206\263\347\255\226.md"
+@@ -26,3 +26,9 @@
+ - 正式停止单冰与“再试另一个单冰位置”方向；
+ - 不通过增加第二个冰来掩盖上限不足；
+ - 下一步若继续，必须至少同时保留两笔真实债务，或改变目标颜色依赖/棋盘结构，让某一窗口天然出现bufferBefore≥2。
++
++## 后续纠正
++
++- 若同一窗口存在两辆债务候选，单冰可能连续逼入两辆，“上限2”不是绝对数学上限；
++- v583已精确测试第28步唯一供给，实际仍只有buffer1；
++- 修正后的结论是：已测单冰窗口无法形成持续债务，而不是所有单冰都固定封顶2。
