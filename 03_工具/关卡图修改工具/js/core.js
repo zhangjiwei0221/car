@@ -1249,9 +1249,10 @@
       if (p.inside === 0) empty.push(idx);      // 整个部件都在画布外
     });
     var flat = composeFlatten(layers, rows, cols);
-    var nz = 0, holes = 0;
+    var nz = 0, holes = 0, colorSet = {};
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
-      if (flat[r][c] > 0) nz++; else holes++;
+      var v = flat[r][c];
+      if (v > 0) { nz++; colorSet[v] = 1; } else holes++;
     }
     return {
       rows: rows, cols: cols,
@@ -1262,6 +1263,7 @@
       layersFullyOutside: empty,          // 完全落在画布外的图层（等于没摆上）
       pixelSum: placed,                   // 各图层落在画布内的像素之和（含重复计算的冲突格）
       pixelActual: nz,                    // 拍平后实际非 0 格数
+      colorCount: Object.keys(colorSet).length,   // 拍平后实际用到的颜色种数（不含 0）
       backgroundHoles: holes,
       // 这两个数不等就说明有覆盖发生：差额 = 被盖掉的像素数
       covered: placed - nz,
@@ -1536,6 +1538,150 @@
       for (var r = r0; r <= r1; r++) { put(r, c0 + w); put(r, c1 - w); }
     }
     return out;
+  }
+
+  /* ---------- 几何图形（矩形 / 椭圆 / 三角形 / 菱形，实心或空心） ----------
+   * 2026-10-28 用户需求：「支持几何的手绘，实心或空心」。
+   * 与边框生成器分开：边框是固定构图的六种形态，几何图形是「拖一个范围就出形状」。
+   * 统一返回格坐标集合，调用方复用涂色、预览、局部替换那套逻辑。
+   */
+
+  var SHAPE_KINDS = ['rect', 'ellipse', 'triangle', 'diamond'];
+
+  /**
+   * 在 box 内生成一种几何图形。
+   * @param {string} kind  rect / ellipse / triangle / diamond
+   * @param {{r0:number,c0:number,r1:number,c1:number}} box 拖出来的范围（自动归正）
+   * @param {number} width 空心时的线宽（格），实心时忽略
+   * @param {boolean} solid true=实心，false=空心
+   * @returns {{r:number,c:number}[]} 去重后的格坐标
+   */
+  function shapeCells(kind, box, width, solid, rows, cols) {
+    var r0 = Math.min(box.r0, box.r1), r1 = Math.max(box.r0, box.r1);
+    var c0 = Math.min(box.c0, box.c1), c1 = Math.max(box.c0, box.c1);
+    width = Math.max(1, width | 0);
+    var out = [], seen = {};
+    function put(r, c) {
+      if (r < r0 || r > r1 || c < c0 || c > c1) return;
+      if (rows != null && (r < 0 || r >= rows)) return;
+      if (cols != null && (c < 0 || c >= cols)) return;
+      var k = r + ',' + c;
+      if (seen[k]) return;
+      seen[k] = 1; out.push({ r: r, c: c });
+    }
+    function putLine(cells) { (cells || []).forEach(function (p) { put(p.r, p.c); }); }
+
+    if (kind === 'rect') {
+      if (solid) {
+        for (var rr = r0; rr <= r1; rr++) for (var cc = c0; cc <= c1; cc++) put(rr, cc);
+      } else {
+        putLine(ringCells(r0, c0, r1, c1, width, rows, cols));
+      }
+      return out;
+    }
+
+    if (kind === 'ellipse') {
+      var cy = (r0 + r1) / 2, cx = (c0 + c1) / 2;
+      var ry = (r1 - r0 + 1) / 2, rx = (c1 - c0 + 1) / 2;
+      // 空心：外椭圆减内椭圆；内半径 <=0 时退化为实心（形状太细，没法再空心）
+      var innerRy = ry - width, innerRx = rx - width;
+      var canHollow = innerRy > 0 && innerRx > 0;
+      for (var er = r0; er <= r1; er++) {
+        for (var ec = c0; ec <= c1; ec++) {
+          var dy = (er - cy) / ry, dx = (ec - cx) / rx;
+          if (dx * dx + dy * dy > 1.000001) continue;
+          if (!solid && canHollow) {
+            var idy = (er - cy) / innerRy, idx = (ec - cx) / innerRx;
+            if (idx * idx + idy * idy <= 1.000001) continue;
+          }
+          put(er, ec);
+        }
+      }
+      return out;
+    }
+
+    if (kind === 'triangle') {
+      var midC = (c0 + c1) / 2;
+      var apex = { r: r0, c: Math.round(midC) };
+      var bl = { r: r1, c: c0 }, br = { r: r1, c: c1 };
+      if (solid) {
+        var th = r1 - r0 + 1;
+        for (var tr = r0; tr <= r1; tr++) {
+          var t = th <= 1 ? 1 : (tr - r0) / (th - 1);
+          var half = (c1 - c0) / 2 * t;
+          var ta = Math.round(midC - half), tb = Math.round(midC + half);
+          for (var tc = ta; tc <= tb; tc++) put(tr, tc);
+        }
+      } else {
+        putLine(lineCells(apex.r, apex.c, bl.r, bl.c, width, rows, cols));
+        putLine(lineCells(apex.r, apex.c, br.r, br.c, width, rows, cols));
+        putLine(lineCells(bl.r, bl.c, br.r, br.c, width, rows, cols));
+      }
+      return out;
+    }
+
+    // diamond
+    var dMidR = (r0 + r1) / 2, dMidC = (c0 + c1) / 2;
+    var top = { r: r0, c: Math.round(dMidC) };
+    var right = { r: Math.round(dMidR), c: c1 };
+    var bottom = { r: r1, c: Math.round(dMidC) };
+    var left = { r: Math.round(dMidR), c: c0 };
+    if (solid) {
+      var dHalfH = (r1 - r0) / 2, dHalfW = (c1 - c0) / 2;
+      for (var dr = r0; dr <= r1; dr++) {
+        var ndy = dHalfH > 0 ? Math.abs(dr - dMidR) / dHalfH : 0;
+        if (ndy > 1) continue;
+        var dHalf = dHalfW * (1 - ndy);
+        var da = Math.round(dMidC - dHalf), db = Math.round(dMidC + dHalf);
+        for (var dc = da; dc <= db; dc++) put(dr, dc);
+      }
+    } else {
+      putLine(lineCells(top.r, top.c, right.r, right.c, width, rows, cols));
+      putLine(lineCells(right.r, right.c, bottom.r, bottom.c, width, rows, cols));
+      putLine(lineCells(bottom.r, bottom.c, left.r, left.c, width, rows, cols));
+      putLine(lineCells(left.r, left.c, top.r, top.c, width, rows, cols));
+    }
+    return out;
+  }
+
+  /**
+   * 自动田字格：把 box 均分成 2×2 四个独立的空心框。
+   *
+   * 与 borderShape('田字格') 的区别：
+   *   - 老田字格是「外框 + 中间十字 + 四个小口」，四格共用一条中线；
+   *   - 这里四个框各自成环、互不重叠，所以上下/左右的中缝是两条边框（2×线宽）。
+   *   好处是四格尺寸能真正做到均分：偶数边长时四格完全相等，奇数边长时只差 1 格。
+   *
+   * @returns {{cells:Array, parts:Array, box:Object, split:{row:number,col:number}, sizes:Array}}
+   */
+  function tianziShape(box, width, rows, cols) {
+    var r0 = Math.min(box.r0, box.r1), r1 = Math.max(box.r0, box.r1);
+    var c0 = Math.min(box.c0, box.c1), c1 = Math.max(box.c0, box.c1);
+    width = Math.max(1, width | 0);
+    var midR = r0 + Math.floor((r1 - r0 + 1) / 2);
+    var midC = c0 + Math.floor((c1 - c0 + 1) / 2);
+    var defs = [
+      { name: '左上框', r0: r0, c0: c0, r1: midR - 1, c1: midC - 1 },
+      { name: '右上框', r0: r0, c0: midC, r1: midR - 1, c1: c1 },
+      { name: '左下框', r0: midR, c0: c0, r1: r1, c1: midC - 1 },
+      { name: '右下框', r0: midR, c0: midC, r1: r1, c1: c1 }
+    ];
+    var parts = [], cells = [], seen = {};
+    defs.forEach(function (d) {
+      var ring = ringCells(d.r0, d.c0, d.r1, d.c1, width, rows, cols);
+      parts.push({ name: d.name, cells: ring });
+      ring.forEach(function (p) {
+        var k = p.r + ',' + p.c;
+        if (seen[k]) return;
+        seen[k] = 1; cells.push(p);
+      });
+    });
+    return {
+      cells: cells, parts: parts,
+      box: { r0: r0, c0: c0, r1: r1, c1: c1 },
+      split: { row: midR, col: midC },
+      sizes: defs.map(function (d) { return { name: d.name, rows: d.r1 - d.r0 + 1, cols: d.c1 - d.c0 + 1 }; })
+    };
   }
 
   /**
@@ -2254,6 +2400,9 @@
     paintCells: paintCells,
     fillRegion: fillRegion,
     ringCells: ringCells,
+    shapeCells: shapeCells,
+    SHAPE_KINDS: SHAPE_KINDS,
+    tianziShape: tianziShape,
     borderShape: borderShape,
     BORDER_KINDS: BORDER_KINDS,
     artPieceStats: artPieceStats,

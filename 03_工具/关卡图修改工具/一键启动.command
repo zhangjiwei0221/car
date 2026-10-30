@@ -1,11 +1,10 @@
 #!/bin/bash
 # 蚂蚁拿块关卡图修改工具 · 一键启动
-# 任务：ANT-ARTTOOL-CLASSIFY-20260729 · 阶段3
-# 2026-08-03 改为「工具目录自成一体」：求解器与生成器改用本目录下的 bin/js/（随工具打包的副本），
-#   服务根目录从项目根改为本工具目录，这样整个「关卡图修改工具」文件夹可以直接拷到别处使用。
+# 2026-10-28 起本工具只做图纸修改/提取/拼接，不再需要求解器与生成器流程。
+# 依赖仅剩本目录 bin/js/utils.js（颜色表）与 bin/js/generator.js（TXT 解析 / 碎色口径）。
 #
-# 为什么要起本地服务：求解跑在 Web Worker 里，浏览器在 file:// 协议下会拦截 Worker 的 importScripts，
-#   起一个静态服务再访问才能用上后台线程（不起服务也能用，但求解时页面会卡住）。
+# 起本地服务的目的：让图纸库的 localStorage 固定在同一 origin 上，并避免 file:// 下
+# 浏览器对本地文件/下载的限制。直接用浏览器打开 index.html 也能用。
 #
 # 双击本文件即可：会在本工具目录起服务并自动打开页面。按 Ctrl+C 停止。
 
@@ -13,10 +12,10 @@ set -u
 cd "$(dirname "$0")" || exit 1
 ROOT="$(pwd)"
 
-if [ ! -f "bin/js/solver.js" ]; then
-  echo "❌ 找不到 bin/js/solver.js。"
-  echo "   本工具需要自带的 bin/ 目录（求解器与生成器）。"
-  echo "   如果这个目录缺失，请从项目根目录重新拷一份 bin/（js、css、index.html、文档）到本工具目录下。"
+if [ ! -f "bin/js/utils.js" ] || [ ! -f "bin/js/generator.js" ]; then
+  echo "❌ 找不到 bin/js/utils.js 或 bin/js/generator.js。"
+  echo "   本工具只用这两份做颜色表、TXT 解析和碎色率，不需要求解器。"
+  echo "   如果目录缺失，请从项目根目录重新拷一份 bin/js/ 下的 utils.js、generator.js。"
   echo "   当前工具目录推断为：$ROOT"
   read -r -p "按回车关闭…" _
   exit 1
@@ -27,7 +26,7 @@ for cand in python3 python; do
   if command -v "$cand" >/dev/null 2>&1; then PY="$cand"; break; fi
 done
 if [ -z "$PY" ]; then
-  echo "❌ 未找到 python3。请安装后重试，或直接用浏览器打开本目录的 index.html（求解时页面会卡住）。"
+  echo "❌ 未找到 python3。请安装后重试，或直接用浏览器打开本目录的 index.html。"
   read -r -p "按回车关闭…" _
   exit 1
 fi
@@ -48,8 +47,8 @@ echo "==============================================="
 echo " 蚂蚁拿块关卡图修改工具"
 echo "-----------------------------------------------"
 echo " 工具目录：  $ROOT"
-echo " 求解器来源：本目录 bin/js/（正式代码的副本，可随文件夹整体迁移）"
-echo "             正式来源仍是项目根目录的 bin/，同步方式见 bin/来源说明.md"
+echo " 图纸依赖：  本目录 bin/js/utils.js + generator.js（颜色表 / TXT 解析 / 碎色率）"
+echo " 不加载：    求解器、模拟器、PlayerSim、生成器流程"
 echo " 访问地址：  $URL"
 echo " 停止服务：  在本窗口按 Ctrl+C"
 echo "==============================================="

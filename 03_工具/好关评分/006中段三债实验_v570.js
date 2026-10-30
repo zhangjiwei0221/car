@@ -36,12 +36,29 @@ const INJECTION = [
   "        var mbSupply = candidates.filter(function (x) { return x.debt <= 0 && x.reach > 0; }).sort(function (a, b) {",
   "          return b.reach - a.reach || a.debt - b.debt || a.color - b.color;",
   "        });",
+  "        var mbReason = 'outside_mid';",
+  "        if (mbProg >= mbLo && mbProg < mbHi && active.length >= mbTarget) mbReason = 'active_target_met';",
   "        if (mbProg >= mbLo && mbProg < mbHi && active.length < mbTarget && mbPositive.length) {",
-  "          bestColor = mbPositive[0].color; bestReach = mbPositive[0].reach;",
-  "        } else if (mbSupply.length) {",
-  "          bestColor = mbSupply[0].color; bestReach = mbSupply[0].reach;",
-  "        } else if (mbPositive.length) {",
-  "          bestColor = mbPositive[0].color; bestReach = mbPositive[0].reach;",
+  "          bestColor = mbPositive[0].color; bestReach = mbPositive[0].reach; mbReason = 'debt_target';",
+  "        } else if (mbProg >= mbLo && mbProg < mbHi && active.length < mbTarget) {",
+  "          mbReason = 'target_unmet_no_positive_candidate';",
+  "        }",
+  "        if (mbReason !== 'debt_target') {",
+  "          if (mbSupply.length) {",
+  "            bestColor = mbSupply[0].color; bestReach = mbSupply[0].reach; mbReason += ';supply_priority';",
+  "          } else if (mbPositive.length) {",
+  "            bestColor = mbPositive[0].color; bestReach = mbPositive[0].reach; mbReason += ';positive_fallback';",
+  "          }",
+  "        }",
+  "        if (config) {",
+  "          if (!config._midBandTrace) config._midBandTrace = [];",
+  "          var mbChosen = null;",
+  "          for (var mbCi = 0; mbCi < candidates.length; mbCi++) if (candidates[mbCi].color === bestColor) { mbChosen = candidates[mbCi]; break; }",
+  "          config._midBandTrace.push({ done: done, total: total, progress: +mbProg.toFixed(4), active: active.length, target: mbTarget,",
+  "            positive: mbPositive.map(function (x) { return { color: x.color, reach: x.reach, cap: x.cap, debt: x.debt }; }),",
+  "            supply: mbSupply.map(function (x) { return { color: x.color, reach: x.reach, cap: x.cap, debt: x.debt }; }),",
+  "            chosen: mbChosen ? { color: mbChosen.color, reach: mbChosen.reach, cap: mbChosen.cap, debt: mbChosen.debt } : null,",
+  "            reason: mbReason });",
   "        }",
   "      }",
   NEEDLE
@@ -231,6 +248,7 @@ function runOne(patch, repeat) {
       bottomOnly: false
     })
     : null;
+  const decisionTrace = r && r.config && r.config._midBandTrace || [];
   const rec = {
     id: POLICY + '_r' + repeat,
     repeat,
@@ -284,6 +302,11 @@ function runOne(patch, repeat) {
       bufferEvents: r.config._instantPlayoutStat.bufferEvents,
       medianEntryReach: r.config._instantPlayoutStat.medianEntryReach
     } : null,
+    fullPlan: r && r.config && r.config._instantPlayoutStat || null,
+    instantPlanCells: raw && raw.board && raw.board.instantPlanCells || null,
+    baselineSolution: r && r.baselineSolution || null,
+    solveResult: r && r.solveResult || null,
+    decisionTrace,
     goalRounds: r && r.goalRounds || null,
     goalStopReason: r && r.goalStopReason || null,
     goalPass: !!(raw && A.Generator.goalResultExperiencePass(r, cfg))
@@ -309,6 +332,33 @@ function runOne(patch, repeat) {
 }
 
 let A = null;
+
+function summarizeDecisionTrace(rows) {
+  const trace = rows[0] && rows[0].decisionTrace || [];
+  const mid = trace.filter(x => x.progress >= 0.2 && x.progress < 0.85);
+  const deficit = mid.filter(x => x.active < x.target);
+  const reasons = {};
+  for (const x of mid) reasons[x.reason] = (reasons[x.reason] || 0) + 1;
+  return {
+    totalChoices: trace.length,
+    midChoices: mid.length,
+    deficitChoices: deficit.length,
+    deficitWithPositive: deficit.filter(x => x.positive.length > 0).length,
+    deficitWithoutPositive: deficit.filter(x => !x.positive.length).length,
+    deficitSelectedDebt: deficit.filter(x => x.reason.indexOf('debt_target') >= 0).length,
+    reasonCounts: reasons,
+    sampleDeficits: deficit.map(x => ({
+      progress: x.progress,
+      active: x.active,
+      positiveCount: x.positive.length,
+      positiveMinDebt: x.positive.length ? Math.min(...x.positive.map(y => y.debt)) : null,
+      positiveMaxDebt: x.positive.length ? Math.max(...x.positive.map(y => y.debt)) : null,
+      supplyCount: x.supply.length,
+      chosen: x.chosen,
+      reason: x.reason
+    }))
+  };
+}
 
 function main() {
   const loaded = load();
@@ -355,6 +405,7 @@ function main() {
     },
     baseline: { shortDebt: baseline },
     rows,
+    decisionTraceSummary: summarizeDecisionTrace(rows),
     summary: {
       runs: rows.length,
       valid: rows.filter(x => x.valid).length,
@@ -402,6 +453,7 @@ function main() {
       plan: x.plan
     })),
     summary: report.summary,
+    decisionTraceSummary: report.decisionTraceSummary,
     checks,
     decision: report.decision,
     out: path.relative(ROOT, OUT)

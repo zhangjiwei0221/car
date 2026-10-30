@@ -4,99 +4,47 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=12">
+<link rel="stylesheet" href="css/style.css?v=16">
 </head>
-<body>
+<body class="composeMode">
 
 <header class="topbar">
   <div class="brand">蚂蚁拿块关卡图修改工具</div>
-  <div class="stage">进度定位 + 棋盘/暂存对比 + 演示动画 + 美术编辑 + 关卡重构</div>
-  <div class="meta" id="envInfo">求解器版本：v95</div>
-  <label class="topToggle" title="只留导入、显示导出、美术编辑、主体提取四块，把求解/进度/演示/暂存压力/重构/待导出库都收起来。这样「美术编辑」和「主体提取」就直接相邻，不用来回滚。随时可以关掉恢复全部功能">
-    <input type="checkbox" id="optArtOnly"> 纯美术编辑模式
-  </label>
-  <button id="btnComposeMode" class="btn primary tiny" title="进入拼接：新建一张自定规格的画布，把图纸库里的部件拖上去摆成多主体。拼接是独立工作台，不会动你正在改的关卡">🧩 拼接图纸</button>
+  <div class="stage">只做目标图的修改、主体提取与拼接</div>
+  <div class="meta" id="envInfo">图纸工作台</div>
+  <button id="btnComposeMode" class="btn primary tiny" title="在拼接工作台与普通修图之间切换。拼接是独立工作台，不会动你正在改的图纸">🎨 回到修图</button>
   <button id="btnCollapseAll" class="btn ghost tiny" title="把所有功能卡片折叠起来，只留标题。再点一次全部展开。也可以单独点某个卡片的标题折叠它">折叠全部</button>
   <a class="btn ghost helpLink" href="使用说明.md" target="_blank" rel="noopener">使用说明</a>
 </header>
 
 <div class="layout">
 
-  <!-- ========== 左栏：输入输出类功能（导入/求解/定位/多路线/显示/导出） ========== -->
+  <!-- ========== 左栏：导入 ========== -->
   <aside class="side sideLeft">
 
     <section class="card" id="cardImport">
-      <h3>1. 导入</h3>
-      <p class="hint">按文件名（去扩展名）自动配对同一关：<code>xxx.txt</code> 目标图 / <code>xxx.json</code> 正式关卡本体 /
-        <code>xxx.solve.json</code> 求解数据（可选）。<code>.txt</code>、<code>.json</code> 以外的文件自动忽略。</p>
+      <h3>1. 导入图纸</h3>
+      <p class="hint">导入目标图 <code>xxx.txt</code>（像素矩阵格式）。选择文件夹会递归读取子目录，一次可导入整批。
+        本工具只处理图纸本身，不读取关卡数据。</p>
       <div class="row wrap">
-        <label class="fileBtn">选择文件<input type="file" id="fileInput" multiple accept=".txt,.json"></label>
+        <label class="fileBtn">选择 TXT<input type="file" id="fileInput" multiple accept=".txt"></label>
         <label class="fileBtn">选择文件夹<input type="file" id="dirInput" webkitdirectory directory multiple></label>
         <button id="btnClear" class="btn ghost">清空</button>
       </div>
-      <p class="hint">选择文件夹会递归读取子目录，一次可导入整批（例：<code>输出文件/348关工具导入包/</code>）。
-        批量导入只做配对与索引，不会自动求解、也不会自动跑多路线。</p>
       <div class="row"><span class="muted" id="importStat">未导入</span></div>
-      <div class="row"><input type="text" id="listFilter" placeholder="过滤关卡名…" style="width:100%"></div>
+      <div class="row"><input type="text" id="listFilter" placeholder="过滤图纸名…" style="width:100%"></div>
       <div id="levelList" class="list"></div>
-    </section>
-
-    <section class="card" id="cardSolve">
-      <h3>2. 求解路线</h3>
-      <div class="kv" id="solveInfo"><span class="muted">请先选择一关</span></div>
-      <div class="row">
-        <button id="btnSolve" class="btn">现场求解 / 重新求解</button>
-      </div>
-      <p class="hint">有现成求解数据时直接回放真实通关路线；没有则现场调用正式求解器求解。
-        冰块耐久统一按 <b>3</b> 还原。</p>
-    </section>
-
-    <section class="card" id="cardInterval">
-      <h3>3. 进度区间</h3>
-      <p class="hint">进度口径 = <b>已完成盒数 ÷ 总盒数</b>（审核统一口径）。盒进度离散，工具会把你输入的上下限吸附到最近的实际可达进度。</p>
-      <div class="row">
-        <label>下限 <input type="number" id="loPct" min="0" max="100" step="0.1" value="50"> %</label>
-        <label>上限 <input type="number" id="hiPct" min="0" max="100" step="0.1" value="90"> %</label>
-      </div>
-      <div class="row wrap presets">
-        <button class="btn tiny" data-lo="50" data-hi="90">50–90</button>
-        <button class="btn tiny" data-lo="50" data-hi="60">50–60</button>
-        <button class="btn tiny" data-lo="10" data-hi="20">10–20</button>
-        <button class="btn tiny" data-lo="0" data-hi="100">0–100</button>
-        <button class="btn tiny" data-lo="80" data-hi="100">80–100</button>
-      </div>
-      <div class="row">
-        <button id="btnLocate" class="btn primary">定位区域</button>
-      </div>
-      <div id="intervalInfo" class="kv"></div>
-    </section>
-
-    <section class="card" id="cardMulti">
-      <h3>4. 多路线复核（按需）</h3>
-      <p class="hint">由你主动启动，最多取 3 条<b>不重复</b>的可通关路线；重复路线自动去重，未通关路线不参与统计。批量导入不会自动跑多路线。</p>
-      <div class="row">
-        <label>路线数
-          <select id="routeCount"><option value="2">2</option><option value="3" selected>3</option></select>
-        </label>
-        <button id="btnRoutes" class="btn">开始多路线复核</button>
-      </div>
-      <div class="row wrap">
-        <label><input type="checkbox" id="showStable" checked> 稳定区域</label>
-        <label><input type="checkbox" id="showFrequent" checked> 高频区域</label>
-        <label><input type="checkbox" id="showFloating" checked> 浮动区域</label>
-      </div>
-      <div id="routeInfo" class="kv"></div>
+      <p class="hint">选中一张图纸后，在中间画布上直接编辑；右侧可做主体提取、存图纸库或进入拼接。</p>
     </section>
 
   </aside>
 
-  <!-- ========== 中间：目标图与结果（主要 UI 占位，固定居中） ========== -->
+  <!-- ========== 中间：图纸画布与结果 ========== -->
   <main class="main">
 
     <!-- ========== 拼接工作台（独立视图，默认隐藏；进入拼接时由 body.composeMode 显示） ==========
          刻意用**独立 canvas** 而不是复用 #cv：拼接要画多图层、选中框、拖拽预览、覆盖提示，
-         与目标图那套（掩码叠加/碎色高亮/区间描边/空位斜纹）诉求完全不同，
-         混在一个 draw() 里两边都会被拖累。 -->
+         与目标图那套（碎色高亮/选区描边/空位斜纹）诉求完全不同。 -->
     <div id="composeView" class="composeView">
       <div class="composeBar">
         <span class="composeTitle">🧩 拼接工作台</span>
@@ -112,8 +60,11 @@
       <div class="composeCanvasWrap">
         <canvas id="composeCv" width="600" height="600"></canvas>
       </div>
-      <div id="composeReadout" class="readout">先在右边「13. 图纸拼接」里新建画布，再从部件列表点「放上画布」。</div>
+      <div id="composeReadout" class="readout">先在右边「5. 图纸拼接」里新建画布，再从部件列表点「放上画布」。</div>
     </div>
+
+    <!-- 画布统计：一眼看到当前画布用了多少种颜色 -->
+    <div class="canvasStats" id="canvasColorStats"><span class="muted">未导入图纸</span></div>
 
     <div class="mainCanvasRow">
       <div class="canvasWrap">
@@ -132,7 +83,7 @@
 
         <div id="viewExportDock" class="floatPanel">
           <div class="floatHead">
-            <span class="floatTitle">5. 显示与导出</span>
+            <span class="floatTitle">2. 显示与导出</span>
             <button class="btn tiny floatToggle" data-float="viewExportDock">悬浮</button>
           </div>
           <div class="floatBody">
@@ -140,63 +91,29 @@
               <label>像素尺寸 <input type="range" id="cellSize" min="4" max="24" step="1" value="11"></label>
             </div>
             <div class="row wrap">
-              <label><input type="checkbox" id="optComp" checked> 按连通块分别描边</label>
-              <label><input type="checkbox" id="optDim"> 淡化区间外像素</label>
-            </div>
-            <div class="row wrap">
               <label><input type="checkbox" id="optGrid"> 显示格线</label>
-              <label><input type="checkbox" id="optA"> 标出区间前已消除范围</label>
+              <label><input type="checkbox" id="optShowVoid" checked title="把值为 0 的格子画成斜纹，便于看清主体边界"> 显示空位</label>
+              <label><input type="checkbox" id="optShowMaskOutline" checked title="把当前选区的轮廓描出来"> 描选区边</label>
             </div>
             <div class="row wrap">
               <button id="btnPng" class="btn ghost">导出当前视图 PNG</button>
-              <button id="btnJson" class="btn ghost">导出区间定位 JSON</button>
             </div>
           </div>
         </div>
       </div>
     </div>
     <div class="legend" id="legend"></div>
-    <div class="readout" id="readout">把鼠标移到目标图上可查看该像素的颜色、消除步序与所属区间。</div>
-
-    <div class="boardSectionHead">
-      <span>棋盘区 &amp; 暂存区</span>
-      <label><input type="checkbox" id="optBoard" checked> 显示（有求解路线即可看；定位区间后显示状态A/B，否则显示开局/末局）</label>
-    </div>
-    <div id="boardCompareWrap" class="boardCompareWrap"></div>
+    <div class="readout" id="readout">把鼠标移到图纸上可查看该像素的行列与颜色。</div>
 
     <div class="logbox"><div class="logHead">运行日志</div><pre id="log"></pre></div>
   </main>
 
-  <!-- ========== 右栏：美术/演示/重构类功能 ========== -->
+  <!-- ========== 右栏：修图 / 提取 / 拼接 ========== -->
   <aside class="side sideRight">
-
-    <section class="card" id="cardDemo">
-      <h3>7. 自动演示</h3>
-      <p class="hint">按真实消除顺序逐步播放，目标图会真实清空已消除的像素。</p>
-      <div class="row">
-        <button id="btnDemoPlay" class="btn primary">▶ 播放</button>
-        <button id="btnDemoPause" class="btn" disabled>⏸ 暂停</button>
-        <button id="btnDemoStepBack" class="btn ghost" title="后退一步">◀</button>
-        <button id="btnDemoStepFwd" class="btn ghost" title="前进一步">▶</button>
-      </div>
-      <div class="row wrap">
-        <label>速度 <input type="range" id="demoSpeed" min="1" max="10" step="1" value="5"></label>
-        <button id="btnDemoJumpA" class="btn ghost" title="跳到区间下限">跳到A</button>
-        <button id="btnDemoJumpB" class="btn ghost" title="跳到区间上限">跳到B</button>
-        <button id="btnDemoJumpEnd" class="btn ghost" title="跳到最后一步">跳到末尾</button>
-      </div>
-      <div class="row">
-        <label><input type="checkbox" id="optDemoRegion"> 显示区间边界（不遮挡消除状态）</label>
-      </div>
-      <div class="row">
-        <input type="range" id="demoScrub" min="0" max="0" step="1" value="0" style="width:100%">
-      </div>
-      <div id="demoInfo" class="kv"></div>
-    </section>
 
     <section class="card" id="editCard">
       <div class="floatHead">
-        <h3 class="floatTitle">8. 美术编辑</h3>
+        <h3 class="floatTitle">3. 美术编辑</h3>
         <button class="btn tiny floatToggle" data-float="editCard">悬浮</button>
       </div>
       <div class="floatBody">
@@ -230,7 +147,7 @@
         直接用「按色选」会选中全图该色（实测熊猫图深灰 573 格），主体轮廓会被一起抹掉。</span>
       </div>
       <div id="editReplaceStatus" class="replaceStatus" style="display:none"></div>
-      <div class="editSubhead">完整色库（共 34 色。边框内是这张目标图已有的颜色，边框外是当前未使用的）</div>
+      <div class="editSubhead">完整色库（共 34 色。边框内是这张图纸已有的颜色，边框外是当前未使用的）</div>
       <div id="editPalette"></div>
       <div class="row">
         <button id="btnEditUndo" class="btn ghost" disabled>撤销</button>
@@ -264,7 +181,7 @@
         <input type="number" id="fragGateCustom" min="0.01" max="99" step="0.01" value="18" style="width:66px;display:none" title="自定义阈值，单位是百分比。改完立即生效，并记住到下次打开">
         <span id="fragGateSaved" class="muted" style="font-size:11px"></span>
         <button id="btnFragCheck" class="btn ghost">重新计算</button>
-        <label title="把被判为碎色的像素在目标图上高亮出来，直接看出该修哪里"><input type="checkbox" id="fragHighlight"> 高亮碎色像素</label>
+        <label title="把被判为碎色的像素在图纸上高亮出来，直接看出该修哪里"><input type="checkbox" id="fragHighlight"> 高亮碎色像素</label>
       </div>
       <div class="hint">阈值随时可改，改完立刻重判（碎色率本身不用重算），并记住到下次打开工具。
         当前采用 18%，与生产端的碎色闸门是同一个值——这里达标的图，生产时不会因碎色被卡掉。
@@ -275,88 +192,15 @@
       </div>
     </section>
 
-    <section class="card" id="cardPressure">
-      <h3>9. 暂存压力图</h3>
-      <p class="hint">纵轴为暂存占用数量，虚线为暂存上限。全知与玩家是两套各自真实的轨迹，用下面的按钮切换查看，
-        互不代替。全知横轴为完成进度，玩家横轴为操作步数。</p>
-      <div class="row wrap">
-        <button id="btnTrackOmni" class="btn primary">查看全知轨迹</button>
-        <button id="btnTrackPlayer" class="btn ghost">查看玩家轨迹</button>
-      </div>
-      <div class="row wrap" id="playerSeedRow" style="display:none">
-        <label>玩家随机种子
-          <select id="selPlayerSeed"></select>
-        </label>
-        <label><input type="checkbox" id="optPlayerSource" checked> 看重构后关卡（不勾选则看原关卡）</label>
-      </div>
-      <div class="row wrap">
-        <label><input type="checkbox" id="optPressureOverlay"> 叠加修改前后对比（需先重构成功；仅全知轨迹）</label>
-      </div>
-      <div id="pressureTrackInfo" class="kv"></div>
-      <canvas id="cvPressure" width="340" height="170"></canvas>
-      <div id="pressureInfo" class="kv"></div>
-      <div id="pressureCompareTable" class="kv"></div>
-    </section>
-
-    <section class="card" id="cardRecon">
-      <h3>10. 重构关卡（完全重新生成）</h3>
-      <p class="hint">用正式生成器和求解器，把改好的目标图重新构造成守恒、结构合法、可解的新关卡。
-        只有这一种方式，棋盘、管道、障碍都会重新排布；失败会说明原因，不会假装成功。
-        重构后除生成器自己的正式玩家结果外，另跑 5 个固定随机种子的多轮玩家验证供你判断稳定性。</p>
-      <div class="row wrap">
-        <label class="fileBtn">导入生成器参数<input type="file" id="genParamsInput" accept=".json,.jsonc"></label>
-        <button id="btnClearGenParams" class="btn ghost" style="display:none">清除已导入参数</button>
-      </div>
-      <div id="genParamsInfo" class="kv"></div>
-      <p class="hint">点下面的按钮前，先核对这次会用到的关键参数：</p>
-      <div id="reconParamPreview" class="kv"></div>
-      <div class="row">
-        <button id="btnReconstruct" class="btn primary">重新生成关卡</button>
-      </div>
-      <div id="reconInfo" class="kv"></div>
-      <div class="row wrap" id="reconViewSwitch" style="display:none">
-        <label><input type="radio" name="viewMode" value="before" checked> 查看原关卡</label>
-        <label><input type="radio" name="viewMode" value="after"> 查看重构后</label>
-      </div>
-      <div id="reconCompareTable" class="kv"></div>
-      <div class="row" id="reconRegionRow" style="display:none">
-        <button id="btnRegionCompare" class="btn ghost">对比当前区间（修改前后）</button>
-      </div>
-      <div id="reconRegionInfo" class="kv"></div>
-      <div id="regionCompareBox" style="display:none">
-        <p class="hint">下面是这一关的进度区域专用对比图（与上方主画布无关，导出时导出的就是这张图）：
-          按同一进度区间，分别标出修改前后都会消除的共同区域、只在修改前消除的区域、只在修改后消除的区域。</p>
-        <div class="canvasWrap"><canvas id="cvRegionCompare" width="600" height="200"></canvas></div>
-        <div class="legend" id="regionCompareLegend"></div>
-      </div>
-      <div class="row" id="reconExportRow" style="display:none">
-        <button id="btnFullExport" class="btn primary">导出完整对比包（ZIP）</button>
-        <button id="btnAddToLibrary" class="btn primary">添加为待导出库</button>
-      </div>
-    </section>
-
-    <section class="card" id="cardExportLib">
-      <h3>11. 待导出库</h3>
-      <p class="hint">重构并通过验证的关卡可加入这里，随时切换到下一关继续修改；同一关再次加入会更新原条目。
-        刷新页面后仍会保留，直到你主动清除。</p>
-      <div id="exportLibInfo" class="kv"></div>
-      <div id="exportLibList" class="list"></div>
-      <div class="row">
-        <button id="btnLibExportSelected" class="btn primary">批量导出勾选项</button>
-        <button id="btnLibExportAll" class="btn ghost">批量导出全部</button>
-        <button id="btnLibClear" class="btn ghost">清空待导出库</button>
-      </div>
-    </section>
-
-    <!-- ===== 12. 主体提取（任务 ANT-ARTTOOL-SUBJECT-EXTRACT-20260902）=====
-         用户需求：把目标图的主体人工框出来、剔掉边缘杂物，输出只含主体的像素图纸；
+    <!-- ===== 4. 主体提取 =====
+         把目标图的主体人工框出来、剔掉边缘杂物，输出只含主体的像素图纸；
          之后要能再导入回来拼接，让一关有多个主体去做目标引导趋势。
          所以这里**保持原尺寸**、空位写 0 —— 拼接时行列坐标才对得上。 -->
     <section class="card" id="extractCard">
-      <h3>12. 主体提取</h3>
+      <h3>4. 主体提取</h3>
       <p class="hint">把主体框出来 → 一键剔掉框外（或框内）→ 存进图纸库。
         <b>剔掉的位置写 0，画布尺寸不变</b>，这样之后再导回来拼接时坐标能对上。
-        选区工具在上面「8. 美术编辑」里选，需先勾「开启编辑模式」。</p>
+        选区工具在上面「3. 美术编辑」里选，需先勾「开启编辑模式」。</p>
 
       <div class="row wrap">
         <button id="btnExtractOutside" class="btn primary" disabled>只保留选区内（剔掉框外）</button>
@@ -365,12 +209,6 @@
       <div class="row wrap">
         <button id="btnExtractUndo" class="btn ghost" disabled>撤销上一步剔除</button>
         <button id="btnExtractReset" class="btn ghost" disabled>还原为原图</button>
-        <label title="把被剔除（值为 0）的格子在画布上画成斜纹，便于看清主体边界">
-          <input type="checkbox" id="optShowVoid" checked> 显示空位
-        </label>
-        <label title="把当前选区的轮廓描出来">
-          <input type="checkbox" id="optShowMaskOutline" checked> 描选区边
-        </label>
       </div>
       <div id="extractInfo" class="kv"></div>
 
@@ -396,7 +234,7 @@
           阈值 40 一次清净。</span>
       </div>
 
-      <div class="editSubhead">图纸库（与上面的关卡待导出库分开存放）</div>
+      <div class="editSubhead">图纸库</div>
       <div class="row wrap">
         <input type="text" id="inPieceName" placeholder="图纸名（留空用图名）" style="flex:1;min-width:120px">
         <button id="btnAddPiece" class="btn primary" disabled>➕ 加入图纸库</button>
@@ -409,12 +247,11 @@
         <label class="fileBtn">导入图纸库 JSON<input type="file" id="filePieceLib" accept=".json"></label>
         <button id="btnPieceClear" class="btn ghost">清空图纸库</button>
       </div>
-      <p class="hint">图纸库和关卡待导出库共用浏览器本地存储的配额。一张 20×20 图纸约 1 KB，
-        比关卡条目（约 54 KB）小得多，攒几百张也没问题。</p>
+      <p class="hint">图纸库保存在浏览器本地，刷新不丢。一张 20×20 图纸约 1 KB，攒几百张也没问题。</p>
     </section>
 
     <section class="card" id="composeCard">
-      <h3>13. 图纸拼接</h3>
+      <h3>5. 图纸拼接</h3>
       <p class="hint">把多个部件摆到一张新画布上，做成**多主体**的目标图。
         摆放过程中部件<b>可以叠在一起</b>（先大致摆好再调）。导出时按图层底到顶合成，
         重叠格<b>只输出最顶层的像素 id</b>。</p>
@@ -438,6 +275,7 @@
         <div class="floatBody">
           <div class="row wrap">
             <label class="fileBtn">导入 TXT 图<input type="file" id="fileComposeTxt" accept=".txt" multiple></label>
+            <label class="fileBtn" title="递归读取文件夹里的所有 .txt，作为部件加入列表">导入文件夹<input type="file" id="fileComposeDir" webkitdirectory directory multiple></label>
             <button id="btnComposeFromLib" class="btn ghost">从图纸库全部添加</button>
             <button id="btnComposeSrcClear" class="btn ghost">清空部件列表</button>
           </div>
@@ -517,7 +355,15 @@
         <label><input type="radio" name="composeTool" value="border"> 边框</label>
       </div>
       <div class="row wrap">
+        <span class="rowLabel">几何手绘</span>
+        <label title="在画布上拖一个范围，生成矩形"><input type="radio" name="composeTool" value="rect"> 矩形</label>
+        <label title="在画布上拖一个范围，生成椭圆"><input type="radio" name="composeTool" value="ellipse"> 椭圆</label>
+        <label title="在画布上拖一个范围，生成三角形"><input type="radio" name="composeTool" value="triangle"> 三角形</label>
+        <label title="在画布上拖一个范围，生成菱形"><input type="radio" name="composeTool" value="diamond"> 菱形</label>
+      </div>
+      <div class="row wrap">
         <label class="inlineNum">线宽 <input type="number" id="inComposeWidth" value="1" min="1" max="20" step="1"> 格</label>
+        <label title="勾选＝实心图形；不勾＝空心，空心粗细用左边的线宽"><input type="checkbox" id="optComposeShapeSolid" checked> 实心图形（不勾＝空心）</label>
         <label><input type="checkbox" id="optComposeErase"> 当橡皮擦（涂成空）</label>
       </div>
       <div class="row wrap" id="composeBorderRow">
@@ -534,6 +380,11 @@
       </div>
       <p class="hint">边框：选「边框」工具后在画布上<b>拖一个范围</b>即可生成；或点「铺满整张画布」。
         生成后下面会列出它的各个部件（田字格就是四个小口＋外框＋十字），可以<b>单独给某一部件换色</b>。</p>
+      <div class="row wrap">
+        <button id="btnComposeTianzi" class="btn primary">自动生成田字格四框</button>
+        <span class="hint">按当前画布均分成 2×2 四个独立框（中缝是两条边框）；颜色用当前画笔色，线宽用上面的「线宽」。
+          偶数边长四格完全相等，奇数边长只差 1 格。</span>
+      </div>
       <div id="composeBorderParts" class="list"></div>
       <div class="editSubhead">当前画笔颜色</div>
       <div id="composePalette" class="palette"></div>
@@ -575,23 +426,13 @@
 
 </div>
 
-<!-- ===== 求解器与生成器：引用本目录 bin/js/（正式代码副本，随工具打包便于迁移） ===== -->
-<!-- 求解器与生成器：引用本目录下的 bin/js/（2026-08-03 起随工具一起打包，便于整个文件夹迁移）。
-     这是正式代码的副本，正式来源仍是项目根目录的 bin/；两者的同步按用户 2026-08-03 决定本轮不做，
-     副本的来源与注意事项见 bin/来源说明.md。 -->
-<script src="bin/js/utils.js?v=113"></script>
-<script src="bin/js/simulator.js?v=113"></script>
-<script src="bin/js/solver-strategy.js?v=113"></script>
-<script src="bin/js/solver.js?v=113"></script>
-<script src="bin/js/playersim.js?v=113"></script>
-<script src="bin/js/analysis.js?v=113"></script>
-<script src="bin/js/generator.js?v=113"></script>
-<!-- ===== 本工具自有文件 ===== -->
-<!-- 碎色率口径：bin/js/generator.js 的 computeFragmentation 同源副本。
-     不放进 bin/js/ 是因为那是主 bin 的 2026-08-12 快照，整体同步会带进 v101~v105 全部改动。
-     依赖 bin/js/utils.js 的 eliminationOrder，故必须排在它之后。 -->
-<script src="js/fragment.js?v=9"></script>
-<script src="js/core.js?v=12"></script>
-<script src="js/app.js?v=12"></script>
+<!-- ===== 只保留图纸编辑所需的公共库：颜色表 / TXT 解析 / 碎色口径。
+     generator.js 只调用 blocksFromTXT 与 computeFragmentation 两个纯函数；
+     求解器、模拟器、PlayerSim、Analysis、ZIP 库都不再载入，本工具不跑任何游玩/关卡逻辑。 ===== -->
+<script src="bin/js/utils.js?v=114"></script>
+<script src="bin/js/generator.js?v=114"></script>
+<script src="js/fragment.js?v=10"></script>
+<script src="js/core.js?v=16"></script>
+<script src="js/app.js?v=16"></script>
 </body>
 </html>

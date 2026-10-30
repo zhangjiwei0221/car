@@ -393,6 +393,10 @@ AntSolver.Simulator = (function() {
   //               （= 用户描述过的“扫一遍到顶还没满，就重新扫一遍，原来的方块就露出来了”）
   //   'pixel'  —— 每取走一个像素就重算一遍（= 玩家模拟 PlayerSim 一直在用的口径）
   var pickLayerMode = 'frozen';
+  // 消除排序参照物（实验开关）：'ring' 层号（默认） | 'corner' 左下角曼哈顿 | 'bottom' 底边
+  var PICK_REF = 'ring';
+  function setPickRef(m) { PICK_REF = (m === 'corner' || m === 'bottom') ? m : 'ring'; }
+  function getPickRef() { return PICK_REF; }
   function setPickLayerMode(m) { pickLayerMode = (m === 'layer' || m === 'pixel') ? m : 'frozen'; }
   function getPickLayerMode() { return pickLayerMode; }
 
@@ -508,6 +512,8 @@ AntSolver.Simulator = (function() {
       // 走到的格子颜色不符 / 此刻还没露出来 → 跳过，继续沿这圈走。
       // 旧的起点距离 / 入口源 / 依赖波深度不再参与排序（start/source/depth 保留仅作兼容）。
       var R = _ring[r * cols + c]; if (R < 0) R = 0;
+      if (PICK_REF === 'corner') R = Math.abs(r - (rows - 1)) + c;
+      else if (PICK_REF === 'bottom') R = rows - 1 - r;
       return R * (rows * cols + 1) + (rows - 1 - r) * cols + c;
     }
     function pushCandidate(r, c, source, depth) {
@@ -1416,7 +1422,9 @@ AntSolver.Simulator = (function() {
     isDeadEnd: isDeadEnd,   // 【v160】死局判定（满格且消不掉 / 无可取盒）——页面每次模拟态刷新时结算失败
     floodFillEliminate: floodFillEliminate, floodFillCount: floodFillCount,
     ringMaskOf: ringMaskOf,          // 「圈」的定义（按图形轮廓分层）——供玩家模拟等复用，避免第二份副本口径漂移
-    setPickLayerMode: setPickLayerMode,   // 「圈」多久重算一次：'frozen' | 'layer' | 'pixel'
+    setPickLayerMode: setPickLayerMode,
+    setPickRef: setPickRef,       // 'ring' | 'corner' | 'bottom'
+    getPickRef: getPickRef,   // 「圈」多久重算一次：'frozen' | 'layer' | 'pixel'
     getPickLayerMode: getPickLayerMode,
     // 第三种玩法模式（四方向瞬时连锁消除）：新增并列口径，原两种模式的函数与行为未改
     instantChainEliminate: instantChainEliminate,

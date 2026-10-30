@@ -1,0 +1,129 @@
+{
+  "schema": "story-plan-proposed-v1",
+  "status": "proposed_unverified",
+  "target": "实验关/关卡6/35x35拼接图纸_006.txt",
+  "createdAt": "2026-10-27",
+  "selection": {
+    "main": "hollowEntry",
+    "support": ["shortDebt", "reveal"],
+    "alternative": ["groupDebt"],
+    "source": "实验关/关卡6/分析_v632/story-atom-ranking.json",
+    "reason": "R2→R10 的边界入口→内部大区域证据最强；短债务和 reveal 可作为后续推进，groupDebt 不是默认主机制"
+  },
+  "frozenInputsProposed": {
+    "ruleMode": "instantChain",
+    "capacity": {
+      "min": 20,
+      "max": 40
+    },
+    "board": {
+      "rows": 7,
+      "cols": 7,
+      "blackCells": 0,
+      "pipeCells": 0,
+      "bufferLimit": 5
+    },
+    "referencePlanLabel": "20-40 / 7×7"
+  },
+  "beats": [
+    {
+      "id": "teach",
+      "intent": "用外围 31/30/5 色完成少量清晰动作，建立取车和消除方向",
+      "evidence": "目标图开局暴露 3 色；外围存在多个边界区域"
+    },
+    {
+      "id": "hollowEntry",
+      "intent": "从 R2（30色，5px）进入，打开内部 R10（15色，58px），形成第一段掏入内部主题的体验",
+      "entryRegion": "R2",
+      "entryColor": 30,
+      "targetRegion": "R10",
+      "targetColor": 15,
+      "staticEvidence": "R2 顶部边界，R2→R10 邻接，扩张比约 11.6，目标区域首次可达步骤约 1",
+      "status": "needs_target_route_replay"
+    },
+    {
+      "id": "shortDebt",
+      "intent": "在进入内部后制造一笔短债务，避免整个开局都是免费消除",
+      "candidateCar": {
+        "referenceCarId": 2,
+        "color": 17,
+        "capacity": 26,
+        "entryReach": 16,
+        "expectedDebt": 10,
+        "slot": 0,
+        "start": {
+          "r": 34,
+          "c": 0
+        },
+        "regions": ["R225", "R186", "R178", "R192", "R215", "R218", "R220", "R221"]
+      },
+      "expectedReleaseHint": "后续 17 色区域 R122/R135/R159 等出现后再补齐",
+      "status": "needs_stateful_replay"
+    },
+    {
+      "id": "reveal",
+      "intent": "在中后段打开一个明确的内部大区域，形成掏开外壳后的视觉/结构回报",
+      "candidateRegions": [
+        {
+          "region": "R59",
+          "color": 28,
+          "area": 42,
+          "firstReachableStep": 14
+        },
+        {
+          "region": "R65",
+          "color": 15,
+          "area": 28,
+          "firstReachableStep": 15
+        }
+      ],
+      "status": "needs_board_binding"
+    },
+    {
+      "id": "finale",
+      "intent": "用剩余内部区域完成收尾，不引入末段隐藏唯一色",
+      "status": "needs_board_binding"
+    }
+  ],
+  "alternatives": [
+    {
+      "type": "groupDebt",
+      "role": "optional",
+      "candidateWindow": {
+        "startIndex": 39,
+        "members": "14:22 + 15:24 + 30:22",
+        "expectedDebt": 21,
+        "duplicateColor": false,
+        "score": 85
+      },
+      "reason": "可作为中后段的组合债务实验，不作为本图默认主剧情"
+    }
+  ],
+  "validation": {
+    "completed": [
+      {
+        "check": "entryHitR2",
+        "result": "30色/22车实际命中R2并打开15色内部区域"
+      },
+      {
+        "check": "hollowConsumedR10",
+        "result": "15色/24车实际命中R10"
+      },
+      {
+        "check": "debtCarLeftDebt",
+        "result": "17色/26车当前消16，真实留下10债务"
+      },
+      {
+        "check": "debtReleased",
+        "result": "31色/30车入场后，自动补账10，17色债务清除"
+      }
+    ],
+    "pending": [
+      "R59/R65 的第一次实际可达点和玩家可见性",
+      "目标状态链转成可行棋盘阻挡",
+      "棋盘入口和旁路",
+      "PlayerSim 和真人可理解性"
+    ],
+    "evidence": "实验关/关卡6/分析_v632/story-state-replay-v1.json"
+  }
+}

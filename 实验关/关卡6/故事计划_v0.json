@@ -1,0 +1,139 @@
+{
+  "schema": "story-plan-draft-v0",
+  "status": "draft_unverified",
+  "target": "实验关/关卡6/35x35拼接图纸_006.txt",
+  "createdAt": "2026-10-27",
+  "frozenInputsProposed": {
+    "ruleMode": "instantChain",
+    "capacity": {
+      "min": 20,
+      "max": 40
+    },
+    "board": {
+      "rows": 7,
+      "cols": 7,
+      "blackCells": 0,
+      "pipeCells": 0,
+      "bufferLimit": 5
+    },
+    "referencePolicy": "shortDebt"
+  },
+  "fitness": {
+    "capacityExact": true,
+    "boardCarCount": 49,
+    "targetPlayoutOk": true,
+    "targetPlayoutCars": 49,
+    "sourceEvidence": "实验关/关卡6/分析_v632/story-candidates.json",
+    "sourcePlanLabel": "20-40 / 7×7"
+  },
+  "storyAtoms": [
+    {
+      "type": "hollowEntry",
+      "entryRegion": "R2",
+      "entryColor": 30,
+      "entryArea": 5,
+      "targetRegion": "R10",
+      "targetColor": 15,
+      "targetArea": 58,
+      "evidence": [
+        "R2 是顶部边界区域",
+        "R2 与 R10 相邻",
+        "一旦入口连通，R10 可在目标拓扑上作为第一段内部区域"
+      ],
+      "status": "hypothesis"
+    },
+    {
+      "type": "groupDebt",
+      "sourcePlanIndex": 10,
+      "groupSize": 3,
+      "members": [
+        {
+          "carId": 11,
+          "color": 34,
+          "capacity": 25,
+          "entryReach": 3,
+          "expectedDebt": 22,
+          "regions": ["R121", "R138", "R141", "R123", "R125", "R129", "R133"]
+        },
+        {
+          "carId": 12,
+          "color": 31,
+          "capacity": 31,
+          "entryReach": 174,
+          "expectedDebt": 0,
+          "regions": ["R160", "R158", "R232", "R217"]
+        },
+        {
+          "carId": 13,
+          "color": 31,
+          "capacity": 31,
+          "entryReach": 143,
+          "expectedDebt": 0,
+          "regions": ["R160", "R158", "R210", "R151"]
+        }
+      ],
+      "expectedExperience": "两辆 31 色完成，34 色留下较大债务，整组共同占槽等待",
+      "status": "needs_chain_group_replay"
+    },
+    {
+      "type": "reveal",
+      "candidateRegions": [
+        "R59",
+        "R65",
+        "R74",
+        "R30",
+        "R73"
+      ],
+      "note": "这些区域面积较大且首次可达步骤较深，可作为中后段揭示候选；尚未绑定具体节拍",
+      "status": "candidate"
+    }
+  ],
+  "beats": [
+    {
+      "id": "teach",
+      "label": "教学",
+      "intent": "用边界上的 30/31/5 色完成少量可理解动作，建立取车与消除方向",
+      "successSignal": "前几步玩家能看到明确进展，不进入无解释等待"
+    },
+    {
+      "id": "hollow",
+      "label": "从缺口向内掏",
+      "intent": "通过边界缺口 R2→R10 或同类入口，让内部大区域首次暴露",
+      "successSignal": "进入内部区域后出现新的选择或债务素材"
+    },
+    {
+      "id": "groupDebt",
+      "label": "三连锁小组债务",
+      "intent": "验证两辆 31 色可完成、一辆 34 色留下债务的 groupDebt",
+      "successSignal": "三辆整组入场，前两辆完成但不能提前离场，34 色保持可见债务"
+    },
+    {
+      "id": "release",
+      "label": "释放",
+      "intent": "后续内部区域补齐 34 色债务，使整组共同离场",
+      "successSignal": "3 个槽位一起释放，buffer 明显下降"
+    },
+    {
+      "id": "finale",
+      "label": "收尾",
+      "intent": "利用中后段大区域完成剩余像素，不以末段唯一色强锁收尾",
+      "successSignal": "最后一段仍有可理解推进，不靠未知信息"
+    }
+  ],
+  "validation": {
+    "verified": [],
+    "pending": [
+      "3 连锁链整组入场状态回放",
+      "34 色的后续释放区域与步数",
+      "棋盘车辆位置、槽位和起点",
+      "旁路检查",
+      "PlayerSim",
+      "障碍移除消融"
+    ]
+  },
+  "notes": [
+    "容量 [20,40] 和 7×7 是实验情景，不代表已冻结的产品输入。",
+    "sourcePlan 中的 entryReach 顺序来自 InstantPlayout，不代表锁链整组同时入场后的最终状态。",
+    "任何 groupDebt 或 hollowEntry 在真实 Simulator 回放前都只是候选。"
+  ]
+}

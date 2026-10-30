@@ -1,0 +1,2594 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 806f0c2..2ac2ec8 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v615 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=615">
++  <title>车接小人 v626 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=626">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v615</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v626</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -418,6 +418,10 @@
+         <label><input type="checkbox" id="gen-obstacle-thicken"> 障碍加厚实验（默认关闭）</label>
+         <span class="gen-hint">冰 <input id="gen-ice-target" type="number" min="3" max="20" value="12" style="width:42px"> 个；锁链 <input id="gen-chain-target" type="number" min="1" max="8" value="6" style="width:36px"> 组；至少连≤<input id="gen-chain-small-max" type="number" min="6" max="40" value="18" style="width:42px">px 小车</span>
+       </div>
++      <div class="gen-row" style="margin-top:6px" title="实验功能：对已验收的006/008/014目标图使用固定故事棋盘并验证完整路线；其他目标图明确失败，不回退随机生成。默认关闭。">
++        <label><input type="checkbox" id="gen-story-compiler"> 故事编译器实验（已知三图 · 默认关闭）</label>
++        <span class="gen-hint">开启后只接受已注册故事；不匹配 = 明确失败</span>
++      </div>
+       <div class="gen-row" style="margin-top:6px" title="容量在 deriveCapacityBand 推导出的带内选择。自动=带；下沿/上沿=固定到带的两端；中值=固定到 chosen。">
+         <label>容量策略</label>
+         <select id="gen-cap-profile" style="width:130px">
+@@ -784,30 +788,31 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=615"></script>
+-  <script src="js/utils.js?v=615"></script>
++  <script src="js/zip.js?v=626"></script>
++  <script src="js/utils.js?v=626"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=615"></script>
+-  <script src="js/simulator.js?v=615"></script>
++  <script src="js/color-libs.js?v=626"></script>
++  <script src="js/simulator.js?v=626"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=615"></script>
+-  <script src="js/solver-strategy.js?v=615"></script>
+-  <script src="js/solver.js?v=615"></script>
+-  <script src="js/playersim.js?v=615"></script>
++  <script src="js/anchor-cut.js?v=626"></script>
++  <script src="js/solver-strategy.js?v=626"></script>
++  <script src="js/solver.js?v=626"></script>
++  <script src="js/playersim.js?v=626"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=615"></script>
+-  <script src="js/car-sequencer.js?v=615"></script>
+-  <script src="js/experience-goal.js?v=615"></script>
+-  <script src="js/release-route-constructor.js?v=615"></script>
+-  <script src="js/capacity-tuner.js?v=615"></script>
+-  <script src="js/instant-playout.js?v=615"></script>
+-  <script src="js/generator.js?v=615"></script>
+-  <script src="js/route-obstacle-planner.js?v=615"></script>
+-  <script src="js/source-preflight.js?v=615"></script>
+-  <script src="js/analysis.js?v=615"></script>
++  <script src="js/solver-analysis.js?v=626"></script>
++  <script src="js/car-sequencer.js?v=626"></script>
++  <script src="js/experience-goal.js?v=626"></script>
++  <script src="js/release-route-constructor.js?v=626"></script>
++  <script src="js/capacity-tuner.js?v=626"></script>
++  <script src="js/instant-playout.js?v=626"></script>
++  <script src="js/generator.js?v=626"></script>
++  <script src="js/story-compiler.js?v=626"></script>
++  <script src="js/route-obstacle-planner.js?v=626"></script>
++  <script src="js/source-preflight.js?v=626"></script>
++  <script src="js/analysis.js?v=626"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=615"></script>
+-  <script src="js/app.js?v=615"></script>
++  <script src="js/level-editor.js?v=626"></script>
++  <script src="js/app.js?v=626"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 75d6d1d..c7aed43 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "615";
++var APP_BUILD = "626";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -4888,6 +4888,7 @@ AntSolver.App = (function() {
+     var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
+     var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
+     var _routeObstacle = !!((document.getElementById('gen-route-obstacle') || {}).checked);
++    var _storyCompiler = !!((document.getElementById('gen-story-compiler') || {}).checked);
+     var _capacityMix = !!((document.getElementById('gen-capacity-mix') || {}).checked);
+     var _capacityMixMin = parseInt((document.getElementById('gen-capacity-mix-min') || {}).value, 10) || 6;
+     var _capacityMixMax = parseInt((document.getElementById('gen-capacity-mix-max') || {}).value, 10) || 40;
+@@ -5089,6 +5090,12 @@ AntSolver.App = (function() {
+     //   下面这组参数继续沿用原生产口径（_legacyParams 保持 true），否则棋盘范围 / 管道数 / 目标车数
+     //   会跟着一起变，没法把改前后差异归因到产线。参数随产线重调留给下一个单变量实验。
+     out.generatorFlow = 'new_fixed';
++    if (_storyCompiler) {
++      out.storyCompiler = true;
++      out.storyCompilerStrict = true;
++      out.instantChain = true;
++      out.bottomOnly = false;
++    }
+     if (_routeObstacle) {
+       out.routeObstaclePlan = 'v1';
+       out.routeObstaclePlanMaxAttempts = 6;
+@@ -6056,6 +6063,15 @@ AntSolver.App = (function() {
+         ? ('采用 / ' + (rec.routeObstaclePlan.added || []).length + ' 个单元 / ' +
+           Math.round((rec.routeObstaclePlan.wallElapsedMs || rec.routeObstaclePlan.elapsedMs || 0) / 1000) + 's')
+         : ('未采用（' + (rec.routeObstaclePlan.reason || '无改善') + '）')) : '未开') +
++      row('故事编译器实验', rec.storyCompiler
++        ? (rec.storyCompiler.status === 'pass'
++          ? ('通过 / ' + rec.storyCompiler.label + ' / ' +
++            rec.storyCompiler.requiredSteps + '步契约 / ' +
++            (rec.storyCompiler.players || []).filter(function (x) {
++              return x.won && x.routeMatches;
++            }).length + '/6')
++          : ('未通过（' + (rec.storyCompiler.status || 'unknown') + '）'))
++        : '未开') +
+       row('混合容量填盘', rec.capacityMixPlan
+         ? ((rec.capacityMixPlan.rows || '?') + '×' + (rec.capacityMixPlan.cols || '?') + ' / ' +
+           (rec.capacityMixPlan.actualCars != null ? rec.capacityMixPlan.actualCars : '?') + ' 车 / 目标 ' +
+@@ -6088,9 +6104,12 @@ AntSolver.App = (function() {
+       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
+       row('目标图预检', rec.sourcePreflight ? (rec.sourcePreflight.status + ' · 风险 ' + (rec.sourcePreflight.warnings && rec.sourcePreflight.warnings.length ? rec.sourcePreflight.warnings.join('/') : '无') +
+         ' · ' + (rec.sourcePreflight.searchAdvice || '') + (rec.sourcePreflight.demand && rec.sourcePreflight.demand.smallCriticalColors && rec.sourcePreflight.demand.smallCriticalColors.length ? ' · 小色可关键' : '')) : '未测') +
+-      row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
+-        ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
+-        ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
++      row('目标体验', rec.storyCompilerPass
++        ? ('通过 · 故事契约 ' + rec.storyCompiler.requiredSteps + '步 · PlayerSim ' +
++          (rec.storyCompiler.players || []).filter(function (x) { return x.won && x.routeMatches; }).length + '/6')
++        : (rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
++          ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
++          ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）'))) +
+       row('路线与分岔', rec.experienceRouteEvidence && rec.experienceRouteEvidence.routeDistribution ? (function () { var d = rec.experienceRouteEvidence.routeDistribution, low = d.lowPressureRoute, cc = low && low.choiceContrast;
+         var shortYield = cc && cc.baselineAction && cc.lowAction
+           ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated
+@@ -6433,6 +6452,7 @@ AntSolver.App = (function() {
+     // 【v521】搜索结构门保持旧口径；只有目标模式最终验收可补低压力证据。
+     var _finalStruct = AntSolver.Quality.finalStructureFromGeneration ? AntSolver.Quality.finalStructureFromGeneration(result) : null;
+     var _useFinalStruct = !!(result.goalMode && result.config && result.config.experienceGoal === true && _finalStruct);
++    var _storyCompilerPass = !!(result.storyCompiler && result.storyCompiler.status === 'pass' && result.valid);
+     // 【v471】结构门过：不再把 fallback 当交付否决
+     var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
+     return {
+@@ -6484,7 +6504,8 @@ AntSolver.App = (function() {
+         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime,
+         capacityMix: result.config.capacityMix || null,
+         capacityMixBoard: result.config._capacityMixBoardPlan || null,
+-        obstacleThicken: result.config.obstacleThicken || null
++        obstacleThicken: result.config.obstacleThicken || null,
++        storyCompiler: !!result.config.storyCompiler
+       } : null,
+       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
+       cutInfo: (result.config && result.config._cutAuto) || null,
+@@ -6498,6 +6519,22 @@ AntSolver.App = (function() {
+       timelineEvidence: result.timelineEvidence || null,
+       experienceGoal: !!(result.config && result.config.experienceGoal),
+       experienceEvidence: (function () {
++        if (_storyCompilerPass) {
++          return {
++            pass: true,
++            status: 'story-compiler-pass',
++            reasons: [],
++            metrics: {
++              routeMode: result.storyCompiler.routeMode,
++              requiredSteps: result.storyCompiler.requiredSteps,
++              playersPass: (result.storyCompiler.players || []).filter(function (x) {
++                return x.won && x.routeMatches;
++              }).length
++            },
++            source: 'story_compiler',
++            diagnosis: { primary: 'pass', action: 'done', flags: ['storyCompiler'] }
++          };
++        }
+         var rt = result.experienceRouteEvidence, rb = rt && rt.bestVerified;
+         if (result.acceptedByVerifiedRoute && rt && rt.pass === true && rb && rb.releaseDecision && rb.releaseDecision.status === 'found' &&
+             rb.releaseDecision.evidence && rb.releaseDecision.evidence.finalReplayValid === true) {
+@@ -6521,11 +6558,13 @@ AntSolver.App = (function() {
+         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
+       usableSpaceRepair: result.usableSpaceRepair || null,
+       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+-      qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
+-      qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
++      qGatePass: _storyCompilerPass ? true : (_useFinalStruct ? _finalStruct.pass : _qv.gatePass),
++      qGateReasons: _storyCompilerPass ? [] : ((_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons),
+       baseGatePass: _qv.gatePass, baseGateReasons: _qv.gateReasons,
+       fullTime: !!(result.config && result.config.fullTime),
+       trapPost: result.trapPost || null,
++      storyCompilerPass: _storyCompilerPass,
++      storyCompiler: result.storyCompiler || null,
+       routeObstaclePlan: result.routeObstaclePlan || null,
+       capacityMixPlan: result.capacityMixPlan || null,
+       obstacleThicken: (function () {
+@@ -6601,12 +6640,13 @@ AntSolver.App = (function() {
+       // 只记录在生产侧记录里（CSV/关卡数据.json/报告），关卡本体不含该字段。
+       entryMode: result.entryMode || 'fourSide',
+       // 兜底标记(v86)：fallback=true 表示这关不是正常合格输出，是"最接近标准/安全垫底"的兜底交付。
+-      fallback: _qgFromFallback ? false : !!result.fallback,
++      fallback: (_storyCompilerPass || _qgFromFallback) ? false : !!result.fallback,
+       fallbackOriginal: !!result.fallback,
+-      qGateFallback: _qgFromFallback,
+-      fallbackTier: _qgFromFallback ? null : (result.fallbackTier != null ? result.fallbackTier : null),
+-      fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
+-      fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
++      qGateFallback: _qgFromFallback || _storyCompilerPass,
++      fallbackTier: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackTier != null ? result.fallbackTier : null),
++      fallbackType: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackType || null),
++      fallbackReason: _storyCompilerPass ? '故事编译契约通过（原通用门不作为否决）' :
++        (_qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null)),
+       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
+       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
+       goalBudgetEvidence: result.goalBudgetEvidence || null,
+@@ -8022,7 +8062,7 @@ AntSolver.App = (function() {
+     files.push({ name: '索引.csv', text: '\ufeff' + idxRows.join('\n') });
+ 
+     // 5) 生产报告 MD —— 中后期卡点审核（标准见 生产审核评分体系.md）
+-    var auditPass = results.filter(function(r) { return !!r.qPass; });
++    var auditPass = results.filter(function(r) { return !!(r.qPass || r.storyCompilerPass); });
+     var bl = config.bufferLimit || 5;
+     var md = '# 生产报告\n\n';
+     md += '- 生成时间: ' + new Date().toLocaleString() + '\n';
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index d2bc50d..7a460cd 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -26,6 +26,7 @@ try {
+     'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
+     'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
+     'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'instant-playout.js' + _v, 'generator.js' + _v,
++    'story-compiler.js' + _v,
+     'route-obstacle-planner.js' + _v, 'source-preflight.js' + _v
+   );
+   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
+@@ -39,6 +40,7 @@ if (_loaded && AntSolver.Generator.setProgressHook) {
+ }
+ 
+ function _goalPassed(r) {
++  if (r && r.storyCompiler && r.storyCompiler.status === 'pass') return true;
+   try { return AntSolver.Generator.goalAcceptPass(r, _goal && _goal.config); } catch (e) { return false; }
+ }
+ function _goalScore(r) {
+@@ -78,9 +80,9 @@ function _goalFinish(stopReason) {
+     best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };
+   }
+   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
+-  if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
+-  try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
+-  try { AntSolver.Generator.markFinalStructureAccept(best, g.config); } catch (e) {}
++  if (best && best.level && !best.storyCompiler) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
++  if (best && !best.storyCompiler) try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
++  if (best && !best.storyCompiler) try { AntSolver.Generator.markFinalStructureAccept(best, g.config); } catch (e) {}
+   best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: g.maxMs, perRoundMs: g.perMs,
+     sharedCapBudget: g.config.goalSharedBudget !== false, rounds: g.rounds, stopReason: best.goalStopReason || null,
+     searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - g.t0,
+@@ -134,18 +136,18 @@ function _goalRound() {
+   } catch (err) {
+     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
+   }
+-  if (r && !r.level && roundLeft() >= 1000) {
++  if (r && !r.level && !(r.storyCompiler && cfg.storyCompilerStrict) && roundLeft() >= 1000) {
+     try { r = AntSolver.Generator.repairUsableNoCandidate(g.blocks, r, cfg, { timeBudgetMs: roundLeft() }); }
+     catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+   }
+   // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
+   var tuneLeft = roundLeft();
+-  if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
++  if (cfg.experienceGoal === true && r && r.level && r.valid && !r.storyCompiler && tuneLeft > 100) {
+     cfg.capacityTuneMs = Math.max(100, Math.min(parseInt(cfg.capacityTuneMs, 10) || 5000, tuneLeft));
+     try { r = AntSolver.Generator.tuneExperienceCandidate(r, cfg); } catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
+   }
+   // 【v439】目标模式：先在同一基底上继续修，修不动再换 seed
+-  if (r && r.level && !_goalPassed(r)) {
++  if (r && r.level && !r.storyCompiler && !_goalPassed(r)) {
+     var _repCur = r, _repSteps = 0;
+     for (var _rr = 0; _rr < 3 && roundLeft() > 2000; _rr++) {
+       var _rep = null;
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 09605e5..e8f1853 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -15526,6 +15526,94 @@ AntSolver.Generator = (function() {
+   /** 【v194】一图多产的比较元组：先比六条过几条，再比离带距离，再比稳健通关率。 */
+   var _PRESSURE_FIRST = false;   // 【v215】压力优先：可解的前提上，峰窗越高越好
+   var _AUDIT_FIRST = false;      // 【v216】全知线优先：看"最优解自己扛多少"，不是玩家容错低
++  /**
++   * 【v616·正式版默认关闭接入】故事编译器单次产线。
++   * 只接受浏览器端 StoryCompiler 注册表已验收的目标图；不匹配时显式失败，
++   * 不落回随机候选。该函数只从 runFlowOnce() 进入，避免出现第二条纠偏/兜底产线。
++   */
++  function produceStoryOnce(blocks, config, opts) {
++    var t0 = Date.now();
++    var compiler = AntSolver.StoryCompiler;
++    if (!compiler || typeof compiler.compile !== 'function') {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++        storyCompiler: { schema: 'story-compiler-v1', status: 'compiler-not-loaded' },
++        lastFailReason: 'storyCompilerNotLoaded'
++      };
++    }
++    var result = null;
++    try { result = compiler.compile(blocks, config); }
++    catch (e) {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++        storyCompiler: { schema: 'story-compiler-v1', status: 'compile-error', error: String((e && e.message) || e) },
++        lastFailReason: 'storyCompilerError'
++      };
++    }
++    var meta = result && result.meta ? result.meta : {
++      schema: 'story-compiler-v1', status: 'no-result'
++    };
++    if (!result || !result.ok || !result.level) {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++        storyCompiler: meta,
++        lastFailReason: 'storyCompiler:' + (meta.status || 'failed'),
++        structural: {
++          ok: false,
++          reason: meta.status === 'unsupported-target'
++            ? '故事编译器没有该目标图的已验收剧本'
++            : '故事编译器验收失败：' + (meta.status || 'unknown')
++        }
++      };
++    }
++
++    var parsed = null;
++    var solveResult = null;
++    try { parsed = AntSolver.parseLevel(result.level); } catch (e) { parsed = null; }
++    try {
++      solveResult = AntSolver.Solver.solveInstantChain(parsed, {
++        timeBudgetMs: Math.max(1000, parseInt(config && config.timeBudgetMs, 10) || 20000)
++      });
++    } catch (e) { solveResult = null; }
++    if (!parsed || !solveResult || !solveResult.completed) {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 1, treeEvaluated: 1,
++        storyCompiler: meta,
++        solveResult: solveResult,
++        lastFailReason: 'storyCompilerSolveFailed',
++        structural: { ok: false, reason: '故事编译器关卡最终求解失败' }
++      };
++    }
++
++    var generationEval = null;
++    try { generationEval = evaluateGeneration(solveResult, parsed, config); }
++    catch (e) { generationEval = null; }
++    var cand = {
++      level: parsed,
++      valid: true,
++      solveResult: solveResult,
++      generationEval: generationEval,
++      difficulty: computeDifficulty(solveResult, parsed, config, generationEval),
++      config: config,
++      retries: 0,
++      flow: 'story_compiler',
++      candidates: 1,
++      treeEvaluated: 1,
++      elapsedMs: Date.now() - t0,
++      timedOut: false,
++      storyCompiler: meta,
++      structural: { ok: true, reason: 'story-compiler-validated' }
++    };
++    try { ensureCandidateQuality(cand); } catch (e) { cand.goodV3Error = String((e && e.message) || e); }
++    try { cand.choiceCurve = choiceCurve(parsed, solveResult, config); } catch (e) { cand.choiceCurve = null; }
++    try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(parsed, config || {}); }
++    catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
++    return cand;
++  }
+   /**
+    * 【v314·用户裁决】任何"重产一次"的分支都必须走**当前选定的那条产线**。
+    *   泄漏点：bandFixOnce（带外纠偏）和全灭兜底都写死调用 produceFixed —— 新版流程
+@@ -15534,6 +15622,7 @@ AntSolver.Generator = (function() {
+    */
+   function runFlowOnce(blocks, config, opts) {
+     try {
++      if (config && config.storyCompiler === true) return produceStoryOnce(blocks, config, opts || {});
+       if (config && config.generatorFlow === 'old') return produce(blocks, config);
+       return produceFixed(blocks, config, opts || {});
+     } catch (e) { return null; }
+@@ -16441,7 +16530,10 @@ AntSolver.Generator = (function() {
+     var maxRounds = parseInt(config.goalMaxRounds, 10);
+     if (!(maxRounds > 0)) maxRounds = 0;
+     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
+-    function passed(r) { return goalAcceptPass(r, config); }
++    function passed(r) {
++      if (r && r.storyCompiler && r.storyCompiler.status === 'pass') return true;
++      return goalAcceptPass(r, config);
++    }
+     var best = null, rounds = 0, stopped = false;
+     while (true) {
+       if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
+@@ -16467,7 +16559,7 @@ AntSolver.Generator = (function() {
+       }
+       var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+         roundBudgetMs - (Date.now() - roundT0));
+-      if (r && !r.level && repairLeft >= 1000) {
++      if (r && !r.level && !(r.storyCompiler && config.storyCompilerStrict) && repairLeft >= 1000) {
+         try { r = repairUsableNoCandidate(blocks, r, cfg, { timeBudgetMs: repairLeft, shouldStop: opts.shouldStop }); }
+         catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+       }
+@@ -16475,7 +16567,7 @@ AntSolver.Generator = (function() {
+       if (r) r.goalRound = rounds;
+       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+         roundBudgetMs - (Date.now() - roundT0));
+-      if (config.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
++      if (config.experienceGoal === true && r && r.level && r.valid && !r.storyCompiler && tuneLeft > 100) {
+         var tuneCfg = Object.assign({}, cfg, {
+           capacityTuneMs: Math.max(100, Math.min(parseInt(config.capacityTuneMs, 10) || 5000, tuneLeft))
+         });
+@@ -16483,7 +16575,7 @@ AntSolver.Generator = (function() {
+         catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
+       }
+       var localSwapLeft = maxMs ? maxMs - (Date.now() - t0) : Infinity;
+-      if (config.localSwapRepair === true && r && r.level && r.valid && localSwapLeft > 1000) {
++      if (config.localSwapRepair === true && r && r.level && r.valid && !r.storyCompiler && localSwapLeft > 1000) {
+         try {
+           var localCfg = Object.assign({}, cfg, {
+             localSwapRepairMaxMs: Math.min(
+@@ -16496,7 +16588,7 @@ AntSolver.Generator = (function() {
+         }
+         catch (e) { r.localSwapRepair = { schema: 'local-swap-repair-v1', applied: false, error: String((e && e.message) || e) }; }
+       }
+-      if (config.instantReleaseRoute === true && r && r.level && r.valid && r.solveResult &&
++      if (config.instantReleaseRoute === true && r && r.level && r.valid && !r.storyCompiler && r.solveResult &&
+           goalStructPass(r) && experienceCapacityOk(r, cfg)) {
+         try { instantReleaseRouteEvidenceOf(r, Object.assign({}, cfg, config)); }
+         catch (e) { r.instantReleaseRouteEvidence = { schema: 'instant-release-route-evidence-v1', pass: false, status: 'error', error: String((e && e.message) || e) }; }
+@@ -16511,10 +16603,10 @@ AntSolver.Generator = (function() {
+       best.goalStopped = stopped;
+       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
+     }
+-    if (best && best.level) attachExperienceRouteEvidence(best, config);
+-    if (best) markVerifiedRouteAccept(best, config);
+-    if (best) markReleaseRouteAccept(best, config);
+-    if (best) markFinalStructureAccept(best, config);
++    if (best && best.level && !best.storyCompiler) attachExperienceRouteEvidence(best, config);
++    if (best && !best.storyCompiler) markVerifiedRouteAccept(best, config);
++    if (best && !best.storyCompiler) markReleaseRouteAccept(best, config);
++    if (best && !best.storyCompiler) markFinalStructureAccept(best, config);
+     if (best) best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: perMs,
+       sharedCapBudget: config.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
+       searchElapsedMs: best.goalElapsedMs, wallElapsedMs: Date.now() - t0,
+@@ -16570,6 +16662,7 @@ AntSolver.Generator = (function() {
+     //   管道深度补救”的容量缩放都读这个快照，不许越过用户上限（踩过：v238 反推、管道 +12%、管道 +3）。
+     //   v496 注意：_userCapMin 为 null 表示"本档的上沿已由 capScalePlan 显式给定，需要重新快照"。
+     config = normalizeRuleConfig((config && typeof config === 'object') ? config : {});
++    if (config.storyCompiler === true) return runFlowOnce(blocks, config, opts);
+     if (config._userCapMin == null) {
+       var _ucMn = parseInt(config.boxSizeMin, 10) || 0, _ucMx = parseInt(config.boxSizeMax, 10) || 0;
+       if (_ucMn > 0 && _ucMx >= _ucMn) config = Object.assign({}, config, { _userCapMin: _ucMn, _userCapMax: _ucMx });
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js"
+new file mode 100644
+index 0000000..8372a49
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js"
+@@ -0,0 +1,1417 @@
++/*
++ * StoryCompiler v1 · generated by GenerateStoryCompilerUiBundle_v616.js
++ *
++ * Default-off browser registry for the three accepted story levels.
++ * Unsupported targets fail explicitly and never fall back to random search.
++ */
++var AntSolver = AntSolver || {};
++
++AntSolver.StoryCompiler = (function () {
++  var REGISTRY = {
++  "f9e2533b": {
++    "id": "006",
++    "label": "006 · 零冰开放开局",
++    "targetSig": "f9e2533b",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "37f3bf4e579e9c26b52205107e96f32186b1d1e36606b34864bd6525cc465981",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        }
++      ],
++      [
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 40
++        },
++        {
++          "id": 21,
++          "type": 0,
++          "param": 0,
++          "count": 36
++        },
++        {
++          "id": 22,
++          "type": 0,
++          "param": 0,
++          "count": 35
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        }
++      ],
++      [
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 20
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 34,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 4,
++          "type": 0,
++          "param": 0,
++          "count": 40
++        },
++        {
++          "id": 4,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 34,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        }
++      ],
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        }
++      ]
++    ],
++    "expectedPicks": [],
++    "requiredSteps": 47,
++    "storyGraph": null,
++    "routeMode": "openFrontier",
++    "storyBeats": [
++      "顶层7个无冰入口",
++      "所有入口立即收满",
++      "先验证开放选择",
++      "后续再绑定债务与R59/R65故事"
++    ]
++  },
++  "e4c16e95": {
++    "id": "008",
++    "label": "008 · 双债务故事图",
++    "targetSig": "e4c16e95",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "1cd5c5875b42ea965058cbbad838a0c8970bca98b4a3e72d1fbd9127e4efdd79",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 3,
++          "type": 0,
++          "param": 0,
++          "count": 29
++        },
++        {
++          "id": 5,
++          "type": 7,
++          "param": 2,
++          "count": 36
++        },
++        {
++          "id": 7,
++          "type": 7,
++          "param": 3,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        }
++      ],
++      [
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        }
++      ],
++      [
++        {
++          "id": 32,
++          "type": 7,
++          "param": 2,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        }
++      ],
++      [
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 26,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        }
++      ],
++      [
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 32
++        },
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        }
++      ],
++      [
++        {
++          "id": 3,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        },
++        {
++          "id": 26,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        }
++      ]
++    ],
++    "expectedPicks": [],
++    "requiredSteps": 47,
++    "storyGraph": {
++      "start": {
++        "r": 0,
++        "c": 0,
++        "color": 7,
++        "count": 26
++      },
++      "choices": [
++        {
++          "id": "lightDebt",
++          "path": [
++            {
++              "r": 1,
++              "c": 0
++            },
++            {
++              "r": 2,
++              "c": 0
++            }
++          ],
++          "debt": {
++            "color": 33,
++            "remaining": 18
++          },
++          "releaseStep": 1
++        },
++        {
++          "id": "heavyDebt",
++          "path": [
++            {
++              "r": 0,
++              "c": 1
++            },
++            {
++              "r": 0,
++              "c": 2
++            }
++          ],
++          "debt": {
++            "color": 3,
++            "remaining": 27
++          },
++          "releaseStep": 1
++        }
++      ],
++      "minRouteDiversity": 2
++    },
++    "routeMode": "storyGraph",
++    "storyBeats": [
++      "7/26教学",
++      "轻债33/22或重债3/29二选一",
++      "32/27或5/36分别偿还",
++      "第二枚7/26汇合",
++      "后续分区选择与终局"
++    ]
++  },
++  "88f1c207": {
++    "id": "014",
++    "label": "014 · 最终留出",
++    "targetSig": "88f1c207",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "8f863e246ecbb0435a086a60cfbd57442458e90fe0fbb4b269042e192c13779e",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 29,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 33,
++          "type": 7,
++          "param": 3,
++          "count": 25
++        },
++        {
++          "id": 24,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 5,
++          "count": 24
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 7,
++          "param": 13,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 12,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 11,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 10,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 9,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 8,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 15,
++          "type": 7,
++          "param": 27,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 26,
++          "count": 24
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 25,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 24,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 23,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 22,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 29,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 30,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 31,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 32,
++          "count": 24
++        },
++        {
++          "id": 18,
++          "type": 7,
++          "param": 33,
++          "count": 26
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 27,
++          "type": 7,
++          "param": 41,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 40,
++          "count": 25
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 26,
++          "type": 7,
++          "param": 38,
++          "count": 31
++        },
++        {
++          "id": 20,
++          "type": 7,
++          "param": 37,
++          "count": 38
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 36,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 29,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 33,
++          "type": 7,
++          "param": 46,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 47,
++          "count": 23
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        }
++      ]
++    ],
++    "expectedPicks": [
++      {
++        "r": 0,
++        "c": 0
++      },
++      {
++        "r": 0,
++        "c": 1
++      },
++      {
++        "r": 0,
++        "c": 2
++      },
++      {
++        "r": 0,
++        "c": 3
++      },
++      {
++        "r": 0,
++        "c": 4
++      },
++      {
++        "r": 0,
++        "c": 5
++      },
++      {
++        "r": 0,
++        "c": 6
++      },
++      {
++        "r": 1,
++        "c": 6
++      },
++      {
++        "r": 1,
++        "c": 5
++      },
++      {
++        "r": 1,
++        "c": 4
++      },
++      {
++        "r": 1,
++        "c": 3
++      },
++      {
++        "r": 1,
++        "c": 2
++      },
++      {
++        "r": 1,
++        "c": 1
++      },
++      {
++        "r": 1,
++        "c": 0
++      },
++      {
++        "r": 2,
++        "c": 0
++      },
++      {
++        "r": 2,
++        "c": 1
++      },
++      {
++        "r": 2,
++        "c": 2
++      },
++      {
++        "r": 2,
++        "c": 3
++      },
++      {
++        "r": 2,
++        "c": 4
++      },
++      {
++        "r": 2,
++        "c": 5
++      },
++      {
++        "r": 2,
++        "c": 6
++      },
++      {
++        "r": 3,
++        "c": 6
++      },
++      {
++        "r": 3,
++        "c": 5
++      },
++      {
++        "r": 3,
++        "c": 4
++      },
++      {
++        "r": 3,
++        "c": 3
++      },
++      {
++        "r": 3,
++        "c": 2
++      },
++      {
++        "r": 3,
++        "c": 1
++      },
++      {
++        "r": 3,
++        "c": 0
++      },
++      {
++        "r": 4,
++        "c": 0
++      },
++      {
++        "r": 4,
++        "c": 1
++      },
++      {
++        "r": 4,
++        "c": 2
++      },
++      {
++        "r": 4,
++        "c": 3
++      },
++      {
++        "r": 4,
++        "c": 4
++      },
++      {
++        "r": 4,
++        "c": 5
++      },
++      {
++        "r": 4,
++        "c": 6
++      },
++      {
++        "r": 5,
++        "c": 6
++      },
++      {
++        "r": 5,
++        "c": 5
++      },
++      {
++        "r": 5,
++        "c": 4
++      },
++      {
++        "r": 5,
++        "c": 3
++      },
++      {
++        "r": 5,
++        "c": 2
++      },
++      {
++        "r": 5,
++        "c": 1
++      },
++      {
++        "r": 5,
++        "c": 0
++      },
++      {
++        "r": 6,
++        "c": 0
++      },
++      {
++        "r": 6,
++        "c": 1
++      },
++      {
++        "r": 6,
++        "c": 2
++      },
++      {
++        "r": 6,
++        "c": 3
++      },
++      {
++        "r": 6,
++        "c": 4
++      },
++      {
++        "r": 6,
++        "c": 5
++      }
++    ],
++    "requiredSteps": 48,
++    "storyGraph": null,
++    "routeMode": "full",
++    "storyBeats": [
++      "R107小缺口",
++      "R69鱼形内部",
++      "玉米未完成债务",
++      "末段31债务释放"
++    ]
++  }
++};
++
++  function clone(value) { return JSON.parse(JSON.stringify(value)); }
++  function signature(blocks) {
++    var hash = 2166136261 >>> 0;
++    function mix(value) {
++      hash ^= (value >>> 0);
++      hash = Math.imul(hash, 16777619) >>> 0;
++    }
++    mix(blocks.length);
++    mix(blocks[0] ? blocks[0].length : 0);
++    for (var r = 0; r < blocks.length; r++) for (var c = 0; c < blocks[r].length; c++) mix(blocks[r][c] | 0);
++    return hash.toString(16);
++  }
++  function uniquePicks(run) {
++    var seen = {};
++    var out = [];
++    var picks = (run && run.pickOrder) || [];
++    for (var i = 0; i < picks.length; i++) {
++      var pick = picks[i];
++      var key = String(pick.step);
++      if (seen[key]) continue;
++      seen[key] = true;
++      out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });
++    }
++    return out;
++  }
++  function poseKey(picks) {
++    return picks.map(function (pick) { return pick.r + "," + pick.c; }).join(">");
++  }
++  function routeMatches(picks, required, mode) {
++    if (mode === "prefix") return poseKey(picks.slice(0, required.length)) === poseKey(required);
++    return poseKey(picks) === poseKey(required);
++  }
++  function storyGraphPass(level, entry, solvePicks, playerRuns) {
++    var graph = entry.storyGraph;
++    if (!graph) return true;
++    var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++    st.capture = true;
++    st.capOps = [];
++    if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;
++    var opening = AntSolver.Simulator.listMoves(st).filter(function (move) { return !move.blocked; });
++    if (opening.length !== graph.choices.length) return false;
++    for (var gi = 0; gi < graph.choices.length; gi++) {
++      var choice = graph.choices[gi];
++      if (!opening.some(function (move) { return move.r === choice.path[0].r && move.c === choice.path[0].c; })) return false;
++      st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++      st.capture = true;
++      st.capOps = [];
++      if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;
++      for (var pi = 0; pi < choice.path.length; pi++) {
++        st.capOps = [];
++        if (!AntSolver.Simulator.applyPick(st, choice.path[pi].r, choice.path[pi].c)) return false;
++        if (pi === 0 && choice.debt) {
++          if (!st.buffer.some(function (item) {
++            return item.color === choice.debt.color && item.need - item.progress === choice.debt.remaining;
++          })) return false;
++        }
++      }
++      if (st.buffer.length !== 0) return false;
++    }
++    var keys = {};
++    keys[poseKey(solvePicks.slice(0, 12))] = true;
++    for (var ri = 0; ri < playerRuns.length; ri++) keys[poseKey(playerRuns[ri].slice(0, 12))] = true;
++    return Object.keys(keys).length >= (graph.minRouteDiversity || 1);
++  }
++  function openingFrontierPass(level, entry) {
++    var contract = entry.openingContract;
++    if (!contract) return true;
++    var state = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++    state.capture = true;
++    var moves = AntSolver.Simulator.listMoves(state).filter(function (move) { return !move.blocked; });
++    if (contract.exactMoves != null && moves.length !== contract.exactMoves) return false;
++    if (contract.allCanConsume && !moves.every(function (move) { return move.canConsume; })) return false;
++    if (contract.bufferAfterEmpty) {
++      for (var i = 0; i < moves.length; i++) {
++        var clone = AntSolver.SolverStrategy.cloneState(state);
++        clone.capOps = [];
++        if (!AntSolver.Simulator.applyPick(clone, moves[i].r, moves[i].c)) return false;
++        if (clone.buffer.length !== 0) return false;
++      }
++    }
++    return true;
++  }
++  function entryFor(blocks) { return REGISTRY[signature(blocks)] || null; }
++  function availableTargets() {
++    return Object.keys(REGISTRY).map(function (key) {
++      var entry = REGISTRY[key];
++      return { id: entry.id, label: entry.label, targetSig: key };
++    });
++  }
++  function compile(blocks, config) {
++    var t0 = Date.now();
++    var entry = entryFor(blocks);
++    if (!entry) {
++      return { ok: false, level: null, meta: {
++        schema: "story-compiler-v1", status: "unsupported-target",
++        targetSig: signature(blocks), available: availableTargets(), elapsedMs: Date.now() - t0
++      } };
++    }
++    if (!blocks.length || blocks.length !== entry.targetSize[0] || blocks[0].length !== entry.targetSize[1]) {
++      return { ok: false, level: null, meta: { schema: "story-compiler-v1", status: "size-mismatch", storyId: entry.id } };
++    }
++    var level = AntSolver.parseLevel(AntSolver.fromGameFormat({
++      toprow: blocks.length, blocks: clone(blocks), maprow: entry.maprow, mapcol: entry.mapcol,
++      spools: clone(entry.spools)
++    }));
++    var solve = AntSolver.Solver.solveInstantChain(level, { timeBudgetMs: 20000 });
++    var solvePicks = uniquePicks(solve);
++    var exactSolveRouteMatches = !!(solve.completed && routeMatches(solvePicks, entry.expectedPicks, entry.routeMode));
++    var players = [];
++    var playerPickLists = [];
++    var seeds = [7, 1009, 2027];
++    var caps = [0, 2];
++    for (var ci = 0; ci < caps.length; ci++) for (var si = 0; si < seeds.length; si++) {
++      var run = AntSolver.PlayerSim.run(level, { seed: seeds[si], instantChain: true, reviveCap: caps[ci] });
++      var runPicks = uniquePicks(run);
++      playerPickLists.push(runPicks);
++      players.push({ seed: seeds[si], reviveCap: caps[ci], won: !!run.won,
++        progress: run.progress, bufferPeak: run.bufferPeak, revivesUsed: run.revivesUsed,
++        routeMatches: entry.routeMode === "storyGraph" ? true : routeMatches(runPicks, entry.expectedPicks, entry.routeMode) });
++    }
++    var graphPass = storyGraphPass(level, entry, solvePicks, playerPickLists);
++    var frontierPass = openingFrontierPass(level, entry);
++    if (entry.routeMode === "storyGraph") {
++      for (var pgi = 0; pgi < players.length; pgi++) players[pgi].routeMatches = graphPass;
++    } else if (entry.routeMode === "openFrontier") {
++      for (var pfj = 0; pfj < players.length; pfj++) players[pfj].routeMatches = frontierPass;
++    }
++    var solveRouteMatches = entry.routeMode === "storyGraph" ? graphPass :
++      (entry.routeMode === "openFrontier" ? frontierPass : exactSolveRouteMatches);
++    var roundtrip = AntSolver.parseLevel(AntSolver.fromGameFormat(AntSolver.toGameFormat(level)));
++    var roundtripSolve = AntSolver.Solver.solveInstantChain(roundtrip, { timeBudgetMs: 20000, greedyOnly: true });
++    var checks = {
++      solveCompleted: !!solve.completed,
++      solveRouteMatches: solveRouteMatches,
++      storyGraphPass: graphPass,
++      openingFrontierPass: frontierPass,
++      playersPass: players.every(function (x) { return x.won && x.progress === 100 && x.routeMatches; }),
++      noRevivePass: players.filter(function (x) { return x.reviveCap === 0; }).every(function (x) { return x.revivesUsed === 0; }),
++      roundtripPass: !!roundtripSolve.completed
++    };
++    var passed = Object.keys(checks).every(function (key) { return checks[key]; });
++    return {
++      ok: passed,
++      level: passed ? level : null,
++      meta: {
++        schema: "story-compiler-v1",
++        status: passed ? "pass" : "story-validation-failed",
++        storyId: entry.id,
++        label: entry.label,
++        targetSig: entry.targetSig,
++        sourceSha256: entry.sha256,
++        routeMode: entry.routeMode,
++        requiredSteps: entry.requiredSteps,
++        storyBeats: entry.storyBeats,
++        checks: checks,
++        solve: { completed: !!solve.completed, progress: solve.progress, bufferPeak: solve.maxBuffer, routeMatches: solveRouteMatches },
++        players: players,
++        elapsedMs: Date.now() - t0
++      }
++    };
++  }
++
++  return {
++    schema: "story-compiler-v1",
++    signature: signature,
++    availableTargets: availableTargets,
++    compile: compile
++  };
++})();
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js"
+new file mode 100644
+index 0000000..cbc5346
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js"
+@@ -0,0 +1,374 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * Generate the browser-side story compiler registry used by the v616 UI.
++ *
++ * Only board spools and route contracts are embedded. Target blocks always come
++ * from the image currently loaded in the production UI.
++ */
++
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const OUT = path.join(
++  ROOT,
++  '02_工程',
++  '完整主bin快照_20261012',
++  'bin',
++  'js',
++  'story-compiler.js'
++);
++
++function readJson(file) {
++  return JSON.parse(fs.readFileSync(file, 'utf8'));
++}
++
++function sha256(file) {
++  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
++}
++
++function blocksFromTXT(file) {
++  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
++  let start = 0;
++  for (let i = 0; i < lines.length; i++) {
++    const trimmed = lines[i].trim();
++    if (trimmed === '' || !/^-?\d/.test(trimmed)) start = i + 1;
++    else break;
++  }
++  const blocks = [];
++  for (let i = start; i < lines.length; i++) {
++    const line = lines[i].trim();
++    if (!line) continue;
++    blocks.push(line.split(/\s+/).map(value => parseInt(value, 10) || 0));
++  }
++  return blocks;
++}
++
++function targetSignature(blocks) {
++  let hash = 2166136261 >>> 0;
++  function mix(value) {
++    hash ^= (value >>> 0);
++    hash = Math.imul(hash, 16777619) >>> 0;
++  }
++  mix(blocks.length);
++  mix(blocks[0] ? blocks[0].length : 0);
++  for (const row of blocks) for (const value of row) mix(value | 0);
++  return hash.toString(16).padStart(8, '0');
++}
++
++function routePicksOf006() {
++  const manifest = readJson(path.join(ROOT, '实验关/关卡6/E5_v1/manifest.json'));
++  return manifest.route.expectedUniqueSteps.map(text => {
++    const [r, c] = text.split(',').map(Number);
++    return { r, c };
++  });
++}
++
++function routePicksOfDebug(file) {
++  const debug = readJson(file);
++  return debug.evidence.map(item => ({ r: item.r, c: item.c }));
++}
++
++function entryOf(config) {
++  const levelFile = path.join(ROOT, config.level);
++  const raw = readJson(levelFile);
++  const blocks = blocksFromTXT(path.join(ROOT, config.target));
++  return {
++    id: config.id,
++    label: config.label,
++    targetSig: targetSignature(blocks),
++    targetSize: [blocks.length, blocks[0].length],
++    sha256: sha256(levelFile),
++    maprow: raw.maprow,
++    mapcol: raw.mapcol,
++    spools: raw.spools,
++    expectedPicks: config.expectedPicks || [],
++    requiredSteps: config.requiredSteps || (config.expectedPicks ? config.expectedPicks.length : 0),
++    storyGraph: config.storyGraph || null,
++    routeMode: config.routeMode,
++    storyBeats: config.storyBeats
++  };
++}
++
++function main() {
++  const entries = [
++    entryOf({
++      id: '006',
++      label: '006 · 零冰开放开局',
++      target: '实验关/关卡6/35x35拼接图纸_006.txt',
++      level: '实验关/关卡6/原型_v12/关卡_实验_006_v12.json',
++      requiredSteps: 47,
++      routeMode: 'openFrontier',
++      openingContract: {
++        exactMoves: 7,
++        allCanConsume: true,
++        bufferAfterEmpty: true
++      },
++      storyBeats: [
++        '顶层7个无冰入口',
++        '所有入口立即收满',
++        '先验证开放选择',
++        '后续再绑定债务与R59/R65故事'
++      ]
++    }),
++    entryOf({
++      id: '008',
++      label: '008 · 双债务故事图',
++      target: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_008.txt',
++      level: '实验关/关卡8/原型_v3/关卡_实验_008_v3.json',
++      requiredSteps: 47,
++      routeMode: 'storyGraph',
++      storyGraph: {
++        start: { r: 0, c: 0, color: 7, count: 26 },
++        choices: [
++          {
++            id: 'lightDebt',
++            path: [{ r: 1, c: 0 }, { r: 2, c: 0 }],
++            debt: { color: 33, remaining: 18 },
++            releaseStep: 1
++          },
++          {
++            id: 'heavyDebt',
++            path: [{ r: 0, c: 1 }, { r: 0, c: 2 }],
++            debt: { color: 3, remaining: 27 },
++            releaseStep: 1
++          }
++        ],
++        minRouteDiversity: 2
++      },
++      storyBeats: [
++        '7/26教学',
++        '轻债33/22或重债3/29二选一',
++        '32/27或5/36分别偿还',
++        '第二枚7/26汇合',
++        '后续分区选择与终局'
++      ]
++    }),
++    entryOf({
++      id: '014',
++      label: '014 · 最终留出',
++      target: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_014.txt',
++      level: '实验关/关卡14/原型_v1/关卡_实验_014_v1.json',
++      expectedPicks: routePicksOfDebug(
++        path.join(ROOT, '实验关/关卡14/原型_v1/关卡_实验_014_v1.debug.json')
++      ),
++      routeMode: 'full',
++      storyBeats: [
++        'R107小缺口',
++        'R69鱼形内部',
++        '玉米未完成债务',
++        '末段31债务释放'
++      ]
++    })
++  ];
++
++  const registry = {};
++  for (const entry of entries) registry[entry.targetSig] = entry;
++
++  const source = [
++    '/*',
++    ' * StoryCompiler v1 · generated by GenerateStoryCompilerUiBundle_v616.js',
++    ' *',
++    ' * Default-off browser registry for the three accepted story levels.',
++    ' * Unsupported targets fail explicitly and never fall back to random search.',
++    ' */',
++    'var AntSolver = AntSolver || {};',
++    '',
++    'AntSolver.StoryCompiler = (function () {',
++    '  var REGISTRY = ' + JSON.stringify(registry, null, 2) + ';',
++    '',
++    '  function clone(value) { return JSON.parse(JSON.stringify(value)); }',
++    '  function signature(blocks) {',
++    '    var hash = 2166136261 >>> 0;',
++    '    function mix(value) {',
++    '      hash ^= (value >>> 0);',
++    '      hash = Math.imul(hash, 16777619) >>> 0;',
++    '    }',
++    '    mix(blocks.length);',
++    '    mix(blocks[0] ? blocks[0].length : 0);',
++    '    for (var r = 0; r < blocks.length; r++) for (var c = 0; c < blocks[r].length; c++) mix(blocks[r][c] | 0);',
++    '    return hash.toString(16);',
++    '  }',
++    '  function uniquePicks(run) {',
++    '    var seen = {};',
++    '    var out = [];',
++    '    var picks = (run && run.pickOrder) || [];',
++    '    for (var i = 0; i < picks.length; i++) {',
++    '      var pick = picks[i];',
++    '      var key = String(pick.step);',
++    '      if (seen[key]) continue;',
++    '      seen[key] = true;',
++    '      out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });',
++    '    }',
++    '    return out;',
++    '  }',
++    '  function poseKey(picks) {',
++    '    return picks.map(function (pick) { return pick.r + \",\" + pick.c; }).join(\">\");',
++    '  }',
++    '  function routeMatches(picks, required, mode) {',
++    '    if (mode === \"prefix\") return poseKey(picks.slice(0, required.length)) === poseKey(required);',
++    '    return poseKey(picks) === poseKey(required);',
++    '  }',
++    '  function storyGraphPass(level, entry, solvePicks, playerRuns) {',
++    '    var graph = entry.storyGraph;',
++    '    if (!graph) return true;',
++    '    var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '    st.capture = true;',
++    '    st.capOps = [];',
++    '    if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;',
++    '    var opening = AntSolver.Simulator.listMoves(st).filter(function (move) { return !move.blocked; });',
++    '    if (opening.length !== graph.choices.length) return false;',
++    '    for (var gi = 0; gi < graph.choices.length; gi++) {',
++    '      var choice = graph.choices[gi];',
++    '      if (!opening.some(function (move) { return move.r === choice.path[0].r && move.c === choice.path[0].c; })) return false;',
++    '      st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '      st.capture = true;',
++    '      st.capOps = [];',
++    '      if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;',
++    '      for (var pi = 0; pi < choice.path.length; pi++) {',
++    '        st.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(st, choice.path[pi].r, choice.path[pi].c)) return false;',
++    '        if (pi === 0 && choice.debt) {',
++    '          if (!st.buffer.some(function (item) {',
++    '            return item.color === choice.debt.color && item.need - item.progress === choice.debt.remaining;',
++    '          })) return false;',
++    '        }',
++    '      }',
++    '      if (st.buffer.length !== 0) return false;',
++    '    }',
++    '    var keys = {};',
++    '    keys[poseKey(solvePicks.slice(0, 12))] = true;',
++    '    for (var ri = 0; ri < playerRuns.length; ri++) keys[poseKey(playerRuns[ri].slice(0, 12))] = true;',
++    '    return Object.keys(keys).length >= (graph.minRouteDiversity || 1);',
++    '  }',
++    '  function openingFrontierPass(level, entry) {',
++    '    var contract = entry.openingContract;',
++    '    if (!contract) return true;',
++    '    var state = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '    state.capture = true;',
++    '    var moves = AntSolver.Simulator.listMoves(state).filter(function (move) { return !move.blocked; });',
++    '    if (contract.exactMoves != null && moves.length !== contract.exactMoves) return false;',
++    '    if (contract.allCanConsume && !moves.every(function (move) { return move.canConsume; })) return false;',
++    '    if (contract.bufferAfterEmpty) {',
++    '      for (var i = 0; i < moves.length; i++) {',
++    '        var clone = AntSolver.SolverStrategy.cloneState(state);',
++    '        clone.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(clone, moves[i].r, moves[i].c)) return false;',
++    '        if (clone.buffer.length !== 0) return false;',
++    '      }',
++    '    }',
++    '    return true;',
++    '  }',
++    '  function entryFor(blocks) { return REGISTRY[signature(blocks)] || null; }',
++    '  function availableTargets() {',
++    '    return Object.keys(REGISTRY).map(function (key) {',
++    '      var entry = REGISTRY[key];',
++    '      return { id: entry.id, label: entry.label, targetSig: key };',
++    '    });',
++    '  }',
++    '  function compile(blocks, config) {',
++    '    var t0 = Date.now();',
++    '    var entry = entryFor(blocks);',
++    '    if (!entry) {',
++    '      return { ok: false, level: null, meta: {',
++    '        schema: \"story-compiler-v1\", status: \"unsupported-target\",',
++    '        targetSig: signature(blocks), available: availableTargets(), elapsedMs: Date.now() - t0',
++    '      } };',
++    '    }',
++    '    if (!blocks.length || blocks.length !== entry.targetSize[0] || blocks[0].length !== entry.targetSize[1]) {',
++    '      return { ok: false, level: null, meta: { schema: \"story-compiler-v1\", status: \"size-mismatch\", storyId: entry.id } };',
++    '    }',
++    '    var level = AntSolver.parseLevel(AntSolver.fromGameFormat({',
++    '      toprow: blocks.length, blocks: clone(blocks), maprow: entry.maprow, mapcol: entry.mapcol,',
++    '      spools: clone(entry.spools)',
++    '    }));',
++    '    var solve = AntSolver.Solver.solveInstantChain(level, { timeBudgetMs: 20000 });',
++    '    var solvePicks = uniquePicks(solve);',
++    '    var exactSolveRouteMatches = !!(solve.completed && routeMatches(solvePicks, entry.expectedPicks, entry.routeMode));',
++    '    var players = [];',
++    '    var playerPickLists = [];',
++    '    var seeds = [7, 1009, 2027];',
++    '    var caps = [0, 2];',
++    '    for (var ci = 0; ci < caps.length; ci++) for (var si = 0; si < seeds.length; si++) {',
++    '      var run = AntSolver.PlayerSim.run(level, { seed: seeds[si], instantChain: true, reviveCap: caps[ci] });',
++    '      var runPicks = uniquePicks(run);',
++    '      playerPickLists.push(runPicks);',
++    '      players.push({ seed: seeds[si], reviveCap: caps[ci], won: !!run.won,',
++    '        progress: run.progress, bufferPeak: run.bufferPeak, revivesUsed: run.revivesUsed,',
++    '        routeMatches: entry.routeMode === \"storyGraph\" ? true : routeMatches(runPicks, entry.expectedPicks, entry.routeMode) });',
++    '    }',
++    '    var graphPass = storyGraphPass(level, entry, solvePicks, playerPickLists);',
++    '    var frontierPass = openingFrontierPass(level, entry);',
++    '    if (entry.routeMode === \"storyGraph\") {',
++    '      for (var pgi = 0; pgi < players.length; pgi++) players[pgi].routeMatches = graphPass;',
++    '    } else if (entry.routeMode === \"openFrontier\") {',
++    '      for (var pfj = 0; pfj < players.length; pfj++) players[pfj].routeMatches = frontierPass;',
++    '    }',
++    '    var solveRouteMatches = entry.routeMode === \"storyGraph\" ? graphPass :',
++    '      (entry.routeMode === \"openFrontier\" ? frontierPass : exactSolveRouteMatches);',
++    '    var roundtrip = AntSolver.parseLevel(AntSolver.fromGameFormat(AntSolver.toGameFormat(level)));',
++    '    var roundtripSolve = AntSolver.Solver.solveInstantChain(roundtrip, { timeBudgetMs: 20000, greedyOnly: true });',
++    '    var checks = {',
++    '      solveCompleted: !!solve.completed,',
++    '      solveRouteMatches: solveRouteMatches,',
++    '      storyGraphPass: graphPass,',
++    '      openingFrontierPass: frontierPass,',
++    '      playersPass: players.every(function (x) { return x.won && x.progress === 100 && x.routeMatches; }),',
++    '      noRevivePass: players.filter(function (x) { return x.reviveCap === 0; }).every(function (x) { return x.revivesUsed === 0; }),',
++    '      roundtripPass: !!roundtripSolve.completed',
++    '    };',
++    '    var passed = Object.keys(checks).every(function (key) { return checks[key]; });',
++    '    return {',
++    '      ok: passed,',
++    '      level: passed ? level : null,',
++    '      meta: {',
++    '        schema: \"story-compiler-v1\",',
++    '        status: passed ? \"pass\" : \"story-validation-failed\",',
++    '        storyId: entry.id,',
++    '        label: entry.label,',
++    '        targetSig: entry.targetSig,',
++    '        sourceSha256: entry.sha256,',
++    '        routeMode: entry.routeMode,',
++    '        requiredSteps: entry.requiredSteps,',
++    '        storyBeats: entry.storyBeats,',
++    '        checks: checks,',
++    '        solve: { completed: !!solve.completed, progress: solve.progress, bufferPeak: solve.maxBuffer, routeMatches: solveRouteMatches },',
++    '        players: players,',
++    '        elapsedMs: Date.now() - t0',
++    '      }',
++    '    };',
++    '  }',
++    '',
++    '  return {',
++    '    schema: \"story-compiler-v1\",',
++    '    signature: signature,',
++    '    availableTargets: availableTargets,',
++    '    compile: compile',
++    '  };',
++    '})();',
++    ''
++  ].join('\n');
++
++  fs.writeFileSync(OUT, source);
++  console.log(JSON.stringify({
++    ok: true,
++    output: OUT,
++    entries: entries.map(entry => ({
++      id: entry.id,
++      targetSig: entry.targetSig,
++      sourceSha256: entry.sha256,
++      routeMode: entry.routeMode,
++      requiredSteps: entry.requiredSteps
++    }))
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006OpenStart_v680.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006OpenStart_v680.js"
+new file mode 100644
+index 0000000..cebf935
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006OpenStart_v680.js"
+@@ -0,0 +1,317 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.7d: zero-ice open-start prototype for 006.
++ *
++ * This deliberately fixes only the opening defect:
++ *   - no ice anywhere;
++ *   - all seven top-row cars are visible and immediately consumable;
++ *   - the accepted v8 capacity multiset and black blocks are preserved.
++ *
++ * This is not yet the final StoryGraph. It is the baseline needed before
++ * assigning branch roles.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v8/关卡_实验_v8.json');
++const OUT = path.join(ROOT, '实验关/关卡6/原型_v12');
++const MODULES = [
++  'utils.js',
++  'color-libs.js',
++  'simulator.js',
++  'solver-strategy.js',
++  'solver.js',
++  'playersim.js',
++  'analysis.js',
++  'car-sequencer.js',
++  'solver-analysis.js',
++  'experience-goal.js',
++  'capacity-tuner.js',
++  'instant-playout.js',
++  'generator.js'
++];
++
++function loadSolver() {
++  const sandbox = {
++    console,
++    WeakMap,
++    Map,
++    Set,
++    Date,
++    Math,
++    JSON,
++    Object,
++    Array,
++    String,
++    Number,
++    isNaN,
++    parseInt,
++    parseFloat,
++    isFinite,
++    setTimeout,
++    clearTimeout
++  };
++  sandbox.global = sandbox;
++  vm.createContext(sandbox);
++  for (const file of MODULES) {
++    vm.runInContext(fs.readFileSync(path.join(BIN, file), 'utf8'), sandbox, { filename: file });
++  }
++  return sandbox.AntSolver;
++}
++
++function uniquePicks(run) {
++  const seen = new Set();
++  const out = [];
++  for (const pick of run.pickOrder || []) {
++    if (seen.has(pick.step)) continue;
++    seen.add(pick.step);
++    out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });
++  }
++  return out;
++}
++
++function poseKey(picks) {
++  return picks.map(pick => pick.r + ',' + pick.c).join('>');
++}
++
++function main() {
++  const A = loadSolver();
++  const game = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
++  const sourceLevel = A.parseLevel(A.fromGameFormat(game));
++  const originalKey = sourceLevel.board.cells
++    .flat()
++    .filter(cell => cell && cell.t === 'box')
++    .map(cell => cell.color + '/' + cell.count)
++    .sort()
++    .join(',');
++
++  // Seven full cars form the visible opening frontier.
++  const topTypes = [
++    [31, 31],
++    [31, 31],
++    [31, 30],
++    [5, 21],
++    [31, 30],
++    [30, 22],
++    [30, 23]
++  ];
++  const pool = [];
++  for (let r = 1; r < 7; r++) {
++    for (let c = 0; c < 7; c++) {
++      const spool = game.spools[r][c];
++      if (spool.id > 0) pool.push({ r, c, spool, claimed: false });
++    }
++  }
++
++  for (let c = 0; c < 7; c++) {
++    const [id, count] = topTypes[c];
++    const source = pool.find(item =>
++      !item.claimed && item.spool.id === id && item.spool.count === count);
++    if (!source) throw new Error('缺少顶层容量: ' + id + '/' + count);
++    source.claimed = true;
++    const displaced = game.spools[0][c];
++    game.spools[0][c] = source.spool;
++    game.spools[source.r][source.c] = displaced;
++  }
++
++  // No ice, chain, pipe or question mark is introduced.
++  for (const row of game.spools) {
++    for (const spool of row) {
++      if (spool.id > 0 && (spool.type === 7 || (Array.isArray(spool.type) && spool.type.includes(7)))) {
++        spool.type = Array.isArray(spool.type)
++          ? spool.type.filter(type => type !== 7)
++          : 0;
++        if (Array.isArray(spool.type) && spool.type.length === 1) spool.type = spool.type[0];
++        spool.param = 0;
++      }
++    }
++  }
++
++  const level = A.parseLevel(A.fromGameFormat(game));
++  const finalKey = level.board.cells
++    .flat()
++    .filter(cell => cell && cell.t === 'box')
++    .map(cell => cell.color + '/' + cell.count)
++    .sort()
++    .join(',');
++
++  const opening = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  opening.capture = true;
++  const openingMoves = A.Simulator.listMoves(opening)
++    .filter(move => !move.blocked)
++    .map(move => {
++      const clone = A.SolverStrategy.cloneState(opening);
++      const before = clone.eliminatedPixels;
++      clone.capOps = [];
++      A.Simulator.applyPick(clone, move.r, move.c);
++      return {
++        r: move.r,
++        c: move.c,
++        color: move.antBox.color,
++        count: move.antBox.count,
++        canConsume: move.canConsume,
++        consumed: clone.eliminatedPixels - before,
++        bufferAfter: clone.buffer.length
++      };
++    });
++
++  const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 30000 });
++  const players = [];
++  for (const seed of [7, 1009, 2027, 41, 99]) {
++    players.push(A.PlayerSim.run(level, {
++      seed,
++      instantChain: true,
++      reviveCap: 0
++    }));
++  }
++
++  const roundtrip = A.parseLevel(A.fromGameFormat(A.toGameFormat(level)));
++  const roundtripSolve = A.Solver.solveInstantChain(roundtrip, {
++    timeBudgetMs: 20000,
++    greedyOnly: true
++  });
++
++  let boxes = 0;
++  let black = 0;
++  let ice = 0;
++  let chain = 0;
++  let pipe = 0;
++  let question = 0;
++  let sum = 0;
++  for (const row of level.board.cells) {
++    for (const cell of row) {
++      if (!cell) continue;
++      if (cell.t === 'black') black++;
++      if (cell.t === 'box') {
++        boxes++;
++        sum += cell.count;
++        if (cell.numice > 0) ice++;
++        if (cell.chain > 0) chain++;
++        if (cell.q) question++;
++      }
++      if (cell.t === 'pipe') pipe++;
++    }
++  }
++
++  const solvePicks = uniquePicks(solve);
++  const routeKeys = new Set([poseKey(solvePicks.slice(0, 12))]);
++  for (const run of players) routeKeys.add(poseKey(uniquePicks(run).slice(0, 12)));
++  const checks = {
++    capacityMultisetPreserved: originalKey === finalKey,
++    capacityContract: boxes === 47 && sum === 1225 &&
++      level.board.cells.flat().filter(cell => cell && cell.t === 'box')
++        .every(cell => cell.count >= 20 && cell.count <= 40),
++    boardContract: boxes === 47 && black === 2,
++    noObstacles: ice === 0 && chain === 0 && pipe === 0 && question === 0,
++    openingHasSevenFullChoices: openingMoves.length === 7 &&
++      openingMoves.every(move => move.canConsume && move.bufferAfter === 0),
++    solvePass: solve.completed && solve.progress === 100,
++    playersPass: players.every(run =>
++      run.won && run.progress === 100 && run.revivesUsed === 0),
++    routeDiversity: routeKeys.size >= 2,
++    roundtripPass: roundtripSolve.completed === true
++  };
++  const passed = Object.values(checks).every(Boolean);
++
++  const report = {
++    schema: '006-open-start-v1',
++    status: passed ? 'OPEN_START_PASS' : 'OPEN_START_FAIL',
++    source: SOURCE,
++    gameFormat: path.join(OUT, '关卡_实验_006_v12.json'),
++    board: {
++      rows: 7,
++      cols: 7,
++      boxes,
++      black,
++      ice,
++      chain,
++      pipe,
++      question,
++      capacitySum: sum
++    },
++    openingMoves,
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      bufferPeak: solve.maxBuffer,
++      first12: solvePicks.slice(0, 12)
++    },
++    players: players.map(run => ({
++      seed: run.seed,
++      won: run.won,
++      progress: run.progress,
++      bufferPeak: run.bufferPeak,
++      revivesUsed: run.revivesUsed,
++      first12: uniquePicks(run).slice(0, 12)
++    })),
++    routeDiversity: routeKeys.size,
++    checks
++  };
++
++  fs.mkdirSync(OUT, { recursive: true });
++  fs.writeFileSync(
++    report.gameFormat,
++    JSON.stringify(A.toGameFormat(level), null, 2) + '\n'
++  );
++  fs.writeFileSync(
++    path.join(OUT, '关卡_实验_006_v12.debug.json'),
++    JSON.stringify(report, null, 2) + '\n'
++  );
++  fs.writeFileSync(
++    path.join(OUT, '关卡_实验_006_v12.md'),
++    [
++      '# 006 · Open Start v12',
++      '',
++      '## 结论',
++      '',
++      passed ? '通过：零冰开局，顶层七个动作全部可立即收满。'
++        : '失败：保留反例。',
++      '',
++      '## 开局',
++      '',
++      '- 7×7、47车、2黑；',
++      '- 0冰、0链、0管道、0问号；',
++      '- 顶层7个动作全部可见、可操作且立即收满。',
++      '',
++      '## 验证',
++      '',
++      `- 全知${solve.progress}%，峰值${solve.maxBuffer}；`,
++      `- 5局0复活PlayerSim全部${players.every(run => run.won) ? '通关' : '未全过'}；`,
++      `- 路线多样性：${routeKeys.size}。`,
++      ''
++    ].join('\n') + '\n'
++  );
++
++  console.log(JSON.stringify({
++    ok: passed,
++    outDir: OUT,
++    board: report.board,
++    openingMoves,
++    solve: report.solve,
++    players: report.players.map(player => ({
++      seed: player.seed,
++      won: player.won,
++      progress: player.progress,
++      bufferPeak: player.bufferPeak,
++      revivesUsed: player.revivesUsed
++    })),
++    routeDiversity: routeKeys.size,
++    checks
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}

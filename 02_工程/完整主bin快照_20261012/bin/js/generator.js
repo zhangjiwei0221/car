@@ -15527,6 +15527,94 @@ AntSolver.Generator = (function() {
   var _PRESSURE_FIRST = false;   // 【v215】压力优先：可解的前提上，峰窗越高越好
   var _AUDIT_FIRST = false;      // 【v216】全知线优先：看"最优解自己扛多少"，不是玩家容错低
   /**
+   * 【v616·正式版默认关闭接入】故事编译器单次产线。
+   * 只接受浏览器端 StoryCompiler 注册表已验收的目标图；不匹配时显式失败，
+   * 不落回随机候选。该函数只从 runFlowOnce() 进入，避免出现第二条纠偏/兜底产线。
+   */
+  function produceStoryOnce(blocks, config, opts) {
+    var t0 = Date.now();
+    var compiler = AntSolver.StoryCompiler;
+    if (!compiler || typeof compiler.compile !== 'function') {
+      return {
+        level: null, valid: false, flow: 'story_compiler', timedOut: false,
+        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
+        storyCompiler: { schema: 'story-compiler-v1', status: 'compiler-not-loaded' },
+        lastFailReason: 'storyCompilerNotLoaded'
+      };
+    }
+    var result = null;
+    try { result = compiler.compile(blocks, config); }
+    catch (e) {
+      return {
+        level: null, valid: false, flow: 'story_compiler', timedOut: false,
+        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
+        storyCompiler: { schema: 'story-compiler-v1', status: 'compile-error', error: String((e && e.message) || e) },
+        lastFailReason: 'storyCompilerError'
+      };
+    }
+    var meta = result && result.meta ? result.meta : {
+      schema: 'story-compiler-v1', status: 'no-result'
+    };
+    if (!result || !result.ok || !result.level) {
+      return {
+        level: null, valid: false, flow: 'story_compiler', timedOut: false,
+        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
+        storyCompiler: meta,
+        lastFailReason: 'storyCompiler:' + (meta.status || 'failed'),
+        structural: {
+          ok: false,
+          reason: meta.status === 'unsupported-target'
+            ? '故事编译器没有该目标图的已验收剧本'
+            : '故事编译器验收失败：' + (meta.status || 'unknown')
+        }
+      };
+    }
+
+    var parsed = null;
+    var solveResult = null;
+    try { parsed = AntSolver.parseLevel(result.level); } catch (e) { parsed = null; }
+    try {
+      solveResult = AntSolver.Solver.solveInstantChain(parsed, {
+        timeBudgetMs: Math.max(1000, parseInt(config && config.timeBudgetMs, 10) || 20000)
+      });
+    } catch (e) { solveResult = null; }
+    if (!parsed || !solveResult || !solveResult.completed) {
+      return {
+        level: null, valid: false, flow: 'story_compiler', timedOut: false,
+        elapsedMs: Date.now() - t0, candidates: 1, treeEvaluated: 1,
+        storyCompiler: meta,
+        solveResult: solveResult,
+        lastFailReason: 'storyCompilerSolveFailed',
+        structural: { ok: false, reason: '故事编译器关卡最终求解失败' }
+      };
+    }
+
+    var generationEval = null;
+    try { generationEval = evaluateGeneration(solveResult, parsed, config); }
+    catch (e) { generationEval = null; }
+    var cand = {
+      level: parsed,
+      valid: true,
+      solveResult: solveResult,
+      generationEval: generationEval,
+      difficulty: computeDifficulty(solveResult, parsed, config, generationEval),
+      config: config,
+      retries: 0,
+      flow: 'story_compiler',
+      candidates: 1,
+      treeEvaluated: 1,
+      elapsedMs: Date.now() - t0,
+      timedOut: false,
+      storyCompiler: meta,
+      structural: { ok: true, reason: 'story-compiler-validated' }
+    };
+    try { ensureCandidateQuality(cand); } catch (e) { cand.goodV3Error = String((e && e.message) || e); }
+    try { cand.choiceCurve = choiceCurve(parsed, solveResult, config); } catch (e) { cand.choiceCurve = null; }
+    try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(parsed, config || {}); }
+    catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
+    return cand;
+  }
+  /**
    * 【v314·用户裁决】任何"重产一次"的分支都必须走**当前选定的那条产线**。
    *   泄漏点：bandFixOnce（带外纠偏）和全灭兜底都写死调用 produceFixed —— 新版流程
    *   按结构/层铺盒，不认 boxSizeMin/Max。结果用户设 30~60，纠偏一变就成了
@@ -15534,6 +15622,7 @@ AntSolver.Generator = (function() {
    */
   function runFlowOnce(blocks, config, opts) {
     try {
+      if (config && config.storyCompiler === true) return produceStoryOnce(blocks, config, opts || {});
       if (config && config.generatorFlow === 'old') return produce(blocks, config);
       return produceFixed(blocks, config, opts || {});
     } catch (e) { return null; }
@@ -16441,7 +16530,10 @@ AntSolver.Generator = (function() {
     var maxRounds = parseInt(config.goalMaxRounds, 10);
     if (!(maxRounds > 0)) maxRounds = 0;
     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
-    function passed(r) { return goalAcceptPass(r, config); }
+    function passed(r) {
+      if (r && r.storyCompiler && r.storyCompiler.status === 'pass') return true;
+      return goalAcceptPass(r, config);
+    }
     var best = null, rounds = 0, stopped = false;
     while (true) {
       if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
@@ -16467,7 +16559,7 @@ AntSolver.Generator = (function() {
       }
       var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
         roundBudgetMs - (Date.now() - roundT0));
-      if (r && !r.level && repairLeft >= 1000) {
+      if (r && !r.level && !(r.storyCompiler && config.storyCompilerStrict) && repairLeft >= 1000) {
         try { r = repairUsableNoCandidate(blocks, r, cfg, { timeBudgetMs: repairLeft, shouldStop: opts.shouldStop }); }
         catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
       }
@@ -16475,7 +16567,7 @@ AntSolver.Generator = (function() {
       if (r) r.goalRound = rounds;
       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
         roundBudgetMs - (Date.now() - roundT0));
-      if (config.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
+      if (config.experienceGoal === true && r && r.level && r.valid && !r.storyCompiler && tuneLeft > 100) {
         var tuneCfg = Object.assign({}, cfg, {
           capacityTuneMs: Math.max(100, Math.min(parseInt(config.capacityTuneMs, 10) || 5000, tuneLeft))
         });
@@ -16483,7 +16575,7 @@ AntSolver.Generator = (function() {
         catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
       }
       var localSwapLeft = maxMs ? maxMs - (Date.now() - t0) : Infinity;
-      if (config.localSwapRepair === true && r && r.level && r.valid && localSwapLeft > 1000) {
+      if (config.localSwapRepair === true && r && r.level && r.valid && !r.storyCompiler && localSwapLeft > 1000) {
         try {
           var localCfg = Object.assign({}, cfg, {
             localSwapRepairMaxMs: Math.min(
@@ -16496,7 +16588,7 @@ AntSolver.Generator = (function() {
         }
         catch (e) { r.localSwapRepair = { schema: 'local-swap-repair-v1', applied: false, error: String((e && e.message) || e) }; }
       }
-      if (config.instantReleaseRoute === true && r && r.level && r.valid && r.solveResult &&
+      if (config.instantReleaseRoute === true && r && r.level && r.valid && !r.storyCompiler && r.solveResult &&
           goalStructPass(r) && experienceCapacityOk(r, cfg)) {
         try { instantReleaseRouteEvidenceOf(r, Object.assign({}, cfg, config)); }
         catch (e) { r.instantReleaseRouteEvidence = { schema: 'instant-release-route-evidence-v1', pass: false, status: 'error', error: String((e && e.message) || e) }; }
@@ -16511,10 +16603,10 @@ AntSolver.Generator = (function() {
       best.goalStopped = stopped;
       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
     }
-    if (best && best.level) attachExperienceRouteEvidence(best, config);
-    if (best) markVerifiedRouteAccept(best, config);
-    if (best) markReleaseRouteAccept(best, config);
-    if (best) markFinalStructureAccept(best, config);
+    if (best && best.level && !best.storyCompiler) attachExperienceRouteEvidence(best, config);
+    if (best && !best.storyCompiler) markVerifiedRouteAccept(best, config);
+    if (best && !best.storyCompiler) markReleaseRouteAccept(best, config);
+    if (best && !best.storyCompiler) markFinalStructureAccept(best, config);
     if (best) best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: perMs,
       sharedCapBudget: config.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
       searchElapsedMs: best.goalElapsedMs, wallElapsedMs: Date.now() - t0,
@@ -16570,6 +16662,7 @@ AntSolver.Generator = (function() {
     //   管道深度补救”的容量缩放都读这个快照，不许越过用户上限（踩过：v238 反推、管道 +12%、管道 +3）。
     //   v496 注意：_userCapMin 为 null 表示"本档的上沿已由 capScalePlan 显式给定，需要重新快照"。
     config = normalizeRuleConfig((config && typeof config === 'object') ? config : {});
+    if (config.storyCompiler === true) return runFlowOnce(blocks, config, opts);
     if (config._userCapMin == null) {
       var _ucMn = parseInt(config.boxSizeMin, 10) || 0, _ucMx = parseInt(config.boxSizeMax, 10) || 0;
       if (_ucMn > 0 && _ucMx >= _ucMn) config = Object.assign({}, config, { _userCapMin: _ucMn, _userCapMax: _ucMx });

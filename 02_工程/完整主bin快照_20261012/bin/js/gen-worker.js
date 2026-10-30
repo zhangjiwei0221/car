@@ -26,6 +26,7 @@ try {
     'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
     'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
     'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'instant-playout.js' + _v, 'generator.js' + _v,
+    'story-compiler.js' + _v,
     'route-obstacle-planner.js' + _v, 'source-preflight.js' + _v
   );
   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
@@ -39,6 +40,7 @@ if (_loaded && AntSolver.Generator.setProgressHook) {
 }
 
 function _goalPassed(r) {
+  if (r && r.storyCompiler && r.storyCompiler.status === 'pass') return true;
   try { return AntSolver.Generator.goalAcceptPass(r, _goal && _goal.config); } catch (e) { return false; }
 }
 function _goalScore(r) {
@@ -78,9 +80,9 @@ function _goalFinish(stopReason) {
     best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };
   }
   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
-  if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
-  try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
-  try { AntSolver.Generator.markFinalStructureAccept(best, g.config); } catch (e) {}
+  if (best && best.level && !best.storyCompiler) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
+  if (best && !best.storyCompiler) try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
+  if (best && !best.storyCompiler) try { AntSolver.Generator.markFinalStructureAccept(best, g.config); } catch (e) {}
   best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: g.maxMs, perRoundMs: g.perMs,
     sharedCapBudget: g.config.goalSharedBudget !== false, rounds: g.rounds, stopReason: best.goalStopReason || null,
     searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - g.t0,
@@ -134,18 +136,18 @@ function _goalRound() {
   } catch (err) {
     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
   }
-  if (r && !r.level && roundLeft() >= 1000) {
+  if (r && !r.level && !(r.storyCompiler && cfg.storyCompilerStrict) && roundLeft() >= 1000) {
     try { r = AntSolver.Generator.repairUsableNoCandidate(g.blocks, r, cfg, { timeBudgetMs: roundLeft() }); }
     catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
   }
   // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
   var tuneLeft = roundLeft();
-  if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
+  if (cfg.experienceGoal === true && r && r.level && r.valid && !r.storyCompiler && tuneLeft > 100) {
     cfg.capacityTuneMs = Math.max(100, Math.min(parseInt(cfg.capacityTuneMs, 10) || 5000, tuneLeft));
     try { r = AntSolver.Generator.tuneExperienceCandidate(r, cfg); } catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
   }
   // 【v439】目标模式：先在同一基底上继续修，修不动再换 seed
-  if (r && r.level && !_goalPassed(r)) {
+  if (r && r.level && !r.storyCompiler && !_goalPassed(r)) {
     var _repCur = r, _repSteps = 0;
     for (var _rr = 0; _rr < 3 && roundLeft() > 2000; _rr++) {
       var _rep = null;

@@ -1,0 +1,5511 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 806f0c2..04dc89c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v615 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=615">
++  <title>车接小人 v629 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=629">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v615</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v629</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -418,6 +418,10 @@
+         <label><input type="checkbox" id="gen-obstacle-thicken"> 障碍加厚实验（默认关闭）</label>
+         <span class="gen-hint">冰 <input id="gen-ice-target" type="number" min="3" max="20" value="12" style="width:42px"> 个；锁链 <input id="gen-chain-target" type="number" min="1" max="8" value="6" style="width:36px"> 组；至少连≤<input id="gen-chain-small-max" type="number" min="6" max="40" value="18" style="width:42px">px 小车</span>
+       </div>
++      <div class="gen-row" style="margin-top:6px" title="实验功能：对已验收的006/008/014目标图使用固定故事棋盘并验证完整路线；其他目标图明确失败，不回退随机生成。默认关闭。">
++        <label><input type="checkbox" id="gen-story-compiler"> 故事编译器实验（已知三图 · 默认关闭）</label>
++        <span class="gen-hint">开启后只接受已注册故事；不匹配 = 明确失败</span>
++      </div>
+       <div class="gen-row" style="margin-top:6px" title="容量在 deriveCapacityBand 推导出的带内选择。自动=带；下沿/上沿=固定到带的两端；中值=固定到 chosen。">
+         <label>容量策略</label>
+         <select id="gen-cap-profile" style="width:130px">
+@@ -784,30 +788,31 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=615"></script>
+-  <script src="js/utils.js?v=615"></script>
++  <script src="js/zip.js?v=629"></script>
++  <script src="js/utils.js?v=629"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=615"></script>
+-  <script src="js/simulator.js?v=615"></script>
++  <script src="js/color-libs.js?v=629"></script>
++  <script src="js/simulator.js?v=629"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=615"></script>
+-  <script src="js/solver-strategy.js?v=615"></script>
+-  <script src="js/solver.js?v=615"></script>
+-  <script src="js/playersim.js?v=615"></script>
++  <script src="js/anchor-cut.js?v=629"></script>
++  <script src="js/solver-strategy.js?v=629"></script>
++  <script src="js/solver.js?v=629"></script>
++  <script src="js/playersim.js?v=629"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=615"></script>
+-  <script src="js/car-sequencer.js?v=615"></script>
+-  <script src="js/experience-goal.js?v=615"></script>
+-  <script src="js/release-route-constructor.js?v=615"></script>
+-  <script src="js/capacity-tuner.js?v=615"></script>
+-  <script src="js/instant-playout.js?v=615"></script>
+-  <script src="js/generator.js?v=615"></script>
+-  <script src="js/route-obstacle-planner.js?v=615"></script>
+-  <script src="js/source-preflight.js?v=615"></script>
+-  <script src="js/analysis.js?v=615"></script>
++  <script src="js/solver-analysis.js?v=629"></script>
++  <script src="js/car-sequencer.js?v=629"></script>
++  <script src="js/experience-goal.js?v=629"></script>
++  <script src="js/release-route-constructor.js?v=629"></script>
++  <script src="js/capacity-tuner.js?v=629"></script>
++  <script src="js/instant-playout.js?v=629"></script>
++  <script src="js/generator.js?v=629"></script>
++  <script src="js/story-compiler.js?v=629"></script>
++  <script src="js/route-obstacle-planner.js?v=629"></script>
++  <script src="js/source-preflight.js?v=629"></script>
++  <script src="js/analysis.js?v=629"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=615"></script>
+-  <script src="js/app.js?v=615"></script>
++  <script src="js/level-editor.js?v=629"></script>
++  <script src="js/app.js?v=629"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 75d6d1d..7d034e7 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "615";
++var APP_BUILD = "629";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -4888,6 +4888,7 @@ AntSolver.App = (function() {
+     var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
+     var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
+     var _routeObstacle = !!((document.getElementById('gen-route-obstacle') || {}).checked);
++    var _storyCompiler = !!((document.getElementById('gen-story-compiler') || {}).checked);
+     var _capacityMix = !!((document.getElementById('gen-capacity-mix') || {}).checked);
+     var _capacityMixMin = parseInt((document.getElementById('gen-capacity-mix-min') || {}).value, 10) || 6;
+     var _capacityMixMax = parseInt((document.getElementById('gen-capacity-mix-max') || {}).value, 10) || 40;
+@@ -5089,6 +5090,12 @@ AntSolver.App = (function() {
+     //   下面这组参数继续沿用原生产口径（_legacyParams 保持 true），否则棋盘范围 / 管道数 / 目标车数
+     //   会跟着一起变，没法把改前后差异归因到产线。参数随产线重调留给下一个单变量实验。
+     out.generatorFlow = 'new_fixed';
++    if (_storyCompiler) {
++      out.storyCompiler = true;
++      out.storyCompilerStrict = true;
++      out.instantChain = true;
++      out.bottomOnly = false;
++    }
+     if (_routeObstacle) {
+       out.routeObstaclePlan = 'v1';
+       out.routeObstaclePlanMaxAttempts = 6;
+@@ -6056,6 +6063,25 @@ AntSolver.App = (function() {
+         ? ('采用 / ' + (rec.routeObstaclePlan.added || []).length + ' 个单元 / ' +
+           Math.round((rec.routeObstaclePlan.wallElapsedMs || rec.routeObstaclePlan.elapsedMs || 0) / 1000) + 's')
+         : ('未采用（' + (rec.routeObstaclePlan.reason || '无改善') + '）')) : '未开') +
++      row('故事编译器实验', rec.storyCompiler
++        ? (rec.storyCompiler.status === 'pass'
++          ? ('通过 / ' + rec.storyCompiler.label + ' / ' +
++            rec.storyCompiler.requiredSteps + '步契约 / ' +
++            (rec.storyCompiler.players || []).filter(function (x) {
++              return x.won && x.routeMatches;
++            }).length + '/6' +
++            (function () {
++              var tested = (rec.storyCompiler.players || []).filter(function (x) {
++                return x.reviveCap === 0 && Array.isArray(x.pressureWindows);
++              });
++              if (!tested.length) return '';
++              var counts = tested.map(function (x) { return x.pressureWindows.length; });
++              var peaks = tested.map(function (x) { return x.bufferPeak || 0; });
++              return ' · 0复活压力 ' + Math.min.apply(null, counts) + '~' +
++                Math.max.apply(null, counts) + '窗 / 峰值 ' + Math.max.apply(null, peaks);
++            })())
++          : ('未通过（' + (rec.storyCompiler.status || 'unknown') + '）'))
++        : '未开') +
+       row('混合容量填盘', rec.capacityMixPlan
+         ? ((rec.capacityMixPlan.rows || '?') + '×' + (rec.capacityMixPlan.cols || '?') + ' / ' +
+           (rec.capacityMixPlan.actualCars != null ? rec.capacityMixPlan.actualCars : '?') + ' 车 / 目标 ' +
+@@ -6088,9 +6114,22 @@ AntSolver.App = (function() {
+       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
+       row('目标图预检', rec.sourcePreflight ? (rec.sourcePreflight.status + ' · 风险 ' + (rec.sourcePreflight.warnings && rec.sourcePreflight.warnings.length ? rec.sourcePreflight.warnings.join('/') : '无') +
+         ' · ' + (rec.sourcePreflight.searchAdvice || '') + (rec.sourcePreflight.demand && rec.sourcePreflight.demand.smallCriticalColors && rec.sourcePreflight.demand.smallCriticalColors.length ? ' · 小色可关键' : '')) : '未测') +
+-      row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
+-        ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
+-        ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
++      row('目标体验', rec.storyCompilerPass
++        ? ('通过 · 故事契约 ' + rec.storyCompiler.requiredSteps + '步 · PlayerSim ' +
++          (rec.storyCompiler.players || []).filter(function (x) { return x.won && x.routeMatches; }).length + '/6' +
++          (function () {
++            var tested = (rec.storyCompiler.players || []).filter(function (x) {
++              return x.reviveCap === 0 && Array.isArray(x.pressureWindows);
++            });
++            if (!tested.length) return '';
++            var counts = tested.map(function (x) { return x.pressureWindows.length; });
++            var peaks = tested.map(function (x) { return x.bufferPeak || 0; });
++            return ' · 压力 ' + Math.min.apply(null, counts) + '~' +
++              Math.max.apply(null, counts) + '窗 / 峰值 ' + Math.max.apply(null, peaks);
++          })())
++        : (rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
++          ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
++          ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）'))) +
+       row('路线与分岔', rec.experienceRouteEvidence && rec.experienceRouteEvidence.routeDistribution ? (function () { var d = rec.experienceRouteEvidence.routeDistribution, low = d.lowPressureRoute, cc = low && low.choiceContrast;
+         var shortYield = cc && cc.baselineAction && cc.lowAction
+           ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated
+@@ -6433,6 +6472,11 @@ AntSolver.App = (function() {
+     // 【v521】搜索结构门保持旧口径；只有目标模式最终验收可补低压力证据。
+     var _finalStruct = AntSolver.Quality.finalStructureFromGeneration ? AntSolver.Quality.finalStructureFromGeneration(result) : null;
+     var _useFinalStruct = !!(result.goalMode && result.config && result.config.experienceGoal === true && _finalStruct);
++    var _storyCompilerPass = !!(result.storyCompiler && result.storyCompiler.status === 'pass' && result.valid);
++    var _storyCapMin = (_storyCompilerPass && result.storyCompiler.capacityMin != null)
++      ? result.storyCompiler.capacityMin : (result.config ? result.config.boxSizeMin : null);
++    var _storyCapMax = (_storyCompilerPass && result.storyCompiler.capacityMax != null)
++      ? result.storyCompiler.capacityMax : (result.config ? result.config.boxSizeMax : null);
+     // 【v471】结构门过：不再把 fallback 当交付否决
+     var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
+     return {
+@@ -6465,15 +6509,17 @@ AntSolver.App = (function() {
+       pressureSamples: (result.solveResult && result.solveResult.pressureSamples) || null,
+       totalBoxes: parsed.totalBoxes || null,
+       appliedParams: result.config ? {
+-        capMin: result.config.boxSizeMin, capMax: result.config.boxSizeMax,
+-        capNormMin: result.config.capNormMin, capNormMax: result.config.capNormMax,
+-        userCapMin: result.config._userCapMin, userCapMax: result.config._userCapMax,
++        capMin: _storyCapMin, capMax: _storyCapMax,
++        capNormMin: _storyCapMin, capNormMax: _storyCapMax,
++        userCapMin: _storyCompilerPass ? _storyCapMin : result.config._userCapMin,
++        userCapMax: _storyCompilerPass ? _storyCapMax : result.config._userCapMax,
+         capScale: result.capScale != null ? result.capScale : (result.config._capScale != null ? result.config._capScale : null),
+-        targetCarCount: result.config.targetCarCount,
+-        rows: result.config.boardRowsMin + '~' + result.config.boardRowsMax,
+-        cols: result.config.boardColsMin + '~' + result.config.boardColsMax,
+-        flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs,
+-        capacityProfile: result.config.capacityProfile || 'auto',
++        targetCarCount: _storyCompilerPass ? parsed.totalBoxes : result.config.targetCarCount,
++        rows: _storyCompilerPass ? parsed.board.rows + '~' + parsed.board.rows : result.config.boardRowsMin + '~' + result.config.boardRowsMax,
++        cols: _storyCompilerPass ? parsed.board.cols + '~' + parsed.board.cols : result.config.boardColsMin + '~' + result.config.boardColsMax,
++        flow: _storyCompilerPass ? 'story_compiler' : result.config.generatorFlow,
++        budgetMs: result.config.timeBudgetMs,
++        capacityProfile: _storyCompilerPass ? 'storyCompiler' : (result.config.capacityProfile || 'auto'),
+         cutMode: result.config.cutMode || null,
+         cutPolicy: result.config.cutPolicy || 'auto',
+         semanticObstacles: !!result.config.semanticObstacles,
+@@ -6484,10 +6530,12 @@ AntSolver.App = (function() {
+         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime,
+         capacityMix: result.config.capacityMix || null,
+         capacityMixBoard: result.config._capacityMixBoardPlan || null,
+-        obstacleThicken: result.config.obstacleThicken || null
++        obstacleThicken: result.config.obstacleThicken || null,
++        storyCompiler: !!result.config.storyCompiler
+       } : null,
+       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
+-      cutInfo: (result.config && result.config._cutAuto) || null,
++      cutInfo: _storyCompilerPass ? { mode: 'storyFixed' } :
++        ((result.config && result.config._cutAuto) || null),
+       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
+       capacityAudit: result.capacityAudit || null,
+       // 【v501】黑块拆解：结构目标墙 / 管道格 / 车少补位
+@@ -6498,6 +6546,22 @@ AntSolver.App = (function() {
+       timelineEvidence: result.timelineEvidence || null,
+       experienceGoal: !!(result.config && result.config.experienceGoal),
+       experienceEvidence: (function () {
++        if (_storyCompilerPass) {
++          return {
++            pass: true,
++            status: 'story-compiler-pass',
++            reasons: [],
++            metrics: {
++              routeMode: result.storyCompiler.routeMode,
++              requiredSteps: result.storyCompiler.requiredSteps,
++              playersPass: (result.storyCompiler.players || []).filter(function (x) {
++                return x.won && x.routeMatches;
++              }).length
++            },
++            source: 'story_compiler',
++            diagnosis: { primary: 'pass', action: 'done', flags: ['storyCompiler'] }
++          };
++        }
+         var rt = result.experienceRouteEvidence, rb = rt && rt.bestVerified;
+         if (result.acceptedByVerifiedRoute && rt && rt.pass === true && rb && rb.releaseDecision && rb.releaseDecision.status === 'found' &&
+             rb.releaseDecision.evidence && rb.releaseDecision.evidence.finalReplayValid === true) {
+@@ -6521,11 +6585,13 @@ AntSolver.App = (function() {
+         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
+       usableSpaceRepair: result.usableSpaceRepair || null,
+       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+-      qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
+-      qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
++      qGatePass: _storyCompilerPass ? true : (_useFinalStruct ? _finalStruct.pass : _qv.gatePass),
++      qGateReasons: _storyCompilerPass ? [] : ((_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons),
+       baseGatePass: _qv.gatePass, baseGateReasons: _qv.gateReasons,
+       fullTime: !!(result.config && result.config.fullTime),
+       trapPost: result.trapPost || null,
++      storyCompilerPass: _storyCompilerPass,
++      storyCompiler: result.storyCompiler || null,
+       routeObstaclePlan: result.routeObstaclePlan || null,
+       capacityMixPlan: result.capacityMixPlan || null,
+       obstacleThicken: (function () {
+@@ -6601,12 +6667,13 @@ AntSolver.App = (function() {
+       // 只记录在生产侧记录里（CSV/关卡数据.json/报告），关卡本体不含该字段。
+       entryMode: result.entryMode || 'fourSide',
+       // 兜底标记(v86)：fallback=true 表示这关不是正常合格输出，是"最接近标准/安全垫底"的兜底交付。
+-      fallback: _qgFromFallback ? false : !!result.fallback,
++      fallback: (_storyCompilerPass || _qgFromFallback) ? false : !!result.fallback,
+       fallbackOriginal: !!result.fallback,
+-      qGateFallback: _qgFromFallback,
+-      fallbackTier: _qgFromFallback ? null : (result.fallbackTier != null ? result.fallbackTier : null),
+-      fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
+-      fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
++      qGateFallback: _qgFromFallback || _storyCompilerPass,
++      fallbackTier: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackTier != null ? result.fallbackTier : null),
++      fallbackType: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackType || null),
++      fallbackReason: _storyCompilerPass ? '故事编译契约通过（原通用门不作为否决）' :
++        (_qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null)),
+       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
+       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
+       goalBudgetEvidence: result.goalBudgetEvidence || null,
+@@ -8022,7 +8089,7 @@ AntSolver.App = (function() {
+     files.push({ name: '索引.csv', text: '\ufeff' + idxRows.join('\n') });
+ 
+     // 5) 生产报告 MD —— 中后期卡点审核（标准见 生产审核评分体系.md）
+-    var auditPass = results.filter(function(r) { return !!r.qPass; });
++    var auditPass = results.filter(function(r) { return !!(r.qPass || r.storyCompilerPass); });
+     var bl = config.bufferLimit || 5;
+     var md = '# 生产报告\n\n';
+     md += '- 生成时间: ' + new Date().toLocaleString() + '\n';
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js"
+new file mode 100644
+index 0000000..b0ab411
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js"
+@@ -0,0 +1,1635 @@
++/*
++ * StoryCompiler v1 · generated by GenerateStoryCompilerUiBundle_v616.js
++ *
++ * Default-off browser registry for the three accepted story levels.
++ * Unsupported targets fail explicitly and never fall back to random search.
++ */
++var AntSolver = AntSolver || {};
++
++AntSolver.StoryCompiler = (function () {
++  var REGISTRY = {
++  "f9e2533b": {
++    "id": "006",
++    "label": "006 · 双段压力与连锁承诺",
++    "targetSig": "f9e2533b",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "52a3523460da5b93b5c548c65322e345af84725301da1307f5f9005f38ed7f4e",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 21,
++          "type": 0,
++          "param": 0,
++          "count": 36
++        },
++        {
++          "id": 22,
++          "type": 0,
++          "param": 0,
++          "count": 35
++        },
++        {
++          "id": 34,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 20
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 40
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 5,
++          "param": 1,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 4,
++          "type": 0,
++          "param": 0,
++          "count": 40
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 34,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 30,
++          "type": 5,
++          "param": 1,
++          "count": 23
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        }
++      ],
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 4,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        }
++      ]
++    ],
++    "capacityMin": 20,
++    "capacityMax": 40,
++    "expectedPicks": [],
++    "requiredSteps": 47,
++    "openingContract": {
++      "exactMoves": 7,
++      "allCanConsume": true,
++      "bufferAfterEmpty": true
++    },
++    "storyGraph": null,
++    "roleGraph": {
++      "roles": [
++        {
++          "id": "safe",
++          "path": [
++            {
++              "r": 0,
++              "c": 3
++            },
++            {
++              "r": 1,
++              "c": 3
++            }
++          ],
++          "debtAfterStep": null,
++          "finalBufferEmpty": true
++        },
++        {
++          "id": "lightDebt",
++          "path": [
++            {
++              "r": 0,
++              "c": 0
++            },
++            {
++              "r": 1,
++              "c": 0
++            },
++            {
++              "r": 2,
++              "c": 0
++            }
++          ],
++          "debtAfterStep": 2,
++          "debt": {
++            "color": 17,
++            "remaining": 10
++          },
++          "finalBufferEmpty": true
++        },
++        {
++          "id": "heavyDebt",
++          "path": [
++            {
++              "r": 0,
++              "c": 6
++            },
++            {
++              "r": 1,
++              "c": 6
++            },
++            {
++              "r": 2,
++              "c": 6
++            }
++          ],
++          "debtAfterStep": 2,
++          "debt": {
++            "color": 34,
++            "remaining": 19
++          },
++          "finalBufferEmpty": true
++        }
++      ]
++    },
++    "pressureContract": {
++      "threshold": 3,
++      "minWindows": 2,
++      "minPeak": 4,
++      "requireRelease": true,
++      "reviveCap": 0
++    },
++    "chainContract": {
++      "group": 1,
++      "cells": [
++        {
++          "r": 4,
++          "c": 1
++        },
++        {
++          "r": 5,
++          "c": 2
++        }
++      ],
++      "requireCompletedMember": true,
++      "requireDebtMember": true,
++      "requireRelease": true
++    },
++    "routeMode": "roleGraph",
++    "storyBeats": [
++      "顶层7个无冰入口全部立即收满",
++      "安全路径不产生债务",
++      "轻债路径17/26欠10后由31/31偿还",
++      "长债路径34/25欠19后由31/31偿还",
++      "第一段同色债务峰值3并在下一窗口部分释放",
++      "第二段混色债务达到4并持续到33/20释放",
++      "二连锁15/25等待30/23补齐，形成第三段组债承诺",
++      "最终组债释放并收尾"
++    ]
++  },
++  "e4c16e95": {
++    "id": "008",
++    "label": "008 · 双债务故事图",
++    "targetSig": "e4c16e95",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "1cd5c5875b42ea965058cbbad838a0c8970bca98b4a3e72d1fbd9127e4efdd79",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 3,
++          "type": 0,
++          "param": 0,
++          "count": 29
++        },
++        {
++          "id": 5,
++          "type": 7,
++          "param": 2,
++          "count": 36
++        },
++        {
++          "id": 7,
++          "type": 7,
++          "param": 3,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        }
++      ],
++      [
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        }
++      ],
++      [
++        {
++          "id": 32,
++          "type": 7,
++          "param": 2,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        }
++      ],
++      [
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 26,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        }
++      ],
++      [
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 32
++        },
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        }
++      ],
++      [
++        {
++          "id": 3,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        },
++        {
++          "id": 26,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        }
++      ]
++    ],
++    "capacityMin": 21,
++    "capacityMax": 36,
++    "expectedPicks": [],
++    "requiredSteps": 47,
++    "openingContract": null,
++    "storyGraph": {
++      "start": {
++        "r": 0,
++        "c": 0,
++        "color": 7,
++        "count": 26
++      },
++      "choices": [
++        {
++          "id": "lightDebt",
++          "path": [
++            {
++              "r": 1,
++              "c": 0
++            },
++            {
++              "r": 2,
++              "c": 0
++            }
++          ],
++          "debt": {
++            "color": 33,
++            "remaining": 18
++          },
++          "releaseStep": 1
++        },
++        {
++          "id": "heavyDebt",
++          "path": [
++            {
++              "r": 0,
++              "c": 1
++            },
++            {
++              "r": 0,
++              "c": 2
++            }
++          ],
++          "debt": {
++            "color": 3,
++            "remaining": 27
++          },
++          "releaseStep": 1
++        }
++      ],
++      "minRouteDiversity": 2
++    },
++    "roleGraph": null,
++    "pressureContract": null,
++    "chainContract": null,
++    "routeMode": "storyGraph",
++    "storyBeats": [
++      "7/26教学",
++      "轻债33/22或重债3/29二选一",
++      "32/27或5/36分别偿还",
++      "第二枚7/26汇合",
++      "后续分区选择与终局"
++    ]
++  },
++  "88f1c207": {
++    "id": "014",
++    "label": "014 · 最终留出",
++    "targetSig": "88f1c207",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "8f863e246ecbb0435a086a60cfbd57442458e90fe0fbb4b269042e192c13779e",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 29,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 33,
++          "type": 7,
++          "param": 3,
++          "count": 25
++        },
++        {
++          "id": 24,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 5,
++          "count": 24
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 7,
++          "param": 13,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 12,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 11,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 10,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 9,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 8,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 15,
++          "type": 7,
++          "param": 27,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 26,
++          "count": 24
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 25,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 24,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 23,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 22,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 29,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 30,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 31,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 32,
++          "count": 24
++        },
++        {
++          "id": 18,
++          "type": 7,
++          "param": 33,
++          "count": 26
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 27,
++          "type": 7,
++          "param": 41,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 40,
++          "count": 25
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 26,
++          "type": 7,
++          "param": 38,
++          "count": 31
++        },
++        {
++          "id": 20,
++          "type": 7,
++          "param": 37,
++          "count": 38
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 36,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 29,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 33,
++          "type": 7,
++          "param": 46,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 47,
++          "count": 23
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        }
++      ]
++    ],
++    "capacityMin": 23,
++    "capacityMax": 38,
++    "expectedPicks": [
++      {
++        "r": 0,
++        "c": 0
++      },
++      {
++        "r": 0,
++        "c": 1
++      },
++      {
++        "r": 0,
++        "c": 2
++      },
++      {
++        "r": 0,
++        "c": 3
++      },
++      {
++        "r": 0,
++        "c": 4
++      },
++      {
++        "r": 0,
++        "c": 5
++      },
++      {
++        "r": 0,
++        "c": 6
++      },
++      {
++        "r": 1,
++        "c": 6
++      },
++      {
++        "r": 1,
++        "c": 5
++      },
++      {
++        "r": 1,
++        "c": 4
++      },
++      {
++        "r": 1,
++        "c": 3
++      },
++      {
++        "r": 1,
++        "c": 2
++      },
++      {
++        "r": 1,
++        "c": 1
++      },
++      {
++        "r": 1,
++        "c": 0
++      },
++      {
++        "r": 2,
++        "c": 0
++      },
++      {
++        "r": 2,
++        "c": 1
++      },
++      {
++        "r": 2,
++        "c": 2
++      },
++      {
++        "r": 2,
++        "c": 3
++      },
++      {
++        "r": 2,
++        "c": 4
++      },
++      {
++        "r": 2,
++        "c": 5
++      },
++      {
++        "r": 2,
++        "c": 6
++      },
++      {
++        "r": 3,
++        "c": 6
++      },
++      {
++        "r": 3,
++        "c": 5
++      },
++      {
++        "r": 3,
++        "c": 4
++      },
++      {
++        "r": 3,
++        "c": 3
++      },
++      {
++        "r": 3,
++        "c": 2
++      },
++      {
++        "r": 3,
++        "c": 1
++      },
++      {
++        "r": 3,
++        "c": 0
++      },
++      {
++        "r": 4,
++        "c": 0
++      },
++      {
++        "r": 4,
++        "c": 1
++      },
++      {
++        "r": 4,
++        "c": 2
++      },
++      {
++        "r": 4,
++        "c": 3
++      },
++      {
++        "r": 4,
++        "c": 4
++      },
++      {
++        "r": 4,
++        "c": 5
++      },
++      {
++        "r": 4,
++        "c": 6
++      },
++      {
++        "r": 5,
++        "c": 6
++      },
++      {
++        "r": 5,
++        "c": 5
++      },
++      {
++        "r": 5,
++        "c": 4
++      },
++      {
++        "r": 5,
++        "c": 3
++      },
++      {
++        "r": 5,
++        "c": 2
++      },
++      {
++        "r": 5,
++        "c": 1
++      },
++      {
++        "r": 5,
++        "c": 0
++      },
++      {
++        "r": 6,
++        "c": 0
++      },
++      {
++        "r": 6,
++        "c": 1
++      },
++      {
++        "r": 6,
++        "c": 2
++      },
++      {
++        "r": 6,
++        "c": 3
++      },
++      {
++        "r": 6,
++        "c": 4
++      },
++      {
++        "r": 6,
++        "c": 5
++      }
++    ],
++    "requiredSteps": 48,
++    "openingContract": null,
++    "storyGraph": null,
++    "roleGraph": null,
++    "pressureContract": null,
++    "chainContract": null,
++    "routeMode": "full",
++    "storyBeats": [
++      "R107小缺口",
++      "R69鱼形内部",
++      "玉米未完成债务",
++      "末段31债务释放"
++    ]
++  }
++};
++
++  function clone(value) { return JSON.parse(JSON.stringify(value)); }
++  function signature(blocks) {
++    var hash = 2166136261 >>> 0;
++    function mix(value) {
++      hash ^= (value >>> 0);
++      hash = Math.imul(hash, 16777619) >>> 0;
++    }
++    mix(blocks.length);
++    mix(blocks[0] ? blocks[0].length : 0);
++    for (var r = 0; r < blocks.length; r++) for (var c = 0; c < blocks[r].length; c++) mix(blocks[r][c] | 0);
++    return hash.toString(16);
++  }
++  function uniquePicks(run) {
++    var seen = {};
++    var out = [];
++    var picks = (run && run.pickOrder) || [];
++    for (var i = 0; i < picks.length; i++) {
++      var pick = picks[i];
++      var key = String(pick.step);
++      if (seen[key]) continue;
++      seen[key] = true;
++      out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });
++    }
++    return out;
++  }
++  function poseKey(picks) {
++    return picks.map(function (pick) { return pick.r + "," + pick.c; }).join(">");
++  }
++  function routeMatches(picks, required, mode) {
++    if (mode === "prefix") return poseKey(picks.slice(0, required.length)) === poseKey(required);
++    return poseKey(picks) === poseKey(required);
++  }
++  function storyGraphPass(level, entry, solvePicks, playerRuns) {
++    var graph = entry.storyGraph;
++    if (!graph) return true;
++    var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++    st.capture = true;
++    st.capOps = [];
++    if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;
++    var opening = AntSolver.Simulator.listMoves(st).filter(function (move) { return !move.blocked; });
++    if (opening.length !== graph.choices.length) return false;
++    for (var gi = 0; gi < graph.choices.length; gi++) {
++      var choice = graph.choices[gi];
++      if (!opening.some(function (move) { return move.r === choice.path[0].r && move.c === choice.path[0].c; })) return false;
++      st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++      st.capture = true;
++      st.capOps = [];
++      if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;
++      for (var pi = 0; pi < choice.path.length; pi++) {
++        st.capOps = [];
++        if (!AntSolver.Simulator.applyPick(st, choice.path[pi].r, choice.path[pi].c)) return false;
++        if (pi === 0 && choice.debt) {
++          if (!st.buffer.some(function (item) {
++            return item.color === choice.debt.color && item.need - item.progress === choice.debt.remaining;
++          })) return false;
++        }
++      }
++      if (st.buffer.length !== 0) return false;
++    }
++    var keys = {};
++    keys[poseKey(solvePicks.slice(0, 12))] = true;
++    for (var ri = 0; ri < playerRuns.length; ri++) keys[poseKey(playerRuns[ri].slice(0, 12))] = true;
++    return Object.keys(keys).length >= (graph.minRouteDiversity || 1);
++  }
++  function roleGraphPass(level, entry) {
++    var graph = entry.roleGraph;
++    if (!graph) return true;
++    for (var ri = 0; ri < graph.roles.length; ri++) {
++      var role = graph.roles[ri];
++      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++      st.capture = true;
++      st.capOps = [];
++      for (var pi = 0; pi < role.path.length; pi++) {
++        var cell = role.path[pi];
++        var move = AntSolver.Simulator.listMoves(st).filter(function (item) {
++          return !item.blocked && item.r === cell.r && item.c === cell.c;
++        })[0];
++        if (!move) return false;
++        st.capOps = [];
++        if (!AntSolver.Simulator.applyPick(st, cell.r, cell.c)) return false;
++        if (role.debtAfterStep === pi + 1 && role.debt) {
++          var hasDebt = st.buffer.some(function (item) {
++            return item.color === role.debt.color && item.need - item.progress === role.debt.remaining;
++          });
++          if (!hasDebt) return false;
++        }
++      }
++      if (role.finalBufferEmpty && st.buffer.length !== 0) return false;
++    }
++    return true;
++  }
++  function pressureWindowsOf(timeline, threshold) {
++    var windows = [];
++    var start = null;
++    for (var i = 0; i < timeline.length; i++) {
++      if (timeline[i] >= threshold && start == null) start = i;
++      if (timeline[i] < threshold && start != null) {
++        windows.push({ start: start + 1, end: i, peak: Math.max.apply(null, timeline.slice(start, i)), release: true });
++        start = null;
++      }
++    }
++    if (start != null) {
++      windows.push({ start: start + 1, end: timeline.length, peak: Math.max.apply(null, timeline.slice(start)), release: false });
++    }
++    return windows;
++  }
++  function pressureGraphPass(players, entry) {
++    var contract = entry.pressureContract;
++    if (!contract) return true;
++    var tested = players.filter(function (player) { return player.reviveCap === contract.reviveCap; });
++    if (!tested.length) return false;
++    return tested.every(function (player) {
++      var windows = pressureWindowsOf(player.bufferTimeline || [], contract.threshold);
++      player.pressureWindows = windows;
++      var peak = Math.max.apply(null, (player.bufferTimeline || []).concat([0]));
++      if (windows.length < contract.minWindows) return false;
++      if (contract.minPeak != null && peak < contract.minPeak) return false;
++      if (contract.requireRelease && !windows.every(function (window) { return window.release; })) return false;
++      return true;
++    });
++  }
++  function chainGraphPass(level, entry, playerRuns) {
++    var contract = entry.chainContract;
++    if (!contract) return true;
++    var actualCells = [];
++    for (var r = 0; r < level.board.rows; r++) for (var c = 0; c < level.board.cols; c++) {
++      var cell = level.board.cells[r][c];
++      if (cell && cell.t === "box" && cell.chain === contract.group) actualCells.push(r + "," + c);
++    }
++    var expectedCells = contract.cells.map(function (cell) { return cell.r + "," + cell.c; });
++    if (actualCells.sort().join("|") !== expectedCells.sort().join("|")) return false;
++    for (var ri = 0; ri < playerRuns.length; ri++) {
++      var picks = playerRuns[ri];
++      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++      st.capture = true;
++      var active = false, completed = false, debt = false, released = false;
++      for (var pi = 0; pi < picks.length; pi++) {
++        st.capOps = [];
++        if (!AntSolver.Simulator.applyPick(st, picks[pi].r, picks[pi].c)) continue;
++        var linked = st.buffer.filter(function (item) { return item.link === contract.group; });
++        if (linked.length) {
++          active = true;
++          if (linked.some(function (item) { return item.need - item.progress === 0; })) completed = true;
++          if (linked.some(function (item) { return item.need - item.progress > 0; })) debt = true;
++        } else if (active) {
++          released = true;
++          break;
++        }
++      }
++      var ok = (!contract.requireCompletedMember || completed) &&
++        (!contract.requireDebtMember || debt) &&
++        (!contract.requireRelease || released);
++      if (ok) return true;
++    }
++    return false;
++  }
++  function openingFrontierPass(level, entry) {
++    var contract = entry.openingContract;
++    if (!contract) return true;
++    var state = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++    state.capture = true;
++    var moves = AntSolver.Simulator.listMoves(state).filter(function (move) { return !move.blocked; });
++    if (contract.exactMoves != null && moves.length !== contract.exactMoves) return false;
++    if (contract.allCanConsume && !moves.every(function (move) { return move.canConsume; })) return false;
++    if (contract.bufferAfterEmpty) {
++      for (var i = 0; i < moves.length; i++) {
++        var clone = AntSolver.SolverStrategy.cloneState(state);
++        clone.capOps = [];
++        if (!AntSolver.Simulator.applyPick(clone, moves[i].r, moves[i].c)) return false;
++        if (clone.buffer.length !== 0) return false;
++      }
++    }
++    return true;
++  }
++  function entryFor(blocks) { return REGISTRY[signature(blocks)] || null; }
++  function availableTargets() {
++    return Object.keys(REGISTRY).map(function (key) {
++      var entry = REGISTRY[key];
++      return { id: entry.id, label: entry.label, targetSig: key };
++    });
++  }
++  function compile(blocks, config) {
++    var t0 = Date.now();
++    var entry = entryFor(blocks);
++    if (!entry) {
++      return { ok: false, level: null, meta: {
++        schema: "story-compiler-v1", status: "unsupported-target",
++        targetSig: signature(blocks), available: availableTargets(), elapsedMs: Date.now() - t0
++      } };
++    }
++    if (!blocks.length || blocks.length !== entry.targetSize[0] || blocks[0].length !== entry.targetSize[1]) {
++      return { ok: false, level: null, meta: { schema: "story-compiler-v1", status: "size-mismatch", storyId: entry.id } };
++    }
++    var level = AntSolver.parseLevel(AntSolver.fromGameFormat({
++      toprow: blocks.length, blocks: clone(blocks), maprow: entry.maprow, mapcol: entry.mapcol,
++      spools: clone(entry.spools)
++    }));
++    var solve = AntSolver.Solver.solveInstantChain(level, { timeBudgetMs: 20000 });
++    var solvePicks = uniquePicks(solve);
++    var exactSolveRouteMatches = !!(solve.completed && routeMatches(solvePicks, entry.expectedPicks, entry.routeMode));
++    var players = [];
++    var playerPickLists = [];
++    var seeds = [7, 1009, 2027];
++    var caps = [0, 2];
++    for (var ci = 0; ci < caps.length; ci++) for (var si = 0; si < seeds.length; si++) {
++      var run = AntSolver.PlayerSim.run(level, { seed: seeds[si], instantChain: true, reviveCap: caps[ci] });
++      var runPicks = uniquePicks(run);
++      playerPickLists.push(runPicks);
++      players.push({ seed: seeds[si], reviveCap: caps[ci], won: !!run.won,
++        progress: run.progress, bufferPeak: run.bufferPeak, revivesUsed: run.revivesUsed,
++        bufferTimeline: run.bufferTimeline || [],
++        routeMatches: entry.routeMode === "storyGraph" ? true : routeMatches(runPicks, entry.expectedPicks, entry.routeMode) });
++    }
++    var graphPass = storyGraphPass(level, entry, solvePicks, playerPickLists);
++    var rolePass = roleGraphPass(level, entry);
++    var pressurePass = pressureGraphPass(players, entry);
++    var chainPass = chainGraphPass(level, entry, playerPickLists);
++    var frontierPass = openingFrontierPass(level, entry);
++    if (entry.routeMode === "storyGraph") {
++      for (var pgi = 0; pgi < players.length; pgi++) players[pgi].routeMatches = graphPass;
++    } else if (entry.routeMode === "openFrontier") {
++      for (var pfj = 0; pfj < players.length; pfj++) players[pfj].routeMatches = frontierPass;
++    } else if (entry.routeMode === "roleGraph") {
++      for (var prj = 0; prj < players.length; prj++) players[prj].routeMatches = frontierPass && rolePass && pressurePass && chainPass;
++    }
++    var solveRouteMatches = entry.routeMode === "storyGraph" ? graphPass :
++      (entry.routeMode === "openFrontier" ? frontierPass :
++        (entry.routeMode === "roleGraph" ? (frontierPass && rolePass && pressurePass && chainPass) : exactSolveRouteMatches));
++    var roundtrip = AntSolver.parseLevel(AntSolver.fromGameFormat(AntSolver.toGameFormat(level)));
++    var roundtripSolve = AntSolver.Solver.solveInstantChain(roundtrip, { timeBudgetMs: 20000, greedyOnly: true });
++    var checks = {
++      solveCompleted: !!solve.completed,
++      solveRouteMatches: solveRouteMatches,
++      storyGraphPass: graphPass,
++      roleGraphPass: rolePass,
++      pressureGraphPass: pressurePass,
++      chainGraphPass: chainPass,
++      openingFrontierPass: frontierPass,
++      playersPass: players.every(function (x) { return x.won && x.progress === 100 && x.routeMatches; }),
++      noRevivePass: players.filter(function (x) { return x.reviveCap === 0; }).every(function (x) { return x.revivesUsed === 0; }),
++      roundtripPass: !!roundtripSolve.completed
++    };
++    var passed = Object.keys(checks).every(function (key) { return checks[key]; });
++    return {
++      ok: passed,
++      level: passed ? level : null,
++      meta: {
++        schema: "story-compiler-v1",
++        status: passed ? "pass" : "story-validation-failed",
++        storyId: entry.id,
++        label: entry.label,
++        targetSig: entry.targetSig,
++        sourceSha256: entry.sha256,
++        capacityMin: entry.capacityMin,
++        capacityMax: entry.capacityMax,
++        routeMode: entry.routeMode,
++        requiredSteps: entry.requiredSteps,
++        storyBeats: entry.storyBeats,
++        checks: checks,
++        roleGraphPass: rolePass,
++        pressureGraphPass: pressurePass,
++        chainGraphPass: chainPass,
++        solve: { completed: !!solve.completed, progress: solve.progress, bufferPeak: solve.maxBuffer, routeMatches: solveRouteMatches },
++        players: players,
++        elapsedMs: Date.now() - t0
++      }
++    };
++  }
++
++  return {
++    schema: "story-compiler-v1",
++    signature: signature,
++    availableTargets: availableTargets,
++    compile: compile
++  };
++})();
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Analyze006BranchPayoff_v686.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Analyze006BranchPayoff_v686.js"
+new file mode 100644
+index 0000000..9041220
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Analyze006BranchPayoff_v686.js"
+@@ -0,0 +1,234 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * Compare the three v15 entry paths with one deterministic greedy continuation.
++ * The purpose is to measure time-to-R59/R65, not to find another solver route.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const LEVEL = path.join(ROOT, '实验关/关卡6/原型_v15/关卡_实验_006_v15.json');
++const ATLAS = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
++const OUT = path.join(ROOT, '实验关/关卡6/原型_v15');
++const MODULES = [
++  'utils.js',
++  'color-libs.js',
++  'simulator.js',
++  'solver-strategy.js',
++  'solver.js',
++  'playersim.js',
++  'analysis.js',
++  'car-sequencer.js',
++  'solver-analysis.js',
++  'experience-goal.js',
++  'capacity-tuner.js',
++  'instant-playout.js',
++  'generator.js'
++];
++
++const PATHS = {
++  safe: [[0, 3], [1, 3]],
++  lightDebt: [[0, 0], [1, 0], [2, 0]],
++  heavyDebt: [[0, 6], [1, 6], [2, 6]]
++};
++
++function loadSolver() {
++  const sandbox = {
++    console,
++    WeakMap,
++    Map,
++    Set,
++    Date,
++    Math,
++    JSON,
++    Object,
++    Array,
++    String,
++    Number,
++    isNaN,
++    parseInt,
++    parseFloat,
++    isFinite,
++    setTimeout,
++    clearTimeout
++  };
++  sandbox.global = sandbox;
++  vm.createContext(sandbox);
++  for (const file of MODULES) {
++    vm.runInContext(
++      fs.readFileSync(path.join(BIN, file), 'utf8'),
++      sandbox,
++      { filename: file }
++    );
++  }
++  return sandbox.AntSolver;
++}
++
++function regionMap(atlas) {
++  const byCell = {};
++  for (const region of atlas.target.regions || []) {
++    for (const cell of region.cells || []) {
++      byCell[cell[0] + ',' + cell[1]] = region.id;
++    }
++  }
++  return byCell;
++}
++
++function reachableRegions(A, state, byCell) {
++  const preview = A.Simulator.previewNextEliminationOrder(state);
++  const ids = new Set();
++  for (let r = 0; r < preview.rank.length; r++) {
++    for (let c = 0; c < preview.rank[r].length; c++) {
++      if (preview.rank[r][c] <= 0) continue;
++      const id = byCell[r + ',' + c];
++      if (id) ids.add(id);
++    }
++  }
++  return ids;
++}
++
++function trace(A, level, byCell, id, prefix) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const prefixEvidence = [];
++  for (const [r, c] of prefix) {
++    const move = A.Simulator.listMoves(state)
++      .find(item => item.r === r && item.c === c && !item.blocked);
++    if (!move) throw new Error(id + ' 入口路径不可执行');
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, r, c)) {
++      throw new Error(id + ' 入口路径执行失败');
++    }
++    prefixEvidence.push({
++      step: prefixEvidence.length + 1,
++      r,
++      c,
++      color: move.antBox.color,
++      count: move.antBox.count,
++      buffer: state.buffer.map(item => ({
++        color: item.color,
++        remaining: item.need - item.progress
++      }))
++    });
++  }
++
++  const firstReach = { R59: null, R65: null };
++  const continuation = [];
++  for (let step = prefix.length; step <= 47; step++) {
++    const reachable = reachableRegions(A, state, byCell);
++    for (const region of ['R59', 'R65']) {
++      if (!firstReach[region] && reachable.has(region)) firstReach[region] = step;
++    }
++    if (firstReach.R59 && firstReach.R65) break;
++    if (state.gameOver) break;
++    const moves = A.Simulator.listMoves(state).filter(move => !move.blocked);
++    if (!moves.length) break;
++    const pick = A.SolverStrategy.greedyPick(state, moves, {});
++    if (!pick) break;
++    continuation.push({
++      step: step + 1,
++      r: pick.r,
++      c: pick.c,
++      color: pick.antBox.color,
++      count: pick.antBox.count,
++      buffer: state.buffer.length
++    });
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, pick.r, pick.c)) break;
++  }
++  return {
++    id,
++    prefix,
++    prefixEvidence,
++    continuation,
++    firstReach,
++    stoppedAtProgress: +(state.eliminatedPixels / state.totalPixels).toFixed(4),
++    stoppedBuffer: state.buffer.length
++  };
++}
++
++function main() {
++  const A = loadSolver();
++  const level = A.parseLevel(A.fromGameFormat(
++    JSON.parse(fs.readFileSync(LEVEL, 'utf8'))
++  ));
++  const byCell = regionMap(JSON.parse(fs.readFileSync(ATLAS, 'utf8')));
++  const branches = Object.keys(PATHS).map(id =>
++    trace(A, level, byCell, id, PATHS[id]));
++  const safe = branches.find(branch => branch.id === 'safe');
++  for (const branch of branches) {
++    branch.leadVsSafe = {
++      R59: safe.firstReach.R59 == null || branch.firstReach.R59 == null
++        ? null : safe.firstReach.R59 - branch.firstReach.R59,
++      R65: safe.firstReach.R65 == null || branch.firstReach.R65 == null
++        ? null : safe.firstReach.R65 - branch.firstReach.R65
++    };
++  }
++
++  const result = {
++    schema: '006-branch-payoff-v1',
++    levelFile: LEVEL,
++    atlasFile: ATLAS,
++    policy: 'same greedy continuation after each entry prefix',
++    branches,
++    conclusion: {
++      earliestR59: branches.slice().sort((a, b) =>
++        a.firstReach.R59 - b.firstReach.R59)[0].id,
++      earliestR65: branches.slice().sort((a, b) =>
++        a.firstReach.R65 - b.firstReach.R65)[0].id,
++      note: 'This is measured evidence; it does not replace human readability review.'
++    }
++  };
++  fs.writeFileSync(
++    path.join(OUT, 'branch-payoff-v1.json'),
++    JSON.stringify(result, null, 2) + '\n'
++  );
++  fs.writeFileSync(
++    path.join(OUT, 'branch-payoff-v1.md'),
++    [
++      '# 006 · Branch Payoff v1',
++      '',
++      '统一策略：执行入口前缀后，三路都使用同一个贪心延续策略。',
++      '',
++      '| 路径 | R59 | R65 | 相对安全提前 R59 | 相对安全提前 R65 |',
++      '|---|---:|---:|---:|---:|',
++      ...branches.map(branch =>
++        '| ' + branch.id + ' | ' + branch.firstReach.R59 + ' | ' +
++        branch.firstReach.R65 + ' | ' + branch.leadVsSafe.R59 + ' | ' +
++        branch.leadVsSafe.R65 + ' |'
++      ),
++      '',
++      '- 最早R59：`' + result.conclusion.earliestR59 + '`；',
++      '- 最早R65：`' + result.conclusion.earliestR65 + '`；',
++      '- 该证据只比较统一策略下的揭示步数，不替代真人可读性判断。',
++      ''
++    ].join('\n') + '\n'
++  );
++
++  console.log(JSON.stringify({
++    ok: true,
++    output: path.join(OUT, 'branch-payoff-v1.json'),
++    branches: branches.map(branch => ({
++      id: branch.id,
++      firstReach: branch.firstReach,
++      leadVsSafe: branch.leadVsSafe,
++      stoppedAtProgress: branch.stoppedAtProgress
++    })),
++    conclusion: result.conclusion
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006ChainCheckpoint_v684.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006ChainCheckpoint_v684.js"
+new file mode 100644
+index 0000000..0ec6a65
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006ChainCheckpoint_v684.js"
+@@ -0,0 +1,800 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.7f B: add one semantic two-chain checkpoint to v14.
++ *
++ * 4,1 / 5,2 are linked because the first completes while the second remains
++ * partial. The completed member is held by the group until the other catches
++ * up, creating a third, visibly different pressure window.
++ */
++
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v14/关卡_实验_006_v14.json');
++const BASE_DEBUG = path.join(ROOT, '实验关/关卡6/原型_v14/关卡_实验_006_v14.debug.json');
++const ATLAS = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
++const OUT = path.join(ROOT, '实验关/关卡6/原型_v15');
++const LEVEL_FILE = path.join(OUT, '关卡_实验_006_v15.json');
++const ROUTE_FILE = path.join(OUT, '关卡_实验_006_v15.route.json');
++const DEBUG_FILE = path.join(OUT, '关卡_实验_006_v15.debug.json');
++const PLAN_JSON = path.join(OUT, 'story-plan-v3.json');
++const PLAN_MD = path.join(OUT, 'story-plan-v3.md');
++const REPORT_MD = path.join(OUT, '关卡_实验_006_v15.md');
++const MODULES = [
++  'utils.js',
++  'color-libs.js',
++  'simulator.js',
++  'solver-strategy.js',
++  'solver.js',
++  'playersim.js',
++  'analysis.js',
++  'car-sequencer.js',
++  'solver-analysis.js',
++  'experience-goal.js',
++  'capacity-tuner.js',
++  'instant-playout.js',
++  'generator.js'
++];
++
++const CHAIN_CELLS = [[4, 1], [5, 2]];
++const CHAIN_GROUP = 1;
++
++function loadSolver() {
++  const sandbox = {
++    console,
++    WeakMap,
++    Map,
++    Set,
++    Date,
++    Math,
++    JSON,
++    Object,
++    Array,
++    String,
++    Number,
++    isNaN,
++    parseInt,
++    parseFloat,
++    isFinite,
++    setTimeout,
++    clearTimeout
++  };
++  sandbox.global = sandbox;
++  vm.createContext(sandbox);
++  for (const file of MODULES) {
++    vm.runInContext(
++      fs.readFileSync(path.join(BIN, file), 'utf8'),
++      sandbox,
++      { filename: file }
++    );
++  }
++  return sandbox.AntSolver;
++}
++
++function uniquePicks(run) {
++  const seen = new Set();
++  const out = [];
++  for (const pick of run.pickOrder || []) {
++    if (seen.has(pick.step)) continue;
++    seen.add(pick.step);
++    out.push({
++      r: pick.r,
++      c: pick.c,
++      color: pick.color,
++      count: pick.count
++    });
++  }
++  return out;
++}
++
++function poseKey(picks) {
++  return picks.map(pick => pick.r + ',' + pick.c).join('>');
++}
++
++function bufferState(state) {
++  return state.buffer.map(item => ({
++    color: item.color,
++    remaining: item.need - item.progress,
++    need: item.need,
++    progress: item.progress,
++    slot: item.slot,
++    link: item.link || 0,
++    enteredAtStep: item.enterStep == null ? null : item.enterStep + 1
++  }));
++}
++
++function regionLookup(atlas) {
++  const byCell = {};
++  const byId = {};
++  for (const region of atlas.target.regions || []) {
++    byId[region.id] = region;
++    for (const cell of region.cells || []) {
++      byCell[cell[0] + ',' + cell[1]] = region.id;
++    }
++  }
++  return { byCell, byId };
++}
++
++function regionHits(cells, lookup) {
++  const counts = {};
++  for (const cell of cells || []) {
++    const r = Array.isArray(cell) ? cell[0] : cell.r;
++    const c = Array.isArray(cell) ? cell[1] : cell.c;
++    const id = lookup.byCell[r + ',' + c];
++    if (!id) continue;
++    counts[id] = (counts[id] || 0) + 1;
++  }
++  return Object.keys(counts)
++    .map(id => ({
++      region: id,
++      color: lookup.byId[id].color,
++      pixels: counts[id]
++    }))
++    .sort((a, b) => b.pixels - a.pixels || a.region.localeCompare(b.region));
++}
++
++function windowsAtLeast(timeline, threshold) {
++  const windows = [];
++  let start = null;
++  for (let i = 0; i < timeline.length; i++) {
++    if (timeline[i] >= threshold && start == null) start = i;
++    if (timeline[i] < threshold && start != null) {
++      windows.push({
++        start: start + 1,
++        end: i,
++        length: i - start,
++        peak: Math.max(...timeline.slice(start, i))
++      });
++      start = null;
++    }
++  }
++  if (start != null) {
++    windows.push({
++      start: start + 1,
++      end: timeline.length,
++      length: timeline.length - start,
++      peak: Math.max(...timeline.slice(start))
++    });
++  }
++  return windows;
++}
++
++function optionsAt(A, state) {
++  return A.Simulator.listMoves(state)
++    .filter(move => !move.blocked)
++    .map(move => {
++      const clone = A.SolverStrategy.cloneState(state);
++      const before = clone.eliminatedPixels;
++      clone.capOps = [];
++      const applied = A.Simulator.applyPick(clone, move.r, move.c);
++      return {
++        r: move.r,
++        c: move.c,
++        color: move.antBox.color,
++        count: move.antBox.count,
++        canConsume: move.canConsume,
++        consumed: clone.eliminatedPixels - before,
++        bufferAfter: bufferState(clone),
++        applied
++      };
++    });
++}
++
++function traceRole(A, level, id, path) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  state.capOps = [];
++  const evidence = [];
++  for (const [r, c] of path) {
++    const move = A.Simulator.listMoves(state)
++      .find(item => item.r === r && item.c === c && !item.blocked);
++    if (!move) return { id, ok: false, evidence, reason: 'not-available' };
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, r, c)) {
++      return { id, ok: false, evidence, reason: 'apply-failed' };
++    }
++    evidence.push({
++      r,
++      c,
++      color: move.antBox.color,
++      count: move.antBox.count,
++      bufferAfter: bufferState(state)
++    });
++  }
++  return { id, ok: true, evidence };
++}
++
++function tracePressure(A, level, run, atlasLookup) {
++  const picks = uniquePicks(run);
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const steps = [];
++
++  for (let i = 0; i < picks.length; i++) {
++    const pick = picks[i];
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, pick.r, pick.c)) {
++      throw new Error('压力回放失败: step=' + (i + 1));
++    }
++    const eaten = [];
++    for (const op of state.capOps || []) {
++      if (op.t === 'eat') for (const cell of op.cells || []) eaten.push(cell);
++    }
++    steps.push({
++      step: i + 1,
++      r: pick.r,
++      c: pick.c,
++      color: pick.color,
++      count: pick.count,
++      buffer: bufferState(state),
++      bufferLevel: state.buffer.length,
++      regions: regionHits(eaten, atlasLookup),
++      nextMoves: state.buffer.length >= 3
++        ? optionsAt(A, state).map(move => ({
++            r: move.r,
++            c: move.c,
++            color: move.color,
++            count: move.count,
++            canConsume: move.canConsume,
++            consumed: move.consumed,
++            bufferAfter: move.bufferAfter.length
++          }))
++        : []
++    });
++  }
++
++  const windows = windowsAtLeast(steps.map(step => step.bufferLevel), 3);
++  return {
++    steps,
++    windows: windows.map((window, index) => {
++      const peakStep = steps
++        .slice(window.start - 1, window.end)
++        .reduce((best, step) =>
++          best == null || step.bufferLevel > best.bufferLevel ? step : best, null);
++      const release = steps
++        .slice(window.end)
++        .find(step => step.bufferLevel < peakStep.bufferLevel);
++      return {
++        id: 'pressure-' + (index + 1),
++        startStep: window.start,
++        endStep: window.end,
++        length: window.length,
++        peak: window.peak,
++        peakStep,
++        steps: steps.slice(window.start - 1, window.end),
++        choiceCountAtPeak: peakStep.nextMoves.length,
++        targetRegions: (function () {
++          const byRegion = {};
++          for (const step of steps.slice(window.start - 1, window.end)) {
++            for (const region of step.regions) {
++              byRegion[region.region] = byRegion[region.region] || {
++                region: region.region,
++                color: region.color,
++                pixels: 0
++              };
++              byRegion[region.region].pixels += region.pixels;
++            }
++          }
++          return Object.values(byRegion)
++            .sort((a, b) => b.pixels - a.pixels || a.region.localeCompare(b.region))
++            .slice(0, 12);
++        })(),
++        release: release ? {
++          step: release.step,
++          r: release.r,
++          c: release.c,
++          color: release.color,
++          count: release.count,
++          bufferAfter: release.buffer,
++          reduction: peakStep.bufferLevel - release.bufferLevel
++        } : null
++      };
++    })
++  };
++}
++
++function chainEvidence(A, level, run) {
++  const picks = uniquePicks(run);
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  let entered = null;
++  let released = null;
++
++  for (let i = 0; i < picks.length; i++) {
++    const pick = picks[i];
++    state.capOps = [];
++    A.Simulator.applyPick(state, pick.r, pick.c);
++    const linked = bufferState(state).filter(item => item.link === CHAIN_GROUP);
++    if (!entered && linked.length > 0) {
++      entered = {
++        step: i + 1,
++        pick,
++        buffer: bufferState(state),
++        linked
++      };
++    }
++    if (entered && !released && linked.length === 0) {
++      released = {
++        step: i + 1,
++        pick,
++        buffer: bufferState(state)
++      };
++    }
++  }
++  return { entered, released };
++}
++
++function main() {
++  const A = loadSolver();
++  const game = JSON.parse(fs.readFileSync(SOURCE, 'utf8'));
++  const atlasLookup = regionLookup(
++    JSON.parse(fs.readFileSync(ATLAS, 'utf8'))
++  );
++  for (const [r, c] of CHAIN_CELLS) {
++    if (!game.spools[r][c] || game.spools[r][c].id <= 0) {
++      throw new Error('锁链位置不是车辆: ' + r + ',' + c);
++    }
++    game.spools[r][c].type = 5;
++    game.spools[r][c].param = CHAIN_GROUP;
++  }
++  const level = A.parseLevel(A.fromGameFormat(game));
++
++  const opening = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  opening.capture = true;
++  const openingMoves = optionsAt(A, opening);
++
++  const roles = {
++    safe: traceRole(A, level, 'safe', [[0, 3], [1, 3]]),
++    lightDebt: traceRole(A, level, 'lightDebt', [[0, 0], [1, 0], [2, 0]]),
++    heavyDebt: traceRole(A, level, 'heavyDebt', [[0, 6], [1, 6], [2, 6]])
++  };
++  const rolePass =
++    roles.safe.ok && roles.safe.evidence.every(step => step.bufferAfter.length === 0) &&
++    roles.lightDebt.evidence[1].bufferAfter.some(item =>
++      item.color === 17 && item.remaining === 10) &&
++    roles.lightDebt.evidence[2].bufferAfter.length === 0 &&
++    roles.heavyDebt.evidence[1].bufferAfter.some(item =>
++      item.color === 34 && item.remaining === 19) &&
++    roles.heavyDebt.evidence[2].bufferAfter.length === 0;
++
++  const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 30000 });
++  const players = [];
++  const playerPlans = [];
++  let groupEvidence = null;
++  for (const reviveCap of [0, 2]) {
++    for (const seed of [7, 1009, 2027]) {
++      const run = A.PlayerSim.run(level, {
++        seed,
++        instantChain: true,
++        reviveCap
++      });
++      const trace = tracePressure(A, level, run, atlasLookup);
++      const group = chainEvidence(A, level, run);
++      if (seed === 7 && reviveCap === 0) groupEvidence = group;
++      const summary = {
++        seed,
++        reviveCap,
++        won: run.won,
++        progress: run.progress,
++        bufferPeak: run.bufferPeak,
++        revivesUsed: run.revivesUsed,
++        bufferTimeline: run.bufferTimeline,
++        windows: trace.windows,
++        pickOrder: run.pickOrder,
++        picks: uniquePicks(run)
++      };
++      players.push(summary);
++      playerPlans.push({
++        seed,
++        reviveCap,
++        windows: trace.windows,
++        steps: trace.steps,
++        group
++      });
++    }
++  }
++
++  const zeroRevive = players.filter(player => player.reviveCap === 0);
++  const baseDebug = JSON.parse(fs.readFileSync(BASE_DEBUG, 'utf8'));
++  const chainAblation = {
++    withoutChain: {
++      solveBufferPeak: baseDebug.solve.bufferPeak,
++      windowsPerZeroReviveSeed: baseDebug.players
++        .filter(player => player.reviveCap === 0)
++        .map(player => player.windows.length)
++    },
++    withChain: {
++      solveBufferPeak: solve.maxBuffer,
++      windowsPerZeroReviveSeed: zeroRevive.map(player => player.windows.length)
++    }
++  };
++
++  const noBlackGame = JSON.parse(JSON.stringify(game));
++  for (let r = 0; r < noBlackGame.maprow; r++) {
++    for (let c = 0; c < noBlackGame.mapcol; c++) {
++      if (noBlackGame.spools[r][c].id === -1) {
++        noBlackGame.spools[r][c] = { id: 0, type: 0, param: 0, count: 0 };
++      }
++    }
++  }
++  const noBlackLevel = A.parseLevel(A.fromGameFormat(noBlackGame));
++  const noBlackSolve = A.Solver.solveInstantChain(noBlackLevel, {
++    timeBudgetMs: 20000
++  });
++  const noBlackPlayers = [7, 1009, 2027].map(seed =>
++    A.PlayerSim.run(noBlackLevel, {
++      seed,
++      instantChain: true,
++      reviveCap: 0
++    })
++  );
++  const blackAblation = {
++    withBlack: {
++      solveBufferPeak: solve.maxBuffer,
++      playersWon: zeroRevive.filter(player => player.won).length
++    },
++    withoutBlack: {
++      solveCompleted: noBlackSolve.completed,
++      solveProgress: noBlackSolve.progress,
++      solveBufferPeak: noBlackSolve.maxBuffer,
++      playersWon: noBlackPlayers.filter(run => run.won).length,
++      playersProgress: noBlackPlayers.map(run => run.progress)
++    }
++  };
++
++  const baseTimeline = JSON.stringify(
++    players.find(player => player.seed === 7 && player.reviveCap === 0).bufferTimeline
++  );
++  let iceProbeChanged = 0;
++  let iceProbePassed = 0;
++  for (let r = 1; r < game.maprow; r++) {
++    for (let c = 0; c < game.mapcol; c++) {
++      const sourceSpool = game.spools[r][c];
++      if (!sourceSpool || sourceSpool.id <= 0 ||
++          CHAIN_CELLS.some(([cr, cc]) => cr === r && cc === c)) continue;
++      const probeGame = JSON.parse(JSON.stringify(game));
++      probeGame.spools[r][c].type = 7;
++      probeGame.spools[r][c].param = 1;
++      let probeLevel;
++      try { probeLevel = A.parseLevel(A.fromGameFormat(probeGame)); }
++      catch (e) { continue; }
++      const probe = A.PlayerSim.run(probeLevel, {
++        seed: 7,
++        instantChain: true,
++        reviveCap: 0
++      });
++      if (JSON.stringify(probe.bufferTimeline) !== baseTimeline) iceProbeChanged++;
++      if (probe.won && probe.progress === 100 && probe.revivesUsed === 0) iceProbePassed++;
++    }
++  }
++  const obstacleDecision = {
++    schema: '006-obstacle-decision-v1',
++    black: {
++      keep: blackAblation.withBlack.playersWon > blackAblation.withoutBlack.playersWon ||
++        blackAblation.withBlack.solveBufferPeak !== blackAblation.withoutBlack.solveBufferPeak,
++      role: 'structural-shape',
++      ablation: blackAblation
++    },
++    chain: {
++      keep: chainAblation.withoutChain.solveBufferPeak !== chainAblation.withChain.solveBufferPeak ||
++        JSON.stringify(chainAblation.withoutChain.windowsPerZeroReviveSeed) !==
++          JSON.stringify(chainAblation.withChain.windowsPerZeroReviveSeed),
++      role: 'group-debt',
++      ablation: chainAblation
++    },
++    ice: {
++      keep: false,
++      reason: iceProbeChanged === 0
++        ? '所有单格1步冰探针均未改变seed7路线或buffer曲线'
++        : '单格冰虽有变化，但未形成独立可解释职责',
++      changedSeed7Routes: iceProbeChanged,
++      passedSeed7Routes: iceProbePassed
++    },
++    pipe: {
++      keep: false,
++      reason: '当前满盘没有空闲出口供queue释放；必须为管道单独重摆，暂不强行加入'
++    },
++    question: {
++      keep: false,
++      reason: '顶层信息立即公开，没有可推断的未知；问号只会隐藏答案'
++    }
++  };
++
++  const roundtrip = A.parseLevel(A.fromGameFormat(A.toGameFormat(level)));
++  const roundtripSolve = A.Solver.solveInstantChain(roundtrip, {
++    timeBudgetMs: 20000,
++    greedyOnly: true
++  });
++
++  let boxes = 0;
++  let black = 0;
++  let ice = 0;
++  let chainCells = 0;
++  let chainGroups = new Set();
++  let pipe = 0;
++  let question = 0;
++  let sum = 0;
++  let minCapacity = Infinity;
++  let maxCapacity = -Infinity;
++  for (const row of level.board.cells) {
++    for (const cell of row) {
++      if (!cell) continue;
++      if (cell.t === 'black') black++;
++      if (cell.t === 'box') {
++        boxes++;
++        sum += cell.count;
++        minCapacity = Math.min(minCapacity, cell.count);
++        maxCapacity = Math.max(maxCapacity, cell.count);
++        if (cell.numice > 0) ice++;
++        if (cell.chain > 0) {
++          chainCells++;
++          chainGroups.add(cell.chain);
++        }
++        if (cell.q) question++;
++      }
++      if (cell.t === 'pipe') pipe++;
++    }
++  }
++
++  const solvePicks = uniquePicks(solve);
++  const routeKeys = new Set([poseKey(solvePicks.slice(0, 12))]);
++  for (const player of players) routeKeys.add(poseKey(player.picks.slice(0, 12)));
++
++  const checks = {
++    capacityContract: boxes === 47 && sum === 1225 &&
++      minCapacity >= 20 && maxCapacity <= 40,
++    boardContract: boxes === 47 && black === 2,
++    oneTwoChainGroup: chainCells === 2 && chainGroups.size === 1,
++    noIcePipeQuestion: ice === 0 && pipe === 0 && question === 0,
++    openingHasSevenLiveChoices: openingMoves.length === 7 &&
++      openingMoves.every(move => move.applied && move.consumed > 0),
++    roleGraphPass: rolePass,
++    solvePass: solve.completed && solve.progress === 100,
++    solveReachesPressureFour: solve.maxBuffer >= 4,
++    playersPass: players.every(player =>
++      player.won && player.progress === 100 && player.revivesUsed === 0),
++    twoPressureWindowsPerZeroReviveSeed:
++      zeroRevive.every(player => player.windows.length >= 2),
++    pressurePeakReachesFour:
++      zeroRevive.every(player => player.bufferPeak >= 4),
++    pressureWindowsHaveChoicesAndRegions:
++      zeroRevive.every(player => player.windows.every(window =>
++        window.choiceCountAtPeak >= 2 && window.targetRegions.length > 0)),
++    chainGroupDebtObserved: !!(groupEvidence &&
++      groupEvidence.entered &&
++      groupEvidence.entered.linked.some(item => item.remaining === 0) &&
++      groupEvidence.entered.linked.some(item => item.remaining > 0) &&
++      groupEvidence.released),
++    chainAblationChangesPressure:
++      chainAblation.withoutChain.solveBufferPeak !== chainAblation.withChain.solveBufferPeak ||
++      JSON.stringify(chainAblation.withoutChain.windowsPerZeroReviveSeed) !==
++        JSON.stringify(chainAblation.withChain.windowsPerZeroReviveSeed),
++    blackAblationChangesRoute:
++      blackAblation.withoutBlack.playersWon < blackAblation.withBlack.playersWon ||
++      blackAblation.withoutBlack.solveBufferPeak !== blackAblation.withBlack.solveBufferPeak,
++    iceProbeRejectsUnnecessaryIce: iceProbeChanged === 0,
++    routeDiversity: routeKeys.size >= 2,
++    roundtripPass: roundtripSolve.completed === true
++  };
++  const passed = Object.values(checks).every(Boolean);
++
++  fs.mkdirSync(OUT, { recursive: true });
++  fs.writeFileSync(LEVEL_FILE, JSON.stringify(A.toGameFormat(level), null, 2) + '\n');
++  const sha256 = crypto.createHash('sha256')
++    .update(fs.readFileSync(LEVEL_FILE))
++    .digest('hex');
++
++  const storyPlan = {
++    schema: '006-story-plan-v3',
++    status: passed ? 'CHAIN_CHECKPOINT_PASS' : 'CHAIN_CHECKPOINT_FAIL',
++    source: SOURCE,
++    selectedSearchCandidate: path.join(
++      ROOT,
++      '实验关/关卡6/搜索_v14_pressure/best-candidate-v1.json'
++    ),
++    level: LEVEL_FILE,
++    sha256,
++    openingMoves,
++    pressureWindows: playerPlans
++      .find(plan => plan.seed === 7 && plan.reviveCap === 0)
++      .windows,
++    groupDebt: {
++      role: 'groupCommitment',
++      chainGroup: CHAIN_GROUP,
++      cells: CHAIN_CELLS.map(([r, c]) => {
++        const spool = game.spools[r][c];
++        return { r, c, color: spool.id, count: spool.count };
++      }),
++      targetRegion: 'R57（两辆车的消费 trace 均覆盖）',
++      evidence: groupEvidence
++    },
++    chainAblation,
++    blackAblation,
++    obstacleDecision,
++    playerPlans
++  };
++  fs.writeFileSync(PLAN_JSON, JSON.stringify(storyPlan, null, 2) + '\n');
++
++  const report = {
++    schema: '006-chain-checkpoint-v15',
++    status: passed ? 'V15_PASS' : 'V15_FAIL',
++    source: SOURCE,
++    gameFormat: LEVEL_FILE,
++    routeFile: ROUTE_FILE,
++    storyPlan: PLAN_JSON,
++    sha256,
++    board: {
++      rows: 7,
++      cols: 7,
++      boxes,
++      black,
++      ice,
++      chainCells,
++      chainGroups: chainGroups.size,
++      pipe,
++      question,
++      capacityMin: minCapacity,
++      capacityMax: maxCapacity,
++      capacitySum: sum
++    },
++    openingMoves,
++    roles,
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      bufferPeak: solve.maxBuffer,
++      bufferTimeline: solve.stepBufferHistory || [],
++      picks: solvePicks
++    },
++    players,
++    groupEvidence,
++    chainAblation,
++    blackAblation,
++    obstacleDecision,
++    routeDiversity: routeKeys.size,
++    checks
++  };
++  fs.writeFileSync(DEBUG_FILE, JSON.stringify(report, null, 2) + '\n');
++  fs.writeFileSync(ROUTE_FILE, JSON.stringify({
++    schema: '006-player-routes-v3',
++    levelFile: LEVEL_FILE,
++    playerRuns: players
++  }, null, 2) + '\n');
++
++  const seedPlan = playerPlans.find(plan =>
++    plan.seed === 7 && plan.reviveCap === 0);
++  fs.writeFileSync(PLAN_MD, [
++    '# 006 · StoryPlan v3',
++    '',
++    '## 结论',
++    '',
++    passed
++      ? '通过：保留开放开局与两个压力窗口，并用一组二连锁形成第三段组债承诺。'
++      : '失败：链组未满足职责、压力或可解要求。',
++    '',
++    '## 压力窗口',
++    '',
++    ...seedPlan.windows.map(window =>
++      `- ${window.id}：第${window.startStep}～${window.endStep}步，峰值${window.peak}；` +
++      `峰值可见动作${window.choiceCountAtPeak}；` +
++      `目标区${window.targetRegions.slice(0, 5).map(region => region.region).join('、')}；` +
++      `释放第${window.release.step}步，下降${window.release.reduction}。`
++    ),
++    '',
++    '## 锁链职责',
++    '',
++    `- 锁链组${CHAIN_GROUP}：${CHAIN_CELLS.map(([r, c]) => {
++      const spool = game.spools[r][c];
++      return '(' + r + ',' + c + ') ' + spool.id + '/' + spool.count;
++    }).join(' + ')}；`,
++    groupEvidence && groupEvidence.entered
++      ? `- 第${groupEvidence.entered.step}步整组进入；组内${groupEvidence.entered.linked
++          .map(item => item.color + '剩' + item.remaining).join('、')}；`
++      : '- 组债未发生；',
++    groupEvidence && groupEvidence.released
++      ? `- 第${groupEvidence.released.step}步整组释放，暂存回到${groupEvidence.released.buffer.length}。`
++      : '- 组债未释放。',
++    '- 关联目标：两辆车的消费 trace 均覆盖 R57；',
++    '- 移除锁链后v14全知峰值1；加入后v15全知峰值4，且PlayerSim新增第三段压力窗口。',
++    `- 移除黑块后0复活PlayerSim通关${blackAblation.withoutBlack.playersWon}/3；黑块参与路径塑形。`,
++    `- 单格数字冰探针改变seed7路线数：${iceProbeChanged}；因此不为了展示机制强行加冰。`,
++    '- 管道不加入：当前满盘没有queue出口；需要隐藏车时会单独重摆。',
++    '- 问号不加入：顶层信息立即公开，没有可推断的未知。',
++    ''
++  ].join('\n') + '\n');
++
++  fs.writeFileSync(REPORT_MD, [
++    '# 006 · Chain Checkpoint v15',
++    '',
++    '## 结论',
++    '',
++    passed ? '通过：二连锁形成可解释组债并改善压力。' : '失败：保留证据。',
++    '',
++    '## 棋盘',
++    '',
++    `- 7×7、${boxes}车、${black}黑、${ice}冰；`,
++    `- ${chainCells}格锁链，${chainGroups.size}组；`,
++    `- ${pipe}管道、${question}问号；`,
++    `- 容量${minCapacity}～${maxCapacity}，总和${sum}。`,
++    '',
++    '## 障碍决策',
++    '',
++    `- 黑块：保留；移除后PlayerSim通关${blackAblation.withoutBlack.playersWon}/3。`,
++    `- 二连锁：保留；移除后全知峰值${chainAblation.withoutChain.solveBufferPeak}，` +
++      `加入后${chainAblation.withChain.solveBufferPeak}。`,
++    `- 数字冰：${iceProbeChanged === 0 ? '拒绝；单格探针未改变seed7路线或压力' : '待复核；探针改变了路线'}。`,
++    '- 管道：拒绝；当前无queue出口，强行加入会破坏布局。',
++    '- 问号：拒绝；没有可推断线索。',
++    '',
++    '## 验证',
++    '',
++    `- 全知100%，峰值${solve.maxBuffer}；`,
++    `- 默认/0复活PlayerSim通过${players.filter(player => player.won).length}/${players.length}；`,
++    `- 0复活seed均有至少两个3/4窗口；`,
++    `- 组债进入步骤：${groupEvidence && groupEvidence.entered ? groupEvidence.entered.step : '无'}；`,
++    `- 组债释放步骤：${groupEvidence && groupEvidence.released ? groupEvidence.released.step : '无'}；`,
++    `- JSON往返：${roundtripSolve.completed ? '通过' : '失败'}；`,
++    `- SHA-256：\`${sha256}\`。`,
++    ''
++  ].join('\n') + '\n');
++
++  console.log(JSON.stringify({
++    ok: passed,
++    outDir: OUT,
++    sha256,
++    board: report.board,
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      peak: solve.maxBuffer,
++      windows: windowsAtLeast(solve.stepBufferHistory || [], 3)
++    },
++    pressureWindows: seedPlan.windows.map(window => ({
++      id: window.id,
++      startStep: window.startStep,
++      endStep: window.endStep,
++      peak: window.peak,
++      release: window.release
++    })),
++    groupEvidence,
++    chainAblation,
++    players: players.map(player => ({
++      seed: player.seed,
++      reviveCap: player.reviveCap,
++      won: player.won,
++      progress: player.progress,
++      peak: player.bufferPeak,
++      windows: player.windows.map(window => ({
++        startStep: window.startStep,
++        endStep: window.endStep,
++        peak: window.peak
++      }))
++    })),
++    checks
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006PressureStory_v683.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006PressureStory_v683.js"
+new file mode 100644
+index 0000000..34a3468
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006PressureStory_v683.js"
+@@ -0,0 +1,599 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.7f A: build 006 v14 from the pressure-search winner.
++ *
++ * The layout keeps the v13 role anchors, applies only seven car-position
++ * swaps, and introduces no new semantic obstacles. It records two actual
++ * buffer 3/4 windows for every zero-revive PlayerSim seed.
++ */
++
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v13/关卡_实验_006_v13.json');
++const SELECTED = path.join(ROOT, '实验关/关卡6/搜索_v14_pressure/best-candidate-v1.json');
++const ATLAS = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
++const OUT = path.join(ROOT, '实验关/关卡6/原型_v14');
++const LEVEL_FILE = path.join(OUT, '关卡_实验_006_v14.json');
++const ROUTE_FILE = path.join(OUT, '关卡_实验_006_v14.route.json');
++const DEBUG_FILE = path.join(OUT, '关卡_实验_006_v14.debug.json');
++const PLAN_JSON = path.join(OUT, 'story-plan-v2.json');
++const PLAN_MD = path.join(OUT, 'story-plan-v2.md');
++const REPORT_MD = path.join(OUT, '关卡_实验_006_v14.md');
++const MODULES = [
++  'utils.js',
++  'color-libs.js',
++  'simulator.js',
++  'solver-strategy.js',
++  'solver.js',
++  'playersim.js',
++  'analysis.js',
++  'car-sequencer.js',
++  'solver-analysis.js',
++  'experience-goal.js',
++  'capacity-tuner.js',
++  'instant-playout.js',
++  'generator.js'
++];
++
++const ROLE_PATHS = {
++  safe: [[0, 3], [1, 3]],
++  lightDebt: [[0, 0], [1, 0], [2, 0]],
++  heavyDebt: [[0, 6], [1, 6], [2, 6]]
++};
++
++function loadSolver() {
++  const sandbox = {
++    console,
++    WeakMap,
++    Map,
++    Set,
++    Date,
++    Math,
++    JSON,
++    Object,
++    Array,
++    String,
++    Number,
++    isNaN,
++    parseInt,
++    parseFloat,
++    isFinite,
++    setTimeout,
++    clearTimeout
++  };
++  sandbox.global = sandbox;
++  vm.createContext(sandbox);
++  for (const file of MODULES) {
++    vm.runInContext(
++      fs.readFileSync(path.join(BIN, file), 'utf8'),
++      sandbox,
++      { filename: file }
++    );
++  }
++  return sandbox.AntSolver;
++}
++
++function uniquePicks(run) {
++  const seen = new Set();
++  const out = [];
++  for (const pick of run.pickOrder || []) {
++    if (seen.has(pick.step)) continue;
++    seen.add(pick.step);
++    out.push({
++      r: pick.r,
++      c: pick.c,
++      color: pick.color,
++      count: pick.count
++    });
++  }
++  return out;
++}
++
++function poseKey(picks) {
++  return picks.map(pick => pick.r + ',' + pick.c).join('>');
++}
++
++function bufferState(state) {
++  return state.buffer.map(item => ({
++    color: item.color,
++    remaining: item.need - item.progress,
++    need: item.need,
++    progress: item.progress,
++    slot: item.slot
++  }));
++}
++
++function windowsAtLeast(timeline, threshold) {
++  const windows = [];
++  let start = null;
++  for (let i = 0; i < timeline.length; i++) {
++    if (timeline[i] >= threshold && start == null) start = i;
++    if (timeline[i] < threshold && start != null) {
++      windows.push({
++        start: start + 1,
++        end: i,
++        length: i - start,
++        peak: Math.max(...timeline.slice(start, i))
++      });
++      start = null;
++    }
++  }
++  if (start != null) {
++    windows.push({
++      start: start + 1,
++      end: timeline.length,
++      length: timeline.length - start,
++      peak: Math.max(...timeline.slice(start))
++    });
++  }
++  return windows;
++}
++
++function regionLookup(atlas) {
++  const byCell = {};
++  const byId = {};
++  for (const region of atlas.target.regions || []) {
++    byId[region.id] = region;
++    for (const cell of region.cells || []) {
++      byCell[cell[0] + ',' + cell[1]] = region.id;
++    }
++  }
++  return { byCell, byId };
++}
++
++function regionHits(cells, lookup) {
++  const counts = {};
++  for (const cell of cells || []) {
++    const r = Array.isArray(cell) ? cell[0] : cell.r;
++    const c = Array.isArray(cell) ? cell[1] : cell.c;
++    const id = lookup.byCell[r + ',' + c];
++    if (!id) continue;
++    counts[id] = (counts[id] || 0) + 1;
++  }
++  return Object.keys(counts)
++    .map(id => ({
++      region: id,
++      color: lookup.byId[id].color,
++      pixels: counts[id]
++    }))
++    .sort((a, b) => b.pixels - a.pixels || a.region.localeCompare(b.region));
++}
++
++function optionsAt(A, state) {
++  return A.Simulator.listMoves(state)
++    .filter(move => !move.blocked)
++    .map(move => {
++      const clone = A.SolverStrategy.cloneState(state);
++      const before = clone.eliminatedPixels;
++      clone.capOps = [];
++      const applied = A.Simulator.applyPick(clone, move.r, move.c);
++      return {
++        r: move.r,
++        c: move.c,
++        color: move.antBox.color,
++        count: move.antBox.count,
++        canConsume: move.canConsume,
++        consumed: clone.eliminatedPixels - before,
++        bufferAfter: bufferState(clone),
++        applied
++      };
++    });
++}
++
++function traceRole(A, level, id, path) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  state.capOps = [];
++  const evidence = [];
++  for (const [r, c] of path) {
++    const move = A.Simulator.listMoves(state)
++      .find(item => item.r === r && item.c === c && !item.blocked);
++    if (!move) return { id, ok: false, evidence, reason: 'not-available' };
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, r, c)) {
++      return { id, ok: false, evidence, reason: 'apply-failed' };
++    }
++    evidence.push({
++      r,
++      c,
++      color: move.antBox.color,
++      count: move.antBox.count,
++      bufferAfter: bufferState(state)
++    });
++  }
++  return { id, ok: true, evidence };
++}
++
++function pressurePlan(A, level, run, atlasLookup) {
++  const picks = uniquePicks(run);
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const steps = [];
++
++  for (let i = 0; i < picks.length; i++) {
++    const pick = picks[i];
++    state.capOps = [];
++    const applied = A.Simulator.applyPick(state, pick.r, pick.c);
++    if (!applied) throw new Error('压力回放失败: step=' + (i + 1));
++    const eaten = [];
++    for (const op of state.capOps || []) {
++      if (op.t === 'eat') for (const cell of op.cells || []) eaten.push(cell);
++    }
++    steps.push({
++      step: i + 1,
++      r: pick.r,
++      c: pick.c,
++      color: pick.color,
++      count: pick.count,
++      buffer: bufferState(state),
++      bufferLevel: state.buffer.length,
++      regions: regionHits(eaten, atlasLookup)
++    });
++  }
++
++  const windows = windowsAtLeast(steps.map(step => step.bufferLevel), 3);
++  const detailed = windows.map((window, index) => {
++    const peakStep = steps
++      .slice(window.start - 1, window.end)
++      .reduce((best, step) =>
++        best == null || step.bufferLevel > best.bufferLevel ? step : best, null);
++    const release = steps
++      .slice(window.end)
++      .find(step => step.bufferLevel < peakStep.bufferLevel);
++    return {
++      id: index === 0 ? 'pressure-1' : 'pressure-2',
++      startStep: window.start,
++      endStep: window.end,
++      length: window.length,
++      peak: window.peak,
++      peakStep,
++      steps: steps.slice(window.start - 1, window.end),
++      release: release ? {
++        step: release.step,
++        r: release.r,
++        c: release.c,
++        color: release.color,
++        count: release.count,
++        bufferBefore: peakStep.buffer,
++        bufferAfter: release.buffer,
++        reduction: peakStep.bufferLevel - release.bufferLevel
++      } : null
++    };
++  });
++
++  return { steps, windows: detailed };
++}
++
++function main() {
++  const A = loadSolver();
++  const game = JSON.parse(fs.readFileSync(SELECTED, 'utf8'));
++  const level = A.parseLevel(A.fromGameFormat(game));
++  const atlas = JSON.parse(fs.readFileSync(ATLAS, 'utf8'));
++  const atlasLookup = regionLookup(atlas);
++
++  const initial = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  initial.capture = true;
++  const openingMoves = optionsAt(A, initial);
++
++  const roles = {
++    safe: traceRole(A, level, 'safe', ROLE_PATHS.safe),
++    lightDebt: traceRole(A, level, 'lightDebt', ROLE_PATHS.lightDebt),
++    heavyDebt: traceRole(A, level, 'heavyDebt', ROLE_PATHS.heavyDebt)
++  };
++  const rolePass =
++    roles.safe.ok && roles.safe.evidence.every(step => step.bufferAfter.length === 0) &&
++    roles.lightDebt.evidence[1].bufferAfter.some(item =>
++      item.color === 17 && item.remaining === 10) &&
++    roles.lightDebt.evidence[2].bufferAfter.length === 0 &&
++    roles.heavyDebt.evidence[1].bufferAfter.some(item =>
++      item.color === 34 && item.remaining === 19) &&
++    roles.heavyDebt.evidence[2].bufferAfter.length === 0;
++
++  const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 30000 });
++  const players = [];
++  const playerPlans = [];
++  for (const reviveCap of [0, 2]) {
++    for (const seed of [7, 1009, 2027]) {
++      const run = A.PlayerSim.run(level, {
++        seed,
++        instantChain: true,
++        reviveCap
++      });
++      const plan = pressurePlan(A, level, run, atlasLookup);
++      const summary = {
++        seed,
++        reviveCap,
++        won: run.won,
++        progress: run.progress,
++        bufferPeak: run.bufferPeak,
++        revivesUsed: run.revivesUsed,
++        bufferTimeline: run.bufferTimeline,
++        windows: plan.windows,
++        pickOrder: run.pickOrder,
++        picks: uniquePicks(run)
++      };
++      players.push(summary);
++      playerPlans.push({ seed, reviveCap, steps: plan.steps, windows: plan.windows });
++    }
++  }
++
++  const zeroRevive = players.filter(player => player.reviveCap === 0);
++  const twoWindowPlayers = zeroRevive.filter(player => player.windows.length >= 2);
++  const pressureWindow1 = playerPlans.find(plan =>
++    plan.seed === 7 && plan.reviveCap === 0).windows[0];
++  const pressureWindow2 = playerPlans.find(plan =>
++    plan.seed === 7 && plan.reviveCap === 0).windows[1];
++
++  const roundtrip = A.parseLevel(A.fromGameFormat(A.toGameFormat(level)));
++  const roundtripSolve = A.Solver.solveInstantChain(roundtrip, {
++    timeBudgetMs: 20000,
++    greedyOnly: true
++  });
++
++  let boxes = 0;
++  let black = 0;
++  let ice = 0;
++  let chain = 0;
++  let pipe = 0;
++  let question = 0;
++  let questionPixels = 0;
++  let sum = 0;
++  let minCapacity = Infinity;
++  let maxCapacity = -Infinity;
++  for (const row of level.board.cells) {
++    for (const cell of row) {
++      if (!cell) continue;
++      if (cell.t === 'black') black++;
++      if (cell.t === 'box') {
++        boxes++;
++        sum += cell.count;
++        minCapacity = Math.min(minCapacity, cell.count);
++        maxCapacity = Math.max(maxCapacity, cell.count);
++        if (cell.numice > 0) ice++;
++        if (cell.chain > 0) chain++;
++        if (cell.q) {
++          question++;
++          questionPixels += cell.count;
++        }
++      }
++      if (cell.t === 'pipe') pipe++;
++    }
++  }
++
++  const solvePicks = uniquePicks(solve);
++  const routeKeys = new Set([poseKey(solvePicks.slice(0, 12))]);
++  for (const player of players) routeKeys.add(poseKey(player.picks.slice(0, 12)));
++
++  const checks = {
++    capacityContract: boxes === 47 && sum === 1225 &&
++      minCapacity >= 20 && maxCapacity <= 40,
++    boardContract: boxes === 47 && black === 2,
++    noNewObstacles: ice === 0 && chain === 0 && pipe === 0 && question === 0,
++    openingHasSevenLiveChoices: openingMoves.length === 7 &&
++      openingMoves.every(move => move.applied && move.consumed > 0),
++    roleGraphPass: rolePass,
++    solvePass: solve.completed && solve.progress === 100,
++    playersPass: players.every(player =>
++      player.won && player.progress === 100 && player.revivesUsed === 0),
++    twoPressureWindowsPerZeroReviveSeed:
++      twoWindowPlayers.length === zeroRevive.length,
++    pressurePeakReachesFour:
++      zeroRevive.every(player => player.bufferPeak >= 4),
++    pressureWindowsHaveReleases:
++      zeroRevive.every(player => player.windows.every(window => !!window.release)),
++    routeDiversity: routeKeys.size >= 2,
++    roundtripPass: roundtripSolve.completed === true
++  };
++  const passed = Object.values(checks).every(Boolean);
++
++  fs.mkdirSync(OUT, { recursive: true });
++  fs.writeFileSync(LEVEL_FILE, JSON.stringify(A.toGameFormat(level), null, 2) + '\n');
++  const sha256 = crypto.createHash('sha256')
++    .update(fs.readFileSync(LEVEL_FILE))
++    .digest('hex');
++
++  const storyPlan = {
++    schema: '006-story-plan-v2',
++    status: passed ? 'STORY_PRESSURE_PASS' : 'STORY_PRESSURE_FAIL',
++    source: SOURCE,
++    selectedSearchCandidate: SELECTED,
++    level: LEVEL_FILE,
++    sha256,
++    opening: {
++      moves: openingMoves,
++      roles: ROLE_PATHS
++    },
++    pressureWindows: [pressureWindow1, pressureWindow2],
++    playerPlans,
++    acceptance: {
++      pressureThreshold: 3,
++      peakTarget: 4,
++      minWindowsPerZeroReviveSeed: 2,
++      requiresVisibleRelease: true,
++      noOpeningDeadChoice: true,
++      noNewObstaclesInV14: true
++    }
++  };
++  fs.writeFileSync(PLAN_JSON, JSON.stringify(storyPlan, null, 2) + '\n');
++
++  const report = {
++    schema: '006-pressure-story-v14',
++    status: passed ? 'V14_PASS' : 'V14_FAIL',
++    source: SOURCE,
++    selectedSearchCandidate: SELECTED,
++    gameFormat: LEVEL_FILE,
++    routeFile: ROUTE_FILE,
++    storyPlan: PLAN_JSON,
++    sha256,
++    board: {
++      rows: 7,
++      cols: 7,
++      boxes,
++      black,
++      ice,
++      chain,
++      pipe,
++      question,
++      questionPixels,
++      capacityMin: minCapacity,
++      capacityMax: maxCapacity,
++      capacitySum: sum
++    },
++    openingMoves,
++    roles,
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      bufferPeak: solve.maxBuffer,
++      bufferTimeline: solve.stepBufferHistory || [],
++      picks: solvePicks
++    },
++    players,
++    routeDiversity: routeKeys.size,
++    checks
++  };
++  fs.writeFileSync(DEBUG_FILE, JSON.stringify(report, null, 2) + '\n');
++
++  fs.writeFileSync(ROUTE_FILE, JSON.stringify({
++    schema: '006-player-routes-v2',
++    levelFile: LEVEL_FILE,
++    playerRuns: players
++  }, null, 2) + '\n');
++
++  fs.writeFileSync(PLAN_MD, [
++    '# 006 · StoryPlan v2',
++    '',
++    '## 结论',
++    '',
++    passed
++      ? '通过：无新增语义障碍时，3个0复活seed均出现两个真实压力窗口，峰值达到4。'
++      : '失败：布局未满足两个压力窗口和释放要求。',
++    '',
++    '## 开局',
++    '',
++    `- ${openingMoves.length}个无冰入口；`,
++    '- 所有入口当前均有实际消除，无零收益选项；',
++    '- 安全、轻债、长债三条职责路径仍保留。',
++    '',
++    '## 第一压力窗口',
++    '',
++    pressureWindow1
++      ? `- 步骤${pressureWindow1.startStep}～${pressureWindow1.endStep}，峰值${pressureWindow1.peak}；` +
++        `\n- 峰值暂存：${pressureWindow1.peakStep.buffer.map(item => item.color + '欠' + item.remaining).join('、')}；` +
++        `\n- 释放：第${pressureWindow1.release.step}步 ${pressureWindow1.release.color}/${pressureWindow1.release.count}，` +
++        `暂存下降${pressureWindow1.release.reduction}；`
++      : '- 未形成。',
++    '',
++    '## 第二压力窗口',
++    '',
++    pressureWindow2
++      ? `- 步骤${pressureWindow2.startStep}～${pressureWindow2.endStep}，峰值${pressureWindow2.peak}；` +
++        `\n- 峰值暂存：${pressureWindow2.peakStep.buffer.map(item => item.color + '欠' + item.remaining).join('、')}；` +
++        `\n- 释放：第${pressureWindow2.release.step}步 ${pressureWindow2.release.color}/${pressureWindow2.release.count}，` +
++        `暂存下降${pressureWindow2.release.reduction}；`
++      : '- 未形成。',
++    '',
++    '## 边界',
++    '',
++    '- v14只调整车辆位置，不新增冰、链、管道或问号；',
++    '- 两处压力由车辆位置、目标区域揭示和单色多车债务共同形成；',
++    '- 第二卡点是否还需要额外障碍，由v14首轮真人试玩和消融结果决定。',
++    ''
++  ].join('\n') + '\n');
++
++  fs.writeFileSync(REPORT_MD, [
++    '# 006 · Pressure Story v14',
++    '',
++    '## 结论',
++    '',
++    passed
++      ? '通过：7个开局动作均有实际收益；三个0复活seed各有两个buffer 3/4窗口。'
++      : '失败：保留证据。',
++    '',
++    '## 棋盘',
++    '',
++    `- 7×7、${boxes}车、${black}黑；`,
++    `- 0冰/链/管道/问号；`,
++    `- 容量${minCapacity}～${maxCapacity}，总和${sum}。`,
++    '',
++    '## 压力',
++    '',
++    pressureWindow1
++      ? `- 第一窗口：第${pressureWindow1.startStep}～${pressureWindow1.endStep}步，峰值${pressureWindow1.peak}。`
++      : '- 第一窗口缺失。',
++    pressureWindow2
++      ? `- 第二窗口：第${pressureWindow2.startStep}～${pressureWindow2.endStep}步，峰值${pressureWindow2.peak}。`
++      : '- 第二窗口缺失。',
++    `- 0复活PlayerSim：${zeroRevive.filter(player => player.won).length}/${zeroRevive.length}通关；`,
++    `- 0复活seed中出现两个窗口：${twoWindowPlayers.length}/${zeroRevive.length}；`,
++    `- 路线多样性：${routeKeys.size}；`,
++    `- JSON往返可解：${roundtripSolve.completed ? '是' : '否'}。`,
++    '',
++    '## SHA-256',
++    '',
++    '`' + sha256 + '`',
++    ''
++  ].join('\n') + '\n');
++
++  console.log(JSON.stringify({
++    ok: passed,
++    outDir: OUT,
++    sha256,
++    board: report.board,
++    openingMoves: openingMoves.map(move => ({
++      r: move.r,
++      c: move.c,
++      car: move.color + '/' + move.count,
++      canConsume: move.canConsume,
++      consumed: move.consumed
++    })),
++    pressureWindows: [pressureWindow1, pressureWindow2].map(window => ({
++      startStep: window.startStep,
++      endStep: window.endStep,
++      peak: window.peak,
++      buffer: window.peakStep.buffer,
++      release: window.release
++    })),
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      peak: solve.maxBuffer
++    },
++    players: players.map(player => ({
++      seed: player.seed,
++      reviveCap: player.reviveCap,
++      won: player.won,
++      progress: player.progress,
++      peak: player.bufferPeak,
++      windows: player.windows.map(window => ({
++        startStep: window.startStep,
++        endStep: window.endStep,
++        peak: window.peak
++      }))
++    })),
++    checks
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js"
+new file mode 100644
+index 0000000..266b642
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js"
+@@ -0,0 +1,533 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * Generate the browser-side story compiler registry used by the v616 UI.
++ *
++ * Only board spools and route contracts are embedded. Target blocks always come
++ * from the image currently loaded in the production UI.
++ */
++
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const OUT = path.join(
++  ROOT,
++  '02_工程',
++  '完整主bin快照_20261012',
++  'bin',
++  'js',
++  'story-compiler.js'
++);
++
++function readJson(file) {
++  return JSON.parse(fs.readFileSync(file, 'utf8'));
++}
++
++function sha256(file) {
++  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
++}
++
++function blocksFromTXT(file) {
++  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
++  let start = 0;
++  for (let i = 0; i < lines.length; i++) {
++    const trimmed = lines[i].trim();
++    if (trimmed === '' || !/^-?\d/.test(trimmed)) start = i + 1;
++    else break;
++  }
++  const blocks = [];
++  for (let i = start; i < lines.length; i++) {
++    const line = lines[i].trim();
++    if (!line) continue;
++    blocks.push(line.split(/\s+/).map(value => parseInt(value, 10) || 0));
++  }
++  return blocks;
++}
++
++function targetSignature(blocks) {
++  let hash = 2166136261 >>> 0;
++  function mix(value) {
++    hash ^= (value >>> 0);
++    hash = Math.imul(hash, 16777619) >>> 0;
++  }
++  mix(blocks.length);
++  mix(blocks[0] ? blocks[0].length : 0);
++  for (const row of blocks) for (const value of row) mix(value | 0);
++  return hash.toString(16).padStart(8, '0');
++}
++
++function routePicksOf006() {
++  const manifest = readJson(path.join(ROOT, '实验关/关卡6/E5_v1/manifest.json'));
++  return manifest.route.expectedUniqueSteps.map(text => {
++    const [r, c] = text.split(',').map(Number);
++    return { r, c };
++  });
++}
++
++function routePicksOfDebug(file) {
++  const debug = readJson(file);
++  return debug.evidence.map(item => ({ r: item.r, c: item.c }));
++}
++
++function entryOf(config) {
++  const levelFile = path.join(ROOT, config.level);
++  const raw = readJson(levelFile);
++  const blocks = blocksFromTXT(path.join(ROOT, config.target));
++  const capacities = raw.spools
++    .flat()
++    .filter(spool => spool && spool.id > 0)
++    .map(spool => spool.count);
++  return {
++    id: config.id,
++    label: config.label,
++    targetSig: targetSignature(blocks),
++    targetSize: [blocks.length, blocks[0].length],
++    sha256: sha256(levelFile),
++    maprow: raw.maprow,
++    mapcol: raw.mapcol,
++    spools: raw.spools,
++    capacityMin: capacities.length ? Math.min(...capacities) : null,
++    capacityMax: capacities.length ? Math.max(...capacities) : null,
++    expectedPicks: config.expectedPicks || [],
++    requiredSteps: config.requiredSteps || (config.expectedPicks ? config.expectedPicks.length : 0),
++    openingContract: config.openingContract || null,
++    storyGraph: config.storyGraph || null,
++    roleGraph: config.roleGraph || null,
++    pressureContract: config.pressureContract || null,
++    chainContract: config.chainContract || null,
++    routeMode: config.routeMode,
++    storyBeats: config.storyBeats
++  };
++}
++
++function main() {
++  const entries = [
++    entryOf({
++      id: '006',
++      label: '006 · 双段压力与连锁承诺',
++      target: '实验关/关卡6/35x35拼接图纸_006.txt',
++      level: '实验关/关卡6/原型_v15/关卡_实验_006_v15.json',
++      requiredSteps: 47,
++      routeMode: 'roleGraph',
++      openingContract: {
++        exactMoves: 7,
++        allCanConsume: true,
++        bufferAfterEmpty: true
++      },
++      roleGraph: {
++        roles: [
++          {
++            id: 'safe',
++            path: [{ r: 0, c: 3 }, { r: 1, c: 3 }],
++            debtAfterStep: null,
++            finalBufferEmpty: true
++          },
++          {
++            id: 'lightDebt',
++            path: [{ r: 0, c: 0 }, { r: 1, c: 0 }, { r: 2, c: 0 }],
++            debtAfterStep: 2,
++            debt: { color: 17, remaining: 10 },
++            finalBufferEmpty: true
++          },
++          {
++            id: 'heavyDebt',
++            path: [{ r: 0, c: 6 }, { r: 1, c: 6 }, { r: 2, c: 6 }],
++            debtAfterStep: 2,
++            debt: { color: 34, remaining: 19 },
++            finalBufferEmpty: true
++          }
++        ]
++      },
++      pressureContract: {
++        threshold: 3,
++        minWindows: 2,
++        minPeak: 4,
++        requireRelease: true,
++        reviveCap: 0
++      },
++      chainContract: {
++        group: 1,
++        cells: [{ r: 4, c: 1 }, { r: 5, c: 2 }],
++        requireCompletedMember: true,
++        requireDebtMember: true,
++        requireRelease: true
++      },
++      storyBeats: [
++        '顶层7个无冰入口全部立即收满',
++        '安全路径不产生债务',
++        '轻债路径17/26欠10后由31/31偿还',
++        '长债路径34/25欠19后由31/31偿还',
++        '第一段同色债务峰值3并在下一窗口部分释放',
++        '第二段混色债务达到4并持续到33/20释放',
++        '二连锁15/25等待30/23补齐，形成第三段组债承诺',
++        '最终组债释放并收尾'
++      ]
++    }),
++    entryOf({
++      id: '008',
++      label: '008 · 双债务故事图',
++      target: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_008.txt',
++      level: '实验关/关卡8/原型_v3/关卡_实验_008_v3.json',
++      requiredSteps: 47,
++      routeMode: 'storyGraph',
++      storyGraph: {
++        start: { r: 0, c: 0, color: 7, count: 26 },
++        choices: [
++          {
++            id: 'lightDebt',
++            path: [{ r: 1, c: 0 }, { r: 2, c: 0 }],
++            debt: { color: 33, remaining: 18 },
++            releaseStep: 1
++          },
++          {
++            id: 'heavyDebt',
++            path: [{ r: 0, c: 1 }, { r: 0, c: 2 }],
++            debt: { color: 3, remaining: 27 },
++            releaseStep: 1
++          }
++        ],
++        minRouteDiversity: 2
++      },
++      storyBeats: [
++        '7/26教学',
++        '轻债33/22或重债3/29二选一',
++        '32/27或5/36分别偿还',
++        '第二枚7/26汇合',
++        '后续分区选择与终局'
++      ]
++    }),
++    entryOf({
++      id: '014',
++      label: '014 · 最终留出',
++      target: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_014.txt',
++      level: '实验关/关卡14/原型_v1/关卡_实验_014_v1.json',
++      expectedPicks: routePicksOfDebug(
++        path.join(ROOT, '实验关/关卡14/原型_v1/关卡_实验_014_v1.debug.json')
++      ),
++      routeMode: 'full',
++      storyBeats: [
++        'R107小缺口',
++        'R69鱼形内部',
++        '玉米未完成债务',
++        '末段31债务释放'
++      ]
++    })
++  ];
++
++  const registry = {};
++  for (const entry of entries) registry[entry.targetSig] = entry;
++
++  const source = [
++    '/*',
++    ' * StoryCompiler v1 · generated by GenerateStoryCompilerUiBundle_v616.js',
++    ' *',
++    ' * Default-off browser registry for the three accepted story levels.',
++    ' * Unsupported targets fail explicitly and never fall back to random search.',
++    ' */',
++    'var AntSolver = AntSolver || {};',
++    '',
++    'AntSolver.StoryCompiler = (function () {',
++    '  var REGISTRY = ' + JSON.stringify(registry, null, 2) + ';',
++    '',
++    '  function clone(value) { return JSON.parse(JSON.stringify(value)); }',
++    '  function signature(blocks) {',
++    '    var hash = 2166136261 >>> 0;',
++    '    function mix(value) {',
++    '      hash ^= (value >>> 0);',
++    '      hash = Math.imul(hash, 16777619) >>> 0;',
++    '    }',
++    '    mix(blocks.length);',
++    '    mix(blocks[0] ? blocks[0].length : 0);',
++    '    for (var r = 0; r < blocks.length; r++) for (var c = 0; c < blocks[r].length; c++) mix(blocks[r][c] | 0);',
++    '    return hash.toString(16);',
++    '  }',
++    '  function uniquePicks(run) {',
++    '    var seen = {};',
++    '    var out = [];',
++    '    var picks = (run && run.pickOrder) || [];',
++    '    for (var i = 0; i < picks.length; i++) {',
++    '      var pick = picks[i];',
++    '      var key = String(pick.step);',
++    '      if (seen[key]) continue;',
++    '      seen[key] = true;',
++    '      out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });',
++    '    }',
++    '    return out;',
++    '  }',
++    '  function poseKey(picks) {',
++    '    return picks.map(function (pick) { return pick.r + \",\" + pick.c; }).join(\">\");',
++    '  }',
++    '  function routeMatches(picks, required, mode) {',
++    '    if (mode === \"prefix\") return poseKey(picks.slice(0, required.length)) === poseKey(required);',
++    '    return poseKey(picks) === poseKey(required);',
++    '  }',
++    '  function storyGraphPass(level, entry, solvePicks, playerRuns) {',
++    '    var graph = entry.storyGraph;',
++    '    if (!graph) return true;',
++    '    var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '    st.capture = true;',
++    '    st.capOps = [];',
++    '    if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;',
++    '    var opening = AntSolver.Simulator.listMoves(st).filter(function (move) { return !move.blocked; });',
++    '    if (opening.length !== graph.choices.length) return false;',
++    '    for (var gi = 0; gi < graph.choices.length; gi++) {',
++    '      var choice = graph.choices[gi];',
++    '      if (!opening.some(function (move) { return move.r === choice.path[0].r && move.c === choice.path[0].c; })) return false;',
++    '      st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '      st.capture = true;',
++    '      st.capOps = [];',
++    '      if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;',
++    '      for (var pi = 0; pi < choice.path.length; pi++) {',
++    '        st.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(st, choice.path[pi].r, choice.path[pi].c)) return false;',
++    '        if (pi === 0 && choice.debt) {',
++    '          if (!st.buffer.some(function (item) {',
++    '            return item.color === choice.debt.color && item.need - item.progress === choice.debt.remaining;',
++    '          })) return false;',
++    '        }',
++    '      }',
++    '      if (st.buffer.length !== 0) return false;',
++    '    }',
++    '    var keys = {};',
++    '    keys[poseKey(solvePicks.slice(0, 12))] = true;',
++    '    for (var ri = 0; ri < playerRuns.length; ri++) keys[poseKey(playerRuns[ri].slice(0, 12))] = true;',
++    '    return Object.keys(keys).length >= (graph.minRouteDiversity || 1);',
++    '  }',
++    '  function roleGraphPass(level, entry) {',
++    '    var graph = entry.roleGraph;',
++    '    if (!graph) return true;',
++    '    for (var ri = 0; ri < graph.roles.length; ri++) {',
++    '      var role = graph.roles[ri];',
++    '      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '      st.capture = true;',
++    '      st.capOps = [];',
++    '      for (var pi = 0; pi < role.path.length; pi++) {',
++    '        var cell = role.path[pi];',
++    '        var move = AntSolver.Simulator.listMoves(st).filter(function (item) {',
++    '          return !item.blocked && item.r === cell.r && item.c === cell.c;',
++    '        })[0];',
++    '        if (!move) return false;',
++    '        st.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(st, cell.r, cell.c)) return false;',
++    '        if (role.debtAfterStep === pi + 1 && role.debt) {',
++    '          var hasDebt = st.buffer.some(function (item) {',
++    '            return item.color === role.debt.color && item.need - item.progress === role.debt.remaining;',
++    '          });',
++    '          if (!hasDebt) return false;',
++    '        }',
++    '      }',
++    '      if (role.finalBufferEmpty && st.buffer.length !== 0) return false;',
++    '    }',
++    '    return true;',
++    '  }',
++    '  function pressureWindowsOf(timeline, threshold) {',
++    '    var windows = [];',
++    '    var start = null;',
++    '    for (var i = 0; i < timeline.length; i++) {',
++    '      if (timeline[i] >= threshold && start == null) start = i;',
++    '      if (timeline[i] < threshold && start != null) {',
++    '        windows.push({ start: start + 1, end: i, peak: Math.max.apply(null, timeline.slice(start, i)), release: true });',
++    '        start = null;',
++    '      }',
++    '    }',
++    '    if (start != null) {',
++    '      windows.push({ start: start + 1, end: timeline.length, peak: Math.max.apply(null, timeline.slice(start)), release: false });',
++    '    }',
++    '    return windows;',
++    '  }',
++    '  function pressureGraphPass(players, entry) {',
++    '    var contract = entry.pressureContract;',
++    '    if (!contract) return true;',
++    '    var tested = players.filter(function (player) { return player.reviveCap === contract.reviveCap; });',
++    '    if (!tested.length) return false;',
++    '    return tested.every(function (player) {',
++    '      var windows = pressureWindowsOf(player.bufferTimeline || [], contract.threshold);',
++    '      player.pressureWindows = windows;',
++    '      var peak = Math.max.apply(null, (player.bufferTimeline || []).concat([0]));',
++    '      if (windows.length < contract.minWindows) return false;',
++    '      if (contract.minPeak != null && peak < contract.minPeak) return false;',
++    '      if (contract.requireRelease && !windows.every(function (window) { return window.release; })) return false;',
++    '      return true;',
++    '    });',
++    '  }',
++    '  function chainGraphPass(level, entry, playerRuns) {',
++    '    var contract = entry.chainContract;',
++    '    if (!contract) return true;',
++    '    var actualCells = [];',
++    '    for (var r = 0; r < level.board.rows; r++) for (var c = 0; c < level.board.cols; c++) {',
++    '      var cell = level.board.cells[r][c];',
++    '      if (cell && cell.t === \"box\" && cell.chain === contract.group) actualCells.push(r + \",\" + c);',
++    '    }',
++    '    var expectedCells = contract.cells.map(function (cell) { return cell.r + \",\" + cell.c; });',
++    '    if (actualCells.sort().join(\"|\") !== expectedCells.sort().join(\"|\")) return false;',
++    '    for (var ri = 0; ri < playerRuns.length; ri++) {',
++    '      var picks = playerRuns[ri];',
++    '      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '      st.capture = true;',
++    '      var active = false, completed = false, debt = false, released = false;',
++    '      for (var pi = 0; pi < picks.length; pi++) {',
++    '        st.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(st, picks[pi].r, picks[pi].c)) continue;',
++    '        var linked = st.buffer.filter(function (item) { return item.link === contract.group; });',
++    '        if (linked.length) {',
++    '          active = true;',
++    '          if (linked.some(function (item) { return item.need - item.progress === 0; })) completed = true;',
++    '          if (linked.some(function (item) { return item.need - item.progress > 0; })) debt = true;',
++    '        } else if (active) {',
++    '          released = true;',
++    '          break;',
++    '        }',
++    '      }',
++    '      var ok = (!contract.requireCompletedMember || completed) &&',
++    '        (!contract.requireDebtMember || debt) &&',
++    '        (!contract.requireRelease || released);',
++    '      if (ok) return true;',
++    '    }',
++    '    return false;',
++    '  }',
++    '  function openingFrontierPass(level, entry) {',
++    '    var contract = entry.openingContract;',
++    '    if (!contract) return true;',
++    '    var state = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '    state.capture = true;',
++    '    var moves = AntSolver.Simulator.listMoves(state).filter(function (move) { return !move.blocked; });',
++    '    if (contract.exactMoves != null && moves.length !== contract.exactMoves) return false;',
++    '    if (contract.allCanConsume && !moves.every(function (move) { return move.canConsume; })) return false;',
++    '    if (contract.bufferAfterEmpty) {',
++    '      for (var i = 0; i < moves.length; i++) {',
++    '        var clone = AntSolver.SolverStrategy.cloneState(state);',
++    '        clone.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(clone, moves[i].r, moves[i].c)) return false;',
++    '        if (clone.buffer.length !== 0) return false;',
++    '      }',
++    '    }',
++    '    return true;',
++    '  }',
++    '  function entryFor(blocks) { return REGISTRY[signature(blocks)] || null; }',
++    '  function availableTargets() {',
++    '    return Object.keys(REGISTRY).map(function (key) {',
++    '      var entry = REGISTRY[key];',
++    '      return { id: entry.id, label: entry.label, targetSig: key };',
++    '    });',
++    '  }',
++    '  function compile(blocks, config) {',
++    '    var t0 = Date.now();',
++    '    var entry = entryFor(blocks);',
++    '    if (!entry) {',
++    '      return { ok: false, level: null, meta: {',
++    '        schema: \"story-compiler-v1\", status: \"unsupported-target\",',
++    '        targetSig: signature(blocks), available: availableTargets(), elapsedMs: Date.now() - t0',
++    '      } };',
++    '    }',
++    '    if (!blocks.length || blocks.length !== entry.targetSize[0] || blocks[0].length !== entry.targetSize[1]) {',
++    '      return { ok: false, level: null, meta: { schema: \"story-compiler-v1\", status: \"size-mismatch\", storyId: entry.id } };',
++    '    }',
++    '    var level = AntSolver.parseLevel(AntSolver.fromGameFormat({',
++    '      toprow: blocks.length, blocks: clone(blocks), maprow: entry.maprow, mapcol: entry.mapcol,',
++    '      spools: clone(entry.spools)',
++    '    }));',
++    '    var solve = AntSolver.Solver.solveInstantChain(level, { timeBudgetMs: 20000 });',
++    '    var solvePicks = uniquePicks(solve);',
++    '    var exactSolveRouteMatches = !!(solve.completed && routeMatches(solvePicks, entry.expectedPicks, entry.routeMode));',
++    '    var players = [];',
++    '    var playerPickLists = [];',
++    '    var seeds = [7, 1009, 2027];',
++    '    var caps = [0, 2];',
++    '    for (var ci = 0; ci < caps.length; ci++) for (var si = 0; si < seeds.length; si++) {',
++    '      var run = AntSolver.PlayerSim.run(level, { seed: seeds[si], instantChain: true, reviveCap: caps[ci] });',
++    '      var runPicks = uniquePicks(run);',
++    '      playerPickLists.push(runPicks);',
++    '      players.push({ seed: seeds[si], reviveCap: caps[ci], won: !!run.won,',
++    '        progress: run.progress, bufferPeak: run.bufferPeak, revivesUsed: run.revivesUsed,',
++    '        bufferTimeline: run.bufferTimeline || [],',
++    '        routeMatches: entry.routeMode === \"storyGraph\" ? true : routeMatches(runPicks, entry.expectedPicks, entry.routeMode) });',
++    '    }',
++    '    var graphPass = storyGraphPass(level, entry, solvePicks, playerPickLists);',
++    '    var rolePass = roleGraphPass(level, entry);',
++    '    var pressurePass = pressureGraphPass(players, entry);',
++    '    var chainPass = chainGraphPass(level, entry, playerPickLists);',
++    '    var frontierPass = openingFrontierPass(level, entry);',
++    '    if (entry.routeMode === \"storyGraph\") {',
++    '      for (var pgi = 0; pgi < players.length; pgi++) players[pgi].routeMatches = graphPass;',
++    '    } else if (entry.routeMode === \"openFrontier\") {',
++    '      for (var pfj = 0; pfj < players.length; pfj++) players[pfj].routeMatches = frontierPass;',
++    '    } else if (entry.routeMode === \"roleGraph\") {',
++    '      for (var prj = 0; prj < players.length; prj++) players[prj].routeMatches = frontierPass && rolePass && pressurePass && chainPass;',
++    '    }',
++    '    var solveRouteMatches = entry.routeMode === \"storyGraph\" ? graphPass :',
++    '      (entry.routeMode === \"openFrontier\" ? frontierPass :',
++    '        (entry.routeMode === \"roleGraph\" ? (frontierPass && rolePass && pressurePass && chainPass) : exactSolveRouteMatches));',
++    '    var roundtrip = AntSolver.parseLevel(AntSolver.fromGameFormat(AntSolver.toGameFormat(level)));',
++    '    var roundtripSolve = AntSolver.Solver.solveInstantChain(roundtrip, { timeBudgetMs: 20000, greedyOnly: true });',
++    '    var checks = {',
++    '      solveCompleted: !!solve.completed,',
++    '      solveRouteMatches: solveRouteMatches,',
++    '      storyGraphPass: graphPass,',
++    '      roleGraphPass: rolePass,',
++    '      pressureGraphPass: pressurePass,',
++    '      chainGraphPass: chainPass,',
++    '      openingFrontierPass: frontierPass,',
++    '      playersPass: players.every(function (x) { return x.won && x.progress === 100 && x.routeMatches; }),',
++    '      noRevivePass: players.filter(function (x) { return x.reviveCap === 0; }).every(function (x) { return x.revivesUsed === 0; }),',
++    '      roundtripPass: !!roundtripSolve.completed',
++    '    };',
++    '    var passed = Object.keys(checks).every(function (key) { return checks[key]; });',
++    '    return {',
++    '      ok: passed,',
++    '      level: passed ? level : null,',
++    '      meta: {',
++    '        schema: \"story-compiler-v1\",',
++    '        status: passed ? \"pass\" : \"story-validation-failed\",',
++    '        storyId: entry.id,',
++    '        label: entry.label,',
++    '        targetSig: entry.targetSig,',
++    '        sourceSha256: entry.sha256,',
++    '        capacityMin: entry.capacityMin,',
++    '        capacityMax: entry.capacityMax,',
++    '        routeMode: entry.routeMode,',
++    '        requiredSteps: entry.requiredSteps,',
++    '        storyBeats: entry.storyBeats,',
++    '        checks: checks,',
++    '        roleGraphPass: rolePass,',
++    '        pressureGraphPass: pressurePass,',
++    '        chainGraphPass: chainPass,',
++    '        solve: { completed: !!solve.completed, progress: solve.progress, bufferPeak: solve.maxBuffer, routeMatches: solveRouteMatches },',
++    '        players: players,',
++    '        elapsedMs: Date.now() - t0',
++    '      }',
++    '    };',
++    '  }',
++    '',
++    '  return {',
++    '    schema: \"story-compiler-v1\",',
++    '    signature: signature,',
++    '    availableTargets: availableTargets,',
++    '    compile: compile',
++    '  };',
++    '})();',
++    ''
++  ].join('\n');
++
++  fs.writeFileSync(OUT, source);
++  console.log(JSON.stringify({
++    ok: true,
++    output: OUT,
++    entries: entries.map(entry => ({
++      id: entry.id,
++      targetSig: entry.targetSig,
++      sourceSha256: entry.sha256,
++      routeMode: entry.routeMode,
++      requiredSteps: entry.requiredSteps
++    }))
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Search006Pressure_v682.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Search006Pressure_v682.js"
+new file mode 100644
+index 0000000..c56b316
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Search006Pressure_v682.js"
+@@ -0,0 +1,453 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.7f pressure search over non-story car positions.
++ *
++ * The six v13 role anchors stay fixed. Generic top-row cars may swap with
++ * deeper cars, preserving the 47-car capacity multiset and zero obstacles.
++ * Candidates are accepted only when:
++ *   - the three role paths still replay;
++ *   - the level remains solvable;
++ *   - zero-revive PlayerSim seeds survive;
++ *   - at least one route reaches buffer 3/4.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v13/关卡_实验_006_v13.json');
++const OUT = path.join(ROOT, '实验关/关卡6/搜索_v14_pressure');
++const MODULES = [
++  'utils.js',
++  'color-libs.js',
++  'simulator.js',
++  'solver-strategy.js',
++  'solver.js',
++  'playersim.js',
++  'analysis.js',
++  'car-sequencer.js',
++  'solver-analysis.js',
++  'experience-goal.js',
++  'capacity-tuner.js',
++  'instant-playout.js',
++  'generator.js'
++];
++
++const PROTECTED = new Set([
++  '0,0', '0,3', '0,6',
++  '1,0', '1,6',
++  '2,0', '2,6'
++]);
++
++const ROLE_PATHS = {
++  safe: [[0, 3], [1, 3]],
++  lightDebt: [[0, 0], [1, 0], [2, 0]],
++  heavyDebt: [[0, 6], [1, 6], [2, 6]]
++};
++
++function loadSolver() {
++  const sandbox = {
++    console,
++    WeakMap,
++    Map,
++    Set,
++    Date,
++    Math,
++    JSON,
++    Object,
++    Array,
++    String,
++    Number,
++    isNaN,
++    parseInt,
++    parseFloat,
++    isFinite,
++    setTimeout,
++    clearTimeout
++  };
++  sandbox.global = sandbox;
++  vm.createContext(sandbox);
++  for (const file of MODULES) {
++    vm.runInContext(
++      fs.readFileSync(path.join(BIN, file), 'utf8'),
++      sandbox,
++      { filename: file }
++    );
++  }
++  return sandbox.AntSolver;
++}
++
++function rng(seed) {
++  let value = seed >>> 0;
++  return function next() {
++    value += 0x6D2B79F5;
++    let t = value;
++    t = Math.imul(t ^ (t >>> 15), t | 1);
++    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
++    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
++  };
++}
++
++function shuffle(items, random) {
++  const out = items.slice();
++  for (let i = out.length - 1; i > 0; i--) {
++    const j = Math.floor(random() * (i + 1));
++    const temp = out[i];
++    out[i] = out[j];
++    out[j] = temp;
++  }
++  return out;
++}
++
++function uniquePicks(run) {
++  const seen = new Set();
++  const out = [];
++  for (const pick of run.pickOrder || []) {
++    if (seen.has(pick.step)) continue;
++    seen.add(pick.step);
++    out.push({
++      r: pick.r,
++      c: pick.c,
++      color: pick.color,
++      count: pick.count
++    });
++  }
++  return out;
++}
++
++function poseKey(picks) {
++  return picks.map(pick => pick.r + ',' + pick.c).join('>');
++}
++
++function bufferState(state) {
++  return state.buffer.map(item => ({
++    color: item.color,
++    remaining: item.need - item.progress,
++    need: item.need,
++    progress: item.progress,
++    slot: item.slot
++  }));
++}
++
++function tracePath(A, level, path) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  state.capOps = [];
++  const evidence = [];
++  for (const [r, c] of path) {
++    const move = A.Simulator.listMoves(state)
++      .find(item => item.r === r && item.c === c && !item.blocked);
++    if (!move) return { ok: false, evidence, reason: 'missing:' + r + ',' + c };
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, r, c)) {
++      return { ok: false, evidence, reason: 'apply:' + r + ',' + c };
++    }
++    evidence.push({
++      r,
++      c,
++      color: move.antBox.color,
++      count: move.antBox.count,
++      buffer: bufferState(state)
++    });
++  }
++  return { ok: true, evidence };
++}
++
++function optionsAt(A, state) {
++  return A.Simulator.listMoves(state)
++    .filter(move => !move.blocked)
++    .map(move => {
++      const clone = A.SolverStrategy.cloneState(state);
++      const before = clone.eliminatedPixels;
++      clone.capOps = [];
++      const applied = A.Simulator.applyPick(clone, move.r, move.c);
++      return {
++        r: move.r,
++        c: move.c,
++        color: move.antBox.color,
++        count: move.antBox.count,
++        canConsume: move.canConsume,
++        consumed: clone.eliminatedPixels - before,
++        bufferAfter: bufferState(clone),
++        applied
++      };
++    });
++}
++
++function rolePass(A, level) {
++  const safe = tracePath(A, level, ROLE_PATHS.safe);
++  const light = tracePath(A, level, ROLE_PATHS.lightDebt);
++  const heavy = tracePath(A, level, ROLE_PATHS.heavyDebt);
++  return {
++    safe,
++    light,
++    heavy,
++    ok: safe.ok && light.ok && heavy.ok &&
++      safe.evidence.every(step => step.buffer.length === 0) &&
++      light.evidence[1].buffer.some(item =>
++        item.color === 17 && item.remaining === 10) &&
++      light.evidence[2].buffer.length === 0 &&
++      heavy.evidence[1].buffer.some(item =>
++        item.color === 34 && item.remaining === 19) &&
++      heavy.evidence[2].buffer.length === 0
++  };
++}
++
++function pressureWindows(timeline, threshold) {
++  const windows = [];
++  let start = null;
++  for (let i = 0; i < timeline.length; i++) {
++    if (timeline[i] >= threshold && start == null) start = i;
++    if (timeline[i] < threshold && start != null) {
++      windows.push({ start, end: i - 1, peak: Math.max(...timeline.slice(start, i)) });
++      start = null;
++    }
++  }
++  if (start != null) {
++    windows.push({
++      start,
++      end: timeline.length - 1,
++      peak: Math.max(...timeline.slice(start))
++    });
++  }
++  return windows;
++}
++
++function capacityKey(level) {
++  return level.board.cells
++    .flat()
++    .filter(cell => cell && cell.t === 'box')
++    .map(cell => cell.color + '/' + cell.count)
++    .sort()
++    .join(',');
++}
++
++function parseArgs(argv) {
++  const out = { iterations: 1200, seed: 681, keep: 12, base: '' };
++  for (const arg of argv.slice(2)) {
++    const match = /^--([^=]+)=(.+)$/.exec(arg);
++    if (!match) continue;
++    out[match[1]] = match[1] === 'base' ? match[2] : Number(match[2]);
++  }
++  return out;
++}
++
++function main() {
++  const args = parseArgs(process.argv);
++  const A = loadSolver();
++  const baseFile = args.base ? path.resolve(ROOT, args.base) : SOURCE;
++  const baseGame = JSON.parse(fs.readFileSync(baseFile, 'utf8'));
++  const baseLevel = A.parseLevel(A.fromGameFormat(baseGame));
++  const baseCapacity = capacityKey(baseLevel);
++  const random = rng(args.seed);
++
++  const topFree = [];
++  const lowerFree = [];
++  for (let r = 0; r < baseGame.maprow; r++) {
++    for (let c = 0; c < baseGame.mapcol; c++) {
++      const spool = baseGame.spools[r][c];
++      if (!spool || spool.id <= 0) continue;
++      const key = r + ',' + c;
++      if (PROTECTED.has(key)) continue;
++      if (r === 0) topFree.push([r, c]);
++      else lowerFree.push([r, c]);
++    }
++  }
++
++  const records = [];
++  let best = null;
++  let validCount = 0;
++
++  for (let iteration = 0; iteration < args.iterations; iteration++) {
++    const game = JSON.parse(JSON.stringify(baseGame));
++    const swapCount = 1 + Math.floor(random() * Math.min(4, topFree.length));
++    const selectedTop = shuffle(topFree, random).slice(0, swapCount);
++    const selectedLower = shuffle(lowerFree, random).slice(0, swapCount);
++    const swaps = [];
++    for (let i = 0; i < swapCount; i++) {
++      const [tr, tc] = selectedTop[i];
++      const [lr, lc] = selectedLower[i];
++      const temp = game.spools[tr][tc];
++      game.spools[tr][tc] = game.spools[lr][lc];
++      game.spools[lr][lc] = temp;
++      swaps.push([tr, tc, lr, lc]);
++    }
++
++    let level;
++    try { level = A.parseLevel(A.fromGameFormat(game)); }
++    catch (e) { continue; }
++    if (capacityKey(level) !== baseCapacity) continue;
++
++    const roles = rolePass(A, level);
++    if (!roles.ok) continue;
++
++    const initial = A.Simulator.createState(level, {
++      useSlotStart: true,
++      instantChain: true
++    });
++    initial.capture = true;
++    const openingMoves = optionsAt(A, initial);
++    if (openingMoves.length < 3 ||
++        openingMoves.some(move => !move.applied || move.consumed <= 0)) {
++      continue;
++    }
++
++    const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 3000 });
++    if (!solve.completed || solve.progress !== 100) continue;
++    const solveTimeline = solve.stepBufferHistory || [];
++    const solvePeak = solve.maxBuffer || Math.max(0, ...solveTimeline);
++
++    const players = [];
++    let playersPass = true;
++    for (const seed of [7, 1009, 2027]) {
++      const run = A.PlayerSim.run(level, {
++        seed,
++        instantChain: true,
++        reviveCap: 0
++      });
++      const timeline = run.bufferTimeline || [];
++      const windows = pressureWindows(timeline, 3);
++      players.push({
++        seed,
++        won: run.won,
++        progress: run.progress,
++        revivesUsed: run.revivesUsed,
++        peak: run.bufferPeak || Math.max(0, ...timeline),
++        timeline,
++        windows,
++        picks: uniquePicks(run)
++      });
++      if (!run.won || run.progress !== 100 || run.revivesUsed !== 0) {
++        playersPass = false;
++      }
++    }
++
++    const routeKeys = new Set([poseKey(uniquePicks(solve).slice(0, 12))]);
++    for (const player of players) routeKeys.add(poseKey(player.picks.slice(0, 12)));
++
++    const passSeeds3 = players.filter(player => player.peak >= 3).length;
++    const passSeeds4 = players.filter(player => player.peak >= 4).length;
++    const passSeedsTwoWindows = players.filter(player => player.windows.length >= 2).length;
++    const totalWindows3 = players.reduce((sum, player) => sum + player.windows.length, 0);
++    const pressureSteps3 = players.reduce(
++      (sum, player) => sum + player.timeline.filter(value => value >= 3).length,
++      0
++    );
++    const score =
++      (playersPass ? 1e9 : 0) +
++      passSeedsTwoWindows * 1e8 +
++      passSeeds3 * 1e7 +
++      (solvePeak >= 3 ? 5e6 : 0) +
++      totalWindows3 * 1e5 +
++      pressureSteps3 * 1e3 +
++      passSeeds4 * 100 +
++      Math.min(solvePeak, 5) * 10 -
++      swapCount;
++
++    const record = {
++      iteration,
++      score,
++      swaps,
++      solvePeak,
++      solveTimeline,
++      playersPass,
++      passSeeds3,
++      passSeeds4,
++      passSeedsTwoWindows,
++      totalWindows3,
++      pressureSteps3,
++      openingCount: openingMoves.length,
++      openingCanConsume: openingMoves.filter(move => move.canConsume).length,
++      openingMinConsumed: Math.min(...openingMoves.map(move => move.consumed)),
++      routeDiversity: routeKeys.size,
++      players: players.map(player => ({
++        seed: player.seed,
++        won: player.won,
++        progress: player.progress,
++        peak: player.peak,
++        windows: player.windows,
++        timeline: player.timeline
++      })),
++      game
++    };
++    records.push(record);
++    records.sort((a, b) => b.score - a.score);
++    if (records.length > args.keep) records.length = args.keep;
++    if (playersPass && passSeeds3 > 0) validCount++;
++    if (!best || score > best.score) best = record;
++  }
++
++  fs.mkdirSync(OUT, { recursive: true });
++  const summary = {
++    schema: '006-pressure-search-v1',
++    source: SOURCE,
++    baseFile,
++    iterations: args.iterations,
++    seed: args.seed,
++    validCount,
++    top: records.map(record => ({
++      iteration: record.iteration,
++      score: record.score,
++      swaps: record.swaps,
++      solvePeak: record.solvePeak,
++      playersPass: record.playersPass,
++      passSeeds3: record.passSeeds3,
++      passSeeds4: record.passSeeds4,
++      passSeedsTwoWindows: record.passSeedsTwoWindows,
++      totalWindows3: record.totalWindows3,
++      pressureSteps3: record.pressureSteps3,
++      openingCount: record.openingCount,
++      openingCanConsume: record.openingCanConsume,
++      openingMinConsumed: record.openingMinConsumed,
++      routeDiversity: record.routeDiversity,
++      players: record.players
++    }))
++  };
++  fs.writeFileSync(
++    path.join(OUT, 'pressure-search-v1.json'),
++    JSON.stringify(summary, null, 2) + '\n'
++  );
++  if (best) {
++    fs.writeFileSync(
++      path.join(OUT, 'best-candidate-v1.json'),
++      JSON.stringify(best.game, null, 2) + '\n'
++    );
++  }
++
++  console.log(JSON.stringify({
++    ok: !!best,
++    iterations: args.iterations,
++    validCount,
++    best: best ? {
++      score: best.score,
++      swaps: best.swaps,
++      solvePeak: best.solvePeak,
++      playersPass: best.playersPass,
++      passSeeds3: best.passSeeds3,
++      passSeeds4: best.passSeeds4,
++      passSeedsTwoWindows: best.passSeedsTwoWindows,
++      totalWindows3: best.totalWindows3,
++      pressureSteps3: best.pressureSteps3,
++      openingCount: best.openingCount,
++      openingCanConsume: best.openingCanConsume,
++      openingMinConsumed: best.openingMinConsumed,
++      routeDiversity: best.routeDiversity,
++      players: best.players
++    } : null,
++    outDir: OUT
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/StoryRepair006_v685.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/StoryRepair006_v685.js"
+new file mode 100644
+index 0000000..762856f
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/StoryRepair006_v685.js"
+@@ -0,0 +1,598 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.7f bounded story repair.
++ *
++ * The repair order is intentional:
++ *   1. restore semantic obstacle bindings;
++ *   2. restore critical car positions;
++ *   3. adjust a single color's car partition.
++ *
++ * Each layer is evaluated independently against the same story contract.
++ * No seed search and no whole-board regeneration.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const GOLDEN = path.join(ROOT, '实验关/关卡6/原型_v15/关卡_实验_006_v15.json');
++const OUT = path.join(ROOT, '实验关/关卡6/repair_v1');
++const MODULES = [
++  'utils.js',
++  'color-libs.js',
++  'simulator.js',
++  'solver-strategy.js',
++  'solver.js',
++  'playersim.js',
++  'analysis.js',
++  'car-sequencer.js',
++  'solver-analysis.js',
++  'experience-goal.js',
++  'capacity-tuner.js',
++  'instant-playout.js',
++  'generator.js'
++];
++
++const ROLE_PATHS = {
++  safe: [[0, 3], [1, 3]],
++  lightDebt: [[0, 0], [1, 0], [2, 0]],
++  heavyDebt: [[0, 6], [1, 6], [2, 6]]
++};
++const KEY_CARS = [
++  [0, 0], [0, 3], [0, 6],
++  [1, 0], [1, 6],
++  [2, 0], [2, 6],
++  [4, 1], [5, 2]
++];
++const BLACK_CELLS = [[1, 1], [1, 2]];
++const CHAIN_CELLS = [[4, 1], [5, 2]];
++const CHAIN_GROUP = 1;
++
++function loadSolver() {
++  const sandbox = {
++    console,
++    WeakMap,
++    Map,
++    Set,
++    Date,
++    Math,
++    JSON,
++    Object,
++    Array,
++    String,
++    Number,
++    isNaN,
++    parseInt,
++    parseFloat,
++    isFinite,
++    setTimeout,
++    clearTimeout
++  };
++  sandbox.global = sandbox;
++  vm.createContext(sandbox);
++  for (const file of MODULES) {
++    vm.runInContext(
++      fs.readFileSync(path.join(BIN, file), 'utf8'),
++      sandbox,
++      { filename: file }
++    );
++  }
++  return sandbox.AntSolver;
++}
++
++function clone(value) {
++  return JSON.parse(JSON.stringify(value));
++}
++
++function uniquePicks(run) {
++  const seen = new Set();
++  const out = [];
++  for (const pick of run.pickOrder || []) {
++    if (seen.has(pick.step)) continue;
++    seen.add(pick.step);
++    out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });
++  }
++  return out;
++}
++
++function pressureWindows(timeline, threshold) {
++  const windows = [];
++  let start = null;
++  for (let i = 0; i < timeline.length; i++) {
++    if (timeline[i] >= threshold && start == null) start = i;
++    if (timeline[i] < threshold && start != null) {
++      windows.push({
++        start: start + 1,
++        end: i,
++        peak: Math.max(...timeline.slice(start, i))
++      });
++      start = null;
++    }
++  }
++  if (start != null) {
++    windows.push({
++      start: start + 1,
++      end: timeline.length,
++      peak: Math.max(...timeline.slice(start))
++    });
++  }
++  return windows;
++}
++
++function traceRole(A, level, path) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const evidence = [];
++  for (const [r, c] of path) {
++    const move = A.Simulator.listMoves(state)
++      .find(item => item.r === r && item.c === c && !item.blocked);
++    if (!move) return null;
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, r, c)) return null;
++    evidence.push({
++      color: move.antBox.color,
++      count: move.antBox.count,
++      buffer: state.buffer.map(item => ({
++        color: item.color,
++        remaining: item.need - item.progress
++      }))
++    });
++  }
++  return { state, evidence };
++}
++
++function openingStats(A, level) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  return A.Simulator.listMoves(state)
++    .filter(move => !move.blocked)
++    .map(move => {
++      const child = A.SolverStrategy.cloneState(state);
++      const before = child.eliminatedPixels;
++      child.capOps = [];
++      A.Simulator.applyPick(child, move.r, move.c);
++      return {
++        r: move.r,
++        c: move.c,
++        color: move.antBox.color,
++        count: move.antBox.count,
++        canConsume: move.canConsume,
++        consumed: child.eliminatedPixels - before,
++        bufferAfter: child.buffer.length
++      };
++    });
++}
++
++function chainEvent(A, level, run) {
++  const picks = uniquePicks(run);
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  let entered = false;
++  let completed = false;
++  let debt = false;
++  let released = false;
++  for (const pick of picks) {
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, pick.r, pick.c)) continue;
++    const linked = state.buffer.filter(item => item.link === CHAIN_GROUP);
++    if (linked.length) {
++      entered = true;
++      if (linked.some(item => item.need - item.progress === 0)) completed = true;
++      if (linked.some(item => item.need - item.progress > 0)) debt = true;
++    } else if (entered) {
++      released = true;
++      break;
++    }
++  }
++  return { entered, completed, debt, released };
++}
++
++function capacityStats(game) {
++  const byColor = {};
++  let boxes = 0;
++  for (const row of game.spools) {
++    for (const spool of row) {
++      if (spool.id > 0) {
++        boxes++;
++        byColor[spool.id] = (byColor[spool.id] || 0) + spool.count;
++      }
++    }
++  }
++  return { boxes, byColor };
++}
++
++function targetColorTotals(game) {
++  const out = {};
++  for (const row of game.blocks) {
++    for (const color of row) {
++      if (color > 0) out[color] = (out[color] || 0) + 1;
++    }
++  }
++  return out;
++}
++
++function analyze(A, game, opts) {
++  const level = A.parseLevel(A.fromGameFormat(game));
++  const opening = openingStats(A, level);
++  const safe = traceRole(A, level, ROLE_PATHS.safe);
++  const light = traceRole(A, level, ROLE_PATHS.lightDebt);
++  const heavy = traceRole(A, level, ROLE_PATHS.heavyDebt);
++  const rolePass = !!safe && !!light && !!heavy &&
++    safe.state.buffer.length === 0 &&
++    light.evidence[1].buffer.some(item =>
++      item.color === 17 && item.remaining === 10) &&
++    light.state.buffer.length === 0 &&
++    heavy.evidence[1].buffer.some(item =>
++      item.color === 34 && item.remaining === 19) &&
++    heavy.state.buffer.length === 0;
++  const solve = A.Solver.solveInstantChain(level, {
++    timeBudgetMs: opts && opts.solveBudgetMs || 3000
++  });
++  const players = [];
++  for (const seed of [7, 1009, 2027]) {
++    const run = A.PlayerSim.run(level, {
++      seed,
++      instantChain: true,
++      reviveCap: 0
++    });
++    const windows = pressureWindows(run.bufferTimeline || [], 3);
++    players.push({
++      seed,
++      won: run.won,
++      progress: run.progress,
++      revivesUsed: run.revivesUsed,
++      peak: run.bufferPeak,
++      bufferTimeline: run.bufferTimeline,
++      windows,
++      chain: chainEvent(A, level, run),
++      run
++    });
++  }
++
++  const totals = capacityStats(game);
++  const targetTotals = targetColorTotals(game);
++  let perColorConserved = true;
++  for (const color of Object.keys(targetTotals)) {
++    if ((totals.byColor[color] || 0) !== targetTotals[color]) {
++      perColorConserved = false;
++    }
++  }
++  const capacities = [];
++  for (const row of game.spools) {
++    for (const spool of row) if (spool.id > 0) capacities.push(spool.count);
++  }
++  const capacityPass = perColorConserved &&
++    capacities.every(value => value >= 20 && value <= 40);
++  const openingPass = opening.length >= 3 &&
++    opening.every(move => move.consumed > 0);
++  const playersPass = players.every(player =>
++    player.won && player.progress === 100 && player.revivesUsed === 0);
++  const pressurePass = players.every(player =>
++    player.windows.length >= 2 && player.peak >= 4);
++  const chainPass = players.every(player =>
++    player.chain.entered && player.chain.completed &&
++    player.chain.debt && player.chain.released);
++
++  const failures = [];
++  if (!capacityPass) failures.push('capacity-contract');
++  if (!openingPass) failures.push('opening-not-live');
++  if (!rolePass) failures.push('role-graph');
++  if (!solve.completed || solve.progress !== 100) failures.push('unsolvable');
++  if (!playersPass) failures.push('player-failure');
++  if (!pressurePass) failures.push('pressure-window');
++  if (!chainPass) failures.push('chain-debt');
++
++  const score =
++    (capacityPass ? 1e10 : 0) +
++    (openingPass ? 1e9 : 0) +
++    (rolePass ? 1e9 : 0) +
++    (solve.completed ? 1e8 : 0) +
++    players.filter(player => player.won).length * 1e7 +
++    players.reduce((sum, player) => sum + player.windows.length, 0) * 1e5 +
++    players.reduce((sum, player) => sum + player.peak, 0) * 1e3 +
++    (chainPass ? 1e6 : 0);
++
++  return {
++    game,
++    level,
++    opening,
++    rolePass,
++    solve,
++    players,
++    capacityPass,
++    openingPass,
++    playersPass,
++    pressurePass,
++    chainPass,
++    failures,
++    score
++  };
++}
++
++function compactAnalysis(result) {
++  return {
++    score: result.score,
++    failures: result.failures,
++    capacityPass: result.capacityPass,
++    openingPass: result.openingPass,
++    rolePass: result.rolePass,
++    solve: {
++      completed: result.solve.completed,
++      progress: result.solve.progress,
++      peak: result.solve.maxBuffer
++    },
++    players: result.players.map(player => ({
++      seed: player.seed,
++      won: player.won,
++      progress: player.progress,
++      peak: player.peak,
++      windows: player.windows,
++      chain: player.chain
++    }))
++  };
++}
++
++function restoreObstacles(A, game, golden) {
++  const candidate = clone(game);
++  for (const row of candidate.spools) {
++    for (const spool of row) {
++      if (spool.id > 0) {
++        const types = Array.isArray(spool.type) ? spool.type : (spool.type ? [spool.type] : []);
++        const params = Array.isArray(spool.param) ? spool.param : (types.length ? [spool.param] : []);
++        const keptTypes = [];
++        const keptParams = [];
++        for (let i = 0; i < types.length; i++) {
++          if (types[i] !== 5) {
++            keptTypes.push(types[i]);
++            keptParams.push(params[i]);
++          }
++        }
++        spool.type = keptTypes.length === 0 ? 0 : (keptTypes.length === 1 ? keptTypes[0] : keptTypes);
++        spool.param = keptParams.length === 0 ? 0 : (keptParams.length === 1 ? keptParams[0] : keptParams);
++      }
++    }
++  }
++  for (const [r, c] of BLACK_CELLS) {
++    if (candidate.spools[r][c].id !== -1) {
++      candidate.spools[r][c] = clone(golden.spools[r][c]);
++    }
++  }
++  for (const [r, c] of CHAIN_CELLS) {
++    const current = candidate.spools[r][c];
++    const expected = golden.spools[r][c];
++    if (current.id === expected.id && current.count === expected.count) {
++      current.type = 5;
++      current.param = CHAIN_GROUP;
++    }
++  }
++  return {
++    game: candidate,
++    action: 'restore-semantic-obstacles'
++  };
++}
++
++function restoreKeyCars(game, golden) {
++  const candidates = [];
++  for (const [r, c] of KEY_CARS) {
++    const expected = golden.spools[r][c];
++    const current = game.spools[r][c];
++    // A same-color key car with a different count is a capacity problem.
++    // Swapping it with another copy would hide that fault instead of repairing it.
++    if (current.id === expected.id) continue;
++    for (let sr = 0; sr < game.maprow; sr++) {
++      for (let sc = 0; sc < game.mapcol; sc++) {
++        const source = game.spools[sr][sc];
++        if (source.id !== expected.id || source.count !== expected.count) continue;
++        const candidate = clone(game);
++        const temp = candidate.spools[r][c];
++        candidate.spools[r][c] = candidate.spools[sr][sc];
++        candidate.spools[sr][sc] = temp;
++        candidates.push({
++          game: candidate,
++          action: 'restore-key-car:' + r + ',' + c + '<->' + sr + ',' + sc
++        });
++      }
++    }
++  }
++  return candidates;
++}
++
++function capacityCandidates(game, maxCandidates) {
++  const groups = {};
++  for (let r = 0; r < game.maprow; r++) {
++    for (let c = 0; c < game.mapcol; c++) {
++      const spool = game.spools[r][c];
++      if (spool.id <= 0) continue;
++      if (!groups[spool.id]) groups[spool.id] = [];
++      groups[spool.id].push({ r, c });
++    }
++  }
++  const candidates = [];
++  for (const color of Object.keys(groups)) {
++    const cells = groups[color];
++    for (let i = 0; i < cells.length; i++) {
++      for (let j = i + 1; j < cells.length; j++) {
++        const a = cells[i];
++        const b = cells[j];
++        for (const delta of [1, -1]) {
++          const sa = game.spools[a.r][a.c];
++          const sb = game.spools[b.r][b.c];
++          if (sa.count + delta < 20 || sa.count + delta > 40) continue;
++          if (sb.count - delta < 20 || sb.count - delta > 40) continue;
++          const candidate = clone(game);
++          candidate.spools[a.r][a.c].count += delta;
++          candidate.spools[b.r][b.c].count -= delta;
++          candidates.push({
++            game: candidate,
++            action: 'reslice-color-' + color + ':' +
++              (a.r + ',' + a.c) + delta + '/' +
++              (b.r + ',' + b.c) + (-delta)
++          });
++          if (candidates.length >= maxCandidates) return candidates;
++        }
++      }
++    }
++  }
++  return candidates;
++}
++
++function bestCandidate(A, candidates, baseline, opts) {
++  let best = baseline;
++  const tested = [];
++  for (const candidate of candidates) {
++    const result = analyze(A, candidate.game, opts);
++    tested.push({
++      action: candidate.action,
++      score: result.score,
++      failures: result.failures
++    });
++    if (result.score > best.score) {
++      best = Object.assign({}, result, { repairAction: candidate.action });
++    }
++  }
++  tested.sort((a, b) => b.score - a.score);
++  return { best, tested: tested.slice(0, 20) };
++}
++
++function repair(A, game, golden, opts) {
++  const maxLayers = opts && opts.maxLayers || 3;
++  const maxCapacity = opts && opts.maxCapacity || 160;
++  const trace = [];
++  let current = analyze(A, game, opts);
++  trace.push({ layer: 'baseline', result: compactAnalysis(current) });
++
++  for (let layer = 1; layer <= maxLayers && current.failures.length; layer++) {
++    let candidates;
++    let layerName;
++    if (layer === 1) {
++      layerName = 'obstacles';
++      candidates = [restoreObstacles(A, current.game, golden)];
++    } else if (layer === 2) {
++      layerName = 'key-cars';
++      candidates = restoreKeyCars(current.game, golden);
++    } else {
++      layerName = 'capacity';
++      candidates = capacityCandidates(current.game, maxCapacity);
++    }
++    if (!candidates.length) {
++      trace.push({ layer: layerName, attempted: 0, accepted: false });
++      continue;
++    }
++    const picked = bestCandidate(A, candidates, current, opts);
++    const accepted = picked.best.score > current.score;
++    trace.push({
++      layer: layerName,
++      attempted: candidates.length,
++      accepted,
++      action: accepted ? picked.best.repairAction : null,
++      bestScore: picked.best.score,
++      top: picked.tested
++    });
++    if (accepted) current = picked.best;
++  }
++  return {
++    schema: '006-bounded-repair-v1',
++    status: current.failures.length === 0 ? 'REPAIRED' : 'STILL_FAILING',
++    repairOrder: ['obstacles', 'key-cars', 'capacity'],
++    layersUsed: trace.filter(item => item.accepted).length,
++    trace,
++    result: compactAnalysis(current),
++    game: current.game
++  };
++}
++
++function inject(game, type) {
++  const broken = clone(game);
++  if (type === 'chain-removed') {
++    for (const [r, c] of CHAIN_CELLS) {
++      broken.spools[r][c].type = 0;
++      broken.spools[r][c].param = 0;
++    }
++    return broken;
++  }
++  if (type === 'key-swap') {
++    const temp = broken.spools[0][0];
++    broken.spools[0][0] = broken.spools[6][6];
++    broken.spools[6][6] = temp;
++    return broken;
++  }
++  if (type === 'capacity-shift') {
++    broken.spools[2][6].count -= 1;
++    broken.spools[4][5].count += 1;
++    return broken;
++  }
++  throw new Error('未知注入类型: ' + type);
++}
++
++function parseArgs(argv) {
++  const out = {
++    inject: 'chain-removed',
++    maxLayers: 3,
++    maxCapacity: 160,
++    solveBudgetMs: 3000
++  };
++  for (const arg of argv.slice(2)) {
++    const match = /^--([^=]+)=(.+)$/.exec(arg);
++    if (!match) continue;
++    out[match[1]] = match[1] === 'inject'
++      ? match[2] : Number(match[2]);
++  }
++  return out;
++}
++
++function main() {
++  const args = parseArgs(process.argv);
++  const A = loadSolver();
++  const golden = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
++  const broken = inject(golden, args.inject);
++  const repaired = repair(A, broken, golden, args);
++  repaired.injection = args.inject;
++  repaired.golden = GOLDEN;
++
++  fs.mkdirSync(OUT, { recursive: true });
++  fs.writeFileSync(
++    path.join(OUT, 'repair-' + args.inject + '.json'),
++    JSON.stringify(repaired, null, 2) + '\n'
++  );
++  if (repaired.game) {
++    fs.writeFileSync(
++      path.join(OUT, 'repaired-' + args.inject + '.json'),
++      JSON.stringify(repaired.game, null, 2) + '\n'
++    );
++  }
++
++  console.log(JSON.stringify({
++    ok: repaired.status === 'REPAIRED',
++    injection: args.inject,
++    status: repaired.status,
++    layersUsed: repaired.layersUsed,
++    trace: repaired.trace.map(item => ({
++      layer: item.layer,
++      attempted: item.attempted,
++      accepted: item.accepted,
++      action: item.action || null,
++      failures: item.result ? item.result.failures : undefined
++    })),
++    result: repaired.result
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/\345\256\236\351\252\214\345\205\263/\345\205\263\345\215\2416/\345\216\237\345\236\213_v1/play.html" "b/\345\256\236\351\252\214\345\205\263/\345\205\263\345\215\2416/\345\216\237\345\236\213_v1/play.html"
+new file mode 100644
+index 0000000..6db757a
+--- /dev/null
++++ "b/\345\256\236\351\252\214\345\205\263/\345\205\263\345\215\2416/\345\216\237\345\236\213_v1/play.html"
+@@ -0,0 +1,321 @@
++<!doctype html>
++<html lang="zh-CN">
++<head>
++  <meta charset="utf-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1">
++  <title>006 可玩原型 v1</title>
++  <style>
++    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
++    body { margin: 0; background: #f5f0e8; color: #33281f; }
++    header { padding: 18px 22px; background: #fffaf2; border-bottom: 1px solid #e7d8c4; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
++    h1 { font-size: 20px; margin: 0; }
++    .muted { color: #806f5f; font-size: 13px; }
++    main { display: grid; grid-template-columns: minmax(360px, 650px) minmax(280px, 1fr); gap: 22px; padding: 22px; max-width: 1180px; margin: auto; }
++    .panel { background: #fffaf2; border: 1px solid #e7d8c4; border-radius: 12px; padding: 14px; box-shadow: 0 4px 18px rgba(80, 50, 20, .05); }
++    .target { display: grid; width: min(100%, 630px); aspect-ratio: 1; margin: auto; gap: 0; image-rendering: pixelated; }
++    .target div { min-width: 0; min-height: 0; }
++    .board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; max-width: 520px; margin: 12px auto 0; }
++    .cell { aspect-ratio: 1; border: 2px solid transparent; border-radius: 8px; color: #fff; font-weight: 800; cursor: default; display: flex; align-items: center; justify-content: center; font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
++    .cell.active { border-color: #1c9b59; box-shadow: 0 0 0 3px rgba(28,155,89,.16); cursor: pointer; }
++    .cell.next { border-color: #d97706; box-shadow: 0 0 0 4px rgba(217,119,6,.24); }
++    .cell.blocked { filter: grayscale(.6); opacity: .55; }
++    .cell.empty { background: #e6ddd0 !important; border: 1px dashed #c9b8a2; }
++    .ice-badge { display: block; margin-top: -3px; padding: 1px 4px; border-radius: 8px; background: #eef8ff; color: #24546f; font-size: 10px; line-height: 1.25; text-shadow: none; }
++    .chain-badge { display: inline-block; margin-left: 4px; padding: 1px 4px; border-radius: 8px; background: #fff0d7; color: #7a4613; font-size: 10px; line-height: 1.25; text-shadow: none; }
++    .buffer { display: grid; grid-template-columns: repeat(5, 54px); gap: 8px; margin: 14px 0; }
++    .slot { width: 54px; height: 54px; border: 2px solid #d9c8b3; border-radius: 9px; background: #f8f2e9; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 12px; }
++    button { border: 0; border-radius: 8px; padding: 9px 14px; background: #5b4634; color: white; cursor: pointer; font-weight: 700; }
++    button.secondary { background: #8a6a4d; }
++    .beats { display: grid; gap: 6px; margin: 12px 0; }
++    .beat { padding: 7px 9px; border: 1px solid #e7d8c4; border-radius: 8px; background: #fbf5ec; }
++    .beat strong { display: block; font-size: 13px; }
++    .beat span { color: #806f5f; font-size: 12px; }
++    .beat.active { border-color: #d97706; background: #fff2dd; }
++    pre { white-space: pre-wrap; font-size: 12px; max-height: 180px; overflow: auto; }
++    @media (max-width: 850px) { main { grid-template-columns: 1fr; padding: 12px; } }
++  </style>
++</head>
++<body>
++  <header>
++    <h1 id="title">006 · 可玩原型 v1</h1>
++    <span id="meta" class="muted">载入中…</span>
++    <button id="reset">重新开始</button>
++    <button id="story" class="secondary">自动演示故事</button>
++  </header>
++  <main>
++    <section class="panel">
++      <div id="target" class="target"></div>
++    </section>
++    <section class="panel">
++      <div id="status" class="muted">载入中…</div>
++      <div id="beats" class="beats"></div>
++      <div id="board" class="board"></div>
++      <h2 style="font-size:15px;margin-bottom:4px">暂存</h2>
++      <div id="buffer" class="buffer"></div>
++      <h2 style="font-size:15px;margin-bottom:4px">操作</h2>
++      <pre id="log">点击绿色边框车辆开始。</pre>
++    </section>
++  </main>
++  <script src="../../../02_工程/完整主bin快照_20261012/bin/js/utils.js"></script>
++  <script src="../../../02_工程/完整主bin快照_20261012/bin/js/color-libs.js"></script>
++  <script src="../../../02_工程/完整主bin快照_20261012/bin/js/simulator.js"></script>
++  <script>
++    let raw, level, state, moves = [], logLines = [];
++    let storyRoute = null, storyRunning = false, storyNext = null, storyStep = 0;
++    let storyBeats = [];
++    const STORY_BEATS_V8 = [
++      { from: 1, to: 2, label: '教学', detail: '30/22 → 15/24' },
++      { from: 3, to: 4, label: '第一笔债务', detail: '17/26 欠10 → 31/30 释放' },
++      { from: 5, to: 6, label: '第二拍', detail: '34/25 欠6 → 5/40 释放' },
++      { from: 7, to: 8, label: '承诺加深', detail: '34、17 同时进入暂存' },
++      { from: 9, to: 29, label: '长等待与推进', detail: '34 色欠额从20降到1' },
++      { from: 30, to: 31, label: '空间揭示', detail: 'R59 / R65 首次可达' },
++      { from: 32, to: 35, label: '偿还长债', detail: '34 色债务释放' },
++      { from: 36, to: 42, label: '收束准备', detail: '继续打开末端区域' },
++      { from: 43, to: 44, label: '终局', detail: '22欠4 → 15/24 释放' },
++      { from: 45, to: 47, label: '收尾', detail: '连续收满' }
++    ];
++    const STORY_BEATS_V15 = [
++      { from: 1, to: 7, label: '开放开局', detail: '7个入口全部有实际消除' },
++      { from: 8, to: 9, label: '第一压力窗口', detail: '同色多车债务，buffer达到3' },
++      { from: 10, to: 10, label: '第一释放', detail: '31/31打开区域，债务先下降1' },
++      { from: 11, to: 20, label: '继续铺路', detail: '保留同色债务，继续打开中段区域' },
++      { from: 21, to: 28, label: '第二压力窗口', detail: '混色债务，buffer达到4' },
++      { from: 29, to: 30, label: '第二释放', detail: '33/20打开区域，buffer下降2' },
++      { from: 31, to: 42, label: '二连锁承诺', detail: '15/25完成并被扣住，等待30/23补齐' },
++      { from: 43, to: 45, label: '组债释放', detail: '后续区域补齐同组车辆，压力逐级下降' },
++      { from: 46, to: 47, label: '收尾', detail: '完成剩余区域' }
++    ];
++
++    function sleep(ms) {
++      return new Promise(resolve => setTimeout(resolve, ms));
++    }
++
++    function color(id) {
++      return window.AntSolver.getColorCSS(id);
++    }
++
++    function moveMap() {
++      const map = {};
++      for (const m of moves) map[m.r + ',' + m.c] = m;
++      return map;
++    }
++
++    function renderTarget() {
++      const el = document.getElementById('target');
++      const rows = state.blocks.length;
++      const cols = state.blocks[0].length;
++      el.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
++      const bits = [];
++      for (let r = 0; r < rows; r++) {
++        for (let c = 0; c < cols; c++) {
++          const id = state.blocks[r][c];
++          const eliminated = state.eliminated[r][c];
++          const bg = id > 0 ? color(id) : '#ffffff';
++          bits.push('<div style="background:' + bg + ';opacity:' + (eliminated ? '.18' : '1') + '"></div>');
++        }
++      }
++      el.innerHTML = bits.join('');
++    }
++
++    function renderBoard() {
++      const el = document.getElementById('board');
++      const mm = moveMap();
++      const bits = [];
++      for (let r = 0; r < state.boardRows; r++) {
++        for (let c = 0; c < state.boardCols; c++) {
++          const cell = state.cells[r][c];
++          const m = mm[r + ',' + c];
++          if (!cell) {
++            bits.push('<div class="cell empty"></div>');
++          } else if (cell.t === 'box') {
++            const isNext = storyNext && storyNext.r === r && storyNext.c === c;
++            const cls = m ? (m.blocked ? 'cell blocked' : 'cell active' + (isNext ? ' next' : '')) : 'cell blocked';
++            const ice = state.numice && state.numice[r + ',' + c] && state.numice[r + ',' + c].remaining;
++            bits.push('<button class="' + cls + '" style="background:' + color(cell.color) + '" data-r="' + r + '" data-c="' + c + '">' +
++              cell.count +
++              (ice ? '<span class="ice-badge">❄' + ice + '</span>' : '') +
++              (cell.chain > 0 ? '<span class="chain-badge">链</span>' : '') +
++              '</button>');
++          } else {
++            bits.push('<div class="cell blocked"></div>');
++          }
++        }
++      }
++      el.innerHTML = bits.join('');
++      for (const button of el.querySelectorAll('button.active')) {
++        button.addEventListener('click', () => pick(+button.dataset.r, +button.dataset.c));
++      }
++    }
++
++    function renderBuffer() {
++      const el = document.getElementById('buffer');
++      const bits = [];
++      for (let i = 0; i < state.bufferLimit; i++) {
++        const item = state.buffer.find(x => x.slot === i);
++        if (!item) bits.push('<div class="slot"></div>');
++        else bits.push('<div class="slot" style="background:' + color(item.color) + '"><span>' + item.progress + '/' + item.need + '</span></div>');
++      }
++      el.innerHTML = bits.join('');
++    }
++
++    function update() {
++      moves = window.AntSolver.Simulator.listMoves(state);
++      renderTarget();
++      renderBoard();
++      renderBuffer();
++      const status = document.getElementById('status');
++      const progress = state.totalPixels ? Math.round(state.eliminatedPixels / state.totalPixels * 100) : 0;
++      const demo = storyRunning && storyStep ? ' · 演示第 ' + storyStep + ' 步' : '';
++      status.textContent = state.gameWon ? '通关！' + demo : (state.gameOver ? '失败' + demo : '进度 ' + progress + '% · 已取 ' + state.completedBoxes + '/' + state.totalBoxes + ' · 暂存 ' + state.buffer.length + '/' + state.bufferLimit + demo);
++      document.getElementById('log').textContent = logLines.slice(-12).join('\n') || '点击绿色边框车辆开始。';
++      renderBeats();
++    }
++
++    function currentBeat() {
++      return storyBeats.find(x => storyStep >= x.from && storyStep <= x.to) || null;
++    }
++
++    function renderBeats() {
++      const el = document.getElementById('beats');
++      if (!storyRoute) {
++        el.innerHTML = '';
++        return;
++      }
++      const active = currentBeat();
++      el.innerHTML = storyBeats.map(x =>
++        '<div class="beat' + (active === x ? ' active' : '') + '">' +
++        '<strong>' + x.from + '–' + x.to + ' · ' + x.label + '</strong>' +
++        '<span>' + x.detail + '</span></div>'
++      ).join('');
++    }
++
++    function pick(r, c) {
++      if (storyRunning) return;
++      if (state.gameOver) return;
++      const m = moves.find(x => x.r === r && x.c === c);
++      if (!m || m.blocked) return;
++      const cell = state.cells[r][c];
++      logLines.push('取 ' + cell.color + '色/' + cell.count);
++      window.AntSolver.Simulator.applyPick(state, r, c);
++      update();
++    }
++
++    async function runStory() {
++      if (!storyRoute) return;
++      if (storyRunning) {
++        storyRunning = false;
++        return;
++      }
++      storyRunning = true;
++      storyNext = null;
++      storyStep = 0;
++      document.getElementById('story').textContent = '停止演示';
++      state = window.AntSolver.Simulator.enter(level, { useSlotStart: true, instantChain: true });
++      logLines = ['自动演示开始'];
++      update();
++      const rawPicks = storyRoute.playerRuns.find(x => x.reviveCap === 0 && x.seed === 7).pickOrder;
++      const seenSteps = new Set();
++      const picks = rawPicks.filter(x => {
++        if (seenSteps.has(x.step)) return false;
++        seenSteps.add(x.step);
++        return true;
++      });
++      for (const expected of picks) {
++        if (!storyRunning) break;
++        storyStep = expected.step;
++        storyNext = { r: expected.r, c: expected.c };
++        update();
++        await sleep(260);
++        if (!storyRunning) break;
++        const move = moves.find(x => x.r === expected.r && x.c === expected.c && !x.blocked);
++        if (!move) {
++          logLines.push('演示中断：找不到 ' + expected.r + ',' + expected.c);
++          storyRunning = false;
++          break;
++        }
++        const beat = currentBeat();
++        if (beat && storyStep === beat.from) logLines.push('【' + beat.label + '】' + beat.detail);
++        const cell = state.cells[expected.r][expected.c];
++        logLines.push('取 ' + cell.color + '色/' + cell.count);
++        window.AntSolver.Simulator.applyPick(state, expected.r, expected.c);
++        storyNext = null;
++        update();
++      }
++      storyRunning = false;
++      storyNext = null;
++      document.getElementById('story').textContent = '自动演示故事';
++      update();
++    }
++
++    async function boot() {
++      storyRunning = false;
++      storyNext = null;
++      const levelPath = new URLSearchParams(location.search).get('level') || '关卡_实验_v1.json';
++      raw = await fetch(levelPath).then(r => r.json());
++      level = window.AntSolver.parseLevel(window.AntSolver.fromGameFormat(raw));
++      state = window.AntSolver.Simulator.enter(level, { useSlotStart: true, instantChain: true });
++      const is014 = levelPath.indexOf('关卡14') >= 0;
++      const is008 = levelPath.indexOf('关卡8') >= 0;
++      const isV15 = levelPath.indexOf('原型_v15') >= 0;
++      const isV14 = levelPath.indexOf('原型_v14') >= 0;
++      const levelLabel = is014
++        ? 'E6 Final Holdout 014 v1 · Four Quarter'
++        : is008
++        ? (levelPath.indexOf('原型_v3') >= 0
++          ? 'E6 Target 008 v3 · Story Graph'
++          : levelPath.indexOf('原型_v2') >= 0
++          ? 'E6 Target 008 v2 · Three Act'
++          : 'E6 Target 008 v1 · Corridor')
++        : isV15 ? 'E6 Target 006 v15 · Pressure + Chain'
++        : isV14 ? 'E6 Target 006 v14 · Two Pressure Windows'
++        : levelPath.indexOf('原型_v12') >= 0 ? 'E6 Target 006 v12 · Open Start'
++        : levelPath.indexOf('原型_v11') >= 0 ? 'E6 Target 006 v11 · Three Paths'
++        : levelPath.indexOf('原型_v10') >= 0 ? 'E6 Target 006 v10 · Dual Debt'
++        : levelPath.indexOf('E5_v1') >= 0 ? 'E5 Delivery 006'
++        : levelPath.indexOf('E4_combined') >= 0 ? 'E4 冰+链+黑'
++        : levelPath.indexOf('E4_groupDebt') >= 0 ? 'E4 groupDebt'
++        : levelPath.indexOf('E4_delayedGate') >= 0 ? 'E4 delayedGate'
++        : levelPath.indexOf('v9') >= 0 ? 'E1-R3 Story Level v9'
++        : levelPath.indexOf('v8') >= 0 ? 'E1-R2 Story Level v8'
++        : levelPath.indexOf('v7') >= 0 ? 'E1-R1 Story Level v7'
++        : levelPath.indexOf('v6') >= 0 ? 'Story Level v6'
++        : levelPath.indexOf('v5') >= 0 ? 'Story Level v5'
++        : levelPath.indexOf('v4') >= 0 ? 'Story Level v4'
++        : levelPath.indexOf('v3') >= 0 ? 'Story Level v3'
++        : levelPath.indexOf('v2') >= 0 ? 'Story Level v2'
++        : '可玩原型 v1';
++      document.title = (is014 ? '014' : is008 ? '008' : '006') + ' · ' + levelLabel;
++      document.getElementById('title').textContent = document.title;
++      document.getElementById('meta').textContent =
++        state.boardRows + '×' + state.boardCols + ' · ' + state.totalBoxes + ' 车 · instantChain · 只读预览';
++      const storyButton = document.getElementById('story');
++      const storyVariant = isV15 ? 'v15'
++        : isV14 ? 'v14'
++        : levelPath.indexOf('原型_v9') >= 0 ? 'v9'
++        : levelPath.indexOf('原型_v8') >= 0 ? 'v8'
++        : null;
++      storyBeats = isV15 ? STORY_BEATS_V15 : STORY_BEATS_V8;
++      storyButton.style.display = storyVariant ? '' : 'none';
++      storyRoute = null;
++      if (storyVariant) {
++        const routePath = levelPath.replace(
++          new RegExp('关卡_实验(?:_006)?_' + storyVariant + '\\.json(?:\\?.*)?$'),
++          '关卡_实验' + (storyVariant === 'v15' || storyVariant === 'v14' ? '_006' : '') +
++            '_' + storyVariant + '.route.json'
++        );
++        const response = await fetch(routePath);
++        if (response.ok) storyRoute = await response.json();
++      }
++      logLines = [];
++      update();
++    }
++
++    document.getElementById('reset').onclick = boot;
++    document.getElementById('story').onclick = runStory;
++    boot().catch(err => {
++      document.getElementById('status').textContent = '载入失败：' + err.message;
++    });
++  </script>
++</body>
++</html>

@@ -1,4 +1,4 @@
-/* 蚂蚁拿块关卡图修改工具 · 样式（本轮：暖色调 + 左右两栏布局） */
+/* 蚂蚁拿块关卡图修改工具 · 样式（图纸工作台：左导入 / 中画布 / 右修图提取拼接） */
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
@@ -16,10 +16,8 @@ body {
 .topbar .helpLink { text-decoration: none; }
 
 .layout { display: flex; align-items: flex-start; gap: 14px; padding: 14px; }
-/* 左右两栏布局：sideLeft(导入/求解/定位/多路线/显示导出) 在最左，main(目标图，主区) 居中，
-   sideRight(演示/美术编辑/重构) 在最右。三栏各自纵向滚动，减少单栏堆叠过长的滑动。
-   DOM 顺序（HTML 里 sideLeft → main → sideRight）与视觉顺序一致，不使用 CSS order，
-   避免 tab 键盘导航顺序与视觉顺序不符。 */
+/* 三栏布局：sideLeft(导入) 最左，main(图纸画布) 居中，sideRight(修图/提取/拼接) 最右。
+   三栏各自纵向滚动。DOM 顺序与视觉顺序一致，不使用 CSS order，避免键盘导航顺序错位。 */
 .main { flex: 1 1 auto; min-width: 0; }
 .side { width: 320px; flex: 0 0 320px; max-height: calc(100vh - 90px); overflow-y: auto; }
 
@@ -131,6 +129,18 @@ canvas { display: block; image-rendering: pixelated; }
   border-radius: 50%; animation: sp 0.9s linear infinite;
 }
 @keyframes sp { to { transform: rotate(360deg); } }
+
+/* 画布统计条：颜色数放在最前，是用户最先想知道的信息 */
+.canvasStats {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px;
+  margin: 0 0 10px; padding: 7px 10px;
+  background: #34241a; border: 1px solid #4d3627; border-left: 3px solid #6b4a9e;
+  border-radius: 5px; font-size: 12px; color: #d9b899;
+}
+.canvasStats .csMain { font-size: 16px; line-height: 1; color: #ffb066; font-weight: 700; }
+.canvasStats .csLabel { color: #c9a98a; }
+.canvasStats .csDivider { color: #6b4a34; }
+body.composeMode #canvasColorStats { display: none !important; }
 
 .legend { margin: 10px 0 4px; display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: #e6d2ba; }
 .legend .sw { display: inline-block; width: 16px; height: 0; border-top-width: 3px; border-top-style: solid; vertical-align: middle; margin-right: 5px; }
@@ -355,20 +365,8 @@ canvas { display: block; image-rendering: pixelated; }
   background: #2b1d12; color: #f0d9bf; border: 1px solid #4d3627; border-radius: 3px;
 }
 
-/* ===== 14. 纯美术编辑模式与卡片折叠（任务 ANT-ARTTOOL-EDGE-TRIM-20260915 需求④）===== */
+/* ===== 14. 卡片折叠 ===== */
 
-/* 顶栏的模式开关 */
-.topToggle {
-  font-size: 12px; color: #f0d9bf; display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px; margin-left: 8px; cursor: pointer;
-  background: #4a3320; border: 1px solid #6b4a2e; border-radius: 5px; white-space: nowrap;
-}
-.topToggle:hover { background: #5a3f28; border-color: #ffb066; }
-.topToggle input { cursor: pointer; }
-/* 开着的时候必须一眼看出来，否则用户会以为功能丢了 */
-body.artOnly .topToggle { background: #7a4a18; border-color: #ffb066; color: #fff3e2; }
-
-/* ---- 卡片折叠 ---- */
 /* 标题可点。折叠时隐藏标题行以外的一切（普通卡片是 h3，美术编辑那张是 .floatHead） */
 .card > h3, .card > .floatHead > .floatTitle { cursor: pointer; user-select: none; }
 .card > h3::before, .card > .floatHead > .floatTitle::before {
@@ -383,21 +381,6 @@ body.artOnly .topToggle { background: #7a4a18; border-color: #ffb066; color: #ff
 .card.collapsed > h3, .card.collapsed > .floatHead { margin-bottom: 0; opacity: .78; }
 .card > h3:hover, .card > .floatHead > .floatTitle:hover { color: #ffd9a8; }
 
-/* ---- 纯美术编辑模式：藏掉与生产/求解有关的部分 ---- */
-/* 用 body class 控制，而不是逐个 element.style.display —— 这样切回来时不会残留 inline 样式，
-   也不会和「折叠」状态互相覆盖（两者是独立维度：折叠记的是用户意图，模式记的是可见范围）。 */
-body.artOnly #cardSolve,
-body.artOnly #cardInterval,
-body.artOnly #cardMulti,
-body.artOnly #cardDemo,
-body.artOnly #cardPressure,
-body.artOnly #cardRecon,
-body.artOnly #cardExportLib,
-body.artOnly .boardSectionHead,
-body.artOnly #boardCompareWrap { display: none !important; }
-/* 纯美术模式下给「主体提取」一点强调，因为它现在紧跟在美术编辑后面，是主要工作区 */
-body.artOnly #extractCard { border-color: #6b4a2e; }
-
 /* ===== 15. 图纸拼接工作台（任务 ANT-ARTTOOL-PIECE-COMPOSE-20260915）=====
    独立视图，默认隐藏；body.composeMode 时显示，并把常规目标图那一套让位。
    历史版本沿用暖棕底 + 橙强调；拼接 2.1 在文件末尾覆盖为浅色工作台。
@@ -408,18 +391,11 @@ body.composeMode .composeView { display: block; }
 /* 进拼接时让常规目标图区域整体让位 —— 它们和拼接无关，留着只会挤空间又容易误操作 */
 body.composeMode .mainCanvasRow,
 body.composeMode #legend,
-body.composeMode .main > .readout,
-body.composeMode .boardSectionHead,
-body.composeMode #boardCompareWrap { display: none !important; }
-/* 拼接时右栏只留拼接卡片，左栏保留导入（要用它拿 txt） */
-body.composeMode #cardSolve,
-body.composeMode #cardInterval,
-body.composeMode #cardMulti,
-body.composeMode #cardDemo,
+body.composeMode .main > .readout { display: none !important; }
+/* 拼接时左栏（普通修图的导入列表）和右栏的修图/提取都让位，只留拼接卡片。
+   拼接自己的「导入 TXT 图 / 导入文件夹」在 ② 部件来源里，不用绕回左栏。 */
+body.composeMode .sideLeft,
 body.composeMode #editCard,
-body.composeMode #cardPressure,
-body.composeMode #cardRecon,
-body.composeMode #cardExportLib,
 body.composeMode #extractCard { display: none !important; }
 /* 反过来：不在拼接模式时，拼接卡片藏起来，免得和主体提取抢注意力 */
 #composeCard { display: none; }
@@ -512,13 +488,6 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
   background: rgba(245,246,248,.88); color: #1f5f9e;
 }
 .spin { border-color: #2f6fae; border-top-color: transparent; }
-.topToggle {
-  background: #eef3f8; border-color: #cbd3dd; color: #27313d;
-}
-.topToggle:hover { background: #e3ebf4; border-color: #7fa6ce; }
-body.artOnly .topToggle {
-  background: #dbeafe; border-color: #2f6fae; color: #174a7a;
-}
 .composeBar {
   background: #ffffff; border-color: #d8dde4; border-left-color: #5b6fe5; color: #27313d;
 }

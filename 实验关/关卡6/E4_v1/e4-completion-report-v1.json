@@ -1,0 +1,148 @@
+{
+  "schema": "e4-completion-report-v1",
+  "status": "E4_COMPLETE_FOR_006",
+  "checks": {
+    "iceAccepted": true,
+    "chainAccepted": true,
+    "pipeRejectedWithEvidence": true,
+    "blackNecessary": true,
+    "questionRejectedWithEvidence": true,
+    "combinedAccepted": true,
+    "noQuotaGeneration": true,
+    "allActualObstaclesHaveEvidence": true
+  },
+  "accepted": {
+    "black": {
+      "role": "shape",
+      "cells": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "ablation": "removal_changes_solver_and_player_route"
+    },
+    "numice": {
+      "role": "delay",
+      "cells": {
+        "0,3": 4,
+        "0,4": 6,
+        "0,5": 6,
+        "0,6": 6
+      },
+      "ablation": "visible_options_5_to_1_and_5_to_2"
+    },
+    "chain": {
+      "role": "bind",
+      "cells": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "ablation": "six_step_separate_to_five_step_group"
+    }
+  },
+  "rejected": {
+    "pipe": [
+      "第二组在计划时点之前已由数字冰锁住，管道会重复delay职责。",
+      "第一笔债务已由二连锁形成共同承诺，管道不能替代bind。",
+      "R59/R65已由棋盘暴露顺序按计划出现，不存在需要暂存供给的关键车。",
+      "当前没有“出口格空出后才应释放某辆关键车”的剧情节拍。",
+      "强行放管道只会制造重复机制或掩盖现有布局问题。"
+    ],
+    "question": [
+      "首行车辆开局即可见，问号放在首行会立即揭示，不能形成未知。",
+      "关键路径颜色和容量已经由Schema/目标图明确，没有可供推理的灰线索。",
+      "把关键格改成问号只会隐藏答案，增加背板成本。",
+      "把非关键格改成问号不会改变故事，属于装饰性信息遮蔽。"
+    ]
+  },
+  "combined": {
+    "file": "/Users/red/Desktop/毛线汽车/实验关/关卡6/E4_v1/E4_combined_冰链黑.json",
+    "prefix": [
+      "0,2",
+      "0,1",
+      "1,0",
+      "0,3",
+      "1,3"
+    ],
+    "solvePeak": 2,
+    "players": [
+      {
+        "seed": 7,
+        "reviveCap": 0,
+        "won": true,
+        "progress": 100,
+        "bufferPeak": 2,
+        "revivesUsed": 0,
+        "prefixMatches": true
+      },
+      {
+        "seed": 1009,
+        "reviveCap": 0,
+        "won": true,
+        "progress": 100,
+        "bufferPeak": 2,
+        "revivesUsed": 0,
+        "prefixMatches": true
+      },
+      {
+        "seed": 2027,
+        "reviveCap": 0,
+        "won": true,
+        "progress": 100,
+        "bufferPeak": 2,
+        "revivesUsed": 0,
+        "prefixMatches": true
+      },
+      {
+        "seed": 7,
+        "reviveCap": 2,
+        "won": true,
+        "progress": 100,
+        "bufferPeak": 2,
+        "revivesUsed": 0,
+        "prefixMatches": true
+      },
+      {
+        "seed": 1009,
+        "reviveCap": 2,
+        "won": true,
+        "progress": 100,
+        "bufferPeak": 2,
+        "revivesUsed": 0,
+        "prefixMatches": true
+      },
+      {
+        "seed": 2027,
+        "reviveCap": 2,
+        "won": true,
+        "progress": 100,
+        "bufferPeak": 2,
+        "revivesUsed": 0,
+        "prefixMatches": true
+      }
+    ]
+  },
+  "issues": [
+    "没有找到合法的两辆完成+一辆债务三连锁组合，因此采用一完成+一债务的二连锁。",
+    "管道与现有delay/reveal重复，被否决。",
+    "问号没有可推断线索，被否决。",
+    "组合验证只覆盖006，不代表多图泛化。"
+  ],
+  "limitations": [
+    "E4只完成006单图。",
+    "E4结果未接入生产UI/bin。",
+    "E4组合未接入多目标图回归。",
+    "真人校准仍未完成。"
+  ]
+}

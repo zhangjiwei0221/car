@@ -1,10 +1,12 @@
 /**
  * 蚂蚁拿块关卡图修改工具 · 界面层（app.js）
- * 任务：ANT-ARTTOOL-CLASSIFY-20260729 · 阶段3（第一阶段：进度区域定位）
  *
- * 职责：导入配对 → 求解/回放（Worker 优先，file:// 下自动退回主线程）→ 进度吸附 → 两状态差值 → 描边高亮。
- * 所有求解与模拟一律走本工具目录下的 bin/js/（正式代码的副本，2026-08-03 起随工具打包），
- * 本文件不含任何求解算法。正式来源仍是项目根目录的 bin/，见 bin/来源说明.md。
+ * 职责（2026-10-28 收敛后）：导入 TXT 图纸 → 画布显示/悬停读数 → 美术编辑（绘制/框选/套索/换色）
+ * → 主体提取 → 图纸库 → 图纸拼接 → 导出 TXT/PNG。
+ *
+ * 本工具**不再包含任何游玩/关卡逻辑**：求解路线、进度区间、多路线复核、自动演示、
+ * 暂存压力图、重构关卡、待导出库、棋盘/暂存对比都已从界面与启动流程移除。
+ * 只保留 bin/js/utils.js（颜色表）与 generator.js（TXT 解析 / 碎色口径）这两份纯数据工具。
  */
 (function () {
   'use strict';
@@ -13,17 +15,10 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var S = {
-    items: [],          // 每关：{key,txtName,levelName,solveName,blocks,level,solve,tl,pxStep,interval,routes,merged,warns}
+    items: [],          // 每张图纸：{key,txtName,blocks,warns}
     index: {},          // key（去扩展名的文件名）→ item，用于同名索引匹配
     cur: -1,
-    worker: null,
-    workerReady: null,  // null=未探测 true=可用 false=退回主线程
-    onWorkerMsg: null,
     busy: false,
-    demo: {             // 自动演示播放状态（不影响已定位的区间结果，只是另一套只读游标）
-      timer: null,
-      idx: 0            // 0=开局；1..n=第几步结束
-    },
     edit: {              // 美术编辑状态：拖动绘制 / 框选编辑（局部统计/局部替换/局部绘制）+ 整图替换 + 靠色检查 + 撤销 + 导出
       on: false,
       color: 1,
@@ -48,15 +43,11 @@
     //   逐像素记反而更大），两者互不干扰，各自的撤销按钮也分开。
     extract: { undo: [], lastResult: null },
     pieceLib: [],          // 图纸库（type='artPiece' 的条目），见 PIECE_LIB_STORAGE_KEY
-    viewMode: 'before',    // 'before'=查看原关卡 'after'=查看重构后关卡（仅影响 draw()/演示/棋盘展示，不影响编辑/定位等操作对象）
-    genParams: null,       // 用户导入的生成器标准参数：{ recognized, unrecognized, source, fileName }，未导入为 null
-    exportLib: [],          // 待导出库条目数组，见 EXPORT_LIB_STORAGE_KEY 持久化说明
-    // 界面偏好（2026-09-15 需求④）：artOnly = 纯美术编辑模式；collapsed = {卡片id:1} 折叠状态。
-    // 只影响显示，不影响任何数据；持久化在 UI_PREF_STORAGE_KEY。
-    ui: { artOnly: false, collapsed: {} },
+    // 界面偏好：collapsed = {卡片id:1} 折叠状态。只影响显示，持久化在 UI_PREF_STORAGE_KEY。
+    ui: { collapsed: {} },
     /* 拼接工作台（任务 ANT-ARTTOOL-PIECE-COMPOSE-20260915）。
-     * 与 S.items（导入的关卡）**完全分开**：拼接是在一张新画布上摆部件，
-     * 不是在编辑某一关，混进 S.items 会让既有的求解/重构/导出链路读到一个没有关卡本体的条目。
+     * 与 S.items（导入的图纸）**完全分开**：拼接是在一张新画布上摆部件，
+     * 不是在编辑某一张图，混进 S.items 会让列表与编辑状态错位。
      * layers 里每个 = { id, name, blocks, rows, cols, offR, offC, locked, visible }
      *   —— 位置只由 offR/offC 表示，拖拽不动像素，所以拖来拖去是无损的。 */
     compose: {
@@ -87,29 +78,13 @@
     }
   };
 
-  // 待导出库持久化：用 localStorage 保存，页面刷新或重新打开后仍能恢复（需求 §六.3）。
-  // 只存"当前必需的最小数据集"（原/新关卡、原/新目标图、求解pickOrder等纯JSON数据），
-  // 不存 canvas/DOM 引用等不可序列化对象；体量上一份典型55x55关卡的待导出条目约几十KB，
-  // localStorage 单域通常有 5-10MB 上限，实践中可支持数十到上百个待导出条目。
-  var EXPORT_LIB_STORAGE_KEY = 'antArtTool_exportLibrary_v1';
-  // 图纸库单独一个 key：它与关卡待导出库是两类东西（图纸只有像素矩阵、没有关卡），
-  // 混在同一个数组里会让既有的批量导出逻辑（无条件读 originalLevel）直接抛错。
+  // 图纸库持久化：只存像素矩阵与元数据，刷新/重开后仍在。
   var PIECE_LIB_STORAGE_KEY = 'antArtTool_pieceLibrary_v1';
-  // 界面偏好（纯美术编辑模式 + 各卡片折叠状态）。与两个数据库分开存：
-  // 这是「怎么看」的偏好，不是数据，清掉它不该影响任何图纸或关卡。
+  // 界面偏好（各卡片折叠状态）。这是「怎么看」的偏好，不是数据。
   var UI_PREF_STORAGE_KEY = 'antArtTool_uiPrefs_v1';
 
-  // 纯美术编辑模式下要收起来的卡片（用户 2026-09-15 需求④：
-  //「把其他关于生产关卡，暂存压力等功能收缩起来」）。
-  // 留下的是：1.导入、5.显示与导出（在中栏）、8.美术编辑、12.主体提取 ——
-  // 这样「美术编辑」与「主体提取」在右栏里直接相邻，不用中间隔着 9/10/11 三张卡来回滚。
-  // 具体隐藏由 CSS 的 body.artOnly 规则做，这里只列出清单供面板提示与回归核对使用。
-  var ART_ONLY_HIDDEN = ['cardSolve', 'cardInterval', 'cardMulti', 'cardDemo',
-    'cardPressure', 'cardRecon', 'cardExportLib'];
-  // 用户需求④原话是「可以将**所有**的功能可选择的折叠隐藏」，所以每新增一张卡片都要登记到这里。
-  // 2026-09-15 补入 composeCard（拼接）—— 漏登记的话那张卡片点标题没反应，属于静默失效。
-  var COLLAPSIBLE_CARDS = ['cardImport', 'cardSolve', 'cardInterval', 'cardMulti', 'cardDemo',
-    'editCard', 'cardPressure', 'cardRecon', 'cardExportLib', 'extractCard', 'composeCard'];
+  // 每新增一张卡片都要登记到这里，否则那张卡片点标题没反应，属于静默失效。
+  var COLLAPSIBLE_CARDS = ['cardImport', 'editCard', 'extractCard', 'composeCard'];
 
   // ==================== 日志与遮罩 ====================
   function log(msg) {
@@ -124,7 +99,7 @@
   }
 
   // ==================== 破坏性操作的两段式二次确认 ====================
-  // 用户 2026-08-20 中途任务：「还原为原图」「清空待导出库」手误点一下就把成果弄没了，要二次确认。
+  // 破坏性操作（还原为原图、清空画布、还原剔除）都要二次确认，避免手误点一下就把成果弄没。
   //
   // 为什么不用原生 confirm()：本工具内零 confirm、零 alert，所有反馈都走页面内 log()。
   // 弹窗会打断这套既有风格，而且 confirm 会阻塞渲染。两段式按钮同样挡得住手误，且不打断流程。
@@ -223,76 +198,29 @@
    */
   function readFiles(fileList, fromDir) {
     var all = Array.prototype.slice.call(fileList);
-    var files = all.filter(function (f) { return /\.(txt|json)$/i.test(f.name); });
+    var files = all.filter(function (f) { return /\.txt$/i.test(f.name); });
     var ignored = all.length - files.length;
     if (!files.length) {
-      log('本次选择的 ' + all.length + ' 个文件里没有 .txt / .json，未导入');
+      log('本次选择的 ' + all.length + ' 个文件里没有 .txt 图纸，未导入');
       return;
     }
 
-    /* 预判：同名是否存在关卡文件（靠文件名判断，`*.solve.json` 是求解数据，其余 .json 视为关卡）。
-     * 有关卡文件时，求解数据只需保留 pickOrder，可丢掉体积最大的 replay.steps 等字段，
-     * 避免整批 348 关全量驻留内存；没有关卡文件时才保留 replay 作为兜底显示。 */
-    var hasLevel = {};
-    files.forEach(function (f) {
-      if (/\.json$/i.test(f.name) && !/\.solve\.json$/i.test(f.name)) hasLevel[baseKey(f.name)] = true;
-    });
-
-    /* 汇总类伴生文件识别（2026-08-05 §导出对齐）：生成器导出包里的 关卡数据/关卡数据.json
-     * 是整批聚合（{type:'ant-level-data', levels:[...]}），不是单关文件。core.js 的 detectKind
-     * 对它返回 'unknown'，若直接计入 bad 会在日志里显示成「读不出来的文件」，误导使用者。
-     * 只在本文件做这一层判定，不改 core.js。 */
-    function isAggregateFile(text) {
-      try {
-        var j = JSON.parse(text);
-        return !!(j && j.type === 'ant-level-data' && Array.isArray(j.levels));
-      } catch (e) { return false; }
-    }
-    var added = 0, bad = 0, processed = 0, active = 0, i = 0, skippedAggregate = 0;
+    var added = 0, bad = 0, processed = 0, active = 0, i = 0;
     var LIMIT = 8;
     busy(true);
     overlay(true, '读取 0/' + files.length + ' 个文件…');
-    log('开始导入' + (fromDir ? '文件夹' : '') + '：可用 ' + files.length + ' 个文件' +
-      (ignored ? '，忽略 ' + ignored + ' 个非 txt/json' : ''));
+    log('开始导入' + (fromDir ? '文件夹' : '') + '：TXT 图纸 ' + files.length + ' 个' +
+      (ignored ? '，忽略 ' + ignored + ' 个非 TXT 文件' : ''));
 
     function handleOne(f, text) {
-      var kind = C.detectKind(f.name, text);
       var key = baseKey(f.name);
       try {
-        if (kind === 'txt') {
-          var a = getItem(key);
-          a.txtName = f.name; a.blocks = C.parseTxt(text); a.tl = null; a.interval = null;
-          added++;
-        } else if (kind === 'level' || kind === 'leveldata') {
-          var b = getItem(key);
-          b.levelName = f.name; b.level = JSON.parse(text); b.levelKind = kind;
-          b.tl = null; b.interval = null;
-          added++;
-        } else if (kind === 'solve') {
-          var c = getItem(key);
-          var sv = JSON.parse(text);
-          if (hasLevel[key]) {
-            // 只留重放所需的最小集合 + 正式压力审核所需的两类真实数据（pickOrder 是求解器真实产出，
-            // 逐步轨迹由工具真机口径重放；pressureSamples/stepBufferHistory 是求解时的真实压力样本，
-            // 正式压力审核/前中后压力/卡点位置必须用它们，不能靠点击时间线反推——需求07.30 §三.2 明确要求，
-            // 体积很小（每关约几十到上百条 {done,buf}），不是丢掉 replay.steps 那个量级的问题）。
-            sv = {
-              meta: sv.meta, summary: sv.summary, pickOrder: sv.pickOrder, audit: sv.audit, player: sv.player,
-              pressureSamples: sv.pressureSamples, stepBufferHistory: sv.stepBufferHistory
-            };
-          }
-          c.solveName = f.name; c.solve = sv; c.tl = null; c.interval = null;
-          added++;
-        } else if (isAggregateFile(text)) {
-          // 生成器导出包的【汇总类】伴生文件（关卡数据/关卡数据.json）：整批聚合，不是单关文件。
-          // 以前它落进 detectKind 的 'unknown' → 被计入「读不出来的文件」，看着像导入出错，
-          // 其实是正常伴生文件——单关内容已由同批的 关卡/、txt图/、求解数据/ 三件套提供。
-          // 这里显式识别为「跳过」而不是「失败」。判定放在本文件、不动 core.js 的 detectKind。
-          skippedAggregate++;
-        } else {
-          bad++;
-          if (bad <= 10) log('无法识别（既不是关卡本体也不是求解数据）：' + f.name);
-        }
+        var a = getItem(key);
+        a.txtName = f.name;
+        a.blocks = null;              // 先清掉旧图，解析失败时不会静默沿用上一版
+        a.blocks = C.parseTxt(text);
+        a.warns = [];
+        added++;
       } catch (e) {
         bad++;
         if (bad <= 10) log('解析失败 ' + f.name + '：' + (e && e.message));
@@ -312,7 +240,7 @@
       }
       if (active === 0 && i >= files.length) {
         busy(false); overlay(false);
-        finishImport(added, bad, ignored, skippedAggregate);
+        finishImport(added, bad, ignored);
       }
     }
     function step() {
@@ -323,45 +251,24 @@
     pump();
   }
 
-  function finishImport(added, bad, ignored, skippedAggregate) {
-    // 目标图来源：优先 TXT；没有 TXT 时用关卡本体内的 blocks（两者都有则做一致性校验）
-    S.items.forEach(function (it) {
-      it.warns = [];
-      var fromLevel = it.level && it.level.blocks && it.level.blocks.length ? it.level.blocks : null;
-      if (!it.blocks && fromLevel) { it.blocks = fromLevel; it.warns.push('目标图取自关卡本体 blocks（未导入 TXT）'); }
-      if (it.blocks && fromLevel) {
-        var same = it.blocks.length === fromLevel.length && it.blocks.every(function (row, r) {
-          return row.length === fromLevel[r].length && row.every(function (v, c) { return v === fromLevel[r][c]; });
-        });
-        if (!same) it.warns.push('⚠ TXT 与关卡本体 blocks 不一致（以 TXT 为显示，求解仍用关卡本体）');
-      }
-      if (!it.level) it.warns.push('缺关卡文件：无法求解，只能看图（阶段二将支持从 TXT 重建关卡）');
-    });
-    // 排序会打乱下标，先记住当前选中的关名，排完再按名字找回
-    var curKey = S.cur >= 0 && S.items[S.cur] ? S.items[S.cur].key : null;
+  function finishImport(added, bad, ignored) {
+    // 只有真正解析出像素矩阵的条目才留在列表里
+    S.items = S.items.filter(function (it) { return !!(it.blocks && it.blocks.length); });
     S.items.sort(function (a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0); });
+
+    var curKey = S.cur >= 0 && S.items[S.cur] ? S.items[S.cur].key : null;
     S.cur = -1;
     if (curKey) {
       for (var i = 0; i < S.items.length; i++) if (S.items[i].key === curKey) { S.cur = i; break; }
     }
 
-    // 配套统计：三件套齐全的关数
-    var full = 0, noLevel = 0, noSolve = 0, noTxt = 0;
-    S.items.forEach(function (x) {
-      if (x.txtName && x.level && x.solve) full++;
-      if (!x.level) noLevel++;
-      if (!x.solve) noSolve++;
-      if (!x.txtName) noTxt++;
-    });
-    $('importStat').innerHTML = '共 <b>' + S.items.length + '</b> 关　三件套齐全 ' + full +
-      '　缺关卡 ' + noLevel + '　缺求解 ' + noSolve + '　缺TXT ' + noTxt +
-      '<br><span class="muted">本次读入 ' + added + ' 个文件，失败 ' + bad +
-      (skippedAggregate ? '，跳过汇总文件 ' + skippedAggregate : '') +
-      (ignored ? '，忽略非 txt/json ' + ignored : '') + '</span>';
+    $('importStat').innerHTML = '共 <b>' + S.items.length + '</b> 张图纸' +
+      (ignored ? '　<span class="muted">忽略非 TXT ' + ignored + ' 个</span>' : '') +
+      '<br><span class="muted">本次读入 ' + added + ' 个文件' + (bad ? '，失败 ' + bad + ' 个' : '') + '</span>';
     renderList();
     if (S.cur < 0 && S.items.length) select(0);
-    log('导入完成：索引 ' + S.items.length + ' 关（三件套齐全 ' + full + '，缺关卡 ' + noLevel + '，缺求解 ' + noSolve + '，缺TXT ' + noTxt + '）' +
-      (skippedAggregate ? '；已跳过 ' + skippedAggregate + ' 个汇总文件（关卡数据.json 这类整批聚合，非单关数据，不影响导入）' : ''));
+    else { draw(); refreshEditPanels(); renderEditInfo(); }
+    log('导入完成：' + S.items.length + ' 张图纸' + (bad ? '，解析失败 ' + bad + ' 个' : ''));
   }
 
   function renderList() {
@@ -369,15 +276,15 @@
     var h = '', shown = 0;
     for (var i = 0; i < S.items.length; i++) {
       var it = S.items[i];
+      if (!it.blocks) continue;
       if (kw && it.key.toLowerCase().indexOf(kw) < 0) continue;
       shown++;
       if (shown > 500) { h += '<div class="item muted">…还有更多，请用过滤框缩小范围</div>'; break; }
-      var tags = '';
-      tags += '<span class="tag ' + (it.txtName ? 'ok' : (it.blocks ? 'warn' : 'bad')) + '">图</span>';
-      tags += '<span class="tag ' + (it.level ? 'ok' : 'bad') + '">关卡</span>';
-      tags += '<span class="tag ' + (it.solve ? 'ok' : '') + '">求解</span>';
-      h += '<div class="item' + (i === S.cur ? ' active' : '') + '" data-i="' + i + '">' +
-        '<span class="nm">' + it.key + '</span>' + tags + '</div>';
+      var size = it.blocks.length ? it.blocks.length + '×' + it.blocks[0].length : '';
+      h += '<div class="item' + (i === S.cur ? ' active' : '') + '" data-i="' + i + '" title="' + size + '">' +
+        '<span class="nm">' + it.key + '</span>' +
+        '<span class="tag ok">图</span>' +
+        '<span class="muted" style="font-size:11px">' + size + '</span></div>';
     }
     $('levelList').innerHTML = h || '<div class="item muted">' + (S.items.length ? '无匹配' : '暂无') + '</div>';
     Array.prototype.forEach.call($('levelList').querySelectorAll('.item[data-i]'), function (el) {
@@ -389,428 +296,71 @@
     S.cur = i;
     renderList();
     var it = S.items[i];
-    // 切关：暂停演示、清空棋盘面板、关闭编辑模式（编辑快照与新关卡的 blocks 不是同一份数据，不能带着切）
-    demoPause();
-    S.demo.idx = 0;
+    // 切图：关闭编辑模式并清空选区/撤销栈 —— 编辑快照与上一张图的 blocks 不是同一份数据
     if ($('optEdit').checked) { $('optEdit').checked = false; }
     S.edit.on = false; S.edit.original = null; S.edit.undoStack = [];
     clearSelection(); S.edit.replacing = null; S.edit.paintDragging = false;
     $('cv').classList.remove('editing');
-    it._playerOne = undefined;   // 切关后原关卡玩家结果缓存清空，避免用上一关的结果
-    renderSolveInfo();
-    renderInterval();
-    renderRoutes();
+    // 主体提取的撤销栈也只属于上一张图
+    S.extract.undo = []; S.extract.lastResult = null;
+    fragState.result = null; fragState.key = null;
     refreshEditPanels();
     renderEditInfo();
-    refreshBoardPanel();
-    refreshPressureChart();
-    resetReconView();
     draw();
-    log('选中 ' + it.key + (it.warns.length ? '（' + it.warns.join('；') + '）' : ''));
+    log('选中 ' + it.key + '（' + it.blocks.length + '×' + it.blocks[0].length + '）');
   }
 
   function cur() { return S.cur >= 0 ? S.items[S.cur] : null; }
 
-  /**
-   * 视图对象：draw()/棋盘展示/自动演示按 S.viewMode 决定显示原关卡还是重构后关卡的数据，
-   * 但导入/求解/进度定位/多路线/美术编辑/重构操作全部仍作用在 cur()（真实的关卡条目）上，不受视图切换影响。
-   * 重构后视图是从 it.reconResult 惰性构建的一个「只读展示包」，字段形状与 it 一致（blocks/tl/interval/pxStep/verify），
-   * 但不写回 it，也不参与导入索引。
-   */
+  /** 视图对象：本工具只编辑当前图纸，没有「原关卡/重构后」双视图。 */
   function viewItem() {
-    var it = cur();
-    if (!it) return null;
-    if (S.viewMode !== 'after' || !it.reconResult || !it.reconResult.ok) return it;
-    var rr = it.reconResult;
-    if (!rr.tl) rr.tl = C.reconstructToTimeline(rr);
-    if (!rr.viewWrap) rr.viewWrap = { key: it.key + '（重构后）', blocks: null, level: rr.level, warns: [] };
-    var vw = rr.viewWrap;
-    vw.blocks = rr.level.blocks;
-    vw.tl = rr.tl;
-    if (rr.tl && !vw._pxBuilt) {
-      vw.pxStep = {};
-      for (var i = 0; i < rr.tl.steps.length; i++) {
-        var s = rr.tl.steps[i];
-        for (var j = 0; j < s.cells.length; j++) vw.pxStep[s.cells[j]] = { step: s.step, done: s.done };
-      }
-      vw.verify = C.verifyTimeline(rr.tl);
-      vw._pxBuilt = true;
-    }
-    // 区间：沿用当前已定位区间的「用户要求区间」百分比，在重构后关卡的时间线上重新吸附计算，
-    // 保证两边比较的是同一个用户输入区间，而不是同一组扁平像素下标（棋盘尺寸可能不同）。
-    if (it.interval && rr.tl && rr.tl.completed) {
-      var iv2 = C.snapInterval(rr.tl.steps, rr.tl.totalBoxes, it.interval.requested.lo / 100, it.interval.requested.hi / 100);
-      if (iv2) { iv2.comps = C.connectedComponents(iv2.diffPixels, rr.tl.rows, rr.tl.cols); vw.interval = iv2; }
-      else vw.interval = null;
-    } else {
-      vw.interval = null;
-    }
-    vw.merged = null; vw.routes = null;   // 多路线复核不对重构后关卡重跑，视图切到 after 时不显示多路线分层
-    return vw;
+    return cur();
   }
 
   // ==================== 求解信息面板 ====================
-  function renderSolveInfo() {
-    var it = cur();
-    if (!it) { $('solveInfo').innerHTML = '<span class="muted">请先选择一关</span>'; return; }
-    var rows = [];
-    rows.push(['关卡', it.key]);
-    rows.push(['目标图', it.blocks ? (it.blocks.length + ' × ' + it.blocks[0].length + '，' + countPixels(it.blocks) + ' 像素') : '<span class="tag bad">缺失</span>']);
-    rows.push(['关卡文件', it.levelName || '<span class="tag bad">缺失</span>']);
-    rows.push(['求解数据', it.solveName || '<span class="muted">未导入（可现场求解）</span>']);
-    if (it.tl) {
-      rows.push(['路线来源', it.tl.source + (it.tl.pass != null ? '（命中遍 ' + it.tl.pass + '）' : '')]);
-      rows.push(['是否通关', it.tl.completed ? '<span class="tag ok">通关</span>' : '<span class="tag bad">未通关</span>']);
-      rows.push(['求解步数', it.tl.steps_count]);
-      rows.push(['总盒数 / 总像素', it.tl.totalBoxes + ' / ' + it.tl.totalPixels]);
-      if (it.verify) {
-        rows.push(['时间线自检', '像素合计 ' + it.verify.pixelSum +
-          '，重复 ' + it.verify.duplicate + '，越界 ' + it.verify.outOfBounds +
-          '，盒数单调 ' + (it.verify.monotonic ? '是' : '否') +
-          '，全覆盖 ' + (it.verify.coversAll === null ? '—' : (it.verify.coversAll ? '是' : '否'))]);
+  /** 画布统计条：当前图纸的尺寸、用色种数、非空/空位格数。 */
+  function renderCanvasStats(it) {
+    var el = $('canvasColorStats');
+    if (!el) return;
+    if (!it || !it.blocks) { el.innerHTML = '<span class="muted">未导入图纸</span>'; return; }
+    var blocks = it.blocks, rows = blocks.length, cols = blocks[0].length;
+    var seen = {}, colorCount = 0, nz = 0;
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var v = blocks[r][c];
+        if (v <= 0) continue;
+        nz++;
+        if (!seen[v]) { seen[v] = 1; colorCount++; }
       }
     }
-    if (it.warns.length) rows.push(['提示', it.warns.join('<br>')]);
-    $('solveInfo').innerHTML = kvTable(rows);
+    var total = rows * cols;
+    el.innerHTML =
+      '<span class="csLabel">画布</span> <b>' + rows + '×' + cols + '</b>' +
+      '<span class="csDivider">|</span>' +
+      '<span class="csMain">' + colorCount + '</span> 种颜色 <span class="muted">（不含空位 0）</span>' +
+      '<span class="csDivider">|</span>' +
+      '非空 <b>' + nz + '</b> / ' + total + ' 格' +
+      (total > nz ? '　空位 <b>' + (total - nz) + '</b> 格' : '');
   }
-
-  function countPixels(blocks) {
-    var n = 0;
-    for (var r = 0; r < blocks.length; r++) for (var c = 0; c < blocks[r].length; c++) if (blocks[r][c] > 0) n++;
-    return n;
-  }
-
-  // ==================== Worker ====================
-  function initWorker(cb) {
-    if (S.workerReady !== null) return cb(S.workerReady ? S.worker : null);
-    var w;
-    try { w = new Worker('js/solve-worker.js'); }
-    catch (e) { S.workerReady = false; log('无法创建 Worker（' + (e && e.message) + '），改用主线程求解'); return cb(null); }
-    var settled = false;
-    function fallback(why) {
-      if (settled) return;
-      settled = true; clearTimeout(to); S.workerReady = false;
-      try { w.terminate(); } catch (e) { }
-      log('Worker 不可用（' + why + '），改用主线程求解：求解期间页面会短暂无响应');
-      cb(null);
-    }
-    var to = setTimeout(function () { fallback('探活超时'); }, 8000);
-    w.onerror = function (e) { fallback((e && e.message) || 'onerror'); };
-    w.onmessage = function (ev) {
-      var d = ev.data || {};
-      if (!settled) {
-        if (d.type === 'pong' && d.ready) {
-          settled = true; clearTimeout(to); S.workerReady = true; S.worker = w;
-          log('Worker 就绪：求解在后台线程执行，页面不卡');
-          return cb(w);
-        }
-        if (d.type === 'pong' || d.type === 'fatal') return fallback(d.error || '正式求解器未载入');
-        return;
-      }
-      if (S.onWorkerMsg) S.onWorkerMsg(d);
-    };
-    w.postMessage({ cmd: 'ping' });
-  }
-
-  // ==================== 求解 / 时间线 ====================
-  /** 确保当前关有可用时间线；没有则按「导入求解数据 → 现场求解」的顺序取得。 */
-  function ensureTimeline(cb, forceSolve) {
-    var it = cur();
-    if (!it) return;
-    if (it.tl && !forceSolve) return cb(it.tl);
-
-    if (it.solve && !forceSolve) {
-      // 首选：只取导入数据里的真实 pickOrder，逐步轨迹由工具按真机口径（useSlotStart）重放。
-      // 这样既不必重新求解（快），又保证区域口径与正式求解器/真机一致。
-      if (it.level) {
-        var tlPO = null;
-        try { tlPO = C.timelineFromSolveFilePickOrder(it.solve, it.level, { captureBoard: true }); }
-        catch (e) { log('按导入的消除顺序回放失败：' + (e && e.message)); }
-        if (tlPO && tlPO.steps.length) {
-          if (!tlPO.completed) log('⚠ 按导入的消除顺序回放没走完（' + (tlPO.replayFail || '未全消') + '），不能用于区间定位');
-          adoptTimeline(it, tlPO);
-          log('已按导入求解数据里的真实消除顺序回放（真机口径，未重新求解）：步 ' + tlPO.steps_count +
-            '，命中遍 ' + tlPO.pass);
-          return cb(it.tl);
-        }
-        log('导入的求解数据里没有可用的消除顺序，改为现场求解');
-      } else {
-        // 没有关卡文件就无法重放，只能退用文件里的旧口径逐步数据，并明确提示
-        var tlOld = C.timelineFromSolveFile(it.solve);
-        if (tlOld && tlOld.steps && tlOld.steps.length) {
-          adoptTimeline(it, tlOld);
-          it.warns.push('⚠ 未导入关卡文件，只能用求解数据里阶段2 旧回放口径的逐步轨迹：' +
-            '该口径未带 useSlotStart，逐步消除像素与真机/正式求解器不一致，区域仅供粗看。导入关卡文件即可按真机口径重放。');
-          renderSolveInfo();
-          log('⚠ 使用阶段2 旧回放口径（缺关卡文件，无法真机口径重放）');
-          return cb(it.tl);
-        }
-      }
-    }
-
-    if (!it.level) { log('缺关卡文件，无法求解'); return; }
-
-    busy(true); overlay(true, '准备求解…');
-    initWorker(function (w) {
-      if (w) {
-        var reqId = Date.now();
-        S.onWorkerMsg = function (d) {
-          if (d.reqId !== reqId) return;
-          if (d.type === 'stage') { overlay(true, d.text); return; }
-          if (d.type === 'fatal') { S.onWorkerMsg = null; busy(false); overlay(false); log('求解失败：' + d.error); return; }
-          if (d.type === 'solved') {
-            S.onWorkerMsg = null; busy(false); overlay(false);
-            if (!d.completed) { log('标准复核未通关（进度 ' + d.progress + '%，步 ' + d.steps + '），不做区间定位'); renderSolveInfo(); return; }
-            it.solve = null; it.solveName = null;
-            var tl2 = C.timelineFromReplay(d.replay, {
-              pass: d.pass, steps_count: d.summary.steps,
-              totalBoxes: d.summary.totalBoxes, totalPixels: d.summary.totalPixels, completed: true
-            });
-            adoptTimeline(it, tl2);
-            it.liveSolve = d;
-            log('现场求解完成：命中遍 ' + d.pass + '，步 ' + d.summary.steps + '，耗时 ' + (d.solveMs / 1000).toFixed(1) + 's');
-            cb(it.tl);
-          }
-        };
-        w.postMessage({ cmd: 'solve', reqId: reqId, level: it.level, budgetMs: C.DEFAULT_BUDGET_MS });
-      } else {
-        overlay(true, '主线程求解中，请稍候（页面会短暂无响应）…');
-        setTimeout(function () {
-          try {
-            var t0 = Date.now();
-            var sv = C.solveStandard(it.level, C.DEFAULT_BUDGET_MS);
-            if (!sv.completed) {
-              log('标准复核未通关（进度 ' + (sv.result ? sv.result.progress : 0) + '%），不做区间定位');
-            } else {
-              var rp = C.replay(it.level, sv.result.pickOrder, { captureBoard: true });
-              var tl3 = C.timelineFromReplay(rp, { pass: sv.pass, steps_count: sv.result.steps, completed: true });
-              it.solve = null; it.solveName = null;
-              adoptTimeline(it, tl3);
-              it.liveSolve = {
-                completed: true, pass: sv.pass, solveMs: Date.now() - t0,
-                summary: {
-                  steps: sv.result.steps, totalBoxes: sv.parsed.totalBoxes, totalPixels: sv.parsed.totalPixels,
-                  eliminatedPixels: sv.result.eliminatedPixels, progress: sv.result.progress,
-                  maxBuffer: sv.result.maxBuffer || 0, avgBuffer: sv.result.avgBuffer
-                },
-                pickOrder: sv.result.pickOrder,
-                // 主线程求解分支此前遗漏了这两个真实压力样本字段（Worker 分支因为直接转发完整消息 d 未遗漏），
-                // 现场求解（无论走 Worker 还是主线程）都必须能提供正式压力审核数据，两条路径口径一致。
-                stepBufferHistory: sv.result.stepBufferHistory,
-                pressureSamples: sv.result.pressureSamples
-              };
-              log('现场求解完成（主线程）：命中遍 ' + sv.pass + '，步 ' + sv.result.steps + '，耗时 ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
-            }
-          } catch (e) {
-            log('求解异常：' + (e && e.message));
-          }
-          busy(false); overlay(false); renderSolveInfo();
-          if (it.tl) cb(it.tl);
-        }, 60);
-      }
-    });
-  }
-
-  /** 采用一条时间线：做自检、建「像素→步」映射、刷新面板。 */
-  function adoptTimeline(it, tl) {
-    it.tl = tl;
-    it.verify = C.verifyTimeline(tl);
-    it.pxStep = {};
-    for (var i = 0; i < tl.steps.length; i++) {
-      var s = tl.steps[i];
-      for (var j = 0; j < s.cells.length; j++) it.pxStep[s.cells[j]] = { step: s.step, done: s.done };
-    }
-    it.interval = null; it.routes = null; it.merged = null;
-    it.pressureCurve = null; it._playerOne = undefined;   // 新时间线意味着新求解结果，旧压力曲线/玩家结果缓存必须失效
-    // 目标图尺寸与时间线口径核对（像素扁平下标依赖列数）
-    if (it.blocks && (it.blocks.length !== tl.rows || it.blocks[0].length !== tl.cols)) {
-      it.warns.push('⚠ 目标图 ' + it.blocks.length + '×' + it.blocks[0].length +
-        ' 与求解路线记录的 ' + tl.rows + '×' + tl.cols + ' 不一致，高亮位置不可信');
-      log('尺寸不一致：目标图 ' + it.blocks.length + '×' + it.blocks[0].length + '，路线 ' + tl.rows + '×' + tl.cols);
-    }
-    if (it.verify.duplicate || it.verify.outOfBounds || !it.verify.monotonic) {
-      log('时间线自检异常：重复 ' + it.verify.duplicate + '，越界 ' + it.verify.outOfBounds + '，单调 ' + it.verify.monotonic);
-    }
-    renderSolveInfo();
-    refreshBoardPanel();   // 有了新时间线（哪怕还没定位区间）就能看棋盘区+暂存区，不必强制先定位
-    refreshPressureChart();
-  }
-
-  // ==================== 区间定位 ====================
-  function locate() {
-    var it = cur();
-    if (!it) return;
-    var lo = parseFloat($('loPct').value), hi = parseFloat($('hiPct').value);
-    if (isNaN(lo) || isNaN(hi)) { log('请输入有效的上下限百分比'); return; }
-    lo = Math.max(0, Math.min(100, lo)); hi = Math.max(0, Math.min(100, hi));
-    // 重新定位前先停掉演示播放：定时器仍在跑的话会用旧游标反复重绘，盖掉本次刚画好的新结果。
-    demoPause();
-    ensureTimeline(function (tl) {
-      if (!tl.completed) { log('该路线未通关，拒绝出区间结果'); return; }
-      var iv = C.snapInterval(tl.steps, tl.totalBoxes, lo / 100, hi / 100);
-      if (!iv) { log('区间计算失败：时间线为空'); return; }
-      iv.comps = C.connectedComponents(iv.diffPixels, tl.rows, tl.cols);
-      // 用新结果完整替换旧区间：多路线分层（routes/merged）与区间区域对比缓存都是针对上一次
-      // lo/hi 算出来的，不清空的话 draw() 里 anyMultiOn && it.merged 分支会继续拿旧的多路线
-      // 区域盖住本次新区间的高亮。
-      it.interval = iv;
-      it.routes = null; it.merged = null;
-      it._lastRegionCompare = null; it._regionCompareMeta = null;
-      $('reconRegionInfo').innerHTML = '';
-      $('regionCompareBox').style.display = 'none';
-      renderInterval();
-      renderRoutes();
-      // demoSetupFromInterval() 会把演示游标复位到新区间下限，但它内部会立刻用「演示累计揭示」样式
-      // 重绘一次画布（demoRenderAtIdx→demoDrawTarget）。这个累计揭示画面只取决于区间下限对应的步数，
-      // 50%-90% 与 50%-60% 的下限同为 50%，两次画出来的内容完全一样——这正是「切换区间后目标图看起来
-      // 没变」的根因：原代码把这一步放在 draw() 之后调用，结果它的重绘覆盖掉了 draw() 刚画好的新区间。
-      // 修正：demoSetupFromInterval() 放前面只用来复位游标/演示信息面板，refreshBoardPanel()/draw()
-      // 放最后，保证画布和棋盘面板最终呈现的是本次新区间的静态高亮结果，不是演示游标画面。
-      demoSetupFromInterval();
-      refreshBoardPanel();
-      refreshPressureChart();
-      draw();
-      log('区间定位：要求 ' + iv.requested.lo + '%–' + iv.requested.hi + '% → 实际 ' +
-        iv.snapped.lo + '%–' + iv.snapped.hi + '%（完成盒 ' + iv.doneBoxes.lo + '–' + iv.doneBoxes.hi +
-        '，步 ' + iv.stepIndex.lo + '–' + iv.stepIndex.hi + '），区域 ' + iv.diffPixelCount + ' 像素 / ' + iv.comps.length + ' 连通块');
-      // 差值口径自检：B − A 必须等于区间内各步 cells 之和
-      var chk = 0;
-      for (var i = iv.stepIndex.lo; i < iv.stepIndex.hi; i++) chk += tl.steps[i].cells.length;
-      if (chk !== iv.diffPixelCount) log('⚠ 差值自检不一致：逐步求和 ' + chk + ' ≠ B−A ' + iv.diffPixelCount);
-    });
-  }
-
-  function renderInterval() {
-    var it = cur(), iv = it && it.interval;
-    if (!iv) { $('intervalInfo').innerHTML = ''; return; }
-    var tl = it.tl;
-    var rows = [
-      ['用户要求区间', '<span class="big">' + iv.requested.lo + '% – ' + iv.requested.hi + '%</span>'],
-      ['实际采用区间', '<span class="big">' + iv.snapped.lo + '% – ' + iv.snapped.hi + '%</span>'],
-      ['对应完成盒数', iv.doneBoxes.lo + ' – ' + iv.doneBoxes.hi + ' / ' + iv.totalBoxes],
-      ['对应步序号', (iv.stepIndex.lo === 0 ? '开局' : '第 ' + iv.stepIndex.lo + ' 步') + ' → 第 ' + iv.stepIndex.hi + ' 步（共 ' + tl.steps_count + ' 步）'],
-      ['状态A 已消除', iv.stateAPixelCount + ' 像素'],
-      ['状态B 已消除', iv.stateBPixelCount + ' 像素'],
-      ['区间区域 B−A', '<span class="big">' + iv.diffPixelCount + ' 像素</span>，' + iv.comps.length + ' 个连通块'],
-      ['占全图比例', tl.totalPixels ? (iv.diffPixelCount / tl.totalPixels * 100).toFixed(2) + '%' : '—']
-    ];
-    if (iv.empty) rows.push(['提示', '<span class="tag warn">区间为空</span> 上下限吸附到了同一个可达进度，请拉开区间']);
-    $('intervalInfo').innerHTML = kvTable(rows);
-  }
-
-  // ==================== 多路线复核 ====================
-  function runRoutes() {
-    var it = cur();
-    if (!it) return;
-    if (!it.level) { log('缺关卡文件，无法做多路线复核'); return; }
-    var want = parseInt($('routeCount').value, 10) || 3;
-    var lo = Math.max(0, Math.min(100, parseFloat($('loPct').value))) / 100;
-    var hi = Math.max(0, Math.min(100, parseFloat($('hiPct').value))) / 100;
-
-    busy(true); overlay(true, '多路线复核准备中…');
-    initWorker(function (w) {
-      function finish(routes, tried) {
-        busy(false); overlay(false);
-        if (!routes.length) { log('多路线复核：没有取到可通关路线'); return; }
-        var intervals = routes.map(function (rt) {
-          return C.snapInterval(rt.timelineSteps, rt.totalBoxes, lo, hi);
-        });
-        var merged = C.mergeRouteRegions(intervals);
-        it.routes = { routes: routes, tried: tried, intervals: intervals };
-        it.merged = merged;
-        renderRoutes();
-        draw();
-        log('多路线复核完成：' + routes.length + ' 条不重复路线，稳定 ' + merged.stable.length +
-          ' / 高频 ' + merged.frequent.length + ' / 浮动 ' + merged.floating.length + ' 像素');
-      }
-      if (w) {
-        var reqId = Date.now();
-        S.onWorkerMsg = function (d) {
-          if (d.reqId !== reqId) return;
-          if (d.type === 'stage') { overlay(true, d.text); return; }
-          if (d.type === 'fatal') { S.onWorkerMsg = null; busy(false); overlay(false); log('多路线失败：' + d.error); return; }
-          if (d.type === 'routes') { S.onWorkerMsg = null; finish(d.routes, d.tried); }
-        };
-        w.postMessage({ cmd: 'routes', reqId: reqId, level: it.level, maxRoutes: want });
-      } else {
-        overlay(true, '主线程多路线复核中，请稍候（页面会短暂无响应）…');
-        setTimeout(function () {
-          var seen = {}, routes = [], tried = [];
-          for (var i = 0; i < C.ROUTE_PASSES.length && routes.length < want; i++) {
-            var p = C.ROUTE_PASSES[i], one = null;
-            try { one = C.solveOnePass(it.level, p); } catch (e) { tried.push({ tag: p.tag, error: e && e.message }); continue; }
-            if (!one.completed) { tried.push({ tag: p.tag, completed: false, progress: one.result ? one.result.progress : 0 }); continue; }
-            var sig = one.result.pickOrder.map(function (x) { return x.r + ',' + x.c; }).join(';');
-            if (seen[sig]) { tried.push({ tag: p.tag, completed: true, duplicateOf: seen[sig] }); continue; }
-            seen[sig] = p.tag;
-            var rp = C.replay(it.level, one.result.pickOrder);
-            routes.push({
-              tag: p.tag, mode: p.mode, noise: p.noise, seed: p.seed, steps: one.result.steps,
-              maxBuffer: one.result.maxBuffer || 0, avgBuffer: one.result.avgBuffer,
-              replayOk: rp.ok, replayFail: rp.fail, rows: rp.rows, cols: rp.cols,
-              totalBoxes: rp.totalBoxes, totalPixels: rp.totalPixels, timelineSteps: rp.steps
-            });
-            tried.push({ tag: p.tag, completed: true, accepted: true, steps: one.result.steps });
-          }
-          finish(routes, tried);
-        }, 60);
-      }
-    });
-  }
-
-  function renderRoutes() {
-    var it = cur();
-    if (!it || !it.routes) { $('routeInfo').innerHTML = ''; return; }
-    var R = it.routes, m = it.merged;
-    var rows = [['不重复可通关路线', R.routes.length + ' 条']];
-    R.routes.forEach(function (rt, i) {
-      var iv = R.intervals[i];
-      rows.push(['路线 ' + (i + 1) + '（' + rt.tag + '·' + rt.mode + '）',
-        '步 ' + rt.steps + '，峰值 ' + rt.maxBuffer + '；实际区间 ' + iv.snapped.lo + '%–' + iv.snapped.hi +
-        '%，盒 ' + iv.doneBoxes.lo + '–' + iv.doneBoxes.hi + '，区域 ' + iv.diffPixelCount + ' 像素']);
-    });
-    rows.push(['稳定区域（全部路线）', '<span class="big">' + m.stable.length + '</span> 像素']);
-    rows.push(['高频区域（多数路线）', m.frequent.length + ' 像素']);
-    rows.push(['浮动区域（少数路线）', m.floating.length + ' 像素']);
-    var skipped = R.tried.filter(function (t) { return !t.accepted; });
-    if (skipped.length) {
-      rows.push(['未采用的遍次', skipped.map(function (t) {
-        return t.tag + '：' + (t.error ? '异常' : (t.duplicateOf ? '与 ' + t.duplicateOf + ' 路线相同（去重）' : '未通关 ' + (t.progress || 0) + '%'));
-      }).join('<br>')]);
-    }
-    $('routeInfo').innerHTML = kvTable(rows);
-  }
-
-  // ==================== 绘制 ====================
-  var STROKE = {
-    single: '#00E5FF',
-    stable: '#3BFF9E',
-    frequent: '#FFD400',
-    floating: '#FF5E5E',
-    stateA: '#8A93A6'
-  };
 
   function draw() {
     var cv = $('cv'), ctx = cv.getContext('2d');
     var it = viewItem();
     if (!it || !it.blocks) {
+      renderCanvasStats(null);
       cv.width = 600; cv.height = 200;
       ctx.fillStyle = '#0f1216'; ctx.fillRect(0, 0, cv.width, cv.height);
       ctx.fillStyle = '#5d6779'; ctx.font = '13px sans-serif';
-      ctx.fillText('导入 TXT 目标图 / 关卡文件后在此显示', 20, 40);
+      ctx.fillText('导入 TXT 图纸后在此显示', 20, 40);
       $('legend').innerHTML = '';
       return;
     }
+    renderCanvasStats(it);
     var blocks = it.blocks, rows = blocks.length, cols = blocks[0].length;
     var cell = parseInt($('cellSize').value, 10) || 11;
     cv.width = cols * cell + 1; cv.height = rows * cell + 1;
 
     ctx.fillStyle = '#0f1216'; ctx.fillRect(0, 0, cv.width, cv.height);
-
-    var iv = it.interval;
-    var inDiff = {};
-    if (iv) for (var i = 0; i < iv.diffPixels.length; i++) inDiff[iv.diffPixels[i]] = 1;
-    var dim = $('optDim').checked && iv;
 
     // ① 原图像素（描边只画在格线上，不覆盖任何像素颜色）
     for (var r = 0; r < rows; r++) {
@@ -819,35 +369,29 @@
         if (!id) continue;
         ctx.fillStyle = window.AntSolver.getColorCSS(id);
         ctx.fillRect(c * cell, r * cell, cell, cell);
-        if (dim && !inDiff[r * cols + c]) {
-          ctx.fillStyle = 'rgba(10,12,16,0.62)';
-          ctx.fillRect(c * cell, r * cell, cell, cell);
-        }
       }
     }
 
-    // ①b 碎色像素高亮（任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825）
-    // 画在原图之上、格线之下：用醒目描边圈出「被判为碎色」的像素，让美术直接看到该修哪里。
-    // 只在勾选了高亮、且已算过碎色、且算的就是当前这张图时才画（换关卡后不拿上一关的结果乱标）。
+    // ①b 碎色像素高亮：画在原图之上、格线之下，让美术直接看到该修哪里
+    var fragCells = [];
     if ($('fragHighlight') && $('fragHighlight').checked && fragState.result &&
         fragState.key === it.key && fragState.result.fragCells.length) {
-      var fc = fragState.result.fragCells;
+      fragCells = fragState.result.fragCells;
       ctx.save();
-      // 半透明红色蒙层 + 白色细边：蒙层保证小格子也看得见，白边保证在深色像素上不糊
-      for (var fi = 0; fi < fc.length; fi++) {
-        var p = fc[fi];
-        if (p.r >= rows || p.c >= cols) continue;
+      for (var fi = 0; fi < fragCells.length; fi++) {
+        var fp = fragCells[fi];
+        if (fp.r >= rows || fp.c >= cols) continue;
         ctx.fillStyle = 'rgba(255,64,64,0.42)';
-        ctx.fillRect(p.c * cell, p.r * cell, cell, cell);
+        ctx.fillRect(fp.c * cell, fp.r * cell, cell, cell);
       }
       if (cell >= 5) {
         ctx.strokeStyle = 'rgba(255,255,255,0.85)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        for (var fj = 0; fj < fc.length; fj++) {
-          var q = fc[fj];
-          if (q.r >= rows || q.c >= cols) continue;
-          ctx.rect(q.c * cell + 1.5, q.r * cell + 1.5, cell - 3, cell - 3);
+        for (var fj = 0; fj < fragCells.length; fj++) {
+          var fq = fragCells[fj];
+          if (fq.r >= rows || fq.c >= cols) continue;
+          ctx.rect(fq.c * cell + 1.5, fq.r * cell + 1.5, cell - 3, cell - 3);
         }
         ctx.stroke();
       }
@@ -863,88 +407,37 @@
       ctx.stroke();
     }
 
-    // ③ 区间前已消除范围（可选参考线）
-    if ($('optA').checked && iv && iv.stateAPixels.length) {
-      strokeGroups(ctx, [iv.stateAPixels], rows, cols, cell, STROKE.stateA, 1.2, [3, 3]);
+    // ③ 空位斜纹：剔除后的格子值为 0，画成斜纹才能和「深色像素」区分开
+    var hasVoid = false, voidCount = 0;
+    for (var vr = 0; vr < rows; vr++) {
+      for (var vc = 0; vc < cols; vc++) { if (blocks[vr][vc] <= 0) { hasVoid = true; voidCount++; } }
     }
-
-    // ③b 空位斜纹（任务 ANT-ARTTOOL-SUBJECT-EXTRACT-20260902）
-    //   剔除后的格子值为 0。0 在画布上本来就没颜色，但「没画东西」和「这里是空的」
-    //   在深色底上看起来一样，美术分不清主体边界到哪。所以给 0 画斜纹底。
-    //   只在图里确实存在 0 时才画，避免给没剔过的图无谓加纹理。
-    if (!$('optShowVoid') || $('optShowVoid').checked) {
-      var hasVoid = false;
-      for (var vr = 0; vr < rows && !hasVoid; vr++) {
-        for (var vc = 0; vc < cols; vc++) { if (blocks[vr][vc] <= 0) { hasVoid = true; break; } }
-      }
-      if (hasVoid) {
-        ctx.save();
-        for (var zr = 0; zr < rows; zr++) {
-          for (var zc = 0; zc < cols; zc++) {
-            if (blocks[zr][zc] > 0) continue;
-            var zx = zc * cell, zy = zr * cell;
-            ctx.fillStyle = '#2b1e15';
-            ctx.fillRect(zx, zy, cell, cell);
-            // 斜纹：两条对角细线，格子小到 3px 以下就只填底色（画线也看不清）
-            if (cell >= 4) {
-              ctx.strokeStyle = 'rgba(120,96,74,0.55)';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(zx, zy + cell); ctx.lineTo(zx + cell, zy);
-              ctx.moveTo(zx, zy + cell / 2); ctx.lineTo(zx + cell / 2, zy);
-              ctx.moveTo(zx + cell / 2, zy + cell); ctx.lineTo(zx + cell, zy + cell / 2);
-              ctx.stroke();
-            }
+    if (hasVoid && (!$('optShowVoid') || $('optShowVoid').checked)) {
+      ctx.save();
+      for (var zr = 0; zr < rows; zr++) {
+        for (var zc = 0; zc < cols; zc++) {
+          if (blocks[zr][zc] > 0) continue;
+          var zx = zc * cell, zy = zr * cell;
+          ctx.fillStyle = '#2b1e15';
+          ctx.fillRect(zx, zy, cell, cell);
+          if (cell >= 4) {
+            ctx.strokeStyle = 'rgba(120,96,74,0.55)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(zx, zy + cell); ctx.lineTo(zx + cell, zy);
+            ctx.moveTo(zx, zy + cell / 2); ctx.lineTo(zx + cell / 2, zy);
+            ctx.moveTo(zx + cell / 2, zy + cell); ctx.lineTo(zx + cell, zy + cell / 2);
+            ctx.stroke();
           }
         }
-        ctx.restore();
       }
+      ctx.restore();
     }
 
-    // ④ 高亮：多路线分层（三类各自独立开关，可任意组合）或单路线区间。
-    // 三个开关互相独立：切换只重绘（本函数本身），不重新执行多路线求解——求解结果已存在 it.merged，
-    // 这里只是按开关状态决定要不要画某一类，不触碰 it.merged 数据本身。
-    var legend = [];
-    var anyMultiOn = $('showStable').checked || $('showFrequent').checked || $('showFloating').checked;
-    if (anyMultiOn && it.merged) {
-      var m = it.merged;
-      if ($('showStable').checked && m.stable.length) { strokeGroups(ctx, groups(m.stable, rows, cols), rows, cols, cell, STROKE.stable, 2, null); legend.push([STROKE.stable, '稳定区域（全部 ' + m.routeCount + ' 条路线）' + m.stable.length + ' 像素', 'solid']); }
-      if ($('showFrequent').checked && m.frequent.length) { strokeGroups(ctx, groups(m.frequent, rows, cols), rows, cols, cell, STROKE.frequent, 2, [5, 3]); legend.push([STROKE.frequent, '高频区域（多数路线）' + m.frequent.length + ' 像素', 'dashed']); }
-      if ($('showFloating').checked && m.floating.length) { strokeGroups(ctx, groups(m.floating, rows, cols), rows, cols, cell, STROKE.floating, 2, [2, 3]); legend.push([STROKE.floating, '浮动区域（少数路线）' + m.floating.length + ' 像素', 'dotted']); }
-    } else if (iv && iv.diffPixels.length) {
-      var gs = $('optComp').checked ? iv.comps : [iv.diffPixels];
-      strokeGroups(ctx, gs, rows, cols, cell, STROKE.single, 2, null);
-      legend.push([STROKE.single, '区间消除区域（' + iv.snapped.lo + '%–' + iv.snapped.hi + '%）' + iv.diffPixelCount + ' 像素 / ' + gs.length + ' 块', 'solid']);
-      // 连通块编号（块数不多且格子够大时标注，方便美术口头指位）
-      if ($('optComp').checked && iv.comps.length <= 30 && cell >= 9) {
-        ctx.font = 'bold ' + Math.max(9, Math.floor(cell * 0.9)) + 'px Menlo, monospace';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        for (var k = 0; k < iv.comps.length; k++) {
-          var comp = iv.comps[k], sr = 0, sc = 0;
-          for (var t = 0; t < comp.length; t++) { sr += Math.floor(comp[t] / cols); sc += comp[t] % cols; }
-          var tx = (sc / comp.length + 0.5) * cell, ty = (sr / comp.length + 0.5) * cell;
-          ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-          ctx.strokeText(String(k + 1), tx, ty);
-          ctx.fillStyle = STROKE.single;
-          ctx.fillText(String(k + 1), tx, ty);
-        }
-      }
-    }
-    if ($('optA').checked && iv) legend.push([STROKE.stateA, '区间前已消除范围（状态A）', 'dashed']);
-
-    $('legend').innerHTML = legend.map(function (l) {
-      return '<span><i class="sw" style="border-top-color:' + l[0] + ';border-top-style:' + l[2] + '"></i>' + l[1] + '</span>';
-    }).join('');
-
-    // ⑤ 选区预览（编辑模式下才画；不覆盖任何像素颜色，只淡淡着色 + 描边）
-    //   任务 ANT-ARTTOOL-SUBJECT-EXTRACT-20260902：选区从「只有矩形」扩到任意形状，
-    //   所以这里由「画矩形框」改成「按掩码逐格淡色 + 沿掩码边界描边」。
-    //   颜色用青色系，与碎色高亮的红、区间描边的白区分开（三者可能同时出现）。
+    // ④ 选区预览（编辑模式下才画；不覆盖任何像素颜色，只淡淡着色 + 描边）
     if (S.edit.on) {
-      // 拖拽中的临时预览
       if (S.edit.dragging && S.edit.dragStart && S.edit.dragCurrent) {
         if (S.edit.lassoPath && S.edit.lassoPath.length) {
-          // 套索：把轨迹连成线，实时看得见画到哪
           ctx.save();
           ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 3;
           ctx.beginPath();
@@ -964,6 +457,15 @@
         drawMaskOverlay(ctx, S.edit.mask, cell);
       }
     }
+
+    // ⑤ 图例
+    var legend = [];
+    if (fragCells.length) legend.push(['#ff4040', '碎色像素 ' + fragCells.length + ' 格', 'solid']);
+    if (hasVoid) legend.push(['#785f4a', '空位（值 0）' + voidCount + ' 格', 'solid']);
+    if (S.edit.mask) legend.push(['#3fb6c4', '当前选区', 'dashed']);
+    $('legend').innerHTML = legend.map(function (l) {
+      return '<span><i class="sw" style="border-top-color:' + l[0] + ';border-top-style:' + l[2] + '"></i>' + l[1] + '</span>';
+    }).join('');
   }
 
   /**
@@ -980,7 +482,7 @@
       ctx.fillRect(c * cell, r * cell, cell, cell);
     }
     // 描边：只在「选中 ↔ 未选中/越界」的交界处画线，所以不会盖住像素。
-    // 复用 core 的 outlineSegments，与「进度区间描边」同一套几何口径。
+    // 复用 core 的 outlineSegments，与拼接里的图层描边同一套几何口径。
     if (!$('optShowMaskOutline') || $('optShowMaskOutline').checked) {
       var segs = C.outlineSegments(C.maskToIndices(mask), mask.rows, mask.cols);
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
@@ -1019,30 +521,6 @@
     ctx.restore();
   }
 
-  function groups(pixels, rows, cols) {
-    return $('optComp').checked ? C.connectedComponents(pixels, rows, cols) : [pixels];
-  }
-
-  /** 逐组描边：先画深色底线再画亮色，保证在任何像素颜色上都看得见；线画在格线上，不遮盖像素。 */
-  function strokeGroups(ctx, gs, rows, cols, cell, color, width, dash) {
-    for (var g = 0; g < gs.length; g++) {
-      var segs = C.outlineSegments(gs[g], rows, cols);
-      for (var pass = 0; pass < 2; pass++) {
-        ctx.beginPath();
-        ctx.setLineDash(pass === 0 ? [] : (dash || []));
-        ctx.lineWidth = pass === 0 ? width + 1.6 : width;
-        ctx.strokeStyle = pass === 0 ? 'rgba(0,0,0,0.8)' : color;
-        for (var i = 0; i < segs.length; i++) {
-          var s = segs[i];
-          ctx.moveTo(s[0] * cell, s[1] * cell);
-          ctx.lineTo(s[2] * cell, s[3] * cell);
-        }
-        ctx.stroke();
-      }
-    }
-    ctx.setLineDash([]);
-  }
-
   // ==================== 悬停读数 ====================
   function onHover(ev) {
     var it = viewItem();
@@ -1052,19 +530,9 @@
     var c = Math.floor((ev.clientX - rect.left) / cell), r = Math.floor((ev.clientY - rect.top) / cell);
     var rows = it.blocks.length, cols = it.blocks[0].length;
     if (r < 0 || c < 0 || r >= rows || c >= cols) return;
-    var id = it.blocks[r][c], idx = r * cols + c;
-    var txt = '行 ' + r + ' 列 ' + c + '　' + colorLabel(id);
-    var st = it.pxStep && it.pxStep[idx];
-    if (st) {
-      txt += '　消除于第 ' + st.step + ' 步（该步结束完成 ' + st.done + ' 盒' +
-        (it.tl ? '，进度 ' + (st.done / it.tl.totalBoxes * 100).toFixed(2) + '%' : '') + '）';
-    } else if (it.tl) {
-      txt += '　本路线未记录该像素的消除步（请检查尺寸口径）';
-    }
-    if (it.interval) {
-      txt += '　' + (it.interval.diffPixels.indexOf(idx) >= 0 ? '✅ 在当前区间内' : '不在当前区间');
-    }
-    $('readout').textContent = txt;
+    var id = it.blocks[r][c];
+    $('readout').textContent = '行 ' + r + ' 列 ' + c + '　' +
+      (id > 0 ? colorLabel(id) : '空位（值 0）');
   }
 
   // ==================== 导出 ====================
@@ -1078,367 +546,8 @@
   function exportPng() {
     var it = cur();
     if (!it || !it.blocks) return;
-    $('cv').toBlob(function (b) { download(it.key + '_区间高亮.png', b); });
+    $('cv').toBlob(function (b) { download(it.key + '_图纸.png', b); });
   }
-  function exportJson() {
-    var it = cur();
-    if (!it || !it.interval) { log('请先定位区域'); return; }
-    var iv = it.interval, tl = it.tl;
-    var out = {
-      工具: '蚂蚁拿块关卡图修改工具 · 阶段一',
-      关卡: it.key,
-      数据定性: '基于正式关卡 JSON 重新求解/回放的标准复核路线，不声称还原生产时未保存的原始路线',
-      冰块耐久: C.ICE_DURABILITY,
-      进度口径: '已完成盒数 ÷ 总盒数',
-      路线来源: tl.source, 命中遍: tl.pass, 是否通关: tl.completed,
-      求解步数: tl.steps_count, 总盒数: tl.totalBoxes, 总像素: tl.totalPixels,
-      目标图尺寸: { 行: tl.rows, 列: tl.cols },
-      像素编码: '扁平下标 = 行 * ' + tl.cols + ' + 列',
-      用户要求区间: iv.requested, 实际采用区间: iv.snapped,
-      对应完成盒数: iv.doneBoxes, 对应步序号: iv.stepIndex,
-      状态A像素数: iv.stateAPixelCount, 状态B像素数: iv.stateBPixelCount,
-      区间区域像素数: iv.diffPixelCount,
-      连通块数: iv.comps.length,
-      连通块: iv.comps.map(function (comp) { return { 像素数: comp.length, 像素: comp }; }),
-      区间区域像素: iv.diffPixels,
-      时间线自检: it.verify,
-      多路线: it.merged ? {
-        路线数: it.merged.routeCount,
-        稳定区域像素数: it.merged.stable.length,
-        高频区域像素数: it.merged.frequent.length,
-        浮动区域像素数: it.merged.floating.length,
-        稳定区域像素: it.merged.stable,
-        高频区域像素: it.merged.frequent,
-        浮动区域像素: it.merged.floating,
-        各路线: it.routes.routes.map(function (rt, i) {
-          return {
-            遍次: rt.tag, 模式: rt.mode, 噪声: rt.noise, 种子: rt.seed, 步数: rt.steps,
-            实际区间: it.routes.intervals[i].snapped,
-            完成盒数: it.routes.intervals[i].doneBoxes,
-            区域像素数: it.routes.intervals[i].diffPixelCount
-          };
-        })
-      } : null
-    };
-    download(it.key + '_区间定位.json', new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' }));
-    log('已导出区间定位 JSON');
-  }
-
-  // ==================== 棋盘区 + 暂存区对比 ====================
-  // 复用 core.js 的 boardAtStep(tl, idx) 取某一步结束时的 {cells, frozen, buffer, bufferLimit} 快照。
-  // 渲染思路参考正式 bin/js/app.js 的 renderCell/renderBufferSlots（取色只认 AntSolver.getColorCSS/getColorName，
-  // 冰用 thaw/durability，锁链用组号描边），但重新实现为本工具自己的小函数，不复制其 UI 代码。
-
-  /**
-   * 刷新棋盘区 + 暂存区面板。不再强制要求先「定位区域」：
-   *   - 有 tl（求解路线）+ 有 interval（已定位区间）→ 展示状态A（区间下限）/ 状态B（区间上限）
-   *   - 有 tl 但还没定位区间 → 展示开局 / 末局（求解完成时的最终棋盘+暂存），先让用户看到棋盘区不是空的
-   *   - 还没有 tl（没求解/没导入求解数据）→ 提示需要先有一条求解路线
-   *   - tl 存在但没有棋盘快照（多路线复核产生的路线不带快照）→ 提示改用标准路线
-   * 演示播放时（S.demo.idx>0）不覆盖，交给 demoRenderAtIdx 接管左列显示"当前帧"。
-   */
-  function refreshBoardPanel() {
-    var it = viewItem();
-    var show = $('optBoard').checked;
-    var wrap = $('boardCompareWrap');
-    if (!show) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
-    if (S.demo.timer) return;   // 演示播放中，由 demoRenderAtIdx 接管，不要在这里抢着刷新
-    wrap.classList.remove('hidden');
-
-    if (!it || !it.tl) {
-      wrap.innerHTML = '<div class="muted">先在「2. 求解路线」求解或导入求解数据，这里会显示棋盘区与暂存区。</div>';
-      return;
-    }
-    if (!it.tl.initialBoard) {
-      wrap.innerHTML = '<div class="muted">当前路线没有棋盘快照（多路线复核产生的路线不带快照），请用「2. 求解路线」的标准路线，或重新「定位区域」。</div>';
-      return;
-    }
-
-    var loIdx, hiIdx, headA, headB;
-    if (it.interval) {
-      loIdx = it.interval.stepIndex.lo; hiIdx = it.interval.stepIndex.hi;
-      headA = '状态A（区间下限 ' + it.interval.snapped.lo + '%）';
-      headB = '状态B（区间上限 ' + it.interval.snapped.hi + '%）';
-    } else {
-      loIdx = 0; hiIdx = it.tl.steps.length;
-      headA = '开局（第 0 步）'; headB = '末局（第 ' + hiIdx + ' 步，' + (it.tl.completed ? '通关' : '未通关') + '）';
-    }
-    buildBoardPanel(wrap, headA, headB);
-    var boardA = C.boardAtStep(it.tl, loIdx);
-    var boardB = C.boardAtStep(it.tl, hiIdx);
-    drawBoardInto($('cvBoardA'), boardA);
-    drawBoardInto($('cvBoardB'), boardB);
-    drawBufferInto($('bufA'), boardA);
-    drawBufferInto($('bufB'), boardB);
-  }
-
-  /** 搭建左右两列骨架（每次调用都会整段重建，标题按传入的文案覆盖）。 */
-  function buildBoardPanel(wrap, headA, headB) {
-    wrap.innerHTML =
-      '<div class="boardCol"><div class="boardColHead">' + headA + '</div>' +
-      '<canvas id="cvBoardA"></canvas><div class="bufferRow" id="bufA"></div></div>' +
-      '<div class="boardCol"><div class="boardColHead">' + headB + '</div>' +
-      '<canvas id="cvBoardB"></canvas><div class="bufferRow" id="bufB"></div></div>';
-  }
-
-  /** 单格渲染：与正式 bin/js/app.js renderCell 思路一致（黑块/管道/冰/锁链/问号图标 + 盒色+数字），画到 canvas 而非 DOM。 */
-  function drawBoardInto(cv, board) {
-    if (!board) return;
-    var rows = board.boardRows, cols = board.boardCols;
-    var cell = Math.max(10, Math.min(34, Math.floor(320 / Math.max(1, cols))));
-    cv.width = cols * cell + 1; cv.height = rows * cell + 1;
-    var ctx = cv.getContext('2d');
-    ctx.fillStyle = '#0f1216'; ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.font = Math.max(9, Math.floor(cell * 0.34)) + 'px Menlo, monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        var cellData = board.cells[r][c];
-        var x = c * cell, y = r * cell;
-        if (!cellData) { continue; }
-        if (cellData.t === 'black') {
-          ctx.fillStyle = '#2a2f38'; ctx.fillRect(x, y, cell, cell);
-          ctx.fillStyle = '#ff8080'; ctx.fillText('✕', x + cell / 2, y + cell / 2);
-        } else if (cellData.t === 'pipe') {
-          ctx.fillStyle = '#20262f'; ctx.fillRect(x, y, cell, cell);
-          var arrow = { 11: '▲', 12: '▶', 13: '▼', 14: '◀' }[cellData.dir] || '▼';
-          var remain = (cellData.queue ? cellData.queue.length : 0) - (cellData.next || 0);
-          ctx.fillStyle = '#9fd0ff';
-          ctx.fillText(arrow + remain, x + cell / 2, y + cell / 2);
-        } else if (cellData.t === 'box') {
-          ctx.fillStyle = window.AntSolver.getColorCSS(cellData.color);
-          ctx.fillRect(x, y, cell, cell);
-          ctx.fillStyle = textColorFor(cellData.color);
-          ctx.fillText(String(cellData.count), x + cell / 2, y + cell / 2);
-          if (cellData.ice > 0) {
-            var f = board.frozen[r + ',' + c];
-            var txt = f ? '❄' + Math.max(0, f.thaw) + '/' + f.durability : '❄' + cellData.ice;
-            ctx.fillStyle = '#bfe9ff'; ctx.font = Math.max(8, Math.floor(cell * 0.26)) + 'px Menlo, monospace';
-            ctx.fillText(txt, x + cell / 2, y + cell * 0.82);
-            ctx.font = Math.max(9, Math.floor(cell * 0.34)) + 'px Menlo, monospace';
-          }
-          if (cellData.chain > 0) {
-            ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 2;
-            ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
-          }
-        }
-      }
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (var gx = 0; gx <= cols; gx++) { ctx.moveTo(gx * cell + .5, 0); ctx.lineTo(gx * cell + .5, rows * cell); }
-    for (var gy = 0; gy <= rows; gy++) { ctx.moveTo(0, gy * cell + .5); ctx.lineTo(cols * cell, gy * cell + .5); }
-    ctx.stroke();
-  }
-
-  function textColorFor(colorId) {
-    var hex = window.AntSolver.getColorCSS(colorId);
-    var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-    if (!m) return '#fff';
-    var n = parseInt(m[1], 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-    return (0.299 * r + 0.587 * g + 0.114 * b) < 140 ? '#fff' : '#000';
-  }
-
-  /** 暂存槛位渲染：用 core.js 的 bufferSlotsArray 把稀疏 buffer 铺成定长数组，逐槛画一个色块。 */
-  function drawBufferInto(el, board) {
-    if (!board) { el.innerHTML = ''; return; }
-    var arr = C.bufferSlotsArray(board.buffer, board.bufferLimit);
-    var h = '';
-    for (var i = 0; i < arr.length; i++) {
-      var b = arr[i];
-      if (!b) { h += '<div class="bufSlot empty">槛' + i + '</div>'; continue; }
-      var cls = 'bufSlot' + (b.link ? ' linked' : '');
-      h += '<div class="' + cls + '" style="background:' + window.AntSolver.getColorCSS(b.color) +
-        ';color:' + textColorFor(b.color) + '" title="槛位 ' + i + (b.link ? '，锁链组 ' + b.link : '') + '">' +
-        b.progress + '/' + b.need + '</div>';
-    }
-    el.innerHTML = h;
-  }
-
-  // ==================== 暂存压力图 ====================
-  // 单关：横轴进度、纵轴暂存量，标暂存上限/峰值/均值/用户区间/卡点。
-  // 叠加对比：重构成功后同一张图画两条曲线（原关卡 vs 重构后关卡），进度都按各自总盒数换算成百分比对齐。
-
-  var PRESSURE_COLOR_BEFORE = '#e6d2ba';
-  var PRESSURE_COLOR_AFTER = '#ffb066';
-  // 玩家轨迹用一个明显不同的色，避免和全知的两条线混淆（需求 §一.5）。
-  var PRESSURE_COLOR_PLAYER = '#7fd1ff';
-
-  /**
-   * 取当前关「真实求解结果」的压力样本：优先取现场求解结果（it.liveSolve.pressureSamples），
-   * 其次取导入求解数据里的真实样本（it.solve.pressureSamples——用导入 pickOrder 重放出时间线时
-   * it.solve 本身不会被清空，见 ensureTimeline）。两者都没有时返回 null，界面须如实提示
-   * 「正式压力审核暂无数据」，不得用点击时间线反推伪造（需求07.30 §三.2 明确禁止）。
-   */
-  function officialSamplesOf(it) {
-    if (it.liveSolve && it.liveSolve.pressureSamples && it.liveSolve.pressureSamples.length) return it.liveSolve.pressureSamples;
-    if (it.solve && it.solve.pressureSamples && it.solve.pressureSamples.length) return it.solve.pressureSamples;
-    return null;
-  }
-
-  // 压力图当前查看的是哪一套轨迹（需求 08.03 §一：全知与玩家两套各自真实的数据，切换查看）。
-  // 'omni' = 全知求解轨迹；'player' = 玩家模拟轨迹。
-  S.pressureTrack = 'omni';
-
-  function refreshPressureChart() {
-    if (S.pressureTrack === 'player') { refreshPressureChartPlayer(); return; }
-    refreshPressureChartOmni();
-  }
-
-  /** 全知轨迹：沿用原有逻辑与口径，未改动（需求 §一.3 要求不改全知求解与正式压力审核口径）。 */
-  function refreshPressureChartOmni() {
-    var it = cur();
-    var cv = $('cvPressure');
-    $('playerSeedRow').style.display = 'none';
-    if (!it || !it.tl) { drawPressureEmpty(cv, '先求解或导入求解数据后显示暂存压力曲线。'); $('pressureTrackInfo').innerHTML = ''; $('pressureInfo').innerHTML = ''; $('pressureCompareTable').innerHTML = ''; return; }
-    var curveBefore = it.pressureCurve ||
-      (it.pressureCurve = C.pressureCurveFromTl(it.tl, { officialSamples: officialSamplesOf(it) }));
-    var overlay = $('optPressureOverlay').checked && it.reconResult && it.reconResult.ok;
-    var curveAfter = null;
-    if (overlay) {
-      var rr = it.reconResult;
-      if (!rr.tl) rr.tl = C.reconstructToTimeline(rr);
-      if (rr.tl) curveAfter = rr.pressureCurve ||
-        (rr.pressureCurve = C.pressureCurveFromTl(rr.tl, { officialAuditPrecomputed: rr.audit || null }));
-    }
-    drawPressureChart(cv, curveBefore, curveAfter, it.interval, {
-      track: 'omni', xLabel: '完成进度',
-      legend: curveAfter ? [['修改前', PRESSURE_COLOR_BEFORE], ['重构后', PRESSURE_COLOR_AFTER]] : [['全知（修改前）', PRESSURE_COLOR_BEFORE]]
-    });
-    renderPressureTrackInfo({
-      track: 'omni', curve: curveBefore,
-      note: curveAfter ? '两条曲线都是全知求解轨迹，区别是修改前与重构后，不是全知与玩家。' : ''
-    });
-    renderPressureInfo(curveBefore, curveAfter);
-  }
-
-  /**
-   * 玩家轨迹：来自正式玩家模拟真实操作过程中每一拍的暂存占用，与全知曲线是两套数据，互不代替。
-   * 没有有效玩家操作时显示「无有效玩家轨迹」；玩家验证接口异常时显示接口异常——
-   * 两种情况都不画曲线、也不拿全知数据补图（需求 §一.4 最后两条）。
-   */
-  function refreshPressureChartPlayer() {
-    var it = cur();
-    var cv = $('cvPressure');
-    if (!it) { drawPressureEmpty(cv, '先选择一关。'); $('pressureTrackInfo').innerHTML = ''; return; }
-    var useRecon = $('optPlayerSource').checked;
-    var src = playerTrackSourceOf(it, useRecon);
-    $('playerSeedRow').style.display = '';
-    if (!src.ok) {
-      drawPressureEmpty(cv, src.message);
-      $('pressureTrackInfo').innerHTML = kvTable([[src.bad ? '<span class="tag bad">' + src.title + '</span>' : '<span class="tag warn">' + src.title + '</span>', src.message]]);
-      $('pressureInfo').innerHTML = ''; $('pressureCompareTable').innerHTML = '';
-      renderPlayerSeedOptions(null);
-      return;
-    }
-    renderPlayerSeedOptions(src.multi);
-    var idx = Math.max(0, Math.min(src.multi.rounds.length - 1, parseInt($('selPlayerSeed').value, 10) || 0));
-    var round = src.multi.rounds[idx];
-    var curve = C.playerPressureCurve(round);
-    if (!curve.valid) {
-      var why = curve.reason === 'noPicks' ? '这一轮玩家一次球都没取到' :
-        curve.reason === 'noTimeline' ? '这一轮没有记录到任何暂存变化' :
-          curve.reason === 'roundError' ? '这一轮模拟本身报错' : '这一轮没有可用轨迹';
-      drawPressureEmpty(cv, '无有效玩家轨迹：' + why + '。');
-      $('pressureTrackInfo').innerHTML = kvTable([
-        ['<span class="tag warn">无有效玩家轨迹</span>', why + '。本图不会用全知数据代替，也不会画成一条 0 压力曲线。'],
-        ['当前查看', '玩家轨迹　种子 ' + round.seed + '　' + src.label]
-      ]);
-      $('pressureInfo').innerHTML = ''; $('pressureCompareTable').innerHTML = '';
-      return;
-    }
-    drawPressureChart(cv, curve, null, null, {
-      track: 'player', xLabel: '操作步数（共 ' + curve.steps + ' 步）',
-      xTicksAsSteps: curve.steps,
-      legend: [['玩家（种子 ' + curve.seed + '）', PRESSURE_COLOR_PLAYER]],
-      color: PRESSURE_COLOR_PLAYER
-    });
-    renderPressureTrackInfo({ track: 'player', curve: curve, source: src.label });
-    renderPressureInfo(curve, null);
-    $('pressureCompareTable').innerHTML = '';
-  }
-
-  /**
-   * 取玩家多轮结果：重构后关卡用重构时已经跑好的那份；原关卡按需现算一次并缓存。
-   * 两边都走 core 的同一套多轮函数与同一张种子表，不另写第二套模拟。
-   */
-  function playerTrackSourceOf(it, useRecon) {
-    if (useRecon) {
-      var rr = it.reconResult;
-      if (!rr || !rr.ok) {
-        return { ok: false, title: '还没有重构后关卡', bad: false,
-          message: '要看重构后关卡的玩家轨迹，请先点「重新生成关卡」并成功一次；或取消勾选改看原关卡。' };
-      }
-      if (rr.playerHealth && !rr.playerHealth.ok) {
-        return { ok: false, title: '玩家验证接口异常', bad: true,
-          message: rr.playerHealth.detail + '　本次玩家数值一律不可用，不会画成 0 压力曲线，也不会用全知数据代替。' };
-      }
-      if (!rr.playerMulti || !rr.playerMulti.rounds || !rr.playerMulti.rounds.length) {
-        return { ok: false, title: '无有效玩家轨迹', bad: false, message: '重构结果里没有多轮玩家数据。' };
-      }
-      return { ok: true, multi: rr.playerMulti, label: '重构后关卡' };
-    }
-    if (!it.level) {
-      return { ok: false, title: '缺少关卡本体', bad: false,
-        message: '原关卡的玩家轨迹需要关卡本体 JSON；本关只导入了目标图。' };
-    }
-    if (it._playerMulti === undefined) {
-      busy(true); overlay(true, '正在跑原关卡的多轮玩家模拟…');
-      var res = null;
-      try { res = C.playerMultiFromLevelFile(it.level, {}); } catch (e) { res = null; }
-      busy(false); overlay(false);
-      it._playerMulti = res && res.multi ? res.multi : null;
-      it._playerMultiHealth = res && res.health ? res.health : null;
-      if (it._playerMulti) {
-        log('原关卡多轮玩家模拟完成：' + it._playerMulti.roundCount + ' 轮，通关率 ' +
-          (it._playerMulti.successRate * 100).toFixed(0) + '%。');
-      }
-    }
-    if (it._playerMultiHealth && !it._playerMultiHealth.ok) {
-      return { ok: false, title: '玩家验证接口异常', bad: true,
-        message: it._playerMultiHealth.detail + '　本次玩家数值一律不可用，不会画成 0 压力曲线，也不会用全知数据代替。' };
-    }
-    if (!it._playerMulti || !it._playerMulti.rounds.length) {
-      return { ok: false, title: '无有效玩家轨迹', bad: false, message: '原关卡没有跑出可用的玩家轨迹。' };
-    }
-    return { ok: true, multi: it._playerMulti, label: '原关卡' };
-  }
-
-  /** 种子下拉：逐轮列出种子与该轮结果，便于用户挑一轮看（需求 §一.4「可以选择具体轮次查看」）。 */
-  function renderPlayerSeedOptions(multi) {
-    var sel = $('selPlayerSeed');
-    if (!sel) return;
-    if (!multi || !multi.rounds || !multi.rounds.length) { sel.innerHTML = '<option value="0">（无）</option>'; return; }
-    var keep = sel.value;
-    sel.innerHTML = multi.rounds.map(function (x, i) {
-      var tag = x.error ? '本轮异常' : ((x.won ? '通关' : '未通关') + '，峰值 ' + x.bufferPeak);
-      return '<option value="' + i + '">种子 ' + x.seed + '（' + tag + '）</option>';
-    }).join('');
-    if (keep !== '' && +keep < multi.rounds.length) sel.value = keep;
-  }
-
-  /** 图上方的口径说明：当前看的是哪一套轨迹、种子、坐标轴含义、暂存上限、峰值。 */
-  function renderPressureTrackInfo(o) {
-    var box = $('pressureTrackInfo');
-    if (!box) return;
-    var c = o.curve;
-    var rows = [];
-    if (o.track === 'player') {
-      rows.push(['当前查看', '<span class="tag ok">玩家轨迹</span>　来自正式玩家模拟的真实操作过程（' + o.source + '）']);
-      rows.push(['玩家随机种子', String(c.seed)]);
-      rows.push(['本轮结果', (c.won ? '通关' : '未通关') + '　取球 ' + c.picks + ' 次　复活 ' +
-        c.revivesUsed + '/' + c.reviveCap + '　完成盒 ' + c.completedBoxes + '/' + c.totalBoxes]);
-      rows.push(['坐标轴', '横轴：操作步数（共 ' + c.steps + ' 步）　纵轴：暂存数量']);
-    } else {
-      rows.push(['当前查看', '<span class="tag ok">全知轨迹</span>　来自正式全知求解的消除顺序']);
-      rows.push(['坐标轴', '横轴：完成进度 0%–100%　纵轴：暂存数量']);
-    }
-    rows.push(['暂存上限', String(c.bufferLimit) + '（图上虚线）']);
-    rows.push(['暂存峰值', String(c.peak) + '　均值 ' + c.avg]);
-    if (o.note) rows.push(['提示', o.note]);
-    box.innerHTML = kvTable(rows);
-  }
-
   // ==================== 可悬浮面板（用户 2026-08-03 微调第 4、5 项） ====================
   // 「悬浮」按钮把面板从原位脱出来变成可拖动的浮层，拖标题栏移动，再点一次收回原位。
   // 只改这个面板自己的定位，不动页面其它布局，也不影响目标图的绘制与坐标换算。
@@ -1496,23 +605,15 @@
    * 给所有带「悬浮」按钮的面板绑定：切换悬浮、拖标题栏移动、拖边缘放大缩小。
    * 移动与拉伸都只在悬浮态下生效；非悬浮态下面板在目标图右侧那一列里按列宽走，不允许乱拉。
    */
-  /* ==================== 界面偏好：纯美术编辑模式 + 卡片折叠 ====================
-   * 任务 ANT-ARTTOOL-EDGE-TRIM-20260915 需求④。
-   *
-   * 两个**独立维度**，刻意不合并：
-   *   - 纯美术编辑模式：决定「哪些卡片与本次工作无关」，整类隐藏；
-   *   - 折叠：决定「这张卡片我现在想不想看它的内容」，用户逐张的意图。
-   * 合并会出问题：退出纯美术模式时若把折叠状态也一并重置，用户手动折起来的卡片会莫名展开；
-   * 反之若用折叠来实现纯美术模式，用户退出模式后还得逐张展开 7 张卡。
-   * 所以隐藏走 CSS 的 body.artOnly、折叠走各卡片自己的 .collapsed，互不干扰。
+  /* ==================== 界面偏好：卡片折叠 ====================
+   * 折叠状态只影响显示，持久化在 UI_PREF_STORAGE_KEY。
    */
   function loadUiPrefs() {
-    var p = { artOnly: false, collapsed: {} };
+    var p = { collapsed: {} };
     try {
       var raw = localStorage.getItem(UI_PREF_STORAGE_KEY);
       if (raw) {
         var o = JSON.parse(raw) || {};
-        p.artOnly = !!o.artOnly;
         if (o.collapsed && typeof o.collapsed === 'object') p.collapsed = o.collapsed;
       }
     } catch (e) {
@@ -1525,30 +626,9 @@
   function saveUiPrefs() {
     try {
       localStorage.setItem(UI_PREF_STORAGE_KEY, JSON.stringify({
-        artOnly: !!S.ui.artOnly, collapsed: S.ui.collapsed || {}
+        collapsed: S.ui.collapsed || {}
       }));
     } catch (e) { log('界面偏好保存失败（' + (e && e.message) + '），本次布局不会被记住'); }
-  }
-
-  /** 应用纯美术编辑模式。隐藏动作全部由 CSS 的 body.artOnly 完成。 */
-  function applyArtOnly(quiet) {
-    var on = !!S.ui.artOnly;
-    document.body.classList.toggle('artOnly', on);
-    var cb = $('optArtOnly');
-    if (cb) cb.checked = on;
-    if (!quiet) {
-      if (on) {
-        log('已进入纯美术编辑模式：收起了 ' + ART_ONLY_HIDDEN.length +
-          ' 块与生产/求解相关的功能（求解路线、进度区间、多路线复核、自动演示、暂存压力图、' +
-          '重构关卡、待导出库）以及棋盘/暂存对比区。' +
-          '现在「8. 美术编辑」与「12. 主体提取」相邻。' +
-          '注意：只是**收起显示**，数据和已有选区都还在，取消勾选即恢复。');
-      } else {
-        log('已退出纯美术编辑模式，全部功能恢复显示（各卡片的折叠状态保持不变）。');
-      }
-    }
-    // 画布尺寸不随卡片显隐变化，但右侧列宽会变，重绘一次避免残影
-    draw();
   }
 
   /** 折叠/展开一张卡片。 */
@@ -1590,10 +670,10 @@
 
   /** 顶栏「折叠全部」：只要还有展开的就全折起，全折了就全展开。 */
   function toggleCollapseAll() {
-    // 纯美术模式下已经隐藏的卡片不算在内 —— 否则「全部展开」会去展开看不见的卡片，
-    // 用户会觉得按钮没反应（因为可见的那几张其实没变）。
+    // 只统计当前真正可见的卡片（拼接卡片在常规视图里是隐藏的）。
     var targets = COLLAPSIBLE_CARDS.filter(function (id) {
-      return $(id) && !(S.ui.artOnly && ART_ONLY_HIDDEN.indexOf(id) >= 0);
+      var el = $(id);
+      return !!el && el.offsetParent !== null;
     });
     var anyOpen = targets.some(function (id) { return !$(id).classList.contains('collapsed'); });
     targets.forEach(function (id) { setCardCollapsed(id, anyOpen); });
@@ -1605,7 +685,7 @@
     draw();
   }
 
-  /* ==================== 13. 图纸拼接工作台 ====================
+  /* ==================== 5. 图纸拼接工作台 ====================
    * 任务 ANT-ARTTOOL-PIECE-COMPOSE-20260915（用户 2026-09-15 六条需求）。
    *
    * 用户 2026-09-18 修订口径：部件可以叠加，导出时不再因重叠被阻止；
@@ -1736,13 +816,23 @@
     }
   }
 
-  /** 进入 / 退出拼接工作台。用 body class 驱动显隐，与 artOnly 同一套机制，互不打扰。 */
+  /** 进入 / 退出拼接工作台。用 body class 驱动显隐，与常规修图视图互不打扰。 */
+  function syncComposeModeButton() {
+    var b = $('btnComposeMode');
+    if (!b) return;
+    b.textContent = cpS().active ? '🎨 回到修图' : '🧩 拼接图纸';
+    b.title = cpS().active
+      ? '退出拼接，回到普通图纸修图'
+      : '进入拼接：新建一张自定规格的画布，把部件拖上去摆成多主体';
+  }
+
   function enterCompose() {
     var C2 = cpS();
     C2.active = true;
     document.body.classList.add('composeMode');
+    syncComposeModeButton();
     if (!cpHasCanvas()) {
-      log('已进入拼接工作台。先在右边「13. 图纸拼接」①里设定新图规格并点「新建画布」，' +
+      log('已进入拼接工作台。先在右边「5. 图纸拼接」①里设定新图规格并点「新建画布」，' +
         '再从②的部件列表把部件放上画布。');
     } else {
       log('已回到拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，' + C2.layers.length + ' 个图层还在）。');
@@ -1757,6 +847,7 @@
   function exitCompose() {
     cpS().active = false;
     document.body.classList.remove('composeMode');
+    syncComposeModeButton();
     log('已退出拼接工作台。画布与图层都留着，下次点「🧩 拼接图纸」还在。');
     draw();   // 回到常规视图要重绘目标图
   }
@@ -1814,7 +905,14 @@
 
   function composeImportTxt(files) {
     if (!files || !files.length) return;
-    var arr = Array.prototype.slice.call(files);
+    var all = Array.prototype.slice.call(files);
+    // 文件夹导入会连 .DS_Store / 图片 / 说明.md 一起带进来，这里只收 .txt，其余静默计数
+    var arr = all.filter(function (f) { return /\.txt$/i.test(f.name); });
+    var ignored = all.length - arr.length;
+    if (!arr.length) {
+      log('所选内容里没有 .txt 图纸' + (ignored ? '（已忽略 ' + ignored + ' 个非 TXT 文件）' : ''));
+      return;
+    }
     var okN = 0, bad = [];
     var pending = arr.length;
     // 撤销点：读文件是异步的，所以先拍好快照，等**第一个**部件真的加进来时才压栈
@@ -1838,7 +936,9 @@
       fr.readAsText(f);
     });
     function finish() {
-      log('部件导入：成功 ' + okN + (bad.length ? '，失败 ' + bad.length + ' —— ' + bad.join('；') : ''));
+      log('部件导入：成功 ' + okN +
+        (bad.length ? '，失败 ' + bad.length + ' —— ' + bad.join('；') : '') +
+        (ignored ? '，忽略非 TXT ' + ignored + ' 个' : ''));
       renderComposeAll();
     }
   }
@@ -1848,7 +948,7 @@
     var lib = S.pieceLib || [];
     var pieces = lib.filter(function (p) { return p && p.type === C.ART_PIECE_TYPE && p.blocks; });
     if (!pieces.length) {
-      if (!quiet) log('图纸库是空的。先去「12. 主体提取」抠几个部件存进图纸库，或用上面的「导入 TXT 图」。');
+      if (!quiet) log('图纸库是空的。先去「4. 主体提取」抠几个部件存进图纸库，或用上面的「导入 TXT 图」。');
       return;
     }
     if (!quiet) composeSnapBefore('从图纸库添加 ' + pieces.length + ' 个部件到部件列表');
@@ -1937,7 +1037,7 @@
       cv.width = 600; cv.height = 160;
       composePaintChecker(ctx, cv.width, cv.height, 16);
       ctx.fillStyle = '#68707a'; ctx.font = '13px sans-serif';
-      ctx.fillText('还没有画布 —— 在右边「13. 图纸拼接」①设定规格并点「新建画布」', 20, 40);
+      ctx.fillText('还没有画布 —— 在右边「5. 图纸拼接」①设定规格并点「新建画布」', 20, 40);
       return;
     }
     var cell = composeCell(), rows = C2.rows, cols = C2.cols;
@@ -2045,13 +1145,15 @@
     if (C2.shapeDrag) {
       var sd = C2.shapeDrag;
       var preview = [];
+      var previewBox = { r0: sd.from.r, c0: sd.from.c, r1: sd.to.r, c1: sd.to.c };
       if (sd.tool === 'line') {
         preview = C.lineCells(sd.from.r, sd.from.c, sd.to.r, sd.to.c, composeBrushWidth(), rows, cols);
+      } else if (composeIsShapeTool(sd.tool)) {
+        try { preview = composeShapeCells(sd.tool, previewBox); } catch (e) { preview = []; }
       } else {
         try {
           preview = C.borderShape($('selComposeBorder').value,
-            { r0: sd.from.r, c0: sd.from.c, r1: sd.to.r, c1: sd.to.c },
-            composeBrushWidth(), rows, cols).cells;
+            previewBox, composeBrushWidth(), rows, cols).cells;
         } catch (e) { preview = []; }
       }
       var pc = composeBrushColor();
@@ -2170,6 +1272,7 @@
       '<div class="kvRow"><span>图层</span><b>' + C2.layers.length + '</b>（可见 ' + audit.visibleLayers + '）</div>' +
       '<div class="kvRow"><span>实际非空像素</span><b>' + audit.pixelActual + '</b>' +
       '（占画布 ' + (audit.pixelActual / (C2.rows * C2.cols) * 100).toFixed(1) + '%）</div>' +
+      '<div class="kvRow"><span>用色</span><b>' + audit.colorCount + ' 种</b>（不含空位 0）</div>' +
       '<div class="kvRow"><span>覆盖提示</span><b style="color:' +
       (audit.conflictCount ? '#b06000' : '#2f8652') + '">' + audit.conflictCount + ' 格</b>' +
       (audit.conflictCount ? '（导出只输出最顶层的像素 id）' : '') + '</div>' +
@@ -2301,7 +1404,8 @@
     if (info) {
       info.textContent = cpHasCanvas()
         ? (C2.rows + '×' + C2.cols + '　图层 ' + C2.layers.length +
-          (a ? '　像素 ' + a.pixelActual + (a.conflictCount ? '　覆盖 ' + a.conflictCount : '') : ''))
+          (a ? '　颜色 ' + a.colorCount + ' 种　像素 ' + a.pixelActual +
+            (a.conflictCount ? '　覆盖 ' + a.conflictCount : '') : ''))
         : '还没有画布';
     }
   }
@@ -2368,7 +1472,7 @@
     if (!cpHasCanvas()) {
       // 原先这里是静默 return —— 用户在没建画布时点画布，什么反应都没有，
       // 只能自己猜是哪里不对。改成如实说清下一步。
-      log('还没有画布，点不了。先在右边「13. 图纸拼接」①填好行列，点「新建画布」。');
+      log('还没有画布，点不了。先在右边「5. 图纸拼接」①填好行列，点「新建画布」。');
       return;
     }
     var p = composeEventToCell(ev);
@@ -2384,8 +1488,8 @@
       if (tool === 'paint') {
         C2.paintDrag = { id: L.id, last: null };
         composeStrokeTo(L, p, true);
-      } else if (tool === 'line' || tool === 'border') {
-        // 直线/边框都是「拖一个范围」：按下记起点，松手才落笔，中途画预览
+      } else if (tool === 'line' || tool === 'border' || composeIsShapeTool(tool)) {
+        // 直线/边框/几何图形都是「拖一个范围」：按下记起点，松手才落笔，中途画预览
         C2.shapeDrag = { id: L.id, tool: tool, from: p, to: p };
         drawCompose();
       } else if (tool === 'fill') {
@@ -2504,6 +1608,7 @@
       C2.shapeDrag = null;
       var L = cpLayerById(sd.id);
       if (!L) { renderComposeAll(); return; }
+      var box = { r0: sd.from.r, c0: sd.from.c, r1: sd.to.r, c1: sd.to.c };
       if (sd.tool === 'line') {
         var cells = C.lineCells(sd.from.r, sd.from.c, sd.to.r, sd.to.c,
           composeBrushWidth(), C2.rows, C2.cols);
@@ -2512,8 +1617,19 @@
           log('直线：从 行' + sd.from.r + ' 列' + sd.from.c + ' 到 行' + sd.to.r + ' 列' + sd.to.c +
             '，线宽 ' + composeBrushWidth() + ' 格，' + k + ' 个像素');
         }
+      } else if (composeIsShapeTool(sd.tool)) {
+        var shapeName = { rect: '矩形', ellipse: '椭圆', triangle: '三角形', diamond: '菱形' }[sd.tool] || sd.tool;
+        var shapeCells = composeShapeCells(sd.tool, box);
+        var n = composeApplyCells(L, shapeCells, composeBrushColor(),
+          '画' + (composeShapeSolid() ? '实心' : '空心') + shapeName);
+        if (n) {
+          log(shapeName + '：' + (composeShapeSolid() ? '实心' : '空心（线宽 ' + composeBrushWidth() + ' 格）') +
+            '，行 ' + Math.min(box.r0, box.r1) + '–' + Math.max(box.r0, box.r1) +
+            ' 列 ' + Math.min(box.c0, box.c1) + '–' + Math.max(box.c0, box.c1) +
+            '，' + n + ' 个像素');
+        }
       } else {
-        composeMakeBorder({ r0: sd.from.r, c0: sd.from.c, r1: sd.to.r, c1: sd.to.c });
+        composeMakeBorder(box);
         return;      // composeMakeBorder 内部已经刷过面板
       }
       renderComposeAll();
@@ -2842,6 +1958,7 @@
     lines.push('<div class="kvRow"><span>画布</span><b>' + a.rows + '×' + a.cols + '</b></div>');
     lines.push('<div class="kvRow"><span>可见图层</span><b>' + a.visibleLayers + '</b></div>');
     lines.push('<div class="kvRow"><span>实际非空像素</span><b>' + a.pixelActual + '</b></div>');
+    lines.push('<div class="kvRow"><span>用色</span><b>' + a.colorCount + ' 种</b>（不含空位 0）</div>');
     lines.push('<div class="kvRow"><span>背景空洞</span><b style="color:' +
       (a.backgroundHoles ? '#b06000' : '#2f8652') + '">' + a.backgroundHoles + ' 格</b>' +
       (composeRequireBackground() ? '（当前要求填满）' : '（仅提示）') + '</div>');
@@ -3231,6 +2348,19 @@
   function composeBrushWidth() {
     var v = parseInt(($('inComposeWidth') || {}).value, 10);
     return isFinite(v) && v > 0 ? v : 1;
+  }
+  /** 几何图形是否实心。默认勾选；取消勾选就是空心，粗细走 composeBrushWidth()。 */
+  function composeShapeSolid() {
+    var el = $('optComposeShapeSolid');
+    return !el || !!el.checked;
+  }
+  function composeIsShapeTool(tool) {
+    return (C.SHAPE_KINDS || []).indexOf(tool) >= 0;
+  }
+  /** 拖出来的范围 → 几何图形的格坐标。 */
+  function composeShapeCells(tool, box) {
+    var C2 = cpS();
+    return C.shapeCells(tool, box, composeBrushWidth(), composeShapeSolid(), C2.rows, C2.cols);
   }
   /** 画笔颜色：勾了橡皮擦就是 0（擦成空），否则用美术编辑那边选中的颜色（同一套色库，不另存一份）。 */
   function composeBrushColor() {
@@ -3815,6 +2945,35 @@
     composeMakeBorder({ r0: 0, c0: 0, r1: C2.rows - 1, c1: C2.cols - 1 });
   }
 
+  /**
+   * 自动田字格四框：按当前画布均分 2×2，四个框各自成环、互不重叠。
+   * 画布尺寸就是唯一输入，所以换 40×40 / 55×55 / 100×100 都会自动跟着变。
+   */
+  function composeTianziAuto() {
+    var C2 = cpS();
+    if (!cpHasCanvas()) { log('先新建画布，再生成田字格'); return; }
+    // 尽量画在一张「和画布一样大、未固定」的图层上；没有就自动新建一张。
+    var L = null;
+    if (C2.selected.length === 1) {
+      var sel = cpLayerById(C2.selected[0]);
+      if (sel && sel.locked) { log('「' + sel.name + '」已固定，先解固再生成'); return; }
+      if (sel && sel.rows === C2.rows && sel.cols === C2.cols && sel.offR === 0 && sel.offC === 0) L = sel;
+    }
+    if (!L) L = composeNewBlankLayer(true);
+    if (!L) return;
+
+    var w = composeBrushWidth();
+    var shape = C.tianziShape({ r0: 0, c0: 0, r1: C2.rows - 1, c1: C2.cols - 1 },
+      w, C2.rows, C2.cols);
+    var n = composeApplyCells(L, shape.cells, composeBrushColor(), '自动生成田字格四框');
+    if (!n) { renderComposeAll(); return; }
+    C2.lastBorder = { layerId: L.id, shape: shape, kind: '田字格四框' };
+    var sizes = shape.sizes.map(function (s) { return s.name + ' ' + s.rows + '×' + s.cols; }).join('、');
+    log('已按画布 ' + C2.rows + '×' + C2.cols + ' 均分生成田字格四框：' + sizes +
+      '，线宽 ' + w + ' 格，' + n + ' 个像素。下面列出了四个框，可单独换色。');
+    renderComposeAll();
+  }
+
   /** 局部替换：把上一次生成的边框里某一个部件换成当前颜色（用户原话的「田字格四个小口」用法）。 */
   function composeRecolorPart(partIndex) {
     var C2 = cpS();
@@ -4030,272 +3189,9 @@
     document.addEventListener('mouseup', function () { act = null; });
   }
 
-  /** 切换压力图轨迹类型，并把两个按钮的选中态同步出来（当前看的是哪一套必须一眼可见）。 */
-  function setPressureTrack(track) {
-    S.pressureTrack = track;
-    var bo = $('btnTrackOmni'), bp = $('btnTrackPlayer');
-    if (bo && bp) {
-      bo.className = 'btn ' + (track === 'omni' ? 'primary' : 'ghost');
-      bp.className = 'btn ' + (track === 'player' ? 'primary' : 'ghost');
-    }
-    refreshPressureChart();
-  }
-
-  function drawPressureEmpty(cv, msg) {
-    var ctx = cv.getContext('2d');
-    ctx.fillStyle = '#1c130c'; ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.fillStyle = '#7a6248'; ctx.font = '11px sans-serif'; ctx.fillText(msg, 8, 20);
-  }
-
-  /**
-   * 画布坐标换算：x=进度(0~1)映射到[padL,w-padR]，y=暂存量(0~bufferLimit)映射到[h-padB,padT]（上小下大翻转）。
-   * 需求 07.30 §三.1 明确要求坐标可读性：横轴 0%-100% 可读比例刻度+网格，纵轴 0/1/2/3/4/5 整数刻度，
-   * 图例/轴标题/数值不得互相遮挡——因此本函数加了顶部图例条（固定高度，不与曲线区重叠）和左右两侧
-   * 分别放轴标题，网格线用比坐标轴更浅的颜色区分主次。
-   */
-  function drawPressureChart(cv, curveBefore, curveAfter, interval, opts) {
-    opts = opts || {};
-    var ctx = cv.getContext('2d');
-    var w = cv.width, h = cv.height;
-    var padL = 30, padR = 10, padT = 20, padB = 26;   // padT 多留一行给图例，padB 多留一行给横轴刻度+标题
-    var plotW = w - padL - padR, plotH = h - padT - padB;
-    ctx.fillStyle = '#1c130c'; ctx.fillRect(0, 0, w, h);
-    var bufferLimit = curveBefore.bufferLimit || 5;
-    var yMax = bufferLimit;
-    function X(p) { return padL + p * plotW; }
-    function Y(v) { return padT + plotH - (Math.min(v, yMax) / yMax) * plotH; }
-
-    // 纵轴网格线 + 整数刻度 0..bufferLimit（需求：按 0、1、2、3、4、5 显示整数刻度）
-    ctx.font = '9px Menlo, monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    for (var yi = 0; yi <= bufferLimit; yi++) {
-      var gy = Y(yi);
-      ctx.strokeStyle = yi === bufferLimit ? 'rgba(255,176,102,0.5)' : 'rgba(255,255,255,0.08)';
-      ctx.lineWidth = 1;
-      if (yi === bufferLimit) { ctx.setLineDash([4, 3]); } else { ctx.setLineDash([]); }
-      ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL + plotW, gy); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = '#7a6248';
-      ctx.fillText(String(yi), padL - 4, gy);
-    }
-    // 横轴网格线 + 刻度。全知轨迹按完成进度标 0%~100%；玩家轨迹按操作步数标真实步号，
-    // 避免把「第几步」显示成百分比造成误读（需求 §一.5 要求横轴含义必须明确）。
-    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    var stepTotal = opts.xTicksAsSteps || 0;
-    [0, 0.25, 0.5, 0.75, 1].forEach(function (p) {
-      var gx = X(p);
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(gx, padT); ctx.lineTo(gx, padT + plotH); ctx.stroke();
-      ctx.fillStyle = '#7a6248';
-      var label = stepTotal ? String(Math.round(p * stepTotal)) : ((p * 100) + '%');
-      ctx.fillText(label, Math.max(padL + 10, Math.min(gx, padL + plotW - 10)), padT + plotH + 3);
-    });
-    // 坐标轴主线（比网格线更亮，标出绘图区边界）
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + plotH); ctx.lineTo(padL + plotW, padT + plotH); ctx.stroke();
-    // 轴标题（横轴：进度；纵轴：暂存数量，竖排文字放在左上角，不与刻度数字重叠）
-    ctx.fillStyle = '#9c8168'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-    ctx.fillText(opts.xLabel || '进度', padL + plotW, padT + plotH + 15);
-    ctx.textAlign = 'left';
-    ctx.save();
-    ctx.translate(8, padT + plotH / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center'; ctx.fillText('暂存数量', 0, 0);
-    ctx.restore();
-
-    // 用户区间参考带（半透明竖条）
-    if (interval) {
-      var x0 = X(interval.snapped.lo / 100), x1 = X(interval.snapped.hi / 100);
-      ctx.fillStyle = 'rgba(255,176,102,0.10)';
-      ctx.fillRect(x0, padT, Math.max(1, x1 - x0), plotH);
-    }
-
-    function drawCurve(curve, color) {
-      if (!curve || !curve.points.length) return;
-      ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
-      curve.points.forEach(function (p, i) {
-        var x = X(p.progress), y = Y(p.buf);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-      // 卡点位置标记（若有正式审核数据；无数据时不画，不伪造标记位置）
-      if (curve.audit && curve.audit.hasChoke && curve.audit.lateAt != null) {
-        var cx = X(curve.audit.lateAt / 100), cy = Y(curve.audit.lateMax);
-        ctx.fillStyle = color;
-        ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    drawCurve(curveBefore, opts.color || PRESSURE_COLOR_BEFORE);
-    if (curveAfter) drawCurve(curveAfter, PRESSURE_COLOR_AFTER);
-
-    // 顶部图例条（固定在 padT 之上的专用区域，不会被曲线/网格盖住）。
-    // 需求 §一.5：图例必须写清求解类型，不能只写「修改前 / 重构后」而不说明是全知还是玩家。
-    var legend = opts.legend || (curveAfter ? [['修改前', PRESSURE_COLOR_BEFORE], ['重构后', PRESSURE_COLOR_AFTER]] : null);
-    if (legend && legend.length) {
-      ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      var lx = padL;
-      legend.forEach(function (lg) {
-        ctx.fillStyle = lg[1]; ctx.fillRect(lx, 2, 8, 8);
-        ctx.fillStyle = '#c9a98a'; ctx.fillText(lg[0], lx + 11, 2);
-        lx += 11 + ctx.measureText(lg[0]).width + 12;
-      });
-    }
-  }
-
-  function renderPressureInfo(curveBefore, curveAfter) {
-    // 玩家轨迹与全知轨迹共用这张小表，标题要跟着变，不能一律写「（原）」。
-    var isPlayer = curveBefore && curveBefore.kind === 'player';
-    var suffix = isPlayer ? '（玩家本轮）' : '（原）';
-    var rows = [
-      ['峰值 / 均值' + suffix, curveBefore.peak + ' / ' + curveBefore.avg],
-      ['卡点' + suffix, curveBefore.audit ? (curveBefore.audit.hasChoke ? '有，位于进度 ' + curveBefore.audit.lateAt + '%' : '无') : '—']
-    ];
-    $('pressureInfo').innerHTML = kvTable(rows);
-    if (!curveAfter) { $('pressureCompareTable').innerHTML = ''; return; }
-    var cmpRows = [
-      ['峰值 / 均值（重构后）', curveAfter.peak + ' / ' + curveAfter.avg],
-      ['卡点（重构后）', curveAfter.audit ? (curveAfter.audit.hasChoke ? '有，位于进度 ' + curveAfter.audit.lateAt + '%' : '无') : '—']
-    ];
-    $('pressureCompareTable').innerHTML = kvTable(cmpRows);
-  }
-
-  // ==================== 自动演示 ====================
-  /** 定位成功后默认把演示游标摆到区间下限，方便直接点播放看后续消除过程。 */
-  function demoSetupFromInterval() {
-    var it = viewItem();
-    if (!it || !it.tl) return;
-    S.demo.idx = it.interval ? it.interval.stepIndex.lo : 0;
-    demoRenderAtIdx();
-  }
-
-  function demoPause() {
-    if (S.demo.timer) { clearInterval(S.demo.timer); S.demo.timer = null; }
-    $('btnDemoPlay').disabled = false;
-    $('btnDemoPause').disabled = true;
-  }
-
-  function demoPlay() {
-    var it = viewItem();
-    if (!it || !it.tl) { log('请先求解 / 导入求解数据，得到可播放的路线'); return; }
-    if (S.demo.timer) return;
-    $('btnDemoPlay').disabled = true;
-    $('btnDemoPause').disabled = false;
-    var speed = parseInt($('demoSpeed').value, 10) || 5;
-    var intervalMs = Math.max(30, 260 - speed * 24);  // 速度1→约236ms/步，速度10→约20ms/步
-    S.demo.timer = setInterval(function () {
-      var itNow = viewItem();
-      if (!itNow || !itNow.tl || S.demo.idx >= itNow.tl.steps.length) { demoPause(); return; }
-      S.demo.idx++;
-      demoRenderAtIdx();
-    }, intervalMs);
-  }
-
-  function demoStep(delta) {
-    var it = viewItem();
-    if (!it || !it.tl) return;
-    demoPause();
-    S.demo.idx = Math.max(0, Math.min(it.tl.steps.length, S.demo.idx + delta));
-    demoRenderAtIdx();
-  }
-
-  function demoJump(idx) {
-    var it = viewItem();
-    if (!it || !it.tl) return;
-    demoPause();
-    S.demo.idx = Math.max(0, Math.min(it.tl.steps.length, idx));
-    demoRenderAtIdx();
-  }
-
-  /** 渲染演示当前游标：目标图累计揭示 + 棋盘/暂存快照（若有）+ 信息面板 + 进度条。 */
-  function demoRenderAtIdx() {
-    var it = viewItem();
-    if (!it || !it.tl) return;
-    var idx = S.demo.idx;
-    var scrub = $('demoScrub');
-    scrub.max = it.tl.steps.length; scrub.value = idx;
-
-    // 目标图累计揭示：用 pixelsUpTo 求 0..idx 步的并集，画法与 draw() 里的高亮一致（描边而非覆盖颜色）
-    var revealed = C.pixelsUpTo(it.tl.steps, idx);
-    demoDrawTarget(it, revealed);
-
-    var board = C.boardAtStep(it.tl, idx);
-    if (board && $('optBoard').checked) {
-      // 演示模式下棋盘区左列改为「当前帧」，右列固定显示区间上限，方便看播放到哪一步、离目标还差多少
-      $('boardCompareWrap').classList.remove('hidden');
-      var boardB = it.interval ? C.boardAtStep(it.tl, it.interval.stepIndex.hi) : null;
-      buildBoardPanel($('boardCompareWrap'), '当前帧（第 ' + idx + ' 步）',
-        it.interval ? ('状态B（区间上限 ' + it.interval.snapped.hi + '%）') : '（未定位区间）');
-      drawBoardInto($('cvBoardA'), board);
-      drawBufferInto($('bufA'), board);
-      if (boardB) { drawBoardInto($('cvBoardB'), boardB); drawBufferInto($('bufB'), boardB); }
-    }
-
-    var done = idx <= 0 ? 0 : it.tl.steps[idx - 1].done;
-    var rows = [
-      ['当前步', idx + ' / ' + it.tl.steps.length],
-      ['完成盒数', done + ' / ' + it.tl.totalBoxes + '（' + (it.tl.totalBoxes ? (done / it.tl.totalBoxes * 100).toFixed(2) : 0) + '%）'],
-      ['累计揭示像素', revealed.length + ' / ' + it.tl.totalPixels]
-    ];
-    if (idx > 0) { var s = it.tl.steps[idx - 1]; rows.push(['本步', '(' + s.r + ',' + s.c + ') ' + colorLabel(s.color) + ' ' + s.count + ' 像素']); }
-    $('demoInfo').innerHTML = kvTable(rows);
-  }
-
-  /**
-   * 演示专用目标图绘制：真实表现「消除」——已消除像素清空为背景色（不画色块），
-   * 未消除像素保持原色。不用任何黑色遮罩（此前版本的方向是反的：未播放区域被遮罩、已播放区域显示原色，
-   * 与真实游戏「消除后清空」相反，已按 Codex 审查结果修正）。
-   * 绘制顺序（自底向上）：①背景 → ②未消除像素原色 → ③可选区间边界描边（不填色）。
-   */
-  function demoDrawTarget(it, revealedList) {
-    var cv = $('cv'), ctx = cv.getContext('2d');
-    var blocks = it.blocks, rows = blocks.length, cols = blocks[0].length;
-    var cell = parseInt($('cellSize').value, 10) || 11;
-    cv.width = cols * cell + 1; cv.height = rows * cell + 1;
-    // ① 背景（同时也是「已消除像素」的显示效果：清空即背景色，不额外画任何东西）
-    ctx.fillStyle = '#1c130c'; ctx.fillRect(0, 0, cv.width, cv.height);
-    var revealedSet = {};
-    for (var i = 0; i < revealedList.length; i++) revealedSet[revealedList[i]] = 1;
-    // ② 只画「尚未消除」的像素，保持原色；已消除的格子不画，直接露出背景
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        var id = blocks[r][c];
-        if (!id) continue;
-        var idx = r * cols + c;
-        if (revealedSet[idx]) continue;   // 已消除：不画，露出背景
-        ctx.fillStyle = window.AntSolver.getColorCSS(id);
-        ctx.fillRect(c * cell, r * cell, cell, cell);
-      }
-    }
-    // ③ 区间边界（可选）：只描边，不覆盖任何像素颜色，不干扰消除状态的显示
-    var legend = [];
-    if ($('optDemoRegion') && $('optDemoRegion').checked && it.interval && it.interval.diffPixels.length) {
-      strokeGroups(ctx, [it.interval.diffPixels], rows, cols, cell, STROKE.single, 1.4, [4, 3]);
-      legend.push('<span><i class="sw" style="border-top-color:' + STROKE.single + '"></i>区间边界参考线（不影响消除显示）</span>');
-    }
-    $('legend').innerHTML = legend.join('');
-  }
-
-  // ==================== 美术编辑（1-34完整色库 + 颜色分组 + 全局/局部替换 + 靠色检查 + 框选） ====================
-  // 交互思路参考 bin/参考/目标图TXT编辑器_可手动框选版（COLOR_MAP/replaceColor/框选状态/局部替换/局部绘制），
-  // 不复制其 UI 代码；色值与中文名以 bin/参考/毛线色库/ 为唯一业务来源（与 bin/js/utils.js 的
-  // AntSolver.COLORS[1..34] 完全一致，工具直接调用 getColorCSS/getColorName，不重复定义色表）。
-  // 本工具只做像素编辑与守恒对比，不做自动重构关卡（重构在「10. 重构关卡」）。
-
+  // 完整色库：1–34 全部标准色。色值与中文名一律取 AntSolver.COLORS，不重复定义。
   var EDIT_PALETTE = (function () { var a = []; for (var i = 1; i <= 34; i++) a.push(i); return a; })();
 
-  /**
-   * 完整色库面板（需求 08.03 §二）。
-   *
-   * 分组方式：**同一套色库**内部分成两段——
-   *   目标图当前已有的颜色集中排在前面，并由一个共同的外层边框整体框住；
-   *   当前未使用的颜色排在这个边框外面。
-   * 边框内外合起来就是完整的 34 色，不复制第二套色库，也不再另做一块「当前目标图颜色」面板。
-   *
-   * 交互保持不变并全部保留：
-   *   点任何色块 = 选为当前绘制颜色；正处于替换流程时点色块 = 选定替换目标色；
-   *   边框内每个已有颜色带一个「整图替换」小按钮 = 原「当前目标图颜色」面板的全局替换入口，
-   *     入口从独立面板搬进边框内，能力没有减少。
-   * 边框内每个色块下方标出该色的像素数与占比。
-   */
   function renderEditPalette() {
     var pal = $('editPalette');
     var it = cur();
@@ -4457,7 +3353,7 @@
       draw(); refreshEditPanels(); renderExtractPanel();
       log('只选：选区已收窄为其中的 ' + name + '，' + n + ' 格' +
         '（原选区 ' + C.maskCount(region) + ' 格）。主体其它地方的同色不受影响，' +
-        '接下来可在「12. 主体提取」点「挖空选区内」清掉它们');
+        '接下来可在「4. 主体提取」点「挖空选区内」清掉它们');
     }
   }
 
@@ -4692,8 +3588,6 @@
     if (!it) return;
     if (on) {
       if (!S.edit.original) S.edit.original = JSON.parse(JSON.stringify(it.blocks));
-      demoPause();
-      if (S.viewMode !== 'before') { S.viewMode = 'before'; var r0 = document.querySelector('input[name="viewMode"][value="before"]'); if (r0) r0.checked = true; }
       var toolCN = { paint: '拖动绘制', select: '矩形框选', lasso: '套索', region: '同色块', color: '按色选' };
       log('编辑模式已开启：当前工具「' + (toolCN[S.edit.tool] || S.edit.tool) + '」，当前颜色 ' +
         window.AntSolver.getColorName(S.edit.color) + '(' + S.edit.color + ')');
@@ -4722,7 +3616,7 @@
     }
     if (batch.length) {
       S.edit.undoStack.push(batch);
-      it._editedAt = new Date().toISOString();   // 记录修改时间，供待导出库与导出包注明
+      it._editedAt = new Date().toISOString();   // 记录修改时间，供导出报告注明
       $('btnEditUndo').disabled = false;
       $('btnEditReset').disabled = false;
       draw();
@@ -4961,726 +3855,8 @@
   }
 
   /** 把当前 canvas 的当前画面转成 PNG 的 Uint8Array（供打包用；比 toBlob 更方便同步收集多张图）。 */
-  function canvasToPngBytes(cv) {
-    return new Promise(function (resolve) {
-      cv.toBlob(function (blob) {
-        var reader = new FileReader();
-        reader.onload = function () { resolve(new Uint8Array(reader.result)); };
-        reader.readAsArrayBuffer(blob);
-      });
-    });
-  }
-
-  /**
-   * 完整导出：一关的全部内容打包成 ZIP，目录按「给游戏用」和「给工具用」分开
-   * （需求 §七第5点：明确区分正式游戏端关卡文件与工具内部关卡数据）。
-   *   正式游戏端关卡文件/：原关卡_官方格式.json、新关卡_官方格式.json（可直接进游戏端）
-   *   工具内部数据/：原关卡_内部结构.json、新关卡_内部结构.json、原求解数据、新求解数据
-   *   目标图/：原图.txt、新图.txt
-   *   对比/：暂存压力图.png、进度区域专用对比图.png、对比分析报告.md
-   * 工具内部数据里的 TXT/关卡/求解数据字段与本工具的导入格式一致，可直接重新导入核验。
-   */
-  function exportFullPackage() {
-    var it = cur();
-    if (!it || !it.reconResult || !it.reconResult.ok) { log('需要先重构成功才能导出完整对比包'); return; }
-    var rr = it.reconResult;
-    if (!rr.tl) rr.tl = C.reconstructToTimeline(rr);
-    busy(true); overlay(true, '打包中…');
-    var oldBlocksForTxt = S.edit.original || it.blocks;
-
-    Promise.resolve().then(function () {
-      var files = [];
-
-      // 正式游戏端关卡文件（可直接进游戏端）与工具内部数据分开放，避免拿错文件（需求 §七第5点）
-      files.push({ name: '正式游戏端关卡文件/说明.txt',
-        text: '这个目录里的 JSON 是正式游戏端格式的关卡文件，可以直接交给游戏端使用。\n' +
-              '工具内部结构（带完整棋盘、便于重新导入本工具继续修改）放在「工具内部数据」目录，两者不要混用。\n' });
-      if (it.level) files.push({ name: '正式游戏端关卡文件/原关卡_官方格式.json', text: JSON.stringify(C.toGameFormatLevel(it.level), null, 1) });
-      files.push({ name: '正式游戏端关卡文件/新关卡_官方格式.json', text: JSON.stringify(C.toGameFormatLevel(rr.level), null, 1) });
-
-      // 目标图/
-      files.push({ name: '目标图/原图.txt', text: C.serializeTxt(oldBlocksForTxt) });
-      files.push({ name: '目标图/新图.txt', text: C.serializeTxt(rr.level.blocks) });
-
-      // 工具内部数据/
-      if (it.level) files.push({ name: '工具内部数据/原关卡_内部结构.json', text: JSON.stringify(it.level, null, 1) });
-      files.push({ name: '工具内部数据/新关卡_内部结构.json', text: JSON.stringify(rr.level, null, 1) });
-      if (it.tl) {
-        files.push({ name: '工具内部数据/原求解数据.solve.json', text: JSON.stringify({
-          meta: { sourceName: it.key, note: '基于正式关卡 JSON 重新求解/回放的标准复核路线' },
-          summary: { completed: it.tl.completed, steps: it.tl.steps_count, totalBoxes: it.tl.totalBoxes, totalPixels: it.tl.totalPixels },
-          pickOrder: it.tl.steps.map(function (s) { return { step: s.step, r: s.r, c: s.c, color: s.color, count: s.count }; })
-        }, null, 1) });
-      }
-      if (rr.solveResult && rr.solveResult.pickOrder) {
-        files.push({ name: '工具内部数据/新求解数据.solve.json', text: JSON.stringify({
-          meta: { sourceName: it.key + '_重构后', strategy: rr.strategy, note: '重构后关卡的标准复核路线' },
-          summary: { completed: true, steps: rr.solveResult.steps, totalBoxes: rr.solveResult.totalBoxes, totalPixels: rr.solveResult.totalPixels },
-          pickOrder: rr.solveResult.pickOrder
-        }, null, 1) });
-      }
-      // 玩家结果与生效参数（批量包里也有同名文件，两处口径一致）
-      files.push({ name: '工具内部数据/玩家结果对比.json', text: JSON.stringify({
-        说明: '原关卡为固定种子单次；重构后为生成器内部正式单次 + 多轮随机种子。playerHealth 为玩家模拟有效性检查结果。',
-        before: it._playerOne || null,
-        afterOfficial: rr.playerOfficial || null,
-        // 只导出摘要，不导出每一拍的暂存轨迹（那份数据是画图用的，几万个数字对报告没有意义）
-        afterMulti: C.stripPlayerTraces(rr.playerMulti) || null,
-        playerHealth: rr.playerHealth || null
-      }, null, 1) });
-      files.push({ name: '生效的生成器参数.json', text: JSON.stringify({
-        方案文件: (rr.genParamsUsed && rr.genParamsUsed.fileName) || '未导入方案（使用工具默认参数）',
-        原始识别参数: (rr.genParamsUsed && rr.genParamsUsed.recognized) || null,
-        未识别字段: (rr.genParamsUsed && rr.genParamsUsed.unrecognized) || [],
-        字段冲突: (rr.genParamsUsed && rr.genParamsUsed.conflicts) || [],
-        最终采用参数说明: '网页方案文件的正式生效参数以 config 为准，inputs 只是页面历史输入记录，不参与生成。',
-        生成器实际生效参数: rr.effectiveConfig || null,
-        暂存上限说明: '暂存上限是玩法固定口径 ' + C.BUFFER_LIMIT + '，方案给了不同值也不采用。',
-        障碍参数核对: rr.obstacleCheck || null,
-        障碍参数容差说明: C.OBSTACLE_TOLERANCE_NOTE,
-        重构方式: RECON_STRATEGY_NAME,
-        目标图修改时间: it._editedAt || null,
-        重构时间: rr.reconstructedAt || null,
-        版本说明: TOOL_VERSION_NOTE
-      }, null, 1) });
-
-      // 对比分析报告.md（先文本部分，图片异步后追加）
-      // 报告直接写全所有指标，不让读者「详见页面某个表」。
-      // 数据来自 collectCompareMetrics —— 与页面对比表同一个来源，两处结论不会各算一套。
-      var m = collectCompareMetrics(it);
-      var reportLines = [
-        '# ' + it.key + ' 修改前后对比分析报告', '',
-        '- 重构方式：' + RECON_STRATEGY_NAME + '（2026-07-31 起只保留此一种）',
-        '- 目标图修改时间：' + (it._editedAt || '本次未在美术编辑里改色'),
-        '- 重构时间：' + (rr.reconstructedAt || '—'),
-        '- 版本说明：' + TOOL_VERSION_NOTE,
-        '',
-        '## 用户选择的进度区间与实际吸附区间',
-        it.interval ? ('- 要求：' + it.interval.requested.lo + '%–' + it.interval.requested.hi + '%，实际：' +
-          it.interval.snapped.lo + '%–' + it.interval.snapped.hi + '%') : '- 未定位区间',
-        '', '## 方案参数',
-        '- 方案文件：' + (rr.genParamsUsed && rr.genParamsUsed.fileName ? rr.genParamsUsed.fileName : '未导入方案（使用工具默认参数）')
-      ];
-      if (rr.genParamsUsed && rr.genParamsUsed.unrecognized && rr.genParamsUsed.unrecognized.length) {
-        reportLines.push('- 未识别字段（如实列出，未参与生成）：' + rr.genParamsUsed.unrecognized.join('、'));
-      }
-      if (rr.genParamsUsed && rr.genParamsUsed.conflicts && rr.genParamsUsed.conflicts.length) {
-        reportLines.push('- 字段冲突（正式生效值一律取 config，历史输入值不参与生成）：');
-        rr.genParamsUsed.conflicts.forEach(function (x) {
-          reportLines.push('  - ' + x.paramKey + '：历史输入值 ' + x.inputValue + ' → 正式生效值 ' + x.configValue);
-        });
-      }
-      if (rr.effectiveConfig) {
-        var ec = rr.effectiveConfig;
-        reportLines.push('- 生成器实际生效参数：底部消除 ' + (ec.bottomOnly ? '开启' : '关闭') +
-          '，盒容量 ' + ec.boxSizeMin + '–' + ec.boxSizeMax + '，暂存 ' + ec.bufferLimit +
-          '，黑块 ' + ec.blackPercent + '%，冰块 ' + ec.icePercent + '%，锁链 ' + ec.chainCount +
-          '，问号 ' + ec.questionPercent + '%，棋盘范围 ' + ec.boardRowsMin + '–' + ec.boardRowsMax +
-          ' 行 × ' + ec.boardColsMin + '–' + ec.boardColsMax + ' 列，窄路缺口 ' +
-          ec.narrowPathGapsMin + '–' + ec.narrowPathGapsMax);
-      }
-      if (rr.board) {
-        var bb = rr.board;
-        reportLines.push('', '## 重构后棋盘实况',
-          '- 棋盘：' + bb.rows + ' 行 × ' + bb.cols + ' 列，共 ' + bb.capacity + ' 格' +
-          '（列-行=' + bb.shapeDiff + '，' + (bb.shapeOk ? '形态合规' : '**形态不合规**') + '）',
-          '- 构成：盒 ' + bb.boxCells + '，黑块 ' + bb.blackCells + '，管道 ' + bb.pipeCells + '，空格 ' + bb.emptyCells);
-      }
-      // 黑块不再单独写一行，改为并入障碍参数核对表（目标/实际/偏差/容差判定，含容差来源）
-      obstacleCheckMarkdown(rr.obstacleCheck).forEach(function (l) { reportLines.push(l); });
-      if (rr.playerHealth && !rr.playerHealth.ok) {
-        reportLines.push('', '## ⚠ 玩家验证接口异常',
-          '- ' + rr.playerHealth.detail,
-          '- 本次玩家相关数值不可用，不能据此判断关卡难度，也不得视为「0% 通关率」。');
-      } else if (rr.playerMulti) {
-        reportLines.push('', '## 多轮玩家验证（随机种子）', '',
-          '| 种子 | 是否通关 | 暂存峰值 | 复活次数/上限 | 完成盒数/总盒数 |', '| --- | --- | --- | --- | --- |');
-        rr.playerMulti.rounds.forEach(function (x) {
-          if (x.error) { reportLines.push('| ' + x.seed + ' | 本轮异常 | — | — | — |'); return; }
-          reportLines.push('| ' + x.seed + ' | ' + (x.won ? '通关' : '未通关') + ' | ' + x.bufferPeak +
-            ' | ' + x.revivesUsed + '/' + x.reviveCap + ' | ' + x.completedBoxes + '/' + x.totalBoxes + ' |');
-        });
-        reportLines.push('', '- 总通关率：' + (rr.playerMulti.successRate * 100).toFixed(0) + '%（' + rr.playerMulti.roundCount + ' 轮）',
-          '- 平均暂存峰值：' + rr.playerMulti.avgPeak,
-          '- 平均复活次数：' + rr.playerMulti.avgRevives);
-      }
-      if (m) {
-        reportLines.push('', '## 修改前后完整指标对比', '',
-          '| 指标 | 修改前 | 重构后 |', '| --- | --- | --- |');
-        m.rows.forEach(function (r) { reportLines.push('| ' + r.label + ' | ' + r.before + ' | ' + r.after + ' |'); });
-        reportLines.push('', '## 守恒 / 结构 / 区域结论');
-        Object.keys(m.extra).forEach(function (k) {
-          reportLines.push('- ' + k.replace(/_/g, '·') + '：' + m.extra[k]);
-        });
-      }
-      files.push({ name: '对比/对比分析报告.md', text: reportLines.join('\n') + '\n' });
-
-      // 对比/*.png
-      var pngPromises = [];
-      pngPromises.push(canvasToPngBytes($('cvPressure')).then(function (bytes) { files.push({ name: '对比/暂存压力图.png', bytes: bytes }); }));
-      // 进度区域专用对比图：用专门绘制的对比画布（需求 §七第1点），不再截取主画布 $('cv') 冒充。
-      // 没做过区域对比时如实缺这张图，并在报告里说明原因，不拿别的图充数。
-      var regionCv = buildRegionCompareCanvas(it);
-      if (regionCv) {
-        pngPromises.push(canvasToPngBytes(regionCv).then(function (bytes) { files.push({ name: '对比/进度区域专用对比图.png', bytes: bytes }); }));
-      } else {
-        files.push({ name: '对比/进度区域专用对比图_缺失说明.txt',
-          text: '本次导出没有这张图：需要先定位进度区间，再点「对比当前区间（修改前后）」生成区域对比结果。\n' });
-      }
-      return Promise.all(pngPromises).then(function () { return files; });
-    }).then(function (files) {
-      var blob = zipCreateBinary(files);
-      download(it.key + '_完整对比包_' + exportStamp() + '.zip', blob);
-      busy(false); overlay(false);
-      log('已导出完整对比包 ZIP（' + files.length + ' 个文件），可重新导入本工具核验新图/新关卡/新求解数据。');
-    }).catch(function (e) {
-      busy(false); overlay(false);
-      log('导出失败：' + (e && e.message));
-    });
-  }
-
-  // ==================== 待导出库（需求 07.30 §六） ====================
-  // 加入/查看/重新编辑/持久化/单项移除/批量导出。只存纯 JSON 可序列化数据（关卡本体/目标图/pickOrder/
-  // 参数摘要等），不存 canvas、DOM 元素等不可序列化对象；对比图 PNG 留到批量导出时才现场生成。
-
-  /**
-   * 读库 + 【历史条目迁移】。
-   * 任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825：老条目里存着 464 KB/条 的 `tickTrajectory`，
-   * 不迁移的话即使新入库的条目已瘦身，整数组一写还是超限（save 是整数组覆盖写）。
-   * 迁移只剥大数组、不动任何导出会用到的字段，且迁移后立刻回写一次。
-   */
-  function loadExportLibFromStorage() {
-    try {
-      var raw = localStorage.getItem(EXPORT_LIB_STORAGE_KEY);
-      if (raw) S.exportLib = JSON.parse(raw) || [];
-    } catch (e) { S.exportLib = []; log('待导出库读取失败（' + (e && e.message) + '），已重置为空'); return; }
-    if (!S.exportLib.length) return;
-    var before = JSON.stringify(S.exportLib).length;
-    var migrated = 0;
-    S.exportLib.forEach(function (e) {
-      var hit = false;
-      ['playerAfterOfficial', 'playerBefore'].forEach(function (k) {
-        if (!e[k]) return;
-        var heavy = (C.PLAYER_HEAVY_KEYS || []).some(function (hk) { return e[k][hk] && e[k][hk].length; });
-        if (!heavy) return;
-        e[k] = C.slimPlayerResult(e[k]);
-        hit = true;
-      });
-      if (hit) migrated++;
-    });
-    if (migrated) {
-      var after = JSON.stringify(S.exportLib).length;
-      var r = saveExportLibToStorage();
-      log('待导出库：已为 ' + migrated + ' 个历史条目剥掉逐 tick 轨迹等大数组（' +
-        kb(before) + ' → ' + kb(after) + '，省 ' + Math.round((1 - after / before) * 100) + '%）。' +
-        '导出内容不受影响（导出只用其中的通关/峰值/复活次数）。' + (r.ok ? '' : '⚠ 回写失败：' + r.error));
-    }
-  }
-
   function kb(chars) { return (chars / 1024).toFixed(0) + ' KB'; }
 
-  /**
-   * 写库。**返回写入结果而不是静默 log** —— 调用方必须据此决定要不要回滚内存。
-   *
-   * 原实现只 try/catch 打一行日志、不回滚：写失败时内存里那条已经 push 进去了，
-   * 列表照常显示「已加入，当前共 6 关」，用户以为成功，但 localStorage 里还是上一次成功的 5 关，
-   * **刷新后那条静默消失**。而且因为是整数组覆盖写，一旦超限，后续任何更新都会持续失败。
-   * 这是本次「攒够 5 个就加不进去」体验最恶劣的一半，必须一起修。
-   */
-  function saveExportLibToStorage() {
-    try {
-      localStorage.setItem(EXPORT_LIB_STORAGE_KEY, JSON.stringify(S.exportLib));
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: (e && e.message) || String(e), quota: !!(e && /quota/i.test(e.name + ' ' + e.message)) };
-    }
-  }
-
-  /** 当前库占用（字符数）。用于在列表上如实显示水位，别等爆了才知道。 */
-  function exportLibBytes() {
-    try { return JSON.stringify(S.exportLib).length; } catch (e) { return 0; }
-  }
-
-  /**
-   * 添加/更新待导出库条目（需求 §六.1/§六.2）：只有重构通过验证（it.reconResult.ok）才能加入；
-   * 同一原关卡（用 key 判重）再次加入时更新原条目，不生成重复副本。
-   */
-  function addCurrentToExportLibrary() {
-    var it = cur();
-    if (!it || !it.reconResult || !it.reconResult.ok) { log('需要先重构成功并通过验证才能加入待导出库'); return; }
-    var rr = it.reconResult;
-    if (!rr.tl) rr.tl = C.reconstructToTimeline(rr);
-    var entry = {
-      key: it.key,                                             // 原关卡标识
-      sourceFiles: { txtName: it.txtName || null, levelName: it.levelName || null, solveName: it.solveName || null },
-      originalBlocks: S.edit.original || it.blocks,             // 原目标图（编辑前快照；未编辑过时就是当前图）
-      editedBlocks: it.blocks,                                  // 修改后目标图
-      originalLevel: it.level,                                  // 原关卡（工具内部无损数据）
-      reconstructedLevel: rr.level,                             // 重构后关卡（工具内部无损数据）
-      strategy: rr.strategy,
-      genParamsUsed: rr.genParamsUsed || null,                  // 使用的生成器参数（识别到的字段）
-      effectiveConfig: rr.effectiveConfig || null,              // 实际生效参数
-      originalPickOrder: it.tl ? it.tl.steps.map(function (s) { return { step: s.step, r: s.r, c: s.c, color: s.color, count: s.count }; }) : null,
-      reconstructedPickOrder: rr.solveResult && rr.solveResult.pickOrder ? rr.solveResult.pickOrder : null,
-      interval: it.interval ? { requested: it.interval.requested, snapped: it.interval.snapped } : null,
-      pressureBefore: it.pressureCurve ? { peak: it.pressureCurve.peak, avg: it.pressureCurve.avg } : null,
-      pressureAfter: rr.pressureCurve ? { peak: rr.pressureCurve.peak, avg: rr.pressureCurve.avg } : null,
-      // 单次玩家结果入库前剥掉逐步大数组（任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825）。
-      //   `playerAfterOfficial` 来自 generationEval.player，自带 464 KB 的 tickTrajectory；
-      //   `playerBefore` 走 officialPlayerResult 那条分支（关卡没带导入求解数据时）同样自带。
-      //   两者都只被导出流程用来取 won/peak/revives/reviveCap 四个标量，剥掉不影响任何产物。
-      playerBefore: C.slimPlayerResult(it._playerOne),
-      playerAfterOfficial: C.slimPlayerResult(rr.playerOfficial),   // 生成器内部正式单次结果
-      // 多轮随机种子结果（含逐轮明细）。逐步暂存轨迹只在内存里用来画玩家压力曲线，
-      // 存进浏览器本地时剥掉，避免几关就把本地存储塞满。
-      playerAfterMulti: C.stripPlayerTraces(rr.playerMulti) || null,
-      playerHealth: rr.playerHealth || null,            // 玩家模拟有效性检查
-      board: rr.board || null,                          // 重构后棋盘实况
-      obstacleCheck: rr.obstacleCheck || null,          // 障碍参数目标/实际/偏差 + 容差判定
-      // 进度区域专用对比图的原始数据（紧凑下标形式）。存数据而不存 PNG：PNG 转 base64 体积太大，
-      // localStorage 装不下几关；批量导出时用这份数据离屏重绘同一张图。
-      regionCompare: compactRegionCompare(it._lastRegionCompare, it._regionCompareMeta),
-      validationStatus: (rr.playerHealth && !rr.playerHealth.ok) ? 'playerSimError' : 'ok',
-      // 修改时间与重构时间分开记录（需求 §七第8点：列表与导出包需注明）
-      editedAt: it._editedAt || null,
-      reconstructedAt: rr.reconstructedAt || null,
-      lastModified: new Date().toISOString()
-    };
-    // 写盘失败必须回滚内存，不能让 UI 显示"已加入"而实际没存（刷新就丢）。
-    var idx = S.exportLib.findIndex(function (e) { return e.key === entry.key; });
-    var prev = idx >= 0 ? S.exportLib[idx] : null;
-    if (idx >= 0) S.exportLib[idx] = entry; else S.exportLib.push(entry);
-    var res = saveExportLibToStorage();
-    if (!res.ok) {
-      // 回滚：更新则还原旧条目，新增则弹出
-      if (idx >= 0) S.exportLib[idx] = prev; else S.exportLib.pop();
-      saveExportLibToStorage();          // 把回滚后的状态写回去（此时体积没变大，应能成功）
-      renderExportLibrary();
-      log('⚠ 待导出库加入失败，已取消本次加入（内存与本地保存均未改变，避免刷新后静默丢失）。' +
-        '原因：' + res.error +
-        (res.quota
-          ? '。这是浏览器本地存储容量上限（每个站点约 5 MB）。当前库 ' + S.exportLib.length + ' 关、占用 ' +
-            kb(exportLibBytes()) + '。请先「批量导出」把已攒的关卡下载下来，再「清空待导出库」腾出空间。'
-          : ''));
-      return;
-    }
-    if (idx >= 0) log('待导出库：已更新原条目「' + entry.key + '」，当前共 ' + S.exportLib.length + ' 关（占用 ' + kb(exportLibBytes()) + '）');
-    else log('待导出库：已加入「' + entry.key + '」，当前共 ' + S.exportLib.length + ' 关（占用 ' + kb(exportLibBytes()) + '）');
-    renderExportLibrary();
-  }
-
-  function removeFromExportLibrary(key) {
-    S.exportLib = S.exportLib.filter(function (e) { return e.key !== key; });
-    var r = saveExportLibToStorage();
-    renderExportLibrary();
-    log('待导出库：已移除「' + key + '」' + (r.ok ? '' : '　⚠ 本地保存失败：' + r.error));
-  }
-
-  function clearExportLibrary() {
-    S.exportLib = [];
-    var r = saveExportLibToStorage();
-    renderExportLibrary();
-    log('待导出库已清空' + (r.ok ? '' : '　⚠ 本地保存失败：' + r.error));
-  }
-
-  /** 打开待导出库中的某一关继续编辑：定位到已导入的同名 item（若已在列表中），否则提示需要先导入该关。 */
-  function openExportLibEntry(key) {
-    var idx = -1;
-    for (var i = 0; i < S.items.length; i++) if (S.items[i].key === key) { idx = i; break; }
-    var ent = S.exportLib.filter(function (x) { return x.key === key; })[0] || null;
-    if (idx < 0) {
-      log('待导出库「' + key + '」对应的关卡不在当前导入列表中。刷新页面后需要重新导入该关的 TXT/关卡文件才能继续修图；' +
-        '库里已保存的修改结果与重构结果不会丢失。');
-      if (ent) renderExportLibEntryDetail(ent);
-      return;
-    }
-    var it = S.items[idx];
-    // 调取后把库里保存的「修改后目标图」恢复到画面上，让用户能接着改（需求 §七第2/3点）。
-    // 但不自动重构、不自动导出：只有用户再次点「重新生成关卡」/「导出」才产生新结果（§七第4/5/6点）。
-    if (ent && ent.editedBlocks && ent.editedBlocks.length) {
-      if (!S.edit.original) S.edit.original = it.blocks.map(function (row) { return row.slice(); });
-      it.blocks = ent.editedBlocks.map(function (row) { return row.slice(); });
-    }
-    select(idx);
-    if (ent) renderExportLibEntryDetail(ent);
-    log('已调取「' + key + '」并恢复库里保存的修改后目标图，可继续修图。' +
-      '本次不会自动重新生成、也不会自动导出——需要新结果时请再点「重新生成关卡」，需要新导出包时再点导出。');
-  }
-
-  /** 调取待导出库条目后，展示该条目已保存的重构结果摘要（只读，不触发任何重算）。 */
-  function renderExportLibEntryDetail(e) {
-    var box = $('reconInfo');
-    if (!box) return;
-    var healthy = !e.playerHealth || e.playerHealth.ok;
-    var pa = normalizePlayerResult(e.playerAfterOfficial);
-    var rows = [
-      ['来自待导出库', e.key + '（以下是库里已保存的结果，不是本次新生成的）'],
-      ['重构方式', RECON_STRATEGY_NAME],
-      ['验证状态', e.validationStatus],
-      ['方案文件', (e.genParamsUsed && e.genParamsUsed.fileName) || '未导入方案（使用工具默认参数）'],
-      ['修改时间', e.editedAt || '—'],
-      ['重构时间', e.reconstructedAt || '—'],
-      ['版本说明', TOOL_VERSION_NOTE]
-    ];
-    if (e.board) {
-      rows.push(['重构后棋盘', e.board.rows + ' 行 × ' + e.board.cols + ' 列，共 ' + e.board.capacity + ' 格' +
-        (e.board.shapeOk ? '' : '　<span class="tag warn">形态不合规</span>')]);
-    }
-    if (e.obstacleCheck) renderObstacleCheckRows(rows, e.obstacleCheck);
-    else if (e.board) {
-      // 07-31 整改前入库的老条目没有 obstacleCheck，如实说明而不是拿黑块一项冒充完整核对
-      rows.push(['黑块比例', '目标 ' + (e.effectiveConfig ? e.effectiveConfig.blackPercent + '%' : '—') +
-        '　实际 ' + e.board.blackCells + ' 格 = ' + e.board.blackPercent + '%' +
-        '<br><span class="hint">这条记录是障碍参数核对上线前入库的，只有黑块一项；' +
-        '需要完整核对请重新点「重新生成关卡」后再次加入待导出库。</span>']);
-    }
-    if (!healthy) {
-      rows.push(['<span class="tag bad">玩家验证接口异常</span>', (e.playerHealth && e.playerHealth.detail) || '玩家数值不可用']);
-    } else if (e.playerAfterMulti) {
-      rows.push(['多轮玩家通关率', (e.playerAfterMulti.successRate * 100).toFixed(0) + '%（' +
-        e.playerAfterMulti.roundCount + ' 轮）　平均峰值 ' + e.playerAfterMulti.avgPeak +
-        '　平均复活 ' + e.playerAfterMulti.avgRevives]);
-    } else if (pa) {
-      rows.push(['玩家结果', (pa.won ? '通关' : '未通关') + '，峰值 ' + pa.peak + '，复活 ' + pa.revives + '/' + pa.reviveCap]);
-    }
-    rows.push(['提示', '继续修图后如需新的重构结果，请再点「重新生成关卡」；导出包不会自动生成，旧导出包也不会被覆盖。']);
-    box.innerHTML = kvTable(rows);
-  }
-
-  function renderExportLibrary() {
-    var infoBox = $('exportLibInfo'), listBox = $('exportLibList');
-    // 如实显示占用水位（任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825）：
-    //   浏览器每站点约 5 MB，按 UTF-16 计费 ≈ 字符数 × 2。以前不显示，用户只能等爆了才发现。
-    var chars = exportLibBytes();
-    var usedMB = chars * 2 / 1024 / 1024;          // UTF-16 实际占用
-    var LIMIT_MB = 5;
-    var pct = Math.round(usedMB / LIMIT_MB * 100);
-    var perEntry = S.exportLib.length ? chars / S.exportLib.length : 0;
-    var room = perEntry > 0 ? Math.max(0, Math.floor((LIMIT_MB * 1024 * 1024 / 2 - chars) / perEntry)) : '—';
-    var lvl = pct >= 85 ? '<span class="tag warn">接近上限</span> ' : (pct >= 60 ? '<span class="tag">偏高</span> ' : '');
-    infoBox.innerHTML = kvTable([
-      ['当前待导出库', S.exportLib.length + ' 关（本地保存，刷新页面不丢失）'],
-      ['本地存储占用', lvl + usedMB.toFixed(2) + ' MB / 约 ' + LIMIT_MB + ' MB（' + pct + '%）' +
-        (S.exportLib.length ? '　单关约 ' + kb(perEntry) + '　按当前体积还能放约 ' + room + ' 关' : '') +
-        '<br><span class="hint">上限是浏览器给每个站点的配额，不是本工具设的。快满时先「批量导出」下载，再「清空待导出库」。</span>']
-    ]);
-    if (!S.exportLib.length) { listBox.innerHTML = '<div class="item muted">暂无</div>'; return; }
-    var h = S.exportLib.map(function (e) {
-      return '<div class="item" data-key="' + e.key + '">' +
-        '<label style="flex:0 0 auto"><input type="checkbox" class="libCheck" data-key="' + e.key + '"></label>' +
-        '<span class="nm">' + e.key + '</span>' +
-        '<span class="tag ok">' + e.strategy + '</span>' +
-        '<button class="btn tiny libOpen" data-key="' + e.key + '">打开</button>' +
-        '<button class="btn tiny ghost libRemove" data-key="' + e.key + '">移除</button>' +
-        '</div>';
-    }).join('');
-    listBox.innerHTML = h;
-    Array.prototype.forEach.call(listBox.querySelectorAll('.libOpen'), function (el) {
-      el.onclick = function () { openExportLibEntry(el.getAttribute('data-key')); };
-    });
-    Array.prototype.forEach.call(listBox.querySelectorAll('.libRemove'), function (el) {
-      el.onclick = function () { removeFromExportLibrary(el.getAttribute('data-key')); };
-    });
-  }
-
-  /** 批量导出：把待导出库里选中的（或全部）条目逐关打包进同一个 ZIP，每关一个子目录。 */
-  function exportLibraryBatch(onlyChecked) {
-    var entries = S.exportLib;
-    if (onlyChecked) {
-      var checkedKeys = Array.prototype.filter.call(document.querySelectorAll('.libCheck'), function (el) { return el.checked; })
-        .map(function (el) { return el.getAttribute('data-key'); });
-      entries = S.exportLib.filter(function (e) { return checkedKeys.indexOf(e.key) >= 0; });
-      if (!entries.length) { log('未勾选任何待导出库条目'); return; }
-    }
-    if (!entries.length) { log('待导出库为空'); return; }
-    // 条目类型守卫（任务 ANT-ARTTOOL-SUBJECT-EXTRACT-20260902）。
-    //   本工具自本轮起有两类条目：关卡条目（本库）与图纸条目（type='artPiece'，另一个 localStorage key）。
-    //   两库物理隔离，正常使用下图纸进不了这里。但下面的打包逻辑**无条件**读
-    //   `e.originalLevel` / `e.reconstructedLevel`，一旦有条目缺这两项（手改过 localStorage、
-    //   旧版残留、或将来新增第三类条目），整次导出会带着一个看不懂的报错全挂。
-    //   所以这里先筛一遍：能打包的照常，不能打包的**跳过并如实报出来**，不静默丢也不整批失败。
-    var skipped = entries.filter(function (e) {
-      return !e || e.type === C.ART_PIECE_TYPE || !e.originalLevel || !e.reconstructedLevel;
-    });
-    if (skipped.length) {
-      entries = entries.filter(function (e) { return skipped.indexOf(e) < 0; });
-      log('⚠ 跳过 ' + skipped.length + ' 个不是「关卡条目」的项：' +
-        skipped.map(function (e) {
-          return (e && e.key ? e.key : '(无名)') +
-            (e && e.type === C.ART_PIECE_TYPE ? '(图纸条目，请用「12. 主体提取」里的导出图纸库)' : '(缺关卡数据)');
-        }).join('、'));
-      if (!entries.length) { log('筛掉之后没有可导出的关卡条目了'); return; }
-    }
-    busy(true); overlay(true, '批量打包中（' + entries.length + ' 关）…');
-    var files = [];
-    var pngPromises = [];
-    var manifestRows = [['关卡名', '验证状态', '重构方式', '玩家通关率(重构后)', '暂存峰值(重构后)',
-      '复活次数(重构后)', '棋盘与黑块', '障碍参数容差', '方案文件', '重构时间']];
-    // ===== 分类汇总层（2026-08-05 需求）=====
-    // 原实现只按 e.key 每关一个子目录，跨关没有归纳，取「所有新关卡」得逐个目录翻。
-    // 这里在同一个 ZIP 内并列增加 汇总/ 一层：按数据类型跨关归并、新旧各自一个目录、
-    // 文件名一律用【原关卡名】（不再是 新关卡_官方格式.json 这类固定名）。
-    // 单关目录保持原样不动，便于逐关下钻与回溯；代价是包内文件数约翻倍（纯文本，压缩后可接受）。
-    var DIGEST = '汇总/';
-    function digest(sub, key, ext, text) {
-      files.push({ name: DIGEST + sub + '/' + key + ext, text: text });
-    }
-    entries.forEach(function (e) {
-      var dir = e.key + '/';
-      // 各项内容只序列化一次，同时写进「单关目录」与「汇总层」，避免两处内容漂移。
-      var txtOfficialOld = JSON.stringify(C.toGameFormatLevel(e.originalLevel), null, 1);
-      var txtOfficialNew = JSON.stringify(C.toGameFormatLevel(e.reconstructedLevel), null, 1);
-      var txtInnerOld = JSON.stringify(e.originalLevel, null, 1);
-      var txtInnerNew = JSON.stringify(e.reconstructedLevel, null, 1);
-      var txtMapNew = C.serializeTxt(e.editedBlocks);
-      var txtMapOld = C.serializeTxt(e.originalBlocks);
-      var txtPickOld = JSON.stringify(e.originalPickOrder || [], null, 1);
-      var txtPickNew = JSON.stringify(e.reconstructedPickOrder || [], null, 1);
-      var txtPlayerCmp = JSON.stringify({
-        说明: '原关卡为固定种子单次；重构后为生成器内部正式单次 + 多轮随机种子。playerHealth 为玩家模拟有效性检查结果。',
-        before: e.playerBefore || null,
-        afterOfficial: e.playerAfterOfficial || null,
-        afterMulti: e.playerAfterMulti || null,
-        playerHealth: e.playerHealth || null
-      }, null, 1);
-
-      // 正式游戏端关卡文件（与工具内部无损数据明确区分，需求 §七第5点）
-      files.push({ name: dir + '正式游戏端关卡文件/原关卡_官方格式.json', text: txtOfficialOld });
-      files.push({ name: dir + '正式游戏端关卡文件/新关卡_官方格式.json', text: txtOfficialNew });
-      // 工具内部无损数据
-      files.push({ name: dir + '工具内部数据/原关卡_内部结构.json', text: txtInnerOld });
-      files.push({ name: dir + '工具内部数据/新关卡_内部结构.json', text: txtInnerNew });
-      // 修改后目标图 TXT
-      files.push({ name: dir + '修改后目标图.txt', text: txtMapNew });
-      files.push({ name: dir + '原目标图.txt', text: txtMapOld });
-      // 求解与玩家结果
-      files.push({ name: dir + '求解与玩家结果/原关卡pickOrder.json', text: txtPickOld });
-      files.push({ name: dir + '求解与玩家结果/新关卡pickOrder.json', text: txtPickNew });
-      files.push({ name: dir + '求解与玩家结果/玩家结果对比.json', text: txtPlayerCmp });
-
-      // ---- 汇总层：按类型跨关归并，新旧分目录，文件名用原关卡名 ----
-      digest('正式游戏端关卡文件/新关卡', e.key, '.json', txtOfficialNew);
-      digest('正式游戏端关卡文件/原关卡', e.key, '.json', txtOfficialOld);
-      digest('工具内部数据/新关卡', e.key, '.json', txtInnerNew);
-      digest('工具内部数据/原关卡', e.key, '.json', txtInnerOld);
-      digest('目标图/新关卡', e.key, '.txt', txtMapNew);
-      digest('目标图/原关卡', e.key, '.txt', txtMapOld);
-      digest('求解与玩家结果/新关卡pickOrder', e.key, '.json', txtPickNew);
-      digest('求解与玩家结果/原关卡pickOrder', e.key, '.json', txtPickOld);
-      digest('求解与玩家结果/玩家结果对比', e.key, '.json', txtPlayerCmp);
-
-      // 生效的生成器参数
-      var txtGenParams = JSON.stringify({
-        方案文件: (e.genParamsUsed && e.genParamsUsed.fileName) || '未导入方案（使用工具默认参数）',
-        原始识别参数: (e.genParamsUsed && e.genParamsUsed.recognized) || null,
-        未识别字段: (e.genParamsUsed && e.genParamsUsed.unrecognized) || [],
-        字段冲突: (e.genParamsUsed && e.genParamsUsed.conflicts) || [],
-        最终采用参数说明: '网页方案文件的正式生效参数以 config 为准，inputs 只是页面历史输入记录，不参与生成。',
-        生成器实际生效参数: e.effectiveConfig || null,
-        暂存上限说明: '暂存上限是玩法固定口径 ' + C.BUFFER_LIMIT + '，方案给了不同值也不采用。',
-        障碍参数核对: e.obstacleCheck || null,
-        障碍参数容差说明: C.OBSTACLE_TOLERANCE_NOTE,
-        重构方式: RECON_STRATEGY_NAME,
-        修改时间: e.editedAt || null,
-        重构时间: e.reconstructedAt || null,
-        版本说明: TOOL_VERSION_NOTE
-      }, null, 1);
-      files.push({ name: dir + '生效的生成器参数.json', text: txtGenParams });
-      digest('生效的生成器参数', e.key, '.json', txtGenParams);
-      // 前后对比分析报告
-      var pAfter = normalizePlayerResult(e.playerAfterOfficial);
-      var pBefore = normalizePlayerResult(e.playerBefore);
-      var healthy = !e.playerHealth || e.playerHealth.ok;
-      var reportLines = [
-        '# ' + e.key + ' 批量导出对比报告', '',
-        '- 重构方式：' + RECON_STRATEGY_NAME,
-        '- 验证状态：' + e.validationStatus,
-        '- 方案文件：' + ((e.genParamsUsed && e.genParamsUsed.fileName) || '未导入方案（使用工具默认参数）'),
-        '- 修改时间：' + (e.editedAt || '—'),
-        '- 重构时间：' + (e.reconstructedAt || '—'),
-        '- 条目最后更新：' + e.lastModified,
-        '- 版本说明：' + TOOL_VERSION_NOTE,
-        '- 进度区间：' + (e.interval ? (e.interval.requested.lo + '%-' + e.interval.requested.hi + '%') : '未定位'),
-        '- 暂存峰值：修改前 ' + (e.pressureBefore ? e.pressureBefore.peak : '—') + ' → 重构后 ' + (e.pressureAfter ? e.pressureAfter.peak : '—')
-      ];
-      if (e.board) {
-        reportLines.push('- 重构后棋盘：' + e.board.rows + ' 行 × ' + e.board.cols + ' 列，共 ' + e.board.capacity + ' 格' +
-          '（列-行=' + e.board.shapeDiff + '，' + (e.board.shapeOk ? '形态合规' : '**形态不合规**') + '）',
-          '- 棋盘构成：盒 ' + e.board.boxCells + '，黑块 ' + e.board.blackCells +
-          '，管道 ' + e.board.pipeCells + '，空格 ' + e.board.emptyCells);
-      }
-      if (e.obstacleCheck) {
-        obstacleCheckMarkdown(e.obstacleCheck).forEach(function (l) { reportLines.push(l); });
-      } else if (e.board) {
-        reportLines.push('- 黑块：目标 ' + (e.effectiveConfig ? e.effectiveConfig.blackPercent + '%' : '—') +
-          '，实际 ' + e.board.blackCells + ' 格 = ' + e.board.blackPercent + '%',
-          '- 说明：这条记录是障碍参数核对上线（2026-07-31）前入库的，只有黑块一项，没有冰块/问号/锁链的目标与实际对比。');
-      }
-      if (!healthy) {
-        reportLines.push('- ⚠ 玩家验证接口异常：' + (e.playerHealth && e.playerHealth.detail) +
-          '。玩家相关数值不可用，不得视为「0% 通关率」。');
-      } else {
-        reportLines.push('- 玩家是否通关：修改前 ' + (pBefore ? (pBefore.won ? '通关' : '未通关') : '—') +
-          ' → 重构后 ' + (pAfter ? (pAfter.won ? '通关' : '未通关') : '—'),
-          '- 玩家复活次数：修改前 ' + (pBefore ? (pBefore.revives + '/' + pBefore.reviveCap) : '—') +
-          ' → 重构后 ' + (pAfter ? (pAfter.revives + '/' + pAfter.reviveCap) : '—'));
-        var em = e.playerAfterMulti;
-        if (em && em.rounds) {
-          reportLines.push('', '## 多轮玩家验证（随机种子）', '',
-            '| 种子 | 是否通关 | 暂存峰值 | 复活次数/上限 | 完成盒数/总盒数 |', '| --- | --- | --- | --- | --- |');
-          em.rounds.forEach(function (x) {
-            if (x.error) { reportLines.push('| ' + x.seed + ' | 本轮异常 | — | — | — |'); return; }
-            reportLines.push('| ' + x.seed + ' | ' + (x.won ? '通关' : '未通关') + ' | ' + x.bufferPeak +
-              ' | ' + x.revivesUsed + '/' + x.reviveCap + ' | ' + x.completedBoxes + '/' + x.totalBoxes + ' |');
-          });
-          reportLines.push('', '- 总通关率：' + (em.successRate * 100).toFixed(0) + '%（' + em.roundCount + ' 轮）',
-            '- 平均暂存峰值：' + em.avgPeak, '- 平均复活次数：' + em.avgRevives, '');
-        }
-      }
-      // 进度区域专用对比图（需求 §六.4）：用条目里存的区域数据离屏重绘专用画布，
-      // 不是主画布截屏；条目没做过区域对比时如实放缺失说明，不拿别的图充数。
-      var rcCv = buildRegionCompareCanvasFromEntry(e);
-      if (rcCv) {
-        pngPromises.push(canvasToPngBytes(rcCv).then(function (bytes) {
-          files.push({ name: dir + '进度区域专用对比图.png', bytes: bytes });
-        }));
-        reportLines.push('- 进度区域变化：共同 ' + e.regionCompare.common.length + ' 像素，只在修改前 ' +
-          e.regionCompare.onlyBefore.length + ' 像素，只在修改后 ' + e.regionCompare.onlyAfter.length + ' 像素');
-      } else {
-        files.push({ name: dir + '进度区域专用对比图_缺失说明.txt',
-          text: '这一关加入待导出库时没有做过区间区域对比，所以没有这张图。\n' +
-                '补做方法：打开这一关 → 定位进度区间 → 重构成功 → 点「对比当前区间（修改前后）」→ 再次点「添加为待导出库」更新条目。\n' });
-        reportLines.push('- 进度区域变化：加入待导出库时未做区间区域对比，无数据');
-      }
-      var txtReport = reportLines.join('\n') + '\n';
-      files.push({ name: dir + '对比分析报告.md', text: txtReport });
-      digest('对比分析报告', e.key, '.md', txtReport);
-      manifestRows.push([e.key, e.validationStatus, RECON_STRATEGY_NAME,
-        !healthy ? '接口异常' : (e.playerAfterMulti ? ((e.playerAfterMulti.successRate * 100).toFixed(0) + '%') :
-          (pAfter ? (pAfter.won ? '通关' : '未通关') : '—')),
-        e.pressureAfter ? e.pressureAfter.peak : '—',
-        !healthy ? '接口异常' : (pAfter ? (pAfter.revives + '/' + pAfter.reviveCap) : '—'),
-        e.board ? (e.board.rows + '×' + e.board.cols + '，黑块 ' + e.board.blackPercent + '%') : '—',
-        e.obstacleCheck ? e.obstacleCheck.overallText : '无核对数据',
-        e.genParamsUsed && e.genParamsUsed.fileName ? e.genParamsUsed.fileName : '工具默认参数',
-        e.reconstructedAt || '—']);
-    });
-    // 总清单（需求 §六.4：批量包同时提供总清单）
-    var manifestMd = '# 批量导出总清单\n\n共 ' + entries.length + ' 关\n\n' +
-      '- 导出时间：' + new Date().toISOString() + '\n' +
-      '- 版本说明：' + TOOL_VERSION_NOTE + '\n' +
-      '- 本包文件名带导出时间戳，多次导出不会互相覆盖，旧导出包请自行保留。\n\n' +
-      '| ' + manifestRows[0].join(' | ') + ' |\n' + '| ' + manifestRows[0].map(function () { return '---'; }).join(' | ') + ' |\n' +
-      manifestRows.slice(1).map(function (r) { return '| ' + r.join(' | ') + ' |'; }).join('\n') + '\n';
-    files.push({ name: '总清单.md', text: manifestMd });
-    // 汇总层：同一份清单再出一份 CSV（便于直接进表格筛选/排序），与上面 md 同源同轮
-    var csvEsc = function (v) { var s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    files.push({ name: DIGEST + '总清单.csv',
-      text: '\ufeff' + manifestRows.map(function (r) { return r.map(csvEsc).join(','); }).join('\n') + '\n' });
-    files.push({ name: DIGEST + '说明.txt', text:
-      '本目录是按【数据类型】跨关归并的汇总视图，文件名一律用原关卡名。\n' +
-      '包根目录下每关一个同名子目录的结构仍然保留，两者内容完全一致，只是组织方式不同：\n' +
-      '  · 想批量拿某一类数据（例如全部新关卡的官方格式）→ 用本汇总目录\n' +
-      '  · 想看某一关的全部产物 → 用包根目录下该关的子目录\n\n' +
-      '目录含义：\n' +
-      '  正式游戏端关卡文件/新关卡、原关卡   可直接进游戏端的官方格式\n' +
-      '  工具内部数据/新关卡、原关卡         带完整棋盘，可重新导入本工具继续修改\n' +
-      '  目标图/新关卡、原关卡               TXT 目标图\n' +
-      '  求解与玩家结果/新关卡pickOrder、原关卡pickOrder、玩家结果对比\n' +
-      '  生效的生成器参数/                   每关一份实际生效参数与障碍核对\n' +
-      '  对比分析报告/                       每关一份修改前后对比报告\n' +
-      '  总清单.csv                          全部关卡的一行式汇总（与包根 总清单.md 同源）\n\n' +
-      '注意：「新关卡」= 重构后，「原关卡」= 修改前的原始关卡。\n' +
-      '进度区域专用对比图（PNG）只放在单关目录，未纳入汇总层（二进制图不便于跨关批量使用）。\n' });
-
-    // PNG 是 canvas.toBlob 异步产出的，必须等全部图片都收进 files 再打包，否则 ZIP 会少图。
-    Promise.all(pngPromises).then(function () {
-      var blob = zipCreateBinary(files);
-      download('待导出库批量导出_' + entries.length + '关_' + exportStamp() + '.zip', blob);
-      busy(false); overlay(false);
-      log('批量导出完成：' + entries.length + ' 关，共 ' + files.length + ' 个文件（含「汇总/」分类归并视图：新旧关卡分目录、文件名用原关卡名）。');
-    }).catch(function (err) {
-      busy(false); overlay(false);
-      log('批量导出失败：' + (err && err.message));
-    });
-  }
-
-  // ==================== 重新生成关卡（唯一策略：完全重新生成） ====================
-  // 2026-07-31 起只保留「完全重新生成」：策略①保障碍布局换色重配、③保结构重切盒 已按需求
-  // 07.31-关卡重构单策略与方案参数纠正 §三 从页面入口与工具调用中移除。
-  // 走 core.js 包装的正式公开入口 Generator.produce()，不复制算法、不直接调内部 produceFixed。
-  // 失败原样展示 core.js 返回的 reason/detail，不伪造成功。
-
-  var RECON_STRATEGY_NAME = '完全重新生成';
-
-  /**
-   * 障碍参数核对的统一渲染（页面 kv 表用）。
-   * 口径与容差都来自 core.js 的 obstacleCheckOf —— 页面、单关报告、批量报告三处同源，
-   * 不各自算一套；容差是用户 2026-07-31 批准的，必须连来源一起显示出来。
-   */
-  function renderObstacleCheckRows(rows, oc) {
-    if (!oc || !oc.items) return;
-    var lines = oc.items.map(function (x) {
-      var unit = x.kind === 'percent' ? '%' : ' 组';
-      var unitDev = x.kind === 'percent' ? ' 个百分点' : ' 组';
-      var dev = (x.deviation > 0 ? '+' : '') + x.deviation + unitDev;
-      var detail = x.kind === 'percent'
-        ? ('（' + x.actualCount + ' / ' + x.denom + ' ' + x.denomLabel + '）')
-        : '';
-      var verdict;
-      if (x.judged === false) {
-        verdict = '　<span class="tag warn">本次不做判定</span><br><span class="hint">' + x.unjudgedReason + '</span>';
-      } else if (x.withinTolerance) {
-        verdict = '　<span class="tag ok">在容差内</span>';
-      } else {
-        verdict = '　<span class="tag bad">超出容差 ±' + x.tolerance + unitDev + '</span>';
-      }
-      return x.label + '：目标 ' + x.target + unit + '　实际 ' + x.actual + unit + detail +
-        '　偏差 ' + dev + verdict +
-        (x.belowNote ? '<br><span class="hint">' + x.belowNote + '</span>' : '');
-    });
-    if (oc.narrowChainNote) lines.push('<span class="hint">' + oc.narrowChainNote + '</span>');
-    // 整体状态三态，直接用核对结果给出的中文结论，页面不另写一套措辞。
-    var head;
-    if (oc.overall === 'outOfTolerance') head = '<span class="tag bad">障碍参数存在超出容差</span>';
-    else if (oc.overall === 'hasUnjudged') head = '<span class="tag warn">障碍参数存在未判定项</span>';
-    else head = '<span class="tag ok">障碍参数全部在容差内</span>';
-    lines.push('<b>整体结论：' + oc.overallText + '</b>' +
-      (oc.complete ? '' : '　<span class="hint">未达到「完整通过」，请按上面逐项看是哪一项。</span>'));
-    rows.push([head, lines.join('<br>') + '<br><span class="hint">' + oc.toleranceNote + '</span>']);
-  }
-
-  /** 障碍参数核对的 Markdown 版（导出报告用，与页面同源同口径）。 */
-  function obstacleCheckMarkdown(oc) {
-    if (!oc || !oc.items) return [];
-    var out = ['', '## 障碍参数核对（目标 / 实际 / 偏差）', '',
-      '| 参数 | 目标 | 实际 | 分母 | 偏差 | 是否在容差内 |', '| --- | --- | --- | --- | --- | --- |'];
-    oc.items.forEach(function (x) {
-      var unit = x.kind === 'percent' ? '%' : ' 组';
-      var unitDev = x.kind === 'percent' ? ' 个百分点' : ' 组';
-      var dev = (x.deviation > 0 ? '+' : '') + x.deviation + unitDev;
-      var verdict = x.judged === false ? '本次不做判定'
-        : (x.withinTolerance ? '是' : '**否，超出 ±' + x.tolerance + unitDev + '**');
-      out.push('| ' + x.label + ' | ' + x.target + unit + ' | ' + x.actual + unit +
-        (x.kind === 'percent' ? '（' + x.actualCount + ' 个）' : '') + ' | ' +
-        (x.kind === 'percent' ? x.denom + ' ' + x.denomLabel : '—') + ' | ' + dev + ' | ' + verdict + ' |');
-    });
-    out.push('', '- 容差口径：' + oc.toleranceNote,
-      '- **整体状态：' + oc.overallText + '**' +
-      (oc.complete ? '（四项全部判定且全部在容差内，算完整通过）'
-        : '（未达到完整通过：只有四项全部判定且全部在容差内才算通过）'),
-      '- 分母与正式生成器一致：黑块按棋盘容量算，冰块与问号按棋盘盒格数算，锁链按组数算。');
-    if (oc.unjudged && oc.unjudged.length) {
-      out.push('- 本次未做判定的项：' + oc.unjudged.join('、') + '。原因：' +
-        oc.items.filter(function (x) { return !x.judged; }).map(function (x) { return x.unjudgedReason; }).join(' / '));
-    }
-    oc.items.forEach(function (x) { if (x.belowNote) out.push('- ' + x.label + '：' + x.belowNote); });
-    if (oc.narrowChainNote) out.push('- ' + oc.narrowChainNote);
-    return out;
-  }
-  // 导出包与列表记录里注明的版本说明（需求 07.31 §七第8点）。
-  var TOOL_VERSION_NOTE = '关卡图修改工具 2026-07-31 版：重构只保留「完全重新生成」一种方式，走正式生成器的正常生产入口；' +
-    '方案文件的正式生效参数取方案本体、不取页面历史输入；玩家验证 = 生成器内部正式单次 + 5 个固定随机种子多轮。';
   // 导出文件名带时间戳：同一关多次导出会得到不同文件名，新导出不会覆盖旧导出（需求 §七第7点）。
   function exportStamp() {
     var d = new Date();
@@ -5689,565 +3865,17 @@
       p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
   }
 
-  /**
-   * 玩家结果字段归一化。两种来源的字段名不同，必须统一后再展示/导出，否则会显示成空值：
-   *   PlayerSim.run 直接返回：won / bufferPeak / revivesUsed / reviveCap（原关卡走这条）
-   *   生成器 generationEval.player：won / peak / revives / reviveCap（重构后关卡走这条）
-   */
-  function normalizePlayerResult(p) {
-    if (!p) return null;
-    return {
-      won: !!p.won,
-      peak: p.bufferPeak != null ? p.bufferPeak : (p.peak != null ? p.peak : 0),
-      revives: p.revivesUsed != null ? p.revivesUsed : (p.revives != null ? p.revives : 0),
-      reviveCap: p.reviveCap != null ? p.reviveCap : 2
-    };
-  }
-
-  /** 导入生成器标准参数文件（需求 §四）：解析、识别字段，未识别字段列出不丢弃，供重构调用时传入。 */
-  function loadGenParamsFile(file) {
-    var reader = new FileReader();
-    reader.onload = function () {
-      var r = C.parseGeneratorParamsFile(reader.result);
-      if (!r.ok) {
-        log('导入生成器参数失败：' + r.detail);
-        $('genParamsInfo').innerHTML = kvTable([['导入失败', r.detail]]);
-        return;
-      }
-      // 网页方案文件里 inputs 只是页面历史输入状态，正式生效参数一律以 config 为准（需求 §四.1）。
-      // 这里额外把两者不一致的字段挑出来展示，便于核对，但不会用 inputs 覆盖 config。
-      var conflicts = detectSchemeConflicts(reader.result, r.recognized);
-      S.genParams = {
-        recognized: r.recognized, unrecognized: r.unrecognized, source: r.source,
-        fileName: file.name, conflicts: conflicts
-      };
-      renderGenParamsInfo();
-      renderReconParamPreview();
-      $('btnClearGenParams').style.display = '';
-      log('已导入生成器参数：' + file.name + '（' + r.source + '），识别 ' + Object.keys(r.recognized).length + ' 项' +
-        (r.unrecognized.length ? '，未识别 ' + r.unrecognized.length + ' 项（不丢弃，见下方列表）' : '') +
-        (conflicts.length ? '；其中 ' + conflicts.length + ' 项与文件里的历史输入值不同，正式生效值取 config' : ''));
-    };
-    reader.readAsText(file);
-  }
-
-  // 网页方案文件里 inputs 的输入框 id ↔ 正式参数名 的对应关系（只用于「展示冲突」，不参与取值）。
-  var SCHEME_INPUT_MAP = {
-    'gen-boxmin': 'boxSizeMin', 'gen-boxmax': 'boxSizeMax', 'gen-boxmode': 'boxSizeMode',
-    'gen-buffer': 'bufferLimit', 'gen-ice': 'icePercent', 'gen-black': 'blackPercent',
-    'gen-chain': 'chainCount', 'gen-question': 'questionPercent',
-    'gen-rowsmin': 'boardRowsMin', 'gen-rowsmax': 'boardRowsMax',
-    'gen-colsmin': 'boardColsMin', 'gen-colsmax': 'boardColsMax',
-    'gen-candidate': 'candidateCount', 'gen-budget': 'timeBudgetMs'
-  };
-
-  /**
-   * 找出网页方案文件里 inputs 与 config 取值不同的字段（需求 §四.1/§四.2：
-   * 冲突要能看见，但不得把 inputs 覆盖到生效参数上）。
-   */
-  function detectSchemeConflicts(text, recognized) {
-    var out = [];
-    var json = null;
-    try { json = JSON.parse(String(text).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')); }
-    catch (e) { return out; }
-    if (!json || !json.inputs || typeof json.inputs !== 'object') return out;
-    Object.keys(SCHEME_INPUT_MAP).forEach(function (inKey) {
-      var cfgKey = SCHEME_INPUT_MAP[inKey];
-      if (!(inKey in json.inputs)) return;
-      if (!(cfgKey in recognized)) return;
-      var iv = json.inputs[inKey], cv = recognized[cfgKey];
-      if (String(iv) !== String(cv)) out.push({ inputKey: inKey, paramKey: cfgKey, inputValue: iv, configValue: cv });
-    });
-    return out;
-  }
-
-  /**
-   * 点重构前的关键参数确认区（需求 §四.2）：用中文列出这次真正会生效的参数。
-   * 没导入方案时显示工具默认值，并注明来源。
-   */
-  function renderReconParamPreview() {
-    var box = $('reconParamPreview');
-    if (!box) return;
-    var Gen = window.AntSolver && window.AntSolver.Generator;
-    var base = (Gen && Gen.DEFAULT_CONFIG) || {};
-    var eff = Object.assign({}, base, (S.genParams && S.genParams.recognized) || {});
-    var src = S.genParams ? ('导入方案 ' + S.genParams.fileName) : '工具默认参数（未导入方案）';
-    // 暂存上限是玩法固定口径（用户已确认为 5），重构时一律按固定值执行；
-    // 方案若给了不同值，不能在这里显示成方案值，否则展示与实际生效不一致（需求 §四.2）。
-    var fixedBuffer = C.BUFFER_LIMIT;
-    var rows = [
-      ['参数来源', src],
-      ['底部消除', eff.bottomOnly ? '开启' : '关闭'],
-      ['盒容量', eff.boxSizeMin + '—' + eff.boxSizeMax],
-      ['暂存上限', String(fixedBuffer) + '（玩法固定口径）'],
-      ['黑块', eff.blackPercent + '%'],
-      ['冰块', eff.icePercent + '%'],
-      ['锁链', eff.chainCount + ' 组'],
-      ['问号', eff.questionPercent + '%'],
-      ['棋盘范围', eff.boardRowsMin + '—' + eff.boardRowsMax + ' 行 × ' + eff.boardColsMin + '—' + eff.boardColsMax + ' 列'],
-      ['窄路', (eff.narrowPath ? '开启' : '关闭') + '，缺口 ' + eff.narrowPathGapsMin + '—' + eff.narrowPathGapsMax],
-      ['障碍参数容差', C.OBSTACLE_TOLERANCE_NOTE + '　重构后会逐项给出目标/实际/偏差与是否在容差内。']
-    ];
-    var cf = (S.genParams && S.genParams.conflicts) || [];
-    if (cf.length) {
-      rows.push(['<span class="tag warn">字段冲突</span>',
-        cf.map(function (x) {
-          return x.paramKey + '：方案里的历史输入值 ' + x.inputValue + '，正式生效值取 ' + x.configValue;
-        }).join('<br>') + '<br>正式生效值一律取 config，历史输入值不参与生成。']);
-    }
-    var schemeBuffer = S.genParams && S.genParams.recognized ? S.genParams.recognized.bufferLimit : null;
-    if (schemeBuffer != null && Number(schemeBuffer) !== Number(fixedBuffer)) {
-      rows.push(['<span class="tag warn">被工具强制覆盖</span>',
-        '方案里的暂存上限是 ' + schemeBuffer + '，本工具一律按玩法固定口径 ' + fixedBuffer +
-        ' 执行，不采用方案值。若确需改这个口径，属于玩法规则变更，需另行确认。']);
-    }
-    box.innerHTML = kvTable(rows);
-  }
-
-  /** 显示已导入参数的简洁中文摘要 + 未识别字段列表（需求 §五第3、6点：不得悄悄丢弃未识别字段）。 */
-  function renderGenParamsInfo() {
-    var box = $('genParamsInfo');
-    if (!S.genParams) { box.innerHTML = ''; return; }
-    var gp = S.genParams;
-    var rows = [
-      ['来源文件', gp.fileName + '（' + gp.source + '）'],
-      ['已识别参数', Object.keys(gp.recognized).map(function (k) { return k + '=' + gp.recognized[k]; }).join('，')]
-    ];
-    if (gp.unrecognized.length) {
-      rows.push(['<span class="tag warn">未识别字段</span>', gp.unrecognized.join('、') + '（不属于正式生成器标准参数，已忽略，未静默丢弃——如实列出）']);
-    }
-    box.innerHTML = kvTable(rows);
-  }
-
-  function runReconstruct() {
-    var it = cur();
-    if (!it || !it.blocks) { log('请先选择一关'); return; }
-    var newBlocks = it.blocks;   // 若用户在「8. 美术编辑」改过色，it.blocks 已是改后的目标图
-    // 需求 §四：导入了生成器标准参数时，重构必须按该参数执行，不得用工具默认值静默覆盖。
-    var genCfg = S.genParams ? S.genParams.recognized : {};
-    busy(true); overlay(true, '重新生成关卡中' + (S.genParams ? '（已应用导入方案参数）' : '') + '…可能需要较长时间');
-    var t0 = Date.now();
-    setTimeout(function () {
-      var res = null, err = null;
-      try { res = C.reconstructFullRegenerate(newBlocks, genCfg); }
-      catch (e) { err = e; }
-      busy(false); overlay(false);
-      var elapsedMs = Date.now() - t0;
-      if (err) {
-        log('重新生成异常：' + (err && err.message));
-        renderReconInfo({ ok: false, strategy: 'fullRegenerate', reason: 'exception', detail: err && err.message }, elapsedMs);
-        return;
-      }
-      it.reconResult = res;
-      it.reconResult.genParamsUsed = S.genParams ? {
-        fileName: S.genParams.fileName, recognized: S.genParams.recognized,
-        unrecognized: S.genParams.unrecognized, conflicts: S.genParams.conflicts || []
-      } : null;
-      it.reconResult.reconstructedAt = new Date().toISOString();
-      renderReconInfo(res, elapsedMs);
-      if (res.ok) {
-        // 不自动覆盖原关卡，只标出「有可用的重构后视图」，用户通过下方单选切换查看/回放。
-        $('reconViewSwitch').style.display = '';
-        $('reconRegionRow').style.display = it.interval ? '' : 'none';
-        $('reconExportRow').style.display = '';
-        renderReconCompareTable(it);
-        var ph = res.playerHealth;
-        if (ph && !ph.ok) {
-          // 需求 §六.2：接口异常时禁止把它当成 0% 通关率，必须显式报异常。
-          log('⚠ 重新生成成功，但玩家验证接口异常（' + ph.detail + '）。玩家相关数值本次不可用，请勿据此判断关卡难度。');
-        } else {
-          var m = res.playerMulti;
-          log('重新生成成功，耗时 ' + (elapsedMs / 1000).toFixed(1) + 's' +
-            (m ? ('；多轮玩家通关率 ' + (m.successRate * 100).toFixed(0) + '%（' + m.roundCount + ' 轮），平均暂存峰值 ' + m.avgPeak) : '') +
-            '。可在下方切换查看原关卡/重构后关卡。');
-        }
-      } else {
-        $('reconViewSwitch').style.display = 'none';
-        $('reconRegionRow').style.display = 'none';
-        $('reconExportRow').style.display = 'none';
-        log('重新生成失败：' + res.reason + (res.detail ? '（' + res.detail + '）' : '') +
-          '，耗时 ' + (elapsedMs / 1000).toFixed(1) + 's');
-      }
-    }, 30);
-  }
-
-  /** 切关/清空时复位重构闭环相关的显示状态，避免带着上一关的重构结果误导当前关。 */
-  function resetReconView() {
-    S.viewMode = 'before';
-    var vs = document.querySelectorAll('input[name="viewMode"]');
-    for (var i = 0; i < vs.length; i++) vs[i].checked = (vs[i].value === 'before');
-    $('reconViewSwitch').style.display = 'none';
-    $('reconRegionRow').style.display = 'none';
-    $('reconExportRow').style.display = 'none';
-    $('reconCompareTable').innerHTML = '';
-    $('reconRegionInfo').innerHTML = '';
-    $('regionCompareBox').style.display = 'none';
-    $('reconInfo').innerHTML = '';
-    $('optPressureOverlay').checked = false;
-    // 切关后压力图回到全知轨迹，避免带着上一关的玩家轮次选择继续看
-    S.pressureTrack = 'omni';
-    var bo = $('btnTrackOmni'), bp = $('btnTrackPlayer');
-    if (bo && bp) { bo.className = 'btn primary'; bp.className = 'btn ghost'; }
-    $('playerSeedRow').style.display = 'none';
-    $('pressureTrackInfo').innerHTML = '';
-  }
-
-  function renderReconInfo(res, elapsedMs) {
-    var box = $('reconInfo');
-    var rows = [
-      ['方式', RECON_STRATEGY_NAME],
-      ['耗时', (elapsedMs / 1000).toFixed(1) + 's']
-    ];
-    if (S.genParams) rows.push(['参数来源', '导入方案「' + S.genParams.fileName + '」']);
-    else rows.push(['参数来源', '工具默认参数（未导入方案）']);
-
-    if (!res.ok) {
-      rows.push(['结果', '<span class="tag bad">失败</span>']);
-      rows.push(['失败阶段', res.stage || res.reason || '未知']);
-      if (res.detail) rows.push(['原因', res.detail]);
-      if (res.solveResult) rows.push(['求解进度', (res.solveResult.progress || 0) + '%' + (res.solveResult.completed ? '（已通关）' : '（未通关）')]);
-      if (res.timedOut) rows.push(['提示', '已超时兜底，仍无合法候选']);
-      if (res.effectiveConfig) rows.push(['尝试时实际使用参数', '盒容量 ' + res.effectiveConfig.boxSizeMin + '—' + res.effectiveConfig.boxSizeMax]);
-      box.innerHTML = kvTable(rows);
-      return;
-    }
-
-    rows.push(['结果', '<span class="tag ok">成功</span>']);
-    if (res.retries != null) rows.push(['重试轮次', res.retries]);
-
-    // 棋盘实况与最终黑块（需求 §五：报告需显示目标黑块、实际黑块与实际比例）
-    var b = res.board;
-    if (b) {
-      rows.push(['重构后棋盘', b.rows + ' 行 × ' + b.cols + ' 列（共 ' + b.capacity + ' 格）' +
-        (b.shapeOk ? '' : '　<span class="tag warn">形态不合规：列-行=' + b.shapeDiff + '</span>')]);
-      rows.push(['棋盘构成', '盒 ' + b.boxCells + '　黑块 ' + b.blackCells + '　管道 ' + b.pipeCells + '　空格 ' + b.emptyCells]);
-    }
-    // 障碍参数核对：逐项列出目标/实际/偏差，并写明容差是谁批准的。
-    // 以前这里是隐式的「实际 > 目标+5 就标超标」，读者看不到容差本身，已改为显式展示。
-    if (res.obstacleCheck) renderObstacleCheckRows(rows, res.obstacleCheck);
-
-    if (res.solveResult) {
-      rows.push(['全知求解', '通关，步数 ' + res.solveResult.steps + '，暂存峰值 ' + (res.solveResult.maxBuffer || 0)]);
-    }
-    if (res.difficulty) {
-      rows.push(['难度分 / 档', (res.difficulty.score != null ? res.difficulty.score : '—') + ' / ' + (res.difficulty.grade || '—')]);
-    }
-
-    // 玩家验证（需求 §六）：接口异常时必须报异常，不得显示成 0% 通关率
-    var ph = res.playerHealth;
-    if (ph && !ph.ok) {
-      rows.push(['<span class="tag bad">玩家验证接口异常</span>',
-        ph.detail + '<br>本次玩家相关数值不可用，请勿据此判断关卡难度。']);
-    } else {
-      if (res.playerOfficial) {
-        var p = res.playerOfficial;
-        rows.push(['玩家结果(生成器正式单次)', (p.won ? '通关' : '未通关') +
-          '，暂存峰值 ' + p.peak + '，复活 ' + p.revives + '/' + p.reviveCap]);
-      }
-      var m = res.playerMulti;
-      if (m) {
-        rows.push(['多轮玩家通关率', '通关率 ' + (m.successRate * 100).toFixed(0) + '%（' + m.roundCount +
-          ' 轮随机种子）　平均暂存峰值 ' + m.avgPeak + '　平均复活 ' + m.avgRevives]);
-        rows.push(['多轮逐轮明细', m.rounds.map(function (x) {
-          if (x.error) return '种子 ' + x.seed + '：本轮异常';
-          return '种子 ' + x.seed + '：' + (x.won ? '通关' : '未通关') +
-            '，峰值 ' + x.bufferPeak + '，复活 ' + x.revivesUsed + '/' + x.reviveCap +
-            '，完成盒 ' + x.completedBoxes + '/' + x.totalBoxes;
-        }).join('<br>')]);
-      }
-    }
-
-    if (res.effectiveConfig) {
-      var ec = res.effectiveConfig;
-      rows.push(['实际生效参数', '底部消除 ' + (ec.bottomOnly ? '开启' : '关闭') +
-        '　盒容量 ' + ec.boxSizeMin + '—' + ec.boxSizeMax +
-        '　暂存 ' + ec.bufferLimit +
-        '　黑块 ' + ec.blackPercent + '%　冰块 ' + ec.icePercent + '%' +
-        '　锁链 ' + ec.chainCount + ' 组　问号 ' + ec.questionPercent + '%' +
-        '　棋盘范围 ' + ec.boardRowsMin + '—' + ec.boardRowsMax + ' 行 × ' + ec.boardColsMin + '—' + ec.boardColsMax + ' 列' +
-        '　窄路缺口 ' + ec.narrowPathGapsMin + '—' + ec.narrowPathGapsMax]);
-    }
-    var cf = S.genParams && S.genParams.conflicts;
-    if (cf && cf.length) {
-      rows.push(['方案字段冲突', cf.map(function (x) {
-        return x.paramKey + '：历史输入值 ' + x.inputValue + '，正式生效值 ' + x.configValue;
-      }).join('<br>') + '<br>正式生效值取 config，历史输入值不参与生成。']);
-    }
-    if (res.reconstructedAt) rows.push(['生成时间', res.reconstructedAt]);
-    box.innerHTML = kvTable(rows);
-  }
-
-  /**
-   * 修改前后完整指标对比表（需求 §3.1 要求的11项）：是否可解/求解步数/暂存峰值/暂存均值/
-   * 前中后压力/卡点位置/难度分档/玩家是否通关/玩家复活次数。压力曲线的峰值/均值/卡点复用
-   * pressureCurveFromTl 的口径，前中后压力借用 Analysis.chokepointAudit 已算出的 early/mid/late 峰窗均值。
-   */
-  function renderReconCompareTable(it) {
-    var m = collectCompareMetrics(it);
-    if (!m) { $('reconCompareTable').innerHTML = ''; return; }
-    var h = '<table><tr><td class="k">指标</td><td class="v">修改前</td><td class="v">重构后</td></tr>';
-    m.rows.forEach(function (r) {
-      h += '<tr><td class="k">' + r.label + '</td><td class="v">' + r.before + '</td><td class="v">' + r.after + '</td></tr>';
-    });
-    $('reconCompareTable').innerHTML = h + '</table>';
-  }
-
-  /**
-   * 汇总修改前后的完整指标。页面对比表和导出报告都只从这里取数，
-   * 保证两处永远是同一份结论，不会各算一套（需求 §七第2点：报告要直接写全这些字段）。
-   * @returns {{rows: Array<{label:string, before:*, after:*}>, extra: object}|null} 未重构成功时返回 null
-   */
-  function collectCompareMetrics(it) {
-    var rr = it && it.reconResult;
-    if (!rr || !rr.ok) return null;
-    if (!rr.tl) rr.tl = C.reconstructToTimeline(rr);
-    // 修改前（原关卡）压力口径：走真实压力样本（officialSamplesOf），不反推；
-    // 修改前的原关卡没有导入求解数据的 audit 字段时（现场求解），用样本现算，
-    // 口径与需求 §三.2 一致（正式审核必须来自 pressureSamples，不能来自点击时间线）。
-    var curveBefore = it.pressureCurve ||
-      (it.pressureCurve = C.pressureCurveFromTl(it.tl, {
-        officialAuditPrecomputed: it.solve && it.solve.audit ? it.solve.audit : null,
-        officialSamples: officialSamplesOf(it)
-      }));
-    var curveAfter = rr.tl ? (rr.pressureCurve ||
-      (rr.pressureCurve = C.pressureCurveFromTl(rr.tl, { officialAuditPrecomputed: rr.audit || null }))) : null;
-    var ab = curveBefore.audit, aa = curveAfter && curveAfter.audit;
-    // 原关卡玩家结果：优先用导入求解数据里已有的真实玩家结果（it.solve.player），
-    // 没有时现场跑一次固定种子模拟（需求 §三.3：「原关卡优先读取已有求解数据中的玩家结果；
-    // 没有时执行一次固定种子的玩家模拟」）。结果缓存在 it._playerOne，避免每次刷新都重新模拟。
-    if (it._playerOne === undefined) {
-      if (it.solve && it.solve.player) {
-        it._playerOne = { won: it.solve.player.won, bufferPeak: it.solve.player.bufferPeak, revivesUsed: it.solve.player.revivesUsed, reviveCap: it.solve.player.reviveCap };
-      } else if (it.level) {
-        it._playerOne = C.officialPlayerResult(it.level);
-      } else {
-        it._playerOne = null;
-      }
-    }
-    // 两侧字段名不同，统一归一化后再比较（详见 normalizePlayerResult 注释）
-    var pb = normalizePlayerResult(it._playerOne);
-    var pa = normalizePlayerResult(rr.playerOfficial);
-    var paHealthy = !rr.playerHealth || rr.playerHealth.ok;
-    var NO_AUDIT = '正式压力审核暂无数据';
-    function afterAudit(v) { return aa ? v : (curveAfter ? NO_AUDIT : '—'); }
-    var rows = [
-      { label: '是否可解', before: it.tl.completed ? '可解' : '未通关', after: rr.solveResult ? (rr.solveResult.completed ? '可解' : '未通关') : '未知' },
-      { label: '求解步数', before: it.tl.steps_count, after: rr.solveResult ? rr.solveResult.steps : '—' },
-      { label: '暂存峰值', before: curveBefore.peak, after: curveAfter ? curveAfter.peak : '—' },
-      { label: '暂存均值', before: curveBefore.avg, after: curveAfter ? curveAfter.avg : '—' },
-      { label: '前期压力(0-20%)', before: ab ? ab.earlyMax : NO_AUDIT, after: afterAudit(aa && aa.earlyMax) },
-      { label: '中期压力(20-50%)', before: ab ? ab.midMax : NO_AUDIT, after: afterAudit(aa && aa.midMax) },
-      { label: '后期压力(50-100%)', before: ab ? ab.lateMax : NO_AUDIT, after: afterAudit(aa && aa.lateMax) },
-      { label: '卡点位置', before: ab ? (ab.hasChoke ? ab.lateAt + '%' : '无') : NO_AUDIT,
-        after: afterAudit(aa && (aa.hasChoke ? aa.lateAt + '%' : '无')) },
-      { label: '难度分/档', before: '—（原关卡未重跑难度评分，避免与生产口径产生第二套结论）',
-        after: rr.difficulty ? (rr.difficulty.score + '/' + rr.difficulty.grade) : '—' },
-      { label: '玩家是否通关', before: pb ? (pb.won ? '通关' : '未通关') : '—',
-        after: !paHealthy ? '玩家验证接口异常' : (pa ? (pa.won ? '通关' : '未通关') : '—') },
-      { label: '玩家暂存峰值', before: pb ? pb.peak : '—',
-        after: !paHealthy ? '玩家验证接口异常' : (pa ? pa.peak : '—') },
-      { label: '玩家复活次数', before: pb ? (pb.revives + '/' + pb.reviveCap) : '—',
-        after: !paHealthy ? '玩家验证接口异常' : (pa ? (pa.revives + '/' + pa.reviveCap) : '—') },
-      { label: '多轮玩家通关率', before: '—（原关卡只跑固定种子单次，未做多轮）',
-        after: !paHealthy ? '玩家验证接口异常' :
-          (rr.playerMulti ? ((rr.playerMulti.successRate * 100).toFixed(0) + '%（' + rr.playerMulti.roundCount +
-            ' 轮），平均峰值 ' + rr.playerMulti.avgPeak + '，平均复活 ' + rr.playerMulti.avgRevives) : '—') }
-    ];
-    // 报告还要写的非「前后对比」类结论（守恒 / 结构 / 区域数量 / 盒数），单独放 extra。
-    var d = S.edit.original ? C.diffBlocks(S.edit.original, it.blocks) : null;
-    var consAll = rr.conservation || [];
-    var consFailed = consAll.filter(function (c) { return c && c.ok === false; });
-    var cmp = it._lastRegionCompare;
-    return {
-      rows: rows,
-      extra: {
-        像素守恒: d ? (d.totalConserved ? '守恒（修改前后像素总数一致）' : '不一致（修改前 ' + d.totalBefore + ' → 修改后 ' + d.totalAfter + '）')
-          : '未经过美术编辑，目标图与导入时一致',
-        改动像素数: d ? d.changedPixelCount : 0,
-        生成器守恒校验: consAll.length ? (consFailed.length ? ('未通过 ' + consFailed.length + '/' + consAll.length + ' 项') : ('通过（' + consAll.length + ' 项全过）')) : '无校验记录',
-        结构死锁检查: '通过（重构成功即已通过正式生成器的结构死锁检查，未通过时不会产出结果）',
-        重构后棋盘: rr.board ? (rr.board.rows + ' 行 × ' + rr.board.cols + ' 列，共 ' + rr.board.capacity + ' 格' +
-          (rr.board.shapeOk ? '（形态合规）' : '（形态不合规，列-行=' + rr.board.shapeDiff + '）')) : '—',
-        棋盘构成: rr.board ? ('盒 ' + rr.board.boxCells + '，黑块 ' + rr.board.blackCells +
-          '，管道 ' + rr.board.pipeCells + '，空格 ' + rr.board.emptyCells) : '—',
-        障碍参数目标与实际: rr.obstacleCheck
-          ? (rr.obstacleCheck.items.map(function (x) {
-              var unit = x.kind === 'percent' ? '%' : ' 组';
-              return x.label + ' 目标 ' + x.target + unit + ' / 实际 ' + x.actual + unit +
-                '（偏差 ' + (x.deviation > 0 ? '+' : '') + x.deviation + '，' +
-                (x.judged === false ? '本次不做判定' : (x.withinTolerance ? '在容差内' : '超出容差')) + '）';
-            }).join('；') + '。整体状态：' + rr.obstacleCheck.overallText + '。' + rr.obstacleCheck.toleranceNote)
-          : (rr.board && rr.effectiveConfig
-            ? ('目标黑块 ' + rr.effectiveConfig.blackPercent + '%，实际 ' + rr.board.blackCells + ' 格 = ' + rr.board.blackPercent + '%（无完整障碍核对数据）')
-            : '—'),
-        区间连通区域数: it.interval && it.interval.comps ? it.interval.comps.length : '—',
-        区间像素数: it.interval ? it.interval.diffPixelCount : '—',
-        区域对比_共同: cmp ? cmp.common.length : '未做区间区域对比',
-        区域对比_只在修改前: cmp ? cmp.onlyBefore.length : '未做区间区域对比',
-        区域对比_只在修改后: cmp ? cmp.onlyAfter.length : '未做区间区域对比'
-      }
-    };
-  }
-
-  /** 「对比当前区间（修改前后）」：沿用已定位区间的用户要求百分比，分别在原/重构后关卡上重新吸附，按坐标对比消除区域。 */
-  function runReconRegionCompare() {
-    var it = cur();
-    if (!it || !it.interval || !it.reconResult || !it.reconResult.ok) { log('需要先定位区间并重构成功'); return; }
-    var rr = it.reconResult;
-    if (!rr.tl) rr.tl = C.reconstructToTimeline(rr);
-    if (!rr.tl || !rr.tl.completed) { log('重构后关卡时间线不可用或未通关，无法对比区域'); return; }
-    var ivAfter = C.snapInterval(rr.tl.steps, rr.tl.totalBoxes, it.interval.requested.lo / 100, it.interval.requested.hi / 100);
-    if (!ivAfter) { log('重构后关卡区间计算失败'); return; }
-    var cmp = C.regionCompare(it.interval.diffPixels, it.tl.cols, ivAfter.diffPixels, rr.tl.cols);
-    var rows = [
-      ['修改前区域', it.interval.diffPixelCount + ' 像素'],
-      ['修改后区域', ivAfter.diffPixelCount + ' 像素'],
-      ['共同区域', cmp.common.length + ' 像素'],
-      ['只在修改前出现', cmp.onlyBefore.length + ' 像素'],
-      ['只在修改后出现', cmp.onlyAfter.length + ' 像素']
-    ];
-    $('reconRegionInfo').innerHTML = kvTable(rows);
-    it._lastRegionCompare = cmp;
-    // 画到专用画布（不是主画布），并记下重画所需的最小数据，供加入待导出库/批量导出时离屏重绘。
-    it._regionCompareMeta = { rows: Math.max(it.tl.rows, rr.tl.rows), cols: Math.max(it.tl.cols, rr.tl.cols) };
-    renderRegionComparePanel(it);
-    log('区间区域对比完成：共同 ' + cmp.common.length + '，只在修改前 ' + cmp.onlyBefore.length + '，只在修改后 ' + cmp.onlyAfter.length);
-  }
-
-  // 进度区域专用对比图配色（需求 §七第1点）。三类区域各用一种颜色，和主画布高亮各画各的，互不复用画布。
-  var REGION_CMP = {
-    common: '#3BFF9E',
-    onlyBefore: '#FFD400',
-    onlyAfter: '#00E5FF',
-    silhouette: 'rgba(255,255,255,0.10)'
-  };
-
-  /**
-   * 在指定画布上绘制「进度区域专用对比图」（需求 §六.4「进度区域专用对比图」/§七第1点）。
-   * 这是一张独立绘制的图，不是主画布 $('cv') 的截屏：
-   *   ① 底层用极淡灰画出目标图轮廓，只作定位参考，不参与三类区域配色；
-   *   ② 共同区域 / 只在修改前 / 只在修改后 三类各用一种颜色实心填充（三类互不相交）；
-   *   ③ 图内自带文字图例和像素数，单独拿出这张 PNG 也能读懂。
-   * @param {HTMLCanvasElement} cv 目标画布，可以是页面上的，也可以是离屏 canvas（批量导出用）
-   * @param {object} cmp C.regionCompare() 的返回值 { common, onlyBefore, onlyAfter }
-   * @param {number[][]|null} silhouetteBlocks 目标图，用于画底层轮廓；传 null 则不画轮廓
-   * @param {number} rows @param {number} cols 画布网格尺寸
-   * @param {number} cell 单格像素边长
-   */
-  function drawRegionCompareTo(cv, cmp, silhouetteBlocks, rows, cols, cell) {
-    var padL = 8, padT = 8, headH = 30;
-    var gridW = cols * cell, gridH = rows * cell;
-    cv.width = Math.max(gridW + padL * 2, 460);
-    cv.height = gridH + padT * 2 + headH;
-    var ctx = cv.getContext('2d');
-    ctx.fillStyle = '#0f1216'; ctx.fillRect(0, 0, cv.width, cv.height);
-
-    // ③ 图内图例（先画，位置在顶部预留的 headH 带内，不会压到网格）
-    var items = [
-      [REGION_CMP.common, '共同区域 ' + cmp.common.length + ' 像素'],
-      [REGION_CMP.onlyBefore, '只在修改前 ' + cmp.onlyBefore.length + ' 像素'],
-      [REGION_CMP.onlyAfter, '只在修改后 ' + cmp.onlyAfter.length + ' 像素']
-    ];
-    ctx.font = '12px sans-serif'; ctx.textBaseline = 'middle';
-    var lx = padL;
-    for (var i = 0; i < items.length; i++) {
-      ctx.fillStyle = items[i][0];
-      ctx.fillRect(lx, headH / 2 - 5, 10, 10);
-      ctx.fillStyle = '#e6d2ba';
-      ctx.fillText(items[i][1], lx + 15, headH / 2);
-      lx += 15 + ctx.measureText(items[i][1]).width + 16;
-    }
-
-    var oy = padT + headH;
-    // ① 目标图轮廓
-    if (silhouetteBlocks) {
-      ctx.fillStyle = REGION_CMP.silhouette;
-      for (var r = 0; r < silhouetteBlocks.length; r++) {
-        var rowArr = silhouetteBlocks[r] || [];
-        for (var c = 0; c < rowArr.length; c++) if (rowArr[c]) ctx.fillRect(padL + c * cell, oy + r * cell, cell, cell);
-      }
-    }
-    // ② 三类区域
-    fillRegionCells(ctx, cmp.common, REGION_CMP.common, padL, oy, cell);
-    fillRegionCells(ctx, cmp.onlyBefore, REGION_CMP.onlyBefore, padL, oy, cell);
-    fillRegionCells(ctx, cmp.onlyAfter, REGION_CMP.onlyAfter, padL, oy, cell);
-
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
-    ctx.strokeRect(padL - .5, oy - .5, gridW + 1, gridH + 1);
-  }
-
-  function fillRegionCells(ctx, list, color, padL, oy, cell) {
-    if (!list || !list.length) return;
-    ctx.fillStyle = color;
-    for (var k = 0; k < list.length; k++) ctx.fillRect(padL + list[k].c * cell, oy + list[k].r * cell, cell, cell);
-  }
-
-  /** 把区域对比结果画到页面上的专用画布并显示图例。 */
-  function renderRegionComparePanel(it) {
-    var cmp = it._lastRegionCompare, meta = it._regionCompareMeta;
-    if (!cmp || !meta) { $('regionCompareBox').style.display = 'none'; return; }
-    var cell = parseInt($('cellSize').value, 10) || 11;
-    drawRegionCompareTo($('cvRegionCompare'), cmp, it.blocks, meta.rows, meta.cols, cell);
-    $('regionCompareBox').style.display = '';
-    $('regionCompareLegend').innerHTML = [
-      [REGION_CMP.common, '共同区域（修改前后同一进度区间都会消除）' + cmp.common.length + ' 像素'],
-      [REGION_CMP.onlyBefore, '只在修改前消除 ' + cmp.onlyBefore.length + ' 像素'],
-      [REGION_CMP.onlyAfter, '只在修改后消除 ' + cmp.onlyAfter.length + ' 像素']
-    ].map(function (l) {
-      return '<span><i class="sw" style="border-top-color:' + l[0] + ';border-top-style:solid"></i>' + l[1] + '</span>';
-    }).join('');
-  }
-
-  /**
-   * 为「导出完整对比包」生成一张离屏的进度区域专用对比图画布。
-   * 没做过区域对比（it._lastRegionCompare 为空）时返回 null，由调用方如实说明缺图原因。
-   */
-  function buildRegionCompareCanvas(it) {
-    if (!it || !it._lastRegionCompare || !it._regionCompareMeta) return null;
-    var cv = document.createElement('canvas');
-    drawRegionCompareTo(cv, it._lastRegionCompare, it.blocks,
-      it._regionCompareMeta.rows, it._regionCompareMeta.cols, 11);
-    return cv;
-  }
-
-  /**
-   * 把区域对比结果压成待导出库可以放进 localStorage 的紧凑形式：坐标存成扁平下标（r*cols+c），
-   * 比存 {r,c} 对象数组省一多半体积。批量导出时再用 expandRegionCompare 还原成坐标。
-   */
-  function compactRegionCompare(cmp, meta) {
-    if (!cmp || !meta) return null;
-    var cols = meta.cols;
-    function flat(list) { return list.map(function (p) { return p.r * cols + p.c; }); }
-    return { rows: meta.rows, cols: cols, common: flat(cmp.common), onlyBefore: flat(cmp.onlyBefore), onlyAfter: flat(cmp.onlyAfter) };
-  }
-
-  function expandRegionCompare(rc) {
-    if (!rc) return null;
-    var cols = rc.cols;
-    function un(list) { return (list || []).map(function (i) { return { r: Math.floor(i / cols), c: i % cols }; }); }
-    return { common: un(rc.common), onlyBefore: un(rc.onlyBefore), onlyAfter: un(rc.onlyAfter) };
-  }
-
-  /** 批量导出用：从待导出库条目还原出进度区域专用对比图画布。条目没存区域对比时返回 null。 */
-  function buildRegionCompareCanvasFromEntry(e) {
-    if (!e || !e.regionCompare) return null;
-    var cmp = expandRegionCompare(e.regionCompare);
-    var cv = document.createElement('canvas');
-    drawRegionCompareTo(cv, cmp, e.editedBlocks, e.regionCompare.rows, e.regionCompare.cols, 11);
-    return cv;
-  }
-
-  /** 未夹边：坐标落在画布外时返回 null（点在画布外应视为无效点击，不是夹到边缘格）。 */
+  /** 鼠标事件 → 图纸格坐标。允许越界，调用方自行判断。 */
   function eventToCell(ev, it) {
     var cell = parseInt($('cellSize').value, 10) || 11;
     var rect = $('cv').getBoundingClientRect();
-    var c = Math.floor((ev.clientX - rect.left) / cell), r = Math.floor((ev.clientY - rect.top) / cell);
-    var rows = it.blocks.length, cols = it.blocks[0].length;
-    if (r < 0 || c < 0 || r >= rows || c >= cols) return null;
-    return { r: r, c: c };
+    return {
+      r: Math.floor((ev.clientY - rect.top) / cell),
+      c: Math.floor((ev.clientX - rect.left) / cell)
+    };
   }
 
-  /** 框选拖拽用：坐标夹到画布边界内（拖出画布也能继续定义选区，而不是直接判无效）。 */
+  /** 鼠标事件 → 夹取到图纸范围内的格坐标（用于开始拖拽，越界不让拖飞）。 */
   function eventToCellClamped(ev, it) {
     var cell = parseInt($('cellSize').value, 10) || 11;
     var rect = $('cv').getBoundingClientRect();
@@ -6536,7 +4164,7 @@
    */
   function doExtract(mode) {
     var it = cur();
-    if (!extractReady()) { log('请先框出选区（在「8. 美术编辑」里选一种选区工具）'); return; }
+    if (!extractReady()) { log('请先框出选区（在「3. 美术编辑」里选一种选区工具）'); return; }
     var before = it.blocks.map(function (r) { return r.slice(); });
     var res;
     try { res = C.applyExtract(it.blocks, S.edit.mask, mode); }
@@ -6583,16 +4211,13 @@
   function invalidateAfterBlocksChange() {
     var it = cur();
     if (it) {
-      it.tl = null;                 // 时间线（求解路线）失效：像素变了，旧路线不成立
-      it.interval = null;
-      it.reconResult = null;
-      fragState.result = null; fragState.key = null;   // 碎色率要重算
+      // 像素变了，任何基于旧图算出来的结论都失效：碎色率必须重算
+      fragState.result = null; fragState.key = null;
     }
     draw();
     renderEditInfo();
     refreshEditPanels();
     renderExtractPanel();
-    refreshPressureChart();
   }
 
   /** 自动选法辅助①：四个角各自的同色连通块合并成选区。 */
@@ -6680,7 +4305,7 @@
     var box = $('extractInfo');
     if (!box) return;
     var it = cur();
-    if (!it || !it.blocks) { box.innerHTML = '<div class="muted">请先选一关</div>'; syncExtractButtons(); return; }
+    if (!it || !it.blocks) { box.innerHTML = '<div class="muted">请先导入并选中一张图纸</div>'; syncExtractButtons(); return; }
     var rowsN = it.blocks.length, colsN = it.blocks[0].length;
     var nz = 0;
     for (var r = 0; r < rowsN; r++) for (var c = 0; c < colsN; c++) if (it.blocks[r][c] > 0) nz++;
@@ -6696,7 +4321,7 @@
       ['当前非空像素', '<span class="num">' + nz + '</span> / ' + tot +
         '（空位 ' + (tot - nz) + ' 格 = 值为 0）'],
       ['选区', selN ? '<span class="num">' + selN + '</span> 格，其中有像素的 ' + selNz + ' 格　' + selRectText()
-        : '<span class="warnText">未选</span> —— 在「8. 美术编辑」里勾「开启编辑模式」并选一种选区工具']
+        : '<span class="warnText">未选</span> —— 在「3. 美术编辑」里勾「开启编辑模式」并选一种选区工具']
     ];
     if (S.edit.mask) {
       rows.push(['剔掉框外会剩', '<span class="num">' + selNz + '</span> 像素（剔除 ' + (nz - selNz) + '）']);
@@ -6727,7 +4352,7 @@
   }
 
   /* ==================== 图纸库 ====================
-   * 与「11. 待导出库」（关卡条目）**分开存放**，单独一个 localStorage key。
+   * 与关卡数据**分开存放**，单独一个 localStorage key。
    * 理由（实读确认）：批量导出关卡时会无条件读 `e.originalLevel` / `e.reconstructedLevel`，
    * 一个只有像素矩阵的图纸条目混进那个数组会让批量导出直接抛错。分开存最省事也最安全。
    */
@@ -6777,7 +4402,7 @@
   /** 把当前目标图作为一张图纸入库。 */
   function addCurrentAsPiece() {
     var it = cur();
-    if (!it || !it.blocks) { log('请先选一关'); return; }
+    if (!it || !it.blocks) { log('请先导入并选中一张图纸'); return; }
     var nameInput = $('inPieceName');
     var base = (nameInput && nameInput.value.trim()) || String(it.key || 'piece');
     // 同名自动加序号，避免静默覆盖用户已攒的图纸
@@ -6802,7 +4427,7 @@
       renderPieceLib();
       log('⚠ 图纸库加入失败，已取消本次加入（内存与本地保存都没变，避免刷新后静默丢失）。原因：' + res.error +
         (res.quota ? '。这是浏览器本地存储配额（每站点约 5 MB），当前图纸库 ' + kb(pieceLibBytes()) +
-          '，关卡待导出库 ' + kb(exportLibBytes()) + '。请先导出再清空腾空间。' : ''));
+          '。请先导出图纸库，再移除部分图纸腾空间。' : ''));
       return;
     }
     if (nameInput) nameInput.value = '';
@@ -6822,13 +4447,13 @@
   /** 把某张图纸载回当前关的目标图（供检查，也是「再导入回来」的第一步）。 */
   function loadPieceIntoCurrent(key) {
     var it = cur();
-    if (!it) { log('请先选一关'); return; }
+    if (!it) { log('请先导入并选中一张图纸'); return; }
     var p = S.pieceLib.filter(function (e) { return e.key === key; })[0];
     if (!p) return;
     if (p.rows !== it.blocks.length || p.cols !== it.blocks[0].length) {
-      log('⚠ 图纸尺寸 ' + p.rows + '×' + p.cols + ' 与当前关目标图 ' +
+      log('⚠ 图纸尺寸 ' + p.rows + '×' + p.cols + ' 与当前图纸 ' +
         it.blocks.length + '×' + it.blocks[0].length + ' 不一致，没有载入。' +
-        '拼接需要同尺寸画布，请换一关或换一张图纸');
+        '拼接需要同尺寸画布，请换一张图纸');
       return;
     }
     if (!S.edit.original) S.edit.original = it.blocks.map(function (r) { return r.slice(); });
@@ -6836,7 +4461,7 @@
     it.blocks = p.blocks.map(function (r) { return r.slice(); });
     clearSelection();
     invalidateAfterBlocksChange();
-    log('已把图纸「' + key + '」载入当前关的目标图（' + p.pixelCount + ' 像素）。可用「撤销上一步剔除」退回');
+    log('已把图纸「' + key + '」载入当前画布（' + p.pixelCount + ' 像素）。可用「撤销上一步剔除」退回');
   }
 
   /** 图纸库面板：水位 + 列表（含缩略图）。 */
@@ -6848,8 +4473,7 @@
     var usedMB = chars * 2 / 1024 / 1024;      // localStorage 按 UTF-16 计费
     var rows = [
       ['图纸数', st.count + ' 张（本地保存，刷新不丢）'],
-      ['本地占用', usedMB.toFixed(3) + ' MB（图纸库自己；关卡待导出库另占 ' +
-        (exportLibBytes() * 2 / 1024 / 1024).toFixed(2) + ' MB，两者共用每站点约 5 MB 配额）']
+      ['本地占用', usedMB.toFixed(3) + ' MB（浏览器每站点约 5 MB 配额）']
     ];
     if (st.count) {
       rows.push(['尺寸分布', Object.keys(st.sizes).map(function (k) { return k + '×' + st.sizes[k] + '张'; }).join('　')]);
@@ -6869,7 +4493,7 @@
         '<span class="nm" title="' + escHtml(e.key) + '">' + escHtml(e.key) + '</span>' +
         '<span class="px">' + e.pixelCount + 'px</span>' +
         '<span class="bb">' + e.rows + '×' + e.cols + '</span>' +
-        '<button class="btn tiny pieceLoad" data-key="' + escHtml(e.key) + '" title="把这张图纸载入当前关的目标图">载入</button>' +
+        '<button class="btn tiny pieceLoad" data-key="' + escHtml(e.key) + '" title="把这张图纸载入当前画布">载入</button>' +
         '<button class="btn tiny ghost pieceDel" data-key="' + escHtml(e.key) + '">移除</button>' +
         '</div>';
     }).join('');
@@ -6997,79 +4621,48 @@
 
   // ==================== 绑定 ====================
   function init() {
-    if (!window.AntSolver || !window.AntSolver.Solver) {
-      // 页面上只说清「要怎么做」，不写脚本路径（需求 §七第6点）
-      $('envInfo').innerHTML = '<span style="color:#ff8080">没有载入正式求解器与生成器：请用「一键启动.command」从项目根目录打开本工具</span>';
-      log('无法启动：没有载入正式求解器与生成器，请用「一键启动.command」从项目根目录打开本工具');
+    if (!window.AntSolver || !window.AntSolver.getColorCSS || !window.ArtToolCore) {
+      $('envInfo').innerHTML = '<span style="color:#ff8080">没有载入图纸工具依赖：请用「一键启动.command」从工具目录打开</span>';
+      log('无法启动：缺少 color/解析依赖（bin/js/utils.js、generator.js 或 js/core.js 未载入）');
       return;
     }
-    $('envInfo').textContent = '求解与生成使用工具自带的正式代码副本 · 生成器流程 ' +
-      (window.AntSolver.Generator ? window.AntSolver.Generator.FLOW : '未载入') +
-      ' · 冰耐久 ' + C.ICE_DURABILITY + ' · 暂存上限 ' + C.BUFFER_LIMIT;
+    $('envInfo').textContent = '图纸工作台 · 只做修改、主体提取与拼接';
 
+    // ---- 1. 导入 ----
     $('fileInput').onchange = function (e) { readFiles(e.target.files, false); e.target.value = ''; };
     $('dirInput').onchange = function (e) { readFiles(e.target.files, true); e.target.value = ''; };
     $('listFilter').oninput = renderList;
     $('btnClear').onclick = function () {
-      demoPause();
       S.items = []; S.index = {}; S.cur = -1;
-      S.demo.idx = 0; S.edit.on = false; S.edit.original = null; S.edit.undoStack = [];
+      S.edit.on = false; S.edit.original = null; S.edit.undoStack = [];
       clearSelection(); S.edit.replacing = null; S.edit.paintDragging = false;
+      S.extract.undo = []; S.extract.lastResult = null;
+      fragState.result = null; fragState.key = null;
       if ($('optEdit')) $('optEdit').checked = false;
       $('cv').classList.remove('editing');
-      $('boardCompareWrap').classList.add('hidden'); $('boardCompareWrap').innerHTML = '';
-      renderList(); renderSolveInfo(); refreshEditPanels(); renderEditInfo();
-      $('intervalInfo').innerHTML = ''; $('routeInfo').innerHTML = ''; $('demoInfo').innerHTML = '';
-      resetReconView();
+      renderList(); refreshEditPanels(); renderEditInfo();
       $('importStat').textContent = '未导入';
-      $('readout').textContent = '把鼠标移到目标图上可查看该像素的颜色、消除步序与所属区间。';
-      refreshBoardPanel();
-      refreshPressureChart();
+      $('readout').textContent = '把鼠标移到图纸上可查看该像素的行列与颜色。';
       draw();
     };
-    $('btnSolve').onclick = function () { ensureTimeline(function () { draw(); }, true); };
-    $('btnLocate').onclick = locate;
-    $('btnRoutes').onclick = runRoutes;
+
+    // ---- 2. 显示与导出 ----
     $('btnPng').onclick = exportPng;
-    $('btnJson').onclick = exportJson;
-    Array.prototype.forEach.call(document.querySelectorAll('.presets .btn'), function (b) {
-      b.onclick = function () {
-        $('loPct').value = b.getAttribute('data-lo');
-        $('hiPct').value = b.getAttribute('data-hi');
-        if (cur() && cur().tl) locate();
-      };
+    $('cellSize').oninput = draw;
+    ['optGrid', 'optShowVoid', 'optShowMaskOutline'].forEach(function (id) {
+      if ($(id)) $(id).onchange = draw;
     });
-    ['optComp', 'optDim', 'optGrid', 'optA', 'showStable', 'showFrequent', 'showFloating'].forEach(function (id) { $(id).onchange = draw; });
-    $('cellSize').oninput = function () { draw(); if (S.demo.idx > 0) demoRenderAtIdx(); };
     $('cv').onmousemove = function (ev) { onHover(ev); onCanvasMouseMove(ev); };
     $('cv').onmousedown = onCanvasMouseDown;
     $('cv').onmouseup = onCanvasMouseUp;
-    // 拖拽框选中途移出画布再松开鼠标时，画布自身的 mouseup 不会触发（鼠标已经不在画布上），
-    // 靠 document 级兜底监听结束选区，避免拖拽状态卡死（参考编辑器 ui.js 同样有这个兜底）。
+    // 拖拽框选中途移出画布再松开鼠标时，画布自身的 mouseup 不会触发，靠 document 级兜底结束选区
     document.addEventListener('mouseup', function () { if (S.edit.dragging || S.edit.paintDragging) onCanvasMouseUp(); });
 
-    // 6. 棋盘区 + 暂存对比
-    $('optBoard').onchange = refreshBoardPanel;
-
-    // 7. 自动演示
-    $('btnDemoPlay').onclick = demoPlay;
-    $('btnDemoPause').onclick = demoPause;
-    $('btnDemoStepBack').onclick = function () { demoStep(-1); };
-    $('btnDemoStepFwd').onclick = function () { demoStep(1); };
-    // 跳到A/B/末尾统一按「当前正在查看的视图对象」（viewItem，随 S.viewMode 切原关卡/重构后关卡）处理，
-    // 不再用 cur()（真实关卡条目）——否则查看重构后关卡时点这三个按钮，会跳到原关卡的区间/步数上去。
-    $('btnDemoJumpA').onclick = function () { var it = viewItem(); if (it && it.interval) demoJump(it.interval.stepIndex.lo); };
-    $('btnDemoJumpB').onclick = function () { var it = viewItem(); if (it && it.interval) demoJump(it.interval.stepIndex.hi); };
-    $('btnDemoJumpEnd').onclick = function () { var it = viewItem(); if (it && it.tl) demoJump(it.tl.steps.length); };
-    $('demoScrub').oninput = function () { demoJump(parseInt($('demoScrub').value, 10) || 0); };
-    $('optDemoRegion').onchange = function () { if (S.demo.idx >= 0) demoRenderAtIdx(); };
-
-    // 8. 美术编辑（点选改色 / 框选编辑 + 全局/局部替换 + 靠色检查）
+    // ---- 3. 美术编辑 ----
     $('optEdit').onchange = function () { toggleEditMode($('optEdit').checked); };
     Array.prototype.forEach.call(document.querySelectorAll('input[name="editTool"]'), function (r) {
       r.onchange = function () {
         S.edit.tool = r.value;
-        // 切工具时清掉进行中的拖拽与套索轨迹，否则残留状态会让下一次落笔或框选行为诡异
         S.edit.dragging = false; S.edit.paintDragging = false; S.edit.lassoPath = null;
         syncCanvasToolClass();
         draw();
@@ -7087,7 +4680,6 @@
           var extra = '';
           if (r.value !== 'paint') {
             extra = '　当前叠加方式：' + moName + '（Shift 临时加选、Alt 临时减选）';
-            // 「按色选 + 替换」是最容易毁主体的组合：会一次选中全图该色。这里主动点出来。
             if (r.value === 'color' && mo === 'replace') {
               extra += '。要只清边缘、保住主体轮廓，请先圈范围再把叠加方式改成「交集」';
             }
@@ -7113,71 +4705,81 @@
         renderExtractPanel();
       };
     });
-    $('editPaintInSelection').onchange = function () { }; // 只是读取用的勾选框，不需要额外动作
+    $('editPaintInSelection').onchange = function () { };
+    $('btnEditClearSelection').onclick = editClearSelection;
     initFloatPanels();
-    // 待替换状态的取消途径（微调第 2 项）：点空白处、按 Esc。
-    // 点色块/替换按钮/状态条本身不算「空白处」，否则会把正常的替换操作也取消掉。
+
+    // 待替换状态的取消途径：点空白处、按 Esc
     document.addEventListener('mousedown', function (ev) {
       if (!S.edit.replacing) return;
       var t = ev.target;
       if (!t.closest) return;
       if (t.closest('#editPalette') || t.closest('#editSelectionColors') || t.closest('#editReplaceStatus')) return;
-      if (t === $('cv')) return;   // 画布由 onCanvasMouseDown 自己处理取消，避免重复提示
+      if (t === $('cv')) return;
       cancelColorReplace('点了空白处');
     });
     document.addEventListener('keydown', function (ev) {
-      // 拼接工作台：方向键逐格微调选中图层。鼠标拖到像素级很难对准，这一步是必需的。
-      // 只在拼接模式且焦点不在输入框里时接管，否则会把输入框里的光标移动也吃掉。
       if (cpS().active) {
         var tag = (ev.target && ev.target.tagName || '').toLowerCase();
         if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
-          // 撤销 / 重做快捷键：Ctrl/⌘+Z 撤销；Ctrl/⌘+Shift+Z 或 Ctrl+Y 重做。
-          // 只在拼接工作台里接管 —— 常规视图那边有自己的编辑撤销栈，不能混在一起。
           if ((ev.metaKey || ev.ctrlKey) && !ev.altKey) {
             var k = (ev.key || '').toLowerCase();
             if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); composeUndo(); return; }
             if (k === 'y' || (k === 'z' && ev.shiftKey)) { ev.preventDefault(); composeRedo(); return; }
           }
-          var step = ev.shiftKey ? 5 : 1;      // Shift = 一次挪 5 格，粗调更快
+          var step = ev.shiftKey ? 5 : 1;
           var d = { ArrowUp: [-step, 0], ArrowDown: [step, 0], ArrowLeft: [0, -step], ArrowRight: [0, step] }[ev.key];
           if (d && composeNudge(d[0], d[1])) { ev.preventDefault(); return; }
         }
       }
       if (ev.key !== 'Escape') return;
       if (S.edit.replacing) cancelColorReplace('按了 Esc');
-      // 二次确认的待确认态也用 Esc 取消（与上面的待替换状态同一套取消习惯）
       if (cancelArmedConfirms()) log('已取消二次确认，未执行任何操作。');
-      // 拼接里 Esc 也用来取消图层选择（与点空白等效，手不用离开键盘）
       if (cpS().active && cpS().selected.length) { cpS().selected = []; renderComposeAll(); }
     });
-    $('btnEditClearSelection').onclick = editClearSelection;
+    $('btnEditUndo').onclick = editUndo;
+    armConfirm('btnEditReset', {
+      confirmText: '确认还原？',
+      hint: '「还原为原图」会丢弃本张图纸全部像素修改，撤销记录也一并清空。再点一次按钮确认；' +
+        '4 秒内不点则自动取消，也可按 Esc 或点击别处取消。',
+      guard: function () {
+        var it = cur();
+        if (!it || !S.edit.original) { log('当前没有可还原的原图。'); return false; }
+        return true;
+      },
+      action: editReset
+    });
+    $('btnEditExportTxt').onclick = exportEditedTxt;
+    $('btnEditExportReport').onclick = exportEditReport;
+    renderEditPalette();
 
-    // ===== 12. 主体提取（任务 ANT-ARTTOOL-SUBJECT-EXTRACT-20260902）=====
+    // ---- 4. 主体提取 + 图纸库 ----
     $('btnExtractOutside').onclick = function () { doExtract('outside'); };
     $('btnExtractInside').onclick = function () { doExtract('inside'); };
     $('btnExtractUndo').onclick = undoExtract;
-    // 还原是破坏性的（丢弃全部剔除），照既有「还原为原图」的做法加二次确认
     armConfirm('btnExtractReset', {
       confirmText: '确认还原？',
-      hint: '「还原为原图」会丢弃本关全部剔除结果。再点一次按钮确认；点其它地方取消。',
+      hint: '「还原为原图」会丢弃本张图纸全部剔除结果。再点一次按钮确认；点其它地方取消。',
       onConfirm: resetExtract
     });
     $('btnPickBgCorners').onclick = pickBgCorners;
     $('btnKeepLargest').onclick = selectLargestComponent;
     $('btnPickSmallComps').onclick = selectSmallComponents;
-
-    // 界面偏好（需求④）：先读回上次的状态，再装事件，避免装了事件又被恢复动作触发一遍
-    S.ui = loadUiPrefs();
-    $('optArtOnly').onchange = function () {
-      S.ui.artOnly = !!$('optArtOnly').checked;
-      applyArtOnly(false);
-      saveUiPrefs();
+    $('btnAddPiece').onclick = addCurrentAsPiece;
+    $('btnPieceExportAll').onclick = exportPieceLibZip;
+    $('btnPieceExportJson').onclick = exportPieceLibJson;
+    $('filePieceLib').onchange = function (e) {
+      var f = e.target.files[0];
+      if (f) importPieceLibJson(f);
+      e.target.value = '';
     };
-    $('btnCollapseAll').onclick = toggleCollapseAll;
-    initCardCollapse();
-    applyArtOnly(true);   // quiet：启动时恢复状态不必往日志里刷一条
+    $('btnPieceClear').onclick = clearPieceLib;
+    loadPieceLib();
+    renderPieceLib();
+    renderExtractPanel();
+    syncCanvasToolClass();
 
-    // ---- 拼接工作台（任务 ANT-ARTTOOL-PIECE-COMPOSE-20260915）----
+    // ---- 5. 拼接 ----
     $('btnComposeMode').onclick = function () { cpS().active ? exitCompose() : enterCompose(); };
     $('btnComposeExit').onclick = exitCompose;
     $('btnComposeNew').onclick = composeNewCanvas;
@@ -7194,27 +4796,21 @@
     });
     $('fileComposeTxt').onchange = function (ev) {
       composeImportTxt(ev.target.files);
-      ev.target.value = '';    // 允许同一文件再次导入
+      ev.target.value = '';
+    };
+    if ($('fileComposeDir')) $('fileComposeDir').onchange = function (ev) {
+      composeImportTxt(ev.target.files);
+      ev.target.value = '';
     };
     $('btnComposeFromLib').onclick = function () { composeAddFromLib(false); };
     $('btnComposeSrcClear').onclick = composeClearSources;
     $('composeCellSize').oninput = drawCompose;
-    $('optComposeGrid').onchange = drawCompose;
-    $('optComposeConflict').onchange = drawCompose;
-    $('optComposeOutline').onchange = drawCompose;
-    // 拖拽：mousemove/mouseup 挂在 document 上，这样拖出画布再松手也能正确收尾
-    // （只挂在 canvas 上的话，鼠标移出画布后就收不到事件，图层会一直粘在手上）
+    ['optComposeGrid', 'optComposeConflict', 'optComposeOutline'].forEach(function (id) {
+      if ($(id)) $(id).onchange = drawCompose;
+    });
     $('composeCv').addEventListener('mousedown', onComposeMouseDown);
     $('composeCv').addEventListener('mousemove', onComposeMouseMove);
-    // canvas 自己也要收 mouseup：在画布内松手是最常见的情况，不该绕一圈靠 document 兜。
     $('composeCv').addEventListener('mouseup', onComposeMouseUp);
-    // document 级兜底：鼠标拖到画布外再松手也要正确收尾。
-    //
-    // ⚠ 这里的判断条件必须覆盖**全部三种**拖拽态。原先只判了 `cpS().drag`（移动图层），
-    // 于是：直线/边框（shapeDrag）永远收不到 mouseup → **永远不落笔**；
-    //       涂色（paintDrag）永远不被清除 → 松手后鼠标一进画布就接着画，成了「跟随鼠标赋色」。
-    // 这正是用户 2026-09-15 报的前两个缺陷。既有的目标图那套（app.js 里 onCanvasMouseUp 的兜底）
-    // 本来就是把 dragging 与 paintDragging 都判上的，这里对齐同一口径。
     document.addEventListener('mousemove', function (ev) {
       if (composeDragging()) onComposeMouseMove(ev);
     });
@@ -7237,11 +4833,10 @@
     $('btnComposeRulesAll').onclick = composeGenerateAllRules;
     $('optComposeRequireBg').onchange = function () { composeRunAudit(false); syncComposeButtons(); };
     initComposeColorPickers();
-    // 绘制（需求⑥）
     $('btnComposeNewLayer').onclick = composeNewBlankLayer;
     $('btnComposeLayerExport').onclick = composeExportLayer;
     $('btnComposeBorderFull').onclick = composeBorderFull;
-    // 撤销 / 重做：卡片里与工作台顶栏两处按钮走同一套动作
+    $('btnComposeTianzi').onclick = composeTianziAuto;
     ['btnComposeUndo', 'btnComposeUndoTop'].forEach(function (bid) {
       if ($(bid)) $(bid).onclick = composeUndo;
     });
@@ -7251,17 +4846,19 @@
     Array.prototype.forEach.call(document.querySelectorAll('input[name="composeTool"]'), function (r) {
       r.onchange = function () {
         if (!r.checked) return;
-        // 切工具时清掉进行中的拖拽，否则残留状态会让下一次操作行为诡异
         cpS().drag = null; cpS().selectBox = null; cpS().paintDrag = null; cpS().shapeDrag = null;
         var tips = {
           move: '移动图层：在画布上拖部件即可挪位；选中后方向键逐格微调',
           paint: '手动涂色：在画布上按住拖，经过的像素改成当前颜色（作用于选中的那一个图层）',
           line: '直线：按住拖出起点到终点，松手落笔。线宽在下面填，单位是格',
           fill: '填充：点一下，把与该点相连的同色（或空白）区域整片换成当前颜色',
-          border: '边框：在画布上拖一个范围，松手即按所选形态生成；也可点「铺满整张画布」'
+          border: '边框：在画布上拖一个范围，松手即按所选形态生成；也可点「铺满整张画布」',
+          rect: '矩形：在画布上拖一个范围，松手生成；勾「实心图形」画实心，不勾画空心（粗细用线宽）',
+          ellipse: '椭圆：在画布上拖一个范围，松手生成；实心/空心同上',
+          triangle: '三角形：在画布上拖一个范围，松手生成；实心/空心同上',
+          diamond: '菱形：在画布上拖一个范围，松手生成；实心/空心同上'
         };
         if (tips[r.value]) log(tips[r.value]);
-        // 说明这一笔会画到哪里。空白画布上不再需要用户先建图层，所以这里只是**告知**，不是要求。
         if (r.value !== 'move') {
           var tgt = composeTargetLayer(true);
           if (tgt) {
@@ -7279,77 +4876,11 @@
       };
     });
     $('inComposeWidth').oninput = drawCompose;
+    if ($('optComposeShapeSolid')) $('optComposeShapeSolid').onchange = drawCompose;
     $('optComposeErase').onchange = drawCompose;
     $('selComposeBorder').onchange = drawCompose;
-    ['optShowVoid', 'optShowMaskOutline'].forEach(function (id) {
-      if ($(id)) $(id).onchange = draw;
-    });
 
-    // 图纸库
-    $('btnAddPiece').onclick = addCurrentAsPiece;
-    $('btnPieceExportAll').onclick = exportPieceLibZip;
-    $('btnPieceExportJson').onclick = exportPieceLibJson;
-    $('filePieceLib').onchange = function (e) {
-      var f = e.target.files[0];
-      if (f) importPieceLibJson(f);
-      e.target.value = '';
-    };
-    $('btnPieceClear').onclick = clearPieceLib;
-    loadPieceLib();
-    renderPieceLib();
-    renderExtractPanel();
-    syncCanvasToolClass();
-    $('btnEditUndo').onclick = editUndo;
-    // 破坏性操作：一击丢弃本关全部像素修改 → 加二次确认（用户 2026-08-20）。
-    // editReset 自身逻辑未改，只是改由确认后才调用。
-    armConfirm('btnEditReset', {
-      confirmText: '确认还原？',
-      hint: '「还原为原图」会丢弃本关全部像素修改，撤销记录也一并清空。再点一次按钮确认；' +
-        '4 秒内不点则自动取消，也可按 Esc 或点击别处取消。',
-      guard: function () {
-        var it = cur();
-        if (!it || !S.edit.original) { log('当前没有可还原的原图。'); return false; }
-        return true;
-      },
-      action: editReset
-    });
-    $('btnEditExportTxt').onclick = exportEditedTxt;
-    $('btnEditExportReport').onclick = exportEditReport;
-    renderEditPalette();
-
-    // 9. 暂存压力图
-    $('optPressureOverlay').onchange = refreshPressureChart;
-    // 压力图轨迹切换（需求 08.03 §一.5：采用切换查看方式，由用户裁决「加上切换按钮即可」）
-    $('btnTrackOmni').onclick = function () { setPressureTrack('omni'); };
-    $('btnTrackPlayer').onclick = function () { setPressureTrack('player'); };
-    $('selPlayerSeed').onchange = refreshPressureChart;
-    $('optPlayerSource').onchange = refreshPressureChart;
-
-    // 10. 重构关卡
-    $('genParamsInput').onchange = function (e) { if (e.target.files[0]) loadGenParamsFile(e.target.files[0]); e.target.value = ''; };
-    $('btnClearGenParams').onclick = function () {
-      S.genParams = null;
-      $('genParamsInfo').innerHTML = '';
-      $('btnClearGenParams').style.display = 'none';
-      renderReconParamPreview();
-      log('已清除导入的生成器参数，重新生成将使用工具默认参数');
-    };
-    // 启动时先显示一次默认参数，让用户点按钮前就能看到会用什么参数
-    renderReconParamPreview();
-    $('btnReconstruct').onclick = runReconstruct;
-    Array.prototype.forEach.call(document.querySelectorAll('input[name="viewMode"]'), function (r) {
-      r.onchange = function () {
-        S.viewMode = r.value;
-        demoPause();
-        refreshBoardPanel();
-        draw();
-        log('切换视图：' + (r.value === 'after' ? '重构后关卡' : '原关卡'));
-      };
-    });
-    $('btnRegionCompare').onclick = runReconRegionCompare;
-    $('btnFullExport').onclick = exportFullPackage;
-
-    // 10b. 碎色率检查（任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825）
+    // ---- 碎色率检查 ----
     if ($('btnFragCheck')) $('btnFragCheck').onclick = function () { runFragCheck(false); };
     if ($('fragGateSel')) $('fragGateSel').onchange = function () {
       var custom = this.value === 'custom';
@@ -7364,30 +4895,16 @@
     };
     renderFragPanel();
 
-    // 11. 待导出库
-    $('btnAddToLibrary').onclick = addCurrentToExportLibrary;
-    $('btnLibExportSelected').onclick = function () { exportLibraryBatch(true); };
-    $('btnLibExportAll').onclick = function () { exportLibraryBatch(false); };
-    // 破坏性操作：一击清空整个待导出库（含浏览器本地保存的记录）→ 加二次确认（用户 2026-08-20）。
-    // clearExportLibrary 自身逻辑未改；库为空时与原先一样不做任何清空动作，只是多给一句提示。
-    armConfirm('btnLibClear', {
-      confirmText: '确认清空？',
-      hint: function () {
-        return '「清空待导出库」会移除全部 ' + S.exportLib.length + ' 项，' +
-          '浏览器本地保存的记录一并删除，不可撤销。再点一次按钮确认；' +
-          '4 秒内不点则自动取消，也可按 Esc 或点击别处取消。';
-      },
-      guard: function () {
-        if (!S.exportLib.length) { log('待导出库本来就是空的，无需清空。'); return false; }
-        return true;
-      },
-      action: clearExportLibrary
-    });
-    loadExportLibFromStorage();
-    renderExportLibrary();
+    // ---- 卡片折叠（只登记本工具现有的卡片）----
+    S.ui = loadUiPrefs();
+    $('btnCollapseAll').onclick = toggleCollapseAll;
+    initCardCollapse();
 
+    renderComposeAll();
     draw();
-    log('工具就绪。求解口径：Solver.solve 六遍编排；进度口径：已完成盒数 ÷ 总盒数；冰耐久 3。');
+    log('工具就绪：只做图纸修改、主体提取与拼接。');
+    // 默认进入拼接模式（用户 2026-10-28 要求）；退出后用顶栏按钮可随时回来
+    enterCompose();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

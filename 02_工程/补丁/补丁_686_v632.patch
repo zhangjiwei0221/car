@@ -1,0 +1,5248 @@
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+index 806f0c2..2abc63c 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/index.html"
+@@ -6,13 +6,13 @@
+   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+   <meta http-equiv="Pragma" content="no-cache">
+   <meta http-equiv="Expires" content="0">
+-  <title>车接小人 v615 · 目标生产全链路</title>
+-  <link rel="stylesheet" href="css/style.css?v=615">
++  <title>车接小人 v632 · 目标生产全链路</title>
++  <link rel="stylesheet" href="css/style.css?v=632">
+ </head>
+ <body>
+   <header>
+     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
+-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v615</span></h1>
++    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v632</span></h1>
+     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
+          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
+          退出模拟就自动回到生成器的参数面板。 -->
+@@ -418,6 +418,10 @@
+         <label><input type="checkbox" id="gen-obstacle-thicken"> 障碍加厚实验（默认关闭）</label>
+         <span class="gen-hint">冰 <input id="gen-ice-target" type="number" min="3" max="20" value="12" style="width:42px"> 个；锁链 <input id="gen-chain-target" type="number" min="1" max="8" value="6" style="width:36px"> 组；至少连≤<input id="gen-chain-small-max" type="number" min="6" max="40" value="18" style="width:42px">px 小车</span>
+       </div>
++      <div class="gen-row" style="margin-top:6px" title="实验功能：对已验收的006/008/014目标图使用固定故事棋盘并验证完整路线；其他目标图明确失败，不回退随机生成。默认关闭。">
++        <label><input type="checkbox" id="gen-story-compiler"> 故事编译器实验（已知三图 · 默认关闭）</label>
++        <span class="gen-hint">开启后只接受已注册故事；不匹配 = 明确失败</span>
++      </div>
+       <div class="gen-row" style="margin-top:6px" title="容量在 deriveCapacityBand 推导出的带内选择。自动=带；下沿/上沿=固定到带的两端；中值=固定到 chosen。">
+         <label>容量策略</label>
+         <select id="gen-cap-profile" style="width:130px">
+@@ -784,30 +788,31 @@
+     </div>
+   </div>
+ 
+-  <script src="js/zip.js?v=615"></script>
+-  <script src="js/utils.js?v=615"></script>
++  <script src="js/zip.js?v=632"></script>
++  <script src="js/utils.js?v=632"></script>
+   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
+-  <script src="js/color-libs.js?v=615"></script>
+-  <script src="js/simulator.js?v=615"></script>
++  <script src="js/color-libs.js?v=632"></script>
++  <script src="js/simulator.js?v=632"></script>
+   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
+-  <script src="js/anchor-cut.js?v=615"></script>
+-  <script src="js/solver-strategy.js?v=615"></script>
+-  <script src="js/solver.js?v=615"></script>
+-  <script src="js/playersim.js?v=615"></script>
++  <script src="js/anchor-cut.js?v=632"></script>
++  <script src="js/solver-strategy.js?v=632"></script>
++  <script src="js/solver.js?v=632"></script>
++  <script src="js/playersim.js?v=632"></script>
+   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
+-  <script src="js/solver-analysis.js?v=615"></script>
+-  <script src="js/car-sequencer.js?v=615"></script>
+-  <script src="js/experience-goal.js?v=615"></script>
+-  <script src="js/release-route-constructor.js?v=615"></script>
+-  <script src="js/capacity-tuner.js?v=615"></script>
+-  <script src="js/instant-playout.js?v=615"></script>
+-  <script src="js/generator.js?v=615"></script>
+-  <script src="js/route-obstacle-planner.js?v=615"></script>
+-  <script src="js/source-preflight.js?v=615"></script>
+-  <script src="js/analysis.js?v=615"></script>
++  <script src="js/solver-analysis.js?v=632"></script>
++  <script src="js/car-sequencer.js?v=632"></script>
++  <script src="js/experience-goal.js?v=632"></script>
++  <script src="js/release-route-constructor.js?v=632"></script>
++  <script src="js/capacity-tuner.js?v=632"></script>
++  <script src="js/instant-playout.js?v=632"></script>
++  <script src="js/generator.js?v=632"></script>
++  <script src="js/story-compiler.js?v=632"></script>
++  <script src="js/route-obstacle-planner.js?v=632"></script>
++  <script src="js/source-preflight.js?v=632"></script>
++  <script src="js/analysis.js?v=632"></script>
+   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
+-  <script src="js/level-editor.js?v=615"></script>
+-  <script src="js/app.js?v=615"></script>
++  <script src="js/level-editor.js?v=632"></script>
++  <script src="js/app.js?v=632"></script>
+   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
+     体检报告已生成
+     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+index 75d6d1d..8c509ca 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/app.js"
+@@ -7,7 +7,7 @@
+ 
+ var AntSolver = AntSolver || {};
+ 
+-var APP_BUILD = "615";
++var APP_BUILD = "632";
+ try { console.log("[app] build " + APP_BUILD); } catch (e) {}
+ 
+ AntSolver.App = (function() {
+@@ -4888,6 +4888,7 @@ AntSolver.App = (function() {
+     var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
+     var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
+     var _routeObstacle = !!((document.getElementById('gen-route-obstacle') || {}).checked);
++    var _storyCompiler = !!((document.getElementById('gen-story-compiler') || {}).checked);
+     var _capacityMix = !!((document.getElementById('gen-capacity-mix') || {}).checked);
+     var _capacityMixMin = parseInt((document.getElementById('gen-capacity-mix-min') || {}).value, 10) || 6;
+     var _capacityMixMax = parseInt((document.getElementById('gen-capacity-mix-max') || {}).value, 10) || 40;
+@@ -5089,6 +5090,12 @@ AntSolver.App = (function() {
+     //   下面这组参数继续沿用原生产口径（_legacyParams 保持 true），否则棋盘范围 / 管道数 / 目标车数
+     //   会跟着一起变，没法把改前后差异归因到产线。参数随产线重调留给下一个单变量实验。
+     out.generatorFlow = 'new_fixed';
++    if (_storyCompiler) {
++      out.storyCompiler = true;
++      out.storyCompilerStrict = true;
++      out.instantChain = true;
++      out.bottomOnly = false;
++    }
+     if (_routeObstacle) {
+       out.routeObstaclePlan = 'v1';
+       out.routeObstaclePlanMaxAttempts = 6;
+@@ -6056,6 +6063,25 @@ AntSolver.App = (function() {
+         ? ('采用 / ' + (rec.routeObstaclePlan.added || []).length + ' 个单元 / ' +
+           Math.round((rec.routeObstaclePlan.wallElapsedMs || rec.routeObstaclePlan.elapsedMs || 0) / 1000) + 's')
+         : ('未采用（' + (rec.routeObstaclePlan.reason || '无改善') + '）')) : '未开') +
++      row('故事编译器实验', rec.storyCompiler
++        ? (rec.storyCompiler.status === 'pass'
++          ? ('通过 / ' + rec.storyCompiler.label + ' / ' +
++            rec.storyCompiler.requiredSteps + '步契约 / ' +
++            (rec.storyCompiler.players || []).filter(function (x) {
++              return x.won && x.routeMatches;
++            }).length + '/6' +
++            (function () {
++              var tested = (rec.storyCompiler.players || []).filter(function (x) {
++                return x.reviveCap === 0 && Array.isArray(x.pressureWindows);
++              });
++              if (!tested.length) return '';
++              var counts = tested.map(function (x) { return x.pressureWindows.length; });
++              var peaks = tested.map(function (x) { return x.bufferPeak || 0; });
++              return ' · 0复活压力 ' + Math.min.apply(null, counts) + '~' +
++                Math.max.apply(null, counts) + '窗 / 峰值 ' + Math.max.apply(null, peaks);
++            })())
++          : ('未通过（' + (rec.storyCompiler.status || 'unknown') + '）'))
++        : '未开') +
+       row('混合容量填盘', rec.capacityMixPlan
+         ? ((rec.capacityMixPlan.rows || '?') + '×' + (rec.capacityMixPlan.cols || '?') + ' / ' +
+           (rec.capacityMixPlan.actualCars != null ? rec.capacityMixPlan.actualCars : '?') + ' 车 / 目标 ' +
+@@ -6088,9 +6114,22 @@ AntSolver.App = (function() {
+       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
+       row('目标图预检', rec.sourcePreflight ? (rec.sourcePreflight.status + ' · 风险 ' + (rec.sourcePreflight.warnings && rec.sourcePreflight.warnings.length ? rec.sourcePreflight.warnings.join('/') : '无') +
+         ' · ' + (rec.sourcePreflight.searchAdvice || '') + (rec.sourcePreflight.demand && rec.sourcePreflight.demand.smallCriticalColors && rec.sourcePreflight.demand.smallCriticalColors.length ? ' · 小色可关键' : '')) : '未测') +
+-      row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
+-        ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
+-        ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
++      row('目标体验', rec.storyCompilerPass
++        ? ('通过 · 故事契约 ' + rec.storyCompiler.requiredSteps + '步 · PlayerSim ' +
++          (rec.storyCompiler.players || []).filter(function (x) { return x.won && x.routeMatches; }).length + '/6' +
++          (function () {
++            var tested = (rec.storyCompiler.players || []).filter(function (x) {
++              return x.reviveCap === 0 && Array.isArray(x.pressureWindows);
++            });
++            if (!tested.length) return '';
++            var counts = tested.map(function (x) { return x.pressureWindows.length; });
++            var peaks = tested.map(function (x) { return x.bufferPeak || 0; });
++            return ' · 压力 ' + Math.min.apply(null, counts) + '~' +
++              Math.max.apply(null, counts) + '窗 / 峰值 ' + Math.max.apply(null, peaks);
++          })())
++        : (rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
++          ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
++          ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）'))) +
+       row('路线与分岔', rec.experienceRouteEvidence && rec.experienceRouteEvidence.routeDistribution ? (function () { var d = rec.experienceRouteEvidence.routeDistribution, low = d.lowPressureRoute, cc = low && low.choiceContrast;
+         var shortYield = cc && cc.baselineAction && cc.lowAction
+           ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated
+@@ -6433,6 +6472,16 @@ AntSolver.App = (function() {
+     // 【v521】搜索结构门保持旧口径；只有目标模式最终验收可补低压力证据。
+     var _finalStruct = AntSolver.Quality.finalStructureFromGeneration ? AntSolver.Quality.finalStructureFromGeneration(result) : null;
+     var _useFinalStruct = !!(result.goalMode && result.config && result.config.experienceGoal === true && _finalStruct);
++    var _storyCompilerPass = !!(result.storyCompiler && result.storyCompiler.status === 'pass' && result.valid);
++    var _storyCapMin = (_storyCompilerPass && result.storyCompiler.capacityMin != null)
++      ? result.storyCompiler.capacityMin : (result.config ? result.config.boxSizeMin : null);
++    var _storyCapMax = (_storyCompilerPass && result.storyCompiler.capacityMax != null)
++      ? result.storyCompiler.capacityMax : (result.config ? result.config.boxSizeMax : null);
++    var _storyCars = (_storyCompilerPass && result.storyCompiler.totalCars != null)
++      ? result.storyCompiler.totalCars : parsed.totalBoxes;
++    if (_storyCompilerPass && result.storyCompiler.totalCars != null) {
++      _boardStat0.boardBoxes = result.storyCompiler.totalCars;
++    }
+     // 【v471】结构门过：不再把 fallback 当交付否决
+     var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
+     return {
+@@ -6463,17 +6512,19 @@ AntSolver.App = (function() {
+       trace: result.trace || null,          // 【v334】生成过程轨迹
+       // 【v335】导出"制作过程"用：全知压力采样 + 总盒数
+       pressureSamples: (result.solveResult && result.solveResult.pressureSamples) || null,
+-      totalBoxes: parsed.totalBoxes || null,
++      totalBoxes: _storyCars || null,
+       appliedParams: result.config ? {
+-        capMin: result.config.boxSizeMin, capMax: result.config.boxSizeMax,
+-        capNormMin: result.config.capNormMin, capNormMax: result.config.capNormMax,
+-        userCapMin: result.config._userCapMin, userCapMax: result.config._userCapMax,
++        capMin: _storyCapMin, capMax: _storyCapMax,
++        capNormMin: _storyCapMin, capNormMax: _storyCapMax,
++        userCapMin: _storyCompilerPass ? _storyCapMin : result.config._userCapMin,
++        userCapMax: _storyCompilerPass ? _storyCapMax : result.config._userCapMax,
+         capScale: result.capScale != null ? result.capScale : (result.config._capScale != null ? result.config._capScale : null),
+-        targetCarCount: result.config.targetCarCount,
+-        rows: result.config.boardRowsMin + '~' + result.config.boardRowsMax,
+-        cols: result.config.boardColsMin + '~' + result.config.boardColsMax,
+-        flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs,
+-        capacityProfile: result.config.capacityProfile || 'auto',
++        targetCarCount: _storyCompilerPass ? _storyCars : result.config.targetCarCount,
++        rows: _storyCompilerPass ? parsed.board.rows + '~' + parsed.board.rows : result.config.boardRowsMin + '~' + result.config.boardRowsMax,
++        cols: _storyCompilerPass ? parsed.board.cols + '~' + parsed.board.cols : result.config.boardColsMin + '~' + result.config.boardColsMax,
++        flow: _storyCompilerPass ? 'story_compiler' : result.config.generatorFlow,
++        budgetMs: result.config.timeBudgetMs,
++        capacityProfile: _storyCompilerPass ? 'storyCompiler' : (result.config.capacityProfile || 'auto'),
+         cutMode: result.config.cutMode || null,
+         cutPolicy: result.config.cutPolicy || 'auto',
+         semanticObstacles: !!result.config.semanticObstacles,
+@@ -6484,10 +6535,12 @@ AntSolver.App = (function() {
+         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime,
+         capacityMix: result.config.capacityMix || null,
+         capacityMixBoard: result.config._capacityMixBoardPlan || null,
+-        obstacleThicken: result.config.obstacleThicken || null
++        obstacleThicken: result.config.obstacleThicken || null,
++        storyCompiler: !!result.config.storyCompiler
+       } : null,
+       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
+-      cutInfo: (result.config && result.config._cutAuto) || null,
++      cutInfo: _storyCompilerPass ? { mode: 'storyFixed' } :
++        ((result.config && result.config._cutAuto) || null),
+       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
+       capacityAudit: result.capacityAudit || null,
+       // 【v501】黑块拆解：结构目标墙 / 管道格 / 车少补位
+@@ -6498,6 +6551,22 @@ AntSolver.App = (function() {
+       timelineEvidence: result.timelineEvidence || null,
+       experienceGoal: !!(result.config && result.config.experienceGoal),
+       experienceEvidence: (function () {
++        if (_storyCompilerPass) {
++          return {
++            pass: true,
++            status: 'story-compiler-pass',
++            reasons: [],
++            metrics: {
++              routeMode: result.storyCompiler.routeMode,
++              requiredSteps: result.storyCompiler.requiredSteps,
++              playersPass: (result.storyCompiler.players || []).filter(function (x) {
++                return x.won && x.routeMatches;
++              }).length
++            },
++            source: 'story_compiler',
++            diagnosis: { primary: 'pass', action: 'done', flags: ['storyCompiler'] }
++          };
++        }
+         var rt = result.experienceRouteEvidence, rb = rt && rt.bestVerified;
+         if (result.acceptedByVerifiedRoute && rt && rt.pass === true && rb && rb.releaseDecision && rb.releaseDecision.status === 'found' &&
+             rb.releaseDecision.evidence && rb.releaseDecision.evidence.finalReplayValid === true) {
+@@ -6521,11 +6590,13 @@ AntSolver.App = (function() {
+         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
+       usableSpaceRepair: result.usableSpaceRepair || null,
+       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
+-      qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
+-      qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
++      qGatePass: _storyCompilerPass ? true : (_useFinalStruct ? _finalStruct.pass : _qv.gatePass),
++      qGateReasons: _storyCompilerPass ? [] : ((_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons),
+       baseGatePass: _qv.gatePass, baseGateReasons: _qv.gateReasons,
+       fullTime: !!(result.config && result.config.fullTime),
+       trapPost: result.trapPost || null,
++      storyCompilerPass: _storyCompilerPass,
++      storyCompiler: result.storyCompiler || null,
+       routeObstaclePlan: result.routeObstaclePlan || null,
+       capacityMixPlan: result.capacityMixPlan || null,
+       obstacleThicken: (function () {
+@@ -6601,12 +6672,13 @@ AntSolver.App = (function() {
+       // 只记录在生产侧记录里（CSV/关卡数据.json/报告），关卡本体不含该字段。
+       entryMode: result.entryMode || 'fourSide',
+       // 兜底标记(v86)：fallback=true 表示这关不是正常合格输出，是"最接近标准/安全垫底"的兜底交付。
+-      fallback: _qgFromFallback ? false : !!result.fallback,
++      fallback: (_storyCompilerPass || _qgFromFallback) ? false : !!result.fallback,
+       fallbackOriginal: !!result.fallback,
+-      qGateFallback: _qgFromFallback,
+-      fallbackTier: _qgFromFallback ? null : (result.fallbackTier != null ? result.fallbackTier : null),
+-      fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
+-      fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
++      qGateFallback: _qgFromFallback || _storyCompilerPass,
++      fallbackTier: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackTier != null ? result.fallbackTier : null),
++      fallbackType: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackType || null),
++      fallbackReason: _storyCompilerPass ? '故事编译契约通过（原通用门不作为否决）' :
++        (_qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null)),
+       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
+       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
+       goalBudgetEvidence: result.goalBudgetEvidence || null,
+@@ -8022,7 +8094,7 @@ AntSolver.App = (function() {
+     files.push({ name: '索引.csv', text: '\ufeff' + idxRows.join('\n') });
+ 
+     // 5) 生产报告 MD —— 中后期卡点审核（标准见 生产审核评分体系.md）
+-    var auditPass = results.filter(function(r) { return !!r.qPass; });
++    var auditPass = results.filter(function(r) { return !!(r.qPass || r.storyCompilerPass); });
+     var bl = config.bufferLimit || 5;
+     var md = '# 生产报告\n\n';
+     md += '- 生成时间: ' + new Date().toLocaleString() + '\n';
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+index d2bc50d..7a460cd 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/gen-worker.js"
+@@ -26,6 +26,7 @@ try {
+     'solver.js' + _v, 'playersim.js' + _v, 'analysis.js' + _v,
+     'solver-analysis.js' + _v, 'car-sequencer.js' + _v,
+     'experience-goal.js' + _v, 'capacity-tuner.js' + _v, 'instant-playout.js' + _v, 'generator.js' + _v,
++    'story-compiler.js' + _v,
+     'route-obstacle-planner.js' + _v, 'source-preflight.js' + _v
+   );
+   _loaded = !!(typeof AntSolver !== 'undefined' && AntSolver.Generator && AntSolver.Generator.produce);
+@@ -39,6 +40,7 @@ if (_loaded && AntSolver.Generator.setProgressHook) {
+ }
+ 
+ function _goalPassed(r) {
++  if (r && r.storyCompiler && r.storyCompiler.status === 'pass') return true;
+   try { return AntSolver.Generator.goalAcceptPass(r, _goal && _goal.config); } catch (e) { return false; }
+ }
+ function _goalScore(r) {
+@@ -78,9 +80,9 @@ function _goalFinish(stopReason) {
+     best = { level: null, valid: false, lastFailReason: stopReason || 'goalNoRound', goalMode: true, goalRounds: g.rounds, goalStopped: !!g.stop };
+   }
+   try { best._workerBuild = (g.config && g.config._build) || null; } catch (e) {}
+-  if (best && best.level) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
+-  try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
+-  try { AntSolver.Generator.markFinalStructureAccept(best, g.config); } catch (e) {}
++  if (best && best.level && !best.storyCompiler) { try { AntSolver.Generator.attachExperienceRouteEvidence(best, g.config); } catch (e) {} }
++  if (best && !best.storyCompiler) try { AntSolver.Generator.markVerifiedRouteAccept(best, g.config); } catch (e) {}
++  if (best && !best.storyCompiler) try { AntSolver.Generator.markFinalStructureAccept(best, g.config); } catch (e) {}
+   best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: g.maxMs, perRoundMs: g.perMs,
+     sharedCapBudget: g.config.goalSharedBudget !== false, rounds: g.rounds, stopReason: best.goalStopReason || null,
+     searchElapsedMs: best.goalElapsedMs || null, wallElapsedMs: Date.now() - g.t0,
+@@ -134,18 +136,18 @@ function _goalRound() {
+   } catch (err) {
+     r = { level: null, valid: false, lastFailReason: 'goalRoundError: ' + ((err && err.message) || err) };
+   }
+-  if (r && !r.level && roundLeft() >= 1000) {
++  if (r && !r.level && !(r.storyCompiler && cfg.storyCompilerStrict) && roundLeft() >= 1000) {
+     try { r = AntSolver.Generator.repairUsableNoCandidate(g.blocks, r, cfg, { timeBudgetMs: roundLeft() }); }
+     catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+   }
+   // 【v502】实验目标：近目标先做小容量精调；默认 experienceGoal 未开时不执行。
+   var tuneLeft = roundLeft();
+-  if (cfg.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
++  if (cfg.experienceGoal === true && r && r.level && r.valid && !r.storyCompiler && tuneLeft > 100) {
+     cfg.capacityTuneMs = Math.max(100, Math.min(parseInt(cfg.capacityTuneMs, 10) || 5000, tuneLeft));
+     try { r = AntSolver.Generator.tuneExperienceCandidate(r, cfg); } catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
+   }
+   // 【v439】目标模式：先在同一基底上继续修，修不动再换 seed
+-  if (r && r.level && !_goalPassed(r)) {
++  if (r && r.level && !r.storyCompiler && !_goalPassed(r)) {
+     var _repCur = r, _repSteps = 0;
+     for (var _rr = 0; _rr < 3 && roundLeft() > 2000; _rr++) {
+       var _rep = null;
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+index 09605e5..e8f1853 100644
+--- "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/generator.js"
+@@ -15526,6 +15526,94 @@ AntSolver.Generator = (function() {
+   /** 【v194】一图多产的比较元组：先比六条过几条，再比离带距离，再比稳健通关率。 */
+   var _PRESSURE_FIRST = false;   // 【v215】压力优先：可解的前提上，峰窗越高越好
+   var _AUDIT_FIRST = false;      // 【v216】全知线优先：看"最优解自己扛多少"，不是玩家容错低
++  /**
++   * 【v616·正式版默认关闭接入】故事编译器单次产线。
++   * 只接受浏览器端 StoryCompiler 注册表已验收的目标图；不匹配时显式失败，
++   * 不落回随机候选。该函数只从 runFlowOnce() 进入，避免出现第二条纠偏/兜底产线。
++   */
++  function produceStoryOnce(blocks, config, opts) {
++    var t0 = Date.now();
++    var compiler = AntSolver.StoryCompiler;
++    if (!compiler || typeof compiler.compile !== 'function') {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++        storyCompiler: { schema: 'story-compiler-v1', status: 'compiler-not-loaded' },
++        lastFailReason: 'storyCompilerNotLoaded'
++      };
++    }
++    var result = null;
++    try { result = compiler.compile(blocks, config); }
++    catch (e) {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++        storyCompiler: { schema: 'story-compiler-v1', status: 'compile-error', error: String((e && e.message) || e) },
++        lastFailReason: 'storyCompilerError'
++      };
++    }
++    var meta = result && result.meta ? result.meta : {
++      schema: 'story-compiler-v1', status: 'no-result'
++    };
++    if (!result || !result.ok || !result.level) {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 0, treeEvaluated: 0,
++        storyCompiler: meta,
++        lastFailReason: 'storyCompiler:' + (meta.status || 'failed'),
++        structural: {
++          ok: false,
++          reason: meta.status === 'unsupported-target'
++            ? '故事编译器没有该目标图的已验收剧本'
++            : '故事编译器验收失败：' + (meta.status || 'unknown')
++        }
++      };
++    }
++
++    var parsed = null;
++    var solveResult = null;
++    try { parsed = AntSolver.parseLevel(result.level); } catch (e) { parsed = null; }
++    try {
++      solveResult = AntSolver.Solver.solveInstantChain(parsed, {
++        timeBudgetMs: Math.max(1000, parseInt(config && config.timeBudgetMs, 10) || 20000)
++      });
++    } catch (e) { solveResult = null; }
++    if (!parsed || !solveResult || !solveResult.completed) {
++      return {
++        level: null, valid: false, flow: 'story_compiler', timedOut: false,
++        elapsedMs: Date.now() - t0, candidates: 1, treeEvaluated: 1,
++        storyCompiler: meta,
++        solveResult: solveResult,
++        lastFailReason: 'storyCompilerSolveFailed',
++        structural: { ok: false, reason: '故事编译器关卡最终求解失败' }
++      };
++    }
++
++    var generationEval = null;
++    try { generationEval = evaluateGeneration(solveResult, parsed, config); }
++    catch (e) { generationEval = null; }
++    var cand = {
++      level: parsed,
++      valid: true,
++      solveResult: solveResult,
++      generationEval: generationEval,
++      difficulty: computeDifficulty(solveResult, parsed, config, generationEval),
++      config: config,
++      retries: 0,
++      flow: 'story_compiler',
++      candidates: 1,
++      treeEvaluated: 1,
++      elapsedMs: Date.now() - t0,
++      timedOut: false,
++      storyCompiler: meta,
++      structural: { ok: true, reason: 'story-compiler-validated' }
++    };
++    try { ensureCandidateQuality(cand); } catch (e) { cand.goodV3Error = String((e && e.message) || e); }
++    try { cand.choiceCurve = choiceCurve(parsed, solveResult, config); } catch (e) { cand.choiceCurve = null; }
++    try { cand.capacityAudit = AntSolver.Quality.capacityEvidence(parsed, config || {}); }
++    catch (e) { cand.capacityAuditError = String((e && e.message) || e); }
++    return cand;
++  }
+   /**
+    * 【v314·用户裁决】任何"重产一次"的分支都必须走**当前选定的那条产线**。
+    *   泄漏点：bandFixOnce（带外纠偏）和全灭兜底都写死调用 produceFixed —— 新版流程
+@@ -15534,6 +15622,7 @@ AntSolver.Generator = (function() {
+    */
+   function runFlowOnce(blocks, config, opts) {
+     try {
++      if (config && config.storyCompiler === true) return produceStoryOnce(blocks, config, opts || {});
+       if (config && config.generatorFlow === 'old') return produce(blocks, config);
+       return produceFixed(blocks, config, opts || {});
+     } catch (e) { return null; }
+@@ -16441,7 +16530,10 @@ AntSolver.Generator = (function() {
+     var maxRounds = parseInt(config.goalMaxRounds, 10);
+     if (!(maxRounds > 0)) maxRounds = 0;
+     var baseSeed = (config.seed != null && !isNaN(+config.seed)) ? (+config.seed) : ((Date.now() & 0x7fffffff) >>> 0);
+-    function passed(r) { return goalAcceptPass(r, config); }
++    function passed(r) {
++      if (r && r.storyCompiler && r.storyCompiler.status === 'pass') return true;
++      return goalAcceptPass(r, config);
++    }
+     var best = null, rounds = 0, stopped = false;
+     while (true) {
+       if (opts.shouldStop && opts.shouldStop()) { stopped = true; break; }
+@@ -16467,7 +16559,7 @@ AntSolver.Generator = (function() {
+       }
+       var repairLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+         roundBudgetMs - (Date.now() - roundT0));
+-      if (r && !r.level && repairLeft >= 1000) {
++      if (r && !r.level && !(r.storyCompiler && config.storyCompilerStrict) && repairLeft >= 1000) {
+         try { r = repairUsableNoCandidate(blocks, r, cfg, { timeBudgetMs: repairLeft, shouldStop: opts.shouldStop }); }
+         catch (e) { r.usableSpaceRepair = { applied: false, error: String((e && e.message) || e) }; }
+       }
+@@ -16475,7 +16567,7 @@ AntSolver.Generator = (function() {
+       if (r) r.goalRound = rounds;
+       var tuneLeft = Math.min(maxMs ? maxMs - (Date.now() - t0) : roundBudgetMs,
+         roundBudgetMs - (Date.now() - roundT0));
+-      if (config.experienceGoal === true && r && r.level && r.valid && tuneLeft > 100) {
++      if (config.experienceGoal === true && r && r.level && r.valid && !r.storyCompiler && tuneLeft > 100) {
+         var tuneCfg = Object.assign({}, cfg, {
+           capacityTuneMs: Math.max(100, Math.min(parseInt(config.capacityTuneMs, 10) || 5000, tuneLeft))
+         });
+@@ -16483,7 +16575,7 @@ AntSolver.Generator = (function() {
+         catch (e) { r.capacityTune = { applied: false, error: String((e && e.message) || e) }; }
+       }
+       var localSwapLeft = maxMs ? maxMs - (Date.now() - t0) : Infinity;
+-      if (config.localSwapRepair === true && r && r.level && r.valid && localSwapLeft > 1000) {
++      if (config.localSwapRepair === true && r && r.level && r.valid && !r.storyCompiler && localSwapLeft > 1000) {
+         try {
+           var localCfg = Object.assign({}, cfg, {
+             localSwapRepairMaxMs: Math.min(
+@@ -16496,7 +16588,7 @@ AntSolver.Generator = (function() {
+         }
+         catch (e) { r.localSwapRepair = { schema: 'local-swap-repair-v1', applied: false, error: String((e && e.message) || e) }; }
+       }
+-      if (config.instantReleaseRoute === true && r && r.level && r.valid && r.solveResult &&
++      if (config.instantReleaseRoute === true && r && r.level && r.valid && !r.storyCompiler && r.solveResult &&
+           goalStructPass(r) && experienceCapacityOk(r, cfg)) {
+         try { instantReleaseRouteEvidenceOf(r, Object.assign({}, cfg, config)); }
+         catch (e) { r.instantReleaseRouteEvidence = { schema: 'instant-release-route-evidence-v1', pass: false, status: 'error', error: String((e && e.message) || e) }; }
+@@ -16511,10 +16603,10 @@ AntSolver.Generator = (function() {
+       best.goalStopped = stopped;
+       best.goalStopReason = stopped ? 'stopped' : (passed(best) ? 'pass' : (maxMs && (Date.now() - t0) >= maxMs ? 'goalTimeUp' : (maxRounds && rounds >= maxRounds ? 'goalMaxRounds' : null)));
+     }
+-    if (best && best.level) attachExperienceRouteEvidence(best, config);
+-    if (best) markVerifiedRouteAccept(best, config);
+-    if (best) markReleaseRouteAccept(best, config);
+-    if (best) markFinalStructureAccept(best, config);
++    if (best && best.level && !best.storyCompiler) attachExperienceRouteEvidence(best, config);
++    if (best && !best.storyCompiler) markVerifiedRouteAccept(best, config);
++    if (best && !best.storyCompiler) markReleaseRouteAccept(best, config);
++    if (best && !best.storyCompiler) markFinalStructureAccept(best, config);
+     if (best) best.goalBudgetEvidence = { schema: 'goal-budget-v1', maxMs: maxMs, perRoundMs: perMs,
+       sharedCapBudget: config.goalSharedBudget !== false, rounds: rounds, stopReason: best.goalStopReason || null,
+       searchElapsedMs: best.goalElapsedMs, wallElapsedMs: Date.now() - t0,
+@@ -16570,6 +16662,7 @@ AntSolver.Generator = (function() {
+     //   管道深度补救”的容量缩放都读这个快照，不许越过用户上限（踩过：v238 反推、管道 +12%、管道 +3）。
+     //   v496 注意：_userCapMin 为 null 表示"本档的上沿已由 capScalePlan 显式给定，需要重新快照"。
+     config = normalizeRuleConfig((config && typeof config === 'object') ? config : {});
++    if (config.storyCompiler === true) return runFlowOnce(blocks, config, opts);
+     if (config._userCapMin == null) {
+       var _ucMn = parseInt(config.boxSizeMin, 10) || 0, _ucMx = parseInt(config.boxSizeMax, 10) || 0;
+       if (_ucMn > 0 && _ucMx >= _ucMn) config = Object.assign({}, config, { _userCapMin: _ucMn, _userCapMax: _ucMx });
+diff --git "a/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js" "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js"
+new file mode 100644
+index 0000000..4ca6f92
+--- /dev/null
++++ "b/02_\345\267\245\347\250\213/\345\256\214\346\225\264\344\270\273bin\345\277\253\347\205\247_20261012/bin/js/story-compiler.js"
+@@ -0,0 +1,1749 @@
++/*
++ * StoryCompiler v1 · generated by GenerateStoryCompilerUiBundle_v616.js
++ *
++ * Default-off browser registry for the three accepted story levels.
++ * Unsupported targets fail explicitly and never fall back to random search.
++ */
++var AntSolver = AntSolver || {};
++
++AntSolver.StoryCompiler = (function () {
++  var REGISTRY = {
++  "f9e2533b": {
++    "id": "006",
++    "label": "006 · 双链债务与分支冰",
++    "targetSig": "f9e2533b",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "9fdef7ad5d4f2c31ce26207b801775d7d59192c071ab4ffbeee622145a81a64d",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 21,
++          "type": 7,
++          "param": 9,
++          "count": 36
++        },
++        {
++          "id": 22,
++          "type": 0,
++          "param": 0,
++          "count": 35
++        },
++        {
++          "id": 34,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        },
++        {
++          "id": 33,
++          "type": 7,
++          "param": 10,
++          "count": 20
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 5,
++          "type": 5,
++          "param": 2,
++          "count": 21
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": 14,
++          "type": 7,
++          "param": 10,
++          "count": 23
++        },
++        {
++          "id": 5,
++          "type": 5,
++          "param": 2,
++          "count": 40
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 4,
++          "type": 0,
++          "param": 0,
++          "count": 40
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 23
++        }
++      ],
++      [
++        {
++          "id": 17,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 34,
++          "type": 5,
++          "param": 1,
++          "count": 25
++        },
++        {
++          "id": 30,
++          "type": 5,
++          "param": 1,
++          "count": 23
++        },
++        {
++          "id": 28,
++          "type": 5,
++          "param": 1,
++          "count": 23
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 7,
++          "param": 8,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        }
++      ],
++      [
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 5,
++          "count": 24
++        },
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 5,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 4,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 0,
++          "type": 11,
++          "param": [
++            {
++              "id": 13,
++              "count": 28
++            }
++          ],
++          "count": 0
++        }
++      ]
++    ],
++    "capacityMin": 20,
++    "capacityMax": 40,
++    "totalCars": 47,
++    "expectedPicks": [],
++    "requiredSteps": 44,
++    "openingContract": {
++      "exactMoves": 7,
++      "allCanConsume": true,
++      "bufferAfterEmpty": true
++    },
++    "storyGraph": null,
++    "roleGraph": {
++      "roles": [
++        {
++          "id": "safe",
++          "path": [
++            {
++              "r": 0,
++              "c": 3
++            },
++            {
++              "r": 1,
++              "c": 3
++            }
++          ],
++          "debtAfterStep": null,
++          "finalBufferEmpty": true
++        },
++        {
++          "id": "lightDebt",
++          "path": [
++            {
++              "r": 0,
++              "c": 0
++            },
++            {
++              "r": 1,
++              "c": 0
++            },
++            {
++              "r": 2,
++              "c": 0
++            }
++          ],
++          "debtAfterStep": 2,
++          "debt": {
++            "color": 17,
++            "remaining": 10
++          },
++          "finalBufferEmpty": true
++        },
++        {
++          "id": "heavyDebt",
++          "path": [
++            {
++              "r": 0,
++              "c": 6
++            },
++            {
++              "r": 1,
++              "c": 6
++            },
++            {
++              "r": 2,
++              "c": 6
++            }
++          ],
++          "debtAfterStep": 2,
++          "debt": {
++            "color": 34,
++            "remaining": 19
++          },
++          "finalBufferEmpty": true
++        }
++      ]
++    },
++    "pressureContract": {
++      "threshold": 3,
++      "minWindows": 2,
++      "minPeak": 3,
++      "requireRelease": true,
++      "reviveCap": 0
++    },
++    "chainContracts": [
++      {
++        "group": 1,
++        "cells": [
++          {
++            "r": 5,
++            "c": 1
++          },
++          {
++            "r": 5,
++            "c": 2
++          },
++          {
++            "r": 5,
++            "c": 3
++          }
++        ],
++        "requireAdjacent": true,
++        "requireCurrentConsumption": true,
++        "requireCompletedMember": true,
++        "requireDebtMember": true,
++        "requireRelease": true
++      },
++      {
++        "group": 2,
++        "cells": [
++          {
++            "r": 2,
++            "c": 5
++          },
++          {
++            "r": 3,
++            "c": 5
++          }
++        ],
++        "requireAdjacent": true,
++        "requireCurrentConsumption": true,
++        "requireCompletedMember": true,
++        "requireDebtMember": true,
++        "requireRelease": true
++      }
++    ],
++    "pipeContract": {
++      "cell": {
++        "r": 6,
++        "c": 6
++      },
++      "direction": 11,
++      "queue": [
++        {
++          "color": 13,
++          "count": 28
++        }
++      ],
++      "requireReleased": true
++    },
++    "routeMode": "roleGraph",
++    "storyBeats": [
++      "顶层7个无冰入口全部立即收满",
++      "安全路径不产生债务",
++      "轻债路径17/26欠10后由31/31偿还",
++      "长债路径34/25欠19后由31/31偿还",
++      "第一段同色债务峰值3并在下一窗口部分释放",
++      "第二段混色债务达到4并持续到33/20释放",
++      "首行7个入口均无冰；债务发生在中段而不是首行免费双消",
++      "右侧5/21先完成、5/40留下30像素债务，完成车被扣住7步后释放",
++      "相邻三连锁包含34/25、30/23、28/23，当前28完成后被扣住",
++      "五格分支数字冰延迟高误判供给，移除后完全随机buffer5比例回升",
++      "管道以13/28暂存并在出口空出后释放",
++      "最终组债释放并收尾"
++    ]
++  },
++  "e4c16e95": {
++    "id": "008",
++    "label": "008 · 双债务故事图",
++    "targetSig": "e4c16e95",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "1cd5c5875b42ea965058cbbad838a0c8970bca98b4a3e72d1fbd9127e4efdd79",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 3,
++          "type": 0,
++          "param": 0,
++          "count": 29
++        },
++        {
++          "id": 5,
++          "type": 7,
++          "param": 2,
++          "count": 36
++        },
++        {
++          "id": 7,
++          "type": 7,
++          "param": 3,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 3,
++          "count": 28
++        }
++      ],
++      [
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 22
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        }
++      ],
++      [
++        {
++          "id": 32,
++          "type": 7,
++          "param": 2,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        }
++      ],
++      [
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 26,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        }
++      ],
++      [
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 14,
++          "type": 0,
++          "param": 0,
++          "count": 32
++        },
++        {
++          "id": 13,
++          "type": 0,
++          "param": 0,
++          "count": 31
++        },
++        {
++          "id": 33,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        }
++      ],
++      [
++        {
++          "id": 3,
++          "type": 0,
++          "param": 0,
++          "count": 28
++        },
++        {
++          "id": 26,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        },
++        {
++          "id": 7,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 32,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 21
++        }
++      ]
++    ],
++    "capacityMin": 21,
++    "capacityMax": 36,
++    "totalCars": 47,
++    "expectedPicks": [],
++    "requiredSteps": 47,
++    "openingContract": null,
++    "storyGraph": {
++      "start": {
++        "r": 0,
++        "c": 0,
++        "color": 7,
++        "count": 26
++      },
++      "choices": [
++        {
++          "id": "lightDebt",
++          "path": [
++            {
++              "r": 1,
++              "c": 0
++            },
++            {
++              "r": 2,
++              "c": 0
++            }
++          ],
++          "debt": {
++            "color": 33,
++            "remaining": 18
++          },
++          "releaseStep": 1
++        },
++        {
++          "id": "heavyDebt",
++          "path": [
++            {
++              "r": 0,
++              "c": 1
++            },
++            {
++              "r": 0,
++              "c": 2
++            }
++          ],
++          "debt": {
++            "color": 3,
++            "remaining": 27
++          },
++          "releaseStep": 1
++        }
++      ],
++      "minRouteDiversity": 2
++    },
++    "roleGraph": null,
++    "pressureContract": null,
++    "chainContracts": [],
++    "pipeContract": null,
++    "routeMode": "storyGraph",
++    "storyBeats": [
++      "7/26教学",
++      "轻债33/22或重债3/29二选一",
++      "32/27或5/36分别偿还",
++      "第二枚7/26汇合",
++      "后续分区选择与终局"
++    ]
++  },
++  "88f1c207": {
++    "id": "014",
++    "label": "014 · 最终留出",
++    "targetSig": "88f1c207",
++    "targetSize": [
++      35,
++      35
++    ],
++    "sha256": "8f863e246ecbb0435a086a60cfbd57442458e90fe0fbb4b269042e192c13779e",
++    "maprow": 7,
++    "mapcol": 7,
++    "spools": [
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 27
++        },
++        {
++          "id": 29,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 33,
++          "type": 7,
++          "param": 3,
++          "count": 25
++        },
++        {
++          "id": 24,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 5,
++          "count": 24
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 7,
++          "param": 13,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 12,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 11,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 10,
++          "count": 26
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 9,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 8,
++          "count": 26
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 15,
++          "type": 7,
++          "param": 27,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 26,
++          "count": 24
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 25,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 24,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 23,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 22,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        }
++      ],
++      [
++        {
++          "id": 19,
++          "type": 0,
++          "param": 0,
++          "count": 25
++        },
++        {
++          "id": 27,
++          "type": 7,
++          "param": 29,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 30,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 31,
++          "count": 25
++        },
++        {
++          "id": 28,
++          "type": 7,
++          "param": 32,
++          "count": 24
++        },
++        {
++          "id": 18,
++          "type": 7,
++          "param": 33,
++          "count": 26
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 27,
++          "type": 7,
++          "param": 41,
++          "count": 25
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 40,
++          "count": 25
++        },
++        {
++          "id": 31,
++          "type": 0,
++          "param": 0,
++          "count": 30
++        },
++        {
++          "id": 26,
++          "type": 7,
++          "param": 38,
++          "count": 31
++        },
++        {
++          "id": 20,
++          "type": 7,
++          "param": 37,
++          "count": 38
++        },
++        {
++          "id": 19,
++          "type": 7,
++          "param": 36,
++          "count": 25
++        },
++        {
++          "id": 15,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        }
++      ],
++      [
++        {
++          "id": 18,
++          "type": 0,
++          "param": 0,
++          "count": 26
++        },
++        {
++          "id": 28,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 29,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 30,
++          "type": 0,
++          "param": 0,
++          "count": 24
++        },
++        {
++          "id": 33,
++          "type": 7,
++          "param": 46,
++          "count": 24
++        },
++        {
++          "id": 15,
++          "type": 7,
++          "param": 47,
++          "count": 23
++        },
++        {
++          "id": -1,
++          "type": 0,
++          "param": 0,
++          "count": 0
++        }
++      ]
++    ],
++    "capacityMin": 23,
++    "capacityMax": 38,
++    "totalCars": 48,
++    "expectedPicks": [
++      {
++        "r": 0,
++        "c": 0
++      },
++      {
++        "r": 0,
++        "c": 1
++      },
++      {
++        "r": 0,
++        "c": 2
++      },
++      {
++        "r": 0,
++        "c": 3
++      },
++      {
++        "r": 0,
++        "c": 4
++      },
++      {
++        "r": 0,
++        "c": 5
++      },
++      {
++        "r": 0,
++        "c": 6
++      },
++      {
++        "r": 1,
++        "c": 6
++      },
++      {
++        "r": 1,
++        "c": 5
++      },
++      {
++        "r": 1,
++        "c": 4
++      },
++      {
++        "r": 1,
++        "c": 3
++      },
++      {
++        "r": 1,
++        "c": 2
++      },
++      {
++        "r": 1,
++        "c": 1
++      },
++      {
++        "r": 1,
++        "c": 0
++      },
++      {
++        "r": 2,
++        "c": 0
++      },
++      {
++        "r": 2,
++        "c": 1
++      },
++      {
++        "r": 2,
++        "c": 2
++      },
++      {
++        "r": 2,
++        "c": 3
++      },
++      {
++        "r": 2,
++        "c": 4
++      },
++      {
++        "r": 2,
++        "c": 5
++      },
++      {
++        "r": 2,
++        "c": 6
++      },
++      {
++        "r": 3,
++        "c": 6
++      },
++      {
++        "r": 3,
++        "c": 5
++      },
++      {
++        "r": 3,
++        "c": 4
++      },
++      {
++        "r": 3,
++        "c": 3
++      },
++      {
++        "r": 3,
++        "c": 2
++      },
++      {
++        "r": 3,
++        "c": 1
++      },
++      {
++        "r": 3,
++        "c": 0
++      },
++      {
++        "r": 4,
++        "c": 0
++      },
++      {
++        "r": 4,
++        "c": 1
++      },
++      {
++        "r": 4,
++        "c": 2
++      },
++      {
++        "r": 4,
++        "c": 3
++      },
++      {
++        "r": 4,
++        "c": 4
++      },
++      {
++        "r": 4,
++        "c": 5
++      },
++      {
++        "r": 4,
++        "c": 6
++      },
++      {
++        "r": 5,
++        "c": 6
++      },
++      {
++        "r": 5,
++        "c": 5
++      },
++      {
++        "r": 5,
++        "c": 4
++      },
++      {
++        "r": 5,
++        "c": 3
++      },
++      {
++        "r": 5,
++        "c": 2
++      },
++      {
++        "r": 5,
++        "c": 1
++      },
++      {
++        "r": 5,
++        "c": 0
++      },
++      {
++        "r": 6,
++        "c": 0
++      },
++      {
++        "r": 6,
++        "c": 1
++      },
++      {
++        "r": 6,
++        "c": 2
++      },
++      {
++        "r": 6,
++        "c": 3
++      },
++      {
++        "r": 6,
++        "c": 4
++      },
++      {
++        "r": 6,
++        "c": 5
++      }
++    ],
++    "requiredSteps": 48,
++    "openingContract": null,
++    "storyGraph": null,
++    "roleGraph": null,
++    "pressureContract": null,
++    "chainContracts": [],
++    "pipeContract": null,
++    "routeMode": "full",
++    "storyBeats": [
++      "R107小缺口",
++      "R69鱼形内部",
++      "玉米未完成债务",
++      "末段31债务释放"
++    ]
++  }
++};
++
++  function clone(value) { return JSON.parse(JSON.stringify(value)); }
++  function signature(blocks) {
++    var hash = 2166136261 >>> 0;
++    function mix(value) {
++      hash ^= (value >>> 0);
++      hash = Math.imul(hash, 16777619) >>> 0;
++    }
++    mix(blocks.length);
++    mix(blocks[0] ? blocks[0].length : 0);
++    for (var r = 0; r < blocks.length; r++) for (var c = 0; c < blocks[r].length; c++) mix(blocks[r][c] | 0);
++    return hash.toString(16);
++  }
++  function uniquePicks(run) {
++    var seen = {};
++    var out = [];
++    var picks = (run && run.pickOrder) || [];
++    for (var i = 0; i < picks.length; i++) {
++      var pick = picks[i];
++      var key = String(pick.step);
++      if (seen[key]) continue;
++      seen[key] = true;
++      out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });
++    }
++    return out;
++  }
++  function poseKey(picks) {
++    return picks.map(function (pick) { return pick.r + "," + pick.c; }).join(">");
++  }
++  function routeMatches(picks, required, mode) {
++    if (mode === "prefix") return poseKey(picks.slice(0, required.length)) === poseKey(required);
++    return poseKey(picks) === poseKey(required);
++  }
++  function storyGraphPass(level, entry, solvePicks, playerRuns) {
++    var graph = entry.storyGraph;
++    if (!graph) return true;
++    var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++    st.capture = true;
++    st.capOps = [];
++    if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;
++    var opening = AntSolver.Simulator.listMoves(st).filter(function (move) { return !move.blocked; });
++    if (opening.length !== graph.choices.length) return false;
++    for (var gi = 0; gi < graph.choices.length; gi++) {
++      var choice = graph.choices[gi];
++      if (!opening.some(function (move) { return move.r === choice.path[0].r && move.c === choice.path[0].c; })) return false;
++      st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++      st.capture = true;
++      st.capOps = [];
++      if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;
++      for (var pi = 0; pi < choice.path.length; pi++) {
++        st.capOps = [];
++        if (!AntSolver.Simulator.applyPick(st, choice.path[pi].r, choice.path[pi].c)) return false;
++        if (pi === 0 && choice.debt) {
++          if (!st.buffer.some(function (item) {
++            return item.color === choice.debt.color && item.need - item.progress === choice.debt.remaining;
++          })) return false;
++        }
++      }
++      if (st.buffer.length !== 0) return false;
++    }
++    var keys = {};
++    keys[poseKey(solvePicks.slice(0, 12))] = true;
++    for (var ri = 0; ri < playerRuns.length; ri++) keys[poseKey(playerRuns[ri].slice(0, 12))] = true;
++    return Object.keys(keys).length >= (graph.minRouteDiversity || 1);
++  }
++  function roleGraphPass(level, entry) {
++    var graph = entry.roleGraph;
++    if (!graph) return true;
++    for (var ri = 0; ri < graph.roles.length; ri++) {
++      var role = graph.roles[ri];
++      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++      st.capture = true;
++      st.capOps = [];
++      for (var pi = 0; pi < role.path.length; pi++) {
++        var cell = role.path[pi];
++        var move = AntSolver.Simulator.listMoves(st).filter(function (item) {
++          return !item.blocked && item.r === cell.r && item.c === cell.c;
++        })[0];
++        if (!move) return false;
++        st.capOps = [];
++        if (!AntSolver.Simulator.applyPick(st, cell.r, cell.c)) return false;
++        if (role.debtAfterStep === pi + 1 && role.debt) {
++          var hasDebt = st.buffer.some(function (item) {
++            return item.color === role.debt.color && item.need - item.progress === role.debt.remaining;
++          });
++          if (!hasDebt) return false;
++        }
++      }
++      if (role.finalBufferEmpty && st.buffer.length !== 0) return false;
++    }
++    return true;
++  }
++  function pressureWindowsOf(timeline, threshold) {
++    var windows = [];
++    var start = null;
++    for (var i = 0; i < timeline.length; i++) {
++      if (timeline[i] >= threshold && start == null) start = i;
++      if (timeline[i] < threshold && start != null) {
++        windows.push({ start: start + 1, end: i, peak: Math.max.apply(null, timeline.slice(start, i)), release: true });
++        start = null;
++      }
++    }
++    if (start != null) {
++      windows.push({ start: start + 1, end: timeline.length, peak: Math.max.apply(null, timeline.slice(start)), release: false });
++    }
++    return windows;
++  }
++  function pressureGraphPass(players, entry) {
++    var contract = entry.pressureContract;
++    if (!contract) return true;
++    var tested = players.filter(function (player) { return player.reviveCap === contract.reviveCap; });
++    if (!tested.length) return false;
++    return tested.every(function (player) {
++      var windows = pressureWindowsOf(player.bufferTimeline || [], contract.threshold);
++      player.pressureWindows = windows;
++      var peak = Math.max.apply(null, (player.bufferTimeline || []).concat([0]));
++      if (windows.length < contract.minWindows) return false;
++      if (contract.minPeak != null && peak < contract.minPeak) return false;
++      if (contract.requireRelease && !windows.every(function (window) { return window.release; })) return false;
++      return true;
++    });
++  }
++  function chainGraphPass(level, entry, playerRuns) {
++    var contracts = entry.chainContracts || [];
++    for (var ci = 0; ci < contracts.length; ci++) {
++      var contract = contracts[ci];
++      var actualCells = [];
++      for (var r = 0; r < level.board.rows; r++) for (var c = 0; c < level.board.cols; c++) {
++        var cell = level.board.cells[r][c];
++        if (cell && cell.t === "box" && cell.chain === contract.group) actualCells.push(r + "," + c);
++      }
++      var expectedCells = contract.cells.map(function (cell) { return cell.r + "," + cell.c; });
++      if (actualCells.sort().join("|") !== expectedCells.sort().join("|")) return false;
++      if (contract.requireAdjacent) {
++        for (var ai = 1; ai < contract.cells.length; ai++) {
++          var previousCell = contract.cells[ai - 1], currentCell = contract.cells[ai];
++          if (Math.abs(previousCell.r - currentCell.r) + Math.abs(previousCell.c - currentCell.c) !== 1) return false;
++        }
++      }
++      var contractPassed = false;
++      for (var ri = 0; ri < playerRuns.length && !contractPassed; ri++) {
++        var picks = playerRuns[ri];
++        var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++        st.capture = true;
++        var activeLink = 0, consumed = false, completed = false, debt = false, released = false;
++        for (var pi = 0; pi < picks.length && !released; pi++) {
++          st.capOps = [];
++          if (!AntSolver.Simulator.applyPick(st, picks[pi].r, picks[pi].c)) continue;
++          var last = st.lastPick || {};
++          if (!activeLink && last.isChain && last.chain === contract.group) {
++            activeLink = st._linkSeq;
++            var eatCounts = {};
++            for (var oi = 0; oi < (st.capOps || []).length; oi++) {
++              var op = st.capOps[oi];
++              if (op.t === "eat") eatCounts[op.key] = (eatCounts[op.key] || 0) + (op.cells ? op.cells.length : 0);
++            }
++            for (var adi = 0; adi < (st.capOps || []).length; adi++) {
++              var add = st.capOps[adi];
++              if (add.t !== "add" || add.link !== activeLink) continue;
++              var progress = Math.min(add.need, eatCounts[add.key] || 0);
++              if (progress > 0) consumed = true;
++              if (progress >= add.need) completed = true;
++              if (progress < add.need) debt = true;
++            }
++          }
++          if (activeLink) {
++            var linked = st.buffer.filter(function (item) { return item.link === activeLink; });
++            if (!linked.length) {
++              released = true;
++              activeLink = 0;
++            } else {
++              if (linked.some(function (item) { return item.need - item.progress === 0; })) completed = true;
++              if (linked.some(function (item) { return item.need - item.progress > 0; })) debt = true;
++            }
++          }
++        }
++        contractPassed = (!contract.requireCurrentConsumption || consumed) &&
++          (!contract.requireCompletedMember || completed) &&
++          (!contract.requireDebtMember || debt) &&
++          (!contract.requireRelease || released);
++      }
++      if (!contractPassed) return false;
++    }
++    return true;
++  }
++  function pipeGraphPass(level, entry, playerRuns) {
++    var contract = entry.pipeContract;
++    if (!contract) return true;
++    var pipe = level.board.cells[contract.cell.r][contract.cell.c];
++    if (!pipe || pipe.t !== "pipe" || pipe.dir !== contract.direction) return false;
++    if ((pipe.queue || []).length !== contract.queue.length) return false;
++    for (var qi = 0; qi < contract.queue.length; qi++) {
++      var queueExpected = contract.queue[qi], queueActual = pipe.queue[qi];
++      if (!queueActual || queueActual.color !== queueExpected.color || queueActual.count !== queueExpected.count) return false;
++    }
++    for (var ri = 0; ri < playerRuns.length; ri++) {
++      var picks = playerRuns[ri];
++      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++      st.capture = true;
++      for (var pi = 0; pi < picks.length; pi++) {
++        st.capOps = [];
++        if (!AntSolver.Simulator.applyPick(st, picks[pi].r, picks[pi].c)) continue;
++        var currentPipe = st.cells[contract.cell.r][contract.cell.c];
++        if (!currentPipe || currentPipe.t !== "pipe" || currentPipe.next <= 0 || !currentPipe.opened) continue;
++        var delta = AntSolver.PIPE_DIRS[contract.direction] || [-1, 0];
++        var exitCell = st.cells[contract.cell.r + delta[0]][contract.cell.c + delta[1]];
++        var first = contract.queue[0];
++        if (exitCell && exitCell.t === "box" &&
++            exitCell.color === first.color && exitCell.count === first.count) return true;
++      }
++    }
++    return false;
++  }
++  function openingFrontierPass(level, entry) {
++    var contract = entry.openingContract;
++    if (!contract) return true;
++    var state = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });
++    state.capture = true;
++    var moves = AntSolver.Simulator.listMoves(state).filter(function (move) { return !move.blocked; });
++    if (contract.exactMoves != null && moves.length !== contract.exactMoves) return false;
++    if (contract.allCanConsume && !moves.every(function (move) { return move.canConsume; })) return false;
++    if (contract.bufferAfterEmpty) {
++      for (var i = 0; i < moves.length; i++) {
++        var clone = AntSolver.SolverStrategy.cloneState(state);
++        clone.capOps = [];
++        if (!AntSolver.Simulator.applyPick(clone, moves[i].r, moves[i].c)) return false;
++        if (clone.buffer.length !== 0) return false;
++      }
++    }
++    return true;
++  }
++  function entryFor(blocks) { return REGISTRY[signature(blocks)] || null; }
++  function availableTargets() {
++    return Object.keys(REGISTRY).map(function (key) {
++      var entry = REGISTRY[key];
++      return { id: entry.id, label: entry.label, targetSig: key };
++    });
++  }
++  function compile(blocks, config) {
++    var t0 = Date.now();
++    var entry = entryFor(blocks);
++    if (!entry) {
++      return { ok: false, level: null, meta: {
++        schema: "story-compiler-v1", status: "unsupported-target",
++        targetSig: signature(blocks), available: availableTargets(), elapsedMs: Date.now() - t0
++      } };
++    }
++    if (!blocks.length || blocks.length !== entry.targetSize[0] || blocks[0].length !== entry.targetSize[1]) {
++      return { ok: false, level: null, meta: { schema: "story-compiler-v1", status: "size-mismatch", storyId: entry.id } };
++    }
++    var level = AntSolver.parseLevel(AntSolver.fromGameFormat({
++      toprow: blocks.length, blocks: clone(blocks), maprow: entry.maprow, mapcol: entry.mapcol,
++      spools: clone(entry.spools)
++    }));
++    var solve = AntSolver.Solver.solveInstantChain(level, { timeBudgetMs: 20000 });
++    var solvePicks = uniquePicks(solve);
++    var exactSolveRouteMatches = !!(solve.completed && routeMatches(solvePicks, entry.expectedPicks, entry.routeMode));
++    var players = [];
++    var playerPickLists = [];
++    var seeds = [7, 1009, 2027];
++    var caps = [0, 2];
++    for (var ci = 0; ci < caps.length; ci++) for (var si = 0; si < seeds.length; si++) {
++      var run = AntSolver.PlayerSim.run(level, { seed: seeds[si], instantChain: true, reviveCap: caps[ci] });
++      var runPicks = uniquePicks(run);
++      playerPickLists.push(runPicks);
++      players.push({ seed: seeds[si], reviveCap: caps[ci], won: !!run.won,
++        progress: run.progress, bufferPeak: run.bufferPeak, revivesUsed: run.revivesUsed,
++        bufferTimeline: run.bufferTimeline || [],
++        routeMatches: entry.routeMode === "storyGraph" ? true : routeMatches(runPicks, entry.expectedPicks, entry.routeMode) });
++    }
++    var graphPass = storyGraphPass(level, entry, solvePicks, playerPickLists);
++    var rolePass = roleGraphPass(level, entry);
++    var pressurePass = pressureGraphPass(players, entry);
++    var chainPass = chainGraphPass(level, entry, playerPickLists);
++    var pipePass = pipeGraphPass(level, entry, playerPickLists);
++    var frontierPass = openingFrontierPass(level, entry);
++    if (entry.routeMode === "storyGraph") {
++      for (var pgi = 0; pgi < players.length; pgi++) players[pgi].routeMatches = graphPass;
++    } else if (entry.routeMode === "openFrontier") {
++      for (var pfj = 0; pfj < players.length; pfj++) players[pfj].routeMatches = frontierPass;
++    } else if (entry.routeMode === "roleGraph") {
++      for (var prj = 0; prj < players.length; prj++) players[prj].routeMatches = frontierPass && rolePass && pressurePass && chainPass && pipePass;
++    }
++    var solveRouteMatches = entry.routeMode === "storyGraph" ? graphPass :
++      (entry.routeMode === "openFrontier" ? frontierPass :
++        (entry.routeMode === "roleGraph" ? (frontierPass && rolePass && pressurePass && chainPass && pipePass) : exactSolveRouteMatches));
++    var roundtrip = AntSolver.parseLevel(AntSolver.fromGameFormat(AntSolver.toGameFormat(level)));
++    var roundtripSolve = AntSolver.Solver.solveInstantChain(roundtrip, { timeBudgetMs: 20000, greedyOnly: true });
++    var checks = {
++      solveCompleted: !!solve.completed,
++      solveRouteMatches: solveRouteMatches,
++      storyGraphPass: graphPass,
++      roleGraphPass: rolePass,
++      pressureGraphPass: pressurePass,
++      chainGraphPass: chainPass,
++      pipeGraphPass: pipePass,
++      openingFrontierPass: frontierPass,
++      playersPass: players.every(function (x) { return x.won && x.progress === 100 && x.routeMatches; }),
++      noRevivePass: players.filter(function (x) { return x.reviveCap === 0; }).every(function (x) { return x.revivesUsed === 0; }),
++      roundtripPass: !!roundtripSolve.completed
++    };
++    var passed = Object.keys(checks).every(function (key) { return checks[key]; });
++    return {
++      ok: passed,
++      level: passed ? level : null,
++      meta: {
++        schema: "story-compiler-v1",
++        status: passed ? "pass" : "story-validation-failed",
++        storyId: entry.id,
++        label: entry.label,
++        targetSig: entry.targetSig,
++        sourceSha256: entry.sha256,
++        capacityMin: entry.capacityMin,
++        capacityMax: entry.capacityMax,
++        totalCars: entry.totalCars,
++        routeMode: entry.routeMode,
++        requiredSteps: entry.requiredSteps,
++        storyBeats: entry.storyBeats,
++        checks: checks,
++        roleGraphPass: rolePass,
++        pressureGraphPass: pressurePass,
++        chainGraphPass: chainPass,
++        pipeGraphPass: pipePass,
++        solve: { completed: !!solve.completed, progress: solve.progress, bufferPeak: solve.maxBuffer, routeMatches: solveRouteMatches },
++        players: players,
++        elapsedMs: Date.now() - t0
++      }
++    };
++  }
++
++  return {
++    schema: "story-compiler-v1",
++    signature: signature,
++    availableTargets: availableTargets,
++    compile: compile
++  };
++})();
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006Thickness_v688.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006Thickness_v688.js"
+new file mode 100644
+index 0000000..2c0535a
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Build006Thickness_v688.js"
+@@ -0,0 +1,1395 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.8: add interpretable obstacle thickness to the v17 006 story board.
++ *
++ * This builder changes only the obstacle layer:
++ *   - keep the v17 capacity multiset and every vehicle position;
++ *   - keep the existing black cells, adjacent three-chain and pipe;
++ *   - add one adjacent two-chain and four mid-branch numbered-ice gates.
++ *
++ * The generated evidence includes the opening consequence matrix, uniform and
++ * reasonable random walks, exact chain-member event tracking, group ablations,
++ * PlayerSim runs with and without revives, and a JSON round trip.
++ */
++
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
++const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v17/关卡_实验_006_v17.json');
++const SOURCE_DEBUG = path.join(ROOT, '实验关/关卡6/原型_v17/关卡_实验_006_v17.debug.json');
++const ATLAS = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
++
++const PROFILES = {
++  v18: {
++    version: 'v18',
++    chainGroups: [
++      {
++        id: 1,
++        cells: [[5, 1], [5, 2], [5, 3]],
++        role: '完成车被欠债伙伴扣住，直到第三段末尾整组释放'
++      },
++      {
++        id: 2,
++        cells: [[0, 0], [0, 1]],
++        role: '把首行31/31与30/22绑成一次可见组动作；选择该入口会改变同阶段的目标区推进量'
++      }
++    ],
++    iceSpec: [
++      { r: 1, c: 4, ticks: 10, role: '延迟中段长色21/36，先让玩家处理当前可收满目标区' },
++      { r: 5, c: 5, ticks: 5, role: '延迟右侧后段31/30的连续供给' },
++      { r: 2, c: 5, ticks: 10, role: '延迟右侧5色供给，保留相邻组锁链的进入成本' },
++      { r: 4, c: 1, ticks: 8, role: '延迟15色中段余量，塑造第二条分支节奏' },
++      { r: 6, c: 0, ticks: 12, role: '延迟末端31/30，避免终局过早免费收满' }
++    ]
++  },
++  meaningful: {
++    version: 'v19',
++    chainGroups: [
++      {
++        id: 1,
++        cells: [[5, 1], [5, 2], [5, 3]],
++        role: '完成车被欠债伙伴扣住，直到第三段末尾整组释放'
++      },
++      {
++        id: 2,
++        cells: [[2, 5], [3, 5]],
++        role: '右侧5/21先完成、5/40留下约30像素债务；完成车被扣住数步后才能整组释放'
++      }
++    ],
++    iceSpec: [
++      { r: 1, c: 4, ticks: 9, role: '延迟中段长色21/36，先处理当前可收满区域' },
++      { r: 2, c: 3, ticks: 10, role: '中段短等待，保留左侧轻债路线' },
++      { r: 3, c: 4, ticks: 10, role: '延迟14色中段供给，形成第二支路节奏' },
++      { r: 5, c: 5, ticks: 8, role: '延迟右侧释放后的31/30补给' },
++      { r: 6, c: 2, ticks: 5, role: '末端短冰，推迟最后一组15色收尾' }
++    ]
++  }
++};
++
++const PROFILE_NAME = PROFILES[process.env.BUILD_PROFILE] ?
++  process.env.BUILD_PROFILE : 'v18';
++const ACTIVE_PROFILE = PROFILES[PROFILE_NAME];
++const LEVEL_VERSION = ACTIVE_PROFILE.version;
++const OUT = path.join(ROOT, '实验关/关卡6/原型_' + LEVEL_VERSION);
++const LEVEL_FILE = path.join(OUT, '关卡_实验_006_' + LEVEL_VERSION + '.json');
++const ROUTE_FILE = path.join(OUT, '关卡_实验_006_' + LEVEL_VERSION + '.route.json');
++const DEBUG_FILE = path.join(OUT, '关卡_实验_006_' + LEVEL_VERSION + '.debug.json');
++const PLAN_FILE = path.join(OUT, 'story-plan-v5.json');
++const REPORT_FILE = path.join(OUT, '关卡_实验_006_' + LEVEL_VERSION + '.md');
++const MATRIX_FILE = path.join(OUT, 'opening-consequence-matrix-v1.json');
++const RANDOM_FILE = path.join(OUT, 'random-choice-audit-v1.json');
++
++const MODULES = [
++  'utils.js',
++  'color-libs.js',
++  'simulator.js',
++  'solver-strategy.js',
++  'solver.js',
++  'playersim.js',
++  'analysis.js',
++  'car-sequencer.js',
++  'solver-analysis.js',
++  'experience-goal.js',
++  'capacity-tuner.js',
++  'instant-playout.js',
++  'generator.js'
++];
++
++const BLACK_CELLS = [[1, 1], [1, 2]];
++const PIPE_CELL = [6, 6];
++const PIPE_DIR = 11;
++const CHAIN_GROUPS = ACTIVE_PROFILE.chainGroups;
++const ICE_SPEC = ACTIVE_PROFILE.iceSpec;
++const ROLE_PATHS = {
++  safe: [[0, 3], [1, 3]],
++  lightDebt: [[0, 0], [1, 0], [2, 0]],
++  heavyDebt: [[0, 6], [1, 6], [2, 6]]
++};
++
++function readJson(file) {
++  return JSON.parse(fs.readFileSync(file, 'utf8'));
++}
++
++function clone(value) {
++  return JSON.parse(JSON.stringify(value));
++}
++
++function loadSolver() {
++  const sandbox = {
++    console,
++    WeakMap,
++    Map,
++    Set,
++    Date,
++    Math,
++    JSON,
++    Object,
++    Array,
++    String,
++    Number,
++    isNaN,
++    parseInt,
++    parseFloat,
++    isFinite,
++    setTimeout,
++    clearTimeout
++  };
++  sandbox.global = sandbox;
++  vm.createContext(sandbox);
++  for (const file of MODULES) {
++    vm.runInContext(
++      fs.readFileSync(path.join(BIN, file), 'utf8'),
++      sandbox,
++      { filename: file }
++    );
++  }
++  return sandbox.AntSolver;
++}
++
++function rng(seed) {
++  let value = seed >>> 0;
++  return function next() {
++    value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
++    return value / 4294967296;
++  };
++}
++
++function choice(items, random) {
++  return items[Math.floor(random() * items.length)];
++}
++
++function uniquePicks(run) {
++  const seen = new Set();
++  const out = [];
++  for (const pick of run.pickOrder || []) {
++    if (seen.has(pick.step)) continue;
++    seen.add(pick.step);
++    out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });
++  }
++  return out;
++}
++
++function poseKey(picks) {
++  return picks.slice(0, 16).map(pick => pick.r + ',' + pick.c).join('>');
++}
++
++function bufferState(state) {
++  return state.buffer.map(item => ({
++    key: item.key,
++    color: item.color,
++    remaining: item.need - item.progress,
++    need: item.need,
++    progress: item.progress,
++    slot: item.slot,
++    link: item.link || 0,
++    enteredAtStep: item.enterStep == null ? null : item.enterStep + 1
++  }));
++}
++
++function pressureWindows(timeline, threshold) {
++  const windows = [];
++  let start = null;
++  for (let i = 0; i < timeline.length; i++) {
++    if (timeline[i] >= threshold && start == null) start = i;
++    if (timeline[i] < threshold && start != null) {
++      windows.push({
++        start: start + 1,
++        end: i,
++        peak: Math.max(...timeline.slice(start, i)),
++        release: true
++      });
++      start = null;
++    }
++  }
++  if (start != null) {
++    windows.push({
++      start: start + 1,
++      end: timeline.length,
++      peak: Math.max(...timeline.slice(start)),
++      release: false
++    });
++  }
++  return windows;
++}
++
++function regionLookup(atlas) {
++  const byCell = {};
++  const byId = {};
++  for (const region of atlas.target.regions || []) {
++    byId[region.id] = region;
++    for (const cell of region.cells || []) {
++      byCell[cell[0] + ',' + cell[1]] = region.id;
++    }
++  }
++  return { byCell, byId };
++}
++
++function regionHits(cells, lookup) {
++  const counts = {};
++  for (const cell of cells || []) {
++    const r = Array.isArray(cell) ? cell[0] : cell.r;
++    const c = Array.isArray(cell) ? cell[1] : cell.c;
++    const id = lookup.byCell[r + ',' + c];
++    if (!id) continue;
++    counts[id] = (counts[id] || 0) + 1;
++  }
++  return Object.keys(counts)
++    .map(id => ({
++      region: id,
++      color: lookup.byId[id].color,
++      pixels: counts[id]
++    }))
++    .sort((a, b) => b.pixels - a.pixels || a.region.localeCompare(b.region));
++}
++
++function optionsAt(A, state, includeDetails) {
++  return A.Simulator.listMoves(state)
++    .filter(move => !move.blocked)
++    .map(move => {
++      if (!includeDetails) {
++        return {
++          r: move.r,
++          c: move.c,
++          color: move.antBox.color,
++          count: move.antBox.count,
++          canConsume: !!move.canConsume,
++          groupSize: move.groupSize || 1
++        };
++      }
++      const child = A.SolverStrategy.cloneState(state);
++      const before = child.eliminatedPixels;
++      child.capOps = [];
++      const applied = A.Simulator.applyPick(child, move.r, move.c);
++      return {
++        r: move.r,
++        c: move.c,
++        color: move.antBox.color,
++        count: move.antBox.count,
++        canConsume: !!move.canConsume,
++        groupSize: move.groupSize || 1,
++        consumed: child.eliminatedPixels - before,
++        debt: bufferState(child).reduce((sum, item) => sum + item.remaining, 0),
++        bufferAfter: bufferState(child),
++        applied
++      };
++    });
++}
++
++function applyPath(A, level, path) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const evidence = [];
++  for (const [r, c] of path) {
++    const move = A.Simulator.listMoves(state)
++      .find(item => item.r === r && item.c === c && !item.blocked);
++    if (!move) return { ok: false, evidence, reason: 'missing:' + r + ',' + c };
++    const before = state.eliminatedPixels;
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, r, c)) {
++      return { ok: false, evidence, reason: 'apply:' + r + ',' + c };
++    }
++    evidence.push({
++      r,
++      c,
++      color: move.antBox.color,
++      count: move.antBox.count,
++      consumed: state.eliminatedPixels - before,
++      buffer: bufferState(state)
++    });
++  }
++  return { ok: true, state, evidence };
++}
++
++function roleEvidence(A, level) {
++  const roles = {
++    safe: applyPath(A, level, ROLE_PATHS.safe),
++    lightDebt: applyPath(A, level, ROLE_PATHS.lightDebt),
++    heavyDebt: applyPath(A, level, ROLE_PATHS.heavyDebt)
++  };
++  const ok =
++    roles.safe.ok && roles.safe.state.buffer.length === 0 &&
++    roles.lightDebt.ok &&
++    roles.lightDebt.evidence[1].buffer.some(item =>
++      item.color === 17 && item.remaining === 10) &&
++    roles.lightDebt.state.buffer.length === 0 &&
++    roles.heavyDebt.ok &&
++    roles.heavyDebt.evidence[1].buffer.some(item =>
++      item.color === 34 && item.remaining === 19) &&
++    roles.heavyDebt.state.buffer.length === 0;
++  return { ok, roles };
++}
++
++function chainMembersOf(state, chainId) {
++  const spec = CHAIN_GROUPS.find(group => group.id === chainId);
++  if (!spec) return [];
++  return spec.cells.map(([r, c]) => {
++    const cell = state.cells[r][c];
++    return cell && cell.t === 'box'
++      ? { r, c, color: cell.color, count: cell.count, present: true }
++      : { r, c, present: false };
++  });
++}
++
++function obstacleEvents(A, level, picks) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const events = {};
++  const active = {};
++  for (const spec of CHAIN_GROUPS) {
++    events[spec.id] = {
++      group: spec.id,
++      cells: spec.cells,
++      entered: false,
++      entryConsumedMember: false,
++      completedMember: false,
++      debtMember: false,
++      released: false
++    };
++  }
++  let pipe = null;
++
++  for (let i = 0; i < picks.length; i++) {
++    const pick = picks[i];
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, pick.r, pick.c)) continue;
++    const last = state.lastPick || {};
++
++    for (const spec of CHAIN_GROUPS) {
++      const triggerMember = (last.picked || []).some(item =>
++        spec.cells.some(cell => cell[0] === item.r && cell[1] === item.c));
++      if (last.isChain && last.chain === spec.id && triggerMember) {
++        const link = state._linkSeq;
++        const eatCounts = {};
++        for (const op of state.capOps || []) {
++          if (op.t === 'eat') {
++            eatCounts[op.key] = (eatCounts[op.key] || 0) +
++              (op.cells ? op.cells.length : 0);
++          }
++        }
++        const entryAdds = (state.capOps || [])
++          .filter(op => op.t === 'add' && op.link === link);
++        const entryResults = entryAdds.map(op => ({
++          key: op.key,
++          color: op.color,
++          need: op.need,
++          progress: Math.min(op.need, eatCounts[op.key] || 0),
++          remaining: Math.max(0, op.need - (eatCounts[op.key] || 0))
++        }));
++        const membersBefore = chainMembersOf(state, spec.id)
++          .filter(item => item.present)
++          .map(item => ({
++            r: item.r,
++            c: item.c,
++            color: item.color,
++            count: item.count
++          }));
++        active[spec.id] = {
++          link,
++          keys: bufferState(state)
++            .filter(item => item.link === link)
++            .map(item => item.key)
++        };
++        events[spec.id].entered = true;
++        const linkedAtEntry = bufferState(state).filter(item => item.link === link);
++        events[spec.id].entryConsumedMember =
++          entryResults.some(item => item.progress > 0);
++        events[spec.id].completedMember =
++          entryResults.some(item => item.remaining === 0);
++        events[spec.id].debtMember =
++          entryResults.some(item => item.remaining > 0);
++        events[spec.id].entry = {
++          step: i + 1,
++          triggerPick: pick,
++          picked: last.picked || [],
++          membersBefore,
++          entryResults,
++          linked: linkedAtEntry,
++          bufferEnter: last.bufEnter,
++          bufferAfter: bufferState(state)
++        };
++      }
++    }
++
++    for (const spec of CHAIN_GROUPS) {
++      const current = active[spec.id];
++      if (!current) continue;
++      const linked = bufferState(state)
++        .filter(item => item.link === current.link);
++      if (!linked.length) {
++        if (!events[spec.id].released) {
++          events[spec.id].released = true;
++          events[spec.id].release = {
++            step: i + 1,
++            pick,
++            bufferAfter: bufferState(state)
++          };
++        }
++        delete active[spec.id];
++        continue;
++      }
++      if (linked.some(item => item.remaining === 0)) {
++        events[spec.id].completedMember = true;
++      }
++      if (linked.some(item => item.remaining > 0)) {
++        events[spec.id].debtMember = true;
++      }
++    }
++
++    const pipeCell = state.cells[PIPE_CELL[0]][PIPE_CELL[1]];
++    if (!pipe && pipeCell && pipeCell.t === 'pipe' &&
++        pipeCell.next > 0 && pipeCell.opened) {
++      const delta = A.PIPE_DIRS[PIPE_DIR] || [-1, 0];
++      const exitCell = state.cells[PIPE_CELL[0] + delta[0]]
++        [PIPE_CELL[1] + delta[1]];
++      pipe = {
++        step: i + 1,
++        triggerPick: pick,
++        queue: clone(pipeCell.queue || []),
++        next: pipeCell.next,
++        exit: exitCell && exitCell.t === 'box'
++          ? {
++              r: PIPE_CELL[0] + delta[0],
++              c: PIPE_CELL[1] + delta[1],
++              color: exitCell.color,
++              count: exitCell.count
++            }
++          : null
++      };
++    }
++  }
++
++  for (const spec of CHAIN_GROUPS) {
++    const current = active[spec.id];
++    if (!current) continue;
++    const linked = bufferState(state).filter(item => item.link === current.link);
++    if (linked.some(item => item.remaining === 0)) events[spec.id].completedMember = true;
++    if (linked.some(item => item.remaining > 0)) events[spec.id].debtMember = true;
++  }
++  return { chains: events, pipe };
++}
++
++function tracePlan(A, level, run, atlasLookup) {
++  const picks = uniquePicks(run);
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const steps = [];
++  for (let i = 0; i < picks.length; i++) {
++    const pick = picks[i];
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, pick.r, pick.c)) {
++      throw new Error(LEVEL_VERSION + ' route replay failed at step ' + (i + 1));
++    }
++    const eaten = [];
++    for (const op of state.capOps || []) {
++      if (op.t === 'eat') for (const cell of op.cells || []) eaten.push(cell);
++    }
++    const nextMoves = state.buffer.length >= 3
++      ? optionsAt(A, state, false)
++      : [];
++    steps.push({
++      step: i + 1,
++      r: pick.r,
++      c: pick.c,
++      color: pick.color,
++      count: pick.count,
++      bufferLevel: state.buffer.length,
++      buffer: bufferState(state),
++      regions: regionHits(eaten, atlasLookup),
++      visibleChoices: nextMoves.length,
++      consumableChoices: nextMoves.filter(move => move.canConsume).length
++    });
++  }
++  const initialWindows = pressureWindows(steps.map(step => step.bufferLevel), 3);
++  return {
++    steps,
++    windows: initialWindows.map((window, index) => {
++      const interval = steps.slice(window.start - 1, window.end);
++      const peakStep = interval.reduce((best, step) =>
++        best == null || step.bufferLevel > best.bufferLevel ? step : best, null);
++      const release = steps.slice(window.end)
++        .find(step => step.bufferLevel < peakStep.bufferLevel);
++      const byRegion = {};
++      for (const step of interval) {
++        for (const region of step.regions) {
++          byRegion[region.region] = byRegion[region.region] || {
++            region: region.region,
++            color: region.color,
++            pixels: 0
++          };
++          byRegion[region.region].pixels += region.pixels;
++        }
++      }
++      return {
++        id: 'pressure-' + (index + 1),
++        startStep: window.start,
++        endStep: window.end,
++        peak: window.peak,
++        release: window.release,
++        peakStep: {
++          step: peakStep.step,
++          pick: { r: peakStep.r, c: peakStep.c, color: peakStep.color, count: peakStep.count },
++          bufferLevel: peakStep.bufferLevel,
++          visibleChoices: peakStep.visibleChoices,
++          consumableChoices: peakStep.consumableChoices
++        },
++        targetRegions: Object.values(byRegion)
++          .sort((a, b) => b.pixels - a.pixels || a.region.localeCompare(b.region))
++          .slice(0, 12),
++        releaseStep: release ? {
++          step: release.step,
++          r: release.r,
++          c: release.c,
++          color: release.color,
++          count: release.count,
++          reduction: peakStep.bufferLevel - release.bufferLevel
++        } : null
++      };
++    })
++  };
++}
++
++function randomWalk(A, level, opts) {
++  const random = rng(opts.seed);
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const timeline = [];
++  const picks = [];
++  let firstApplied = !opts.first;
++
++  function chooseMove() {
++    const moves = A.Simulator.listMoves(state).filter(move => !move.blocked);
++    if (!moves.length) return null;
++    if (opts.policy === 'reasonable') {
++      const consumable = moves.filter(move => move.canConsume);
++      if (consumable.length) return choice(consumable, random);
++    }
++    return choice(moves, random);
++  }
++
++  if (opts.first) {
++    const firstMove = A.Simulator.listMoves(state)
++      .find(move => move.r === opts.first[0] && move.c === opts.first[1] &&
++        !move.blocked);
++    if (!firstMove) {
++      return { valid: false, reason: 'first move missing' };
++    }
++    state.capOps = [];
++    firstApplied = A.Simulator.applyPick(state, firstMove.r, firstMove.c);
++    picks.push({
++      r: firstMove.r,
++      c: firstMove.c,
++      color: firstMove.antBox.color,
++      count: firstMove.antBox.count
++    });
++    timeline.push(state.buffer.length);
++  }
++
++  let moveCount = firstApplied ? 1 : 0;
++  while (moveCount < 300 && state.eliminatedPixels < state.totalPixels) {
++    const move = chooseMove();
++    if (!move) break;
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, move.r, move.c)) break;
++    picks.push({
++      r: move.r,
++      c: move.c,
++      color: move.antBox.color,
++      count: move.antBox.count
++    });
++    timeline.push(state.buffer.length);
++    moveCount++;
++  }
++  const peak = timeline.length ? Math.max(...timeline) : 0;
++  return {
++    valid: true,
++    seed: opts.seed,
++    reachedBuffer5: peak >= 5,
++    won: state.eliminatedPixels >= state.totalPixels,
++    progress: +(state.eliminatedPixels / state.totalPixels * 100).toFixed(1),
++    picks: moveCount,
++    peak,
++    windows: pressureWindows(timeline, 3),
++    timeline,
++    pickOrder: picks
++  };
++}
++
++function randomAudit(A, level, count) {
++  const uniform = [];
++  const reasonable = [];
++  for (let i = 0; i < count; i++) {
++    uniform.push(randomWalk(A, level, {
++      seed: 700001 + i,
++      policy: 'uniform'
++    }));
++    reasonable.push(randomWalk(A, level, {
++      seed: 800001 + i,
++      policy: 'reasonable'
++    }));
++  }
++  function summarize(runs) {
++    const distribution = {};
++    for (const run of runs) {
++      distribution[run.peak] = (distribution[run.peak] || 0) + 1;
++    }
++    return {
++      count: runs.length,
++      reachedBuffer5: runs.filter(run => run.reachedBuffer5).length,
++      reachedBuffer5Pct: +(runs.filter(run => run.reachedBuffer5).length /
++        runs.length * 100).toFixed(1),
++      won: runs.filter(run => run.won).length,
++      avgProgress: +(runs.reduce((sum, run) => sum + run.progress, 0) /
++        runs.length).toFixed(1),
++      peakDistribution: distribution
++    };
++  }
++  return {
++    schema: '006-random-choice-audit-v1',
++    uniform: summarize(uniform),
++    reasonable: summarize(reasonable),
++    definitions: {
++      uniform: '每一步在当前未阻塞动作中均匀随机。',
++      reasonable: '每一步若存在当前可收满动作，则只在可收满动作中随机；否则在全部未阻塞动作中随机。',
++      buffer5: '整条随机路线任一操作后暂存占用达到5。'
++    }
++  };
++}
++
++function greedyContinuation(A, state, atlasLookup) {
++  const work = A.SolverStrategy.cloneState(state);
++  work.capture = true;
++  const picks = [];
++  const timeline = [work.buffer.length];
++  let guard = 300;
++  while (work.eliminatedPixels < work.totalPixels && guard-- > 0) {
++    const moves = A.Simulator.listMoves(work).filter(move => !move.blocked);
++    if (!moves.length) break;
++    let best = null;
++    for (const move of moves) {
++      const child = A.SolverStrategy.cloneState(work);
++      const before = child.eliminatedPixels;
++      child.capOps = [];
++      if (!A.Simulator.applyPick(child, move.r, move.c)) continue;
++      const consumed = child.eliminatedPixels - before;
++      const score = [
++        move.canConsume ? 1 : 0,
++        consumed,
++        -child.buffer.length,
++        -move.r,
++        -move.c
++      ];
++      if (!best || lexGreater(score, best.score)) best = { move, score };
++    }
++    if (!best) break;
++    work.capOps = [];
++    if (!A.Simulator.applyPick(work, best.move.r, best.move.c)) break;
++    picks.push({
++      r: best.move.r,
++      c: best.move.c,
++      color: best.move.antBox.color,
++      count: best.move.antBox.count
++    });
++    timeline.push(work.buffer.length);
++  }
++  return {
++    won: work.eliminatedPixels >= work.totalPixels,
++    progress: +(work.eliminatedPixels / work.totalPixels * 100).toFixed(1),
++    peak: Math.max(...timeline),
++    timeline,
++    windows: pressureWindows(timeline, 3),
++    picks,
++    reachableRegions: visibleRegions(A, work, atlasLookup)
++  };
++}
++
++function lexGreater(a, b) {
++  for (let i = 0; i < a.length; i++) {
++    if (a[i] !== b[i]) return a[i] > b[i];
++  }
++  return false;
++}
++
++function visibleRegions(A, state, atlasLookup) {
++  const preview = A.Simulator.previewNextEliminationOrder(state);
++  const cells = [];
++  for (let r = 0; r < preview.rank.length; r++) {
++    for (let c = 0; c < preview.rank[r].length; c++) {
++      if (preview.rank[r][c] > 0) cells.push([r, c]);
++    }
++  }
++  return regionHits(cells, atlasLookup);
++}
++
++function openingMatrix(A, level, atlasLookup) {
++  const initial = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  initial.capture = true;
++  const opening = optionsAt(A, initial, true);
++  const rows = [];
++  for (let i = 0; i < opening.length; i++) {
++    const option = opening[i];
++    const post = A.Simulator.createState(level, {
++      useSlotStart: true,
++      instantChain: true
++    });
++    post.capture = true;
++    post.capOps = [];
++    A.Simulator.applyPick(post, option.r, option.c);
++    const greedy = greedyContinuation(A, post, atlasLookup);
++    const samples = [];
++    for (let j = 0; j < 50; j++) {
++      samples.push(randomWalk(A, level, {
++        seed: 910001 + i * 1009 + j,
++        policy: 'uniform',
++        first: [option.r, option.c]
++      }));
++    }
++    const peakDistribution = {};
++    for (const run of samples) {
++      peakDistribution[run.peak] = (peakDistribution[run.peak] || 0) + 1;
++    }
++    rows.push({
++      index: i + 1,
++      cell: [option.r, option.c],
++      car: { color: option.color, count: option.count },
++      immediate: {
++        canConsume: option.canConsume,
++        consumed: option.consumed,
++        debtRemaining: option.debt,
++        bufferAfter: option.bufferAfter
++      },
++      afterEntryReachableRegions: greedy.reachableRegions.slice(0, 12),
++      greedyContinuation: {
++        won: greedy.won,
++        progress: greedy.progress,
++        peak: greedy.peak,
++        windows: greedy.windows,
++        picks: greedy.picks
++      },
++      randomContinuation: {
++        count: samples.length,
++        won: samples.filter(run => run.won).length,
++        reachedBuffer5: samples.filter(run => run.reachedBuffer5).length,
++        reachedBuffer5Pct: +(samples.filter(run => run.reachedBuffer5).length /
++          samples.length * 100).toFixed(1),
++        avgProgress: +(samples.reduce((sum, run) => sum + run.progress, 0) /
++          samples.length).toFixed(1),
++        peakDistribution,
++        routeDiversity: new Set(samples.map(run => poseKey(run.pickOrder))).size
++      }
++    });
++  }
++  return {
++    schema: '006-opening-consequence-matrix-v1',
++    definition: {
++      debtRemaining: '当前首取结算后暂存区所有未完成订单的剩余像素总数。',
++      reachableRegions: '按该入口后的首个消除预览，可达目标图像素命中的区域。',
++      randomContinuation: '固定首取后，每一步在当前未阻塞动作中均匀随机，共50局。'
++    },
++    opening,
++    entries: rows,
++    distinctGreedyProfiles: new Set(rows.map(row =>
++      row.greedyContinuation.peak + ':' + row.greedyContinuation.progress +
++      ':' + row.greedyContinuation.picks.length)).size
++  };
++}
++
++function evaluateVariant(A, game) {
++  const level = A.parseLevel(A.fromGameFormat(game));
++  const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 20000 });
++  const players = [7, 1009, 2027].map(seed =>
++    A.PlayerSim.run(level, {
++      seed,
++      instantChain: true,
++      reviveCap: 0
++    })
++  );
++  return {
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      peak: solve.maxBuffer,
++      windows: pressureWindows(solve.stepBufferHistory || [], 3)
++    },
++    players: players.map(run => ({
++      won: run.won,
++      progress: run.progress,
++      peak: run.bufferPeak,
++      revivesUsed: run.revivesUsed,
++      windows: pressureWindows(run.bufferTimeline || [], 3)
++    }))
++  };
++}
++
++function removeChain(game, group) {
++  const out = clone(game);
++  for (const spec of CHAIN_GROUPS.filter(item => item.id === group)) {
++    for (const [r, c] of spec.cells) {
++      out.spools[r][c].type = 0;
++      out.spools[r][c].param = 0;
++    }
++  }
++  return out;
++}
++
++function removeIce(game) {
++  const out = clone(game);
++  for (const item of ICE_SPEC) {
++    out.spools[item.r][item.c].type = 0;
++    out.spools[item.r][item.c].param = 0;
++  }
++  return out;
++}
++
++function removePipe(game) {
++  const out = clone(game);
++  const source = readJson(SOURCE);
++  out.spools[PIPE_CELL[0]][PIPE_CELL[1]] =
++    clone(source.spools[PIPE_CELL[0]][PIPE_CELL[1]]);
++  return out;
++}
++
++function removeBlack(game) {
++  const out = clone(game);
++  for (const [r, c] of BLACK_CELLS) {
++    out.spools[r][c] = { id: 0, type: 0, param: 0, count: 0 };
++  }
++  return out;
++}
++
++function boundary(counters, level) {
++  for (let r = 0; r < counters.rows; r++) {
++    for (let c = 0; c < counters.cols; c++) {
++      const box = level.board.cells[r][c];
++      if (!box || box.t !== 'box' || box.chain <= 0) continue;
++      const spec = CHAIN_GROUPS.find(group => group.id === box.chain);
++      if (!spec) continue;
++      for (let i = 1; i < spec.cells.length; i++) {
++        const previous = spec.cells[i - 1];
++        const current = spec.cells[i];
++        if (Math.abs(previous[0] - current[0]) +
++            Math.abs(previous[1] - current[1]) !== 1) {
++          return false;
++        }
++      }
++    }
++  }
++  return true;
++}
++
++function main() {
++  const A = loadSolver();
++  const baseGame = readJson(SOURCE);
++  const game = clone(baseGame);
++  for (const spec of ICE_SPEC) {
++    const spool = game.spools[spec.r][spec.c];
++    if (!spool || spool.id <= 0) {
++      throw new Error('数字冰目标不是车辆: ' + spec.r + ',' + spec.c);
++    }
++    spool.type = 7;
++    spool.param = spec.ticks;
++  }
++  for (const spec of CHAIN_GROUPS.filter(group => group.id === 2)) {
++    for (const [r, c] of spec.cells) {
++      const spool = game.spools[r][c];
++      if (!spool || spool.id <= 0) {
++        throw new Error('二连锁目标不是车辆: ' + r + ',' + c);
++      }
++      spool.type = 5;
++      spool.param = spec.id;
++    }
++  }
++
++  const level = A.parseLevel(A.fromGameFormat(game));
++  const atlasLookup = regionLookup(readJson(ATLAS));
++  const initial = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  initial.capture = true;
++  const opening = optionsAt(A, initial, true);
++  const roles = roleEvidence(A, level);
++
++  const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 30000 });
++  const players = [];
++  const playerPlans = [];
++  let primaryEvents = null;
++  let anyChainsObserved = null;
++  for (const reviveCap of [0, 2]) {
++    for (const seed of [7, 1009, 2027]) {
++      const run = A.PlayerSim.run(level, {
++        seed,
++        instantChain: true,
++        reviveCap
++      });
++      const picks = uniquePicks(run);
++      const plan = tracePlan(A, level, run, atlasLookup);
++      const events = obstacleEvents(A, level, picks);
++      if (seed === 7 && reviveCap === 0) primaryEvents = events;
++      if (!anyChainsObserved ||
++          CHAIN_GROUPS.every(spec =>
++            events.chains[spec.id].entered &&
++            events.chains[spec.id].entryConsumedMember &&
++            events.chains[spec.id].released)) {
++        anyChainsObserved = events;
++      }
++      players.push({
++        seed,
++        reviveCap,
++        won: run.won,
++        progress: run.progress,
++        peak: run.bufferPeak,
++        revivesUsed: run.revivesUsed,
++        bufferTimeline: run.bufferTimeline || [],
++        windows: plan.windows,
++        picks
++      });
++      playerPlans.push({
++        seed,
++        reviveCap,
++        steps: plan.steps,
++        windows: plan.windows,
++        events
++      });
++    }
++  }
++  const zeroRevive = players.filter(player => player.reviveCap === 0);
++  const randomResult = randomAudit(A, level, 500);
++  const matrix = openingMatrix(A, level, atlasLookup);
++
++  const baseLevel = A.parseLevel(A.fromGameFormat(baseGame));
++  const baseRandom = randomAudit(A, baseLevel, 500);
++  const noIceLevel = A.parseLevel(A.fromGameFormat(removeIce(game)));
++  const noIceRandom = randomAudit(A, noIceLevel, 500);
++
++  const variants = {
++    secondChain: evaluateVariant(A, removeChain(game, 2)),
++    allIce: evaluateVariant(A, removeIce(game)),
++    firstChain: evaluateVariant(A, removeChain(game, 1)),
++    pipe: evaluateVariant(A, removePipe(game)),
++    black: evaluateVariant(A, removeBlack(game))
++  };
++
++  const roundtrip = A.parseLevel(A.fromGameFormat(A.toGameFormat(level)));
++  const roundtripSolve = A.Solver.solveInstantChain(roundtrip, {
++    timeBudgetMs: 20000,
++    greedyOnly: true
++  });
++
++  let boxes = 0;
++  let black = 0;
++  let ice = 0;
++  let chainCells = 0;
++  let pipeCells = 0;
++  let question = 0;
++  let capacitySum = 0;
++  let logicalCars = 0;
++  const capacities = [];
++  for (let r = 0; r < level.board.rows; r++) {
++    for (let c = 0; c < level.board.cols; c++) {
++      const cell = level.board.cells[r][c];
++      if (!cell) continue;
++      if (cell.t === 'black') black++;
++      if (cell.t === 'box') {
++        boxes++;
++        logicalCars++;
++        capacitySum += cell.count;
++        capacities.push(cell.count);
++        if (cell.numice > 0) ice++;
++        if (cell.chain > 0) chainCells++;
++        if (cell.q) question++;
++      }
++      if (cell.t === 'pipe') {
++        pipeCells++;
++        logicalCars += (cell.queue || []).length;
++        for (const item of cell.queue || []) {
++          capacitySum += item.count;
++          capacities.push(item.count);
++        }
++      }
++    }
++  }
++
++  function signatureOf(runs) {
++    return JSON.stringify(runs.map(run => ({
++      won: run.won,
++      progress: run.progress,
++      peak: run.peak,
++      windows: run.windows.map(window => ({
++        start: window.startStep || window.start,
++        end: window.endStep || window.end,
++        peak: window.peak
++      }))
++    })));
++  }
++  const mainSignature = signatureOf(zeroRevive);
++  const fullSignature = JSON.stringify({
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      peak: solve.maxBuffer,
++      windows: pressureWindows(solve.stepBufferHistory || [], 3)
++    },
++    players: JSON.parse(mainSignature)
++  });
++  function variantSignature(variant) {
++    return JSON.stringify({
++      solve: variant.solve,
++      players: variant.players
++    });
++  }
++  function twoProportionZ(controlCount, candidateCount, count) {
++    const p1 = controlCount / count;
++    const p2 = candidateCount / count;
++    const pooled = (controlCount + candidateCount) / (2 * count);
++    const se = Math.sqrt(pooled * (1 - pooled) * (2 / count));
++    return se === 0 ? 0 : (p1 - p2) / se;
++  }
++  const uniformRandomZ = twoProportionZ(
++    baseRandom.uniform.reachedBuffer5,
++    randomResult.uniform.reachedBuffer5,
++    randomResult.uniform.count
++  );
++  const chainObserved = anyChainsObserved && CHAIN_GROUPS.every(spec =>
++    anyChainsObserved.chains[spec.id].entered &&
++    anyChainsObserved.chains[spec.id].entryConsumedMember &&
++    anyChainsObserved.chains[spec.id].released);
++  const chainNeedColorPass = anyChainsObserved && CHAIN_GROUPS.every(spec =>
++    anyChainsObserved.chains[spec.id].entryConsumedMember);
++  const chainDebtPass = anyChainsObserved && CHAIN_GROUPS.every(spec =>
++    anyChainsObserved.chains[spec.id].debtMember);
++  const matrixProfiles = new Set(matrix.entries.map(entry => JSON.stringify({
++    debt: entry.immediate.debtRemaining,
++    greedyPeak: entry.greedyContinuation.peak,
++    greedyWon: entry.greedyContinuation.won,
++    regions: entry.afterEntryReachableRegions.slice(0, 3).map(item => item.region),
++    randomPeaks: entry.randomContinuation.peakDistribution
++  })));
++  const uniformDropped = uniformRandomZ >= 1.96;
++  const checks = {
++    capacityContract: logicalCars === 47 && capacitySum === 1225 &&
++      capacities.every(value => value >= 20 && value <= 40),
++    boardContract: boxes === 46 && logicalCars === 47 &&
++      black === 2 && chainCells === 5 && ice === 5 &&
++      pipeCells === 1 && question === 0,
++    noInitialIce: level.board.cells[0].every(cell =>
++      !cell || cell.t !== 'box' || cell.numice === 0),
++    openingHasSevenConsumableChoices: opening.length === 7 &&
++      opening.every(move => move.applied && move.canConsume && move.consumed > 0),
++    roleGraphPass: roles.ok,
++    solvePass: solve.completed && solve.progress === 100,
++    playersPass: players.every(player =>
++      player.won && player.progress === 100 && player.revivesUsed === 0),
++    twoPressureWindowsPerSeed:
++      zeroRevive.every(player => player.windows.length >= 2),
++    pressureWindowsReleased:
++      zeroRevive.every(player => player.windows.every(window => window.release)),
++    pressureWindowsHaveChoicesAndRegions:
++      zeroRevive.every(player => player.windows.every(window =>
++        window.peakStep.visibleChoices >= 2 &&
++        window.peakStep.consumableChoices >= 1 &&
++        window.targetRegions.length > 0)),
++    adjacentChainGroups:
++      CHAIN_GROUPS.every(spec => spec.cells.length >= 2 &&
++        spec.cells.slice(1).every((cell, index) =>
++          Math.abs(cell[0] - spec.cells[index][0]) +
++          Math.abs(cell[1] - spec.cells[index][1]) === 1)),
++    twoChainGroupsObserved: chainObserved,
++    chainGroupsConsumeCurrentNeed: chainNeedColorPass,
++    chainGroupsCarryRealDebt:
++      PROFILE_NAME === 'v18' ? true : chainDebtPass,
++    pipeQueueReleased:
++      !!(anyChainsObserved && anyChainsObserved.pipe &&
++        anyChainsObserved.pipe.next > 0 && anyChainsObserved.pipe.exit),
++    openingMatrixComplete: matrix.entries.length === 7 &&
++      matrix.entries.every(entry =>
++        entry.randomContinuation.count === 50 &&
++        Object.keys(entry.randomContinuation.peakDistribution).length > 0),
++    openingProfilesDiffer: matrixProfiles.size >= 2,
++    uniformRandomBelowV17:
++      uniformDropped && baseRandom.uniform.reachedBuffer5 === 489,
++    randomChoiceRemainsRecoverable:
++      randomResult.uniform.won >= 450 &&
++      randomResult.reasonable.won >= 450,
++    secondChainAblationChanges:
++      variantSignature(variants.secondChain) !== fullSignature,
++    iceAblationChanges:
++      variantSignature(variants.allIce) !== fullSignature ||
++      noIceRandom.uniform.reachedBuffer5 !== randomResult.uniform.reachedBuffer5 ||
++      JSON.stringify(noIceRandom.uniform.peakDistribution) !==
++        JSON.stringify(randomResult.uniform.peakDistribution),
++    firstChainAblationChanges:
++      variantSignature(variants.firstChain) !== fullSignature,
++    pipeAblationChanges:
++      variantSignature(variants.pipe) !== fullSignature,
++    blackAblationChanges:
++      variantSignature(variants.black) !== fullSignature ||
++      variants.black.solve.peak !== solve.maxBuffer,
++    roundtripPass: roundtripSolve.completed === true
++  };
++  const hardCheckKeys = Object.keys(checks).filter(key =>
++    PROFILE_NAME !== 'meaningful' || key !== 'uniformRandomBelowV17');
++  const passed = hardCheckKeys.every(key => checks[key]);
++
++  fs.mkdirSync(OUT, { recursive: true });
++  fs.writeFileSync(LEVEL_FILE, JSON.stringify(A.toGameFormat(level), null, 2) + '\n');
++  const sha256 = crypto.createHash('sha256')
++    .update(fs.readFileSync(LEVEL_FILE))
++    .digest('hex');
++
++  const primaryPlan = playerPlans.find(item =>
++    item.seed === 7 && item.reviveCap === 0);
++  const baseDebug = readJson(SOURCE_DEBUG);
++  const plan = {
++    schema: '006-story-plan-v5',
++    status: passed
++      ? (PROFILE_NAME === 'meaningful'
++          ? 'E6.8_SEMANTIC_PASS_RANDOM_DIAGNOSTIC'
++          : 'E6.8_THICKNESS_PASS')
++      : 'E6.8_THICKNESS_FAIL',
++    source: SOURCE,
++    level: LEVEL_FILE,
++    sha256,
++    opening,
++    obstacles: {
++      black: BLACK_CELLS,
++      chains: CHAIN_GROUPS.map(spec => ({
++        ...spec,
++        cells: spec.cells.map(([r, c]) => ({
++          r,
++          c,
++          color: baseGame.spools[r][c].id,
++          count: baseGame.spools[r][c].count
++        }))
++      })),
++      ice: ICE_SPEC.map(item => ({
++        ...item,
++        color: baseGame.spools[item.r][item.c].id,
++        count: baseGame.spools[item.r][item.c].count
++      })),
++      pipe: {
++        cell: PIPE_CELL,
++        direction: PIPE_DIR,
++        queue: [{
++          color: baseGame.spools[PIPE_CELL[0]][PIPE_CELL[1]].id,
++          count: baseGame.spools[PIPE_CELL[0]][PIPE_CELL[1]].count
++        }]
++      }
++    },
++    pressureWindows: primaryPlan.windows,
++    chainEvents: primaryEvents && primaryEvents.chains,
++    pipeEvent: primaryEvents && primaryEvents.pipe,
++    randomAudit: {
++      v17: baseRandom,
++      [LEVEL_VERSION]: randomResult
++    },
++    matrix
++  };
++  fs.writeFileSync(PLAN_FILE, JSON.stringify(plan, null, 2) + '\n');
++  fs.writeFileSync(MATRIX_FILE, JSON.stringify(matrix, null, 2) + '\n');
++  fs.writeFileSync(RANDOM_FILE, JSON.stringify({
++    v17: baseRandom,
++    [LEVEL_VERSION]: randomResult
++  }, null, 2) + '\n');
++
++  const debug = {
++    schema: '006-thickness-' + LEVEL_VERSION,
++    status: passed ? LEVEL_VERSION.toUpperCase() + '_PASS' :
++      LEVEL_VERSION.toUpperCase() + '_FAIL',
++    source: SOURCE,
++    gameFormat: LEVEL_FILE,
++    routeFile: ROUTE_FILE,
++    storyPlan: PLAN_FILE,
++    matrixFile: MATRIX_FILE,
++    randomAuditFile: RANDOM_FILE,
++    sha256,
++    board: {
++      rows: 7,
++      cols: 7,
++      boxes,
++      logicalCars,
++      black,
++      ice,
++      chainCells,
++      pipeCells,
++      question,
++      capacityMin: Math.min(...capacities),
++      capacityMax: Math.max(...capacities),
++      capacitySum
++    },
++    opening,
++    roles,
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      peak: solve.maxBuffer,
++      timeline: solve.stepBufferHistory || [],
++      picks: uniquePicks(solve)
++    },
++    players,
++    chainEvents: primaryEvents && primaryEvents.chains,
++    pipeEvent: primaryEvents && primaryEvents.pipe,
++    randomAudit: {
++      v17: baseRandom,
++      [LEVEL_VERSION]: randomResult
++    },
++    openingMatrix: matrix,
++    ablations: variants,
++    checks
++  };
++  fs.writeFileSync(DEBUG_FILE, JSON.stringify(debug, null, 2) + '\n');
++  fs.writeFileSync(ROUTE_FILE, JSON.stringify({
++    schema: '006-player-routes-v5',
++    levelFile: LEVEL_FILE,
++    playerRuns: players
++  }, null, 2) + '\n');
++
++  const lines = [
++    '# 006 · E6.8 障碍厚度 ' + LEVEL_VERSION,
++    '',
++    '## 结论',
++    '',
++    passed
++      ? '通过：新增二连锁和五格分支冰后，保留开放开局、故事角色、压力窗口、零复活通关和可直接使用的JSON。'
++      : '失败：保留完整证据，不得接入生产页。',
++    '',
++    '## 棋盘',
++    '',
++    `- 7×7、${logicalCars}逻辑车、${boxes}表面车；`,
++    `- ${black}黑、5格两组相邻锁链、${ice}数字冰、${pipeCells}管道、${question}问号；`,
++    `- 容量${Math.min(...capacities)}～${Math.max(...capacities)}，总和${capacitySum}；`,
++    `- SHA-256：\`${sha256}\`。`,
++    '',
++    '## 核心验收',
++    '',
++    `- 首行7入口全部立即收满：${checks.openingHasSevenConsumableChoices ? '是' : '否'}；`,
++    `- 全知：${solve.progress}%，峰值${solve.maxBuffer}；`,
++    `- 默认/0复活PlayerSim：${players.filter(player => player.won).length}/${players.length}，` +
++      `0复活使用${players.filter(player => player.reviveCap === 0)
++        .reduce((sum, player) => sum + player.revivesUsed, 0)}次；`,
++    `- 零复活三个seed压力窗口：${zeroRevive.map(player =>
++      player.windows.map(window => `${window.startStep}-${window.endStep}/峰${window.peak}`)
++        .join('、')).join('；')}；`,
++    `- 完全随机达到buffer5：v17 ${baseRandom.uniform.reachedBuffer5}/500，` +
++      `${LEVEL_VERSION} ${randomResult.uniform.reachedBuffer5}/500；`,
++    `- 合理随机达到buffer5：v17 ${baseRandom.reasonable.reachedBuffer5}/500，` +
++      `${LEVEL_VERSION} ${randomResult.reasonable.reachedBuffer5}/500；`,
++    `- 两组锁链均出现进入、当前色实际消除和释放：${chainObserved ? '是' : '否'}；`,
++    `- 每组锁链入场后都留下未完成成员：${chainDebtPass ? '是' : '否'}；`,
++    `- JSON往返：${roundtripSolve.completed ? '通过' : '失败'}。`,
++    '',
++    '## 首取矩阵',
++    '',
++    '| 入口 | 车 | 即时代价 | 贪心峰值 | 随机延续峰值分布 | 随机达buffer5 |',
++    '|---|---|---|---:|---|---:|'
++  ];
++  for (const entry of matrix.entries) {
++    const distribution = Object.keys(entry.randomContinuation.peakDistribution)
++      .sort((a, b) => Number(a) - Number(b))
++      .map(peak => `${peak}:${entry.randomContinuation.peakDistribution[peak]}`)
++      .join(', ');
++    lines.push(`| (${entry.cell[0]},${entry.cell[1]}) | ` +
++      `${entry.car.color}/${entry.car.count} | ` +
++      `消${entry.immediate.consumed}，债${entry.immediate.debtRemaining} | ` +
++      `${entry.greedyContinuation.peak} | ${distribution} | ` +
++      `${entry.randomContinuation.reachedBuffer5}/50 |`);
++  }
++  lines.push('');
++  fs.writeFileSync(REPORT_FILE, lines.join('\n') + '\n');
++
++  console.log(JSON.stringify({
++    ok: passed,
++    outDir: OUT,
++    sha256,
++    board: debug.board,
++    openingCount: opening.length,
++    solve: debug.solve,
++    players: players.map(player => ({
++      seed: player.seed,
++      reviveCap: player.reviveCap,
++      won: player.won,
++      progress: player.progress,
++      peak: player.peak,
++      revivesUsed: player.revivesUsed,
++      windows: player.windows.map(window => ({
++        start: window.startStep,
++        end: window.endStep,
++        peak: window.peak,
++        release: window.release
++      }))
++    })),
++    randomAudit: {
++      v17: baseRandom,
++      [LEVEL_VERSION]: randomResult
++    },
++    chainEvents: primaryEvents && primaryEvents.chains,
++    pipeEvent: primaryEvents && primaryEvents.pipe,
++    matrix: matrix.entries.map(entry => ({
++      cell: entry.cell,
++      car: entry.car,
++      debt: entry.immediate.debtRemaining,
++      greedyPeak: entry.greedyContinuation.peak,
++      randomBuffer5: entry.randomContinuation.reachedBuffer5,
++      distribution: entry.randomContinuation.peakDistribution
++    })),
++    checks
++  }, null, 2));
++}
++
++module.exports = {
++  BLACK_CELLS,
++  PIPE_CELL,
++  PIPE_DIR,
++  CHAIN_GROUPS,
++  ICE_SPEC,
++  ROLE_PATHS,
++  readJson,
++  clone,
++  loadSolver,
++  uniquePicks,
++  poseKey,
++  pressureWindows,
++  optionsAt,
++  applyPath,
++  roleEvidence,
++  obstacleEvents,
++  tracePlan,
++  randomWalk,
++  randomAudit,
++  greedyContinuation,
++  openingMatrix,
++  evaluateVariant,
++  removeChain,
++  removeIce,
++  removePipe,
++  removeBlack
++};
++
++if (require.main === module) {
++  try {
++    main();
++  } catch (err) {
++    console.error(err && err.stack || err);
++    process.exit(1);
++  }
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/SearchObstacleThickness_v688.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/SearchObstacleThickness_v688.js"
+new file mode 100644
+index 0000000..fb1cc2b
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/SearchObstacleThickness_v688.js"
+@@ -0,0 +1,212 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.8 search helper: enumerate one additional adjacent chain group on v17.
++ *
++ * This is a deterministic screening pass, not a random seed search. For every
++ * adjacent car pair, the same 006 target, vehicle multiset, role graph and
++ * PlayerSim seeds are used. The output narrows the manual ice-gate search.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const B = require('./Build006Thickness_v688');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v17/关卡_实验_006_v17.json');
++const ATLAS = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
++const OUT = path.join(ROOT, '实验关/关卡6/搜索_v18_thickness');
++const REPORT = path.join(OUT, 'chain-search-v1.json');
++
++function applyPair(game, cells) {
++  const out = B.clone(game);
++  for (const [r, c] of cells) {
++    out.spools[r][c].type = 5;
++    out.spools[r][c].param = 2;
++  }
++  return out;
++}
++
++function adjacentPairs(game) {
++  const protectedCells = new Set();
++  for (const spec of B.CHAIN_GROUPS.filter(group => group.id === 1)) {
++    for (const [r, c] of spec.cells) protectedCells.add(r + ',' + c);
++  }
++  for (const [r, c] of B.BLACK_CELLS) protectedCells.add(r + ',' + c);
++  protectedCells.add(B.PIPE_CELL[0] + ',' + B.PIPE_CELL[1]);
++  const pairs = [];
++  for (let r = 0; r < game.maprow; r++) {
++    for (let c = 0; c < game.mapcol; c++) {
++      const first = game.spools[r][c];
++      if (!first || first.id <= 0 || protectedCells.has(r + ',' + c)) continue;
++      for (const [dr, dc] of [[0, 1], [1, 0]]) {
++        const rr = r + dr;
++        const cc = c + dc;
++        if (rr >= game.maprow || cc >= game.mapcol) continue;
++        const second = game.spools[rr][cc];
++        if (!second || second.id <= 0 || protectedCells.has(rr + ',' + cc)) continue;
++        pairs.push([[r, c], [rr, cc]]);
++      }
++    }
++  }
++  return pairs;
++}
++
++function measure(A, game, atlasLookup, cells) {
++  B.CHAIN_GROUPS.find(group => group.id === 2).cells = cells;
++  const level = A.parseLevel(A.fromGameFormat(game));
++  const roles = B.roleEvidence(A, level);
++  const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 10000 });
++  const players = [];
++  let observed = false;
++  for (const seed of [7, 1009, 2027]) {
++    const run = A.PlayerSim.run(level, {
++      seed,
++      instantChain: true,
++      reviveCap: 0
++    });
++    const picks = B.uniquePicks(run);
++    const plan = B.tracePlan(A, level, run, atlasLookup);
++    const events = B.obstacleEvents(A, level, picks);
++    const group = events.chains[2];
++    if (group.entered && group.completedMember &&
++        group.debtMember && group.released) observed = true;
++    players.push({
++      won: run.won,
++      progress: run.progress,
++      peak: run.bufferPeak,
++      revivesUsed: run.revivesUsed,
++      windows: plan.windows,
++      group2: {
++        entered: group.entered,
++        completedMember: group.completedMember,
++        debtMember: group.debtMember,
++        released: group.released,
++        entryStep: group.entry && group.entry.step,
++        releaseStep: group.release && group.release.step
++      }
++    });
++  }
++  const uniform = [];
++  const reasonable = [];
++  for (let i = 0; i < 80; i++) {
++    uniform.push(B.randomWalk(A, level, {
++      seed: 610001 + i,
++      policy: 'uniform'
++    }));
++    reasonable.push(B.randomWalk(A, level, {
++      seed: 620001 + i,
++      policy: 'reasonable'
++    }));
++  }
++  return {
++    cells,
++    cars: cells.map(([r, c]) => ({
++      r,
++      c,
++      color: game.spools[r][c].id,
++      count: game.spools[r][c].count
++    })),
++    rolesPass: roles.ok,
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      peak: solve.maxBuffer,
++      windows: B.pressureWindows(solve.stepBufferHistory || [], 3)
++    },
++    players,
++    allPlayersPass: players.every(player =>
++      player.won && player.progress === 100 && player.revivesUsed === 0),
++    everySeedTwoWindows: players.every(player => player.windows.length >= 2),
++    peakDistribution: players.reduce((out, player) => {
++      out[player.peak] = (out[player.peak] || 0) + 1;
++      return out;
++    }, {}),
++    group2Observed: observed,
++    uniformBuffer5: uniform.filter(run => run.reachedBuffer5).length,
++    reasonableBuffer5: reasonable.filter(run => run.reachedBuffer5).length
++  };
++}
++
++function main() {
++  const A = B.loadSolver();
++  const base = B.readJson(SOURCE);
++  const atlasLookup = require('./Build006Thickness_v688').readJson(ATLAS);
++  const lookup = {
++    byCell: {},
++    byId: {}
++  };
++  for (const region of atlasLookup.target.regions || []) {
++    lookup.byId[region.id] = region;
++    for (const cell of region.cells || []) {
++      lookup.byCell[cell[0] + ',' + cell[1]] = region.id;
++    }
++  }
++  const pairs = adjacentPairs(base);
++  const records = [];
++  for (let i = 0; i < pairs.length; i++) {
++    const game = applyPair(base, pairs[i]);
++    let record;
++    try {
++      record = measure(A, game, lookup, pairs[i]);
++    } catch (err) {
++      record = {
++        cells: pairs[i],
++        error: String(err && err.stack || err)
++      };
++    }
++    const rank =
++      (record.rolesPass ? 1e9 : 0) +
++      (record.solve && record.solve.completed ? 1e8 : 0) +
++      (record.allPlayersPass ? 1e7 : 0) +
++      (record.everySeedTwoWindows ? 1e6 : 0) +
++      (record.group2Observed ? 1e5 : 0) +
++      (record.players || []).filter(player => player.peak >= 4).length * 1e4 -
++      (record.uniformBuffer5 || 80) * 10 -
++      (record.reasonableBuffer5 || 80);
++    records.push({ rank, ...record });
++    console.log(i + '/' + pairs.length + ' ' +
++      pairs[i].map(cell => cell.join(',')).join('+') +
++      ' rank=' + rank);
++  }
++  records.sort((a, b) => b.rank - a.rank);
++  fs.mkdirSync(OUT, { recursive: true });
++  fs.writeFileSync(REPORT, JSON.stringify({
++    schema: '006-thickness-chain-search-v1',
++    source: SOURCE,
++    pairCount: pairs.length,
++    top: records.slice(0, 30),
++    all: records
++  }, null, 2) + '\n');
++  console.log(JSON.stringify({
++    ok: true,
++    output: REPORT,
++    top: records.slice(0, 12).map(record => ({
++      rank: record.rank,
++      cells: record.cells,
++      cars: record.cars,
++      rolesPass: record.rolesPass,
++      solvePeak: record.solve && record.solve.peak,
++      players: record.players && record.players.map(player => ({
++        won: player.won,
++        peak: player.peak,
++        windows: player.windows.map(window => [
++          window.startStep,
++          window.endStep,
++          window.peak
++        ])
++      })),
++      group2Observed: record.group2Observed,
++      uniformBuffer5: record.uniformBuffer5,
++      reasonableBuffer5: record.reasonableBuffer5
++    }))
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Search006Ice_v688.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Search006Ice_v688.js"
+new file mode 100644
+index 0000000..4ac1a65
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Search006Ice_v688.js"
+@@ -0,0 +1,276 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.8 deterministic ice-gate search.
++ *
++ * Candidate cells are restricted to mid-board branch cars. Initial entries,
++ * role-path cells, black cells, pipe cells and both chain groups are excluded.
++ * The score rewards story preservation first and lower random-choice debt
++ * second; this is not a seed search over generated boards.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const B = require('./Build006Thickness_v688');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v17/关卡_实验_006_v17.json');
++const ATLAS = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
++const OUT = path.join(ROOT, '实验关/关卡6/搜索_v18_thickness');
++const SEARCH_TAG = process.env.SEARCH_TAG || 'ice-search-v1';
++const REPORT = path.join(OUT, SEARCH_TAG + '.json');
++
++const SECOND_CHAIN = process.env.SECOND_CHAIN ?
++  JSON.parse(process.env.SECOND_CHAIN) :
++  [[3, 6], [4, 6]];
++const ROLE_CELLS = new Set([
++  '0,0', '0,3', '0,6', '1,0', '1,3', '1,6', '2,0', '2,6'
++]);
++const EXCLUDED = new Set([
++  ...ROLE_CELLS,
++  ...B.BLACK_CELLS.map(cell => cell.join(',')),
++  ...B.CHAIN_GROUPS[0].cells.map(cell => cell.join(',')),
++  ...SECOND_CHAIN.map(cell => cell.join(',')),
++  B.PIPE_CELL.join(',')
++]);
++const CANDIDATE_CELLS = [
++  [1, 1], [1, 2], [1, 4], [1, 5],
++  [2, 1], [2, 2], [2, 3], [2, 4], [2, 5],
++  [3, 0], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5],
++  [4, 0], [4, 1], [4, 2], [4, 3], [4, 4], [4, 5],
++  [5, 0], [5, 4], [5, 5], [5, 6],
++  [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [6, 5]
++].filter(cell => !EXCLUDED.has(cell.join(',')));
++
++function rng(seed) {
++  let value = seed >>> 0;
++  return function next() {
++    value = (Math.imul(value, 1664525) + 1013904223) >>> 0;
++    return value / 4294967296;
++  };
++}
++
++function shuffle(items, random) {
++  const out = items.slice();
++  for (let i = out.length - 1; i > 0; i--) {
++    const j = Math.floor(random() * (i + 1));
++    const temp = out[i];
++    out[i] = out[j];
++    out[j] = temp;
++  }
++  return out;
++}
++
++function applyCandidate(base, cells, durations) {
++  const game = B.clone(base);
++  for (const [r, c] of SECOND_CHAIN) {
++    game.spools[r][c].type = 5;
++    game.spools[r][c].param = 2;
++  }
++  for (let i = 0; i < cells.length; i++) {
++    const [r, c] = cells[i];
++    game.spools[r][c].type = 7;
++    game.spools[r][c].param = durations[i];
++  }
++  return game;
++}
++
++function lookupAtlas() {
++  const atlas = B.readJson(ATLAS);
++  const lookup = { byCell: {}, byId: {} };
++  for (const region of atlas.target.regions || []) {
++    lookup.byId[region.id] = region;
++    for (const cell of region.cells || []) {
++      lookup.byCell[cell[0] + ',' + cell[1]] = region.id;
++    }
++  }
++  return lookup;
++}
++
++function randomSample(A, level, count) {
++  const uniform = [];
++  const reasonable = [];
++  for (let i = 0; i < count; i++) {
++    uniform.push(B.randomWalk(A, level, {
++      seed: 710001 + i,
++      policy: 'uniform'
++    }));
++    reasonable.push(B.randomWalk(A, level, {
++      seed: 720001 + i,
++      policy: 'reasonable'
++    }));
++  }
++  return {
++    uniform: uniform.filter(run => run.reachedBuffer5).length,
++    reasonable: reasonable.filter(run => run.reachedBuffer5).length,
++    uniformWon: uniform.filter(run => run.won).length,
++    reasonableWon: reasonable.filter(run => run.won).length,
++    uniformPeakDistribution: uniform.reduce((out, run) => {
++      out[run.peak] = (out[run.peak] || 0) + 1;
++      return out;
++    }, {})
++  };
++}
++
++function evaluate(A, base, lookup, cells, durations) {
++  B.CHAIN_GROUPS.find(group => group.id === 2).cells = SECOND_CHAIN;
++  const game = applyCandidate(base, cells, durations);
++  const level = A.parseLevel(A.fromGameFormat(game));
++  const role = B.roleEvidence(A, level);
++  if (!role.ok) return { rolePass: false };
++  let st = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  st.capture = true;
++  const opening = B.optionsAt(A, st, true);
++  const solve = A.Solver.solveInstantChain(level, { timeBudgetMs: 10000 });
++  const players = [];
++  let groupsObserved = false;
++  for (const seed of [7, 1009, 2027]) {
++    const run = A.PlayerSim.run(level, {
++      seed,
++      instantChain: true,
++      reviveCap: 0
++    });
++    const picks = B.uniquePicks(run);
++    const plan = B.tracePlan(A, level, run, lookup);
++    const events = B.obstacleEvents(A, level, picks);
++    const group1 = events.chains[1];
++    const group2 = events.chains[2];
++    if (group1.entered && group1.entryConsumedMember && group1.released &&
++        group2.entered && group2.entryConsumedMember && group2.released) {
++      groupsObserved = true;
++    }
++    players.push({
++      won: run.won,
++      progress: run.progress,
++      peak: run.bufferPeak,
++      revivesUsed: run.revivesUsed,
++      windows: plan.windows,
++      picks
++    });
++  }
++  const current = randomSample(A, level, 100);
++  const noIce = applyCandidate(base, [], []);
++  const noIceLevel = A.parseLevel(A.fromGameFormat(noIce));
++  const without = randomSample(A, noIceLevel, 100);
++  return {
++    rolePass: true,
++    cells,
++    durations,
++    cars: cells.map(([r, c]) => ({
++      r,
++      c,
++      color: base.spools[r][c].id,
++      count: base.spools[r][c].count
++    })),
++    openingPass: opening.length === 7 &&
++      opening.every(move => move.applied && move.canConsume && move.consumed > 0),
++    solve: {
++      completed: solve.completed,
++      progress: solve.progress,
++      peak: solve.maxBuffer,
++      windows: B.pressureWindows(solve.stepBufferHistory || [], 3)
++    },
++    players,
++    allPlayersPass: players.every(player =>
++      player.won && player.progress === 100 && player.revivesUsed === 0),
++    everySeedTwoWindows: players.every(player => player.windows.length >= 2),
++    peak4Seeds: players.filter(player => player.peak >= 4).length,
++    groupsObserved,
++    current,
++    without,
++    iceChangesRandom:
++      current.uniform !== without.uniform ||
++      current.reasonable !== without.reasonable ||
++      current.uniformWon !== without.uniformWon,
++    iceChangesPlayers:
++      JSON.stringify(players.map(player => player.windows)) !==
++      JSON.stringify([])
++  };
++}
++
++function main() {
++  const A = B.loadSolver();
++  const base = B.readJson(SOURCE);
++  const lookup = lookupAtlas();
++  const random = rng(6882);
++  const records = [];
++  const seen = new Set();
++  const attempted = Number(process.env.SEARCH_COUNT || 320);
++  for (let i = 0; i < attempted; i++) {
++    const count = 4 + Math.floor(random() * 5);
++    const cells = shuffle(CANDIDATE_CELLS, random).slice(0, count);
++    const durations = cells.map(() =>
++      [5, 6, 7, 8, 9, 10, 11, 12][Math.floor(random() * 8)]);
++    const key = cells.map(cell => cell.join(',')).sort().join('|');
++    if (seen.has(key)) {
++      i--;
++      continue;
++    }
++    seen.add(key);
++    let record;
++    try {
++      record = evaluate(A, base, lookup, cells, durations);
++    } catch (err) {
++      record = { rolePass: false, error: String(err && err.stack || err), cells };
++    }
++    const score =
++      (record.rolePass ? 1e12 : 0) +
++      (record.openingPass ? 1e11 : 0) +
++      (record.solve && record.solve.completed ? 1e10 : 0) +
++      (record.allPlayersPass ? 1e9 : 0) +
++      (record.everySeedTwoWindows ? 1e8 : 0) +
++      (record.peak4Seeds || 0) * 1e7 +
++      (record.groupsObserved ? 1e6 : 0) +
++      (record.iceChangesRandom ? 1e5 : 0) +
++      (record.iceChangesPlayers ? 1e4 : 0) -
++      (record.current ? record.current.uniform * 100 : 1e8) -
++      (record.current ? record.current.reasonable * 10 : 1e7);
++    records.push({ score, ...record });
++    if ((i + 1) % 10 === 0 || i === attempted - 1) {
++      records.sort((a, b) => b.score - a.score);
++      console.log((i + 1) + '/' + attempted + ' best=' + records[0].score +
++        ' cells=' + records[0].cells.map(cell => cell.join(',')).join('+'));
++    }
++  }
++  records.sort((a, b) => b.score - a.score);
++  fs.mkdirSync(OUT, { recursive: true });
++  fs.writeFileSync(REPORT, JSON.stringify({
++    schema: '006-ice-search-v1',
++    source: SOURCE,
++    secondChain: SECOND_CHAIN,
++    attempted,
++    candidateCellCount: CANDIDATE_CELLS.length,
++    top: records.slice(0, 40),
++    all: records
++  }, null, 2) + '\n');
++  console.log(JSON.stringify({
++    ok: true,
++    output: REPORT,
++    top: records.slice(0, 12).map(record => ({
++      score: record.score,
++      cells: record.cells,
++      durations: record.durations,
++      cars: record.cars,
++      openingPass: record.openingPass,
++      solvePeak: record.solve && record.solve.peak,
++      allPlayersPass: record.allPlayersPass,
++      everySeedTwoWindows: record.everySeedTwoWindows,
++      peak4Seeds: record.peak4Seeds,
++      groupsObserved: record.groupsObserved,
++      iceChangesRandom: record.iceChangesRandom,
++      current: record.current,
++      without: record.without
++    }))
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js"
+new file mode 100644
+index 0000000..190053b
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/GenerateStoryCompilerUiBundle_v616.js"
+@@ -0,0 +1,629 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * Generate the browser-side story compiler registry used by the v616 UI.
++ *
++ * Only board spools and route contracts are embedded. Target blocks always come
++ * from the image currently loaded in the production UI.
++ */
++
++const crypto = require('crypto');
++const fs = require('fs');
++const path = require('path');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const OUT = path.join(
++  ROOT,
++  '02_工程',
++  '完整主bin快照_20261012',
++  'bin',
++  'js',
++  'story-compiler.js'
++);
++
++function readJson(file) {
++  return JSON.parse(fs.readFileSync(file, 'utf8'));
++}
++
++function sha256(file) {
++  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
++}
++
++function blocksFromTXT(file) {
++  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
++  let start = 0;
++  for (let i = 0; i < lines.length; i++) {
++    const trimmed = lines[i].trim();
++    if (trimmed === '' || !/^-?\d/.test(trimmed)) start = i + 1;
++    else break;
++  }
++  const blocks = [];
++  for (let i = start; i < lines.length; i++) {
++    const line = lines[i].trim();
++    if (!line) continue;
++    blocks.push(line.split(/\s+/).map(value => parseInt(value, 10) || 0));
++  }
++  return blocks;
++}
++
++function targetSignature(blocks) {
++  let hash = 2166136261 >>> 0;
++  function mix(value) {
++    hash ^= (value >>> 0);
++    hash = Math.imul(hash, 16777619) >>> 0;
++  }
++  mix(blocks.length);
++  mix(blocks[0] ? blocks[0].length : 0);
++  for (const row of blocks) for (const value of row) mix(value | 0);
++  return hash.toString(16).padStart(8, '0');
++}
++
++function routePicksOf006() {
++  const manifest = readJson(path.join(ROOT, '实验关/关卡6/E5_v1/manifest.json'));
++  return manifest.route.expectedUniqueSteps.map(text => {
++    const [r, c] = text.split(',').map(Number);
++    return { r, c };
++  });
++}
++
++function routePicksOfDebug(file) {
++  const debug = readJson(file);
++  return debug.evidence.map(item => ({ r: item.r, c: item.c }));
++}
++
++function entryOf(config) {
++  const levelFile = path.join(ROOT, config.level);
++  const raw = readJson(levelFile);
++  const blocks = blocksFromTXT(path.join(ROOT, config.target));
++  function typesOf(value) {
++    return Array.isArray(value) ? value : (value == null || value === 0 ? [] : [value]);
++  }
++  const totalCars = raw.spools.flat().reduce((sum, spool) => {
++    if (!spool) return sum;
++    if (spool.id > 0) return sum + 1;
++    if (typesOf(spool.type).some(type => type >= 11 && type <= 14)) {
++      return sum + (Array.isArray(spool.param) ? spool.param.length : 0);
++    }
++    return sum;
++  }, 0);
++  const capacities = raw.spools
++    .flat()
++    .filter(spool => spool && spool.id > 0)
++    .map(spool => spool.count);
++  return {
++    id: config.id,
++    label: config.label,
++    targetSig: targetSignature(blocks),
++    targetSize: [blocks.length, blocks[0].length],
++    sha256: sha256(levelFile),
++    maprow: raw.maprow,
++    mapcol: raw.mapcol,
++    spools: raw.spools,
++    capacityMin: capacities.length ? Math.min(...capacities) : null,
++    capacityMax: capacities.length ? Math.max(...capacities) : null,
++    totalCars,
++    expectedPicks: config.expectedPicks || [],
++    requiredSteps: config.requiredSteps || (config.expectedPicks ? config.expectedPicks.length : 0),
++    openingContract: config.openingContract || null,
++    storyGraph: config.storyGraph || null,
++    roleGraph: config.roleGraph || null,
++    pressureContract: config.pressureContract || null,
++    chainContracts: config.chainContracts || [],
++    pipeContract: config.pipeContract || null,
++    routeMode: config.routeMode,
++    storyBeats: config.storyBeats
++  };
++}
++
++function main() {
++  const entries = [
++    entryOf({
++      id: '006',
++      label: '006 · 双链债务与分支冰',
++      target: '实验关/关卡6/35x35拼接图纸_006.txt',
++      level: '实验关/关卡6/原型_v19/关卡_实验_006_v19.json',
++      requiredSteps: 44,
++      routeMode: 'roleGraph',
++      openingContract: {
++        exactMoves: 7,
++        allCanConsume: true,
++        bufferAfterEmpty: true
++      },
++      roleGraph: {
++        roles: [
++          {
++            id: 'safe',
++            path: [{ r: 0, c: 3 }, { r: 1, c: 3 }],
++            debtAfterStep: null,
++            finalBufferEmpty: true
++          },
++          {
++            id: 'lightDebt',
++            path: [{ r: 0, c: 0 }, { r: 1, c: 0 }, { r: 2, c: 0 }],
++            debtAfterStep: 2,
++            debt: { color: 17, remaining: 10 },
++            finalBufferEmpty: true
++          },
++          {
++            id: 'heavyDebt',
++            path: [{ r: 0, c: 6 }, { r: 1, c: 6 }, { r: 2, c: 6 }],
++            debtAfterStep: 2,
++            debt: { color: 34, remaining: 19 },
++            finalBufferEmpty: true
++          }
++        ]
++      },
++      pressureContract: {
++        threshold: 3,
++        minWindows: 2,
++        minPeak: 3,
++        requireRelease: true,
++        reviveCap: 0
++      },
++      chainContracts: [
++        {
++          group: 1,
++          cells: [{ r: 5, c: 1 }, { r: 5, c: 2 }, { r: 5, c: 3 }],
++          requireAdjacent: true,
++          requireCurrentConsumption: true,
++          requireCompletedMember: true,
++          requireDebtMember: true,
++          requireRelease: true
++        },
++        {
++          group: 2,
++          cells: [{ r: 2, c: 5 }, { r: 3, c: 5 }],
++          requireAdjacent: true,
++          requireCurrentConsumption: true,
++          requireCompletedMember: true,
++          requireDebtMember: true,
++          requireRelease: true
++        }
++      ],
++      pipeContract: {
++        cell: { r: 6, c: 6 },
++        direction: 11,
++        queue: [{ color: 13, count: 28 }],
++        requireReleased: true
++      },
++      storyBeats: [
++        '顶层7个无冰入口全部立即收满',
++        '安全路径不产生债务',
++        '轻债路径17/26欠10后由31/31偿还',
++        '长债路径34/25欠19后由31/31偿还',
++        '第一段同色债务峰值3并在下一窗口部分释放',
++        '第二段混色债务达到4并持续到33/20释放',
++        '首行7个入口均无冰；债务发生在中段而不是首行免费双消',
++        '右侧5/21先完成、5/40留下30像素债务，完成车被扣住7步后释放',
++        '相邻三连锁包含34/25、30/23、28/23，当前28完成后被扣住',
++        '五格分支数字冰延迟高误判供给，移除后完全随机buffer5比例回升',
++        '管道以13/28暂存并在出口空出后释放',
++        '最终组债释放并收尾'
++      ]
++    }),
++    entryOf({
++      id: '008',
++      label: '008 · 双债务故事图',
++      target: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_008.txt',
++      level: '实验关/关卡8/原型_v3/关卡_实验_008_v3.json',
++      requiredSteps: 47,
++      routeMode: 'storyGraph',
++      storyGraph: {
++        start: { r: 0, c: 0, color: 7, count: 26 },
++        choices: [
++          {
++            id: 'lightDebt',
++            path: [{ r: 1, c: 0 }, { r: 2, c: 0 }],
++            debt: { color: 33, remaining: 18 },
++            releaseStep: 1
++          },
++          {
++            id: 'heavyDebt',
++            path: [{ r: 0, c: 1 }, { r: 0, c: 2 }],
++            debt: { color: 3, remaining: 27 },
++            releaseStep: 1
++          }
++        ],
++        minRouteDiversity: 2
++      },
++      storyBeats: [
++        '7/26教学',
++        '轻债33/22或重债3/29二选一',
++        '32/27或5/36分别偿还',
++        '第二枚7/26汇合',
++        '后续分区选择与终局'
++      ]
++    }),
++    entryOf({
++      id: '014',
++      label: '014 · 最终留出',
++      target: '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_014.txt',
++      level: '实验关/关卡14/原型_v1/关卡_实验_014_v1.json',
++      expectedPicks: routePicksOfDebug(
++        path.join(ROOT, '实验关/关卡14/原型_v1/关卡_实验_014_v1.debug.json')
++      ),
++      routeMode: 'full',
++      storyBeats: [
++        'R107小缺口',
++        'R69鱼形内部',
++        '玉米未完成债务',
++        '末段31债务释放'
++      ]
++    })
++  ];
++
++  const registry = {};
++  for (const entry of entries) registry[entry.targetSig] = entry;
++
++  const source = [
++    '/*',
++    ' * StoryCompiler v1 · generated by GenerateStoryCompilerUiBundle_v616.js',
++    ' *',
++    ' * Default-off browser registry for the three accepted story levels.',
++    ' * Unsupported targets fail explicitly and never fall back to random search.',
++    ' */',
++    'var AntSolver = AntSolver || {};',
++    '',
++    'AntSolver.StoryCompiler = (function () {',
++    '  var REGISTRY = ' + JSON.stringify(registry, null, 2) + ';',
++    '',
++    '  function clone(value) { return JSON.parse(JSON.stringify(value)); }',
++    '  function signature(blocks) {',
++    '    var hash = 2166136261 >>> 0;',
++    '    function mix(value) {',
++    '      hash ^= (value >>> 0);',
++    '      hash = Math.imul(hash, 16777619) >>> 0;',
++    '    }',
++    '    mix(blocks.length);',
++    '    mix(blocks[0] ? blocks[0].length : 0);',
++    '    for (var r = 0; r < blocks.length; r++) for (var c = 0; c < blocks[r].length; c++) mix(blocks[r][c] | 0);',
++    '    return hash.toString(16);',
++    '  }',
++    '  function uniquePicks(run) {',
++    '    var seen = {};',
++    '    var out = [];',
++    '    var picks = (run && run.pickOrder) || [];',
++    '    for (var i = 0; i < picks.length; i++) {',
++    '      var pick = picks[i];',
++    '      var key = String(pick.step);',
++    '      if (seen[key]) continue;',
++    '      seen[key] = true;',
++    '      out.push({ r: pick.r, c: pick.c, color: pick.color, count: pick.count });',
++    '    }',
++    '    return out;',
++    '  }',
++    '  function poseKey(picks) {',
++    '    return picks.map(function (pick) { return pick.r + \",\" + pick.c; }).join(\">\");',
++    '  }',
++    '  function routeMatches(picks, required, mode) {',
++    '    if (mode === \"prefix\") return poseKey(picks.slice(0, required.length)) === poseKey(required);',
++    '    return poseKey(picks) === poseKey(required);',
++    '  }',
++    '  function storyGraphPass(level, entry, solvePicks, playerRuns) {',
++    '    var graph = entry.storyGraph;',
++    '    if (!graph) return true;',
++    '    var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '    st.capture = true;',
++    '    st.capOps = [];',
++    '    if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;',
++    '    var opening = AntSolver.Simulator.listMoves(st).filter(function (move) { return !move.blocked; });',
++    '    if (opening.length !== graph.choices.length) return false;',
++    '    for (var gi = 0; gi < graph.choices.length; gi++) {',
++    '      var choice = graph.choices[gi];',
++    '      if (!opening.some(function (move) { return move.r === choice.path[0].r && move.c === choice.path[0].c; })) return false;',
++    '      st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '      st.capture = true;',
++    '      st.capOps = [];',
++    '      if (!AntSolver.Simulator.applyPick(st, graph.start.r, graph.start.c)) return false;',
++    '      for (var pi = 0; pi < choice.path.length; pi++) {',
++    '        st.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(st, choice.path[pi].r, choice.path[pi].c)) return false;',
++    '        if (pi === 0 && choice.debt) {',
++    '          if (!st.buffer.some(function (item) {',
++    '            return item.color === choice.debt.color && item.need - item.progress === choice.debt.remaining;',
++    '          })) return false;',
++    '        }',
++    '      }',
++    '      if (st.buffer.length !== 0) return false;',
++    '    }',
++    '    var keys = {};',
++    '    keys[poseKey(solvePicks.slice(0, 12))] = true;',
++    '    for (var ri = 0; ri < playerRuns.length; ri++) keys[poseKey(playerRuns[ri].slice(0, 12))] = true;',
++    '    return Object.keys(keys).length >= (graph.minRouteDiversity || 1);',
++    '  }',
++    '  function roleGraphPass(level, entry) {',
++    '    var graph = entry.roleGraph;',
++    '    if (!graph) return true;',
++    '    for (var ri = 0; ri < graph.roles.length; ri++) {',
++    '      var role = graph.roles[ri];',
++    '      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '      st.capture = true;',
++    '      st.capOps = [];',
++    '      for (var pi = 0; pi < role.path.length; pi++) {',
++    '        var cell = role.path[pi];',
++    '        var move = AntSolver.Simulator.listMoves(st).filter(function (item) {',
++    '          return !item.blocked && item.r === cell.r && item.c === cell.c;',
++    '        })[0];',
++    '        if (!move) return false;',
++    '        st.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(st, cell.r, cell.c)) return false;',
++    '        if (role.debtAfterStep === pi + 1 && role.debt) {',
++    '          var hasDebt = st.buffer.some(function (item) {',
++    '            return item.color === role.debt.color && item.need - item.progress === role.debt.remaining;',
++    '          });',
++    '          if (!hasDebt) return false;',
++    '        }',
++    '      }',
++    '      if (role.finalBufferEmpty && st.buffer.length !== 0) return false;',
++    '    }',
++    '    return true;',
++    '  }',
++    '  function pressureWindowsOf(timeline, threshold) {',
++    '    var windows = [];',
++    '    var start = null;',
++    '    for (var i = 0; i < timeline.length; i++) {',
++    '      if (timeline[i] >= threshold && start == null) start = i;',
++    '      if (timeline[i] < threshold && start != null) {',
++    '        windows.push({ start: start + 1, end: i, peak: Math.max.apply(null, timeline.slice(start, i)), release: true });',
++    '        start = null;',
++    '      }',
++    '    }',
++    '    if (start != null) {',
++    '      windows.push({ start: start + 1, end: timeline.length, peak: Math.max.apply(null, timeline.slice(start)), release: false });',
++    '    }',
++    '    return windows;',
++    '  }',
++    '  function pressureGraphPass(players, entry) {',
++    '    var contract = entry.pressureContract;',
++    '    if (!contract) return true;',
++    '    var tested = players.filter(function (player) { return player.reviveCap === contract.reviveCap; });',
++    '    if (!tested.length) return false;',
++    '    return tested.every(function (player) {',
++    '      var windows = pressureWindowsOf(player.bufferTimeline || [], contract.threshold);',
++    '      player.pressureWindows = windows;',
++    '      var peak = Math.max.apply(null, (player.bufferTimeline || []).concat([0]));',
++    '      if (windows.length < contract.minWindows) return false;',
++    '      if (contract.minPeak != null && peak < contract.minPeak) return false;',
++    '      if (contract.requireRelease && !windows.every(function (window) { return window.release; })) return false;',
++    '      return true;',
++    '    });',
++    '  }',
++    '  function chainGraphPass(level, entry, playerRuns) {',
++    '    var contracts = entry.chainContracts || [];',
++    '    for (var ci = 0; ci < contracts.length; ci++) {',
++    '      var contract = contracts[ci];',
++    '      var actualCells = [];',
++    '      for (var r = 0; r < level.board.rows; r++) for (var c = 0; c < level.board.cols; c++) {',
++    '        var cell = level.board.cells[r][c];',
++    '        if (cell && cell.t === \"box\" && cell.chain === contract.group) actualCells.push(r + \",\" + c);',
++    '      }',
++    '      var expectedCells = contract.cells.map(function (cell) { return cell.r + \",\" + cell.c; });',
++    '      if (actualCells.sort().join(\"|\") !== expectedCells.sort().join(\"|\")) return false;',
++    '      if (contract.requireAdjacent) {',
++    '        for (var ai = 1; ai < contract.cells.length; ai++) {',
++    '          var previousCell = contract.cells[ai - 1], currentCell = contract.cells[ai];',
++    '          if (Math.abs(previousCell.r - currentCell.r) + Math.abs(previousCell.c - currentCell.c) !== 1) return false;',
++    '        }',
++    '      }',
++    '      var contractPassed = false;',
++    '      for (var ri = 0; ri < playerRuns.length && !contractPassed; ri++) {',
++    '        var picks = playerRuns[ri];',
++    '        var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '        st.capture = true;',
++    '        var activeLink = 0, consumed = false, completed = false, debt = false, released = false;',
++    '        for (var pi = 0; pi < picks.length && !released; pi++) {',
++    '          st.capOps = [];',
++    '          if (!AntSolver.Simulator.applyPick(st, picks[pi].r, picks[pi].c)) continue;',
++    '          var last = st.lastPick || {};',
++    '          if (!activeLink && last.isChain && last.chain === contract.group) {',
++    '            activeLink = st._linkSeq;',
++    '            var eatCounts = {};',
++    '            for (var oi = 0; oi < (st.capOps || []).length; oi++) {',
++    '              var op = st.capOps[oi];',
++    '              if (op.t === \"eat\") eatCounts[op.key] = (eatCounts[op.key] || 0) + (op.cells ? op.cells.length : 0);',
++    '            }',
++    '            for (var adi = 0; adi < (st.capOps || []).length; adi++) {',
++    '              var add = st.capOps[adi];',
++    '              if (add.t !== \"add\" || add.link !== activeLink) continue;',
++    '              var progress = Math.min(add.need, eatCounts[add.key] || 0);',
++    '              if (progress > 0) consumed = true;',
++    '              if (progress >= add.need) completed = true;',
++    '              if (progress < add.need) debt = true;',
++    '            }',
++    '          }',
++    '          if (activeLink) {',
++    '            var linked = st.buffer.filter(function (item) { return item.link === activeLink; });',
++    '            if (!linked.length) {',
++    '              released = true;',
++    '              activeLink = 0;',
++    '            } else {',
++    '              if (linked.some(function (item) { return item.need - item.progress === 0; })) completed = true;',
++    '              if (linked.some(function (item) { return item.need - item.progress > 0; })) debt = true;',
++    '            }',
++    '          }',
++    '        }',
++    '        contractPassed = (!contract.requireCurrentConsumption || consumed) &&',
++    '          (!contract.requireCompletedMember || completed) &&',
++    '          (!contract.requireDebtMember || debt) &&',
++    '          (!contract.requireRelease || released);',
++    '      }',
++    '      if (!contractPassed) return false;',
++    '    }',
++    '    return true;',
++    '  }',
++    '  function pipeGraphPass(level, entry, playerRuns) {',
++    '    var contract = entry.pipeContract;',
++    '    if (!contract) return true;',
++    '    var pipe = level.board.cells[contract.cell.r][contract.cell.c];',
++    '    if (!pipe || pipe.t !== \"pipe\" || pipe.dir !== contract.direction) return false;',
++    '    if ((pipe.queue || []).length !== contract.queue.length) return false;',
++    '    for (var qi = 0; qi < contract.queue.length; qi++) {',
++    '      var queueExpected = contract.queue[qi], queueActual = pipe.queue[qi];',
++    '      if (!queueActual || queueActual.color !== queueExpected.color || queueActual.count !== queueExpected.count) return false;',
++    '    }',
++    '    for (var ri = 0; ri < playerRuns.length; ri++) {',
++    '      var picks = playerRuns[ri];',
++    '      var st = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '      st.capture = true;',
++    '      for (var pi = 0; pi < picks.length; pi++) {',
++    '        st.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(st, picks[pi].r, picks[pi].c)) continue;',
++    '        var currentPipe = st.cells[contract.cell.r][contract.cell.c];',
++    '        if (!currentPipe || currentPipe.t !== \"pipe\" || currentPipe.next <= 0 || !currentPipe.opened) continue;',
++    '        var delta = AntSolver.PIPE_DIRS[contract.direction] || [-1, 0];',
++    '        var exitCell = st.cells[contract.cell.r + delta[0]][contract.cell.c + delta[1]];',
++    '        var first = contract.queue[0];',
++    '        if (exitCell && exitCell.t === \"box\" &&',
++    '            exitCell.color === first.color && exitCell.count === first.count) return true;',
++    '      }',
++    '    }',
++    '    return false;',
++    '  }',
++    '  function openingFrontierPass(level, entry) {',
++    '    var contract = entry.openingContract;',
++    '    if (!contract) return true;',
++    '    var state = AntSolver.Simulator.createState(level, { useSlotStart: true, instantChain: true });',
++    '    state.capture = true;',
++    '    var moves = AntSolver.Simulator.listMoves(state).filter(function (move) { return !move.blocked; });',
++    '    if (contract.exactMoves != null && moves.length !== contract.exactMoves) return false;',
++    '    if (contract.allCanConsume && !moves.every(function (move) { return move.canConsume; })) return false;',
++    '    if (contract.bufferAfterEmpty) {',
++    '      for (var i = 0; i < moves.length; i++) {',
++    '        var clone = AntSolver.SolverStrategy.cloneState(state);',
++    '        clone.capOps = [];',
++    '        if (!AntSolver.Simulator.applyPick(clone, moves[i].r, moves[i].c)) return false;',
++    '        if (clone.buffer.length !== 0) return false;',
++    '      }',
++    '    }',
++    '    return true;',
++    '  }',
++    '  function entryFor(blocks) { return REGISTRY[signature(blocks)] || null; }',
++    '  function availableTargets() {',
++    '    return Object.keys(REGISTRY).map(function (key) {',
++    '      var entry = REGISTRY[key];',
++    '      return { id: entry.id, label: entry.label, targetSig: key };',
++    '    });',
++    '  }',
++    '  function compile(blocks, config) {',
++    '    var t0 = Date.now();',
++    '    var entry = entryFor(blocks);',
++    '    if (!entry) {',
++    '      return { ok: false, level: null, meta: {',
++    '        schema: \"story-compiler-v1\", status: \"unsupported-target\",',
++    '        targetSig: signature(blocks), available: availableTargets(), elapsedMs: Date.now() - t0',
++    '      } };',
++    '    }',
++    '    if (!blocks.length || blocks.length !== entry.targetSize[0] || blocks[0].length !== entry.targetSize[1]) {',
++    '      return { ok: false, level: null, meta: { schema: \"story-compiler-v1\", status: \"size-mismatch\", storyId: entry.id } };',
++    '    }',
++    '    var level = AntSolver.parseLevel(AntSolver.fromGameFormat({',
++    '      toprow: blocks.length, blocks: clone(blocks), maprow: entry.maprow, mapcol: entry.mapcol,',
++    '      spools: clone(entry.spools)',
++    '    }));',
++    '    var solve = AntSolver.Solver.solveInstantChain(level, { timeBudgetMs: 20000 });',
++    '    var solvePicks = uniquePicks(solve);',
++    '    var exactSolveRouteMatches = !!(solve.completed && routeMatches(solvePicks, entry.expectedPicks, entry.routeMode));',
++    '    var players = [];',
++    '    var playerPickLists = [];',
++    '    var seeds = [7, 1009, 2027];',
++    '    var caps = [0, 2];',
++    '    for (var ci = 0; ci < caps.length; ci++) for (var si = 0; si < seeds.length; si++) {',
++    '      var run = AntSolver.PlayerSim.run(level, { seed: seeds[si], instantChain: true, reviveCap: caps[ci] });',
++    '      var runPicks = uniquePicks(run);',
++    '      playerPickLists.push(runPicks);',
++    '      players.push({ seed: seeds[si], reviveCap: caps[ci], won: !!run.won,',
++    '        progress: run.progress, bufferPeak: run.bufferPeak, revivesUsed: run.revivesUsed,',
++    '        bufferTimeline: run.bufferTimeline || [],',
++    '        routeMatches: entry.routeMode === \"storyGraph\" ? true : routeMatches(runPicks, entry.expectedPicks, entry.routeMode) });',
++    '    }',
++    '    var graphPass = storyGraphPass(level, entry, solvePicks, playerPickLists);',
++    '    var rolePass = roleGraphPass(level, entry);',
++    '    var pressurePass = pressureGraphPass(players, entry);',
++    '    var chainPass = chainGraphPass(level, entry, playerPickLists);',
++    '    var pipePass = pipeGraphPass(level, entry, playerPickLists);',
++    '    var frontierPass = openingFrontierPass(level, entry);',
++    '    if (entry.routeMode === \"storyGraph\") {',
++    '      for (var pgi = 0; pgi < players.length; pgi++) players[pgi].routeMatches = graphPass;',
++    '    } else if (entry.routeMode === \"openFrontier\") {',
++    '      for (var pfj = 0; pfj < players.length; pfj++) players[pfj].routeMatches = frontierPass;',
++    '    } else if (entry.routeMode === \"roleGraph\") {',
++    '      for (var prj = 0; prj < players.length; prj++) players[prj].routeMatches = frontierPass && rolePass && pressurePass && chainPass && pipePass;',
++    '    }',
++    '    var solveRouteMatches = entry.routeMode === \"storyGraph\" ? graphPass :',
++    '      (entry.routeMode === \"openFrontier\" ? frontierPass :',
++    '        (entry.routeMode === \"roleGraph\" ? (frontierPass && rolePass && pressurePass && chainPass && pipePass) : exactSolveRouteMatches));',
++    '    var roundtrip = AntSolver.parseLevel(AntSolver.fromGameFormat(AntSolver.toGameFormat(level)));',
++    '    var roundtripSolve = AntSolver.Solver.solveInstantChain(roundtrip, { timeBudgetMs: 20000, greedyOnly: true });',
++    '    var checks = {',
++    '      solveCompleted: !!solve.completed,',
++    '      solveRouteMatches: solveRouteMatches,',
++    '      storyGraphPass: graphPass,',
++    '      roleGraphPass: rolePass,',
++    '      pressureGraphPass: pressurePass,',
++    '      chainGraphPass: chainPass,',
++    '      pipeGraphPass: pipePass,',
++    '      openingFrontierPass: frontierPass,',
++    '      playersPass: players.every(function (x) { return x.won && x.progress === 100 && x.routeMatches; }),',
++    '      noRevivePass: players.filter(function (x) { return x.reviveCap === 0; }).every(function (x) { return x.revivesUsed === 0; }),',
++    '      roundtripPass: !!roundtripSolve.completed',
++    '    };',
++    '    var passed = Object.keys(checks).every(function (key) { return checks[key]; });',
++    '    return {',
++    '      ok: passed,',
++    '      level: passed ? level : null,',
++    '      meta: {',
++    '        schema: \"story-compiler-v1\",',
++    '        status: passed ? \"pass\" : \"story-validation-failed\",',
++    '        storyId: entry.id,',
++    '        label: entry.label,',
++    '        targetSig: entry.targetSig,',
++    '        sourceSha256: entry.sha256,',
++    '        capacityMin: entry.capacityMin,',
++    '        capacityMax: entry.capacityMax,',
++    '        totalCars: entry.totalCars,',
++    '        routeMode: entry.routeMode,',
++    '        requiredSteps: entry.requiredSteps,',
++    '        storyBeats: entry.storyBeats,',
++    '        checks: checks,',
++    '        roleGraphPass: rolePass,',
++    '        pressureGraphPass: pressurePass,',
++    '        chainGraphPass: chainPass,',
++    '        pipeGraphPass: pipePass,',
++    '        solve: { completed: !!solve.completed, progress: solve.progress, bufferPeak: solve.maxBuffer, routeMatches: solveRouteMatches },',
++    '        players: players,',
++    '        elapsedMs: Date.now() - t0',
++    '      }',
++    '    };',
++    '  }',
++    '',
++    '  return {',
++    '    schema: \"story-compiler-v1\",',
++    '    signature: signature,',
++    '    availableTargets: availableTargets,',
++    '    compile: compile',
++    '  };',
++    '})();',
++    ''
++  ].join('\n');
++
++  fs.writeFileSync(OUT, source);
++  console.log(JSON.stringify({
++    ok: true,
++    output: OUT,
++    entries: entries.map(entry => ({
++      id: entry.id,
++      targetSig: entry.targetSig,
++      sourceSha256: entry.sha256,
++      routeMode: entry.routeMode,
++      requiredSteps: entry.requiredSteps
++    }))
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}
+diff --git "a/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Audit006RouteSpace_v690.js" "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Audit006RouteSpace_v690.js"
+new file mode 100644
+index 0000000..54d8365
+--- /dev/null
++++ "b/03_\345\267\245\345\205\267/\346\255\243\345\274\217\347\211\210/Audit006RouteSpace_v690.js"
+@@ -0,0 +1,420 @@
++#!/usr/bin/env node
++'use strict';
++
++/**
++ * E6.8R: audit whether planned story states survive across route families.
++ *
++ * This is intentionally a diagnostic, not a generator. It runs deterministic
++ * human-like policy families on the current level and reports which planned
++ * debt states can be bypassed.
++ */
++
++const fs = require('fs');
++const path = require('path');
++const B = require('./Build006Thickness_v688');
++
++const ROOT = path.resolve(__dirname, '..', '..');
++const VERSION = process.env.AUDIT_VERSION || 'v19';
++const LEVEL_FILE = process.env.AUDIT_LEVEL ?
++  path.resolve(ROOT, process.env.AUDIT_LEVEL) :
++  path.join(
++    ROOT,
++    '实验关/关卡6/原型_' + VERSION,
++    '关卡_实验_006_' + VERSION + '.json'
++  );
++const ATLAS_FILE = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
++const OUT_DIR = process.env.AUDIT_OUT_DIR ?
++  path.resolve(ROOT, process.env.AUDIT_OUT_DIR) :
++  path.join(ROOT, '实验关/关卡6/原型_' + VERSION);
++const OUT = path.join(OUT_DIR, 'route-space-audit-v1.json');
++const REPORT = path.join(OUT_DIR, 'route-space-audit-v1.md');
++
++const GAME = B.readJson(LEVEL_FILE);
++
++function chainsFromGame(game) {
++  const byGroup = {};
++  for (let r = 0; r < game.maprow; r++) {
++    for (let c = 0; c < game.mapcol; c++) {
++      const spool = game.spools[r][c];
++      if (!spool || spool.id <= 0) continue;
++      const types = Array.isArray(spool.type) ? spool.type : [spool.type];
++      if (!types.includes(5)) continue;
++      const index = types.indexOf(5);
++      const group = Array.isArray(spool.param) ? spool.param[index] : spool.param;
++      if (!(group > 0)) continue;
++      (byGroup[group] = byGroup[group] || []).push([r, c]);
++    }
++  }
++  return Object.keys(byGroup).map(Number).sort((a, b) => a - b).map(id => ({
++    id,
++    cells: byGroup[id],
++    role: 'group-' + id
++  }));
++}
++
++const CHAINS = chainsFromGame(GAME);
++
++function regionLookup() {
++  const atlas = B.readJson(ATLAS_FILE);
++  const lookup = { byCell: {}, byId: {} };
++  for (const region of atlas.target.regions || []) {
++    lookup.byId[region.id] = region;
++    for (const cell of region.cells || []) {
++      lookup.byCell[cell[0] + ',' + cell[1]] = region.id;
++    }
++  }
++  return lookup;
++}
++
++function options(A, state, detailed) {
++  return A.Simulator.listMoves(state)
++    .filter(move => !move.blocked)
++    .map(move => {
++      const base = {
++        r: move.r,
++        c: move.c,
++        color: move.antBox.color,
++        count: move.antBox.count,
++        canConsume: !!move.canConsume,
++        groupSize: move.groupSize || 1
++      };
++      if (!detailed) return base;
++      const child = A.SolverStrategy.cloneState(state);
++      const before = child.eliminatedPixels;
++      child.capOps = [];
++      const applied = A.Simulator.applyPick(child, move.r, move.c);
++      return {
++        ...base,
++        applied,
++        consumed: child.eliminatedPixels - before,
++        bufferAfter: child.buffer.length,
++        debt: child.buffer.reduce((sum, item) =>
++          sum + Math.max(0, item.need - item.progress), 0)
++      };
++    });
++}
++
++function scoreMove(policy, move) {
++  if (policy === 'leftColumn') return [-move.c, -move.r, move.canConsume ? 0 : 1];
++  if (policy === 'rightColumn') return [-(-move.c), -move.r, move.canConsume ? 0 : 1];
++  if (policy === 'rowMajor') return [-move.r, -move.c, move.canConsume ? 0 : 1];
++  if (policy === 'safe') {
++    return [
++      move.canConsume ? 1 : 0,
++      move.consumed,
++      -move.bufferAfter,
++      -move.debt,
++      -move.r,
++      -move.c
++    ];
++  }
++  if (policy === 'debtSeek') {
++    return [
++      move.debt,
++      move.groupSize,
++      move.consumed,
++      -move.bufferAfter,
++      -move.r,
++      -move.c
++    ];
++  }
++  throw new Error('unknown policy ' + policy);
++}
++
++function lexGreater(a, b) {
++  for (let i = 0; i < Math.min(a.length, b.length); i++) {
++    if (a[i] !== b[i]) return a[i] > b[i];
++  }
++  return a.length > b.length;
++}
++
++function choose(A, state, policy, first) {
++  let moves = options(A, state, true);
++  if (first) {
++    moves = moves.filter(move =>
++      move.r === first[0] && move.c === first[1]);
++  }
++  if (!moves.length) return null;
++  if (policy === 'safe') {
++    const full = moves.filter(move => move.canConsume);
++    if (full.length) moves = full;
++  }
++  let best = null;
++  for (const move of moves) {
++    const score = scoreMove(policy, move);
++    if (!best || lexGreater(score, best.score)) best = { move, score };
++  }
++  return best && best.move;
++}
++
++function runPolicy(A, level, policy, first) {
++  const state = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  state.capture = true;
++  const picks = [];
++  const timeline = [];
++  let fixedDone = !first;
++  let guard = 300;
++
++  while (state.eliminatedPixels < state.totalPixels && guard-- > 0) {
++    const move = choose(A, state, policy, fixedDone ? null : first);
++    if (!move) break;
++    state.capOps = [];
++    if (!A.Simulator.applyPick(state, move.r, move.c)) break;
++    picks.push({
++      r: move.r,
++      c: move.c,
++      color: move.color,
++      count: move.count,
++      canConsume: move.canConsume,
++      groupSize: move.groupSize
++    });
++    timeline.push(state.buffer.length);
++    fixedDone = true;
++  }
++
++  const events = B.obstacleEvents(A, level, picks);
++  const chainSummary = {};
++  for (const group of CHAINS) {
++    const event = events.chains[group.id];
++    chainSummary[group.id] = {
++      role: group.role,
++      cells: group.cells,
++      entered: event.entered,
++      consumedCurrent: event.entryConsumedMember,
++      debt: event.debtMember,
++      completed: event.completedMember,
++      released: event.released,
++      entryStep: event.entry && event.entry.step,
++      releaseStep: event.release && event.release.step
++    };
++  }
++
++  const windows = B.pressureWindows(timeline, 3);
++  const controlDeadline = Math.max(1, Math.ceil(picks.length * 0.7));
++  const controlledDebtGroups = CHAINS.filter(group => {
++    const item = chainSummary[group.id];
++    return item.debt && item.released &&
++      item.entryStep != null && item.entryStep <= controlDeadline;
++  }).length;
++  return {
++    policy,
++    first: first || null,
++    won: state.eliminatedPixels >= state.totalPixels,
++    progress: +(state.eliminatedPixels / state.totalPixels * 100).toFixed(1),
++    steps: picks.length,
++    peak: timeline.length ? Math.max(...timeline) : 0,
++    windows,
++    reachedBuffer3: timeline.some(value => value >= 3),
++    reachedBuffer4: timeline.some(value => value >= 4),
++    reachedBuffer5: timeline.some(value => value >= 5),
++    chains: chainSummary,
++    plannedDebtGroups: CHAINS.filter(group =>
++      chainSummary[group.id].debt && chainSummary[group.id].released).length,
++    controlledDebtGroups,
++    controlDeadline,
++    missedDebtGroups: CHAINS.filter(group =>
++      !chainSummary[group.id].debt || !chainSummary[group.id].released)
++      .map(group => group.id),
++    picks,
++    timeline
++  };
++}
++
++function summarizeChainEvents(A, level, picks) {
++  const events = B.obstacleEvents(A, level, picks);
++  const summary = {};
++  for (const group of CHAINS) {
++    const event = events.chains[group.id];
++    summary[group.id] = {
++      role: group.role,
++      cells: group.cells,
++      entered: event.entered,
++      consumedCurrent: event.entryConsumedMember,
++      debt: event.debtMember,
++      completed: event.completedMember,
++      released: event.released,
++      entryStep: event.entry && event.entry.step,
++      releaseStep: event.release && event.release.step
++    };
++  }
++  return summary;
++}
++
++function runAllKnowing(A, level) {
++  const solve = A.Solver.solveInstantChain(level, {
++    timeBudgetMs: 30000
++  });
++  const picks = B.uniquePicks(solve);
++  const timeline = solve.stepBufferHistory || [];
++  const chain = summarizeChainEvents(A, level, picks);
++  const steps = picks.length;
++  const controlDeadline = Math.max(1, Math.ceil(steps * 0.7));
++  const controlledDebtGroups = CHAINS.filter(group => {
++    const item = chain[group.id];
++    return item.debt && item.released &&
++      item.entryStep != null && item.entryStep <= controlDeadline;
++  }).length;
++  return {
++    policy: 'allKnowing',
++    first: null,
++    won: !!solve.completed && solve.progress === 100,
++    progress: solve.progress,
++    steps,
++    peak: solve.maxBuffer || (timeline.length ? Math.max(...timeline) : 0),
++    windows: B.pressureWindows(timeline, 3),
++    reachedBuffer3: timeline.some(value => value >= 3),
++    reachedBuffer4: timeline.some(value => value >= 4),
++    reachedBuffer5: timeline.some(value => value >= 5),
++    chains: chain,
++    plannedDebtGroups: CHAINS.filter(group =>
++      chain[group.id].debt && chain[group.id].released).length,
++    controlledDebtGroups,
++    controlDeadline,
++    missedDebtGroups: CHAINS.filter(group =>
++      !chain[group.id].debt || !chain[group.id].released)
++      .map(group => group.id),
++    picks,
++    timeline
++  };
++}
++
++function main() {
++  const A = B.loadSolver();
++  B.CHAIN_GROUPS.splice(0, B.CHAIN_GROUPS.length, ...B.clone(CHAINS));
++  const level = A.parseLevel(A.fromGameFormat(B.readJson(LEVEL_FILE)));
++  const lookup = regionLookup();
++  const policies = ['leftColumn', 'rightColumn', 'rowMajor', 'safe', 'debtSeek'];
++  const runs = [runAllKnowing(A, level)];
++  for (const policy of policies) {
++    runs.push(runPolicy(A, level, policy));
++  }
++
++  const initial = A.Simulator.createState(level, {
++    useSlotStart: true,
++    instantChain: true
++  });
++  initial.capture = true;
++  const firstMoves = options(A, initial, true);
++  const firstEntryRuns = [];
++  for (const first of firstMoves) {
++    const result = runPolicy(A, level, 'safe', [first.r, first.c]);
++    firstEntryRuns.push({
++      first: {
++        r: first.r,
++        c: first.c,
++        color: first.color,
++        count: first.count,
++        canConsume: first.canConsume,
++        consumed: first.consumed,
++        debt: first.debt
++      },
++      result
++    });
++  }
++
++  const bypasses = runs.filter(run =>
++    run.won && run.controlledDebtGroups === 0);
++  const uncontrolledWins = runs.filter(run =>
++    run.won && (run.controlledDebtGroups === 0 || run.reachedBuffer5));
++  const failedPolicies = runs.filter(run => !run.won);
++  const summary = {
++    schema: '006-route-space-audit-v1',
++    version: VERSION,
++    level: LEVEL_FILE,
++    policyCount: policies.length,
++    firstEntryCount: firstEntryRuns.length,
++    bypassCount: bypasses.length,
++    uncontrolledWinCount: uncontrolledWins.length,
++    failedPolicyCount: failedPolicies.length,
++    bypassPolicies: bypasses.map(run => ({
++      policy: run.policy,
++      missedDebtGroups: run.missedDebtGroups,
++      peak: run.peak,
++      windows: run.windows
++    })),
++    failedPolicies: failedPolicies.map(run => ({
++      policy: run.policy,
++      progress: run.progress,
++      peak: run.peak,
++      missedDebtGroups: run.missedDebtGroups
++    })),
++    minimumRequiredDebtGroups: CHAINS.length,
++    runs,
++    firstEntries: firstEntryRuns
++  };
++  fs.mkdirSync(OUT_DIR, { recursive: true });
++  fs.writeFileSync(OUT, JSON.stringify(summary, null, 2) + '\n');
++
++  const lines = [
++    '# 006 · 路线空间审计 ' + VERSION,
++    '',
++    '## 结论',
++    '',
++    bypasses.length || uncontrolledWins.length || failedPolicies.length
++      ? '失败：存在无受控组债务、触顶或无法通关的策略族。'
++      : '通过：当前策略族均在70%前进组债务，零复活通关且不触顶。',
++    '',
++    '## 策略族',
++    '',
++    '| 策略 | 通关 | 进度 | 步数 | 峰值 | 受控债务组 | 漏掉组 |',
++    '|---|---:|---:|---:|---:|---:|---|'
++  ];
++  for (const run of runs) {
++    lines.push(`| ${run.policy} | ${run.won ? '是' : '否'} | ` +
++      `${run.progress}% | ${run.steps} | ${run.peak} | ` +
++      `${run.controlledDebtGroups}/${CHAINS.length} | ` +
++      `${run.missedDebtGroups.join('、') || '无'} |`);
++  }
++  lines.push('', '## 首行固定首取', '',
++    '| 首取 | 通关 | 进度 | 峰值 | 受控债务组 | 漏掉组 |',
++    '|---|---:|---:|---:|---:|---|');
++  for (const item of firstEntryRuns) {
++    const run = item.result;
++    lines.push(`| (${item.first.r},${item.first.c}) ${item.first.color}/${item.first.count} | ` +
++      `${run.won ? '是' : '否'} | ${run.progress}% | ${run.peak} | ` +
++      `${run.controlledDebtGroups}/${CHAINS.length} | ` +
++      `${run.missedDebtGroups.join('、') || '无'} |`);
++  }
++  lines.push('');
++  fs.writeFileSync(REPORT, lines.join('\n') + '\n');
++
++  console.log(JSON.stringify({
++    ok: true,
++    version: VERSION,
++    output: OUT,
++    report: REPORT,
++    bypassCount: bypasses.length,
++    uncontrolledWinCount: uncontrolledWins.length,
++    failedPolicyCount: failedPolicies.length,
++    policies: runs.map(run => ({
++      policy: run.policy,
++      won: run.won,
++      progress: run.progress,
++      steps: run.steps,
++      peak: run.peak,
++      plannedDebtGroups: run.plannedDebtGroups,
++      controlledDebtGroups: run.controlledDebtGroups,
++      missedDebtGroups: run.missedDebtGroups,
++      windows: run.windows
++    })),
++    firstEntries: firstEntryRuns.map(item => ({
++      first: item.first,
++      won: item.result.won,
++      progress: item.result.progress,
++      peak: item.result.peak,
++      plannedDebtGroups: item.result.plannedDebtGroups,
++      controlledDebtGroups: item.result.controlledDebtGroups,
++      missedDebtGroups: item.result.missedDebtGroups
++    }))
++  }, null, 2));
++}
++
++try {
++  main();
++} catch (err) {
++  console.error(err && err.stack || err);
++  process.exit(1);
++}

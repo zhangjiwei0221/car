@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "615";
+var APP_BUILD = "634";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -47,6 +47,7 @@ AntSolver.App = (function() {
   function elimModeOfEntry(em) {
     if (em === 'fourSideInstantChain') return 'instantChain';
     if (em === 'bottomOnly') return 'bottomOnly';
+    if (em === 'corner' || em === 'bottomEdge') return em;
     return 'fourSide';
   }
   /** entryMode → 中文名（面板显示用） */
@@ -3730,7 +3731,14 @@ AntSolver.App = (function() {
   function elimModeSelected() {
     var el = document.getElementById('sim-elim-mode');
     var v = el ? el.value : 'instantChain';
+    if (v === 'corner' || v === 'bottomEdge') return v;   // 排序参照物变体（仍是四边入口）
     return v === 'bottomOnly' ? 'bottomOnly' : (v === 'fourSide' ? 'fourSide' : 'instantChain');
+  }
+  /** 手点消除模式 → 排序参照物：四边入口=层号；左下角/底边=曼哈顿距离变体 */
+  function pickRefOfMode(mode) {
+    if (mode === 'corner') return 'corner';
+    if (mode === 'bottomEdge') return 'bottom';
+    return 'ring';
   }
   // 【2026-10-14】「圈」多久重算一次：frozen（整盒冻结，默认）| layer（每层重算）| pixel（每人重算）
   function pickLayerLabel(v) {
@@ -3744,6 +3752,7 @@ AntSolver.App = (function() {
   function applyElimModeToState(mode) {
     var st = AntSolver.Simulator.getState();
     if (!st) return;
+    if (AntSolver.Simulator.setPickRef) AntSolver.Simulator.setPickRef(pickRefOfMode(mode));
     st.instantChain = (mode === 'instantChain');
     st.bottomOnly = (mode === 'bottomOnly');
     if (mode === 'bottomOnly') {
@@ -4454,7 +4463,9 @@ AntSolver.App = (function() {
     };
   }
   function modeCN(m) {
-    return m === 'instantChain' ? '四方向瞬时连锁' : (m === 'bottomOnly' ? '仅底部入口' : '四边入口');
+    if (m === 'corner') return '左下角（曼哈顿距离）';
+    if (m === 'bottomEdge') return '底边（从下往上）';
+    return m === 'instantChain' ? '四方向瞬时连锁' : (m === 'bottomOnly' ? '仅底部入口' : '四边入口（层号）');
   }
   function toggleRouteOverlay() {
     var btn = document.getElementById('btn-show-route');
@@ -4888,6 +4899,7 @@ AntSolver.App = (function() {
     var _fullTime = !!((document.getElementById('gen-full-time') || {}).checked);
     var _trapPost = !!((document.getElementById('gen-trap-post') || {}).checked);
     var _routeObstacle = !!((document.getElementById('gen-route-obstacle') || {}).checked);
+    var _storyCompiler = !!((document.getElementById('gen-story-compiler') || {}).checked);
     var _capacityMix = !!((document.getElementById('gen-capacity-mix') || {}).checked);
     var _capacityMixMin = parseInt((document.getElementById('gen-capacity-mix-min') || {}).value, 10) || 6;
     var _capacityMixMax = parseInt((document.getElementById('gen-capacity-mix-max') || {}).value, 10) || 40;
@@ -5089,6 +5101,12 @@ AntSolver.App = (function() {
     //   下面这组参数继续沿用原生产口径（_legacyParams 保持 true），否则棋盘范围 / 管道数 / 目标车数
     //   会跟着一起变，没法把改前后差异归因到产线。参数随产线重调留给下一个单变量实验。
     out.generatorFlow = 'new_fixed';
+    if (_storyCompiler) {
+      out.storyCompiler = true;
+      out.storyCompilerStrict = true;
+      out.instantChain = true;
+      out.bottomOnly = false;
+    }
     if (_routeObstacle) {
       out.routeObstaclePlan = 'v1';
       out.routeObstaclePlanMaxAttempts = 6;
@@ -6056,6 +6074,25 @@ AntSolver.App = (function() {
         ? ('采用 / ' + (rec.routeObstaclePlan.added || []).length + ' 个单元 / ' +
           Math.round((rec.routeObstaclePlan.wallElapsedMs || rec.routeObstaclePlan.elapsedMs || 0) / 1000) + 's')
         : ('未采用（' + (rec.routeObstaclePlan.reason || '无改善') + '）')) : '未开') +
+      row('故事编译器实验', rec.storyCompiler
+        ? (rec.storyCompiler.status === 'pass'
+          ? ('通过 / ' + rec.storyCompiler.label + ' / ' +
+            rec.storyCompiler.requiredSteps + '步契约 / ' +
+            (rec.storyCompiler.players || []).filter(function (x) {
+              return x.won && x.routeMatches;
+            }).length + '/6' +
+            (function () {
+              var tested = (rec.storyCompiler.players || []).filter(function (x) {
+                return x.reviveCap === 0 && Array.isArray(x.pressureWindows);
+              });
+              if (!tested.length) return '';
+              var counts = tested.map(function (x) { return x.pressureWindows.length; });
+              var peaks = tested.map(function (x) { return x.bufferPeak || 0; });
+              return ' · 0复活压力 ' + Math.min.apply(null, counts) + '~' +
+                Math.max.apply(null, counts) + '窗 / 峰值 ' + Math.max.apply(null, peaks);
+            })())
+          : ('未通过（' + (rec.storyCompiler.status || 'unknown') + '）'))
+        : '未开') +
       row('混合容量填盘', rec.capacityMixPlan
         ? ((rec.capacityMixPlan.rows || '?') + '×' + (rec.capacityMixPlan.cols || '?') + ' / ' +
           (rec.capacityMixPlan.actualCars != null ? rec.capacityMixPlan.actualCars : '?') + ' 车 / 目标 ' +
@@ -6088,9 +6125,22 @@ AntSolver.App = (function() {
       row('生成模式', rec.goalMode ? ('目标（' + (rec.goalRounds || 1) + ' 轮）') : '按时间') +
       row('目标图预检', rec.sourcePreflight ? (rec.sourcePreflight.status + ' · 风险 ' + (rec.sourcePreflight.warnings && rec.sourcePreflight.warnings.length ? rec.sourcePreflight.warnings.join('/') : '无') +
         ' · ' + (rec.sourcePreflight.searchAdvice || '') + (rec.sourcePreflight.demand && rec.sourcePreflight.demand.smallCriticalColors && rec.sourcePreflight.demand.smallCriticalColors.length ? ' · 小色可关键' : '')) : '未测') +
-      row('目标体验', rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
-        ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
-        ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）')) +
+      row('目标体验', rec.storyCompilerPass
+        ? ('通过 · 故事契约 ' + rec.storyCompiler.requiredSteps + '步 · PlayerSim ' +
+          (rec.storyCompiler.players || []).filter(function (x) { return x.won && x.routeMatches; }).length + '/6' +
+          (function () {
+            var tested = (rec.storyCompiler.players || []).filter(function (x) {
+              return x.reviveCap === 0 && Array.isArray(x.pressureWindows);
+            });
+            if (!tested.length) return '';
+            var counts = tested.map(function (x) { return x.pressureWindows.length; });
+            var peaks = tested.map(function (x) { return x.bufferPeak || 0; });
+            return ' · 压力 ' + Math.min.apply(null, counts) + '~' +
+              Math.max.apply(null, counts) + '窗 / 峰值 ' + Math.max.apply(null, peaks);
+          })())
+        : (rec.experienceGoal && rec.experienceEvidence ? ((rec.experienceEvidence.pass ? '通过' : '未通过') +
+          ' · 中段3/4 ' + rec.experienceEvidence.metrics.midBuffer34Pct + '% · 显著释放 ' + rec.experienceEvidence.metrics.significantReleaseCount +
+          ' · 容量精调 ' + (rec.capacityTune && rec.capacityTune.applied ? '命中' : '未用/未中')) : (rec.experienceGoal ? '待评价' : '未启用（旧结构门）'))) +
       row('路线与分岔', rec.experienceRouteEvidence && rec.experienceRouteEvidence.routeDistribution ? (function () { var d = rec.experienceRouteEvidence.routeDistribution, low = d.lowPressureRoute, cc = low && low.choiceContrast;
         var shortYield = cc && cc.baselineAction && cc.lowAction
           ? cc.baselineAction.immediateEliminated + '→' + cc.lowAction.immediateEliminated
@@ -6433,6 +6483,16 @@ AntSolver.App = (function() {
     // 【v521】搜索结构门保持旧口径；只有目标模式最终验收可补低压力证据。
     var _finalStruct = AntSolver.Quality.finalStructureFromGeneration ? AntSolver.Quality.finalStructureFromGeneration(result) : null;
     var _useFinalStruct = !!(result.goalMode && result.config && result.config.experienceGoal === true && _finalStruct);
+    var _storyCompilerPass = !!(result.storyCompiler && result.storyCompiler.status === 'pass' && result.valid);
+    var _storyCapMin = (_storyCompilerPass && result.storyCompiler.capacityMin != null)
+      ? result.storyCompiler.capacityMin : (result.config ? result.config.boxSizeMin : null);
+    var _storyCapMax = (_storyCompilerPass && result.storyCompiler.capacityMax != null)
+      ? result.storyCompiler.capacityMax : (result.config ? result.config.boxSizeMax : null);
+    var _storyCars = (_storyCompilerPass && result.storyCompiler.totalCars != null)
+      ? result.storyCompiler.totalCars : parsed.totalBoxes;
+    if (_storyCompilerPass && result.storyCompiler.totalCars != null) {
+      _boardStat0.boardBoxes = result.storyCompiler.totalCars;
+    }
     // 【v471】结构门过：不再把 fallback 当交付否决
     var _qgFromFallback = !!(_qv && _qv.gatePass && result.fallback);
     return {
@@ -6463,17 +6523,19 @@ AntSolver.App = (function() {
       trace: result.trace || null,          // 【v334】生成过程轨迹
       // 【v335】导出"制作过程"用：全知压力采样 + 总盒数
       pressureSamples: (result.solveResult && result.solveResult.pressureSamples) || null,
-      totalBoxes: parsed.totalBoxes || null,
+      totalBoxes: _storyCars || null,
       appliedParams: result.config ? {
-        capMin: result.config.boxSizeMin, capMax: result.config.boxSizeMax,
-        capNormMin: result.config.capNormMin, capNormMax: result.config.capNormMax,
-        userCapMin: result.config._userCapMin, userCapMax: result.config._userCapMax,
+        capMin: _storyCapMin, capMax: _storyCapMax,
+        capNormMin: _storyCapMin, capNormMax: _storyCapMax,
+        userCapMin: _storyCompilerPass ? _storyCapMin : result.config._userCapMin,
+        userCapMax: _storyCompilerPass ? _storyCapMax : result.config._userCapMax,
         capScale: result.capScale != null ? result.capScale : (result.config._capScale != null ? result.config._capScale : null),
-        targetCarCount: result.config.targetCarCount,
-        rows: result.config.boardRowsMin + '~' + result.config.boardRowsMax,
-        cols: result.config.boardColsMin + '~' + result.config.boardColsMax,
-        flow: result.config.generatorFlow, budgetMs: result.config.timeBudgetMs,
-        capacityProfile: result.config.capacityProfile || 'auto',
+        targetCarCount: _storyCompilerPass ? _storyCars : result.config.targetCarCount,
+        rows: _storyCompilerPass ? parsed.board.rows + '~' + parsed.board.rows : result.config.boardRowsMin + '~' + result.config.boardRowsMax,
+        cols: _storyCompilerPass ? parsed.board.cols + '~' + parsed.board.cols : result.config.boardColsMin + '~' + result.config.boardColsMax,
+        flow: _storyCompilerPass ? 'story_compiler' : result.config.generatorFlow,
+        budgetMs: result.config.timeBudgetMs,
+        capacityProfile: _storyCompilerPass ? 'storyCompiler' : (result.config.capacityProfile || 'auto'),
         cutMode: result.config.cutMode || null,
         cutPolicy: result.config.cutPolicy || 'auto',
         semanticObstacles: !!result.config.semanticObstacles,
@@ -6484,10 +6546,12 @@ AntSolver.App = (function() {
         p7BaseCount: result.config.p7BaseCount, fullTime: !!result.config.fullTime,
         capacityMix: result.config.capacityMix || null,
         capacityMixBoard: result.config._capacityMixBoardPlan || null,
-        obstacleThicken: result.config.obstacleThicken || null
+        obstacleThicken: result.config.obstacleThicken || null,
+        storyCompiler: !!result.config.storyCompiler
       } : null,
       // 【2026-10-22】自动切法/自动容量的依据（结果条显示“它选了什么”）
-      cutInfo: (result.config && result.config._cutAuto) || null,
+      cutInfo: _storyCompilerPass ? { mode: 'storyFixed' } :
+        ((result.config && result.config._cutAuto) || null),
       goodV3Pass: !!(result.goodV3 && result.goodV3.pass),
       capacityAudit: result.capacityAudit || null,
       // 【v501】黑块拆解：结构目标墙 / 管道格 / 车少补位
@@ -6498,6 +6562,22 @@ AntSolver.App = (function() {
       timelineEvidence: result.timelineEvidence || null,
       experienceGoal: !!(result.config && result.config.experienceGoal),
       experienceEvidence: (function () {
+        if (_storyCompilerPass) {
+          return {
+            pass: true,
+            status: 'story-compiler-pass',
+            reasons: [],
+            metrics: {
+              routeMode: result.storyCompiler.routeMode,
+              requiredSteps: result.storyCompiler.requiredSteps,
+              playersPass: (result.storyCompiler.players || []).filter(function (x) {
+                return x.won && x.routeMatches;
+              }).length
+            },
+            source: 'story_compiler',
+            diagnosis: { primary: 'pass', action: 'done', flags: ['storyCompiler'] }
+          };
+        }
         var rt = result.experienceRouteEvidence, rb = rt && rt.bestVerified;
         if (result.acceptedByVerifiedRoute && rt && rt.pass === true && rb && rb.releaseDecision && rb.releaseDecision.status === 'found' &&
             rb.releaseDecision.evidence && rb.releaseDecision.evidence.finalReplayValid === true) {
@@ -6521,11 +6601,13 @@ AntSolver.App = (function() {
         base: result.capacityTune.base || null, after: result.capacityTune.after || null } : null,
       usableSpaceRepair: result.usableSpaceRepair || null,
       qPass: _qv.pass, qLabel: _qv.label, qReasons: _qv.reasons,
-      qGatePass: _useFinalStruct ? _finalStruct.pass : _qv.gatePass,
-      qGateReasons: (_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons,
+      qGatePass: _storyCompilerPass ? true : (_useFinalStruct ? _finalStruct.pass : _qv.gatePass),
+      qGateReasons: _storyCompilerPass ? [] : ((_useFinalStruct && _finalStruct.pass) ? [] : _qv.gateReasons),
       baseGatePass: _qv.gatePass, baseGateReasons: _qv.gateReasons,
       fullTime: !!(result.config && result.config.fullTime),
       trapPost: result.trapPost || null,
+      storyCompilerPass: _storyCompilerPass,
+      storyCompiler: result.storyCompiler || null,
       routeObstaclePlan: result.routeObstaclePlan || null,
       capacityMixPlan: result.capacityMixPlan || null,
       obstacleThicken: (function () {
@@ -6601,12 +6683,13 @@ AntSolver.App = (function() {
       // 只记录在生产侧记录里（CSV/关卡数据.json/报告），关卡本体不含该字段。
       entryMode: result.entryMode || 'fourSide',
       // 兜底标记(v86)：fallback=true 表示这关不是正常合格输出，是"最接近标准/安全垫底"的兜底交付。
-      fallback: _qgFromFallback ? false : !!result.fallback,
+      fallback: (_storyCompilerPass || _qgFromFallback) ? false : !!result.fallback,
       fallbackOriginal: !!result.fallback,
-      qGateFallback: _qgFromFallback,
-      fallbackTier: _qgFromFallback ? null : (result.fallbackTier != null ? result.fallbackTier : null),
-      fallbackType: _qgFromFallback ? null : (result.fallbackType || null),
-      fallbackReason: _qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null),
+      qGateFallback: _qgFromFallback || _storyCompilerPass,
+      fallbackTier: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackTier != null ? result.fallbackTier : null),
+      fallbackType: (_storyCompilerPass || _qgFromFallback) ? null : (result.fallbackType || null),
+      fallbackReason: _storyCompilerPass ? '故事编译契约通过（原通用门不作为否决）' :
+        (_qgFromFallback ? '结构门通过（原兜底转为正常交付）' : (result.fallbackReason || null)),
       // 【2026-10-22】目标模式：试了几轮、是不是用户点结束才收的；开局暴露（算白给车用）
       goalMode: !!result.goalMode, goalRounds: result.goalRounds || null, goalStopped: !!result.goalStopped, goalStopReason: result.goalStopReason || null,
       goalBudgetEvidence: result.goalBudgetEvidence || null,
@@ -8022,7 +8105,7 @@ AntSolver.App = (function() {
     files.push({ name: '索引.csv', text: '\ufeff' + idxRows.join('\n') });
 
     // 5) 生产报告 MD —— 中后期卡点审核（标准见 生产审核评分体系.md）
-    var auditPass = results.filter(function(r) { return !!r.qPass; });
+    var auditPass = results.filter(function(r) { return !!(r.qPass || r.storyCompilerPass); });
     var bl = config.bufferLimit || 5;
     var md = '# 生产报告\n\n';
     md += '- 生成时间: ' + new Date().toLocaleString() + '\n';
