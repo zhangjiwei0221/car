@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=23">
+<link rel="stylesheet" href="css/style.css?v=24">
 </head>
 <body class="composeMode">
 
@@ -113,7 +113,7 @@
 
       <div id="viewExportDock" class="floatPanel card">
         <div class="floatHead">
-          <span class="floatTitle">2. 显示与导出</span>
+          <span class="floatTitle">2. 显示</span>
           <button class="btn tiny floatToggle" data-float="viewExportDock">悬浮</button>
         </div>
         <div class="floatBody">
@@ -129,9 +129,6 @@
             <label><input type="checkbox" id="optGrid"> 显示格线</label>
             <label><input type="checkbox" id="optShowVoid" checked title="把值为 0 的格子画成斜纹，便于看清主体边界"> 显示空位</label>
             <label><input type="checkbox" id="optShowMaskOutline" checked title="把当前选区的轮廓描出来"> 描选区边</label>
-          </div>
-          <div class="row wrap">
-            <button id="btnPng" class="btn ghost">导出当前视图 PNG</button>
           </div>
         </div>
       </div>
@@ -186,8 +183,6 @@
       <div class="row">
         <button id="btnEditUndo" class="btn ghost" disabled title="Ctrl/⌘+Z。一笔（按下到松开之间改的格子）算一次撤销">撤销</button>
         <button id="btnEditReset" class="btn ghost" disabled>还原为原图</button>
-        <button id="btnEditExportTxt" class="btn ghost">导出修改后 TXT</button>
-        <button id="btnEditExportReport" class="btn ghost">导出对比报告</button>
       </div>
 
       <div id="editSelectionInfo" class="muted"></div>
@@ -419,6 +414,25 @@
       <div id="fragPerColor"></div>
     </section>
 
+    <!-- ===== 7. 导出：三个出口原来分散在「2. 显示与导出」和「3. 美术编辑」里，
+         2026-10-30 按用户要求收成一张卡（他原话：导出入口分散，收成一个导出区）。 ===== -->
+    <section class="card" id="exportCard">
+      <h3>7. 导出</h3>
+      <p class="hint">三个出口都在这里。导出的都是**当前这张图纸**；图纸库的 ZIP/JSON 导出在左栏「图纸库」卡里。</p>
+      <div class="row wrap">
+        <button id="btnEditExportTxt" class="btn primary">导出修改后 TXT</button>
+        <span class="hint">像素矩阵 txt，可直接回生产链</span>
+      </div>
+      <div class="row wrap">
+        <button id="btnPng" class="btn ghost">导出当前视图 PNG</button>
+        <span class="hint">所见即所得：含格线/选区/碎色高亮</span>
+      </div>
+      <div class="row wrap">
+        <button id="btnEditExportReport" class="btn ghost">导出对比报告</button>
+        <span class="hint">Markdown：改了哪些像素、逐色增减</span>
+      </div>
+    </section>
+
     </div>
 
     <div class="logbox"><div class="logHead">运行日志</div><pre id="log"></pre></div>
@@ -490,6 +504,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=23"></script>
+<script src="js/app.js?v=24"></script>
 </body>
 </html>

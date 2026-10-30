@@ -91,7 +91,7 @@
   var UI_PREF_STORAGE_KEY = 'antArtTool_uiPrefs_v1';
 
   // 每新增一张卡片都要登记到这里，否则那张卡片点标题没反应，属于静默失效。
-  var COLLAPSIBLE_CARDS = ['cardImport', 'pieceLibCard', 'viewExportDock', 'editCard', 'extractCard', 'composeSetupCard', 'composeCard'];
+  var COLLAPSIBLE_CARDS = ['cardImport', 'pieceLibCard', 'viewExportDock', 'editCard', 'extractCard', 'checkCard', 'exportCard', 'composeSetupCard', 'composeCard'];
 
   // ==================== 日志与遮罩 ====================
   function log(msg) {
