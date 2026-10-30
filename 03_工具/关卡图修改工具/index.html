@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=26">
+<link rel="stylesheet" href="css/style.css?v=28">
 </head>
 <body class="composeMode">
 
@@ -300,11 +300,11 @@
       <div class="row wrap">
         <label class="inlineNum">大小 <input type="number" id="inStampScale" value="1" min="1" max="6" step="1"> ×</label>
         <label class="inlineNum">撒 <input type="number" id="inStampCount" value="30" min="1" max="600" step="1"> 个</label>
-        <label title="只撒在目前还是空位（0）的格子上，不会压到主体和背景纹理"><input type="checkbox" id="optStampEmptyOnly" checked> 只撒在空白处</label>
+        <label title="避开部件等其它图层；背景纹理上照样撒（这就是「填在背景上」的用法），同一层已有的图章也不会叠"><input type="checkbox" id="optStampEmptyOnly" checked> 不压到部件</label>
         <button id="btnStampScatter" class="btn primary">随机撒到背景</button>
       </div>
       <p class="hint">点一个图章＝选中「贴图章」工具，之后在画布上点一下就盖一个（颜色用当前画笔色）。
-        「随机撒到背景」会一次性撒满指定数量，撒在覆盖整张画布的绘制层上，用一个撤销点就能整批撤回。</p>
+        「随机撒到背景」会一次性撒满指定数量，落在覆盖整张画布的绘制层上（**背景纹理之上**），一个撤销点就能整批撤回。</p>
       <div class="row wrap" id="composeBorderRow">
         <span class="rowLabel">边框形态</span>
         <select id="selComposeBorder">
@@ -525,6 +525,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=26"></script>
+<script src="js/app.js?v=28"></script>
 </body>
 </html>

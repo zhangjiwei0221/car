@@ -1570,6 +1570,9 @@
         drawCompose();
       } else if (tool === 'fill') {
         composeFillAt(L, p);
+      } else if (tool === 'stamp') {
+        C2.shapeDrag = null;
+        composeStampAt(p);
       }
       return;
     }
@@ -2946,6 +2949,197 @@
   }
 
   /** 把一批格坐标画到图层上。cells 是**画布坐标**，落到图层内要减去偏移。 */
+  /* ==================== 装饰图章（2026-10-30 用户要求：星星 / 爱心等小配件填背景） ====================
+   * 每个图章就是一张 '#'/'.' 的小位图，落笔时按「当前画笔色」写成像素，所以不用给每个图章配色。
+   * 单个盖章走「贴图章」工具（点一下盖一个），批量走「随机撒到背景」（只撒空白处、一个撤销点）。 */
+  var COMPOSE_STAMPS = [
+    { id: 'star5', name: '五角星', rows: [
+      '...###...',
+      '...###...',
+      '..#####..',
+      '#########',
+      '.#######.',
+      '..#####..',
+      '.##...##.'] },
+    { id: 'star_s', name: '小星', rows: [
+      '..#..',
+      '.###.',
+      '#####',
+      '.###.',
+      '.#.#.'] },
+    { id: 'heart', name: '爱心', rows: [
+      '.##.##.',
+      '#######',
+      '#######',
+      '.#####.',
+      '..###..',
+      '...#...'] },
+    { id: 'spark', name: '闪光', rows: [
+      '..#..',
+      '.#.#.',
+      '#####',
+      '.#.#.',
+      '..#..'] },
+    { id: 'diamond', name: '菱形', rows: [
+      '..#..',
+      '.###.',
+      '#####',
+      '.###.',
+      '..#..'] },
+    { id: 'cross', name: '十字', rows: [
+      '..#..',
+      '..#..',
+      '#####',
+      '..#..',
+      '..#..'] },
+    { id: 'dot', name: '小点', rows: [
+      '.#.',
+      '###',
+      '.#.'] },
+    { id: 'flower', name: '花瓣', rows: [
+      '.#.#.',
+      '#####',
+      '.###.',
+      '#####',
+      '.#.#.'] }
+  ];
+
+  function composeStampById(id) {
+    for (var i = 0; i < COMPOSE_STAMPS.length; i++) if (COMPOSE_STAMPS[i].id === id) return COMPOSE_STAMPS[i];
+    return COMPOSE_STAMPS[0];
+  }
+
+  /** 某个图章盖在 (centerR, centerC) 时占哪些画布格（含缩放，越界丢弃）。 */
+  function composeStampCellsAt(spec, scale, centerR, centerC, rows, cols) {
+    var h = spec.rows.length, w = spec.rows[0].length, out = [];
+    var baseR = centerR - Math.floor(h * scale / 2), baseC = centerC - Math.floor(w * scale / 2);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        if (spec.rows[y].charAt(x) !== '#') continue;
+        for (var sy = 0; sy < scale; sy++) {
+          for (var sx = 0; sx < scale; sx++) {
+            var r = baseR + y * scale + sy, c = baseC + x * scale + sx;
+            if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
+            out.push({ r: r, c: c });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  /** 当前选中的图章 id / 缩放倍数。 */
+  function composeStampId() { return cpS().stampId || COMPOSE_STAMPS[0].id; }
+  function composeStampScale() {
+    var v = parseInt(($('inStampScale') || {}).value, 10);
+    return (isFinite(v) && v >= 1) ? Math.min(6, v) : 1;
+  }
+
+  /** 图章选择区：缩略图就是按 '#' 位图画的，点一下选中并切到「贴图章」工具。 */
+  function renderComposeStampPalette() {
+    var box = $('composeStampPalette');
+    if (!box) return;
+    box.innerHTML = COMPOSE_STAMPS.map(function (sp) {
+      var h = sp.rows.length, w = sp.rows[0].length;
+      return '<button class="stampBtn' + (sp.id === composeStampId() ? ' active' : '') +
+        '" data-stamp="' + sp.id + '" title="' + sp.name + '：选中后在画布上点一下就盖一个">' +
+        '<canvas data-stampThumb="' + sp.id + '" width="' + (w * 3) + '" height="' + (h * 3) + '"></canvas>' +
+        '<span>' + sp.name + '</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.stampBtn'), function (b) {
+      var cv = b.querySelector('canvas');
+      var sp = composeStampById(b.getAttribute('data-stamp'));
+      var ctx = cv.getContext('2d');
+      var cell = 3;
+      ctx.fillStyle = '#8f7963';
+      sp.rows.forEach(function (row, y) {
+        for (var x = 0; x < row.length; x++) if (row.charAt(x) === '#') ctx.fillRect(x * cell, y * cell, cell, cell);
+      });
+      b.onclick = function () {
+        cpS().stampId = b.getAttribute('data-stamp');
+        var r = document.querySelector('input[name="composeTool"][value="stamp"]');
+        if (r) { r.checked = true; if (r.onchange) r.onchange(); }
+        renderComposeStampPalette();
+        log('装饰图章：已选「' + sp.name + '」，在画布上点一下就盖一个（大小 ' + composeStampScale() + '×，颜色用当前画笔色）。');
+      };
+    });
+  }
+
+  /** 单个盖章：点哪盖哪，落在整张画布的绘制层上。 */
+  function composeStampAt(p) {
+    var C2 = cpS();
+    var spec = composeStampById(composeStampId());
+    var cells = composeStampCellsAt(spec, composeStampScale(), p.r, p.c, C2.rows, C2.cols);
+    if (!cells.length) { log('这一下超出画布了，没盖上。'); return; }
+    var L = composeCanvasPaintLayer();
+    if (!L) return;
+    C2.selected = [L.id];
+    var n = composeApplyCells(L, cells, composeBrushColor(), '盖图章「' + spec.name + '」');
+    if (n) log('盖了「' + spec.name + '」（' + composeStampScale() + '×，' + n + ' 格）。');
+    renderComposeAll();
+  }
+
+  /**
+   * 随机撒到背景：按「撒 N 个」随机落点，默认只落在空白处（不压主体/背景纹理），
+   * 整批走一次 composeApplyCells → 一个撤销点就能全撤回。
+   */
+  function composeScatterStamps() {
+    var C2 = cpS();
+    if (!cpHasCanvas()) { log('先有画布才能撒。'); return; }
+    var n = Math.max(1, Math.min(600, parseInt(($('inStampCount') || {}).value, 10) || 30));
+    var emptyOnly = !$('optStampEmptyOnly') || $('optStampEmptyOnly').checked;
+    var spec = composeStampById(composeStampId());
+    var scale = composeStampScale();
+    var color = composeBrushColor();
+    var rows = C2.rows, cols = C2.cols;
+    // 目标层：整张画布的绘制层（没有就建）。判断「空不空」时要**排除这一层**——
+    // 改前把背景层也算进去，结果铺了背景纹理后永远找不到空格，怎么撒都没反应（实测）。
+    // 用户要的是「撒在背景上」，所以这里只避开**其它图层**（部件/包围等）和本层已有的图章。
+    var L = composeCanvasPaintLayer();
+    if (!L) return;
+    // 背景层不算「占位」——图章就是要盖在背景上的；只避开部件/包围/手绘这些真内容。
+    var others = C2.layers.filter(function (x) {
+      return x.id !== L.id && composeLayerType(x) !== 'background';
+    });
+    var flat = C.composeFlatten(others, rows, cols);
+    var taken = {};                        // 这一批里已经盖过的格子，避免图章互相叠
+    var all = [], placed = 0;
+    // 候选中心点打乱后逐个试（改前是纯随机试探 + 40n 次上限：画布占了一半之后
+    // 每次落点几乎必然撞车，实测「撒 40 个」只落得下 16 个）。打乱后贪心落，密度能上去且仍是随机的。
+    var cand = [];
+    for (var rr = 2; rr < rows - 2; rr++) for (var cc2 = 2; cc2 < cols - 2; cc2++) cand.push({ r: rr, c: cc2 });
+    for (var si = cand.length - 1; si > 0; si--) {
+      var sj = Math.floor(Math.random() * (si + 1));
+      var st = cand[si]; cand[si] = cand[sj]; cand[sj] = st;
+    }
+    for (var qi = 0; qi < cand.length && placed < n; qi++) {
+      var cells = composeStampCellsAt(spec, scale, cand[qi].r, cand[qi].c, rows, cols);
+      if (!cells.length) continue;
+      var ok = true;
+      for (var i = 0; i < cells.length; i++) {
+        var k = cells[i].r + '_' + cells[i].c;
+        if (taken[k]) { ok = false; break; }
+        if (!emptyOnly) continue;
+        var fr = flat[cells[i].r], fc = fr ? fr[cells[i].c] : 0;
+        var lr = cells[i].r - L.offR, lc = cells[i].c - L.offC;
+        var mine = (L.blocks[lr] && L.blocks[lr][lc]) || 0;
+        if (fc || mine) { ok = false; break; }
+      }
+      if (!ok) continue;
+      for (var j = 0; j < cells.length; j++) {
+        taken[cells[j].r + '_' + cells[j].c] = 1;
+        all.push(cells[j]);
+      }
+      placed++;
+    }
+    if (!placed) { log('没找到能撒的位置：可以取消「只撒在空白处」，或把图章调小 / 数量调少。'); return; }
+    C2.selected = [L.id];
+    var changed = composeApplyCells(L, all, color, '随机撒 ' + placed + ' 个「' + spec.name + '」');
+    log('已撒 ' + placed + ' 个「' + spec.name + '」' + (scale > 1 ? '（' + scale + '×）' : '') +
+      '，共 ' + changed + ' 格' + (emptyOnly ? '，避开了部件与已有图章' : '') + '。Ctrl/⌘+Z 可整批撤回。');
+    renderComposeAll();
+  }
+
   /** 找一张「和画布一样大、能画」的绘制层；没有就自动建一张（并选中）。 */
   function composeCanvasPaintLayer() {
     var C2 = cpS();
@@ -5116,6 +5310,9 @@
     $('btnComposeMode').onclick = function () { cpS().active ? exitCompose() : enterCompose(); };
     $('btnComposeExit').onclick = exitCompose;
     $('btnComposeNew').onclick = composeNewCanvas;
+    // 装饰图章（2026-10-30）：选图章 / 随机撒到背景
+    if ($('btnStampScatter')) $('btnStampScatter').onclick = composeScatterStamps;
+    renderComposeStampPalette();
     // 2026-10-30 用户反馈「怎么画布的大小改变不了」：改前必须点「新建画布」才生效，
     // 只改数字完全没反应。现在松手 / 回车就自动应用，另加四个常用尺寸按钮。
     var composeResizeTimer = null;

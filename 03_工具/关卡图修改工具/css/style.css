@@ -675,3 +675,15 @@ body.composeMode .sideRight { display: block; }
 .hintFold > p.hint { margin: 6px 0 0; }
 /* 折叠块里的 hintBlock 不要再撑出外层间距 */
 .hintFold > .hintBlock { margin: 6px 0 0; }
+
+/* ===== 22. 2026-10-30（十）装饰图章：一排小图章按钮（缩略图就是按位图画出来的） ===== */
+#composeStampPalette { gap: 6px; }
+.stampBtn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 3px 5px; border: 1px solid #cbd3dd; border-radius: 5px;
+  background: #ffffff; cursor: pointer; font-size: 10px; color: #5d6878;
+}
+.stampBtn:hover { background: #eaf2fb; border-color: #2f6fae; }
+.stampBtn.active { border-color: #2f6fae; background: #e7f1ff; color: #1f5f9e; font-weight: 600; }
+.stampBtn canvas { image-rendering: pixelated; display: block; }
+
