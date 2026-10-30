@@ -45,6 +45,15 @@ const cands = [{ name: 'base', file: FILE, m: base }];
 const needAt4 = base.at4 < T_AT4, needLate = base.late4 < T_LATE;
 console.log(`诊断：${needAt4 ? 'at4 不足 → 优先墙' : 'at4 达标'}；${needLate ? 'late4 不足 → 优先冰' : 'late4 达标'}`);
 
+// ── 决策树：先只跑“缺的那一类”，不再一上来三件全跑 ──
+const NEED_AT4 = base.at4 < T_AT4;
+const NEED_LATE = base.late4 < T_LATE;
+const FAST = !process.argv.includes('--all-pairs');
+
+if (FAST) {
+  console.log(`\n[决策] at4 ${NEED_AT4 ? '不足→先空间类(墙/管道)' : '达标'}；late4 ${NEED_LATE ? '不足→后段补冰' : '达标'}`);
+}
+
 // 1) 单障碍：墙
 console.log('\n[1/3] 墙搜索…');
 const wOut = '/tmp/plan745_wall.json';
@@ -65,6 +74,35 @@ const pOut = '/tmp/plan745_pipe.json';
 run([`${TOOL}/PipePair_v744.js`, FILE, '--out', pOut, '--ref', REF, '--mode', MODE].concat(NO_EMPTY ? ['--no-empty'] : []));
 if (fs.existsSync(pOut)) { const m = metrics(pOut); cands.push({ name: 'pipe', file: pOut, m }); console.log(`  管道 → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}`); }
 else console.log('  管道：无候选');
+
+// ── FAST 路径：若两者都缺，就在“最好的空间类结果”上补一次冰；否则直接用最好的单障碍 ──
+if (FAST) {
+  cands.sort((a, b) => score(b.m) - score(a.m));
+  const spaceBest = cands.filter(c => c.name === 'wall' || c.name === 'pipe').sort((a, b) => score(b.m) - score(a.m))[0];
+  const base0 = cands.find(c => c.name === 'base');
+  let bestSoFar = cands[0];
+  if (NEED_AT4 && spaceBest && score(spaceBest.m) > score(base0.m)) bestSoFar = spaceBest;
+  if (NEED_LATE) {
+    const out = '/tmp/plan745_fast_ice.json';
+    console.log(`\n[决策] 在 ${bestSoFar.name} 上补冰（只跑一次）…`);
+    run([`${TOOL}/LateIceSearch_v743.js`, bestSoFar.file, '--out', out, '--ref', REF, '--mode', MODE, '--max-ice', '2']);
+    if (fs.existsSync(out) && JSON.stringify(B.readJson(out)) !== JSON.stringify(B.readJson(bestSoFar.file))) {
+      const m = metrics(out);
+      cands.push({ name: bestSoFar.name + '+ice', file: out, m });
+      console.log(`  ${bestSoFar.name}+ice → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak} ${m.won ? '可解' : '不可解'}`);
+    } else console.log('  冰：无候选（关卡未改动）');
+  }
+  cands.sort((a, b) => score(b.m) - score(a.m));
+  const bestFast = cands[0];
+  console.log('\n=== 决策树结果 ===');
+  for (const c of cands) {
+    const ok = c.m.won && c.m.peak <= 4 && c.m.at4 >= T_AT4 && c.m.late4 >= T_LATE;
+    console.log(`  ${c.name.padEnd(14)} at4=${String(c.m.at4).padStart(2)} run4=${String(c.m.run4).padStart(2)} late4=${String(c.m.late4).padStart(2)} 峰值${c.m.peak} ${ok ? '★达标' : ''}`);
+  }
+  fs.writeFileSync(OUT, JSON.stringify(B.readJson(bestFast.file), null, 2));
+  console.log(`\n选定：${bestFast.name} → ${OUT}`);
+  process.exit(0);
+}
 
 // 4) 叠加：默认只在“最优单障碍”上再叠一种；--all-pairs 则对每个单障碍都把另外两种各叠一次
 const ALL_PAIRS = process.argv.includes('--all-pairs');
