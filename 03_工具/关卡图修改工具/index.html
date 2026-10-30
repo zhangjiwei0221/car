@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=22">
+<link rel="stylesheet" href="css/style.css?v=23">
 </head>
 <body class="composeMode">
 
@@ -248,7 +248,7 @@
 
       <div class="composeTiles">
       <div class="composeTile tileRules">
-      <div class="editSubhead">④ 规则生成（包围 / 背景 / 分隔）</div>
+      <div class="editSubhead">④ 规则生成（包围 / 背景）</div>
       <div class="row wrap">
         <label class="inlineNum">包围宽 <input type="number" id="inComposeHaloWidth" value="2" min="1" max="12" step="1"> 格</label>
         <label class="inlineNum">包围色 <input type="number" id="inComposeHaloColor" value="31" min="1" max="34" step="1"></label>
@@ -269,13 +269,9 @@
         <button id="btnComposeBackground" class="btn ghost">生成背景</button>
       </div>
       <div class="row wrap">
-        <label class="inlineNum">分隔色 <input type="number" id="inComposeSepColor" value="33" min="1" max="34" step="1"></label>
-        <label class="inlineNum">线宽 <input type="number" id="inComposeSepWidth" value="1" min="1" max="6" step="1"></label>
-        <label class="inlineNum">距离 <input type="number" id="inComposeSepSpan" value="32" min="4" max="120" step="1"></label>
-        <button id="btnComposeSeparator" class="btn ghost">生成主体分隔</button>
-        <button id="btnComposeRulesAll" class="btn primary">生成背景+包围+分隔</button>
+        <button id="btnComposeRulesAll" class="btn primary">生成背景+包围</button>
       </div>
-      <p class="hint">规则生成会创建独立图层：背景默认在最底层，分隔与包围在主体下方。重新生成同类规则时会替换旧规则层，不会改动主体原图。</p>
+      <p class="hint">规则生成会创建独立图层：背景在最底层，包围在主体下方。重新生成同类规则时会替换旧规则层，不会改动主体原图。</p>
       <div id="composeColorPicker" class="composeColorPicker hidden"></div>
 
       </div>
@@ -339,7 +335,7 @@
         <button id="btnComposeUndo" class="btn ghost" disabled>↶ 撤销</button>
         <button id="btnComposeRedo" class="btn ghost" disabled>↷ 重做</button>
         <span class="hint">快捷键 <b>Ctrl/⌘+Z</b> 撤销、<b>Ctrl/⌘+Shift+Z</b>（或 Ctrl+Y）重做。
-          <b>放上部件、生成背景/包围/分隔、拖动移动、合并、改画布规格、删图层</b>，以及画的那一笔，
+          <b>放上部件、生成背景/包围、拖动移动、合并、改画布规格、删图层</b>，以及画的那一笔，
           都能一步步退回；工作台顶栏也有这两个按钮。</span>
       </div>
       <div class="editSubhead">当前画笔颜色</div>
@@ -494,6 +490,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=22"></script>
+<script src="js/app.js?v=23"></script>
 </body>
 </html>

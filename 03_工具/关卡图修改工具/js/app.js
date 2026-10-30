@@ -751,7 +751,6 @@
   var COMPOSE_TYPE_LABEL = {
     subject: '主体',
     halo: '包围',
-    separator: '分隔',
     background: '背景',
     paint: '手绘',
     guide: '辅助'
@@ -759,8 +758,7 @@
   var COMPOSE_COLOR_INPUTS = [
     { id: 'inComposeHaloColor', label: '包围色' },
     { id: 'inComposeBgColorA', label: '背景主色' },
-    { id: 'inComposeBgColorB', label: '背景辅色' },
-    { id: 'inComposeSepColor', label: '分隔色' }
+    { id: 'inComposeBgColorB', label: '背景辅色' }
   ];
 
   function cpS() { return S.compose; }
@@ -1121,7 +1119,7 @@
     // 底：PS 风格灰色棋盘格。空位不是某种颜色，只是透明/空白的视觉提示。
     composePaintChecker(ctx, cv.width, cv.height, cell);
 
-    // 各图层（按列表真实层序从底到顶绘制；生成时只负责把背景/分隔/包围放到合理默认位置）
+    // 各图层（按列表真实层序从底到顶绘制；生成时只负责把背景/包围放到合理默认位置）
     C.composeSortedLayers(C2.layers).forEach(function (entry) {
       var L = entry.layer;
       if (!L.visible) return;
@@ -1424,7 +1422,7 @@
     var C2 = cpS();
     var un = (C2.undo || []).length, rn = (C2.redo || []).length;
     var undoTitle = un
-      ? '撤销上一步（还可撤 ' + un + ' 步）：放上部件、生成背景/包围/分隔、拖动移动、合并、删除图层、画的那一笔…都能一步步退回。快捷键 Ctrl/⌘+Z'
+      ? '撤销上一步（还可撤 ' + un + ' 步）：放上部件、生成背景/包围、拖动移动、合并、删除图层、画的那一笔…都能一步步退回。快捷键 Ctrl/⌘+Z'
       : '还没有可撤销的操作 —— 放上部件、生成背景、拖动或画一笔之后就能撤了';
     var redoTitle = rn
       ? '重做（还可重做 ' + rn + ' 步）。快捷键 Ctrl/⌘+Shift+Z 或 Ctrl+Y'
@@ -2509,7 +2507,7 @@
    *    只改某几个图层的 blocks，别的一律没动 → 记「整层像素快照」最省事。
    *    （一次直线/边框动几十上百格，逐格记反而更大。）
    *
-   * ② **结构类**（放上部件 / 从部件列表移除 / 生成背景·包围·分隔 / 新建或清空画布 /
+   * ② **结构类**（放上部件 / 从部件列表移除 / 生成背景·包围 / 新建或清空画布 /
    *    新建空白图层 / 复制·移除·合并图层 / 改层序 / 拖动与方向键移动 / 改名 / 固定·隐藏 /
    *    导入部件 …）
    *    动的是**图层清单本身**（增、删、换序）与各图层的几个字段 —— 这种操作**没法**
@@ -2613,7 +2611,7 @@
   }
 
   /**
-   * 把一组结构操作并成**一个**撤销点（例：「生成背景+包围+分隔」一键生成只留一步）。
+   * 把一组结构操作并成**一个**撤销点（例：「生成背景+包围」一键生成只留一步）。
    * 组内各操作自己的 composeSnapBefore 会被忽略（见上面的 historyGroup 判断）。
    */
   function composeSnapGroup(what, fn) {
@@ -2921,36 +2919,13 @@
     });
   }
 
-  function composeGenerateSeparator() {
-    var C2 = cpS();
-    if (!cpHasCanvas()) { log('先新建画布'); return; }
-    var color = composeColorNumber('inComposeSepColor', 33);
-    var width = Math.max(1, parseInt(($('inComposeSepWidth') || {}).value, 10) || 1);
-    var span = Math.max(4, parseInt(($('inComposeSepSpan') || {}).value, 10) || 32);
-    var res = C.composeSeparatorBlocks(C2.layers, C2.rows, C2.cols, {
-      color: color,
-      width: width,
-      maxSpan: span
-    });
-    if (res.subjectCount < 2) { log('至少需要 2 个主体层才能生成主体间分隔。'); return; }
-    if (!res.cells.length) {
-      log('没有生成分隔像素：主体可能距离太远，或参数里的作用距离太小。可以调大「分隔距离」。'); return;
-    }
-    composeAddOrReplaceGeneratedLayer('separator', '自动分隔_' + width + '格', res.blocks, {
-      kind: 'separator',
-      params: { color: color, width: width, maxSpan: span },
-      generatedAt: new Date().toISOString()
-    });
-  }
-
   function composeGenerateAllRules() {
     var keepSelected = cpS().selected.slice();
     // 一键生成 = 三步「结构」改动，但用户眼里是一下子 —— 所以并成一个撤销点
-    composeSnapGroup('一键生成 背景+包围+分隔', function () {
+    composeSnapGroup('一键生成 背景+包围', function () {
       composeGenerateBackground();
       cpS().selected = keepSelected;
       composeGenerateHalo();
-      composeGenerateSeparator();
     });
   }
 
@@ -4220,6 +4195,36 @@
    *     落笔一律限制在选区内，选区外像素不受影响；此时框选工具下的拖拽也变成在选区内绘制。
    *   待替换状态下点画布 = 取消替换而不落笔，避免误触后只能靠撤销回退。
    */
+  /** 全选（Ctrl/⌘+A）。 */
+  function selectAllCells() {
+    var it = cur();
+    if (!it || !it.blocks) return;
+    if (!S.edit.on) { log('先在「3. 美术编辑」勾上「开启编辑模式」再全选。'); return; }
+    var rows = it.blocks.length, cols = it.blocks[0].length;
+    setSelectionMask(C.maskFromRect(rows, cols, 0, 0, rows - 1, cols - 1));
+    draw(); refreshEditPanels(); renderExtractPanel();
+    log('已全选（' + rows + '×' + cols + '，' + selCount() + ' 格）。Ctrl/⌘+D 可取消。');
+  }
+
+  /** 缩放一档（Ctrl/⌘ + / -），以画布中心为锚点。 */
+  function zoomBy(delta) {
+    var cv = $('cv');
+    if (!cv) return;
+    var old = parseInt($('cellSize').value, 10) || 11;
+    var next = Math.max(4, Math.min(24, old + delta));
+    if (next === old) return;
+    var r = cv.getBoundingClientRect();
+    zoomAt(next, r.left + r.width / 2, r.top + r.height / 2);
+  }
+
+  /** 按 name 切换编辑工具（供快捷键用），与点单选按钮走同一套副作用。 */
+  function setEditTool(tool) {
+    var r = document.querySelector('input[name="editTool"][value="' + tool + '"]');
+    if (!r) return;
+    r.checked = true;
+    if (r.onchange) r.onchange();
+  }
+
   /** 当前是否只允许在选区内落笔（开关已上移到工具行，两种工具下都生效）。 */
   function paintLimitedToSelection() {
     var el = $('editPaintInSelection');
@@ -4277,7 +4282,10 @@
       draw();
       return;
     }
-    if (S.edit.tool === 'select' && !paintLimitedToSelection()) {
+    // 2026-10-30：框选工具永远框选。改前勾着「只在选区内绘制」时，框选工具拖拽会变成画笔
+    // （2026-08-03 的既定行为），但界面上看不出来，几乎每次都要误画一笔再去撤销 —— 不符合习惯。
+    // 想在选区里补画，请用「拖动绘制」工具，那个仍然受「只在选区内绘制」约束。
+    if (S.edit.tool === 'select') {
       var p0 = eventToCellClamped(ev, it);
       S.edit.dragging = true; S.edit.lassoPath = null;
       S.edit.dragStart = p0; S.edit.dragCurrent = p0;
@@ -4286,13 +4294,6 @@
     }
     // 拖动绘制（默认工具）：按下即落笔并进入拖拽状态，移动时连续改色。
     // 原「点选改色」工具已按用户 2026-08-03 微调要求删除，改色一律走拖动绘制这一套。
-    // 2026-10-30：走到这里还可能是因为「框选工具 + 勾了只在选区内绘制」——
-    //   这是既定行为（框选工具在限制态下改为在选区内绘制），但界面上完全看不出来，
-    //   用户会以为框选坏了。每种情况只提示一次。
-    if (S.edit.tool === 'select' && Date.now() - (S.edit.hintAt2 || 0) > 8000) {
-      S.edit.hintAt2 = Date.now();
-      log('提示：当前勾着「只在选区内绘制」，所以框选工具在选区内拖拽＝绘制。想重新框选，请先取消那个勾选。');
-    }
     var p = eventToCell(ev, it);
     if (!p) return;
     // Alt + 点击 = 吸管取色（2026-10-30）。放在落笔之前，所以取色这一下不会改图。
@@ -4887,6 +4888,8 @@
     }, { passive: false });
     $('cv').onmousemove = function (ev) { onHover(ev); onCanvasMouseMove(ev); };
     $('cv').onmousedown = onCanvasMouseDown;
+    // 2026-10-30：指针移出画布再移回来时，不要从上一次的位置连一条直线过来
+    $('cv').onmouseleave = function () { S.edit.lastPaintCell = null; };
     $('cv').onmouseup = onCanvasMouseUp;
     // 拖拽框选中途移出画布再松开鼠标时，画布自身的 mouseup 不会触发，靠 document 级兜底结束选区
     document.addEventListener('mouseup', function () { if (S.edit.dragging || S.edit.paintDragging) onCanvasMouseUp(); });
@@ -4975,9 +4978,31 @@
           if (d && composeNudge(d[0], d[1])) { ev.preventDefault(); return; }
         }
       } else if (!inField) {
+        // 无修饰键：单字母切工具（画笔 B / 框选 M / 套索 L / 同色块 W / 橡皮擦 E）
+        if (!ev.metaKey && !ev.ctrlKey && !ev.altKey && S.edit.on) {
+          var one = (ev.key || '').toLowerCase();
+          var toolByKey = { b: 'paint', m: 'select', l: 'lasso', w: 'region' };
+          if (toolByKey[one]) {
+            ev.preventDefault();
+            setEditTool(toolByKey[one]);
+            return;
+          }
+          if (one === 'e') {
+            ev.preventDefault();
+            var er = $('optErase');
+            if (er) { er.checked = !er.checked; er.onchange(); }
+            return;
+          }
+        }
         // 2026-10-30：修图模式原来没有撤销快捷键（拼接模式有 Ctrl+Z），同一个键两种行为很别扭。
         if ((ev.metaKey || ev.ctrlKey) && !ev.altKey) {
           var kk = (ev.key || '').toLowerCase();
+          // 图像编辑器惯例：Ctrl+A 全选、Ctrl+D 取消选区、Ctrl+= / - 缩放、Ctrl+0 适应窗口
+          if (kk === 'a') { ev.preventDefault(); selectAllCells(); return; }
+          if (kk === 'd') { ev.preventDefault(); editClearSelection(); log('已取消选区（Ctrl/⌘+D）'); return; }
+          if (kk === '=' || kk === '+') { ev.preventDefault(); zoomBy(+1); return; }
+          if (kk === '-' || kk === '_') { ev.preventDefault(); zoomBy(-1); return; }
+          if (kk === '0') { ev.preventDefault(); zoomFit(); return; }
           if (kk === 'z' && !ev.shiftKey) {
             ev.preventDefault();
             if (S.edit.undoStack.length) { editUndo(); log('撤销一步（Ctrl/⌘+Z）'); }
@@ -5090,7 +5115,6 @@
     $('btnComposeMerge').onclick = composeMergeSelected;
     $('btnComposeHalo').onclick = composeGenerateHalo;
     $('btnComposeBackground').onclick = composeGenerateBackground;
-    $('btnComposeSeparator').onclick = composeGenerateSeparator;
     $('btnComposeRulesAll').onclick = composeGenerateAllRules;
     $('optComposeRequireBg').onchange = function () { composeRunAudit(false); syncComposeButtons(); };
     initComposeColorPickers();

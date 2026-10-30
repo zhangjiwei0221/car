@@ -1352,49 +1352,7 @@
     return dr + dc;
   }
 
-  function composeSeparatorBlocks(layers, rows, cols, opts) {
-    opts = opts || {};
-    var color = Math.max(0, opts.color | 0) || 33;
-    var width = Math.max(1, opts.width | 0);
-    var tolerance = Math.max(0, opts.tolerance | 0);
-    if (opts.tolerance == null) tolerance = 1;
-    var maxSpan = Math.max(4, opts.maxSpan | 0) || 32;
-    var subjects = [];
-    (layers || []).forEach(function (L) {
-      if (!L || L.visible === false || composeLayerType(L) !== 'subject') return;
-      var b = composeLayerPlacedBBox(L, rows, cols);
-      if (b) subjects.push({ id: L.id, name: L.name || '', bbox: b });
-    });
-    var occupied = composeMaskFromCells(composeSubjectCells(layers, rows, cols), rows, cols);
-    var out = composeNewCanvas(rows, cols), cells = [];
-    if (subjects.length < 2) return { blocks: out, cells: cells, subjectCount: subjects.length };
-    function put(r, c) {
-      for (var dr = -Math.floor((width - 1) / 2); dr < width - Math.floor((width - 1) / 2); dr++) {
-        for (var dc = -Math.floor((width - 1) / 2); dc < width - Math.floor((width - 1) / 2); dc++) {
-          var R = r + dr, C = c + dc;
-          if (R < 0 || C < 0 || R >= rows || C >= cols) continue;
-          var k = R * cols + C;
-          if (occupied[k] || out[R][C] > 0) continue;
-          out[R][C] = color;
-          cells.push({ r: R, c: C });
-        }
-      }
-    }
-    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
-      if (occupied[r * cols + c]) continue;
-      var best = Infinity, second = Infinity, bi = -1;
-      for (var i = 0; i < subjects.length; i++) {
-        var d = composeRectDist(r, c, subjects[i].bbox);
-        if (d < best) { second = best; best = d; bi = i; }
-        else if (d < second) second = d;
-      }
-      if (bi < 0 || second === Infinity) continue;
-      if (best + second > maxSpan) continue;
-      if (second - best <= tolerance) put(r, c);
-    }
-    return { blocks: out, cells: cells, subjectCount: subjects.length, color: color, width: width, maxSpan: maxSpan };
-  }
-
+  
   /**
    * 把若干图层合并成一个新部件（用户需求⑤「可加选减选不同的主体成为新主体」）。
    *
@@ -2395,7 +2353,6 @@
     composeSubjectCells: composeSubjectCells,
     composeHaloBlocks: composeHaloBlocks,
     composeBackgroundBlocks: composeBackgroundBlocks,
-    composeSeparatorBlocks: composeSeparatorBlocks,
     lineCells: lineCells,
     paintCells: paintCells,
     fillRegion: fillRegion,
