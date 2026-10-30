@@ -13,6 +13,8 @@ const MODE = 'a';
 const NO_EMPTY = !process.argv.includes('--allow-empty');
 const STACK = Number(arg('--stack', '1'));   // 在最优结果上继续叠障碍的次数上限   // 默认不允许棋盘出现空格
 const OUT = arg('--out', '/tmp/plan745.json');
+const TMPDIR = `/tmp/plan745_${process.pid}`;
+require('fs').mkdirSync(TMPDIR, { recursive: true });
 const T_AT4 = Number(arg('--target-at4', 20));
 const T_LATE = Number(arg('--target-late4', 4));
 const A = B.loadSolver(REF);
@@ -57,21 +59,21 @@ if (FAST) {
 
 // 1) 单障碍：墙
 console.log('\n[1/3] 墙搜索…');
-const wOut = '/tmp/plan745_wall.json';
+const wOut = `${TMPDIR}/wall.json`;
 const wLog = run([`${TOOL}/WallSearch_v742.js`, FILE, '--out', wOut, '--ref', REF, '--mode', MODE, '--max-walls', '2']);
 if (fs.existsSync(wOut)) { const m = metrics(wOut); cands.push({ name: 'wall', file: wOut, m }); console.log(`  墙 → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}`); }
 else console.log('  墙：无候选');
 
 // 2) 单障碍：冰
 console.log('\n[2/3] 冰搜索…');
-const iOut = '/tmp/plan745_ice.json';
+const iOut = `${TMPDIR}/ice.json`;
 run([`${TOOL}/LateIceSearch_v743.js`, FILE, '--out', iOut, '--ref', REF, '--mode', MODE, '--max-ice', '3']);
 if (fs.existsSync(iOut)) { const m = metrics(iOut); cands.push({ name: 'ice', file: iOut, m }); console.log(`  冰 → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}`); }
 else console.log('  冰：无候选');
 
 // 3) 单障碍：管道
 console.log('\n[3/3] 管道搜索…');
-const pOut = '/tmp/plan745_pipe.json';
+const pOut = `${TMPDIR}/pipe.json`;
 run([`${TOOL}/PipePair_v744.js`, FILE, '--out', pOut, '--ref', REF, '--mode', MODE].concat(NO_EMPTY ? ['--no-empty'] : []));
 if (fs.existsSync(pOut)) { const m = metrics(pOut); cands.push({ name: 'pipe', file: pOut, m }); console.log(`  管道 → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}`); }
 else console.log('  管道：无候选');
@@ -84,7 +86,7 @@ if (FAST) {
   let bestSoFar = cands[0];
   if (NEED_AT4 && spaceBest && score(spaceBest.m) > score(base0.m)) bestSoFar = spaceBest;
   if (NEED_LATE) {
-    const out = '/tmp/plan745_fast_ice.json';
+    const out = `${TMPDIR}/fast_ice.json`;
     console.log(`\n[决策] 在 ${bestSoFar.name} 上补冰（只跑一次）…`);
     run([`${TOOL}/LateIceSearch_v743.js`, bestSoFar.file, '--out', out, '--ref', REF, '--mode', MODE, '--max-ice', '2']);
     if (fs.existsSync(out) && JSON.stringify(B.readJson(out)) !== JSON.stringify(B.readJson(bestSoFar.file))) {
@@ -111,7 +113,7 @@ if (FAST) {
   for (let k = 1; k < STACK; k++) {
     let bestAdd = null;
     for (const tag of Object.keys(TOOLSET)) {
-      const out = `/tmp/plan745_stack_${k}_${tag}.json`;
+      const out = `${TMPDIR}/stack_${k}_${tag}.json`;
       run([`${TOOL}/${TOOLSET[tag].tool}`, curFile, '--out', out, '--ref', REF, '--mode', MODE].concat(TOOLSET[tag].args));
       if (!fs.existsSync(out)) continue;
       if (JSON.stringify(B.readJson(out)) === JSON.stringify(B.readJson(curFile))) continue;
@@ -143,7 +145,7 @@ const bases = ALL_PAIRS ? cands.filter(c => c.name !== 'base') : (best1.name !==
 for (const b of bases) {
   for (const tag of Object.keys(TOOLS)) {
     if (b.name.split('+').includes(tag)) continue;              // 不重复叠同一种
-    const out = `/tmp/plan745_${b.name}_${tag}.json`;
+    const out = `${TMPDIR}/${b.name}_${tag}.json`;
     console.log(`  在 ${b.name} 上叠加 ${tag} …`);
     run([`${TOOL}/${TOOLS[tag].tool}`, b.file, '--out', out, '--ref', REF, '--mode', MODE].concat(TOOLS[tag].args));
     if (!fs.existsSync(out)) { console.log(`    ${tag}：无候选`); continue; }
