@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=22">
 </head>
 <body class="composeMode">
 
@@ -108,8 +108,8 @@
     <!-- ===== 参数区（2026-10-30：全部参数从右栏搬到画布下方） =====
          宽屏自动排成两到三列；每张卡点标题可折叠，「悬浮」可拖到任意位置。
          拼接模式下只留「5. 图纸拼接」这一张，占满整行。 -->
+    <div class="paramAreaHead">参数与工具<span class="muted">（都在画布下方 · 点卡片标题可折叠 · 右上角「悬浮」可拖到任意位置）</span></div>
     <div class="paramArea" id="paramArea">
-      <div class="paramAreaHead">参数与工具<span class="muted">（都在画布下方 · 点卡片标题可折叠 · 右上角「悬浮」可拖到任意位置）</span></div>
 
       <div id="viewExportDock" class="floatPanel card">
         <div class="floatHead">
@@ -171,6 +171,7 @@
         <b>Ctrl/⌘+滚轮</b> 缩放 · <b>Shift</b> 加选、<b>Alt</b> 减选（框选类工具）
         <span class="muted">「撤销」按<b>一笔</b>退：按下到松开鼠标之间改的所有格子算一次。</span>
       </div>
+      <details class="hintFold"><summary>去毛边怎么做（点开看：套索 → 交集 → 按色选 → 挖空）</summary>
       <div class="hintBlock">
         <b>去毛边怎么做</b>（边缘和主体共用同一个描边色时）：①套索圈住要清理的边缘一带 →
         ②叠加方式选<b>交集</b> → ③用「按色选」点一下描边色，或在下方「选区内颜色」里点该色的
@@ -178,6 +179,7 @@
         <span class="muted">这样只清掉圈内的该色，主体轮廓上的同色一格不动。
         直接用「按色选」会选中全图该色（实测熊猫图深灰 573 格），主体轮廓会被一起抹掉。</span>
       </div>
+      </details>
       <div id="editReplaceStatus" class="replaceStatus" style="display:none"></div>
       <div class="editSubhead">完整色库（共 34 色。边框内是这张图纸已有的颜色，边框外是当前未使用的）</div>
       <div id="editPalette"></div>
@@ -191,36 +193,6 @@
       <div id="editSelectionInfo" class="muted"></div>
       <div id="editSelectionColors" class="row wrap"></div>
 
-      <div class="editSubhead">靠色检查（固定5组，全图）</div>
-      <div id="editCloseCheckFull"></div>
-      <div id="editCloseCheckSelection"></div>
-
-      <!-- 碎色率检查（任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825）：
-           口径与生产端的生产前置碎色闸门完全同源（js/fragment.js 是 bin/js/generator.js 的副本），
-           所以这里显示的数字就是生产时会被拿去判定的那个数字。 -->
-      <div class="editSubhead">碎色率检查（与生产端闸门同一口径）</div>
-      <div class="row wrap">
-        <label>达标阈值
-          <select id="fragGateSel" style="width:auto">
-            <option value="0.18" selected>18% · 当前采用上限</option>
-            <option value="0.1147">11.47% · 好关率最高档(新口径Q1上界)</option>
-            <option value="0.1054">10.54% · 最整档(新口径L1上界)</option>
-            <option value="0.1879">18.79% · 旧Q2上界</option>
-            <option value="0.2047">20.47% · 旧差关率断点</option>
-            <option value="custom">自定义…</option>
-          </select>
-        </label>
-        <input type="number" id="fragGateCustom" min="0.01" max="99" step="0.01" value="18" style="width:66px;display:none" title="自定义阈值，单位是百分比。改完立即生效，并记住到下次打开">
-        <span id="fragGateSaved" class="muted" style="font-size:11px"></span>
-        <button id="btnFragCheck" class="btn ghost">重新计算</button>
-        <label title="把被判为碎色的像素在图纸上高亮出来，直接看出该修哪里"><input type="checkbox" id="fragHighlight"> 高亮碎色像素</label>
-      </div>
-      <div class="hint">阈值随时可改，改完立刻重判（碎色率本身不用重算），并记住到下次打开工具。
-        当前采用 18%，与生产端的碎色闸门是同一个值——这里达标的图，生产时不会因碎色被卡掉。
-        <br>⚠ 2026-08-25 起小色块判定放宽到「小于 8 像素」，同一张图的碎色率比之前低约 4.3 个百分点，
-        因此 18% 现在比较宽松（344 关实测放过约 79%）。要更严可选 11.47% 或 10.54%。</div>
-      <div id="fragInfo" class="kv"></div>
-      <div id="fragPerColor"></div>
       </div>
     </section>
 
@@ -274,6 +246,8 @@
         摆放过程中部件<b>可以叠在一起</b>（先大致摆好再调）。导出时按图层底到顶合成，
         重叠格<b>只输出最顶层的像素 id</b>。</p>
 
+      <div class="composeTiles">
+      <div class="composeTile tileRules">
       <div class="editSubhead">④ 规则生成（包围 / 背景 / 分隔）</div>
       <div class="row wrap">
         <label class="inlineNum">包围宽 <input type="number" id="inComposeHaloWidth" value="2" min="1" max="12" step="1"> 格</label>
@@ -304,21 +278,10 @@
       <p class="hint">规则生成会创建独立图层：背景默认在最底层，分隔与包围在主体下方。重新生成同类规则时会替换旧规则层，不会改动主体原图。</p>
       <div id="composeColorPicker" class="composeColorPicker hidden"></div>
 
+      </div>
+
+      <div class="composeTile tileDraw">
       <div class="editSubhead">⑤ 在画布上画（涂色 / 直线 / 边框 / 填充）</div>
-      <p class="hint"><b>新建画布后直接就能画</b> —— 画布上还没有图层时，会自动为你新建一张覆盖整张画布的
-        「绘制层」，接着画都落在同一层上。已经选中某个部件时，就画在那个部件上。
-        画好的图层可以单独导出成模块图纸，再当部件导入回来反复用。</p>
-      <div class="row wrap">
-        <button id="btnComposeNewLayer" class="btn ghost">新建空白图层</button>
-        <button id="btnComposeLayerExport" class="btn ghost" disabled>把选中图层导出为模块 TXT</button>
-      </div>
-      <div class="row wrap">
-        <button id="btnComposeUndo" class="btn ghost" disabled>↶ 撤销</button>
-        <button id="btnComposeRedo" class="btn ghost" disabled>↷ 重做</button>
-        <span class="hint">快捷键 <b>Ctrl/⌘+Z</b> 撤销、<b>Ctrl/⌘+Shift+Z</b>（或 Ctrl+Y）重做。
-          <b>放上部件、生成背景/包围/分隔、拖动移动、合并、改画布规格、删图层</b>，以及画的那一笔，
-          都能一步步退回；工作台顶栏也有这两个按钮。</span>
-      </div>
       <div class="row wrap">
         <span class="rowLabel">工具</span>
         <label><input type="radio" name="composeTool" value="move" checked> 移动图层</label>
@@ -351,17 +314,40 @@
         </select>
         <button id="btnComposeBorderFull" class="btn ghost">铺满整张画布</button>
       </div>
-      <p class="hint">边框：选「边框」工具后在画布上<b>拖一个范围</b>即可生成；或点「铺满整张画布」。
-        生成后下面会列出它的各个部件（田字格就是四个小口＋外框＋十字），可以<b>单独给某一部件换色</b>。</p>
+      <details class="hintFold"><summary>边框工具怎么用（点开看）</summary>
+<p class="hint">边框：选「边框」工具后在画布上<b>拖一个范围</b>即可生成；或点「铺满整张画布」。
+        生成后下面会列出它的各个部件（田字格就是四个小口＋外框＋十字），可以<b>单独给某一部件换色</b>。</p></details>
       <div class="row wrap">
         <button id="btnComposeTianzi" class="btn primary">自动生成田字格四框</button>
         <span class="hint">按当前画布均分成 2×2 四个独立框（中缝是两条边框）；颜色用当前画笔色，线宽用上面的「线宽」。
           偶数边长四格完全相等，奇数边长只差 1 格。</span>
       </div>
       <div id="composeBorderParts" class="list"></div>
+      </div>
+
+      <div class="composeTile tileBrush">
+      <div class="editSubhead">图层与画笔</div>
+      <details class="hintFold"><summary>画布与绘制层怎么用（点开看）</summary>
+<p class="hint"><b>新建画布后直接就能画</b> —— 画布上还没有图层时，会自动为你新建一张覆盖整张画布的
+        「绘制层」，接着画都落在同一层上。已经选中某个部件时，就画在那个部件上。
+        画好的图层可以单独导出成模块图纸，再当部件导入回来反复用。</p></details>
+      <div class="row wrap">
+        <button id="btnComposeNewLayer" class="btn ghost">新建空白图层</button>
+        <button id="btnComposeLayerExport" class="btn ghost" disabled>把选中图层导出为模块 TXT</button>
+      </div>
+      <div class="row wrap">
+        <button id="btnComposeUndo" class="btn ghost" disabled>↶ 撤销</button>
+        <button id="btnComposeRedo" class="btn ghost" disabled>↷ 重做</button>
+        <span class="hint">快捷键 <b>Ctrl/⌘+Z</b> 撤销、<b>Ctrl/⌘+Shift+Z</b>（或 Ctrl+Y）重做。
+          <b>放上部件、生成背景/包围/分隔、拖动移动、合并、改画布规格、删图层</b>，以及画的那一笔，
+          都能一步步退回；工作台顶栏也有这两个按钮。</span>
+      </div>
       <div class="editSubhead">当前画笔颜色</div>
       <div id="composePalette" class="palette"></div>
 
+      </div>
+
+      <div class="composeTile tileOut">
       <div class="editSubhead">⑥ 出图</div>
       <div class="row wrap">
         <input type="text" id="inComposeName" placeholder="拼接图名（留空自动取名）" style="flex:1;min-width:120px">
@@ -393,6 +379,48 @@
           <div id="composeSparseList" class="list"></div>
         </div>
       </div>
+      </div>
+      </div>
+
+    </section>
+
+    <!-- ===== 图纸体检：靠色 + 碎色率 =====
+         2026-10-30 从「3. 美术编辑」拆出来独立成卡：那张原来 853px 高，
+         是参数区里唯一「一栏顶三栏」的长条，拆开后参数区才能平铺开。 ===== -->
+    <section class="card" id="checkCard">
+      <h3>6. 图纸体检（靠色 / 碎色）</h3>
+      <p class="hint">只做检查与提示，不改图。改完像素后碎色结果会标为过期，点「重新计算」刷新。</p>
+
+      <div class="editSubhead">靠色检查（固定5组，全图）</div>
+      <div id="editCloseCheckFull"></div>
+      <div id="editCloseCheckSelection"></div>
+
+      <!-- 碎色率检查（任务 ANT-ARTTOOL-FRAGMENT-QUOTA-20260825）：
+           口径与生产端的生产前置碎色闸门完全同源（js/fragment.js 是 bin/js/generator.js 的副本），
+           所以这里显示的数字就是生产时会被拿去判定的那个数字。 -->
+      <div class="editSubhead">碎色率检查（与生产端闸门同一口径）</div>
+      <div class="row wrap">
+        <label>达标阈值
+          <select id="fragGateSel" style="width:auto">
+            <option value="0.18" selected>18% · 当前采用上限</option>
+            <option value="0.1147">11.47% · 好关率最高档(新口径Q1上界)</option>
+            <option value="0.1054">10.54% · 最整档(新口径L1上界)</option>
+            <option value="0.1879">18.79% · 旧Q2上界</option>
+            <option value="0.2047">20.47% · 旧差关率断点</option>
+            <option value="custom">自定义…</option>
+          </select>
+        </label>
+        <input type="number" id="fragGateCustom" min="0.01" max="99" step="0.01" value="18" style="width:66px;display:none" title="自定义阈值，单位是百分比。改完立即生效，并记住到下次打开">
+        <span id="fragGateSaved" class="muted" style="font-size:11px"></span>
+        <button id="btnFragCheck" class="btn ghost">重新计算</button>
+        <label title="把被判为碎色的像素在图纸上高亮出来，直接看出该修哪里"><input type="checkbox" id="fragHighlight"> 高亮碎色像素</label>
+      </div>
+      <div class="hint">阈值随时可改，改完立刻重判（碎色率本身不用重算），并记住到下次打开工具。
+        当前采用 18%，与生产端的碎色闸门是同一个值——这里达标的图，生产时不会因碎色被卡掉。
+        <br>⚠ 2026-08-25 起小色块判定放宽到「小于 8 像素」，同一张图的碎色率比之前低约 4.3 个百分点，
+        因此 18% 现在比较宽松（344 关实测放过约 79%）。要更严可选 11.47% 或 10.54%。</div>
+      <div id="fragInfo" class="kv"></div>
+      <div id="fragPerColor"></div>
     </section>
 
     </div>
@@ -466,6 +494,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=20"></script>
+<script src="js/app.js?v=22"></script>
 </body>
 </html>

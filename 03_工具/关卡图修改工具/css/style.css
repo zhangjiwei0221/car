@@ -398,6 +398,7 @@ body.composeMode .main > .readout { display: none !important; }
 body.composeMode #cardImport,
 body.composeMode #editCard,
 body.composeMode #extractCard,
+body.composeMode #checkCard,
 body.composeMode #viewExportDock { display: none !important; }
 /* 反过来：不在拼接模式时，拼接卡片藏起来，免得和主体提取抢注意力 */
 #composeCard { display: none; }
@@ -600,20 +601,25 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
 /* 参数区：宽屏自动 2–3 列，笔记本单列。
    用 auto-fit 而不是写死列数：1600px 屏（左栏 320 + 主区约 1250）排 3 列，
    1280px 屏退 2 列，再窄单列。 */
+/* 2026-10-30（五）用户：「中间的区域太长了，想办法平铺一点」。
+   参数区从「等宽网格」改成「瀑布式多栏」：每张卡各自成块、绝不跨栏折行（break-inside: avoid），
+   短卡（显示与导出 210px）下面的空白会被后面的卡吃掉，而不是撑出一整行空行；
+   配合把原来 853px 的「3. 美术编辑」拆出「6. 图纸体检」，最长一栏从 899px 降到 500 上下。 */
 .paramArea {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
-  gap: 12px;
-  align-items: start;
+  columns: 340px;
+  column-gap: 12px;
   margin: 4px 0 12px;
 }
-.paramArea > * { min-width: 0; }
-/* 卡片在网格里不留下外边距，间距交给 gap，否则列底会错位 */
-.paramArea > .card, .paramArea > .floatPanel, .paramArea > .composeFloatPanel { margin-bottom: 0; }
+.paramArea > .card, .paramArea > .floatPanel {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+  margin: 0 0 12px;
+  width: 100%;
+}
 
-/* 参数区标题条：横跨所有列，作为「画布 → 参数」之间的分隔 */
+/* 参数区标题条：多栏布局下放在容器外面，作为「画布 → 参数」之间的分隔 */
 .paramAreaHead {
-  grid-column: 1 / -1;
   display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
   padding: 7px 10px;
   background: #ffffff; border: 1px solid #d8dde4; border-left: 3px solid #2f6fae;
@@ -621,8 +627,8 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
 }
 .paramAreaHead .muted { font-weight: 400; font-size: 11px; }
 
-/* 拼接模式下参数区只剩「5. 图纸拼接」一张卡，占满整行（它行内控件多，塞进 330px 会全折行） */
-body.composeMode .paramArea { grid-template-columns: 1fr; }
+/* 拼接模式下参数区只剩「5. 图纸拼接」一张卡（④⑤⑥ 已在卡内平铺），多栏会把它压成一栏宽，退回块级 */
+body.composeMode .paramArea { display: block; columns: auto; }   /* columns:auto 必须一起清，否则仍是多栏 */
 
 /* ==================== 18. 2026-10-30 拼接台右栏：① 新建画布 / ② 部件来源 / ③ 画布上的图层 ====================
    用户原话：「新建画布、部件来源，和画布上的图层放到右侧」。
@@ -643,3 +649,28 @@ body.composeMode .sideRight { display: block; }
 .shortcutBlock { border-left-color: #2f6fae; }
 .shortcutBlock b { color: #1f5f9e; }
 
+/* ==================== 20. 2026-10-30（五）拼接卡内部平铺：④ / ⑤ / ⑥ 三块并排 ====================
+   改前这三块竖着摞，整张卡 1186px（1600px 屏），中间区域长得要滚三屏。
+   平铺后同一屏能同时看到「规则生成 / 画布绘制 / 出图」，高度约降到 1/3。 */
+.composeTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0 18px;
+  align-items: start;
+}
+.composeTile { min-width: 0; }
+/* 每块顶部自带 editSubhead 的分隔线；第一行的线在卡片标题下重复，去掉 */
+.composeTile > .editSubhead:first-child { margin-top: 4px; }
+/* 浅色主题下编辑小标题的分隔线原来是深棕，平铺后线更多，统一成浅灰 */
+.editSubhead { color: #6f7b8d; border-top-color: #e3e7ed; }
+
+
+/* ===== 21. 2026-10-30（五）长说明折叠：点开才看（平铺后每条 3–4 行的说明占掉的都是控件的位置） ===== */
+.hintFold { margin: 4px 0 8px; font-size: 12px; color: #6f7b8d; }
+.hintFold > summary {
+  cursor: pointer; user-select: none; padding: 2px 0; color: #2f6fae; font-size: 11px;
+}
+.hintFold > summary:hover { text-decoration: underline; }
+.hintFold > p.hint { margin: 6px 0 0; }
+/* 折叠块里的 hintBlock 不要再撑出外层间距 */
+.hintFold > .hintBlock { margin: 6px 0 0; }

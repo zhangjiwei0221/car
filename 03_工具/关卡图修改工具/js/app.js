@@ -26,7 +26,8 @@
       // 后三种是任务 ANT-ARTTOOL-SUBJECT-EXTRACT-20260902 新增的主体提取选法
       tool: 'paint',
       original: null,      // 进入编辑模式时的像素矩阵快照（还原用）
-      undoStack: [],       // 每步 {r,c,before,after} 数组（一次点选/一次替换算一批）
+      undoStack: [],       // 每笔 {r,c,before,after} 数组（一次拖动 / 一次替换算一笔）
+      redoStack: [],       // 2026-10-30：重做栈（撤销时把批次挪过来）
       // selection 仍是 {r0,c0,r1,c1}（闭区间），但自本轮起它是 **mask 的外接矩形**，
       //   保留它是因为若干既有面板按矩形显示「选区 W×H、行 a–b 列 c–d」；
       //   **真正的选区权威是 mask** —— 不规则选区（套索/同色块）无法用矩形表达。
@@ -306,7 +307,7 @@
     if ($('optEdit').checked) { $('optEdit').checked = false; }
     S.edit.on = false; S.edit.original = null; S.edit.undoStack = [];
     clearSelection(); S.edit.replacing = null; S.edit.paintDragging = false;
-    S.edit.strokeBatch = null; S.edit.lastPaintCell = null;
+    S.edit.strokeBatch = null; S.edit.lastPaintCell = null; S.edit.redoStack = [];
     $('cv').classList.remove('editing');
     // 主体提取的撤销栈也只属于上一张图
     S.extract.undo = []; S.extract.lastResult = null;
@@ -3720,6 +3721,7 @@
     S.edit.lastPaintCell = null;
     if (!b || !b.length) return;
     S.edit.undoStack.push(b);
+    S.edit.redoStack = [];          // 新的一笔作废重做
     var it = cur();
     if (it) it._editedAt = new Date().toISOString();
     $('btnEditUndo').disabled = false;
@@ -3745,6 +3747,7 @@
     if (S.edit.strokeBatch) S.edit.strokeBatch = S.edit.strokeBatch.concat(batch);
     else {
       S.edit.undoStack.push(batch);
+      S.edit.redoStack = [];
       $('btnEditUndo').disabled = false;
       $('btnEditReset').disabled = false;
     }
@@ -3859,23 +3862,46 @@
     refreshEditPanels();
   }
 
+  /** 把一批像素改动按 before/after 写回去。 */
+  function applyEditBatch(it, batch, dir) {
+    for (var i = 0; i < batch.length; i++) {
+      it.blocks[batch[i].r][batch[i].c] = (dir === 'after') ? batch[i].after : batch[i].before;
+    }
+  }
+
   function editUndo() {
     var it = cur();
     if (!it || !S.edit.undoStack.length) return;
     if (S.edit.strokeBatch) { log('正在画这一笔：松开鼠标后再撤销。'); return; }
     var batch = S.edit.undoStack.pop();
-    for (var i = 0; i < batch.length; i++) it.blocks[batch[i].r][batch[i].c] = batch[i].before;
+    applyEditBatch(it, batch, 'before');
+    S.edit.redoStack.push(batch);          // 2026-10-30：撤销后可重做（Ctrl/⌘+Shift+Z 或 Ctrl+Y）
     $('btnEditUndo').disabled = S.edit.undoStack.length === 0;
     draw();
     renderEditInfo();
     refreshEditPanels();
   }
 
+  /** 重做（2026-10-30 新增）：把最近一次撤销的那一笔按 after 写回来。 */
+  function editRedo() {
+    var it = cur();
+    if (!it || !S.edit.redoStack.length) { log('没有可重做的改动。'); return; }
+    var batch = S.edit.redoStack.pop();
+    applyEditBatch(it, batch, 'after');
+    S.edit.undoStack.push(batch);
+    $('btnEditUndo').disabled = false;
+    $('btnEditReset').disabled = false;
+    draw();
+    renderEditInfo();
+    refreshEditPanels();
+    log('重做一步（Ctrl/⌘+Shift+Z）');
+  }
+
   function editReset() {
     var it = cur();
     if (!it || !S.edit.original) return;
     it.blocks = JSON.parse(JSON.stringify(S.edit.original));
-    S.edit.undoStack = [];
+    S.edit.undoStack = []; S.edit.redoStack = [];
     S.edit.strokeBatch = null; S.edit.lastPaintCell = null;
     clearSelection(); S.edit.replacing = null;
     $('btnEditUndo').disabled = true;
@@ -4832,7 +4858,7 @@
       S.items = []; S.index = {}; S.cur = -1;
       S.edit.on = false; S.edit.original = null; S.edit.undoStack = [];
       clearSelection(); S.edit.replacing = null; S.edit.paintDragging = false;
-      S.edit.strokeBatch = null; S.edit.lastPaintCell = null;
+      S.edit.strokeBatch = null; S.edit.lastPaintCell = null; S.edit.redoStack = [];
       S.extract.undo = []; S.extract.lastResult = null;
       fragState.result = null; fragState.key = null;
       if ($('optEdit')) $('optEdit').checked = false;
@@ -4950,11 +4976,19 @@
         }
       } else if (!inField) {
         // 2026-10-30：修图模式原来没有撤销快捷键（拼接模式有 Ctrl+Z），同一个键两种行为很别扭。
-        if ((ev.metaKey || ev.ctrlKey) && !ev.altKey && (ev.key || '').toLowerCase() === 'z') {
-          ev.preventDefault();
-          if (S.edit.undoStack.length) { editUndo(); log('撤销一步（Ctrl/⌘+Z）'); }
-          else log('没有可撤销的改动（这一笔还没结束？松开鼠标就是一笔）');
-          return;
+        if ((ev.metaKey || ev.ctrlKey) && !ev.altKey) {
+          var kk = (ev.key || '').toLowerCase();
+          if (kk === 'z' && !ev.shiftKey) {
+            ev.preventDefault();
+            if (S.edit.undoStack.length) { editUndo(); log('撤销一步（Ctrl/⌘+Z）'); }
+            else log('没有可撤销的改动（这一笔还没结束？松开鼠标就是一笔）');
+            return;
+          }
+          if (kk === 'y' || (kk === 'z' && ev.shiftKey)) {   // 重做
+            ev.preventDefault();
+            editRedo();
+            return;
+          }
         }
       }
       if (ev.key !== 'Escape') return;
