@@ -36,7 +36,13 @@
       dragging: false, dragStart: null, dragCurrent: null,   // 拖拽框选中的临时状态
       lassoPath: null,     // 套索拖拽中的轨迹 [{r,c}]，松手后转成掩码
       paintDragging: false,   // 「选区内绘制」模式下正在拖拽连续绘制
-      replacing: null      // {scope:'global'|'selection', oldId} 正在等待用户从色库选目标色完成替换
+      replacing: null,     // {scope:'global'|'selection', oldId} 正在等待用户从色库选目标色完成替换
+      // ===== 2026-10-30 交互修复新增 =====
+      eraser: false,          // 橡皮擦：落笔写 0（空位）
+      strokeBatch: null,      // 一笔内累积的改动；松手才并入 undoStack（一笔 = 一次撤销）
+      lastPaintCell: null,    // 拖动中上一落笔格，用于补齐指针跳格漏掉的格子
+      hintAt: 0,              // 「未开编辑模式」提示的节流时间戳
+      hintAt2: 0              // 「框选工具被当成绘制」提示的节流时间戳
     },
     // 主体提取：剔除操作的撤销栈。与 edit.undoStack 分开 ——
     //   那个是「逐像素改色」的批次栈，这里存的是整张图的快照（剔除一次可能动几百格，
@@ -300,6 +306,7 @@
     if ($('optEdit').checked) { $('optEdit').checked = false; }
     S.edit.on = false; S.edit.original = null; S.edit.undoStack = [];
     clearSelection(); S.edit.replacing = null; S.edit.paintDragging = false;
+    S.edit.strokeBatch = null; S.edit.lastPaintCell = null;
     $('cv').classList.remove('editing');
     // 主体提取的撤销栈也只属于上一张图
     S.extract.undo = []; S.extract.lastResult = null;
@@ -343,7 +350,49 @@
       (total > nz ? '　空位 <b>' + (total - nz) + '</b> 格' : '');
   }
 
+  /** 当前缩放读数（px/格 + 图纸尺寸）。2026-10-30 新增：改前只有一根滑块，看不出现在是几倍。 */
+  function syncZoomInfo() {
+    var el = $('zoomInfo'); if (!el) return;
+    var cell = parseInt($('cellSize').value, 10) || 11;
+    var it = viewItem();
+    el.textContent = cell + ' px/格' + (it && it.blocks ? ' · ' + it.blocks[0].length + '×' + it.blocks.length : '');
+  }
+
+  /**
+   * 以光标为锚点缩放：缩放后让光标下的那一格仍然停在光标下。
+   * 2026-10-30 新增：改前只有滑块，放大后想看的角落要重新滚很久才能找回来。
+   */
+  function zoomAt(newCell, clientX, clientY) {
+    var cv = $('cv');
+    if (!cv) return;
+    var wrap = cv.parentNode;
+    var old = parseInt($('cellSize').value, 10) || 11;
+    if (newCell === old) return;
+    var rect = cv.getBoundingClientRect();
+    var fx = (clientX - rect.left) / old, fy = (clientY - rect.top) / old;
+    $('cellSize').value = newCell;
+    draw();
+    var rect2 = cv.getBoundingClientRect();
+    wrap.scrollLeft += (rect2.left + fx * newCell) - clientX;
+    wrap.scrollTop += (rect2.top + fy * newCell) - clientY;
+  }
+
+  /** 适应窗口：把格子像素调到「整张图刚好装进画布容器」。 */
+  function zoomFit() {
+    var it = cur();
+    if (!it || !it.blocks) { log('还没导入图纸，没法适应窗口。'); return; }
+    var wrap = $('cv').parentNode;
+    var availW = Math.max(80, wrap.clientWidth - 20);
+    var availH = Math.max(80, Math.round(window.innerHeight * 0.62));
+    var cols = it.blocks[0].length, rows = it.blocks.length;
+    var cell = Math.max(4, Math.min(24, Math.floor(Math.min(availW / cols, availH / rows))));
+    $('cellSize').value = cell;
+    draw();
+    log('适应窗口：' + cell + ' px/格（图纸 ' + cols + '×' + rows + '，可用 ' + availW + '×' + availH + 'px）');
+  }
+
   function draw() {
+    syncZoomInfo();
     var cv = $('cv'), ctx = cv.getContext('2d');
     var it = viewItem();
     if (!it || !it.blocks) {
@@ -3243,6 +3292,12 @@
         var id = +el.getAttribute('data-color');
         if (S.edit.replacing) { performColorReplace(id); return; }
         S.edit.color = id;
+        // 点了颜色就是在选画什么色，橡皮擦要自动退出，否则「选了色却画出空白」很费解
+        if (S.edit.eraser) {
+          S.edit.eraser = false;
+          if ($('optErase')) $('optErase').checked = false;
+          $('cv').classList.remove('erasing');
+        }
         renderEditPalette();
       };
     });
@@ -3589,11 +3644,13 @@
     if (on) {
       if (!S.edit.original) S.edit.original = JSON.parse(JSON.stringify(it.blocks));
       var toolCN = { paint: '拖动绘制', select: '矩形框选', lasso: '套索', region: '同色块', color: '按色选' };
-      log('编辑模式已开启：当前工具「' + (toolCN[S.edit.tool] || S.edit.tool) + '」，当前颜色 ' +
-        window.AntSolver.getColorName(S.edit.color) + '(' + S.edit.color + ')');
+      log('编辑模式已开启：当前工具「' + (toolCN[S.edit.tool] || S.edit.tool) + '」，' +
+        (S.edit.eraser ? '当前是橡皮擦（落笔写空位 0）' : '当前颜色 ' + colorLabel(S.edit.color)) +
+        '。快捷键：Ctrl/⌘+Z 撤销、Esc 取消选区、Alt+点击取色、Ctrl/⌘+滚轮缩放');
     } else {
+      if (S.edit.paintDragging) endStroke();
       S.edit.dragging = false; S.edit.paintDragging = false; S.edit.replacing = null;
-      S.edit.lassoPath = null;
+      S.edit.lassoPath = null; S.edit.lastPaintCell = null;
       renderReplaceStatus();
       log('编辑模式已关闭');
     }
@@ -3602,27 +3659,104 @@
     draw();
   }
 
-  /** 点选/框选内绘制的批量应用：记一次撤销批次，刷新画面与统计。 */
+  /** 落笔的「生效颜色」：勾了橡皮擦就是 0（空位），否则是色库里选的颜色。 */
+  function effectiveEditColor() { return S.edit.eraser ? 0 : S.edit.color; }
+
+  /**
+   * 吸管：把光标下这一格的颜色取成当前绘制色（Alt + 点击画布，2026-10-30 新增）。
+   * 以前要从画上取一个色只能去色库里凭眼睛找，34 个色块里认错是常事。
+   */
+  function pickColorAt(p) {
+    var it = cur();
+    if (!it || !it.blocks) return;
+    var rows = it.blocks.length, cols = it.blocks[0].length;
+    if (p.r < 0 || p.c < 0 || p.r >= rows || p.c >= cols) return;
+    var id = it.blocks[p.r][p.c];
+    if (!(id > 0)) { log('吸管：行 ' + p.r + ' 列 ' + p.c + ' 是空位（0），颜色不变'); return; }
+    S.edit.eraser = false;
+    if ($('optErase')) $('optErase').checked = false;
+    S.edit.color = id;
+    renderEditPalette();
+    log('吸管取色：' + colorLabel(id) + '（行 ' + p.r + ' 列 ' + p.c + '）');
+    $('readout').textContent = '吸管取色：' + colorLabel(id) + '　行 ' + p.r + ' 列 ' + p.c;
+  }
+
+  /** 开始一笔：这一笔的改动先攒在 strokeBatch 里。 */
+  function beginStroke() { S.edit.strokeBatch = []; }
+
+  /**
+   * 结束一笔：并入撤销栈（一笔 = 一次撤销）。
+   * 2026-10-30 前是每个 mousemove 各推一个批次 —— 使用说明写「一次拖动算一批」，
+   * 实测拖 6 格后点一次「撤销」只退回 1 格，与实际不符。
+   */
+  function endStroke() {
+    var b = S.edit.strokeBatch;
+    S.edit.strokeBatch = null;
+    S.edit.lastPaintCell = null;
+    if (!b || !b.length) return;
+    S.edit.undoStack.push(b);
+    var it = cur();
+    if (it) it._editedAt = new Date().toISOString();
+    $('btnEditUndo').disabled = false;
+    $('btnEditReset').disabled = false;
+  }
+
+  /** 落笔批量应用：记一次撤销批次，刷新画面与统计。 */
   function editApplyColor(cells) {
     var it = cur();
     if (!it || !cells.length) return;
+    var color = effectiveEditColor();
+    var rows = it.blocks.length, cols = it.blocks[0].length;
     var batch = [];
     for (var i = 0; i < cells.length; i++) {
       var r = cells[i].r, c = cells[i].c;
+      if (r < 0 || c < 0 || r >= rows || c >= cols) continue;   // 拖出画布时的越界保护
       var before = it.blocks[r][c];
-      if (before === S.edit.color) continue;
-      it.blocks[r][c] = S.edit.color;
-      batch.push({ r: r, c: c, before: before, after: S.edit.color });
+      if (before === color) continue;
+      it.blocks[r][c] = color;
+      batch.push({ r: r, c: c, before: before, after: color });
     }
-    if (batch.length) {
+    if (!batch.length) return;
+    if (S.edit.strokeBatch) S.edit.strokeBatch = S.edit.strokeBatch.concat(batch);
+    else {
       S.edit.undoStack.push(batch);
-      it._editedAt = new Date().toISOString();   // 记录修改时间，供导出报告注明
       $('btnEditUndo').disabled = false;
       $('btnEditReset').disabled = false;
-      draw();
-      renderEditInfo();
-      refreshEditPanels();
     }
+    it._editedAt = new Date().toISOString();     // 记录修改时间，供导出报告注明
+    draw();
+    renderEditInfo();
+    refreshEditPanels();
+  }
+
+  /**
+   * 拖动插值：上一格 → 当前格之间被指针跳过的格子（Bresenham，含两端）。
+   * 2026-10-30：鼠标指针快时两帧之间会跳好几格，只画当前格会断线（实测拖 6 格只改 2 格）。
+   */
+  function lineCells(a, b) {
+    var out = [], r = a.r, c = a.c;
+    var dr = Math.abs(b.r - a.r), dc = Math.abs(b.c - a.c);
+    var sr = a.r < b.r ? 1 : -1, sc = a.c < b.c ? 1 : -1, err = dr - dc;
+    for (;;) {
+      out.push({ r: r, c: c });
+      if (r === b.r && c === b.c) break;
+      var e2 = err * 2;
+      if (e2 > -dc) { err -= dc; r += sr; }
+      if (e2 < dr) { err += dr; c += sc; }
+    }
+    return out;
+  }
+
+  /** 没进编辑模式就点画布：闪一下边框 + 记一条日志（6 秒内只记一次，别刷屏）。 */
+  function hintNeedEditMode() {
+    var cv = $('cv');
+    if (cv) {
+      cv.classList.add('needEdit');
+      setTimeout(function () { cv.classList.remove('needEdit'); }, 1200);
+    }
+    if (Date.now() - (S.edit.hintAt || 0) < 6000) return;
+    S.edit.hintAt = Date.now();
+    log('画布还没进入编辑状态：先勾选上方「开启编辑模式」再落笔（只选色不改图的话不用开）。');
   }
 
   /**
@@ -3703,6 +3837,7 @@
   function editUndo() {
     var it = cur();
     if (!it || !S.edit.undoStack.length) return;
+    if (S.edit.strokeBatch) { log('正在画这一笔：松开鼠标后再撤销。'); return; }
     var batch = S.edit.undoStack.pop();
     for (var i = 0; i < batch.length; i++) it.blocks[batch[i].r][batch[i].c] = batch[i].before;
     $('btnEditUndo').disabled = S.edit.undoStack.length === 0;
@@ -3716,6 +3851,7 @@
     if (!it || !S.edit.original) return;
     it.blocks = JSON.parse(JSON.stringify(S.edit.original));
     S.edit.undoStack = [];
+    S.edit.strokeBatch = null; S.edit.lastPaintCell = null;
     clearSelection(); S.edit.replacing = null;
     $('btnEditUndo').disabled = true;
     draw();
@@ -4054,8 +4190,13 @@
   }
 
   function onCanvasMouseDown(ev) {
-    if (!S.edit.on) return;
     var it = cur();
+    // 2026-10-30：没开编辑模式就点画布，改前是【完全没反应】（不改色、无提示、无日志），
+    // 用户会以为工具坏了。现在闪一下画布边框 + 记一条日志。
+    if (!S.edit.on) {
+      if (it && it.blocks) hintNeedEditMode();
+      return;
+    }
     if (!it || !it.blocks) return;
     // 待替换状态下点画布 = 取消替换，不落笔。避免误触替换后又在图上乱点、只能靠撤销回退。
     if (S.edit.replacing) { cancelColorReplace('在目标图上点击'); return; }
@@ -4094,9 +4235,21 @@
     }
     // 拖动绘制（默认工具）：按下即落笔并进入拖拽状态，移动时连续改色。
     // 原「点选改色」工具已按用户 2026-08-03 微调要求删除，改色一律走拖动绘制这一套。
+    // 2026-10-30：走到这里还可能是因为「框选工具 + 勾了只在选区内绘制」——
+    //   这是既定行为（框选工具在限制态下改为在选区内绘制），但界面上完全看不出来，
+    //   用户会以为框选坏了。每种情况只提示一次。
+    if (S.edit.tool === 'select' && Date.now() - (S.edit.hintAt2 || 0) > 8000) {
+      S.edit.hintAt2 = Date.now();
+      log('提示：当前勾着「只在选区内绘制」，所以框选工具在选区内拖拽＝绘制。想重新框选，请先取消那个勾选。');
+    }
     var p = eventToCell(ev, it);
+    if (!p) return;
+    // Alt + 点击 = 吸管取色（2026-10-30）。放在落笔之前，所以取色这一下不会改图。
+    if (ev.altKey) { pickColorAt(p); return; }
     if (!paintAllowed(p)) return;
+    beginStroke();
     S.edit.paintDragging = true;
+    S.edit.lastPaintCell = p;
     editApplyColor([{ r: p.r, c: p.c }]);
   }
 
@@ -4109,16 +4262,31 @@
       S.edit.dragCurrent = pm;
       // 套索：把移动轨迹逐格记下来。同一格连续移动不重复 push，否则轨迹会膨胀到几千点、
       // 射线法逐点算会明显卡（20×20 的图不明显，55×55 会）。
+      // 2026-10-30：与画笔同一个毛病 —— 指针快时两帧之间跳好几格，轨迹会只剩几个稀疏点，
+      // 闭合成多边形后选出来的形状是残缺的。这里补上中间格（Bresenham）。
       if (S.edit.lassoPath) {
         var last = S.edit.lassoPath[S.edit.lassoPath.length - 1];
-        if (!last || last.r !== pm.r || last.c !== pm.c) S.edit.lassoPath.push(pm);
+        if (!last) S.edit.lassoPath.push(pm);
+        else if (last.r !== pm.r || last.c !== pm.c) {
+          var seg = lineCells(last, pm);
+          for (var si = 1; si < seg.length; si++) S.edit.lassoPath.push(seg[si]);
+        }
       }
       draw();
       return;
     }
     if (!S.edit.paintDragging) return;
     var p = eventToCell(ev, it);
-    if (paintAllowed(p)) editApplyColor([p]);
+    if (!p) return;
+    // 2026-10-30：指针跳格会断线。从上一格补到当前格，每格都过一遍「只在选区内绘制」的限制。
+    var last = S.edit.lastPaintCell;
+    var seg = last ? lineCells(last, p) : [p];
+    S.edit.lastPaintCell = p;
+    var cells = [];
+    for (var i = 0; i < seg.length; i++) {
+      if (paintAllowed(seg[i])) cells.push(seg[i]);
+    }
+    if (cells.length) editApplyColor(cells);
   }
 
   function finishSelectionDrag(ev) {
@@ -4142,7 +4310,9 @@
 
   function onCanvasMouseUp(ev) {
     finishSelectionDrag(ev);
+    if (S.edit.paintDragging) endStroke();     // 一笔结束才并入撤销栈
     S.edit.paintDragging = false;
+    S.edit.lastPaintCell = null;
   }
 
   /* ==================== 12. 主体提取 ====================
@@ -4637,6 +4807,7 @@
       S.items = []; S.index = {}; S.cur = -1;
       S.edit.on = false; S.edit.original = null; S.edit.undoStack = [];
       clearSelection(); S.edit.replacing = null; S.edit.paintDragging = false;
+      S.edit.strokeBatch = null; S.edit.lastPaintCell = null;
       S.extract.undo = []; S.extract.lastResult = null;
       fragState.result = null; fragState.key = null;
       if ($('optEdit')) $('optEdit').checked = false;
@@ -4653,6 +4824,16 @@
     ['optGrid', 'optShowVoid', 'optShowMaskOutline'].forEach(function (id) {
       if ($(id)) $(id).onchange = draw;
     });
+    if ($('btnZoomFit')) $('btnZoomFit').onclick = zoomFit;
+    // Ctrl/⌘ + 滚轮缩放画布（以光标为锚点）。普通滚轮不拦，仍然交给容器滚动。
+    $('cv').addEventListener('wheel', function (ev) {
+      if (!(ev.ctrlKey || ev.metaKey)) return;
+      ev.preventDefault();
+      var cur0 = parseInt($('cellSize').value, 10) || 11;
+      var next = Math.max(4, Math.min(24, cur0 + (ev.deltaY < 0 ? 1 : -1)));
+      if (next === cur0) return;
+      zoomAt(next, ev.clientX, ev.clientY);
+    }, { passive: false });
     $('cv').onmousemove = function (ev) { onHover(ev); onCanvasMouseMove(ev); };
     $('cv').onmousedown = onCanvasMouseDown;
     $('cv').onmouseup = onCanvasMouseUp;
@@ -4707,6 +4888,15 @@
       };
     });
     $('editPaintInSelection').onchange = function () { };
+    // 橡皮擦（2026-10-30）：勾上后落笔写 0。改前清一个像素要「框选 → 主体提取 → 挖空选区内」。
+    if ($('optErase')) {
+      $('optErase').onchange = function () {
+        S.edit.eraser = !!$('optErase').checked;
+        $('cv').classList.toggle('erasing', S.edit.eraser);
+        log(S.edit.eraser ? '橡皮擦已开：落笔把像素涂成空位（0）'
+          : '橡皮擦已关：恢复用色库里选的颜色（当前 ' + colorLabel(S.edit.color) + '）');
+      };
+    }
     $('btnEditClearSelection').onclick = editClearSelection;
     initFloatPanels();
 
@@ -4720,9 +4910,10 @@
       cancelColorReplace('点了空白处');
     });
     document.addEventListener('keydown', function (ev) {
+      var tag = (ev.target && ev.target.tagName || '').toLowerCase();
+      var inField = (tag === 'input' || tag === 'textarea' || tag === 'select');
       if (cpS().active) {
-        var tag = (ev.target && ev.target.tagName || '').toLowerCase();
-        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+        if (!inField) {
           if ((ev.metaKey || ev.ctrlKey) && !ev.altKey) {
             var k = (ev.key || '').toLowerCase();
             if (k === 'z' && !ev.shiftKey) { ev.preventDefault(); composeUndo(); return; }
@@ -4732,9 +4923,19 @@
           var d = { ArrowUp: [-step, 0], ArrowDown: [step, 0], ArrowLeft: [0, -step], ArrowRight: [0, step] }[ev.key];
           if (d && composeNudge(d[0], d[1])) { ev.preventDefault(); return; }
         }
+      } else if (!inField) {
+        // 2026-10-30：修图模式原来没有撤销快捷键（拼接模式有 Ctrl+Z），同一个键两种行为很别扭。
+        if ((ev.metaKey || ev.ctrlKey) && !ev.altKey && (ev.key || '').toLowerCase() === 'z') {
+          ev.preventDefault();
+          if (S.edit.undoStack.length) { editUndo(); log('撤销一步（Ctrl/⌘+Z）'); }
+          else log('没有可撤销的改动（这一笔还没结束？松开鼠标就是一笔）');
+          return;
+        }
       }
       if (ev.key !== 'Escape') return;
       if (S.edit.replacing) cancelColorReplace('按了 Esc');
+      // 2026-10-30：Esc 取消选区（以前 Esc 只管「待替换」与二次确认，选区只能去点按钮）
+      else if (!cpS().active && S.edit.on && S.edit.mask) { editClearSelection(); log('已取消选区（Esc）'); }
       if (cancelArmedConfirms()) log('已取消二次确认，未执行任何操作。');
       if (cpS().active && cpS().selected.length) { cpS().selected = []; renderComposeAll(); }
     });

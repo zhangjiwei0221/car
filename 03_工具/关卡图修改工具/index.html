@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=18">
+<link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body class="composeMode">
 
@@ -121,6 +121,11 @@
             <label>像素尺寸 <input type="range" id="cellSize" min="4" max="24" step="1" value="11"></label>
           </div>
           <div class="row wrap">
+            <span id="zoomInfo" class="muted" style="font-size:11px">11 px/格</span>
+            <button id="btnZoomFit" class="btn ghost" title="把格子像素调到整张图刚好装进画布区（F 键也可，在画布上按）">适应窗口</button>
+          </div>
+          <p class="hint">画布上 <b>Ctrl/⌘ + 滚轮</b>可以以光标为中心缩放；普通滚轮还是滚动页面。</p>
+          <div class="row wrap">
             <label><input type="checkbox" id="optGrid"> 显示格线</label>
             <label><input type="checkbox" id="optShowVoid" checked title="把值为 0 的格子画成斜纹，便于看清主体边界"> 显示空位</label>
             <label><input type="checkbox" id="optShowMaskOutline" checked title="把当前选区的轮廓描出来"> 描选区边</label>
@@ -157,7 +162,14 @@
       </div>
       <div class="row wrap">
         <label><input type="checkbox" id="editPaintInSelection"> 只在选区内绘制</label>
+        <label title="勾上后落笔把像素涂成空位 0（等于擦除）。点一下色库里的颜色会自动取消勾选"><input type="checkbox" id="optErase"> 橡皮擦（涂成空位 0）</label>
         <button id="btnEditClearSelection" class="btn ghost">取消选区</button>
+      </div>
+      <div class="hintBlock shortcutBlock">
+        <b>快捷键</b>（画布上生效，输入框里打字时不抢）：
+        <b>Ctrl/⌘+Z</b> 撤销一笔 · <b>Esc</b> 取消选区 · <b>Alt+点击</b> 吸管取色 ·
+        <b>Ctrl/⌘+滚轮</b> 缩放 · <b>Shift</b> 加选、<b>Alt</b> 减选（框选类工具）
+        <span class="muted">「撤销」按<b>一笔</b>退：按下到松开鼠标之间改的所有格子算一次。</span>
       </div>
       <div class="hintBlock">
         <b>去毛边怎么做</b>（边缘和主体共用同一个描边色时）：①套索圈住要清理的边缘一带 →
@@ -170,7 +182,7 @@
       <div class="editSubhead">完整色库（共 34 色。边框内是这张图纸已有的颜色，边框外是当前未使用的）</div>
       <div id="editPalette"></div>
       <div class="row">
-        <button id="btnEditUndo" class="btn ghost" disabled>撤销</button>
+        <button id="btnEditUndo" class="btn ghost" disabled title="Ctrl/⌘+Z。一笔（按下到松开之间改的格子）算一次撤销">撤销</button>
         <button id="btnEditReset" class="btn ghost" disabled>还原为原图</button>
         <button id="btnEditExportTxt" class="btn ghost">导出修改后 TXT</button>
         <button id="btnEditExportReport" class="btn ghost">导出对比报告</button>
@@ -453,6 +465,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=18"></script>
+<script src="js/app.js?v=19"></script>
 </body>
 </html>

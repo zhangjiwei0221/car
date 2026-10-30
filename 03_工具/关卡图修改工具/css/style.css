@@ -634,3 +634,12 @@ body.composeMode .sideRight { display: block; }
 .sideRight .composeFloatPanel { margin: 8px 0 0; }
 .sideRight .composeFloatPanel .list { max-height: 220px; }
 
+/* ==================== 19. 2026-10-30 交互修复配套样式 ====================
+   ① 没开编辑模式就点画布：画布闪一圈橙色边框（改前是毫无反应）；
+   ② 橡皮擦生效时给个不同的光标，避免「选了色却画不出来」；
+   ③ 快捷键说明块沿用 hintBlock，只压低一点行距。 */
+#cv.needEdit { outline: 3px solid #e37a2e; outline-offset: 1px; }
+#cv.erasing { cursor: cell; }
+.shortcutBlock { border-left-color: #2f6fae; }
+.shortcutBlock b { color: #1f5f9e; }
+
