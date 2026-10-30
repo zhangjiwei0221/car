@@ -1559,6 +1559,9 @@
       var L = composeEnsureDrawTarget();
       if (!L) return;
       if (tool === 'paint') {
+        // 按下那一格就不在目标图层里（例如选中了部件却在空白处落笔）→ 换成整张画布的绘制层，
+        // 否则 composeStrokeTo 会直接 return，用户看到的是「点了没反应」。
+        L = composeFitDrawLayer(L, [{ r: p.r, c: p.c }]);
         C2.paintDrag = { id: L.id, last: null };
         composeStrokeTo(L, p, true);
       } else if (tool === 'line' || tool === 'border' || composeIsShapeTool(tool)) {
@@ -2943,7 +2946,51 @@
   }
 
   /** 把一批格坐标画到图层上。cells 是**画布坐标**，落到图层内要减去偏移。 */
+  /** 找一张「和画布一样大、能画」的绘制层；没有就自动建一张（并选中）。 */
+  function composeCanvasPaintLayer() {
+    var C2 = cpS();
+    var found = null;
+    C2.layers.forEach(function (L) {
+      if (found || !L || L.locked || L.visible === false) return;
+      if (!L.blocks || !L.blocks[0]) return;
+      if (L.offR === 0 && L.offC === 0 &&
+          L.blocks.length === C2.rows && L.blocks[0].length === C2.cols) found = L;
+    });
+    if (found) return found;
+    return composeNewBlankLayer(true) || null;
+  }
+
+  /** 这一笔有多少格落在图层外面。 */
+  function composeCellsOutside(L, cells) {
+    var rows = L.blocks.length, cols = L.blocks[0] ? L.blocks[0].length : 0, n = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var r = cells[i].r - L.offR, c = cells[i].c - L.offC;
+      if (r < 0 || c < 0 || r >= rows || c >= cols) n++;
+    }
+    return n;
+  }
+
+  /**
+   * 落笔前把目标图层换成「装得下这一笔」的那张。
+   *
+   * 2026-10-30 用户报：「我绘制矩形，结果他只出现在画布上的部件的区域」。
+   * 原因：选中部件时绘制落在部件那一层，而 composeApplyCells 会把超出部件尺寸的格子**悄悄剪掉**；
+   * 拖拽时的预览却是在整张画布上画的完整形状 —— 预览与结果对不上，看起来就是「只有部件那块」。
+   * 现在改成：装不下就换到覆盖整张画布的绘制层（没有就自动建一张），一个格子都不剪。
+   */
+  function composeFitDrawLayer(L, cells) {
+    if (!composeCellsOutside(L, cells)) return L;
+    var canvasL = composeCanvasPaintLayer();
+    if (!canvasL || canvasL.id === L.id) return L;
+    log('这一笔有格子落在「' + L.name + '」外面（它只有 ' + L.blocks.length + '×' +
+      (L.blocks[0] ? L.blocks[0].length : 0) + '），已改画在整张画布的「' + canvasL.name + '」上，不剪裁。');
+    cpS().selected = [canvasL.id];
+    renderComposeLayers();
+    return canvasL;
+  }
+
   function composeApplyCells(L, cells, color, what) {
+    L = composeFitDrawLayer(L, cells);
     var local = [];
     for (var i = 0; i < cells.length; i++) {
       var r = cells[i].r - L.offR, c = cells[i].c - L.offC;
