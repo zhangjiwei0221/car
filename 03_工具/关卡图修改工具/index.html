@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=19">
+<link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body class="composeMode">
 
@@ -79,7 +79,7 @@
       <div class="composeCanvasWrap">
         <canvas id="composeCv" width="600" height="600"></canvas>
       </div>
-      <div id="composeReadout" class="readout">先在右边「5. 图纸拼接 · 画布与部件」里新建画布，再从部件列表点「放上画布」。</div>
+      <div id="composeReadout" class="readout">画布已默认建好 35×35：从右边②部件列表点「放上画布」，或直接用⑤的画笔画。</div>
     </div>
 
     <!-- 画布统计：一眼看到当前画布用了多少种颜色 -->
@@ -409,14 +409,15 @@
       <h3>5. 图纸拼接 · 画布与部件</h3>
       <div class="editSubhead">① 新建画布（决定新 txt 图的规格）</div>
       <div class="row wrap">
-        <label class="inlineNum">行 <input type="number" id="inComposeRows" value="55" min="4" max="200" step="1"></label>
-        <label class="inlineNum">列 <input type="number" id="inComposeCols" value="55" min="4" max="200" step="1"></label>
+        <label class="inlineNum">行 <input type="number" id="inComposeRows" value="35" min="4" max="200" step="1"></label>
+        <label class="inlineNum">列 <input type="number" id="inComposeCols" value="35" min="4" max="200" step="1"></label>
         <button id="btnComposeNew" class="btn primary">新建画布</button>
         <button id="btnComposeClear" class="btn ghost">清空画布</button>
       </div>
-      <p class="hint">现有关卡目标图是 55×55。<b>实测提示</b>：你现有那三张图纸体积偏大
-        （熊猫外接 54×55 几乎占满一整张），两两都放不进同一张 55×55 —— 想拼多主体，
-        要么把画布开大，要么先提取更小的部件。</p>
+      <p class="hint">打开工具就已经建好 <b>35×35</b> 画布，可以直接摆部件或开画。</p>
+      <p class="hint">为什么默认 35：新构图方向是「简单背景 + 单主体 + 少量点缀」的 30–35 见方，
+        旧关卡目标图是 55×55、且那几张图纸体积偏大（熊猫外接 54×55 几乎占满一整张），
+        两两都放不进同一张 55×55 —— 要拼多主体或要旧尺寸，改上面的行列再点「新建画布」。</p>
 
       <div id="composeSourcePanel" class="floatPanel composeFloatPanel">
         <div class="floatHead">
@@ -465,6 +466,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=19"></script>
+<script src="js/app.js?v=20"></script>
 </body>
 </html>

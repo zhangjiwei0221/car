@@ -881,8 +881,11 @@
     document.body.classList.add('composeMode');
     syncComposeModeButton();
     if (!cpHasCanvas()) {
-      log('已进入拼接工作台。先在右边「5. 图纸拼接 · 画布与部件」①里设定新图规格并点「新建画布」，' +
-        '再从②的部件列表把部件放上画布。');
+      composeInitDefaultCanvas();
+    }
+    if (!C2.layers.length) {
+      log('已进入拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，还没有图层）：' +
+        '从右边②放部件，或直接用⑤的画笔画。');
     } else {
       log('已回到拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，' + C2.layers.length + ' 个图层还在）。');
     }
@@ -902,6 +905,28 @@
   }
 
   /** 新建画布（用户需求③：可预设新 txt 图的规格）。 */
+  /**
+   * 默认画布规格（2026-10-30 用户要求：「默认就是建好画布，且大小 35×35」）。
+   * 35×35 与《新构图方向》（30–35 见方：简单背景 + 单主体 + 少量点缀）一致，
+   * 也比 55×55 更贴近现在真正在做的图。
+   */
+  var COMPOSE_DEFAULT_ROWS = 35, COMPOSE_DEFAULT_COLS = 35;
+
+  /**
+   * 工具启动时就把画布建好，省掉「先点新建画布」这一步。
+   * 刻意**不记撤销点**：否则第一次 Ctrl+Z 会退成「没有画布」这种没意义的状态。
+   */
+  function composeInitDefaultCanvas() {
+    var C2 = cpS();
+    if (cpHasCanvas()) return;
+    C2.rows = COMPOSE_DEFAULT_ROWS; C2.cols = COMPOSE_DEFAULT_COLS;
+    C2.lastAudit = null;
+    if ($('inComposeRows')) $('inComposeRows').value = C2.rows;
+    if ($('inComposeCols')) $('inComposeCols').value = C2.cols;
+    log('已默认建好画布 ' + C2.rows + '×' + C2.cols + '（' + (C2.rows * C2.cols) + ' 格）。' +
+      '要换规格改①的行列再点「新建画布」。');
+  }
+
   function composeNewCanvas() {
     var r = parseInt($('inComposeRows').value, 10);
     var c = parseInt($('inComposeCols').value, 10);
@@ -5102,6 +5127,7 @@
     $('btnCollapseAll').onclick = toggleCollapseAll;
     initCardCollapse();
 
+    composeInitDefaultCanvas();   // 2026-10-30：进来就有 35×35 画布
     renderComposeAll();
     draw();
     log('工具就绪：只做图纸修改、主体提取与拼接。');
