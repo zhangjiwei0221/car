@@ -10,7 +10,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const FILE = process.argv[2];
 const REF = String(arg('--ref', 'ring'));
 const MODE = 'a';
-const NO_EMPTY = !process.argv.includes('--allow-empty');   // 默认不允许棋盘出现空格
+const NO_EMPTY = !process.argv.includes('--allow-empty');
+const STACK = Number(arg('--stack', '1'));   // 在最优结果上继续叠障碍的次数上限   // 默认不允许棋盘出现空格
 const OUT = arg('--out', '/tmp/plan745.json');
 const T_AT4 = Number(arg('--target-at4', 20));
 const T_LATE = Number(arg('--target-late4', 4));
@@ -99,8 +100,32 @@ if (FAST) {
     const ok = c.m.won && c.m.peak <= 4 && c.m.at4 >= T_AT4 && c.m.late4 >= T_LATE;
     console.log(`  ${c.name.padEnd(14)} at4=${String(c.m.at4).padStart(2)} run4=${String(c.m.run4).padStart(2)} late4=${String(c.m.late4).padStart(2)} 峰值${c.m.peak} ${ok ? '★达标' : ''}`);
   }
-  fs.writeFileSync(OUT, JSON.stringify(B.readJson(bestFast.file), null, 2));
-  console.log(`\n选定：${bestFast.name} → ${OUT}`);
+  // ── 继续叠障碍：--stack N（N-1 次追加，每次在 wall/ice/pipe 里挑最好的）──
+  let curFile = bestFast.file, curName = bestFast.name;
+  let curM = metrics(curFile);
+  const TOOLSET = {
+    wall: { tool: 'WallSearch_v742.js', args: ['--max-walls', '2'] },
+    ice: { tool: 'LateIceSearch_v743.js', args: ['--max-ice', '2'] },
+    pipe: { tool: 'PipePair_v744.js', args: NO_EMPTY ? ['--no-empty'] : [] },
+  };
+  for (let k = 1; k < STACK; k++) {
+    let bestAdd = null;
+    for (const tag of Object.keys(TOOLSET)) {
+      const out = `/tmp/plan745_stack_${k}_${tag}.json`;
+      run([`${TOOL}/${TOOLSET[tag].tool}`, curFile, '--out', out, '--ref', REF, '--mode', MODE].concat(TOOLSET[tag].args));
+      if (!fs.existsSync(out)) continue;
+      if (JSON.stringify(B.readJson(out)) === JSON.stringify(B.readJson(curFile))) continue;
+      const m = metrics(out);
+      if (!m.won || m.peak > 4) continue;
+      if (score(m) <= score(curM)) continue;
+      if (!bestAdd || score(m) > score(bestAdd.m)) bestAdd = { tag, file: out, m };
+    }
+    if (!bestAdd) { console.log(`\n[stack] 第 ${k} 次追加：没有能进一步提升的障碍，停止`); break; }
+    curFile = bestAdd.file; curM = bestAdd.m; curName += '+' + bestAdd.tag;
+    console.log(`[stack] 第 ${k} 次追加 ${bestAdd.tag} → at4=${curM.at4} run4=${curM.run4} late4=${curM.late4} 峰值${curM.peak}`);
+  }
+  fs.writeFileSync(OUT, JSON.stringify(B.readJson(curFile), null, 2));
+  console.log(`\n选定：${curName} → ${OUT}（at4=${curM.at4} run4=${curM.run4} late4=${curM.late4}）`);
   process.exit(0);
 }
 

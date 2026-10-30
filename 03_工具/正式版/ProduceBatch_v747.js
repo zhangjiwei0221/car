@@ -18,6 +18,7 @@ const ROUNDS = arg('--rounds', '3'), SAMPLES = arg('--samples', '120');
 const REF = arg('--ref', 'corner');
 const PLAN = has('--plan');
 const ALLPAIRS = has('--all-pairs');
+const STACK = arg('--stack', '1');
 const SEED = arg('--seed', '20261030');
 const LIST = String(arg('--list', '')).split(',').map(x => x.trim()).filter(Boolean);
 
@@ -40,6 +41,7 @@ function launch(f) {
     '--rows', ROWS, '--cols', COLS, '--rounds', ROUNDS, '--samples', SAMPLES, '--ref', REF, '--seed', SEED];
   if (PLAN) args.push('--plan');
   if (ALLPAIRS) args.push('--all-pairs');
+  if (Number(STACK) > 1) args.push('--stack', STACK);
   const t0 = Date.now();
   const ch = spawn('node', args, { cwd: ROOT });
   let buf = '';
@@ -70,7 +72,7 @@ function finish() {
     ? `| ${r.file} | ${r.at4} | ${r.run4} | ${r.late4} | ${r.peak} | ${r.firstQuad} | ${r.capacityOK ? '✅' : '❌'} | ${r.wall}s |`
     : `| ${r.file} | ❌ ${r.stage} | - | - | - | - | - | ${r.wall}s |`);
   const md = `# 批次 ${path.basename(OUT)}\n\n` +
-    `参数：rows=${ROWS} cols=${COLS} rounds=${ROUNDS} samples=${SAMPLES} ref=${REF} plan=${PLAN} allPairs=${ALLPAIRS} seed=${SEED}\n\n` +
+    `参数：rows=${ROWS} cols=${COLS} rounds=${ROUNDS} samples=${SAMPLES} ref=${REF} plan=${PLAN} allPairs=${ALLPAIRS} stack=${STACK} seed=${SEED}\n\n` +
     `| 图 | at4 | run4 | late4 | 峰值 | 首手落点 | 容量 | 用时 |\n|---|---|---|---|---|---|---|---|\n` + lines.join('\n') + '\n';
   fs.writeFileSync(path.join(ROOT, OUT, '报告.md'), md);
   fs.writeFileSync(path.join(ROOT, OUT, 'results.json'), JSON.stringify(results, null, 2));

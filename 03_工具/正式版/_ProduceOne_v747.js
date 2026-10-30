@@ -16,6 +16,7 @@ const ROUNDS = arg('--rounds', '3'), SAMPLES = arg('--samples', '120');
 const REF = arg('--ref', 'corner');
 const PLAN = has('--plan');
 const ALLPAIRS = has('--all-pairs');
+const STACK = arg('--stack', '1');
 const SEED = arg('--seed', '20261030');
 
 fs.mkdirSync(OUTDIR, { recursive: true });
@@ -43,6 +44,7 @@ let src = build;
 if (PLAN) {
   const planArgs = ['03_工具/正式版/ObstaclePlan_v745.js', build, '--ref', REF, '--out', finalF];
   if (ALLPAIRS) planArgs.push('--all-pairs');
+  if (Number(STACK) > 1) { planArgs.push('--stack', STACK); }
   r = run(planArgs);
   if (fs.existsSync(finalF)) src = finalF;
 }
