@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=16">
+<link rel="stylesheet" href="css/style.css?v=17">
 </head>
 <body class="composeMode">
 
@@ -19,7 +19,7 @@
 
 <div class="layout">
 
-  <!-- ========== 左栏：导入 ========== -->
+  <!-- ========== 左栏：上传与图库（2026-10-30 起参数不再放这里） ========== -->
   <aside class="side sideLeft">
 
     <section class="card" id="cardImport">
@@ -34,7 +34,26 @@
       <div class="row"><span class="muted" id="importStat">未导入</span></div>
       <div class="row"><input type="text" id="listFilter" placeholder="过滤图纸名…" style="width:100%"></div>
       <div id="levelList" class="list"></div>
-      <p class="hint">选中一张图纸后，在中间画布上直接编辑；右侧可做主体提取、存图纸库或进入拼接。</p>
+      <p class="hint">选中一张图纸后，在中间画布上直接编辑。画布下方的「3. 美术编辑」改图、「4. 主体提取」抠图，抠好的主体存进下面的「图纸库」。</p>
+    </section>
+
+    <!-- ===== 图纸库：原本在「4. 主体提取」卡里，2026-10-30 移到左栏，让「上传 / 图库」都留在左边 ===== -->
+    <section class="card" id="pieceLibCard">
+      <h3>图纸库</h3>
+      <p class="hint">抠好的主体存在这里（浏览器本地，刷新不丢）。拼接时点「② 部件来源 → 从图纸库全部添加」可一次全取。</p>
+      <div class="row wrap">
+        <input type="text" id="inPieceName" placeholder="图纸名（留空用图名）" style="flex:1;min-width:120px">
+        <button id="btnAddPiece" class="btn primary" disabled>➕ 加入图纸库</button>
+      </div>
+      <div id="pieceLibInfo" class="kv"></div>
+      <div id="pieceLibList" class="list"></div>
+      <div class="row wrap">
+        <button id="btnPieceExportAll" class="btn primary">导出图纸库 ZIP</button>
+        <button id="btnPieceExportJson" class="btn ghost">导出图纸库 JSON</button>
+        <label class="fileBtn">导入图纸库 JSON<input type="file" id="filePieceLib" accept=".json"></label>
+        <button id="btnPieceClear" class="btn ghost">清空图纸库</button>
+      </div>
+      <p class="hint">图纸库保存在浏览器本地，刷新不丢。一张 20×20 图纸约 1 KB，攒几百张也没问题。</p>
     </section>
 
   </aside>
@@ -60,7 +79,7 @@
       <div class="composeCanvasWrap">
         <canvas id="composeCv" width="600" height="600"></canvas>
       </div>
-      <div id="composeReadout" class="readout">先在右边「5. 图纸拼接」里新建画布，再从部件列表点「放上画布」。</div>
+      <div id="composeReadout" class="readout">先在下方「5. 图纸拼接」里新建画布，再从部件列表点「放上画布」。</div>
     </div>
 
     <!-- 画布统计：一眼看到当前画布用了多少种颜色 -->
@@ -71,7 +90,7 @@
         <canvas id="cv" width="600" height="600"></canvas>
         <div id="overlay" class="overlay hidden"><div class="spin"></div><div id="overlayText">处理中…</div></div>
       </div>
-      <!-- 目标图右侧那一列：编辑改动统计 + 显示与导出，都可以点「悬浮」脱出来拖动/拉伸 -->
+      <!-- 目标图右侧：只剩「编辑改动统计」这个读数面板（参数都搬到画布下方了） -->
       <div class="mainSideCol">
         <div id="editStatsDock" class="floatPanel">
           <div class="floatHead">
@@ -81,35 +100,36 @@
           <div class="floatBody"><div id="editInfo" class="kv"></div></div>
         </div>
 
-        <div id="viewExportDock" class="floatPanel">
-          <div class="floatHead">
-            <span class="floatTitle">2. 显示与导出</span>
-            <button class="btn tiny floatToggle" data-float="viewExportDock">悬浮</button>
-          </div>
-          <div class="floatBody">
-            <div class="row wrap">
-              <label>像素尺寸 <input type="range" id="cellSize" min="4" max="24" step="1" value="11"></label>
-            </div>
-            <div class="row wrap">
-              <label><input type="checkbox" id="optGrid"> 显示格线</label>
-              <label><input type="checkbox" id="optShowVoid" checked title="把值为 0 的格子画成斜纹，便于看清主体边界"> 显示空位</label>
-              <label><input type="checkbox" id="optShowMaskOutline" checked title="把当前选区的轮廓描出来"> 描选区边</label>
-            </div>
-            <div class="row wrap">
-              <button id="btnPng" class="btn ghost">导出当前视图 PNG</button>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
     <div class="legend" id="legend"></div>
     <div class="readout" id="readout">把鼠标移到图纸上可查看该像素的行列与颜色。</div>
 
-    <div class="logbox"><div class="logHead">运行日志</div><pre id="log"></pre></div>
-  </main>
+    <!-- ===== 参数区（2026-10-30：全部参数从右栏搬到画布下方） =====
+         宽屏自动排成两到三列；每张卡点标题可折叠，「悬浮」可拖到任意位置。
+         拼接模式下只留「5. 图纸拼接」这一张，占满整行。 -->
+    <div class="paramArea" id="paramArea">
+      <div class="paramAreaHead">参数与工具<span class="muted">（都在画布下方 · 点卡片标题可折叠 · 右上角「悬浮」可拖到任意位置）</span></div>
 
-  <!-- ========== 右栏：修图 / 提取 / 拼接 ========== -->
-  <aside class="side sideRight">
+      <div id="viewExportDock" class="floatPanel card">
+        <div class="floatHead">
+          <span class="floatTitle">2. 显示与导出</span>
+          <button class="btn tiny floatToggle" data-float="viewExportDock">悬浮</button>
+        </div>
+        <div class="floatBody">
+          <div class="row wrap">
+            <label>像素尺寸 <input type="range" id="cellSize" min="4" max="24" step="1" value="11"></label>
+          </div>
+          <div class="row wrap">
+            <label><input type="checkbox" id="optGrid"> 显示格线</label>
+            <label><input type="checkbox" id="optShowVoid" checked title="把值为 0 的格子画成斜纹，便于看清主体边界"> 显示空位</label>
+            <label><input type="checkbox" id="optShowMaskOutline" checked title="把当前选区的轮廓描出来"> 描选区边</label>
+          </div>
+          <div class="row wrap">
+            <button id="btnPng" class="btn ghost">导出当前视图 PNG</button>
+          </div>
+        </div>
+      </div>
 
     <section class="card" id="editCard">
       <div class="floatHead">
@@ -234,20 +254,6 @@
           阈值 40 一次清净。</span>
       </div>
 
-      <div class="editSubhead">图纸库</div>
-      <div class="row wrap">
-        <input type="text" id="inPieceName" placeholder="图纸名（留空用图名）" style="flex:1;min-width:120px">
-        <button id="btnAddPiece" class="btn primary" disabled>➕ 加入图纸库</button>
-      </div>
-      <div id="pieceLibInfo" class="kv"></div>
-      <div id="pieceLibList" class="list"></div>
-      <div class="row wrap">
-        <button id="btnPieceExportAll" class="btn primary">导出图纸库 ZIP</button>
-        <button id="btnPieceExportJson" class="btn ghost">导出图纸库 JSON</button>
-        <label class="fileBtn">导入图纸库 JSON<input type="file" id="filePieceLib" accept=".json"></label>
-        <button id="btnPieceClear" class="btn ghost">清空图纸库</button>
-      </div>
-      <p class="hint">图纸库保存在浏览器本地，刷新不丢。一张 20×20 图纸约 1 KB，攒几百张也没问题。</p>
     </section>
 
     <section class="card" id="composeCard">
@@ -422,7 +428,10 @@
       </div>
     </section>
 
-  </aside>
+    </div>
+
+    <div class="logbox"><div class="logHead">运行日志</div><pre id="log"></pre></div>
+  </main>
 
 </div>
 
@@ -433,6 +442,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=16"></script>
+<script src="js/app.js?v=17"></script>
 </body>
 </html>

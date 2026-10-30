@@ -392,11 +392,13 @@ body.composeMode .composeView { display: block; }
 body.composeMode .mainCanvasRow,
 body.composeMode #legend,
 body.composeMode .main > .readout { display: none !important; }
-/* 拼接时左栏（普通修图的导入列表）和右栏的修图/提取都让位，只留拼接卡片。
-   拼接自己的「导入 TXT 图 / 导入文件夹」在 ② 部件来源里，不用绕回左栏。 */
-body.composeMode .sideLeft,
+/* 拼接时让位的是**修图专用的东西**，不是整条左栏：
+   左栏 2026-10-30 起只放「上传 + 图纸库」，图纸库正是拼接的部件来源（② 里有「从图纸库全部添加」），
+   所以左栏留着；让位的是修图的导入列表、美术编辑、主体提取、显示与导出这些只服务于 #cv 的面板。 */
+body.composeMode #cardImport,
 body.composeMode #editCard,
-body.composeMode #extractCard { display: none !important; }
+body.composeMode #extractCard,
+body.composeMode #viewExportDock { display: none !important; }
 /* 反过来：不在拼接模式时，拼接卡片藏起来，免得和主体提取抢注意力 */
 #composeCard { display: none; }
 body.composeMode #composeCard { display: block; }
@@ -484,6 +486,12 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
 .canvasWrap, .boardCol {
   background: #bfc3c7; border-color: #cbd3dd;
 }
+/* 画布统计条漏在浅色主题外，一直是深棕色底（2026-10-30 布局改版时顺手补上） */
+.canvasStats {
+  background: #ffffff; border-color: #d8dde4; border-left-color: #6b4a9e; color: #5d6878;
+}
+.canvasStats .csLabel, .canvasStats .csDivider { color: #6f7b8d; }
+.canvasStats .csMain { color: #1f5f9e; }
 .overlay {
   background: rgba(245,246,248,.88); color: #1f5f9e;
 }
@@ -579,3 +587,39 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
     linear-gradient(-45deg, transparent 75%, #c4c7cb 75%);
   background-color: #dde0e3; background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0;
 }
+
+/* ==================== 17. 2026-10-30 布局改版：左栏只放上传与图库，参数全部搬到画布下方 ====================
+   用户原话：「将左侧的参数调整类的东西放到中间的区域，画布的下方，左侧放上传的图库等内容」。
+   做法：三栏 → 两栏（左栏 + 主区），参数卡（2 显示与导出 / 3 美术编辑 / 4 主体提取 / 5 图纸拼接）
+   统一收进 .paramArea，排在画布下方；宽度从 320px 的窄栏解放出来，行内控件不再疯狂折行。 */
+
+/* 左栏跟着滚动固定住：参数搬到画布下方后主区变长，滚动时上传与本地图库始终在左边够得到。
+   sticky 而不是 fixed —— 不改文档流，窄屏（溢出滚动）时退回普通定位。 */
+.sideLeft { position: sticky; top: 10px; align-self: flex-start; }
+
+/* 参数区：宽屏自动 2–3 列，笔记本单列。
+   用 auto-fit 而不是写死列数：1600px 屏（左栏 320 + 主区约 1250）排 3 列，
+   1280px 屏退 2 列，再窄单列。 */
+.paramArea {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 12px;
+  align-items: start;
+  margin: 4px 0 12px;
+}
+.paramArea > * { min-width: 0; }
+/* 卡片在网格里不留下外边距，间距交给 gap，否则列底会错位 */
+.paramArea > .card, .paramArea > .floatPanel, .paramArea > .composeFloatPanel { margin-bottom: 0; }
+
+/* 参数区标题条：横跨所有列，作为「画布 → 参数」之间的分隔 */
+.paramAreaHead {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 7px 10px;
+  background: #ffffff; border: 1px solid #d8dde4; border-left: 3px solid #2f6fae;
+  border-radius: 5px; font-size: 12px; font-weight: 600; color: #1f5f9e;
+}
+.paramAreaHead .muted { font-weight: 400; font-size: 11px; }
+
+/* 拼接模式下参数区只剩「5. 图纸拼接」一张卡，占满整行（它行内控件多，塞进 330px 会全折行） */
+body.composeMode .paramArea { grid-template-columns: 1fr; }

@@ -84,7 +84,7 @@
   var UI_PREF_STORAGE_KEY = 'antArtTool_uiPrefs_v1';
 
   // 每新增一张卡片都要登记到这里，否则那张卡片点标题没反应，属于静默失效。
-  var COLLAPSIBLE_CARDS = ['cardImport', 'editCard', 'extractCard', 'composeCard'];
+  var COLLAPSIBLE_CARDS = ['cardImport', 'pieceLibCard', 'viewExportDock', 'editCard', 'extractCard', 'composeCard'];
 
   // ==================== 日志与遮罩 ====================
   function log(msg) {
@@ -576,7 +576,7 @@
       el.style.height = st.height ? st.height + 'px' : '';
       if (btn) btn.textContent = '收回原位';
       log('「' + floatTitleOf(el) + '」已变成悬浮框：拖标题栏移动，拖右边缘/下边缘/右下角可以放大缩小；' +
-        '再点「收回原位」放回目标图右侧。');
+        '再点「收回原位」放回画布下方的参数区。');
     } else {
       el.classList.remove('floating');
       el.style.left = ''; el.style.top = ''; el.style.width = ''; el.style.height = '';
@@ -603,7 +603,7 @@
 
   /**
    * 给所有带「悬浮」按钮的面板绑定：切换悬浮、拖标题栏移动、拖边缘放大缩小。
-   * 移动与拉伸都只在悬浮态下生效；非悬浮态下面板在目标图右侧那一列里按列宽走，不允许乱拉。
+   * 移动与拉伸都只在悬浮态下生效；非悬浮态下面板在画布下方的参数区里按格子宽度走，不允许乱拉。
    */
   /* ==================== 界面偏好：卡片折叠 ====================
    * 折叠状态只影响显示，持久化在 UI_PREF_STORAGE_KEY。
@@ -832,7 +832,7 @@
     document.body.classList.add('composeMode');
     syncComposeModeButton();
     if (!cpHasCanvas()) {
-      log('已进入拼接工作台。先在右边「5. 图纸拼接」①里设定新图规格并点「新建画布」，' +
+      log('已进入拼接工作台。先在下方「5. 图纸拼接」①里设定新图规格并点「新建画布」，' +
         '再从②的部件列表把部件放上画布。');
     } else {
       log('已回到拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，' + C2.layers.length + ' 个图层还在）。');
@@ -1037,7 +1037,7 @@
       cv.width = 600; cv.height = 160;
       composePaintChecker(ctx, cv.width, cv.height, 16);
       ctx.fillStyle = '#68707a'; ctx.font = '13px sans-serif';
-      ctx.fillText('还没有画布 —— 在右边「5. 图纸拼接」①设定规格并点「新建画布」', 20, 40);
+      ctx.fillText('还没有画布 —— 在下方「5. 图纸拼接」①设定规格并点「新建画布」', 20, 40);
       return;
     }
     var cell = composeCell(), rows = C2.rows, cols = C2.cols;
@@ -1343,7 +1343,7 @@
   /**
    * 撤销 / 重做按钮的同步。
    * 两处按钮共用：拼接工作台顶栏（看得见的地方，顶栏顺带显示还能撤几步）
-   * 与右栏「⑤ 在画布上画」那张卡片里的按钮。
+   * 与画布下方「⑤ 在画布上画」那张卡片里的按钮。
    */
   function syncComposeHistoryButtons() {
     var C2 = cpS();
@@ -1472,7 +1472,7 @@
     if (!cpHasCanvas()) {
       // 原先这里是静默 return —— 用户在没建画布时点画布，什么反应都没有，
       // 只能自己猜是哪里不对。改成如实说清下一步。
-      log('还没有画布，点不了。先在右边「5. 图纸拼接」①填好行列，点「新建画布」。');
+      log('还没有画布，点不了。先在下方「5. 图纸拼接」①填好行列，点「新建画布」。');
       return;
     }
     var p = composeEventToCell(ev);
@@ -3736,7 +3736,8 @@
 
   /**
    * 编辑改动统计（已改动像素 / 总量守恒 / 逐色变化）。
-   * 用户 2026-08-03 微调：这块固定放在目标图右侧的位置，可点「悬浮」拖到任意位置；提示文字按要求去掉。
+   * 用户 2026-08-03 微调：这块固定放在目标图旁边，可点「悬浮」拖到任意位置；提示文字按要求去掉。
+   * 2026-10-30：位置改到画布下方的参数区（布局改版）。
    * 逐色变化按要求带上中文颜色名（凡是出现颜色数量的地方都必须能看出是哪个颜色）。
    */
   function renderEditInfo() {
