@@ -3079,9 +3079,43 @@
     renderComposeAll();
   }
 
+  /** 固定种子的伪随机（mulberry32）：同参数同种子 → 同结果，可复现。 */
+  function composeSeededRandom(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /** 均匀分布：按 sqrt(面积/个数) 分格，每格里抖一点，疏密一致但不像网格那么死。 */
+  function composeEvenCenters(n, rows, cols, rnd) {
+    var area = Math.max(1, rows * cols);
+    var step = Math.max(2, Math.sqrt(area / Math.max(1, n)));
+    var nx = Math.max(1, Math.round(cols / step));
+    var ny = Math.max(1, Math.round(rows / step));
+    var out = [];
+    for (var iy = 0; iy < ny; iy++) {
+      for (var ix = 0; ix < nx; ix++) {
+        var baseR = (iy + 0.5) * (rows / ny);
+        var baseC = (ix + 0.5) * (cols / nx);
+        // 抖动幅度取格子的 30%：够打破网格感，又不会让间距乱掉
+        var jr = (rnd() - 0.5) * 0.6 * (rows / ny);
+        var jc = (rnd() - 0.5) * 0.6 * (cols / nx);
+        var r = Math.round(baseR + jr), c = Math.round(baseC + jc);
+        r = Math.max(1, Math.min(rows - 2, r));
+        c = Math.max(1, Math.min(cols - 2, c));
+        out.push({ r: r, c: c });
+      }
+    }
+    return out;
+  }
+
   /**
-   * 随机撒到背景：按「撒 N 个」随机落点，默认只落在空白处（不压主体/背景纹理），
-   * 整批走一次 composeApplyCells → 一个撤销点就能全撤回。
+   * 撒到背景：按「撒 N 个」落点，默认**均匀分布**（网格 + 抖动，可复现），也可切成纯随机。
+   * 只落在非背景的空位（不压主体/已有图章），整批走一次 composeApplyCells → 一个撤销点。
    */
   function composeScatterStamps() {
     var C2 = cpS();
@@ -3104,13 +3138,22 @@
     var flat = C.composeFlatten(others, rows, cols);
     var taken = {};                        // 这一批里已经盖过的格子，避免图章互相叠
     var all = [], placed = 0;
-    // 候选中心点打乱后逐个试（改前是纯随机试探 + 40n 次上限：画布占了一半之后
-    // 每次落点几乎必然撞车，实测「撒 40 个」只落得下 16 个）。打乱后贪心落，密度能上去且仍是随机的。
-    var cand = [];
-    for (var rr = 2; rr < rows - 2; rr++) for (var cc2 = 2; cc2 < cols - 2; cc2++) cand.push({ r: rr, c: cc2 });
-    for (var si = cand.length - 1; si > 0; si--) {
-      var sj = Math.floor(Math.random() * (si + 1));
-      var st = cand[si]; cand[si] = cand[sj]; cand[sj] = st;
+    // 落点策略（2026-10-30 用户问「为什么要纯随机」后改的）：
+    //   默认 even = 按 sqrt(面积/个数) 分格 + 每格抖动 30%，疏密一致、可复现；
+    //   random = 旧的候选点打乱 + 贪心，保留给「想要不规则」的场合。
+    var seed = Math.max(1, Math.min(999999, parseInt(($('inStampSeed') || {}).value, 10) || 1));
+    var rnd = composeSeededRandom(seed);
+    var mode = ($('selStampMode') || {}).value || 'even';
+    var cand;
+    if (mode === 'random') {
+      cand = [];
+      for (var rr = 2; rr < rows - 2; rr++) for (var cc2 = 2; cc2 < cols - 2; cc2++) cand.push({ r: rr, c: cc2 });
+      for (var si = cand.length - 1; si > 0; si--) {
+        var sj = Math.floor(rnd() * (si + 1));
+        var st = cand[si]; cand[si] = cand[sj]; cand[sj] = st;
+      }
+    } else {
+      cand = composeEvenCenters(n, rows, cols, rnd);
     }
     for (var qi = 0; qi < cand.length && placed < n; qi++) {
       var cells = composeStampCellsAt(spec, scale, cand[qi].r, cand[qi].c, rows, cols);
@@ -3136,7 +3179,9 @@
     C2.selected = [L.id];
     var changed = composeApplyCells(L, all, color, '随机撒 ' + placed + ' 个「' + spec.name + '」');
     log('已撒 ' + placed + ' 个「' + spec.name + '」' + (scale > 1 ? '（' + scale + '×）' : '') +
-      '，共 ' + changed + ' 格' + (emptyOnly ? '，避开了部件与已有图章' : '') + '。Ctrl/⌘+Z 可整批撤回。');
+      '，共 ' + changed + ' 格' + (emptyOnly ? '，避开了部件与已有图章' : '') +
+      '。分布：' + (mode === 'random' ? '随机' : '均匀') + '，种子 ' + seed +
+      '（同参数同种子结果一样；要变就改种子或点「换一批」）。Ctrl/⌘+Z 可整批撤回。');
     renderComposeAll();
   }
 
@@ -5312,6 +5357,13 @@
     $('btnComposeNew').onclick = composeNewCanvas;
     // 装饰图章（2026-10-30）：选图章 / 随机撒到背景
     if ($('btnStampScatter')) $('btnStampScatter').onclick = composeScatterStamps;
+    if ($('btnStampReseed')) $('btnStampReseed').onclick = function () {
+      var el = $('inStampSeed');
+      var v = (parseInt(el.value, 10) || 1) + 1;
+      el.value = v;
+      log('种子 → ' + v + '，重新撒一批（上一批想撤就 Ctrl/⌘+Z）。');
+      composeScatterStamps();
+    };
     renderComposeStampPalette();
     // 2026-10-30 用户反馈「怎么画布的大小改变不了」：改前必须点「新建画布」才生效，
     // 只改数字完全没反应。现在松手 / 回车就自动应用，另加四个常用尺寸按钮。

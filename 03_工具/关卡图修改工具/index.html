@@ -301,10 +301,20 @@
         <label class="inlineNum">大小 <input type="number" id="inStampScale" value="1" min="1" max="6" step="1"> ×</label>
         <label class="inlineNum">撒 <input type="number" id="inStampCount" value="30" min="1" max="600" step="1"> 个</label>
         <label title="避开部件等其它图层；背景纹理上照样撒（这就是「填在背景上」的用法），同一层已有的图章也不会叠"><input type="checkbox" id="optStampEmptyOnly" checked> 不压到部件</label>
-        <button id="btnStampScatter" class="btn primary">随机撒到背景</button>
+      </div>
+      <div class="row wrap">
+        <label>分布
+          <select id="selStampMode">
+            <option value="even" selected>均匀（推荐）</option>
+            <option value="random">随机</option>
+          </select>
+        </label>
+        <label class="inlineNum" title="同样的种子 + 同样的参数 = 撒出同样的图案；改种子就是换一批">种子 <input type="number" id="inStampSeed" value="1" min="1" max="999999" step="1"></label>
+        <button id="btnStampScatter" class="btn primary">撒到背景</button>
+        <button id="btnStampReseed" class="btn ghost" title="种子 +1 再撒一次（先撤掉上一批再看）">换一批</button>
       </div>
       <p class="hint">点一个图章＝选中「贴图章」工具，之后在画布上点一下就盖一个（颜色用当前画笔色）。
-        「随机撒到背景」会一次性撒满指定数量，落在覆盖整张画布的绘制层上（**背景纹理之上**），一个撤销点就能整批撤回。</p>
+        「撒到背景」落在覆盖整张画布的绘制层上（**背景纹理之上**），一个撤销点就能整批撤回。默认**均匀**分布（网格抖动，疏密一致）；种子固定 → 同样参数撒出同样结果，改种子或点「换一批」才会变。</p>
       <div class="row wrap" id="composeBorderRow">
         <span class="rowLabel">边框形态</span>
         <select id="selComposeBorder">
@@ -525,6 +535,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=28"></script>
+<script src="js/app.js?v=29"></script>
 </body>
 </html>
