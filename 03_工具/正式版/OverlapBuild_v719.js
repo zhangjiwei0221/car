@@ -36,7 +36,8 @@ let NEW_ALLOW = [];
 const GUIDE = Number(arg('--guide-color', 0));   // 要求第 1 步必须是这个颜色（引导）
 const GUIDE_STEPS = Number(arg('--guide-steps', 0));  // 前 K 步只允许引导色
 const NO_EARLY = Number(arg('--no-early', 0));
-const W_RUN4 = Number(arg('--w-run4', 0));   // 目标里奖励最长连续 >=4
+const W_RUN4 = Number(arg('--w-run4', 0));
+const OBJ = String(arg('--obj', 'low'));   // low=原目标(减少低压段) | at4=最大化 at4   // 目标里奖励最长连续 >=4
 const MODE = String(arg('--mode', 'b')).toLowerCase();   // b=瞬时连锁（默认） / a=四边入口        // 前 K 步不许到 buffer>=4（避免前期卡点）
 const ALLOW = String(arg('--allow-colors', '')).split(',').map(Number).filter(n => n > 0);
 NEW_ALLOW = ALLOW.length ? ALLOW : (GUIDE > 0 ? [GUIDE] : []);
@@ -290,12 +291,17 @@ for (let round = 0; round < ROUNDS; round++) {
       if (!e.firstK.every(c => allow.includes(c))) continue;
     }
     if (e.at4 < Math.max(MIN_AT4, curE.at4 - 1)) continue;
-    const scoreE = e.lowRun * 10 + e.lowTotal - W_RUN4 * e.run4;
-    const scoreC = curE.lowRun * 10 + curE.lowTotal - W_RUN4 * curE.run4;
-    if (scoreE > scoreC) continue;
-    if (scoreE === scoreC && e.at4 <= curE.at4) continue;
-    const bestScore = bestE ? (bestE.lowRun * 10 + bestE.lowTotal - W_RUN4 * bestE.run4) : Infinity;
-    if (scoreE < bestScore || (scoreE === bestScore && e.at4 > bestE.at4)) { best = { mv, level: cands[i].h }; bestE = e; }
+    const scoreOf = x => OBJ === 'at4' ? (x.at4 * 10 + x.run4) : (x.lowRun * 10 + x.lowTotal - W_RUN4 * x.run4);
+    const scoreE = scoreOf(e), scoreC = scoreOf(curE);
+    if (OBJ !== 'at4') {
+      if (scoreE > scoreC) continue;
+      if (scoreE === scoreC && e.at4 <= curE.at4) continue;
+    } else {
+      if (scoreE <= scoreC) continue;      // at4 目标：必须严格更好
+    }
+    const bestScore = bestE ? scoreOf(bestE) : (OBJ === 'at4' ? -Infinity : Infinity);
+    if ((OBJ === 'at4' ? scoreE > bestScore : scoreE < bestScore)
+      || (scoreE === bestScore && e.at4 > bestE.at4)) { best = { mv, level: cands[i].h }; bestE = e; }
   }
   if (!best) { console.log(`第${round + 1}轮：无改进，停止`); break; }
   cur = best.level; curE = bestE;
