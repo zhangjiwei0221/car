@@ -246,9 +246,31 @@ let cur = base;
 let curE = evalLevel(cur);
 console.log(`基线：步${curE.steps} 峰值${curE.peak} at4=${curE.at4} run4=${curE.run4} 空窗总${curE.gapTotal}/最大${curE.gapMax} 前导空${curE.leadFree}`);
 const log = [];
+// 固定种子的洗牌，保证可复现
+let _seedS = Number((process.argv[process.argv.indexOf('--seed') + 1]) || 20261030) || 20261030;
+function rndS() { _seedS = (_seedS * 1103515245 + 12345) & 0x7fffffff; return _seedS / 0x7fffffff; }
+function sampleMoves(all, n) {
+  if (!(n > 0) || all.length <= n) return all;
+  // 按类型分层抽样，保证 chain / capswap / posswap / ice 都有代表
+  const byType = {};
+  for (const m of all) (byType[m.type] = byType[m.type] || []).push(m);
+  const types = Object.keys(byType);
+  const per = Math.max(4, Math.floor(n / Math.max(1, types.length)));
+  const out = [];
+  for (const t of types) {
+    const arr = byType[t];
+    if (arr.length <= per) { out.push(...arr); continue; }
+    const idx = arr.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rndS() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    out.push(...idx.slice(0, per).map(i => arr[i]));
+  }
+  return out;
+}
 for (let round = 0; round < ROUNDS; round++) {
-  const moves = candidateMoves(cur);
+  const allMoves = candidateMoves(cur);
+  const moves = sampleMoves(allMoves, SAMPLES);
   let best = null, bestE = null;
+  console.log(`  第${round + 1}轮：候选 ${allMoves.length} 个，本轮评估 ${moves.length} 个`);
   for (const mv of moves) {
     const h = applyMove(cur, mv); if (!h) continue;
     let e; try { e = evalLevel(h); } catch (err) { continue; }
