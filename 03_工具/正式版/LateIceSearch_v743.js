@@ -19,6 +19,7 @@ const ABLATE = has('--ablate');
 const CHAIN_ONLY = has('--chain-only');   // 只给“锁链组成员”上冰（成组债务）
 // 链成员默认用更小的 param：冻太久会整组完不成（不可解）
 const A = B.loadSolver(REF);
+const { createPool } = require('./EvalPool_v749');
 const INSTANT = MODE !== 'a';
 
 const PARAMS2 = String(arg('--params', CHAIN_ONLY ? '8,12,16,20,24' : '18,22,26,30,34,38,42,46')).split(',').map(Number);
@@ -38,6 +39,8 @@ function metrics(g) {
   return { won: !!o.completed, peak: Math.max(0, ...buf), at4, run4, steps: n, late4, late3, mid4, midN: e - a, from, buf };
 }
 
+(async () => {
+const POOL = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE });
 const base = JSON.parse(fs.readFileSync(FILE, 'utf8'));
 const R = base.spools.length, C = base.spools[0].length;
 const b0 = metrics(base);
@@ -86,19 +89,26 @@ for (let round = 1; round <= MAX_ICE; round++) {
   const rej = { unsolv: 0, peak: 0, at4: 0, nogain: 0, ok: 0 };
   const cands = CHAIN_ONLY ? chainCells(cur) : plainCells(cur).map(([r, c]) => [r, c, 0]);
   if (round === 1) console.log(`  候选来源：${CHAIN_ONLY ? '锁链组成员' : '普通车'}，共 ${cands.length} 个`);
+  // 先构造全部候选，再并行评估
+  const batch = [];
   for (const [r, c, chainId] of cands) {
     for (const param of PARAMS2) {
       const h = JSON.parse(JSON.stringify(cur));
       withIce(h, [r, c], param);
-      let e; try { e = metrics(h); } catch (err) { continue; }
-      if (!e.won) { rej.unsolv++; continue; }
-      if (e.peak > 4) { rej.peak++; continue; }
-      if (e.at4 < b0.at4 - AT4_TOL) { rej.at4++; continue; }
-      const gain = (e.late4 - curM.late4) * 3 + (e.late3 - curM.late3);
-      if (gain <= 0) { rej.nogain++; continue; }
-      rej.ok++;
-      if (!best || gain > best.gain) best = { gain, r, c, param, e, g: h, chainId };
+      batch.push({ r, c, param, chainId, h });
     }
+  }
+  const evals = await POOL.evalAll(batch.map(b => b.h));
+  for (let i = 0; i < batch.length; i++) {
+    const b = batch[i], e = evals[i];
+    if (!e || e.error) continue;
+    if (!e.won) { rej.unsolv++; continue; }
+    if (e.peak > 4) { rej.peak++; continue; }
+    if (e.at4 < b0.at4 - AT4_TOL) { rej.at4++; continue; }
+    const gain = (e.late4 - curM.late4) * 3 + (e.late3 - curM.late3);
+    if (gain <= 0) { rej.nogain++; continue; }
+    rej.ok++;
+    if (!best || gain > best.gain) best = { gain, r: b.r, c: b.c, param: b.param, e, g: b.h, chainId: b.chainId };
   }
   console.log(`  第 ${round} 轮筛选统计:`, JSON.stringify(rej));
   if (!best) { console.log(`第 ${round} 轮：没有能进一步改善后段的冰，停止`); break; }
@@ -142,3 +152,5 @@ if (ABLATE && added.length) {
 
 fs.writeFileSync(OUT, JSON.stringify(cur, null, 2));
 console.log('已写出：' + OUT);
+await POOL.close();
+})().catch(e => { console.error(e); process.exit(1); });

@@ -242,16 +242,19 @@ function candidateMoves(g) {
   return moves;
 }
 
+
+(async () => {
+const { createPool } = require('./EvalPool_v749');
+const POOL = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE, guideSteps: GUIDE_STEPS, noEarly: NO_EARLY });
+
 let cur = base;
-let curE = evalLevel(cur);
+let curE = await POOL.evalOne(cur);
 console.log(`基线：步${curE.steps} 峰值${curE.peak} at4=${curE.at4} run4=${curE.run4} 空窗总${curE.gapTotal}/最大${curE.gapMax} 前导空${curE.leadFree}`);
 const log = [];
-// 固定种子的洗牌，保证可复现
 let _seedS = Number((process.argv[process.argv.indexOf('--seed') + 1]) || 20261030) || 20261030;
 function rndS() { _seedS = (_seedS * 1103515245 + 12345) & 0x7fffffff; return _seedS / 0x7fffffff; }
 function sampleMoves(all, n) {
   if (!(n > 0) || all.length <= n) return all;
-  // 按类型分层抽样，保证 chain / capswap / posswap / ice 都有代表
   const byType = {};
   for (const m of all) (byType[m.type] = byType[m.type] || []).push(m);
   const types = Object.keys(byType);
@@ -266,28 +269,33 @@ function sampleMoves(all, n) {
   }
   return out;
 }
+
 for (let round = 0; round < ROUNDS; round++) {
   const allMoves = candidateMoves(cur);
   const moves = sampleMoves(allMoves, SAMPLES);
-  let best = null, bestE = null;
   console.log(`  第${round + 1}轮：候选 ${allMoves.length} 个，本轮评估 ${moves.length} 个`);
-  for (const mv of moves) {
-    const h = applyMove(cur, mv); if (!h) continue;
-    let e; try { e = evalLevel(h); } catch (err) { continue; }
+  // 先应用全部候选，再并行评估
+  const cands = [];
+  for (const mv of moves) { const h = applyMove(cur, mv); if (h) cands.push({ mv, h }); }
+  const evals = await POOL.evalAll(cands.map(c => c.h));
+  let best = null, bestE = null;
+  for (let i = 0; i < cands.length; i++) {
+    const e = evals[i]; const mv = cands[i].mv;
+    if (!e || e.error) continue;
     if (!e.won || e.peak > 4 || e.itemUses > 0) continue;
-    if (GUIDE > 0 && e.firstColor !== GUIDE) continue;   // 引导：第一步必须是目标色
-    if (NO_EARLY > 0 && e.earlyHigh) continue;   // 前期不许到 4
+    if (GUIDE > 0 && e.firstColor !== GUIDE) continue;
+    if (NO_EARLY > 0 && e.earlyHigh) continue;
     if (GUIDE_STEPS > 0) {
       const allow = ALLOW.length ? NEW_ALLOW : [GUIDE];
-      if (!e.firstK.every(c => allow.includes(c))) continue;   // 前 K 步只能取允许的颜色
+      if (!e.firstK.every(c => allow.includes(c))) continue;
     }
-    if (e.at4 < Math.max(MIN_AT4, curE.at4 - 1)) continue;   // 守住平台，不让空窗换 at4（可用 --min-at4 设下限）
+    if (e.at4 < Math.max(MIN_AT4, curE.at4 - 1)) continue;
     const scoreE = e.lowRun * 10 + e.lowTotal - W_RUN4 * e.run4;
     const scoreC = curE.lowRun * 10 + curE.lowTotal - W_RUN4 * curE.run4;
     if (scoreE > scoreC) continue;
     if (scoreE === scoreC && e.at4 <= curE.at4) continue;
     const bestScore = bestE ? (bestE.lowRun * 10 + bestE.lowTotal - W_RUN4 * bestE.run4) : Infinity;
-    if (scoreE < bestScore || (scoreE === bestScore && e.at4 > bestE.at4)) { best = { mv, level: h }; bestE = e; }
+    if (scoreE < bestScore || (scoreE === bestScore && e.at4 > bestE.at4)) { best = { mv, level: cands[i].h }; bestE = e; }
   }
   if (!best) { console.log(`第${round + 1}轮：无改进，停止`); break; }
   cur = best.level; curE = bestE;
@@ -300,6 +308,7 @@ for (let round = 0; round < ROUNDS; round++) {
   console.log(`第${round + 1}轮：${desc} → 最长低压段${curE.lowRun} 低压步${curE.lowTotal} at4=${curE.at4} run4=${curE.run4}`);
   log.push({ round: round + 1, move: best.mv, after: { gapTotal: curE.gapTotal, gapMax: curE.gapMax, at4: curE.at4, run4: curE.run4 } });
 }
+await POOL.close();
 const ok = cliOK(cur);
 console.log(`\n终局：最长低压段${curE.lowRun} 低压步${curE.lowTotal} at4=${curE.at4} run4=${curE.run4} 峰值${curE.peak} CLI=${ok ? '✅' : '❌'}`);
 if (OUT && ok) {
@@ -308,3 +317,4 @@ if (OUT && ok) {
   fs.writeFileSync(OUT.replace(/\.json$/, '.moves.json'), JSON.stringify(log, null, 2));
   console.log(`已写入：${OUT}`);
 }
+})().catch(e => { console.error(e); process.exit(1); });
