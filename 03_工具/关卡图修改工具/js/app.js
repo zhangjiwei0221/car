@@ -5116,6 +5116,41 @@
     $('btnComposeMode').onclick = function () { cpS().active ? exitCompose() : enterCompose(); };
     $('btnComposeExit').onclick = exitCompose;
     $('btnComposeNew').onclick = composeNewCanvas;
+    // 2026-10-30 用户反馈「怎么画布的大小改变不了」：改前必须点「新建画布」才生效，
+    // 只改数字完全没反应。现在松手 / 回车就自动应用，另加四个常用尺寸按钮。
+    var composeResizeTimer = null;
+    function scheduleCanvasResize() {
+      clearTimeout(composeResizeTimer);
+      composeResizeTimer = setTimeout(function () {
+        var C2 = cpS();
+        var r = parseInt($('inComposeRows').value, 10);
+        var c = parseInt($('inComposeCols').value, 10);
+        if (!isFinite(r) || !isFinite(c)) return;
+        if (r === C2.rows && c === C2.cols) return;
+        composeNewCanvas();
+      }, 120);
+    }
+    ['inComposeRows', 'inComposeCols'].forEach(function (id) {
+      var el = $(id);
+      if (!el) return;
+      el.onchange = scheduleCanvasResize;   // change = 失焦/回车才触发，避免边打数字边改尺寸
+      el.onkeydown = function (ev) {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault();
+        clearTimeout(composeResizeTimer);
+        composeNewCanvas();
+      };
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.sizePreset'), function (b) {
+      b.onclick = function () {
+        var n = parseInt(b.getAttribute('data-size'), 10);
+        if (!isFinite(n)) return;
+        $('inComposeRows').value = n;
+        $('inComposeCols').value = n;
+        clearTimeout(composeResizeTimer);
+        composeNewCanvas();
+      };
+    });
     armConfirm('btnComposeClear', {
       confirmText: '再点一次＝清空画布',
       guard: function () {
