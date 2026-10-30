@@ -15,6 +15,7 @@ const ROWS = arg('--rows', '7'), COLS = arg('--cols', '7');
 const ROUNDS = arg('--rounds', '3'), SAMPLES = arg('--samples', '120');
 const REF = arg('--ref', 'corner');
 const PLAN = has('--plan');
+const ALLPAIRS = has('--all-pairs');
 const SEED = arg('--seed', '20261030');
 
 fs.mkdirSync(OUTDIR, { recursive: true });
@@ -40,7 +41,9 @@ if (!fs.existsSync(build)) return report({ target: TARGET, stage: 'build', ok: f
 // 3) 可选：障碍分配
 let src = build;
 if (PLAN) {
-  r = run(['03_工具/正式版/ObstaclePlan_v745.js', build, '--ref', REF, '--out', finalF]);
+  const planArgs = ['03_工具/正式版/ObstaclePlan_v745.js', build, '--ref', REF, '--out', finalF];
+  if (ALLPAIRS) planArgs.push('--all-pairs');
+  r = run(planArgs);
   if (fs.existsSync(finalF)) src = finalF;
 }
 

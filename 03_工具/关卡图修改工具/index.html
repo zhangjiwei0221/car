@@ -280,6 +280,7 @@
         <label><input type="radio" name="composeTool" value="line"> 直线</label>
         <label><input type="radio" name="composeTool" value="fill"> 填充</label>
         <label><input type="radio" name="composeTool" value="border"> 边框</label>
+        <label title="在画布上点一下就盖一个装饰图章，图章在下面「装饰图章」里选"><input type="radio" name="composeTool" value="stamp"> 贴图章</label>
       </div>
       <div class="row wrap">
         <span class="rowLabel">几何手绘</span>
@@ -293,6 +294,17 @@
         <label title="勾选＝实心图形；不勾＝空心，空心粗细用左边的线宽"><input type="checkbox" id="optComposeShapeSolid" checked> 实心图形（不勾＝空心）</label>
         <label><input type="checkbox" id="optComposeErase"> 当橡皮擦（涂成空）</label>
       </div>
+
+      <div class="editSubhead">装饰图章（星星 / 爱心…填背景用）</div>
+      <div class="row wrap" id="composeStampPalette"></div>
+      <div class="row wrap">
+        <label class="inlineNum">大小 <input type="number" id="inStampScale" value="1" min="1" max="6" step="1"> ×</label>
+        <label class="inlineNum">撒 <input type="number" id="inStampCount" value="30" min="1" max="600" step="1"> 个</label>
+        <label title="只撒在目前还是空位（0）的格子上，不会压到主体和背景纹理"><input type="checkbox" id="optStampEmptyOnly" checked> 只撒在空白处</label>
+        <button id="btnStampScatter" class="btn primary">随机撒到背景</button>
+      </div>
+      <p class="hint">点一个图章＝选中「贴图章」工具，之后在画布上点一下就盖一个（颜色用当前画笔色）。
+        「随机撒到背景」会一次性撒满指定数量，撒在覆盖整张画布的绘制层上，用一个撤销点就能整批撤回。</p>
       <div class="row wrap" id="composeBorderRow">
         <span class="rowLabel">边框形态</span>
         <select id="selComposeBorder">

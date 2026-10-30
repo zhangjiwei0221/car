@@ -81,6 +81,22 @@ if (CROP && (sub.length > SIZE || sub[0].length > SIZE)) {
   }
   sub = out;
 }
+// 若主体实际覆盖率不足目标，按比例继续放大（最多 3 轮）
+for (let k = 0; k < 3; k++) {
+  const cov = countPixels(sub) / (SIZE * SIZE);
+  if (cov >= FILL * 0.9 || sub.length >= SIZE || sub[0].length >= SIZE) break;
+  const grow = Math.sqrt(FILL / Math.max(0.01, cov));
+  const nh = Math.min(SIZE, Math.round(sub.length * grow)), nw = Math.min(SIZE, Math.round(sub[0].length * grow));
+  const out = [];
+  for (let y = 0; y < nh; y++) {
+    const row = [];
+    for (let x = 0; x < nw; x++) {
+      row.push(sub[Math.min(sub.length - 1, Math.floor(y * sub.length / nh))][Math.min(sub[0].length - 1, Math.floor(x * sub[0].length / nw))]);
+    }
+    out.push(row);
+  }
+  sub = out;
+}
 const sh = sub.length, sw = sub[0].length;
 
 // 主体放在左下（左边距 1–2，底边贴 1）
