@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=17">
+<link rel="stylesheet" href="css/style.css?v=18">
 </head>
 <body class="composeMode">
 
@@ -79,7 +79,7 @@
       <div class="composeCanvasWrap">
         <canvas id="composeCv" width="600" height="600"></canvas>
       </div>
-      <div id="composeReadout" class="readout">先在下方「5. 图纸拼接」里新建画布，再从部件列表点「放上画布」。</div>
+      <div id="composeReadout" class="readout">先在右边「5. 图纸拼接 · 画布与部件」里新建画布，再从部件列表点「放上画布」。</div>
     </div>
 
     <!-- 画布统计：一眼看到当前画布用了多少种颜色 -->
@@ -257,55 +257,10 @@
     </section>
 
     <section class="card" id="composeCard">
-      <h3>5. 图纸拼接</h3>
+      <h3>5. 图纸拼接 · 规则 / 绘制 / 出图</h3>
       <p class="hint">把多个部件摆到一张新画布上，做成**多主体**的目标图。
         摆放过程中部件<b>可以叠在一起</b>（先大致摆好再调）。导出时按图层底到顶合成，
         重叠格<b>只输出最顶层的像素 id</b>。</p>
-
-      <div class="editSubhead">① 新建画布（决定新 txt 图的规格）</div>
-      <div class="row wrap">
-        <label class="inlineNum">行 <input type="number" id="inComposeRows" value="55" min="4" max="200" step="1"></label>
-        <label class="inlineNum">列 <input type="number" id="inComposeCols" value="55" min="4" max="200" step="1"></label>
-        <button id="btnComposeNew" class="btn primary">新建画布</button>
-        <button id="btnComposeClear" class="btn ghost">清空画布</button>
-      </div>
-      <p class="hint">现有关卡目标图是 55×55。<b>实测提示</b>：你现有那三张图纸体积偏大
-        （熊猫外接 54×55 几乎占满一整张），两两都放不进同一张 55×55 —— 想拼多主体，
-        要么把画布开大，要么先提取更小的部件。</p>
-
-      <div id="composeSourcePanel" class="floatPanel composeFloatPanel">
-        <div class="floatHead">
-          <span class="floatTitle">② 部件来源</span>
-          <button class="btn tiny floatToggle" data-float="composeSourcePanel">悬浮</button>
-        </div>
-        <div class="floatBody">
-          <div class="row wrap">
-            <label class="fileBtn">导入 TXT 图<input type="file" id="fileComposeTxt" accept=".txt" multiple></label>
-            <label class="fileBtn" title="递归读取文件夹里的所有 .txt，作为部件加入列表">导入文件夹<input type="file" id="fileComposeDir" webkitdirectory directory multiple></label>
-            <button id="btnComposeFromLib" class="btn ghost">从图纸库全部添加</button>
-            <button id="btnComposeSrcClear" class="btn ghost">清空部件列表</button>
-          </div>
-          <div id="composeSourceInfo" class="kv"></div>
-          <div id="composeSourceList" class="list"></div>
-        </div>
-      </div>
-
-      <div id="composeLayerPanel" class="floatPanel composeFloatPanel">
-        <div class="floatHead">
-          <span class="floatTitle">③ 画布上的图层</span>
-          <button class="btn tiny floatToggle" data-float="composeLayerPanel">悬浮</button>
-        </div>
-        <div class="floatBody">
-          <p class="hint">在画布上<b>拖拽</b>可以挪部件；选中后用<b>方向键</b>逐格微调（按住 Shift 一次 5 格）。
-            画布上 <b>Shift 点击</b>或列表里 Shift 点名字＝多选，多选后可合并成一个新主体。</p>
-          <div class="row wrap">
-            <button id="btnComposeMerge" class="btn ghost" disabled>合并选中图层为新主体</button>
-            <span class="hint">合并后它们变成一个整体，不能再单独拖开。</span>
-          </div>
-          <div id="composeLayerInfo" class="kv"></div>
-          <div id="composeLayerList" class="list"></div>
-        </div>
-      </div>
 
       <div class="editSubhead">④ 规则生成（包围 / 背景 / 分隔）</div>
       <div class="row wrap">
@@ -433,6 +388,62 @@
     <div class="logbox"><div class="logHead">运行日志</div><pre id="log"></pre></div>
   </main>
 
+  <!-- ===== 右栏：拼接工作台专用（2026-10-30 起 ①②③ 放这里） =====
+       画布规格、部件来源、图层列表都在画布右边：这三块是「摆」的时候一直在看的，
+       放画布右边不用上下滚，中间画布也不用被 320px 的参数列挤窄。 ===== -->
+  <aside class="side sideRight" id="composeRightSide">
+
+    <section class="card" id="composeSetupCard">
+      <h3>5. 图纸拼接 · 画布与部件</h3>
+      <div class="editSubhead">① 新建画布（决定新 txt 图的规格）</div>
+      <div class="row wrap">
+        <label class="inlineNum">行 <input type="number" id="inComposeRows" value="55" min="4" max="200" step="1"></label>
+        <label class="inlineNum">列 <input type="number" id="inComposeCols" value="55" min="4" max="200" step="1"></label>
+        <button id="btnComposeNew" class="btn primary">新建画布</button>
+        <button id="btnComposeClear" class="btn ghost">清空画布</button>
+      </div>
+      <p class="hint">现有关卡目标图是 55×55。<b>实测提示</b>：你现有那三张图纸体积偏大
+        （熊猫外接 54×55 几乎占满一整张），两两都放不进同一张 55×55 —— 想拼多主体，
+        要么把画布开大，要么先提取更小的部件。</p>
+
+      <div id="composeSourcePanel" class="floatPanel composeFloatPanel">
+        <div class="floatHead">
+          <span class="floatTitle">② 部件来源</span>
+          <button class="btn tiny floatToggle" data-float="composeSourcePanel">悬浮</button>
+        </div>
+        <div class="floatBody">
+          <div class="row wrap">
+            <label class="fileBtn">导入 TXT 图<input type="file" id="fileComposeTxt" accept=".txt" multiple></label>
+            <label class="fileBtn" title="递归读取文件夹里的所有 .txt，作为部件加入列表">导入文件夹<input type="file" id="fileComposeDir" webkitdirectory directory multiple></label>
+            <button id="btnComposeFromLib" class="btn ghost">从图纸库全部添加</button>
+            <button id="btnComposeSrcClear" class="btn ghost">清空部件列表</button>
+          </div>
+          <div id="composeSourceInfo" class="kv"></div>
+          <div id="composeSourceList" class="list"></div>
+        </div>
+      </div>
+
+      <div id="composeLayerPanel" class="floatPanel composeFloatPanel">
+        <div class="floatHead">
+          <span class="floatTitle">③ 画布上的图层</span>
+          <button class="btn tiny floatToggle" data-float="composeLayerPanel">悬浮</button>
+        </div>
+        <div class="floatBody">
+          <p class="hint">在画布上<b>拖拽</b>可以挪部件；选中后用<b>方向键</b>逐格微调（按住 Shift 一次 5 格）。
+            画布上 <b>Shift 点击</b>或列表里 Shift 点名字＝多选，多选后可合并成一个新主体。</p>
+          <div class="row wrap">
+            <button id="btnComposeMerge" class="btn ghost" disabled>合并选中图层为新主体</button>
+            <span class="hint">合并后它们变成一个整体，不能再单独拖开。</span>
+          </div>
+          <div id="composeLayerInfo" class="kv"></div>
+          <div id="composeLayerList" class="list"></div>
+        </div>
+      </div>
+
+    </section>
+
+  </aside>
+
 </div>
 
 <!-- ===== 只保留图纸编辑所需的公共库：颜色表 / TXT 解析 / 碎色口径。
@@ -442,6 +453,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=17"></script>
+<script src="js/app.js?v=18"></script>
 </body>
 </html>

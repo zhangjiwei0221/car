@@ -1,11 +1,50 @@
 # 蚂蚁拿块关卡图修改工具
 
-> **当前版本（2026-10-30）：纯图纸工作台，两栏布局（左栏上传+图库，参数在画布下方）。**
+> **当前版本（2026-10-30）：纯图纸工作台。修图＝两栏（左栏上传+图库，参数在画布下方）；拼接＝三栏（左图库 / 中画布 / 右画布与部件）。**
 > 只做目标图 TXT 的查看、美术编辑、主体提取、图纸库、多图拼接和导出。
 > 求解路线、进度区间、多路线复核、自动演示、暂存压力图、重构关卡、待导出库、棋盘/暂存对比
 > 已从页面、`init()` 启动流程和脚本加载中移除。本目录只加载 `bin/js/utils.js`（颜色表）和
 > `bin/js/generator.js`（TXT 解析 / 碎色口径），不再加载 Solver / Simulator / PlayerSim / Analysis。
 > 操作说明见 [`使用说明.md`](./使用说明.md)；本文件保留下方历史交付记录。
+
+## 2026-10-30（二）· 拼接台 ①②③ 搬到画布右侧
+
+### 用户要求
+
+「新建画布、部件来源，和画布上的图层放到右侧。」（原话里的「不见来源」＝「部件来源」，同音误输）
+
+### 改动
+
+- `index.html`：新增右栏 `<aside class="side sideRight" id="composeRightSide">`，内卡片
+  `id="composeSetupCard"`，标题「5. 图纸拼接 · 画布与部件」，装：
+  `① 新建画布`（`inComposeRows/inComposeCols/btnComposeNew/btnComposeClear`）＋
+  `② 部件来源`（`composeSourcePanel`）＋`③ 画布上的图层`（`composeLayerPanel`）。
+  三块原样搬出，**内含 id 一个没改**。
+- `#composeCard` 只剩 `④ 规则生成`、`⑤ 在画布上画`、`⑥ 出图`，标题改为「5. 图纸拼接 · 规则 / 绘制 / 出图」，
+  仍在画布下方（`#paramArea` 里）。
+- `css/style.css` 新增第 18 节：`.sideRight { display:none }`，`body.composeMode .sideRight { display:block }`
+  宽 340px —— 这一栏是拼接专用，修图视图不出现（修图时画布右侧仍只有「编辑改动统计」）。
+- `js/app.js`：`COLLAPSIBLE_CARDS` 增加 `composeSetupCard`；三处提示文案由「下方『5. 图纸拼接』①」
+  改为「右边『5. 图纸拼接 · 画布与部件』①」。
+- 缓存标记 `css/style.css 17→18`、`js/app.js 17→18`。
+- 备份：`index.html.bak-20261030-右栏拼接前置`、`css/style.css.bak-20261030-右栏拼接前置`、
+  `js/app.js.bak-20261030-右栏拼接前置`。
+
+### 验证（无头 Chrome 注入脚本实测）
+
+- 拼接模式：`composeRightSide=shown / composeSetupCard=shown / composeCard=shown / 画布=shown /
+  图纸库=shown / 导入图纸=hidden`；
+- 点「新建画布」→ 顶栏「55×55　图层 0　颜色 0 种　像素 0」；改成 30×40 再点 → 「30×40 …」；
+- `composeSetupCard` 点标题折叠正常；`②` 悬浮/收回正常；
+- 退出拼接：`composeRightSide=hidden / composeSetupCard=hidden / composeCard=hidden /
+  editCard=shown / 画布=shown`；console 0 报错；
+- 1280px 宽下三栏不重叠（左 320 / 中 ~550 / 右 340），拼接顶栏换行但功能完整；
+- `node --check js/app.js` 通过。
+
+### 已知限制
+
+- 三栏并排后中间画布变窄（1600px 屏约 890px，1280px 屏约 550px）。55×55 默认 9px/格＝495px 放得下，
+  想更大就用拼接顶栏的「像素」滑块或把右栏的 ②③ 点「悬浮」拖开。
 
 ## 2026-10-30 · 布局改版：左栏只留上传与图库，参数全部搬到画布下方
 

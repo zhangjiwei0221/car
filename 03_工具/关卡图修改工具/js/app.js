@@ -84,7 +84,7 @@
   var UI_PREF_STORAGE_KEY = 'antArtTool_uiPrefs_v1';
 
   // 每新增一张卡片都要登记到这里，否则那张卡片点标题没反应，属于静默失效。
-  var COLLAPSIBLE_CARDS = ['cardImport', 'pieceLibCard', 'viewExportDock', 'editCard', 'extractCard', 'composeCard'];
+  var COLLAPSIBLE_CARDS = ['cardImport', 'pieceLibCard', 'viewExportDock', 'editCard', 'extractCard', 'composeSetupCard', 'composeCard'];
 
   // ==================== 日志与遮罩 ====================
   function log(msg) {
@@ -832,7 +832,7 @@
     document.body.classList.add('composeMode');
     syncComposeModeButton();
     if (!cpHasCanvas()) {
-      log('已进入拼接工作台。先在下方「5. 图纸拼接」①里设定新图规格并点「新建画布」，' +
+      log('已进入拼接工作台。先在右边「5. 图纸拼接 · 画布与部件」①里设定新图规格并点「新建画布」，' +
         '再从②的部件列表把部件放上画布。');
     } else {
       log('已回到拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，' + C2.layers.length + ' 个图层还在）。');
@@ -1037,7 +1037,7 @@
       cv.width = 600; cv.height = 160;
       composePaintChecker(ctx, cv.width, cv.height, 16);
       ctx.fillStyle = '#68707a'; ctx.font = '13px sans-serif';
-      ctx.fillText('还没有画布 —— 在下方「5. 图纸拼接」①设定规格并点「新建画布」', 20, 40);
+      ctx.fillText('还没有画布 —— 在右边「5. 图纸拼接 · 画布与部件」①设定规格并点「新建画布」', 20, 40);
       return;
     }
     var cell = composeCell(), rows = C2.rows, cols = C2.cols;
@@ -1343,7 +1343,7 @@
   /**
    * 撤销 / 重做按钮的同步。
    * 两处按钮共用：拼接工作台顶栏（看得见的地方，顶栏顺带显示还能撤几步）
-   * 与画布下方「⑤ 在画布上画」那张卡片里的按钮。
+   * 与画布下方「⑤ 在画布上画」那张卡片里的按钮（①–③ 在画布右侧）。
    */
   function syncComposeHistoryButtons() {
     var C2 = cpS();
@@ -1472,7 +1472,7 @@
     if (!cpHasCanvas()) {
       // 原先这里是静默 return —— 用户在没建画布时点画布，什么反应都没有，
       // 只能自己猜是哪里不对。改成如实说清下一步。
-      log('还没有画布，点不了。先在下方「5. 图纸拼接」①填好行列，点「新建画布」。');
+      log('还没有画布，点不了。先在右边「5. 图纸拼接 · 画布与部件」①填好行列，点「新建画布」。');
       return;
     }
     var p = composeEventToCell(ev);

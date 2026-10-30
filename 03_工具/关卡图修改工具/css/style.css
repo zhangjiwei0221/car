@@ -623,3 +623,14 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
 
 /* 拼接模式下参数区只剩「5. 图纸拼接」一张卡，占满整行（它行内控件多，塞进 330px 会全折行） */
 body.composeMode .paramArea { grid-template-columns: 1fr; }
+
+/* ==================== 18. 2026-10-30 拼接台右栏：① 新建画布 / ② 部件来源 / ③ 画布上的图层 ====================
+   用户原话：「新建画布、部件来源，和画布上的图层放到右侧」。
+   这三块是摆部件时一直在看的东西，放画布右边不用上下滚，中间画布也不必被窄参数列挤着。
+   它们只服务于拼接，修图视图整体隐藏（修图时画布右侧只留「编辑改动统计」）。 */
+.sideRight { display: none; width: 340px; flex: 0 0 340px; }
+body.composeMode .sideRight { display: block; }
+/* 右栏里 ②③ 两个悬浮面板跟卡片同宽，别再把内边距叠一层 */
+.sideRight .composeFloatPanel { margin: 8px 0 0; }
+.sideRight .composeFloatPanel .list { max-height: 220px; }
+
