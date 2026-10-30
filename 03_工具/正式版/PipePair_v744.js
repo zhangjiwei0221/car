@@ -20,6 +20,7 @@ const MIN_GAIN = Number(arg('--min-gain', 3));
 const ABLATE = has('--ablate');
 const NO_EMPTY = has('--no-empty');   // 搬空的车格直接涂黑（不允许棋盘上出现空格）
 const A = B.loadSolver(REF);
+const { createPool } = require('./EvalPool_v749');
 const INSTANT = MODE !== 'a';
 
 const DIRS = { 11: [-1, 0], 12: [0, 1], 13: [1, 0], 14: [0, -1] };
@@ -38,6 +39,7 @@ function metrics(g) {
   return { won: !!o.completed, peak: Math.max(0, ...buf), at4, run4, steps: n, late4, firstUse };
 }
 
+(async () => {
 const base = JSON.parse(fs.readFileSync(FILE, 'utf8'));
 const R = base.spools.length, C = base.spools[0].length;
 const b0 = metrics(base);
@@ -88,6 +90,7 @@ function build(g, Bcolor, pipeR, pipeC, dir, frontR, frontC) {
   return h;
 }
 
+const batch = [];
 let best = null;
 const rej = { noSlot: 0, unsolv: 0, peak: 0, nogain: 0, noserial: 0, ok: 0 };
 for (const Bcolor of bCands) {
@@ -98,20 +101,31 @@ for (const Bcolor of bCands) {
       if (pr < 0 || pr >= R || pc < 0 || pc >= C) continue;
       const h = build(base, Bcolor, pr, pc, dir, fr, fc);
       if (!h) { rej.noSlot++; continue; }
-      let e; try { e = metrics(h); } catch (err) { continue; }
-      if (!e.won) { rej.unsolv++; continue; }
-      if (e.peak > 4) { rej.peak++; continue; }
-      const gainAt4 = e.at4 - b0.at4, gainLate = e.late4 - b0.late4;
-      if (gainAt4 < MIN_GAIN && gainLate < MIN_GAIN) { rej.nogain++; continue; }
-      // 串行校验：B 的首次可用步数必须明显晚于 Q
-      const bFirst = e.firstUse[Bcolor] || 999;
-      const qFirst = e.firstUse[base.spools[fr][fc].id] || 0;
-      if (bFirst < qFirst + 3) { rej.noserial++; continue; }
-      const score = gainAt4 * 2 + gainLate;
-      if (!best || score > best.score) best = { score, Bcolor, pr, pc, dir, fr, fc, e, g: h, bFirst, qFirst, gainAt4, gainLate };
+      batch.push({ Bcolor, pr, pc, dir, fr, fc, h });
     }
   }
 }
+
+// 并行评估全部候选
+{
+  const pool = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE });
+  const evals = await pool.evalAll(batch.map(b => b.h));
+  await pool.close();
+  for (let i = 0; i < batch.length; i++) {
+    const b = batch[i], e = evals[i];
+    if (!e || e.error) continue;
+    if (!e.won) { rej.unsolv++; continue; }
+    if (e.peak > 4) { rej.peak++; continue; }
+    const gainAt4 = e.at4 - b0.at4, gainLate = e.late4 - b0.late4;
+    if (gainAt4 < MIN_GAIN && gainLate < MIN_GAIN) { rej.nogain++; continue; }
+    const bFirst = e.firstUse[BcolorOf(b)] || 999;
+    const qFirst = e.firstUse[base.spools[b.fr][b.fc].id] || 0;
+    if (bFirst < qFirst + 3) { rej.noserial++; continue; }
+    const score = gainAt4 * 2 + gainLate;
+    if (!best || score > best.score) best = { score, Bcolor: b.Bcolor, pr: b.pr, pc: b.pc, dir: b.dir, fr: b.fr, fc: b.fc, e, g: b.h, bFirst, qFirst, gainAt4, gainLate };
+  }
+}
+function BcolorOf(b) { return b.Bcolor; }
 
 console.log('筛选统计:', JSON.stringify(rej));
 if (!best) { console.log('没有管道候选能同时满足：可解 / 峰值≤4 / at4或后段 +' + MIN_GAIN + ' / 串行', '→ 本关失败'); process.exit(0); }
@@ -127,3 +141,4 @@ if (ABLATE) {
 
 fs.writeFileSync(OUT, JSON.stringify(best.g, null, 2));
 console.log('已写出：' + OUT);
+})().catch(e => { console.error(e); process.exit(1); });
