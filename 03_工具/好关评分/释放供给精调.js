@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
+const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','游戏主bin','bin','js');
 const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','release-tuner.js','generator.js'];const sb={console:{log(){},warn(){},error(){}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
 const args=process.argv.slice(2),file=args[0];function opt(n,d){const i=args.indexOf('--'+n);return i>=0?+args[i+1]:d;}function str(n,d){const i=args.indexOf('--'+n);return i>=0?args[i+1]:d;}const capMin=opt('cap-min',0),capMax=opt('cap-max',0),out=str('out',''),dump=str('dump-best','');if(!file||!(capMin>0&&capMax>=capMin))throw new Error('需要关卡和容量上下界');
 const raw=JSON.parse(fs.readFileSync(file,'utf8')),level=A.parseLevel(raw.spools?A.fromGameFormat(raw):raw),sr=A.Solver.solve(level),base=A.ExperienceGoal.evaluate(level,{solveResult:sr,decision:true}),made=A.ReleaseTuner.supplyVariants(level,sr,{capMin,capMax}),rec={file,base:{metrics:base.metrics,release:base.releaseDecision.status},reason:made.reason,variants:[]};let win=null;

@@ -8,7 +8,7 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const INPUT_ROOT = path.join(ROOT, '关卡');
 const OUT = path.join(__dirname, arg('out', '障碍落地修复验证_v571.json'));
 const LEVEL_DIR = path.join(__dirname, arg('levels-dir', '障碍落地修复验证_v571.levels'));

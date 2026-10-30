@@ -2,7 +2,7 @@
 /** v520：Git旧门 vs 工作区低压力门，同图同seed同预算真实生成。 */
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process'), crypto = require('crypto');
-const ROOT = path.join(__dirname, '..', '..'), REL = '02_工程/完整主bin快照_20261012/bin/js', BIN = path.join(ROOT, REL);
+const ROOT = path.join(__dirname, '..', '..'), REL = '02_工程/游戏主bin/bin/js', BIN = path.join(ROOT, REL);
 const CANDIDATE = path.join(__dirname, '候选低压力门_v520');
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js', 'source-preflight.js'];
 function opt(n, d) { const i = process.argv.indexOf('--' + n); return i >= 0 ? process.argv[i + 1] : d; }

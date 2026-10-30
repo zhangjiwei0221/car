@@ -1,7 +1,7 @@
 // 生成「切球动画」HTML：对比三种切法（依赖层 / 贪心轮次 / 按总量）
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const TXT = process.argv[2] || '/Users/red/Downloads/蚂蚁图库/拼接图/拼接图图库/40x40拼接图纸_016.txt';
-const OUT = process.argv[3] || path.join(__dirname, '..', '..', '01_交接文档', '切球动画.html');
+const OUT = process.argv[3] || path.join(__dirname, '..', '..', '01_项目文档', '切球动画.html');
 const CAP = 30;
 
 const blocks = fs.readFileSync(TXT, 'utf8').split(/\r?\n/).map(l => l.trim())
@@ -79,7 +79,7 @@ const dist = blocks.map(row => row.map(() => -1));
 const MAXDIST = Math.max(...dist.flat());
 
 // ---- ② 贪心日程轮次（引擎 eliminationOrder）----
-const BIN = path.join(__dirname, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(__dirname, '..', '..', '02_工程', '游戏主bin', 'bin', 'js');
 const FILES = ['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','generator.js'];
 const sb = { console:{log(){},warn(){},error(){}}, module:{exports:{}}, WeakMap, Map, Set, setTimeout, clearTimeout, Infinity, Math, JSON };
 vm.createContext(sb);

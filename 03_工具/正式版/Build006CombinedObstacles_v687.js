@@ -15,7 +15,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const SOURCE = path.join(ROOT, '实验关/关卡6/原型_v14/关卡_实验_006_v14.json');
 const ATLAS = path.join(ROOT, '实验关/关卡6/分析_v632/target-atlas.json');
 const OUT = path.join(ROOT, '实验关/关卡6/原型_v17');

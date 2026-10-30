@@ -48,7 +48,7 @@ for (const s of cfg.subjects) {
 // 每个主体的内部量化：只保留它自己最常用的 K 色，其余按最近色并入
 if (SUBCOLORS.length) {
   const pal0 = (() => {
-    const src = fs.readFileSync(path.join(ROOT, '02_工程/完整主bin快照_20261012/bin/js/utils.js'), 'utf8');
+    const src = fs.readFileSync(path.join(ROOT, '02_工程/游戏主bin/bin/js/utils.js'), 'utf8');
     const m2 = {}; const re = /\{\s*name:\s*'([^']+)',\s*hex:\s*'#([0-9A-Fa-f]{6})'\s*\}\s*,\s*\/\/\s*(\d+)/g;
     let mm; while ((mm = re.exec(src))) m2[+mm[3]] = mm[2];
     return m2;
@@ -110,7 +110,7 @@ if (cfg.entryRing) {
 
 // 色数收敛：超过上限时，把用量最少的颜色并到最近的保留色
 function loadPalette() {
-  const src = fs.readFileSync(path.join(ROOT, '02_工程/完整主bin快照_20261012/bin/js/utils.js'), 'utf8');
+  const src = fs.readFileSync(path.join(ROOT, '02_工程/游戏主bin/bin/js/utils.js'), 'utf8');
   const pal = {}; const re = /\{\s*name:\s*'([^']+)',\s*hex:\s*'#([0-9A-Fa-f]{6})'\s*\}\s*,\s*\/\/\s*(\d+)/g;
   let m; while ((m = re.exec(src))) pal[+m[3]] = m[2];
   return pal;
@@ -175,7 +175,7 @@ if (PNG) {
 import re
 from PIL import Image
 pal={}
-src=open('02_工程/完整主bin快照_20261012/bin/js/utils.js').read()
+src=open('02_工程/游戏主bin/bin/js/utils.js').read()
 for mm in re.finditer(r"{ name: '([^']+)',\\s+hex: '#([0-9A-Fa-f]{6})' \\}\\s*,\\s*// (\\d+)", src):
     pal[int(mm.group(3))]=mm.group(2)
 lines=[l for l in open('${OUT}').read().strip().splitlines() if l.strip()]

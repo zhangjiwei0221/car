@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
 const QUEUE_ORDER = process.env.QUEUE_ORDER === 'asc' ? 'asc' : 'desc';
 const OUT = path.join(__dirname, '棋盘混合容量_v576_' + QUEUE_ORDER + '.json');

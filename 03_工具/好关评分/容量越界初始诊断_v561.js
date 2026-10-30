@@ -5,7 +5,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const REL = '02_工程/完整主bin快照_20261012/bin/js';
+const REL = '02_工程/游戏主bin/bin/js';
 const BIN = path.join(ROOT, REL);
 const OLD = 'ed468cd';
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',

@@ -2,7 +2,7 @@
 /** v518：有真实容量边界的结构近失精调，先结构评价，不要求先过体验曲线。 */
 'use strict';
 const fs=require('fs'),path=require('path'),vm=require('vm'),crypto=require('crypto');
-const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js'),FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','generator.js'];
+const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','游戏主bin','bin','js'),FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','generator.js'];
 const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON,setTimeout,clearTimeout,Infinity};vm.createContext(sb);for(const f of FILES)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver,G=A.Generator;
 function opt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?process.argv[i+1]:d;}const budget=+opt('budget','20000'),out=opt('out',''),only=opt('levels','recommend_32677').split(',');
 const sources={recommend_32677_near:{report:'独立回归_32677_v516.json',image:'recommend',level:'推荐32677_近失变体_v518.json'},recommend_32677:{report:'独立回归_32677_v516.json',image:'recommend',level:'独立回归关卡_v516/recommend_32677.json'},recommend_1002:{report:'独立回归_1002_v516.json',image:'recommend',level:'独立回归关卡_v516/recommend_1002.json'},good_32677:{report:'独立回归_32677_v516.json',image:'good',level:'独立回归关卡_v516/good_32677.json'}};

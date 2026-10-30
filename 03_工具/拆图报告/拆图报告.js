@@ -26,7 +26,7 @@ const fs = require('fs');
 const path = require('path');
 
 const HERE = __dirname;
-const BINJS = path.join(HERE, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BINJS = path.join(HERE, '..', '..', '02_工程', '游戏主bin', 'bin', 'js');
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
                'playersim.js', 'analysis.js', 'generator.js'];
 

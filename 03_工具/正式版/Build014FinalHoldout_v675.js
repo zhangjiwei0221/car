@@ -18,7 +18,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const TARGET = path.join(ROOT, '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_014.txt');
 const OUT = path.join(ROOT, '实验关/关卡14/原型_v1');
 const MODULES = [

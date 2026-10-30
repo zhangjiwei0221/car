@@ -2,7 +2,7 @@
 /** v504：读取目标搜索A/B JSON，按结构/远近/释放/顶格/末段分类，不重跑生成。 */
 'use strict';
 const fs=require('fs'),path=require('path'),vm=require('vm');
-const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
+const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','游戏主bin','bin','js');
 const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js'];
 const sb={console:{log(){},warn(){},error(){}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
 const args=process.argv.slice(2),oi=args.indexOf('--out'),outFile=oi>=0?args[oi+1]:'';

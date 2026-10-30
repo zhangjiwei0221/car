@@ -38,7 +38,7 @@ def load(p):
     return [[int(x) for x in l.split()] for l in lines]
 
 def palette():
-    src = open(os.path.join(ROOT, '02_工程/完整主bin快照_20261012/bin/js/utils.js'), encoding='utf-8').read()
+    src = open(os.path.join(ROOT, '02_工程/游戏主bin/bin/js/utils.js'), encoding='utf-8').read()
     pal = {}
     for m in re.finditer(r"{ name: '([^']+)',\s+hex: '#([0-9A-Fa-f]{6})' \}\s*,\s*// (\d+)", src):
         idx = int(m.group(3))

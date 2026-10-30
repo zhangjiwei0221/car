@@ -10,7 +10,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const IMAGE = '蚂蚁图库/拼接图/拼接图图库/35x35拼接图纸_007.txt';
 const SEEDS = String(process.argv.find(function(x) { return x.indexOf('--seeds=') === 0; }) || '--seeds=1001,1002,32677')
   .slice('--seeds='.length).split(',').map(Number);

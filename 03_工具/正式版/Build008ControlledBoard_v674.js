@@ -18,7 +18,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const V1 = path.join(ROOT, '实验关/关卡8/原型_v1/关卡_实验_008_v1.json');
 const OUT = path.join(ROOT, '实验关/关卡8/原型_v2');
 const MODULES = [

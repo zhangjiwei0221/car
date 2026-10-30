@@ -8,7 +8,7 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
 const OUT = path.join(__dirname, '债务间隔_v596.json');
 const LEVEL_DIR = path.join(__dirname, '债务间隔_v596.levels');

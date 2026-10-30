@@ -16,7 +16,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const OUT = path.join(
   ROOT,
   '02_工程',
-  '完整主bin快照_20261012',
+  '游戏主bin',
   'bin',
   'js',
   'story-compiler.js'

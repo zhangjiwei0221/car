@@ -61,7 +61,7 @@ function findBin() {
     let names = [];
     try { names = fs.readdirSync(dir); } catch (e) { names = []; }
     for (const n of names) {
-      const cands = [path.join(dir, n, 'bin', 'js'), path.join(dir, n, '完整主bin快照_20261012', 'bin', 'js')];
+      const cands = [path.join(dir, n, 'bin', 'js'), path.join(dir, n, '游戏主bin', 'bin', 'js')];
       for (const cd of cands) if (fs.existsSync(path.join(cd, 'utils.js'))) return cd;
     }
     const direct = path.join(dir, 'bin', 'js');
@@ -149,7 +149,7 @@ if (!CL) {
 }
 if (!CL) {
   console.log('⚠ 这份工程副本里没有色库模块 color-libs.js（' + BIN + '）——「老色库 34 色」照常可用；');
-  console.log('  要用「官方 22 色」请加 --bin 指向带 color-libs.js 的工程（如 完整主bin快照_20261012/bin/js）。');
+  console.log('  要用「官方 22 色」请加 --bin 指向带 color-libs.js 的工程（如 游戏主bin/bin/js）。');
 }
 
 // ---------- 0. 【v154】定"取色表"与"输出色库" ----------
@@ -159,7 +159,7 @@ if (!CL) {
 //             而工作态要用 0 表示空位，所以整体 +1；出文件时再减回去（空位写 -1）。
 function paletteOf(lib) {
   if (lib === 'official') {
-    if (!CL) throw new Error('这份工程副本没有 color-libs.js，取不到官方 22 色。请加 --bin 指向 完整主bin快照_20261012/bin/js');
+    if (!CL) throw new Error('这份工程副本没有 color-libs.js，取不到官方 22 色。请加 --bin 指向 游戏主bin/bin/js');
     return CL.OFFICIAL.colors.map((c, i) => ({ id: i + 1, hex: c.hex, name: c.name }));
   }
   // 老色库：有色库模块就用它（与求解器内置副本同源）；没有就直接用工程的 AntSolver.COLORS

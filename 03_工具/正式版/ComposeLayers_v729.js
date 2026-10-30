@@ -97,7 +97,7 @@ if (PNG) {
 import re,sys
 from PIL import Image
 pal={}
-src=open('02_工程/完整主bin快照_20261012/bin/js/utils.js').read()
+src=open('02_工程/游戏主bin/bin/js/utils.js').read()
 for mm in re.finditer(r"{ name: '([^']+)',\\s+hex: '#([0-9A-Fa-f]{6})' \\}\\s*,\\s*// (\\d+)", src):
     pal[int(mm.group(3))]=mm.group(2)
 lines=[l for l in open('${OUT}').read().strip().splitlines() if l.strip()]

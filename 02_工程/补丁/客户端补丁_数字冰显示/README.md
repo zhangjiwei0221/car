@@ -3,7 +3,7 @@
 这三个脚本打的是**实机游戏的可执行文件**（`ParkPassenger.app` / `ParkPassenger_patched.app` 的 `Contents/MacOS/ParkPassenger`），
 **不是** `02_工程/补丁/` 里那些给求解器（bin/）用的 diff。两者别搞混：
 
-- 求解器侧改动 → `补丁_*.patch`（`patch -p1` 打到 `完整主bin快照_20261012/`）
+- 求解器侧改动 → `补丁_*.patch`（`patch -p1` 打到 `游戏主bin/`）
 - 客户端侧改动 → 本目录的脚本（直接改 124MB 可执行文件里的几十~两百字节）
 
 ## 怎么用
@@ -20,7 +20,7 @@ python3 make_v13_解锁后显示容量.py       # 读 /private/tmp/ParkPassenger
 装进 app：把生成的二进制覆盖到 `…/Contents/MacOS/ParkPassenger`（覆盖前先备份），**然后必须重启游戏**才生效
 （这包带 quarantine，macOS 会做 App Translocation）。
 
-## 三版各改了什么（详细经过见 `01_交接文档/工作日志_20261012.md` 第十六节）
+## 三版各改了什么（详细经过见 `01_项目文档/工作日志_20261012.md` 第十六节）
 
 | 脚本 | 版本 | 改了什么 |
 | --- | --- | --- |

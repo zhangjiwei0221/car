@@ -1,0 +1,553 @@
+/* 像素毛线关卡生成工具 - 样式表 */
+
+/* CSS变量定义 */
+:root {
+    --primary-color: #4a90d9;
+    --success-color: #5cb85c;
+    --secondary-color: #6c757d;
+    --danger-color: #d9534f;
+    --background-color: #f5f5f5;
+    --border-color: #ddd;
+    --text-color: #333;
+    --white: #fff;
+    --black: #000;
+    --cell-size: 40px;
+    --gap-size: 2px;
+}
+
+/* 重置样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.5;
+}
+
+/* 应用容器 */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* 工具栏 */
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background-color: var(--white);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+select.btn {
+    background-color: var(--white);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    appearance: auto;
+}
+
+.btn-primary:hover {
+    background-color: #3a7bc8;
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    color: var(--white);
+}
+
+.btn-success:hover {
+    background-color: #4cae4c;
+}
+
+.btn-secondary {
+    background-color: var(--secondary-color);
+    color: var(--white);
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+/* 主内容区域 - 上中下布局 */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 15px;
+    flex: 1;
+}
+
+/* 区域通用样式 */
+.zone {
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.zone-header {
+    padding: 10px 16px;
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+.zone-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.zone-controls {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.control-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--secondary-color);
+}
+
+.control-group input[type="number"],
+.control-group input[type="text"] {
+    width: 80px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.control-group input[type="text"] {
+    width: 150px;
+}
+
+.control-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+/* 缩放滑块 */
+.control-group input[type="range"] {
+    width: 120px;
+    cursor: pointer;
+}
+
+.control-group span {
+    font-size: 12px;
+    color: var(--secondary-color);
+    min-width: 40px;
+}
+
+.control-group span.hint {
+    font-size: 11px;
+    color: #888;
+    font-style: italic;
+    min-width: auto;
+}
+
+/* 颜色选择面板 */
+.color-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    max-width: 600px;
+}
+
+.color-swatch {
+    width: 24px;
+    height: 24px;
+    border: 2px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 2px black;
+    transition: transform 0.1s, border-color 0.1s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+}
+
+.color-swatch.selected {
+    border-color: var(--black);
+    transform: scale(1.15);
+}
+
+.color-swatch.empty-swatch {
+    background-color: #f0f0f0;
+    border: 2px dashed #ccc;
+    color: #999;
+}
+
+/* 特殊元素面板 */
+.special-panel {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.special-elements {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.special-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--white);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.special-btn:hover {
+    background-color: var(--primary-color);
+    color: var(--white);
+    border-color: var(--primary-color);
+}
+
+.special-btn.active,
+.special-btn.selected {
+    background-color: var(--primary-color);
+    color: var(--white);
+    border-color: var(--primary-color);
+}
+
+/* 地形选项面板 */
+.terrain-panel {
+    margin-top: 8px;
+}
+
+.terrain-elements {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.terrain-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--white);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.terrain-btn:hover {
+    background-color: #333;
+    color: var(--white);
+    border-color: #333;
+}
+
+.terrain-btn.selected {
+    background-color: #333;
+    color: var(--white);
+    border-color: #333;
+}
+
+/* 区域内容 */
+.zone-content {
+    flex: 1;
+    padding: 16px;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 150px;
+}
+
+/* 网格容器 - CSS Grid */
+.grid-container {
+    display: grid;
+    gap: var(--gap-size);
+    background-color: var(--border-color);
+    padding: var(--gap-size);
+    border-radius: 4px;
+}
+
+/* 网格单元格 */
+.grid-cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background-color: var(--white);
+    border: 1px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    position: relative;
+    font-size: 10px;
+}
+
+.grid-cell:hover {
+    background-color: #f0f0f0;
+    box-shadow: inset 0 0 0 2px var(--primary-color);
+}
+
+/* 黑块样式 */
+.grid-cell.black-block {
+    background-color: var(--black);
+    cursor: not-allowed;
+}
+
+/* 空位样式 */
+.grid-cell.empty-cell {
+    background-color: #f9f9f9;
+}
+
+/* 地形区单元格样式 */
+.grid-cell.terrain-cell {
+    transition: background-color 0.15s;
+}
+
+.grid-cell.terrain-blocked {
+    background-color: var(--black);
+}
+
+.grid-cell.terrain-blocked:hover {
+    background-color: #333;
+}
+
+.grid-cell.terrain-passable {
+    background-color: var(--white);
+}
+
+.grid-cell.terrain-passable:hover {
+    background-color: #f0f0f0;
+}
+
+/* 特殊元素图标叠加 */
+.grid-cell .special-icon {
+    position: absolute;
+    font-size: 8px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 1px 3px;
+    border-radius: 2px;
+}
+
+.grid-cell .special-icon:first-child {
+    top: 2px;
+    right: 2px;
+}
+
+.grid-cell .special-icon:nth-child(2) {
+    bottom: 2px;
+    left: 2px;
+}
+
+/* 颜色单元格 - 用于显示颜色ID */
+.grid-cell .color-id {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--white);
+    text-shadow: 0 0 2px var(--black);
+}
+
+/* 单元格图片 */
+.grid-cell .cell-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* 特殊元素图标容器 - 占单元格1/4大小 */
+.grid-cell .special-icon-container {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.grid-cell .special-icon-container:first-of-type {
+    top: 0;
+    right: 0;
+}
+
+.grid-cell .special-icon-container:nth-of-type(2) {
+    bottom: 0;
+    left: 0;
+}
+
+.grid-cell .special-icon-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* 特殊元素文字图标 */
+.grid-cell .special-icon-text {
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 2px;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 管道组个数标签 */
+.grid-cell .pipe-count-label {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    background-color: #e74c3c;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+}
+
+/* 线轴像素数标签 */
+.grid-cell .spool-count-label {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    min-width: 9px;
+    height: 9px;
+    padding: 0 1px;
+    font-size: 7px;
+    font-weight: bold;
+    line-height: 9px;
+    color: #fff;
+    background-color: rgba(35, 35, 35, 0.9);
+    border-radius: 5px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 9;
+}
+
+/* 管道单元格 */
+.grid-cell.pipe-cell {
+    background-color: #f0f0f0;
+}
+
+.grid-cell .pipe-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.grid-cell .pipe-text {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+}
+
+/* 错误提示 Toast */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    background-color: var(--danger-color);
+    color: var(--white);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.toast.hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+    pointer-events: none;
+}
+
+/* 颜色映射 - 由 utils.js 中的 COLOR_MAP 动态注入 */
+
+/* 统计标签样式 */
+.stats-group .stat-value {
+    font-weight: bold;
+    color: var(--primary-color);
+    min-width: 30px;
+    text-align: center;
+}
+
+/* 空状态提示 */
+.empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--secondary-color);
+    font-size: 14px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    width: 100%;
+}

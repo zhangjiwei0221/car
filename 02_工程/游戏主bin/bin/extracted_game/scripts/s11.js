@@ -1,0 +1,1 @@
+window.pi.injectAdData=function(){if(!this.env.impressionId)try{const i=mraid.getMraidAdData();this.env.impressionId=i.UII,this.env.creativeId=i.creativeId||"",this.env.campaignId=i.campaignId||""}catch(i){console.warn("mraid API is not available, skipping ad data injection")}}

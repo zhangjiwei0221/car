@@ -2,8 +2,8 @@
 /** v520：固定历史UI批次留出复核，使用落库曲线和当时体验标签。 */
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const ROOT = path.join(__dirname, '..', '..'), OUT = path.join(ROOT, '02_工程', '完整主bin快照_20261012', '输出文件');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const ROOT = path.join(__dirname, '..', '..'), OUT = path.join(ROOT, '02_工程', '游戏主bin', '输出文件');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const sb = { console, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
 vm.createContext(sb); for (const f of ['utils.js', 'color-libs.js']) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sb, { filename: f });
 const A = sb.AntSolver;

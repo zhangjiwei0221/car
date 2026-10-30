@@ -2,12 +2,12 @@
 /** v513预实验：同图同seed同produceGoal总预算，旧容量臂各自计时 vs 新容量臂共享计时。 */
 'use strict';
 const fs=require('fs'),path=require('path'),vm=require('vm'),crypto=require('crypto'),cp=require('child_process');
-const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
+const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','游戏主bin','bin','js');
 const FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js'];
 function opt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?process.argv[i+1]:d;}function num(n,d){return +opt(n,d);}
 const budgetMs=num('budget',60000),roundMs=num('round',20000),seed=num('seed',1001),out=opt('out',''),sharedBoth=opt('shared-both','0')==='1';
 const candidatePath=opt('candidate','/tmp/generator_v513_candidate.js');
-const rel='02_工程/完整主bin快照_20261012/bin/js/generator.js';
+const rel='02_工程/游戏主bin/bin/js/generator.js';
 const baselineSource=cp.execFileSync('git',['show','HEAD:'+rel],{cwd:ROOT,encoding:'utf8',maxBuffer:32*1024*1024});
 const candidateSource=fs.readFileSync(path.resolve(ROOT,candidatePath),'utf8');
 function load(source){const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON,setTimeout,clearTimeout,Infinity};vm.createContext(sb);for(const f of FILES)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});vm.runInContext(source,sb,{filename:'generator-under-test.js'});return sb.AntSolver;}

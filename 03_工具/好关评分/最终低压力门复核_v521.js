@@ -2,14 +2,14 @@
 /** v521：近失关最终补充验收、时间模式不变、其他结构失败不可抵消。 */
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm'), cp = require('child_process'), assert = require('assert');
-const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js'), CAND = path.join(__dirname, '候选最终低压力门_v521');
+const ROOT = path.join(__dirname, '..', '..'), BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js'), CAND = path.join(__dirname, '候选最终低压力门_v521');
 const CURRENT = process.argv.includes('--current'), OUT_NAME = CURRENT ? '最终低压力门近失复核_v522.json' : '最终低压力门近失复核_v521.json';
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js', 'capacity-tuner.js', 'generator.js'];
 function load(arm) {
   const sb = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON, setTimeout, clearTimeout, Infinity };
   vm.createContext(sb);
   for (const f of FILES) {
-    const source = arm === 'old' ? cp.execFileSync('git', ['show', '07f7c11:02_工程/完整主bin快照_20261012/bin/js/' + f], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }) :
+    const source = arm === 'old' ? cp.execFileSync('git', ['show', '07f7c11:02_工程/游戏主bin/bin/js/' + f], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }) :
       fs.readFileSync((f === 'utils.js' || f === 'generator.js') ? path.join(CURRENT ? BIN : CAND, f) : path.join(BIN, f), 'utf8');
     vm.runInContext(source, sb, { filename: f });
   }

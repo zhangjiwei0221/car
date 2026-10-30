@@ -8,7 +8,7 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const LEVEL_DIR = path.join(__dirname, '目标分支策略矩阵_v570.levels');
 const LEVEL_PATH = path.join(LEVEL_DIR, '006_1001_A_base_shortDebt.json');
 const ROUTE_PATH = path.join(LEVEL_DIR, '006_1001_A_base_shortDebt.route.json');

@@ -3,7 +3,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
   'playersim.js', 'analysis.js', 'car-sequencer.js', 'solver-analysis.js', 'experience-goal.js',
   'capacity-tuner.js', 'instant-playout.js', 'generator.js', 'source-preflight.js'];
@@ -33,7 +33,7 @@ const probe = A.Generator.produceFixed(blocks, {
   targetCarCount: 52, blackPercent: 10, experienceGoal: false,
   candidateCount: 1, rounds: 0, timeBudgetMs: 30000, acceptMode: 'time'
 });
-const html = fs.readFileSync(path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(BIN, 'app.js'), 'utf8');
 const checks = {
   generatorDefaultConfig: A.Generator.DEFAULT_CONFIG.instantChain === true &&

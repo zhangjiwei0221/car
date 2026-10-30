@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const cp = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
 const OUT = path.join(__dirname, '路线障碍接入_v613.json');
 const LEVEL_DIR = path.join(__dirname, '路线障碍接入_v613.levels');
@@ -133,7 +133,7 @@ function summary(result) {
 const PRE_INTEGRATION_REF = '74cc317';
 const stableGenerator = cp.execFileSync('git', [
   'show',
-  PRE_INTEGRATION_REF + ':02_工程/完整主bin快照_20261012/bin/js/generator.js'
+  PRE_INTEGRATION_REF + ':02_工程/游戏主bin/bin/js/generator.js'
 ], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 const ABefore = load(stableGenerator);
 const A = load();

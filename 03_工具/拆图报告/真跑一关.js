@@ -16,8 +16,8 @@ const fs = require('fs');
 const path = require('path');
 
 const HERE = __dirname;
-const BIN = path.join(HERE, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin');
-const DEFAULT_SCHEME = path.join(HERE, '..', '..', '02_工程', '完整主bin快照_20261012', '方案文件夹', '方案_v120四方向低管道去微棋盘.json');
+const BIN = path.join(HERE, '..', '..', '02_工程', '游戏主bin', 'bin');
+const DEFAULT_SCHEME = path.join(HERE, '..', '..', '02_工程', '游戏主bin', '方案文件夹', '方案_v120四方向低管道去微棋盘.json');
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
                'playersim.js', 'analysis.js', 'generator.js'];
 

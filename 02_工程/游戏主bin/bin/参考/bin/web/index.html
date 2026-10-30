@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>大像素版毛线关卡 生成-审核-分析工具</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #2a1b12; color: #f5e9dc; padding: 20px; }
+h1 { text-align: center; margin-bottom: 20px; color: #ffb066; font-size: 1.4em; }
+.container { max-width: 1200px; margin: 0 auto; }
+.panel { background: #3a2618; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #5a3d27; }
+.panel h2 { font-size: 1em; color: #ffc189; margin-bottom: 12px; }
+.row { display: flex; gap: 16px; flex-wrap: wrap; }
+.col { flex: 1; min-width: 300px; }
+
+/* 上传区 */
+.upload-zone { border: 2px dashed #8a5a36; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.3s; }
+.upload-zone:hover, .upload-zone.dragover { border-color: #ffb066; background: #4a3120; }
+.upload-zone p { color: #d8b694; }
+.file-list { margin-top: 12px; max-height: 150px; overflow-y: auto; font-size: 0.85em; }
+.file-list div { padding: 4px 8px; background: #5a3a22; border-radius: 4px; margin: 4px 0; }
+
+/* 参数 */
+.param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+.param-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.param-item label { font-size: 0.85em; color: #e0bc97; min-width: 100px; }
+.param-item input { width: 60px; padding: 4px 8px; border-radius: 4px; border: 1px solid #6a4528; background: #5a3a22; color: #f5e9dc; text-align: center; }
+.param-item span { font-size: 0.75em; color: #b58a63; }
+.param-hint { display: block; font-size: 0.7em; color: #a07a55; margin-top: 2px; grid-column: 1 / -1; }
+.param-note { margin-top: 12px; padding: 8px 12px; background: #4a2e1a; border-radius: 6px; font-size: 0.75em; color: #d8b694; line-height: 1.6; }
+
+/* 按钮 */
+.btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 1em; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+.btn-primary { background: #e8732a; color: #fff7ef; }
+.btn-primary:hover { background: #d4621d; }
+.btn-primary:disabled { background: #6a5040; cursor: not-allowed; }
+.btn-secondary { background: #5a3a22; color: #ffc189; border: 1px solid #8a5a36; }
+.btn-secondary:hover { background: #6e4829; }
+.actions { display: flex; gap: 12px; align-items: center; margin-top: 16px; }
+
+/* 进度 */
+.progress-bar { width: 100%; height: 8px; background: #5a3d27; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #e8732a, #ffc189); transition: width 0.3s; }
+.status-text { font-size: 0.85em; color: #d8b694; }
+
+/* 任务列表 */
+.task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 300px; overflow-y: auto; }
+.task-card { padding: 8px 12px; border-radius: 6px; font-size: 0.8em; border: 1px solid #5a3d27; }
+.task-card.pending { background: #4a3120; }
+.task-card.processing { background: #6a4520; border-color: #ffa64d; animation: pulse 1s infinite; }
+.task-card.passed { background: #4a4520; border-color: #c4d44a; }
+.task-card.failed { background: #5a2418; border-color: #f0865a; }
+.task-card.done { background: #4a3a20; border-color: #c4d44a; }
+.task-card .name { font-weight: bold; }
+.task-card .info { color: #d8b694; margin-top: 2px; }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+/* 日志 */
+.log-box { background: #1f140c; border-radius: 6px; padding: 12px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.75em; line-height: 1.6; }
+.log-box .pass { color: #d4d44a; }
+.log-box .fail { color: #f0865a; }
+.log-box .info { color: #ffc189; }
+
+/* 结果 */
+.result-table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+.result-table th, .result-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #5a3d27; }
+.result-table th { color: #ffc189; }
+.result-table .pass { color: #d4d44a; }
+.result-table .fail { color: #f0865a; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧶 大像素版毛线关卡 生成-审核-分析工具</h1>
+  <p style="margin-top:-6px;"><a href="/sort.html" style="color:#4a90d9;font-size:13px;">🧩 打开「分组排序工具」（导入合格关卡批量重排/重命名）→</a></p>
+
+  <div class="row">
+    <div class="col">
+      <div class="panel">
+        <h2>📁 导入TXT关卡图纸</h2>
+        <div class="upload-zone" id="uploadZone">
+          <p>拖拽 .txt 文件到此处，或点击选择文件</p>
+          <input type="file" id="fileInput" multiple accept=".txt" style="display:none">
+        </div>
+        <div class="file-list" id="fileList"></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel">
+        <h2>⚙️ 参数设置</h2>
+        <div class="param-grid">
+          <div class="param-item">
+            <label>审核基准档</label>
+            <select id="pAuditTier" style="padding:4px 8px;border-radius:4px;">
+              <option value="strong">高手（默认）</option>
+              <option value="novice">菜鸟</option>
+            </select>
+            <span class="param-hint">用哪一档玩家表现做审核基准：高手=现网口径(前期≤4.2)；菜鸟=拟合真实低水平玩家(前期严格&lt;3.5，难度下限默认20)。切换后难度/曲线/前期判定都按该档曲线。</span>
+          </div>
+          <div class="param-item">
+            <label>难度区间 [min, max]</label>
+            <input id="pDiffMin" type="number" value="30" style="width:64px;">
+            <input id="pDiffMax" type="number" value="100" style="width:64px;">
+            <span class="param-hint">难度分落在此区间（含端点）才算合格（满分100）。窄区间可精准命中某难度段。</span>
+          </div>
+          <div class="param-item">
+            <label>最大轮次</label>
+            <input id="pRounds" type="number" value="10">
+            <span class="param-hint">每个关卡最多尝试几轮，超过标记为"需美术返图"</span>
+          </div>
+          <div class="param-item">
+            <label>每轮候选</label>
+            <input id="pCandidates" type="number" value="5">
+            <span class="param-hint">每轮对同一张图生成几个不同棋盘，有一个合格就过</span>
+          </div>
+          <div class="param-item">
+            <label>冰块占比</label>
+            <input id="pIce" type="number" value="15" step="1"><span>%</span>
+            <span class="param-hint">冰块数=棋盘总格数×此值。例：90格×15%=13个冰块。冰块延迟消除4步</span>
+          </div>
+          <div class="param-item">
+            <label>锁链密度</label>
+            <input id="pChainDiv" type="number" value="20" step="1">
+            <span class="param-hint">锁链对数=1+可用格数÷此值。值越小锁链越多。例：72÷20≈4对锁链</span>
+          </div>
+          <div class="param-item">
+            <label>问号占比</label>
+            <input id="pQuestion" type="number" value="25" step="1"><span>%</span>
+            <span class="param-hint">问号数=棋盘总格数×此值。问号=未翻开时看不到颜色，增加不确定性</span>
+          </div>
+          <div class="param-item">
+            <label>后区起始行</label>
+            <input id="pBackRow" type="number" value="40" step="5"><span>%</span>
+            <span class="param-hint">第2轮起，50%的冰块优先放在"行号≥此比例"的区域（制造后期高压）</span>
+          </div>
+          <div class="param-item">
+            <label>加压增量</label>
+            <input id="pIceBonus" type="number" value="10" step="5"><span>%</span>
+            <span class="param-hint">第4轮起，在基础冰块数上额外增加此百分比。例：13×10%=多加1-2个冰块</span>
+          </div>
+          <div class="param-item">
+            <label>管道乱序比例</label>
+            <input id="pPipeShuffleRatio" type="number" value="100" min="0" max="100" step="5"><span>%</span>
+            <span class="param-hint">打乱多少比例的管道深层球序（基准=全关管道总数）。<b>默认100%=推荐值</b>（回测最优，仍可解、不抬前期）；设 0 关闭。例：10管道×50%=打乱5个</span>
+          </div>
+          <div class="param-item">
+            <label>乱序层范围</label>
+            <input id="pPipeShuffleLo" type="number" value="4" min="1" max="6" step="1" style="width:46px;">–<input id="pPipeShuffleHi" type="number" value="6" min="1" max="6" step="1" style="width:46px;"><span>层</span>
+            <span class="param-hint">打乱管道第几层球（1=最浅/最先出口，6=最深）。默认 4-6 层=深层 param[3..5]，只动深层故不抬前期</span>
+          </div>
+          <div class="param-item">
+            <label>乱序程度</label>
+            <select id="pPipeShuffleIntensity" style="padding:3px 6px;border-radius:4px;">
+              <option value="swap2">仅换两个球</option>
+              <option value="full">区间全打乱</option>
+            </select>
+            <span class="param-hint">swap2=区间内随机交换2个球（<b>默认/推荐</b>，回测最稳）；full=区间内所有球全随机重排</span>
+          </div>
+          <div class="param-item">
+            <label>换球比例(两遍解)</label>
+            <input id="pBallSwapRatio" type="number" value="0" min="0" max="100" step="5"><span>%</span>
+            <span class="param-hint">候选审核后<b>没有真卡点</b>(目标区均暂存&lt;4，含"趋势符合"简单关；难度/全知/该档都过、非前期前移)时，按求解进度换中后期球颜色再审一遍，<b>升级出真卡点</b>才用换球版，否则回落原判定。<b>默认0=关闭</b>；回测甜点≈25%</span>
+          </div>
+          <div class="param-item">
+            <label>线轴容量下限–上限</label>
+            <input id="pSpoolMin" type="number" value="28" min="1" step="1" style="width:46px;">–<input id="pSpoolMax" type="number" value="58" min="1" step="1" style="width:46px;"><span>像素</span>
+            <span class="param-hint">每个球消除的像素数范围（贴目标图同色块切分）。块落在[下限,上限]整块作一球；超上限按消除顺序切段；不足下限的小块同色合并。<b>默认 28–58</b></span>
+          </div>
+          <div class="param-item">
+            <label>阻隔容忍度</label>
+            <input id="pSpoolGap" type="number" value="1" min="0" step="1"><span>个</span>
+            <span class="param-hint">连通块识别时、同列方向上下相邻两个同色像素之间允许夹的异色数（≤此值仍视为连通）。越大块越大、球越少、消除越顺。<b>默认1</b>；设0=仅认4直接邻接</span>
+          </div>
+          <div class="param-item">
+            <label>目标平均容量</label>
+            <input id="pSpoolAvg" type="number" value="0" min="0" step="1"><span>像素</span>
+            <span class="param-hint">切分软目标，用于调控整关总球数（总球数≈各色像素总数之和÷此值）。<b>默认0=不启用</b>（按自然连通块切分）；&gt;0 则朝该平均值靠拢，会被钳到[下限,上限]</span>
+          </div>
+          <div class="param-item">
+            <label>趋势符合算合格</label>
+            <select id="pAllowTrend" style="padding:3px 6px;border-radius:4px;">
+              <option value="1" selected>开（路线B，默认）</option>
+              <option value="0">关（路线A·必须真卡点）</option>
+            </select>
+            <span class="param-hint">合格闸门开关。<b>开</b>=无明确卡点但"后半段峰值&gt;前期且前期不越位"也算合格(趋势符合)。<b>关</b>=必须有真卡点(目标区均暂存≥4)才合格，趋势符合按无卡点判不合格。配合换球比例&gt;0：关了能逼无卡点关进换球升级，升不出真卡点就判不合格。</span>
+          </div>
+        </div>
+        <div class="param-note">
+          💡 <b>动态难度平衡策略</b>：常规按轮次升压（第1轮全随机→第2轮冰块偏后区→第3轮锁链覆冰→第4轮加量）。<b>加压</b>：判为"过于简单"则直接在后区加障碍。<b>减压</b>：判为"前期峰值前移"则先后移冰块/锁链，仍跳升再减少障碍比例。目标：50-90%出现压力峰值、且前期不跳升。
+        </div>
+        <div class="param-note" style="text-align:left;">
+          <b>🧩 障碍区域预设（拖拽框选，可选）</b>：选「障碍类型 + 本次占比%」，在下方棋盘上<b>拖拽画一个矩形</b> = 把该占比的此类障碍预设到这块区域。可画多笔叠加（每笔不同色边框），未覆盖部分全盘随机补齐；不画 = 完全默认随机。
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;">
+            <label>障碍：
+              <select id="brushType" style="padding:3px 6px;border-radius:4px;">
+                <option value="ice">冰块</option><option value="question">问号</option><option value="chain">锁链对</option><option value="pipeShuffle">乱序管道区域</option>
+              </select>
+            </label>
+            <label>本次占比 <input id="brushRatio" type="number" value="30" min="1" max="100" style="width:54px;">%</label>
+            <button type="button" class="btn" id="btnUndoStroke" style="padding:3px 10px;font-size:12px;">↶ 撤销上一笔</button>
+            <button type="button" class="btn" id="btnClearStrokes" style="padding:3px 10px;font-size:12px;">清空</button>
+          </div>
+          <canvas id="presetCanvas" width="360" height="324" style="background:#fff;border:1px solid #8a5a36;border-radius:6px;touch-action:none;cursor:crosshair;display:block;max-width:100%;"></canvas>
+          <div id="strokeList" style="margin-top:6px;font-size:12px;color:#d8b694;">（未画任何区域 = 默认随机）</div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span>应用范围：</span>
+            <label><input type="radio" name="presetScope" value="global" checked> 全部关卡</label>
+            <label><input type="radio" name="presetScope" value="selected"> 仅选定关卡</label>
+            <button type="button" class="btn" id="btnRefreshLevels" style="padding:3px 10px;font-size:12px;">↻ 刷新关卡列表</button>
+            <button type="button" class="btn" id="btnSelAll" style="padding:3px 10px;font-size:12px;">全选</button>
+            <button type="button" class="btn" id="btnSelNone" style="padding:3px 10px;font-size:12px;">清空</button>
+          </div>
+          <div id="presetLevelTable" style="display:none;max-height:160px;overflow:auto;border:1px solid #5a3d27;border-radius:5px;margin-top:6px;padding:6px;font-size:12px;">
+            （点"刷新关卡列表"载入 input_txt 中的图纸）
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btnStart" disabled>▶ 开始生产</button>
+          <span class="status-text" id="statusText">请先导入TXT文件</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>📊 生产进度</h2>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="status-text" id="progressText">等待开始...</div>
+    <div class="task-grid" id="taskGrid"></div>
+  </div>
+
+  <div class="panel">
+    <h2>📝 运行日志</h2>
+    <div class="log-box" id="logBox"></div>
+  </div>
+
+  <div class="panel" id="resultPanel" style="display:none">
+    <h2>✅ 结果</h2>
+    <div class="actions" style="margin-bottom:12px">
+      <button class="btn btn-secondary" id="btnDownloadAll">📦 下载全部合格JSON</button>
+    </div>
+    <table class="result-table" id="resultTable">
+      <thead><tr><th>关卡</th><th>状态</th><th>难度</th><th>曲线</th><th>轮次</th><th>操作</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const ws = new WebSocket(`ws://${location.host}/ws`);
+const uploadedFiles = [];
+let taskMap = {};
+let productionStarted = false;
+
+// 连接状态可见化（便于排查：若日志里看不到"已连接"，说明网页没连上后端）
+ws.onopen = () => {
+  addLog('✅ 已连接到后端服务。', 'info');
+};
+ws.onerror = () => {
+  addLog('⚠️ 与后端服务的连接出错。请确认启动器窗口仍在运行，然后刷新本页面。', 'fail');
+};
+ws.onclose = () => {
+  addLog('⚠️ 与后端服务的连接已断开。若生产已结束属正常；否则请重新双击启动入口。', 'fail');
+};
+
+// 上传
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+uploadZone.onclick = () => fileInput.click();
+uploadZone.ondragover = e => { e.preventDefault(); uploadZone.classList.add('dragover'); };
+uploadZone.ondragleave = () => uploadZone.classList.remove('dragover');
+uploadZone.ondrop = e => { e.preventDefault(); uploadZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); };
+fileInput.onchange = e => handleFiles(e.target.files);
+
+function handleFiles(files) {
+  for (const f of files) {
+    if (!f.name.endsWith('.txt')) continue;
+    const reader = new FileReader();
+    reader.onload = () => {
+      uploadedFiles.push({ name: f.name, content: reader.result });
+      document.getElementById('fileList').innerHTML = uploadedFiles.map(f => `<div>${f.name}</div>`).join('');
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('statusText').textContent = `已导入 ${uploadedFiles.length} 个文件`;
+    };
+    reader.readAsText(f);
+  }
+}
+
+// ===== 障碍区域预设：拖拽框选画布 =====
+var presetStrokes = []; // [{type, ratio(0-1), rect:{x0,y0,x1,y1}}]
+var STROKE_COLORS = ['#e53e3e', '#3182ce', '#38a169', '#d69e2e', '#805ad5', '#dd6b20', '#319795', '#d53f8c'];
+var TYPE_LABEL = { ice: '冰块', question: '问号', chain: '锁链', pipeShuffle: '乱序管道' };
+
+function renderStrokeList() {
+  var el = document.getElementById('strokeList');
+  if (!presetStrokes.length) { el.textContent = '（未画任何区域 = 默认随机）'; return; }
+  el.innerHTML = presetStrokes.map(function (s, i) {
+    var col = STROKE_COLORS[i % STROKE_COLORS.length];
+    var lbl = TYPE_LABEL[s.type] + (s.type === 'pipeShuffle' ? '' : ' ' + Math.round(s.ratio * 100) + '%');
+    return '<span style="display:inline-block;margin:2px 8px 2px 0;border-left:10px solid ' + col + ';padding-left:6px;">'
+      + (i + 1) + '. ' + lbl + '</span>';
+  }).join('');
+}
+
+(function initPresetCanvas() {
+  var cv = document.getElementById('presetCanvas');
+  if (!cv) return;
+  var ctx = cv.getContext('2d');
+  var GW = cv.width, GH = cv.height, COLS = 10, ROWS = 9;
+  var dragging = false, sx = 0, sy = 0, cx = 0, cy = 0;
+  function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+  function hexA(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
+  function pos(e) { var rc = cv.getBoundingClientRect(); return [(e.clientX - rc.left) * GW / rc.width, (e.clientY - rc.top) * GH / rc.height]; }
+  function draw(preview) {
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, GW, GH);
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+    for (var c = 1; c < COLS; c++) { var x = Math.round(c * GW / COLS) + 0.5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, GH); ctx.stroke(); }
+    for (var r = 1; r < ROWS; r++) { var y = Math.round(r * GH / ROWS) + 0.5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(GW, y); ctx.stroke(); }
+    presetStrokes.forEach(function (s, i) {
+      var col = STROKE_COLORS[i % STROKE_COLORS.length];
+      var x = s.rect.x0 * GW, y = s.rect.y0 * GH, w = (s.rect.x1 - s.rect.x0) * GW, h = (s.rect.y1 - s.rect.y0) * GH;
+      ctx.fillStyle = hexA(col, 0.15); ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, Math.max(0, w - 2), Math.max(0, h - 2));
+      ctx.fillStyle = col; ctx.font = '11px sans-serif';
+      ctx.fillText(TYPE_LABEL[s.type] + (s.type === 'pipeShuffle' ? '' : ' ' + Math.round(s.ratio * 100) + '%'), x + 3, y + 13);
+    });
+    if (preview) {
+      ctx.strokeStyle = '#2a1b12'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5;
+      ctx.strokeRect(Math.min(sx, cx), Math.min(sy, cy), Math.abs(cx - sx), Math.abs(cy - sy));
+      ctx.setLineDash([]);
+    }
+  }
+  cv.addEventListener('pointerdown', function (e) { dragging = true; var p = pos(e); sx = cx = p[0]; sy = cy = p[1]; try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
+  cv.addEventListener('pointermove', function (e) { if (!dragging) return; var p = pos(e); cx = p[0]; cy = p[1]; draw(true); });
+  cv.addEventListener('pointerup', function (e) {
+    if (!dragging) return; dragging = false; var p = pos(e); cx = p[0]; cy = p[1];
+    var rect = { x0: clamp01(Math.min(sx, cx) / GW), y0: clamp01(Math.min(sy, cy) / GH), x1: clamp01(Math.max(sx, cx) / GW), y1: clamp01(Math.max(sy, cy) / GH) };
+    if ((rect.x1 - rect.x0) > 0.02 && (rect.y1 - rect.y0) > 0.02) {
+      var btype = document.getElementById('brushType').value;
+      var ratio = Math.max(0, Math.min(1, (parseFloat(document.getElementById('brushRatio').value) || 0) / 100));
+      // 乱序管道区域只取区域、不需要占比；其它障碍类型需占比 > 0
+      if (btype === 'pipeShuffle') presetStrokes.push({ type: btype, ratio: 0, rect: rect });
+      else if (ratio > 0) presetStrokes.push({ type: btype, ratio: ratio, rect: rect });
+    }
+    renderStrokeList(); draw(false);
+  });
+  document.getElementById('btnUndoStroke').addEventListener('click', function () { presetStrokes.pop(); renderStrokeList(); draw(false); });
+  document.getElementById('btnClearStrokes').addEventListener('click', function () { presetStrokes.length = 0; renderStrokeList(); draw(false); });
+  draw(false);
+})();
+
+function getPresetScope() {
+  const r = document.querySelector('input[name="presetScope"]:checked');
+  return r ? r.value : 'global';
+}
+
+function getSelectedLevelBases() {
+  return Array.prototype.slice.call(document.querySelectorAll('#presetLevelTable input[type="checkbox"]:checked'))
+    .map(cb => cb.getAttribute('data-base'));
+}
+
+// 从拖拽框选的笔画构建预设 → {global|perTxt: {ice/question/chain:[{rect,ratio}]}}
+function buildObstaclePreset() {
+  if (!presetStrokes.length) return null;
+  const regions = { ice: [], question: [], chain: [], pipeShuffle: [] };
+  presetStrokes.forEach(function (s) {
+    if (s.type === 'pipeShuffle') regions.pipeShuffle.push({ rect: s.rect });   // 乱序管道区域：只取区域，无 ratio
+    else regions[s.type].push({ rect: s.rect, ratio: s.ratio });
+  });
+  if (getPresetScope() === 'global') return { global: regions };
+  const bases = getSelectedLevelBases();
+  if (bases.length === 0) return null;
+  const perTxt = {};
+  bases.forEach(function (b) { perTxt[b] = regions; });
+  return { perTxt: perTxt };
+}
+
+// 载入 input_txt + 已上传文件，渲染可勾选的关卡表
+async function loadPresetLevels() {
+  const box = document.getElementById('presetLevelTable');
+  const names = new Set();
+  try {
+    const resp = await fetch('/api/inputs');
+    const data = await resp.json();
+    (data.files || []).forEach(n => names.add(n));
+  } catch (e) {}
+  (typeof uploadedFiles !== 'undefined' ? uploadedFiles : []).forEach(f => names.add(f.name));
+  const list = Array.from(names).sort();
+  if (list.length === 0) { box.innerHTML = '（input_txt 里没有图纸，请先放入/上传 txt）'; return; }
+  box.innerHTML = list.map(function (n) {
+    const base = n.replace(/\.txt$/i, '');
+    return '<label style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0;">'
+      + '<input type="checkbox" data-base="' + base + '"> ' + base + '</label>';
+  }).join('');
+}
+
+// 范围切换 / 刷新 / 全选 / 清空
+document.querySelectorAll('input[name="presetScope"]').forEach(function (r) {
+  r.addEventListener('change', function () {
+    const sel = getPresetScope() === 'selected';
+    const box = document.getElementById('presetLevelTable');
+    box.style.display = sel ? 'block' : 'none';
+    if (sel && !box.querySelector('input')) loadPresetLevels();
+  });
+});
+document.getElementById('btnRefreshLevels').addEventListener('click', loadPresetLevels);
+document.getElementById('btnSelAll').addEventListener('click', function () {
+  document.querySelectorAll('#presetLevelTable input[type="checkbox"]').forEach(cb => cb.checked = true);
+});
+document.getElementById('btnSelNone').addEventListener('click', function () {
+  document.querySelectorAll('#presetLevelTable input[type="checkbox"]').forEach(cb => cb.checked = false);
+});
+
+// 启动生产（按钮点击 / 自动启动 共用）
+async function startProduction() {
+  if (productionStarted) return;
+  productionStarted = true;
+  document.getElementById('btnStart').disabled = true;
+
+  // 若用户在网页里拖拽/选择了新文件，先上传到 input_txt（写入服务器）。
+  // 若没有拖拽（傻瓜式：直接把 txt 放进 input_txt 文件夹），则跳过上传，
+  // 直接对 input_txt 里已有的图纸开始生产。
+  if (uploadedFiles.length > 0) {
+    document.getElementById('statusText').textContent = '上传中...';
+    await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ files: uploadedFiles }) });
+  }
+
+  const params = {
+    auditTier: document.getElementById('pAuditTier').value,
+    difficultyMin: +document.getElementById('pDiffMin').value,
+    difficultyMax: +document.getElementById('pDiffMax').value,
+    maxRounds: +document.getElementById('pRounds').value,
+    candidatesPerRound: +document.getElementById('pCandidates').value,
+    iceRatio: (+document.getElementById('pIce').value || 15) / 100,
+    questionRatio: (+document.getElementById('pQuestion').value || 25) / 100,
+    chainDivisor: +document.getElementById('pChainDiv').value || 20,
+    backRow: (+document.getElementById('pBackRow').value || 40) / 100,
+    iceBonus: (+document.getElementById('pIceBonus').value || 10) / 100,
+    pipeShuffleRatio: Math.max(0, Math.min(1, (+document.getElementById('pPipeShuffleRatio').value || 0) / 100)),
+    pipeShuffleLayerLo: +document.getElementById('pPipeShuffleLo').value || 4,
+    pipeShuffleLayerHi: +document.getElementById('pPipeShuffleHi').value || 6,
+    pipeShuffleIntensity: document.getElementById('pPipeShuffleIntensity').value,
+    ballSwapRatio: Math.max(0, Math.min(1, (+document.getElementById('pBallSwapRatio').value || 0) / 100)),
+    spoolMin: +document.getElementById('pSpoolMin').value || 28,
+    spoolMax: +document.getElementById('pSpoolMax').value || 58,
+    spoolGap: Math.max(0, +document.getElementById('pSpoolGap').value || 0),
+    spoolAvg: Math.max(0, +document.getElementById('pSpoolAvg').value || 0),
+    allowTrendCompliant: document.getElementById('pAllowTrend').value !== '0',
+    obstaclePreset: buildObstaclePreset(),
+  };
+  document.getElementById('statusText').textContent = '生产中...';
+  document.getElementById('progressText').textContent = '正在启动生产…';
+  addLog('▶ 开始生产…', 'info');
+  await fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) });
+}
+
+// 开始按钮
+document.getElementById('btnStart').onclick = startProduction;
+
+// 审核基准档切换：同步难度下限默认（菜鸟20 / 高手30）。仅当当前值仍是"另一档默认"时才改，不覆盖手动输入。
+document.getElementById('pAuditTier').addEventListener('change', function() {
+  const el = document.getElementById('pDiffMin');
+  const cur = +el.value;
+  if (this.value === 'novice' && cur === 30) el.value = 20;
+  else if (this.value === 'strong' && cur === 20) el.value = 30;
+});
+
+// 网页加载时：自动识别 input_txt/ 里已经放好的图纸（傻瓜式流程，无需拖拽上传）。
+// 检测到就启用「开始生产」按钮，点一下即可对这些图纸开跑。
+async function detectExistingInputs() {
+  try {
+    const resp = await fetch('/api/inputs');
+    const data = await resp.json();
+    if (data.files && data.files.length > 0) {
+      document.getElementById('fileList').innerHTML =
+        `<div style="opacity:.8">📂 已在 input_txt 文件夹检测到 ${data.files.length} 个图纸：</div>` +
+        data.files.map(n => `<div>${n}</div>`).join('');
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('statusText').textContent =
+        `已就绪：input_txt 中有 ${data.files.length} 个图纸，正在自动开始生产…`;
+      addLog(`📂 检测到 input_txt 中有 ${data.files.length} 个图纸，自动开始生产。`, 'info');
+      // 傻瓜式：检测到图纸即自动开跑，无需手动点击。
+      startProduction();
+    } else {
+      document.getElementById('statusText').textContent =
+        '请把 .txt 图纸放入 input_txt 文件夹（或拖拽到上方），再点击「开始生产」';
+      addLog('ℹ️ input_txt 文件夹为空。请放入 .txt 图纸后刷新本页面，或拖拽文件到上方区域。', 'info');
+    }
+  } catch (e) {
+    addLog('⚠️ 无法读取 input_txt 列表，可手动拖拽文件后点击「开始生产」。', 'fail');
+  }
+}
+// 等 WS 连接就绪后再自动启动，确保不漏掉任何进度消息。
+if (ws.readyState === WebSocket.OPEN) {
+  detectExistingInputs();
+} else {
+  ws.addEventListener('open', detectExistingInputs, { once: true });
+}
+
+// WebSocket 消息处理
+ws.onmessage = e => {
+  const data = JSON.parse(e.data);
+  const log = document.getElementById('logBox');
+
+  if (data.type === 'init') {
+    document.getElementById('taskGrid').innerHTML = '';
+    taskMap = {};
+    data.tasks.forEach(t => {
+      taskMap[t.name] = t;
+      const div = document.createElement('div');
+      div.className = `task-card ${t.status}`;
+      div.id = `task-${t.name}`;
+      div.innerHTML = `<div class="name">${t.name}</div><div class="info">${t.status === 'done' ? '已完成' : '等待中'}</div>`;
+      document.getElementById('taskGrid').appendChild(div);
+    });
+    document.getElementById('progressText').textContent = `待处理: ${data.pending}/${data.total}`;
+    addLog(`开始处理：共 ${data.total} 关。`, 'info');
+    if (data.pending === 0) {
+      addLog('input_txt 中没有需要处理的图纸。请把 .txt 图纸放入 input_txt 文件夹后再点"开始生产"。', 'info');
+    }
+  }
+
+  if (data.type === 'round') {
+    addLog(`══ 第${data.round}轮 ══ 剩余${data.remaining}关 策略等级${data.diffLevel}`, 'info');
+  }
+
+  if (data.type === 'task') {
+    const card = document.getElementById(`task-${data.name}`);
+    if (card) {
+      card.className = `task-card ${data.status}`;
+      card.querySelector('.info').textContent = data.status === 'processing' ? `第${data.round}轮处理中...` : data.status === 'passed' ? '✓合格' : `第${data.round}轮未通过`;
+    }
+  }
+
+  if (data.type === 'candidate') {
+    const cls = data.result.includes('合格') ? 'pass' : 'fail';
+    const info = data.difficulty ? ` 难度=${data.difficulty} ${data.quality}` : '';
+    addLog(`  ${data.name} 候选${data.c}: ${data.result}${info}`, cls);
+    const card = document.getElementById(`task-${data.name}`);
+    if (card && data.result.includes('合格')) {
+      card.className = 'task-card passed';
+      card.querySelector('.info').textContent = `✓ 难度${data.difficulty} ${data.quality}`;
+    }
+  }
+
+  if (data.type === 'phase') {
+    addLog(`▸ ${data.msg}`, 'info');
+    document.getElementById('progressText').textContent = data.msg;
+  }
+
+  if (data.type === 'done') {
+    document.getElementById('statusText').textContent = '完成！';
+    document.getElementById('btnStart').disabled = false;
+    if (data.results) {
+      showResults(data.results);
+      const total = data.results.length;
+      const passCount = data.passed || 0;
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('progressText').textContent = `完成: ${passCount}/${total} 合格`;
+      addLog(`\n=== 完成 === 合格${passCount} / 不合格${data.failed}`, 'info');
+      if (data.outputFolder) {
+        addLog(`📦 所有产物已打包到文件夹：${data.outputFolder}/（内含 合格关卡/ 与 不合格关卡/）`, 'pass');
+      }
+    } else {
+      // 没有 results：通常是所有关卡此前已生产完成、本次全部跳过
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('progressText').textContent = data.msg || '完成（无需处理）';
+      addLog(`=== 完成 === ${data.msg || '没有需要处理的新关卡'}`, 'info');
+    }
+  }
+
+  if (data.type === 'error') {
+    addLog(`错误: ${data.msg}`, 'fail');
+    document.getElementById('statusText').textContent = '出错';
+    document.getElementById('btnStart').disabled = false;
+  }
+};
+
+function addLog(text, cls) {
+  const log = document.getElementById('logBox');
+  const div = document.createElement('div');
+  div.className = cls || '';
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function showResults(results) {
+  document.getElementById('resultPanel').style.display = 'block';
+  const tbody = document.querySelector('#resultTable tbody');
+  tbody.innerHTML = '';
+  results.forEach(r => {
+    const tr = document.createElement('tr');
+    const cls = r.status === '合格' ? 'pass' : 'fail';
+    tr.innerHTML = `<td>${r.name}</td><td class="${cls}">${r.status}</td><td>${r.difficulty || '-'}</td><td>${r.quality || '-'}</td><td>${r.round || '-'}</td><td>${r.status === '合格' ? `<a href="/api/download/${r.name}" class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em">下载</a>` : '-'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>

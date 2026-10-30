@@ -24,7 +24,7 @@ const { JSDOM, VirtualConsole } = loadJsdom();
 
 const TOOL = __dirname;
 const HTML = path.join(TOOL, '图片转像素画.html');
-const LIBDIR = path.join(TOOL, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', '参考', '色库');
+const LIBDIR = path.join(TOOL, '..', '..', '02_工程', '游戏主bin', 'bin', '参考', '色库');
 
 let fail = 0;
 const ok = (m) => console.log('  ✓ ' + m);

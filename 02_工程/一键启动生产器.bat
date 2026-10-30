@@ -5,11 +5,11 @@ rem 蚂蚁拿块 · 一键启动（Windows 双击入口）
 rem
 rem 双击本文件 → 自动拉起本地生产服务 + 打开浏览器到生产器页面。
 rem 真正的启动逻辑（选端口 / 起服务 / 开浏览器）都在
-rem   完整主bin快照_20261012\网页启动器\启动.js
+rem   游戏主bin\网页启动器\启动.js
 rem 里，与 macOS 的 .command 共用同一套，避免两处逻辑漂移。
 rem
 rem 双击没反应？直接在命令行里启动：
-rem     cd /d "<交接包根目录>\完整主bin快照_20261012"
+rem     cd /d "<交接包根目录>\游戏主bin"
 rem     node "网页启动器\启动.js"
 rem 想先看到底哪里不对：
 rem     node "网页启动器\自检.js"
@@ -23,7 +23,7 @@ rem ------------------------------------------------------------------
 
 setlocal
 set "HERE=%~dp0"
-set "PROJ=%HERE%完整主bin快照_20261012"
+set "PROJ=%HERE%游戏主bin"
 set "LAUNCHER=%PROJ%\网页启动器\启动.js"
 
 where node >nul 2>nul
@@ -39,7 +39,7 @@ if errorlevel 1 (
 if not exist "%LAUNCHER%" (
   echo.
   echo [x] 找不到启动器：%LAUNCHER%
-  echo     请确认 完整主bin快照_20261012\网页启动器\启动.js 与本文件在同一层目录下。
+  echo     请确认 游戏主bin\网页启动器\启动.js 与本文件在同一层目录下。
   echo.
   pause
   exit /b 1

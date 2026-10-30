@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>蚂蚁拿块求解器</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>蚂蚁拿块求解器</h1>
+    <div class="header-actions">
+      <button id="btn-import">导入关卡JSON</button>
+      <button id="btn-sample">加载示例关卡</button>
+      <button id="btn-solve">求解</button>
+      <button id="btn-simulate" disabled>模拟游玩</button>
+      <button id="btn-exit-sim" class="hidden">退出模拟</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 左侧：棋盘区 -->
+    <section id="panel-board">
+      <h2>棋盘（蚂蚁盒队列）</h2>
+      <div id="board-container">
+        <div id="board-queues"></div>
+      </div>
+    </section>
+
+    <!-- 中间：目标图 -->
+    <section id="panel-target">
+      <h2>目标图</h2>
+      <div id="target-container">
+        <canvas id="target-canvas"></canvas>
+      </div>
+      <div id="target-info"></div>
+    </section>
+
+    <!-- 右侧：状态面板 -->
+    <section id="panel-status">
+      <h2 id="status-title">关卡信息</h2>
+      <div id="status-content">
+        <p class="placeholder">请导入关卡JSON或加载示例</p>
+      </div>
+      <!-- 模拟模式UI -->
+      <div id="sim-ui" class="hidden">
+        <div id="sim-buffer">
+          <h3>暂存区 <span id="buffer-count">0/5</span></h3>
+          <div id="buffer-slots"></div>
+        </div>
+        <div id="sim-controls">
+          <button id="btn-undo">撤销</button>
+          <button id="btn-reset">重置</button>
+          <button id="btn-auto-step">自动一步</button>
+          <button id="btn-auto-all">自动全部</button>
+        </div>
+        <div id="sim-stats">
+          <p>步数: <span id="stat-steps">0</span></p>
+          <p>已消除: <span id="stat-eliminated">0</span> / <span id="stat-total">0</span></p>
+          <p>进度: <span id="stat-progress">0%</span></p>
+        </div>
+      </div>
+      <!-- 求解结果 -->
+      <div id="solve-result" class="hidden">
+        <h3>求解结果</h3>
+        <div id="solve-details"></div>
+      </div>
+    </section>
+  </main>
+
+  <input type="file" id="file-input" accept=".json" style="display:none">
+
+  <script src="js/utils.js"></script>
+  <script src="js/simulator.js"></script>
+  <script src="js/solver.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

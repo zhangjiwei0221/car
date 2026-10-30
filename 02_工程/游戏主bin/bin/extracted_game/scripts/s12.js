@@ -1,0 +1,1 @@
+window.pi.originalLogEvent=window.pi.logEvent,window.pi.logEvent=function(i,n,o){return this.injectAdData(),this.originalLogEvent(i,n,o)}

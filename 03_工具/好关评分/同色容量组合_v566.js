@@ -8,7 +8,7 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const BASE_LEVEL = path.join(__dirname, 'P2P3归因_v566.levels', '006_1002.json');
 const BASE_ROUTE = path.join(__dirname, 'P2P3归因_v566.levels', '006_1002.route.json');
 const OUT = path.join(__dirname, '同色容量组合_006_1002_v566.json');

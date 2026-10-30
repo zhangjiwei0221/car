@@ -8,7 +8,7 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const IMAGE = process.env.IMAGE || '关卡00199_原图039-056-023-038_分图3色_40x40.txt';
 const INPUT = path.join(ROOT, '关卡', IMAGE);
 const IMAGE_LABEL = (IMAGE.match(/(\d{5})/) || [null, '199'])[1];

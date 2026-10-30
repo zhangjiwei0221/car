@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>像素毛线关卡生成工具</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 工具栏 -->
+        <header class="toolbar">
+            <h1>像素毛线关卡生成工具</h1>
+            <div class="toolbar-actions">
+                <button id="loadLevelBtn" class="btn btn-primary">加载关卡文件</button>
+                <button id="saveLevelBtn" class="btn btn-success">保存关卡</button>
+                <input type="file" id="levelFileInput" accept=".json" hidden>
+            </div>
+        </header>
+
+        <!-- 主内容区域 - 上中下布局 -->
+        <main class="main-content">
+            <!-- 目标区 (Target Zone) -->
+            <section class="zone target-zone">
+                <div class="zone-header">
+                    <h2>目标区</h2>
+                </div>
+                <div class="zone-controls">
+                    <div class="control-group">
+                        <label>导入原始数据:</label>
+                        <button id="importTiledBtn" class="btn btn-secondary">导入Tiled</button>
+                        <button id="importTxtBtn" class="btn btn-secondary">导入TXT</button>
+                        <input type="file" id="tiledFileInput" accept=".json" hidden>
+                        <input type="file" id="txtFileInput" accept=".txt" hidden>
+                    </div>
+                    <div class="control-group">
+                        <label>基础行数:</label>
+                        <input type="number" id="baseRowCount" min="1" value="1">
+                    </div>
+                    <div class="control-group">
+                        <label>默认颜色ID:</label>
+                        <input type="number" id="defaultColorId" min="0" value="0" placeholder="0表示不替换">
+                        <span class="hint">导入时替换空颜色(0)</span>
+                    </div>
+                    <div class="control-group">
+                        <label>选择颜色:</label>
+                        <div id="targetColorPalette" class="color-palette"></div>
+                    </div>
+                    <div class="control-group">
+                        <label>缩放:</label>
+                        <input type="range" id="targetZoom" min="5" max="40" value="10">
+                        <span id="targetZoomValue">10px</span>
+                    </div>
+                    <div class="control-group stats-group">
+                        <label>颜色种类数:</label>
+                        <span id="targetColorCount" class="stat-value">0</span>
+                        <label>像素格总数:</label>
+                        <span id="targetGroupCount" class="stat-value">0</span>
+                    </div>
+                </div>
+                <div class="zone-content">
+                    <div id="targetGrid" class="grid-container"></div>
+                </div>
+            </section>
+
+            <!-- 元素区 (Element Zone) -->
+            <section class="zone element-zone">
+                <div class="zone-header">
+                    <h2>元素区</h2>
+                </div>
+                <div class="zone-controls">
+                    <div class="control-group">
+                        <label>行数:</label>
+                        <input type="number" id="elementRows" min="1" value="9">
+                        <label>列数:</label>
+                        <input type="number" id="elementCols" min="1" value="9">
+                        <button id="generateBoardBtn" class="btn btn-secondary">生成基础棋盘</button>
+                        <button id="loadTerrainBtn" class="btn btn-secondary">加载地形文件</button>
+                        <input type="file" id="terrainFileInput" accept=".json" hidden>
+                    </div>
+                    <div class="control-group special-panel">
+                        <label>特殊元素:</label>
+                        <div class="special-elements">
+                            <button class="special-btn" data-type="0" title="清空">清空</button>
+                            <button class="special-btn" data-type="11" title="管道-上">管道↑</button>
+                            <button class="special-btn" data-type="12" title="管道-右">管道→</button>
+                            <button class="special-btn" data-type="13" title="管道-下">管道↓</button>
+                            <button class="special-btn" data-type="14" title="管道-左">管道←</button>
+                            <button class="special-btn" data-type="21" title="钥匙1">钥匙1</button>
+                            <button class="special-btn" data-type="22" title="钥匙2">钥匙2</button>
+                            <button class="special-btn" data-type="23" title="钥匙3">钥匙3</button>
+                            <button class="special-btn" data-type="24" title="钥匙4">钥匙4</button>
+                            <button class="special-btn" data-type="25" title="钥匙5">钥匙5</button>
+                            <button class="special-btn" data-type="31" title="锁1">锁1</button>
+                            <button class="special-btn" data-type="32" title="锁2">锁2</button>
+                            <button class="special-btn" data-type="33" title="锁3">锁3</button>
+                            <button class="special-btn" data-type="34" title="锁4">锁4</button>
+                            <button class="special-btn" data-type="35" title="锁5">锁5</button>
+                            <button class="special-btn" data-type="4" title="冰块">冰块</button>
+                            <button class="special-btn" data-type="5" title="链条">链条</button>
+                            <button class="special-btn" data-type="6" title="问号">问号</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>冰块个数:</label>
+                        <input type="number" id="iceCount" min="0" value="0">
+                        <label>链条个数:</label>
+                        <input type="number" id="chainCount" min="0" value="0">
+                        <label>问号个数:</label>
+                        <input type="number" id="elementQuestionCount" min="0" value="0">
+                    </div>
+                    <div class="control-group">
+                        <label>单颜色百分比:</label>
+                        <input type="number" id="singleColorExtractPercent" min="0" max="100" step="0.01" value="33.33">
+                        <span class="hint">%</span>
+                        <label>基础像素数:</label>
+                        <input type="number" id="spoolBasePixelCount" min="1" step="1" value="48">
+                        <label>第一行范围倍数:</label>
+                        <input type="number" id="firstRowRangeMultiplier" min="0" step="0.01" value="3">
+                        <label>后续行范围倍数:</label>
+                        <input type="number" id="nextRowRangeMultiplier" min="0" step="0.01" value="2">
+                        <button id="generateElementsBtn" class="btn btn-primary">生成基础元素</button>
+                    </div>
+                    <div class="control-group">
+                        <label>选择颜色:</label>
+                        <div id="elementColorPalette" class="color-palette"></div>
+                    </div>
+                    <div class="control-group">
+                        <label>缩放:</label>
+                        <input type="range" id="elementZoom" min="5" max="80" value="40">
+                        <span id="elementZoomValue">40px</span>
+                    </div>
+                    <div class="control-group stats-group">
+                        <label>未放置线轴数:</label>
+                        <span id="unplacedSpoolCount" class="stat-value">0</span>
+                    </div>
+                    <div class="control-group terrain-panel">
+                        <label>地形选项:</label>
+                        <div class="terrain-elements">
+                            <button class="terrain-btn" data-terrain="black" title="设置黑块">黑块</button>
+                            <button class="terrain-btn" data-terrain="clear" title="清除黑块">清除黑块</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="zone-content">
+                    <div id="elementGrid" class="grid-container"></div>
+                </div>
+            </section>
+
+            <!-- 地形区 (Terrain Zone) -->
+            <section class="zone terrain-zone">
+                <div class="zone-header">
+                    <h2>地形区</h2>
+                </div>
+                <div class="zone-controls">
+                    <div class="control-group">
+                        <label>行数:</label>
+                        <input type="number" id="terrainRows" min="1" value="9">
+                        <label>列数:</label>
+                        <input type="number" id="terrainCols" min="1" value="9">
+                        <button id="generateTerrainBtn" class="btn btn-secondary">生成</button>
+                        <button id="loadTerrainDataBtn" class="btn btn-secondary">加载</button>
+                        <button id="saveTerrainBtn" class="btn btn-success">保存</button>
+                        <input type="file" id="terrainDataFileInput" accept=".json" hidden>
+                    </div>
+                </div>
+                <div class="zone-content">
+                    <div id="terrainGrid" class="grid-container"></div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- 错误提示 -->
+        <div id="errorToast" class="toast hidden"></div>
+    </div>
+
+    <!-- JavaScript 拆分版本 - 按依赖顺序加载 -->
+    <script src="js/utils.js"></script>
+    <script src="js/parsers.js"></script>
+    <script src="js/managers.js"></script>
+    <script src="js/elementManager.js"></script>
+    <script src="js/terrainManager.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/elementUI.js"></script>
+    <script src="js/terrainUI.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

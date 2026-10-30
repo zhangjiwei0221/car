@@ -1,0 +1,1396 @@
+/* ==================== 全局样式 - 浅色主题 ==================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f7fa;
+  color: #2d3748;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ==================== 工具栏 ==================== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  height: 50px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-center {
+  flex: 1;
+  text-align: center;
+}
+
+.toolbar-btn {
+  padding: 6px 14px;
+  background: #ffffff;
+  color: #2d3748;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+  background: #f7fafc;
+  border-color: #4a90d9;
+  color: #4a90d9;
+}
+
+.toolbar-btn.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.level-select {
+  padding: 5px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fff;
+  cursor: pointer;
+}
+.level-select:hover { border-color: #4a90d9; }
+
+.file-name-input {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #2d3748;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 240px;
+  text-align: center;
+}
+
+.file-name-input:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74,144,217,0.2);
+}
+
+.undo-count {
+  font-size: 11px;
+  color: #718096;
+}
+
+/* ==================== 主布局 ==================== */
+.main-container {
+  display: flex;
+  height: calc(100vh - 50px);
+  gap: 0;
+}
+
+.panel {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #4a90d9;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 6px;
+}
+
+/* 左侧面板 */
+.panel-left {
+  width: 220px;
+  min-width: 220px;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+}
+
+.target-info {
+  margin-bottom: 10px;
+}
+
+.target-info label {
+  font-size: 12px;
+  color: #718096;
+}
+
+.target-info input {
+  width: 50px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #2d3748;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.target-viewer {
+  display: grid;
+  gap: 1px;
+  background: #e2e8f0;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+}
+
+.target-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 1px;
+}
+
+/* 验证警告区域 */
+.validation-warnings {
+  margin-top: 12px;
+  padding: 8px;
+  background: #fffbeb;
+  border: 1px solid #f0ad4e;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #856404;
+  display: none;
+}
+
+.validation-warnings.visible {
+  display: block;
+}
+
+.validation-warnings .warn-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #d97706;
+}
+
+.validation-warnings .warn-item {
+  margin-bottom: 3px;
+  padding-left: 8px;
+  border-left: 2px solid #f0ad4e;
+}
+
+/* 中间面板 */
+.panel-center {
+  flex: 1;
+  background: #f5f7fa;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 编辑模式：目标预览 + 棋盘 左右分栏 */
+.editor-split {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.editor-target-col {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.editor-board-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.editor-target-wrap {
+  flex: 1;
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.target-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #718096;
+}
+
+.target-zoom-controls input[type="range"] {
+  width: 110px;
+}
+
+.board-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.board-size-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-size-controls label {
+  font-size: 12px;
+  color: #718096;
+}
+
+.board-size-controls input {
+  width: 45px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #2d3748;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.edit-mode-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.mode-btn {
+  padding: 4px 10px;
+  background: #ffffff;
+  color: #718096;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.mode-btn:hover {
+  background: #f7fafc;
+  color: #4a90d9;
+  border-color: #4a90d9;
+}
+
+.mode-btn.active {
+  background: #4a90d9;
+  color: #fff;
+  border-color: #4a90d9;
+}
+
+/* 棋盘容器 */
+.board-container {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.board-grid {
+  display: grid;
+  gap: 1px;
+  background: #d0d5dd;
+  border: 2px solid #e2e8f0;
+  border-radius: 4px;
+}
+
+.board-cell {
+  width: 40px;
+  height: 40px;
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.15s;
+  font-size: 11px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.board-cell:hover {
+  border-color: #4a90d9;
+  box-shadow: inset 0 0 0 1px rgba(74,144,217,0.3);
+}
+
+.board-cell.selected {
+  border: 2px solid #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74,144,217,0.2);
+}
+
+.board-cell.empty-cell {
+  background: #f7fafc;
+}
+
+.board-cell.black-cell {
+  background: #1a202c !important;
+}
+
+/* 不可达标红 */
+.board-cell.unreachable {
+  background: rgba(217, 83, 79, 0.15) !important;
+  border-color: #d9534f !important;
+}
+
+/* 路线高亮 */
+.board-cell.path-highlight-1 {
+  box-shadow: inset 0 0 0 2px #4a90d9;
+}
+
+.board-cell.path-highlight-2 {
+  box-shadow: inset 0 0 0 2px #5cb85c;
+}
+
+.board-cell.path-highlight-3 {
+  box-shadow: inset 0 0 0 2px #f0ad4e;
+}
+
+.board-cell.bottleneck {
+  box-shadow: inset 0 0 0 2px #d9534f;
+}
+
+/* 格子内元素 */
+.cell-color-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  position: absolute;
+}
+
+.cell-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.cell-pipe-arrow {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #2d3748;
+  text-shadow: 0 0 2px #fff;
+  z-index: 3;
+}
+
+.cell-pipe-bg {
+  background: rgba(74, 144, 217, 0.12) !important;
+  border: 1px solid rgba(74, 144, 217, 0.4);
+}
+
+.cell-pipe-index {
+  position: absolute;
+  bottom: 1px;
+  left: 2px;
+  font-size: 8px;
+  font-weight: bold;
+  color: #4a90d9;
+  background: rgba(255,255,255,0.85);
+  padding: 0 2px;
+  border-radius: 2px;
+  z-index: 3;
+  line-height: 1.2;
+}
+
+.cell-pipe-dots {
+  position: absolute;
+  bottom: 1px;
+  left: 2px;
+  display: flex;
+  gap: 1px;
+  z-index: 3;
+}
+
+.pipe-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.2);
+}
+
+/* 颜色选择面板 */
+.color-picker-panel,
+.special-picker-panel,
+.pipe-picker-panel {
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.color-picker-panel.hidden,
+.special-picker-panel.hidden,
+.pipe-picker-panel.hidden {
+  display: none;
+}
+
+.color-picker-title,
+.special-picker-title,
+.pipe-picker-title {
+  font-size: 12px;
+  color: #718096;
+  margin-bottom: 8px;
+}
+
+.color-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+  gap: 4px;
+}
+
+.color-picker-item {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.color-picker-item:hover {
+  transform: scale(1.2);
+  border-color: #2d3748;
+}
+
+.color-picker-item.active {
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74,144,217,0.4);
+}
+
+.color-picker-item .color-id {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 8px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  border-radius: 3px;
+  padding: 0 2px;
+  line-height: 1.2;
+}
+
+/* 特殊元素按钮 */
+.special-buttons,
+.pipe-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.special-btn,
+.pipe-btn {
+  padding: 6px 12px;
+  background: #ffffff;
+  color: #2d3748;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.special-btn:hover,
+.pipe-btn:hover {
+  background: #f7fafc;
+  border-color: #4a90d9;
+  color: #4a90d9;
+}
+
+.special-btn.active,
+.pipe-btn.active {
+  background: #4a90d9;
+  border-color: #4a90d9;
+  color: #fff;
+}
+
+/* 验证按钮区 */
+.board-validation-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.validate-btn {
+  padding: 6px 14px;
+  background: #ffffff;
+  color: #2d3748;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.validate-btn:hover {
+  background: #4a90d9;
+  color: #fff;
+  border-color: #4a90d9;
+}
+
+.validate-btn.active {
+  background: #5cb85c;
+  color: #fff;
+  border-color: #5cb85c;
+}
+
+/* 右侧面板 */
+.panel-right {
+  width: 280px;
+  min-width: 280px;
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+}
+
+.property-panel {
+  font-size: 13px;
+}
+
+.no-selection {
+  color: #718096;
+  text-align: center;
+  padding: 30px 10px;
+}
+
+.prop-section {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.prop-section:last-child {
+  border-bottom: none;
+}
+
+.prop-label {
+  font-size: 11px;
+  color: #718096;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.prop-value {
+  color: #2d3748;
+  font-size: 13px;
+}
+
+.prop-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #2d3748;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.prop-input:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74,144,217,0.2);
+}
+
+.prop-color-preview {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+/* 属性面板按钮 */
+.prop-btn {
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  border: 1px solid #cbd5e0;
+  background: #ffffff;
+  color: #2d3748;
+  transition: all 0.2s;
+  margin-top: 6px;
+  display: inline-block;
+}
+
+.prop-btn:hover {
+  background: #f7fafc;
+  border-color: #4a90d9;
+}
+
+.prop-btn.btn-danger {
+  border-color: #d9534f;
+  color: #d9534f;
+}
+
+.prop-btn.btn-danger:hover {
+  background: #d9534f;
+  color: #fff;
+}
+
+.prop-btn.btn-success {
+  border-color: #5cb85c;
+  color: #5cb85c;
+}
+
+.prop-btn.btn-success:hover {
+  background: #5cb85c;
+  color: #fff;
+}
+
+.prop-distance-info {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: #edf2f7;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #4a5568;
+}
+
+.prop-distance-info .distance-value {
+  font-weight: 600;
+  color: #4a90d9;
+}
+
+/* 管道参数编辑器 */
+.pipe-param-editor {
+  margin-top: 8px;
+}
+
+.pipe-param-list {
+  list-style: none;
+  margin-top: 6px;
+}
+
+.pipe-param-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin-bottom: 3px;
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 3px;
+  cursor: grab;
+}
+
+.pipe-param-item:active {
+  cursor: grabbing;
+}
+
+.pipe-param-item.dragging {
+  opacity: 0.5;
+  background: #edf2f7;
+}
+
+.pipe-param-item .drag-handle {
+  color: #a0aec0;
+  cursor: grab;
+  font-size: 10px;
+}
+
+.pipe-param-item .param-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+}
+
+.pipe-param-item .param-color-name {
+  flex: 1;
+  font-size: 11px;
+  color: #4a5568;
+}
+
+.pipe-param-item .param-remove-btn {
+  background: none;
+  border: none;
+  color: #d9534f;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+}
+
+.pipe-param-item .param-remove-btn:hover {
+  color: #c0392b;
+}
+
+.pipe-param-add {
+  margin-top: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+.pipe-param-add select {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #2d3748;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.pipe-param-add button {
+  padding: 3px 8px;
+  background: #5cb85c;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.pipe-param-add button:hover {
+  background: #4cae4c;
+}
+
+/* 坐标显示 */
+.cell-coord {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  font-size: 8px;
+  color: rgba(0,0,0,0.25);
+  z-index: 1;
+}
+
+/* 响应式 */
+@media (max-width: 1100px) {
+  .panel-left {
+    width: 180px;
+    min-width: 180px;
+  }
+  .panel-right {
+    width: 240px;
+    min-width: 240px;
+  }
+}
+
+/* 点击格子时的最优路线高亮 */
+.board-cell.path-to-cell {
+  box-shadow: inset 0 0 0 2px #4a90d9 !important;
+  background-color: rgba(74, 144, 217, 0.08) !important;
+}
+
+/* 拖拽状态 */
+.board-cell.dragging {
+  opacity: 0.4;
+}
+
+.board-cell[style*="outline"] {
+  z-index: 10;
+}
+
+/* 隐藏类 */
+.hidden {
+  display: none !important;
+}
+
+/* 路径箭头 */
+.path-arrow {
+  position: absolute;
+  font-size: 14px;
+  font-weight: bold;
+  z-index: 10;
+  pointer-events: none;
+  bottom: 1px;
+  right: 1px;
+  line-height: 1;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff;
+}
+
+.path-arrow-1 { color: #4a90d9; }
+.path-arrow-2 { color: #5cb85c; }
+.path-arrow-3 { color: #f0ad4e; }
+
+/* 消除顺序标记 */
+.elim-order-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+  background: #d9534f;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+
+/* ==================== 管道面板 ==================== */
+.pipe-panel {
+  min-width: 80px;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: calc(100vh - 140px);
+}
+
+.pipe-panel:empty {
+  display: none;
+}
+
+.pipe-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  background: #f0f4f8;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #4a5568;
+}
+
+.pipe-panel-item .pipe-label {
+  font-size: 10px;
+  color: #718096;
+  min-width: 30px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pipe-panel-item .pipe-arrow-icon {
+  font-size: 14px;
+  margin-right: 2px;
+}
+
+.pipe-panel-item .pipe-balls {
+  display: flex;
+  gap: 3px;
+  flex-wrap: nowrap;
+}
+
+.pipe-panel-item .pipe-ball {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.15);
+  position: relative;
+  cursor: grab;
+  transition: transform 0.1s;
+}
+
+.pipe-panel-item .pipe-ball:hover {
+  transform: scale(1.15);
+}
+
+.pipe-panel-item .pipe-ball.dragging {
+  opacity: 0.4;
+}
+
+.pipe-panel-item .pipe-ball .pipe-ball-step {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  font-size: 8px;
+  font-weight: bold;
+  color: #fff;
+  background: #d9534f;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+
+/* ==================== 模拟模式样式 ==================== */
+.board-cell.sim-picked {
+  background: #edf2f7 !important;
+  opacity: 0.4;
+}
+
+.board-cell.sim-active {
+  background: rgba(74, 144, 217, 0.06) !important;
+}
+
+.board-cell.sim-pickable {
+  border: 2px solid #4a90d9 !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 0 1px rgba(74,144,217,0.3);
+}
+
+.board-cell.sim-pickable:hover {
+  background: rgba(74, 144, 217, 0.12) !important;
+  transform: scale(1.02);
+}
+
+.sim-thaw-badge {
+  position: absolute;
+  bottom: 1px;
+  left: 1px;
+  font-size: 8px;
+  font-weight: bold;
+  color: #0E9CE6;
+  background: rgba(255,255,255,0.85);
+  padding: 0 3px;
+  border-radius: 3px;
+  z-index: 5;
+}
+
+.sim-pipe-tag {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  font-size: 8px;
+  color: #fff;
+  background: #4a90d9;
+  padding: 0 3px;
+  border-radius: 3px;
+  z-index: 5;
+}
+
+/* 目标区已消除像素 */
+.target-cell.sim-target-eliminated {
+  opacity: 0.2;
+  position: relative;
+}
+
+.target-cell.sim-target-eliminated::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #333;
+}
+
+/* 暂存区显示 */
+.sim-buffer {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.sim-buffer-slot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px dashed #cbd5e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.sim-buffer-slot.filled {
+  border-style: solid;
+  border-color: rgba(0,0,0,0.2);
+}
+
+.sim-buffer-slot.empty {
+  background: #f7fafc;
+}
+
+.sim-buffer-progress {
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+
+/* 模拟模式中最优解法步数标注 */
+.sim-opt-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(74, 144, 217, 0.7);
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+
+/* ==================== 暂存区图表 ==================== */
+.buffer-chart-container {
+  margin-top: 12px;
+  padding: 8px;
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.buffer-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.buffer-chart-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.buffer-chart-controls {
+  display: flex;
+  gap: 3px;
+}
+
+.chart-toggle {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #cbd5e0;
+  background: #fff;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #718096;
+  transition: all 0.15s;
+}
+
+.chart-toggle:hover {
+  border-color: #4a90d9;
+  color: #4a90d9;
+}
+
+.chart-toggle.active {
+  background: #4a90d9;
+  color: #fff;
+  border-color: #4a90d9;
+}
+
+#buffer-chart-canvas {
+  width: 100%;
+  height: 220px;
+  cursor: crosshair;
+  border-radius: 3px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+#fused-chart-canvas {
+  width: 100%;
+  height: 180px;
+  cursor: crosshair;
+  border-radius: 3px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.buffer-chart-tooltip {
+  position: absolute;
+  display: none;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  font-size: 11px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+}
+
+
+/* 模拟模式暂存区条（棋盘上方） */
+.sim-buffer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.sim-buffer-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4a5568;
+  min-width: 60px;
+}
+
+.sim-step-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4a90d9;
+  margin-left: auto;
+}
+
+.sim-buffer-slots {
+  display: flex;
+  gap: 4px;
+}
+
+
+/* 当前推荐步数高亮（更醒目） */
+.sim-opt-badge.sim-opt-next {
+  background: rgba(217, 83, 79, 0.9);
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  box-shadow: 0 0 4px rgba(217, 83, 79, 0.5);
+}
+
+
+/* 管道格子高亮（当其内容为推荐步时） */
+.board-cell.sim-pipe-highlight {
+  border: 2px solid #d9534f !important;
+  box-shadow: 0 0 6px rgba(217, 83, 79, 0.4);
+  background: rgba(217, 83, 79, 0.08) !important;
+}
+
+/* 当前推荐步格子的边框高亮 */
+.board-cell.sim-next-step {
+  border: 2px solid #d9534f !important;
+  box-shadow: 0 0 6px rgba(217, 83, 79, 0.4) !important;
+}
+
+/* 当前推荐步格子的边框高亮（更醒目） */
+.sim-opt-badge.sim-opt-next {
+  background: rgba(217, 83, 79, 0.95);
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  box-shadow: 0 0 4px rgba(217, 83, 79, 0.6);
+}
+
+/* 有推荐步数的可点击格子加深边框 */
+.board-cell.sim-pickable:has(.sim-opt-next) {
+  border-color: #d9534f !important;
+  box-shadow: 0 0 6px rgba(217, 83, 79, 0.4) !important;
+}
+
+
+/* 重置按钮 */
+.sim-reset-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd5e0;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  margin-left: 8px;
+}
+
+.sim-reset-btn:hover {
+  border-color: #d9534f;
+  background: #fcebeb;
+}
+
+
+/* ==================== 模拟模式一体化面板 ==================== */
+.sim-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sim-content.hidden {
+  display: none !important;
+}
+
+.sim-unified-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 目标区（更大像素、居中）*/
+.sim-target-area {
+  padding: 10px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-height: 45%;
+  overflow-y: auto;
+}
+
+.sim-target-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  width: 100%;
+  max-width: 700px;
+}
+
+.sim-target-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a90d9;
+}
+
+.sim-progress-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a90d9;
+}
+
+.sim-target-viewer {
+  display: grid;
+  gap: 1px;
+  background: #e2e8f0;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 2px;
+  grid-auto-rows: min-content;
+  align-content: start;
+  justify-content: start;
+}
+
+.sim-target-viewer .target-cell {
+  border-radius: 1px;
+  position: relative;
+}
+
+.sim-target-canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* 目标区下落动画 */
+.sim-target-viewer .target-cell.target-dropping {
+  animation: targetDrop 0.3s ease-out;
+}
+
+@keyframes targetDrop {
+  0% { transform: translateY(-24px); opacity: 0.5; }
+  70% { transform: translateY(1px); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* 暂存区（居中） */
+.sim-buffer-area {
+  padding: 8px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* 棋盘区（居中、顶部留间距） */
+.sim-board-area {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px 10px 10px 10px;
+}
+
+
+/* ==================== 棋盘消除动画 ==================== */
+.board-cell.sim-pick-anim {
+  animation: spoolPickUp 0.4s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes spoolPickUp {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: scale(1.2);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(0.3) translateY(-30px);
+    opacity: 0;
+  }
+}
+
+/* 锁链配对同时消除动画 */
+.board-cell.sim-chain-pick-anim {
+  animation: chainPickUp 0.4s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes chainPickUp {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  20% {
+    transform: scale(1.15) rotate(5deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(0.2) rotate(-10deg) translateY(-25px);
+    opacity: 0;
+  }
+}

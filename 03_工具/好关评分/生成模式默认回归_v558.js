@@ -3,8 +3,8 @@
 'use strict';
 const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..', '..');
-const html = fs.readFileSync(path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'index.html'), 'utf8');
-const app = fs.readFileSync(path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js', 'app.js'), 'utf8');
+const html = fs.readFileSync(path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'index.html'), 'utf8');
+const app = fs.readFileSync(path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js', 'app.js'), 'utf8');
 const checks = {
   goalOptionSelected: /<option value="goal" selected>按目标（预算内达标才停）<\/option>/.test(html),
   timeOptionNotSelected: /<option value="time">按时间（到点出最好）<\/option>/.test(html) &&

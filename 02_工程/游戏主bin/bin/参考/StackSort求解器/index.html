@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StackSort 关卡求解器</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 顶部栏：等级 / 步数 -->
+  <div class="topbar">
+    <span class="title">StackSort 求解器</span>
+    <span class="stat">关卡 <b id="levelName">—</b></span>
+    <span class="stat">剩余步数 <b id="movesVal">0</b></span>
+    <span class="spacer"></span>
+    <button id="prevBtn">◀ 上一关</button>
+    <select id="levelSelect"></select>
+    <button id="nextBtn">下一关 ▶</button>
+    <button id="resetBtn">↺ 重置</button>
+    <button id="solveBtn">🤖 求解</button>
+    <button id="batchBtn">📊 批量分析</button>
+    <button id="editBtn">✏️ 编辑</button>
+    <button id="genBtn">🏭 生成</button>
+    <label class="stat" style="cursor:pointer">批量导入
+      <input id="fileInput" type="file" accept="application/json,.json" multiple style="display:none">
+    </label>
+  </div>
+
+  <div class="main">
+    <!-- 舞台：棋盘 + 下方暂存区 -->
+    <div class="stage">
+      <div id="board" class="board"></div>
+      <div class="bench-wrap">
+        <div class="bench-label">暂存区 BENCH</div>
+        <div id="bench" class="bench"></div>
+      </div>
+    </div>
+
+    <!-- 侧栏：关卡信息 / 图例 / 提示 -->
+    <div class="sidebar">
+      <div id="banner" class="banner"></div>
+      <div>
+        <h3>关卡信息</h3>
+        <div class="kv"><span>棋盘尺寸</span><span id="sizeVal">—</span></div>
+        <div class="kv"><span>颜色数</span><span id="colorVal">—</span></div>
+      </div>
+      <div>
+        <h3>求解器</h3>
+        <div class="kv"><span>求解模式</span>
+          <select id="solveMode" style="flex:1; margin-left:8px;">
+            <option value="omni">全知版（看穿所有障碍色）</option>
+            <option value="player">玩家版（模拟真实玩家，问号渐揭示）</option>
+          </select>
+        </div>
+        <div class="kv"><span>状态</span><span id="solveStatus">—</span></div>
+        <div class="kv"><span>步数</span><span id="solveSteps">—</span></div>
+        <div class="kv"><span>尝试轮次</span><span id="solveAttempts">—</span></div>
+        <div style="margin-top:8px; display:flex; gap:6px; align-items:center;">
+          <button id="solvePlayBtn" disabled>▶ 播放</button>
+          <button id="solveStepBtn" disabled>步进</button>
+          <label class="hint" style="margin-left:auto;">速度
+            <input id="solveSpeed" type="range" min="80" max="900" value="350" style="vertical-align:middle;">
+          </label>
+        </div>
+      </div>
+      <div>
+        <h3>颜色图例</h3>
+        <div id="legend" class="legend"></div>
+      </div>
+      <div>
+        <h3>玩法</h3>
+        <div class="hint">
+          点击未完成的列：暂存区卡片放到该列顶部，整列下移，<br>
+          底部卡片被挤出到暂存区，步数 −1。<br>
+          每列颜色统一即完成（万能牌不参与判定）。<br>
+          所有列完成 = 通关；步数用尽未完成 = 失败。
+        </div>
+      </div>
+
+      <!-- 编辑面板（仅编辑模式显示） -->
+      <div id="editPanel" style="display:none;">
+        <h3>✏️ 编辑器 <span id="editDirty" class="hint"></span></h3>
+        <div class="hint" style="margin-bottom:6px;">
+          单击卡片=选中；长按拖动=交换两卡位置。改动只在临时副本，导出才落盘，不影响源文件。
+        </div>
+        <div class="kv"><span>步数上限</span>
+          <input id="stepLimitInput" type="number" min="1" max="999" style="width:64px;">
+        </div>
+        <div class="kv"><span>尺寸</span>
+          <span style="display:flex; gap:4px;">
+            <button id="addRowBtn" class="tool-btn">+行</button>
+            <button id="delRowBtn" class="tool-btn">−行</button>
+            <button id="addColBtn" class="tool-btn">+列</button>
+            <button id="delColBtn" class="tool-btn">−列</button>
+          </span>
+        </div>
+        <div id="editWarn" class="sf-warn" style="display:none;"></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+          <button id="undoBtn" disabled>↶ 撤回</button>
+          <button id="editSolveBtn">🧮 求解+难度</button>
+          <button id="exportOneBtn">⬇ 导出本关</button>
+          <button id="exportAllBtn">⬇ 批量导出</button>
+          <button id="exitEditBtn">✕ 退出编辑</button>
+        </div>
+
+        <h3>① 替换颜色</h3>
+        <div class="hint">点棋盘卡片(自动设为源色)或下方"源色"，再点"目标色"即替换。</div>
+        <label class="hint" style="display:block; margin:4px 0;">
+          <input id="replaceOneCol" type="checkbox"> 只替换选中卡片所在列（一色占多列时用）
+        </label>
+        <div class="kv"><span>源色(选中)</span><div id="srcColors" class="legend"></div></div>
+        <div class="kv"><span>目标色</span><div id="dstColors" class="legend palette"></div></div>
+
+        <h3>③ 障碍编辑</h3>
+        <div id="selInfo" class="hint">未选中卡片</div>
+        <div id="cellObsTools" style="display:flex; gap:4px; flex-wrap:wrap; margin:6px 0;"></div>
+        <div id="colObsTools" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 批量分析弹窗 -->
+  <div id="batchModal" class="modal" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-head">
+        <span class="modal-title">📊 批量分析</span>
+        <div class="modal-actions">
+          <span id="batchProgress" class="hint"></span>
+          <button id="batchRunBtn">▶ 开始分析当前关卡库</button>
+          <label class="hint">每模式轮数
+            <input id="batchRuns" type="number" min="3" max="40" value="10" style="width:52px;">
+          </label>
+          <button id="batchCsvBtn" disabled>⬇ 导出CSV</button>
+          <button id="batchJpgBtn" disabled>⬇ 导出折线图JPG</button>
+          <button id="batchCloseBtn">✕ 关闭</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <canvas id="batchChart" width="1000" height="320"></canvas>
+        <div id="batchNotes" class="batch-notes"></div>
+        <div id="batchTableWrap" class="batch-table-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 关卡生成弹窗 -->
+  <div id="genModal" class="modal" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-head">
+        <span class="modal-title">🏭 关卡生成器</span>
+        <div class="modal-actions">
+          <label class="hint">批次(日期)<input id="genBatch" type="text" style="width:90px;"></label>
+          <label class="hint" title="求解器对每个决策模式重复求解的次数。每次用随机平局分流探索不同解法，取其中最优/最稳的结果。轮数越多→难度与步数评估越准、越能解出难关，但越慢。一般 6-10。">每模式轮数<input id="genRuns" type="number" min="3" max="20" value="6" style="width:56px;"></label>
+          <label class="hint" title="同一关卡换不同随机棋盘重试的最大次数。难度阈值/可解性不满足时换棋盘重来，次数越多越容易命中目标，但越慢。">单关重试<input id="genAttempts" type="number" min="5" max="80" value="25" style="width:56px;"></label>
+          <label class="hint" title="允许的步数余量范围（步，以最优解为基线）。如 0-20 表示步数上限可比最优解多 0~20 步；生成器在此范围内挑使难度命中目标的步数。可在分组/逐关单独覆盖。">步数余量(步)<input id="genMarginMin" type="number" min="0" max="60" value="0" style="width:52px;">–<input id="genMarginMax" type="number" min="0" max="60" value="20" style="width:52px;"></label>
+          <label class="hint"><input id="genStrict" type="checkbox" checked> 合法性严格校验</label>
+          <button id="genRefreshMargin" class="tool-btn" title="按当前各组/逐关的难度区间，重新自动对齐步数余量(容错)到对应难度等级。调完难度区间点这个刷新一次。">🔄 刷新步数余量</button>
+          <button id="genRunBtn">▶ 开始生成</button>
+          <button id="genZipBtn" disabled>⬇ 下载ZIP</button>
+          <button id="genCloseBtn">✕ 关闭</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="hint" style="margin-bottom:8px; line-height:1.6;">
+          📌 <b>每模式轮数</b>：求解器对每个决策模式重复求解的次数（随机平局分流探索不同解法，取最优/最稳）。越多越准越能解难关、但越慢，一般 6-10。
+          ｜<b>单关重试</b>：换不同随机棋盘重试的上限，越多越易命中目标难度。
+          ｜<b>步数余量(步)</b>：步数上限相对最优解可多给的步数（0-20 为宜），可在分组/逐关单独覆盖（逐关手调后不被全局/分组批量改动影响）。
+        </div>
+        <div class="gen-groups">
+          <div class="gen-groups-head">
+            <b>分组参数</b>（按关卡区间设置；点"关卡区间"可展开设置单关难度）
+            <button id="genAddGroup" class="tool-btn">+ 添加分组</button>
+            <button id="genImportLib" class="tool-btn" title="读取已加载的关卡库，逐关提取行/列/颜色/障碍组合/难度，自动对齐参数并按相同结构分组，导入后可微调">📥 导入关卡库对齐</button>
+            <span style="margin-left:auto;"></span>
+            <label class="hint">方案记忆<select id="genSchemeSel" style="max-width:220px;"></select></label>
+            <button id="genSchemeLoad" class="tool-btn">调取</button>
+            <button id="genSchemeSave" class="tool-btn">保存当前</button>
+            <button id="genSchemeDel" class="tool-btn">删除</button>
+            <button id="genSchemeClearAll" class="tool-btn" title="清空全部已存方案记忆">清空全部</button>
+            <button id="genSchemeFile" class="tool-btn" title="链接一个方案文件(读写)：读入其中的方案，且之后保存/删除/清空都会自动写回该文件，实现增删对齐到同一文件。浏览器不支持时退化为导入。">📂 方案文件</button>
+            <button id="genSchemeExport" class="tool-btn" title="把当前方案记忆导出/写回为 JSON 文件（已链接文件则直接写回该文件）">⬇ 导出文件</button>
+          </div>
+          <table class="gen-group-table">
+            <thead><tr>
+              <th>关卡区间</th><th>行</th><th>列</th><th>颜色种类</th>
+              <th>难度区间</th><th>步数余量</th><th>障碍组合</th><th></th>
+            </tr></thead>
+            <tbody id="genGroupBody"></tbody>
+          </table>
+        </div>
+        <div class="gen-curve-wrap">
+          <div class="gen-groups-head">
+            <b>宏观难度曲线</b>（在图上拖动 = 设定每关目标难度，覆盖分组难度区间）
+            <label class="hint">横轴分组<input id="genCurveGroups" type="number" min="1" max="200" value="10" style="width:46px;"></label>
+            <label class="hint">窗口±<input id="genCurveWin" type="number" min="2" max="20" value="6" style="width:42px;"></label>
+            <button id="genCurveClear" class="tool-btn">清除曲线</button>
+          </div>
+          <canvas id="genCurve" width="1000" height="340"></canvas>
+        </div>
+        <div id="genProgress" class="hint" style="margin:10px 0;"></div>
+        <canvas id="genChart" width="1000" height="280"></canvas>
+        <div id="genTableWrap" class="batch-table-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 编辑模式：求解+难度 浮窗 -->
+  <div id="editStatsFloat" class="stats-float" style="display:none;">
+    <div class="stats-float-head">
+      <span id="statsFloatTitle">求解 / 难度评估</span>
+      <button id="statsFloatClose">✕</button>
+    </div>
+    <div id="statsFloatBody" class="stats-float-body"></div>
+  </div>
+
+  <script src="js/colors.js"></script>
+  <script src="js/level-loader.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/solver.js"></script>
+  <script src="js/analysis.js"></script>
+  <script src="js/player-solver.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/zip.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // 合球结果（静态）：一行统计 + 容量直方图 + 分档表，不做动画
 const fs=require('fs'), path=require('path');
 const TXT = process.argv[2] || '/Users/red/Downloads/蚂蚁图库/拼接图/拼接图图库/40x40拼接图纸_016.txt';
-const OUT = process.argv[3] || path.join(__dirname,'..','..','01_交接文档','合球结果.html');
+const OUT = process.argv[3] || path.join(__dirname,'..','..','01_项目文档','合球结果.html');
 const BMN=24, BMX=36;
 const blocks = fs.readFileSync(TXT,'utf8').split(/\r?\n/).map(l=>l.trim())
   .filter(l=>l && /^[\d\s,]+$/.test(l)).map(l=>l.split(/[\s,]+/).filter(Boolean).map(Number))

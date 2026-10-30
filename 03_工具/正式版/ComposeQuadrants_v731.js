@@ -42,7 +42,7 @@ LEVELS.forEach((file, i) => {
 
 // 色数收敛：超过上限时，把“用量最少”的颜色并到最近的已保留色（RGB 距离）
 function palette() {
-  const src = fs.readFileSync(path.resolve(__dirname, '../../02_工程/完整主bin快照_20261012/bin/js/utils.js'), 'utf8');
+  const src = fs.readFileSync(path.resolve(__dirname, '../../02_工程/游戏主bin/bin/js/utils.js'), 'utf8');
   const pal = {};
   const re = /\{\s*name:\s*'([^']+)',\s*hex:\s*'#([0-9A-Fa-f]{6})'\s*\}\s*,\s*\/\/\s*(\d+)/g;
   let m; while ((m = re.exec(src))) pal[+m[3]] = m[2];

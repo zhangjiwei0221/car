@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** v505 只读：release-sync候选 → 重解 → 目标/结构/容量复核。 */
 'use strict';
-const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
+const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','游戏主bin','bin','js');
 const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','release-tuner.js','generator.js'];
 const sb={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
 const args=process.argv.slice(2),file=args[0];function opt(n,d){const i=args.indexOf('--'+n);return i>=0?+args[i+1]:d;}function str(n,d){const i=args.indexOf('--'+n);return i>=0?args[i+1]:d;}if(!file)throw new Error('需要关卡');

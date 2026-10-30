@@ -7,7 +7,7 @@
 'use strict';
 const fs=require('fs'),path=require('path'),vm=require('vm');
 const ROOT=process.cwd();
-const BASE=path.join(ROOT,'02_工程/完整主bin快照_20261012');
+const BASE=path.join(ROOT,'02_工程/游戏主bin');
 const FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','generator.js'];
 const sandbox={console:{log(){},warn(){},error(){}},module:{exports:{}},WeakMap,Map,Set,setTimeout,clearTimeout,Infinity,Math,JSON};
 vm.createContext(sandbox);for(const f of FILES)vm.runInContext(fs.readFileSync(path.join(BASE,'bin/js',f),'utf8'),sandbox,{filename:f});

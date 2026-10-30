@@ -186,7 +186,7 @@ node 03_工具/正式版/BatchHoldoutE6_v676.js
 node 03_工具/正式版/GenerateStoryCompilerUiBundle_v616.js
 ```
 
-生成`02_工程/完整主bin快照_20261012/bin/js/story-compiler.js`。
+生成`02_工程/游戏主bin/bin/js/story-compiler.js`。
 当前内置006/008/014三张图，页面开关默认关闭；陌生图明确失败，不回退随机生成。
 
 008双债务故事图：

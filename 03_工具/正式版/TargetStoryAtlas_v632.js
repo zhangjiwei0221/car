@@ -17,7 +17,7 @@ const vm = require('vm');
 const zlib = require('zlib');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const MODULES = [
   'utils.js',
   'color-libs.js',

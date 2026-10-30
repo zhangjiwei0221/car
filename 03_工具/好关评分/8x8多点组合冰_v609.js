@@ -8,7 +8,7 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const BASE_LEVEL = path.join(__dirname, '8x8分段封堵_v607.levels', 'v607_best.json');
 const OUT = path.join(__dirname, '8x8多点组合冰_v609.json');
 const LEVEL_DIR = path.join(__dirname, '8x8多点组合冰_v609.levels');

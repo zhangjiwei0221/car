@@ -26,7 +26,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BASE = path.join(ROOT, '02_工程', '完整主bin快照_20261012');
+const BASE = path.join(ROOT, '02_工程', '游戏主bin');
 const BIN = path.join(BASE, 'bin', 'js');
 const DEFAULT_OUT = path.join(__dirname, '生产尺寸偏好AB_v560.json');
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',

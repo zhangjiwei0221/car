@@ -4,7 +4,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
 const args = process.argv.slice(2), input = args[0], output = args[1];
 if (!input) { console.error('用法：node 解法结构汇总.js <输入.jsonl> [汇总.json]'); process.exit(1); }
-const BIN = path.join(__dirname, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(__dirname, '..', '..', '02_工程', '游戏主bin', 'bin', 'js');
 const sandbox = { console, Math, JSON, WeakMap, Map, Set, Date }; vm.createContext(sandbox);
 for (const f of ['utils.js', 'color-libs.js', 'simulator.js']) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sandbox, { filename: f });
 const A = sandbox.AntSolver, rows = fs.readFileSync(input, 'utf8').trim().split(/\n/).map(JSON.parse), byId = {};

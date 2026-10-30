@@ -5,7 +5,7 @@
 const fs = require('fs'), path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin');
 const html = fs.readFileSync(path.join(BIN, 'index.html'), 'utf8');
 const app = fs.readFileSync(path.join(BIN, 'js', 'app.js'), 'utf8');
 const generator = fs.readFileSync(path.join(BIN, 'js', 'generator.js'), 'utf8');

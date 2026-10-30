@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>清理 StackSort 方案存储</title>
+  <style>
+    body { font-family: sans-serif; background: #1b1f2a; color: #e8ebf2; padding: 40px; line-height: 1.7; }
+    button { font-size: 16px; padding: 10px 20px; margin: 8px 8px 8px 0; cursor: pointer; border-radius: 6px; border: none; }
+    .danger { background: #ff7a7a; }
+    .ok { background: #4cc2ff; }
+    #log { margin-top: 20px; padding: 12px; background: #11141c; border-radius: 6px; white-space: pre-wrap; }
+    a { color: #4cc2ff; }
+  </style>
+</head>
+<body>
+  <h2>🧹 清理 StackSort 生成器方案存储</h2>
+  <p>新版求解器已改为：<b>每次打开页面自动重置方案缓存</b>，并把历史方案改用<b>文件存储</b>（生成器面板里的「📂 方案文件 / ⬇ 导出文件」），所以正常情况下不会再撑爆缓存。</p>
+  <p>这个页面保留作应急用：如果旧版本残留的 localStorage 还在拖慢页面，点下面按钮清理即可（不影响关卡文件，也不影响你已导出的方案文件）。</p>
+  <button class="ok" id="trim">只保留最近 40 条（推荐）</button>
+  <button class="danger" id="clear">全部清空方案</button>
+  <div id="log"></div>
+  <p style="margin-top:24px;">清理后回到 <a href="index.html">求解器主页面 index.html</a>。</p>
+  <script>
+    var KEY = 'ss_gen_schemes';
+    var log = document.getElementById('log');
+    function show(msg) { log.textContent = msg; }
+    function count() { try { return (JSON.parse(localStorage.getItem(KEY) || '[]')).length; } catch (e) { return '?(解析失败)'; } }
+    show('当前已存方案数：' + count());
+    document.getElementById('trim').addEventListener('click', function () {
+      try {
+        var a = JSON.parse(localStorage.getItem(KEY) || '[]');
+        var before = a.length;
+        localStorage.setItem(KEY, JSON.stringify(a.slice(-40)));
+        show('✓ 已裁剪：' + before + ' → ' + count() + ' 条。回到主页面即可正常使用。');
+      } catch (e) {
+        localStorage.removeItem(KEY);
+        show('解析失败，已直接清空。回到主页面即可正常使用。');
+      }
+    });
+    document.getElementById('clear').addEventListener('click', function () {
+      localStorage.removeItem(KEY);
+      show('✓ 已清空所有方案。回到主页面即可正常使用。');
+    });
+  </script>
+</body>
+</html>

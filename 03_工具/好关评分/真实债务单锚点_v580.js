@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const BASE_LEVEL = path.join(__dirname, '棋盘供时闸门_v579.levels', 'A_row1_gate_1001.json');
 const BASE_ROUTE = path.join(__dirname, '棋盘供时闸门_v579.levels', 'A_row1_gate_1001.route.json');
 const OUT = path.join(__dirname, '真实债务单锚点_v580.json');

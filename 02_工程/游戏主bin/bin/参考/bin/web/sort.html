@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分组排序工具</title>
+  <style>
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 820px; margin: 0 auto; padding: 24px; color: #2d3748; background: #f7fafc; }
+    h1 { font-size: 20px; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; }
+    .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+    label { min-width: 96px; color: #4a5568; font-size: 14px; }
+    input[type=number], input[type=text] { padding: 5px 8px; border: 1px solid #cbd5e0; border-radius: 5px; }
+    input[type=text] { width: 220px; }
+    .hint { color: #718096; font-size: 12px; }
+    button { padding: 9px 18px; border: none; border-radius: 6px; background: #4a90d9; color: #fff; font-size: 14px; cursor: pointer; }
+    button:disabled { background: #a0aec0; cursor: not-allowed; }
+    #result { white-space: pre-wrap; font-size: 13px; }
+    .ok { color: #2f855a; } .warn { color: #c05621; } .err { color: #c53030; }
+    a { color: #4a90d9; }
+  </style>
+</head>
+<body>
+  <h1>🧩 分组排序工具（导入合格关卡 → 批量分组排序 → 重命名输出）</h1>
+  <p class="hint">读取每个关卡内嵌的 <code>_analysis</code> 难度数据（不重跑求解器，结果稳定）。<a href="/">← 返回生产页</a></p>
+
+  <div class="card">
+    <div class="row"><label>选择关卡 JSON</label><input id="files" type="file" accept=".json" multiple></div>
+    <div class="row"><span id="fileCount" class="hint">未选择文件</span></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><label>组大小</label><input id="pGroupSize" type="number" value="5" min="1" style="width:70px;"><span class="hint">每组关卡数（前 N-1 普通 + 1 Boss）</span></div>
+    <div class="row"><label>Boss阈值</label><input id="pBoss" type="number" value="55" min="0" max="100" style="width:70px;"><span class="hint">难度 ≥ 此值进 Boss 池</span></div>
+    <div class="row"><label>起始关号</label><input id="pStart" type="number" value="1" min="1" style="width:70px;"></div>
+    <div class="row"><label>Boss打点</label><input id="pBossAnchor" type="number" min="1" style="width:70px;"><span class="hint">第一个 boss 出现的<strong>关号</strong>（绝对关号）；留空=默认每组组末。例：想让前 3 组丝滑、从第 4 组组末开始投 boss → 填 20（第 G 组组末关号 = G×组大小）</span></div>
+    <div class="row"><label>Boss间隔</label><input id="pBossInterval" type="number" min="1" style="width:70px;"><span class="hint">相邻 boss 的<strong>关号间隔</strong>；留空=默认等于组大小</span></div>
+    <div class="row"><label>命名模板</label><input id="pName" type="text" value="第{level}关_{name}"><span class="hint">占位符 {level} {name}</span></div>
+    <div class="row"><label>保留内嵌分析</label><input id="pKeep" type="checkbox" checked><span class="hint">输出 JSON 是否保留 _analysis</span></div>
+    <div class="row"><button id="go" disabled>▶ 开始分组排序</button></div>
+  </div>
+
+  <div class="card"><div id="result" class="hint">结果会显示在这里。</div></div>
+
+  <script src="sort.js"></script>
+</body>
+</html>

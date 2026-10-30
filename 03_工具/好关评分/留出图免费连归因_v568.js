@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const LEVEL_DIR = path.join(__dirname, 'M7独立seed留出图_v568.levels');
 const OUT = path.join(__dirname, '留出图免费连归因_v568.json');
 const FILES = [

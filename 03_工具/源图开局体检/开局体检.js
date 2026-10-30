@@ -2,7 +2,7 @@
 /**
  * 源图「开局体检」—— 一眼看出这张目标图**开局露出几种颜色**，也就是"能不能出有选择的关"。
  *
- * 为什么看这一项（2026-10-15 v153 实测，见 01_交接文档/工作日志_20261012.md 第十七节）：
+ * 为什么看这一项（2026-10-15 v153 实测，见 01_项目文档/工作日志_20261012.md 第十七节）：
  *   玩家每一步的可选项 = 【棋盘顶行的车】(第 0 行恒可取) ∩ 【目标图上当前暴露的颜色】。
  *   一辆车只有在"它自己颜色的暴露像素 ≥ 这辆车的容量"时才吃得满，而暴露 = 贴图边 或 邻接外部背景
  *   —— 也就是【从画的外圈往里剥】。所以剪影被单一颜色包住的图，开局几乎只能按唯一路线走。
@@ -26,7 +26,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin');
 
 function loadGenerator() {
   const sb = { console, Math, Date, JSON, Object, Array, String, Number, isNaN, parseInt, parseFloat, Set, Map, WeakMap, setTimeout, clearTimeout };

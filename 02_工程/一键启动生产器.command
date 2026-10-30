@@ -4,14 +4,14 @@
 #
 # 双击本文件 → 自动拉起本地生产服务 + 打开浏览器到生产器页面。
 # 真正的启动逻辑（选端口 / 起服务 / 开浏览器）都在
-#   完整主bin快照_20261012/网页启动器/启动.js
+#   游戏主bin/网页启动器/启动.js
 # 里，与 Windows 的 .bat 共用同一套，避免两处逻辑漂移。
 #
 # 双击没反应？用命令启动（不受执行权限 / 隔离属性影响）：
 #     cd "/Users/red/Desktop/毛线汽车"
 #     bash "一键启动生产器.command"
 # 想先看到底哪里不对：
-#     cd "完整主bin快照_20261012"
+#     cd "游戏主bin"
 #     node "网页启动器/自检.js"
 #
 # 为什么必须用 http 打开、而不是双击 bin/index.html：
@@ -24,7 +24,7 @@
 set -u
 SELF="$0"
 HERE="$(cd "$(dirname "$SELF")" && pwd)"
-PROJ="$HERE/完整主bin快照_20261012"
+PROJ="$HERE/游戏主bin"
 
 # 出错时停住窗口：双击运行的窗口会瞬间关掉，不停住等于没有报错
 fail() {
@@ -47,7 +47,7 @@ chmod +x "$SELF" 2>/dev/null
 xattr -dr com.apple.quarantine "$HERE" 2>/dev/null
 
 # ---------- ② 关键路径检查 ----------
-[ -d "$PROJ" ] || fail "找不到工程目录：$PROJ" "请确认完整主bin快照_20261012 与本文件在同一层。"
+[ -d "$PROJ" ] || fail "找不到工程目录：$PROJ" "请确认游戏主bin 与本文件在同一层。"
 [ -f "$PROJ/网页启动器/启动.js" ] || fail "找不到启动器：$PROJ/网页启动器/启动.js" "请确认快照目录完整（网页启动器/ 与 bin/ 都在）。"
 [ -f "$PROJ/bin/index.html" ] || fail "找不到页面：$PROJ/bin/index.html" "请确认快照目录完整。"
 

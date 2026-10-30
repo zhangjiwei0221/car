@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const INPUT = path.join(ROOT, '关卡', '关卡00199_原图039-056-023-038_分图3色_40x40.txt');
 const ARMSET = process.env.ARMSET === 'v579' ? 'v579' : 'v578';
 const OUT = path.join(__dirname, ARMSET === 'v579' ? '棋盘供时闸门_v579.json' : '棋盘锚点闸门_交错_v578.json');

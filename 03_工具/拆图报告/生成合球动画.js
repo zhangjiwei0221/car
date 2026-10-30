@@ -1,7 +1,7 @@
 // 合球动画：把色块按「色 × 层」拼成车（对比“按色总量混装”）
 const fs = require('fs'), path = require('path');
 const TXT = process.argv[2] || '/Users/red/Downloads/蚂蚁图库/拼接图/拼接图图库/40x40拼接图纸_016.txt';
-const OUT = process.argv[3] || path.join(__dirname, '..', '..', '01_交接文档', '合球动画.html');
+const OUT = process.argv[3] || path.join(__dirname, '..', '..', '01_项目文档', '合球动画.html');
 const BMN = 24, BMX = 36;
 
 const blocks = fs.readFileSync(TXT, 'utf8').split(/\r?\n/).map(l => l.trim())

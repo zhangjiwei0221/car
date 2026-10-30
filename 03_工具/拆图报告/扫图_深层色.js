@@ -24,8 +24,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 const HERE = __dirname;
-const BINJS = path.join(HERE, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
-const DEFAULT_ROOT = path.join(HERE, '..', '..', '02_工程', '完整主bin快照_20261012', '输出文件');
+const BINJS = path.join(HERE, '..', '..', '02_工程', '游戏主bin', 'bin', 'js');
+const DEFAULT_ROOT = path.join(HERE, '..', '..', '02_工程', '游戏主bin', '输出文件');
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js',
                'playersim.js', 'analysis.js', 'generator.js'];
 

@@ -2,7 +2,7 @@
 /* 只读债务生命周期：node 03_工具/好关评分/债务时间线.js <关卡.json> [--out 报告.json] */
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const BIN = path.join(__dirname, '..', '..', '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(__dirname, '..', '..', '02_工程', '游戏主bin', 'bin', 'js');
 const FILES = ['utils.js', 'color-libs.js', 'simulator.js', 'solver-strategy.js', 'solver.js', 'playersim.js', 'analysis.js', 'solver-analysis.js', 'car-sequencer.js'];
 const sandbox = { console: { log() {}, warn() {}, error() {} }, module: { exports: {} }, WeakMap, Map, Set, Date, Math, JSON };
 vm.createContext(sandbox); for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(BIN, f), 'utf8'), sandbox, { filename: f });

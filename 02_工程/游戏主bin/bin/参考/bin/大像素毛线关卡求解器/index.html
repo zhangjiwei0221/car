@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大像素毛线JSON关卡求解器</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 顶部工具栏 -->
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <button id="btn-import" class="toolbar-btn">📂 导入JSON</button>
+      <button id="btn-import-lib" class="toolbar-btn" title="批量导入多个关卡到关卡库，可在中间下拉框切换">📚 导入关卡库</button>
+      <button id="btn-export" class="toolbar-btn">💾 导出JSON</button>
+      <button id="btn-batch" class="toolbar-btn" title="批量导入多个关卡JSON，自动求解并导出暂存区数据">📊 批量分析</button>
+      <input type="file" id="file-input" accept=".json" style="display:none">
+      <input type="file" id="batch-file-input" accept=".json" multiple style="display:none">
+      <input type="file" id="lib-file-input" accept=".json" multiple style="display:none">
+    </div>
+    <div class="toolbar-center">
+      <select id="level-select" class="level-select" style="display:none;max-width:220px;margin-right:8px;"></select>
+      <button id="btn-prev-level" class="toolbar-btn btn-sm" style="display:none;" title="上一关">◀</button>
+      <button id="btn-next-level" class="toolbar-btn btn-sm" style="display:none;" title="下一关">▶</button>
+      <input type="text" id="file-name" class="file-name-input" placeholder="未命名关卡.json" value="未命名关卡.json">
+    </div>
+    <div class="toolbar-right">
+      <button id="btn-sim-mode" class="toolbar-btn" title="模拟游玩">🎮 模拟游玩</button>
+      <button id="btn-undo" class="toolbar-btn" title="撤回 (Ctrl+Z)">↩ 撤回</button>
+      <span id="undo-count" class="undo-count"></span>
+    </div>
+  </header>
+
+  <!-- 主体区域 -->
+  <main class="main-container">
+    <!-- 左侧：信息/验证（编辑模式） -->
+    <aside class="panel panel-left" id="panel-left">
+      <h3 class="panel-title">关卡信息</h3>
+      <div class="target-info">
+        <label>toprow: <input type="number" id="input-toprow" min="1" max="100" value="8"></label>
+      </div>
+      <!-- 验证警告区域 -->
+      <div id="validation-warnings" class="validation-warnings">
+        <div class="warn-title">⚠ 验证警告</div>
+        <div id="validation-warnings-content"></div>
+      </div>
+    </aside>
+
+    <!-- 中间：目标预览 + 棋盘编辑器 / 模拟游玩区 -->
+    <section class="panel panel-center">
+      <!-- 编辑模式内容 -->
+      <div id="editor-content">
+        <div class="editor-split">
+          <!-- 目标区预览（中间放大显示） -->
+          <div class="editor-target-col">
+            <div class="board-toolbar">
+              <h3 class="panel-title">目标区预览</h3>
+              <div class="target-zoom-controls">
+                <label>缩放: <input type="range" id="input-target-zoom" min="2" max="16" value="8" step="1"></label>
+                <span id="target-zoom-val">8px</span>
+              </div>
+            </div>
+            <div class="editor-target-wrap">
+              <div id="target-viewer" class="target-viewer"></div>
+            </div>
+          </div>
+          <!-- 棋盘编辑器 -->
+          <div class="editor-board-col">
+            <div class="board-toolbar">
+              <h3 class="panel-title">元素区棋盘</h3>
+              <div class="board-size-controls">
+                <label>行: <input type="number" id="input-maprow" min="1" max="20" value="9"></label>
+                <label>列: <input type="number" id="input-mapcol" min="1" max="20" value="10"></label>
+                <button id="btn-resize" class="toolbar-btn btn-sm">应用尺寸</button>
+              </div>
+            </div>
+            <div style="display:flex;align-items:flex-start;flex:1;overflow:auto;">
+              <div id="pipe-panel" class="pipe-panel"></div>
+              <div id="board-container" class="board-container"></div>
+            </div>
+          </div>
+        </div>
+        <!-- 验证按钮区 -->
+        <div class="board-validation-bar">
+          <button id="btn-validate-colors" class="validate-btn">🎨 验证颜色</button>
+          <button id="btn-validate-reach" class="validate-btn">🔍 验证死锁</button>
+          <button id="btn-show-solution" class="validate-btn">🧩 最优解法</button>
+          <button id="btn-show-player" class="validate-btn">🙋 模拟玩家</button>
+          <button id="btn-clear-validation" class="validate-btn">✕ 清除</button>
+        </div>
+      </div>
+
+      <!-- 模拟模式内容（一体化面板：目标区+暂存区+棋盘） -->
+      <div id="sim-content" class="sim-content hidden">
+        <div class="sim-unified-panel">
+          <!-- 目标区（小型紧凑展示） -->
+          <div class="sim-target-area">
+            <div class="sim-target-header">
+              <span class="sim-target-title">目标区</span>
+              <span class="sim-progress-text" id="sim-progress-text"></span>
+            </div>
+            <div id="sim-target-viewer" class="sim-target-viewer"></div>
+          </div>
+          <!-- 暂存区 -->
+          <div class="sim-buffer-area">
+            <span class="sim-buffer-label" id="sim-buffer-label">暂存区 0/7</span>
+            <div class="sim-buffer-slots" id="sim-buffer-slots"></div>
+          </div>
+          <!-- 棋盘 -->
+          <div class="sim-board-area">
+            <div id="sim-pipe-panel" class="pipe-panel"></div>
+            <div id="sim-board-grid" class="board-container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右侧：属性面板（编辑+模拟共用） -->
+    <aside class="panel panel-right">
+      <h3 class="panel-title" id="right-panel-title">属性面板</h3>
+      <div id="property-panel" class="property-panel">
+        <div class="no-selection">点击格子查看属性</div>
+      </div>
+      <!-- 暂存区占用图表 -->
+      <div id="buffer-chart-container" class="buffer-chart-container" style="display:none;">
+        <div class="buffer-chart-header">
+          <span class="buffer-chart-title">暂存区变化</span>
+          <div class="buffer-chart-controls">
+            <button id="btn-chart-bar" class="chart-toggle active" title="柱状图">▮</button>
+            <button id="btn-chart-line" class="chart-toggle" title="折线图">╱</button>
+            <button id="btn-chart-zoom-in" class="chart-toggle" title="放大">+</button>
+            <button id="btn-chart-zoom-out" class="chart-toggle" title="缩小">−</button>
+            <button id="btn-chart-export" class="chart-toggle" title="导出CSV">📥</button>
+          </div>
+        </div>
+        <canvas id="buffer-chart-canvas" width="280" height="220"></canvas>
+        <div id="buffer-chart-tooltip" class="buffer-chart-tooltip"></div>
+
+        <!-- 融合压力曲线（0.4全知+0.6玩家，按球进度），卡点判定依据 -->
+        <div id="fused-chart-block" style="display:none;margin-top:12px;border-top:1px solid #e2e8f0;padding-top:8px;">
+          <div class="buffer-chart-header">
+            <span class="buffer-chart-title" style="color:#9b59b6;">卡点压力曲线 <span style="font-size:10px;color:#a0aec0;">(高手档·横轴=进度·紫框=卡点)</span></span>
+          </div>
+          <canvas id="fused-chart-canvas" width="280" height="180"></canvas>
+          <div id="fused-chart-tooltip" class="buffer-chart-tooltip"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="js/utils.js"></script>
+  <script src="js/target-viewer.js"></script>
+  <script src="js/board-editor.js"></script>
+  <script src="js/validator.js"></script>
+  <script src="js/simulator.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

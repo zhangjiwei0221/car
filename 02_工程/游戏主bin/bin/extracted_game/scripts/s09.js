@@ -1,0 +1,1 @@
+window.DEBUG=document.location.search.includes("debug"),window.TRACE=!1,window.DEVELOP=!1,window.TESTS=!1,window.FORCE_STABLE_RANDOM_SEED=!1

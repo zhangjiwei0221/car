@@ -8,11 +8,11 @@ const vm = require('vm');
 const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, '02_工程', '完整主bin快照_20261012', 'bin', 'js');
+const BIN = path.join(ROOT, '02_工程', '游戏主bin', 'bin', 'js');
 const IMAGE = process.env.IMAGE || '关卡00199_原图039-056-023-038_分图3色_40x40.txt';
 const INPUT = path.join(ROOT, '关卡', IMAGE);
 const IMAGE_LABEL = (IMAGE.match(/(\d{5})/) || [null, '199'])[1];
-const OLD_DIR = path.join(ROOT, '02_工程', '完整主bin快照_20261012', '输出文件', 'unnamed-10-27-3', '生产文档', '关卡数据');
+const OLD_DIR = path.join(ROOT, '02_工程', '游戏主bin', '输出文件', 'unnamed-10-27-3', '生产文档', '关卡数据');
 const OLD_LEVEL = path.join(OLD_DIR, '关卡00199_原图039-056-023-038_分图3色_40x40.json');
 const OUT = path.join(__dirname, '黑块形态硬门_v575_' + IMAGE_LABEL + '.json');
 const LEVEL_DIR = path.join(__dirname, '黑块形态硬门_v575.levels');

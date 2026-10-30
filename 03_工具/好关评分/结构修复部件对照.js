@@ -2,7 +2,7 @@
 /** v514预实验：真实失败关上的现有P7部件对照；只在VM导出内部函数，不改生产。 */
 'use strict';
 const fs=require('fs'),path=require('path'),vm=require('vm'),crypto=require('crypto');
-const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','完整主bin快照_20261012','bin','js');
+const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','游戏主bin','bin','js');
 const FILES=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js'];
 function opt(n,d){const i=process.argv.indexOf('--'+n);return i>=0?process.argv[i+1]:d;}const out=opt('out',''),only=opt('levels','').split(',').filter(Boolean);
 let gs=fs.readFileSync(path.join(BIN,'generator.js'),'utf8');
@@ -19,7 +19,7 @@ const samples=[
 function hash(x){return crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');}
 function cand(level,ev,cfg){return {level,valid:!!(ev&&ev.valid),solveResult:ev&&ev.solveResult,audit:ev&&ev.audit,goodV3:ev&&ev.goodV3,config:cfg};}
 function metrics(c){const fc=c.goodV3&&c.goodV3.fillCurve||{},p=c.goodV3&&c.goodV3.goodV3&&c.goodV3.persist||{};return {struct:G.goalStructPass(c),freeLowPct:fc.freeLowPct,freeRunMax:fc.freeRunMax,selectMedian:fc.selectMedian,fullMedian2:fc.fullMedian2,pressurePct3:fc.pressurePct3};}
-function runSample(s){const file=path.join(ROOT,'02_工程','完整主bin快照_20261012','输出文件',s.batch,s.file),raw=JSON.parse(fs.readFileSync(file,'utf8'));
+function runSample(s){const file=path.join(ROOT,'02_工程','游戏主bin','输出文件',s.batch,s.file),raw=JSON.parse(fs.readFileSync(file,'utf8'));
  const level=A.parseLevel(A.fromGameFormat(raw)),blocks=level.blocks,band=G.deriveCapacityBand(blocks),cfg=Object.assign({},G.DEFAULT_CONFIG,{trapEvalMs:1500,bottomOnly:false,instantChain:false,boxSizeMin:band.band[0],boxSizeMax:band.band[1]});
  const t0=Date.now(),ev0=G.evaluateLevel(level,cfg),base=cand(level,ev0,cfg),rec={id:s.id,batch:s.batch,file:s.file,protect:!!s.protect,baseHash:hash(level),base:metrics(base),variants:[]};
  if(!ev0){rec.error='base evaluateLevel null';return rec;}

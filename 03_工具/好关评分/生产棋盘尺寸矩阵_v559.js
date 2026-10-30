@@ -29,7 +29,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm'), crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BASE = path.join(ROOT, '02_工程', '完整主bin快照_20261012');
+const BASE = path.join(ROOT, '02_工程', '游戏主bin');
 const BIN = path.join(BASE, 'bin', 'js');
 const OUTDIR = path.join(BASE, '输出文件');
 
