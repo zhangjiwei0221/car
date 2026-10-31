@@ -13,13 +13,21 @@ const TARGET = arg('--target');
 const OUTDIR = arg('--outdir');
 const ROWS = arg('--rows', '7'), COLS = arg('--cols', '7');
 const BOARDS = String(arg('--boards', '')).split(',').map(x => x.trim()).filter(Boolean);   // 如 "7x7,6x6,8x8"
+const TIER = String(arg('--tier', 'std')).toLowerCase();
+const PRESET = {
+  easy: { at4: 12, run4: 6,  maxAt4: 18, plan: true,  wRun4: 5, rounds: 2, samples: 40,  stack: 1, attempts: 2 },
+  std:  { at4: 20, run4: 12, maxAt4: 99, plan: true,  wRun4: 5, rounds: 3, samples: 60,  stack: 1, attempts: 3 },
+  hard: { at4: 28, run4: 20, maxAt4: 99, plan: true,  wRun4: 8, rounds: 4, samples: 100, stack: 3, attempts: 3 },
+}[TIER] || null;
+if (PRESET) console.log(`档位 ${TIER}：目标 at4≥${PRESET.at4}${PRESET.maxAt4 < 99 ? ' 且 ≤' + PRESET.maxAt4 : ''}、run4≥${PRESET.run4}、plan=${PRESET.plan}、w-run4=${PRESET.wRun4}`);
 const ROUNDS = arg('--rounds', '3'), SAMPLES = arg('--samples', '120');
 const REF = arg('--ref', 'corner');
 const PLAN = has('--plan');
-const ATTEMPTS = Number(arg('--attempts', '3'));
-const T_AT4 = Number(arg('--target-at4', '20'));
-const T_RUN4 = Number(arg('--target-run4', '12'));
+let ATTEMPTS = Number(arg('--attempts', PRESET ? String(PRESET.attempts) : '3'));
+let T_AT4 = Number(arg('--target-at4', PRESET ? String(PRESET.at4) : '20'));
+let T_RUN4 = Number(arg('--target-run4', PRESET ? String(PRESET.run4) : '12'));
 const T_LATE = Number(arg('--target-late4', '4'));
+const T_MAX_AT4 = PRESET ? PRESET.maxAt4 : 99;
 const ALLPAIRS = has('--all-pairs');
 const STACK = arg('--stack', '1');
 const SEED = arg('--seed', '20261030');
@@ -63,24 +71,30 @@ for (const board of boardList) {
   let r = run(['03_工具/正式版/SplitLevel_v722.js', '--target', TARGET, '--out', init, '--rows', BR, '--cols', BC]);
   if (!fs.existsSync(init)) { report({ target: TARGET, stage: 'split', ok: false }); return; }
   // 2) 构建（换 seed、逐次加样本）
-  const rounds = String(Number(ROUNDS) + (attempt - 1));
-  const samples = String(Number(SAMPLES) + (attempt - 1) * 40);
-  r = run(['03_工具/正式版/OverlapBuild_v719.js', init, '--out', bFile, '--rounds', rounds, '--samples', samples, '--mode', 'a', '--ref', REF, '--seed', seed]);
+  const baseRounds = PRESET ? PRESET.rounds : Number(ROUNDS);
+  const baseSamples = PRESET ? PRESET.samples : Number(SAMPLES);
+  const wRun4 = PRESET ? PRESET.wRun4 : null;
+  const rounds = String(baseRounds + (attempt - 1));
+  const samples = String(baseSamples + (attempt - 1) * 40);
+  const buildArgs = ['03_工具/正式版/OverlapBuild_v719.js', init, '--out', bFile, '--rounds', rounds, '--samples', samples, '--mode', 'a', '--ref', REF, '--seed', seed];
+  if (wRun4 != null) buildArgs.push('--w-run4', String(wRun4));
+  r = run(buildArgs);
   if (!fs.existsSync(bFile)) { console.log(`  尝试${attempt}：构建失败`); continue; }
   // 3) 可选分配（后几次尝试允许叠加）
   let src = bFile;
-  if (PLAN) {
+  const doPlan = PRESET ? PRESET.plan : PLAN;
+  if (doPlan) {
     const fFile = path.join(OUTDIR, base + '.a' + attemptNo + '.plan.json');
     const planArgs = ['03_工具/正式版/ObstaclePlan_v745.js', bFile, '--ref', REF, '--out', fFile];
     if (ALLPAIRS) planArgs.push('--all-pairs');
-    const st = attempt >= 2 ? 2 : Number(STACK);
+    const st = attempt >= 2 ? 2 : (PRESET ? PRESET.stack : Number(STACK));
     if (st > 1) planArgs.push('--stack', String(st));
     run(planArgs);
     if (fs.existsSync(fFile)) src = fFile;
   }
   const m = measureFile(src);
   // 主指标：at4 与 run4；late4 只作参考（实测与 at4/run4 互斥）
-  const hit = m.won && m.peak <= 4 && m.at4 >= T_AT4 && m.run4 >= T_RUN4;
+  const hit = m.won && m.peak <= 4 && m.at4 >= T_AT4 && m.run4 >= T_RUN4 && m.at4 <= T_MAX_AT4;
   const score = m.at4 + m.run4 * 0.5 + m.late4 * 2;
   console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★达目标' : ''}`);
   if (!bestRes || score > bestRes.score) bestRes = { src, m, score, attempt };
@@ -123,7 +137,7 @@ function report(o) { console.log('RESULT ' + JSON.stringify(o)); }
     if (Array.isArray(x.param)) for (const b of x.param) if (b && b.count) qn += b.count;
   }
   const px = g.blocks.flat().filter(v => v > 0).length;
-  const hit = o.completed && Math.max(0, ...p) <= 4 && at4 >= T_AT4 && run4 >= T_RUN4;   // late4 仅参考
+  const hit = o.completed && Math.max(0, ...p) <= 4 && at4 >= T_AT4 && run4 >= T_RUN4 && at4 <= T_MAX_AT4;   // late4 仅参考
 
   report({
     target: TARGET, stage: 'done', ok: true, file: src,
