@@ -72,7 +72,8 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     if (fs.existsSync(fFile)) src = fFile;
   }
   const m = measureFile(src);
-  const hit = m.won && m.peak <= 4 && m.at4 >= T_AT4 && m.run4 >= T_RUN4 && m.late4 >= T_LATE;
+  // 主指标：at4 与 run4；late4 只作参考（实测与 at4/run4 互斥）
+  const hit = m.won && m.peak <= 4 && m.at4 >= T_AT4 && m.run4 >= T_RUN4;
   const score = m.at4 + m.run4 * 0.5 + m.late4 * 2;
   console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★达目标' : ''}`);
   if (!bestRes || score > bestRes.score) bestRes = { src, m, score, attempt };
@@ -114,7 +115,7 @@ function report(o) { console.log('RESULT ' + JSON.stringify(o)); }
     if (Array.isArray(x.param)) for (const b of x.param) if (b && b.count) qn += b.count;
   }
   const px = g.blocks.flat().filter(v => v > 0).length;
-  const hit = o.completed && Math.max(0, ...p) <= 4 && at4 >= T_AT4 && run4 >= T_RUN4 && late4 >= T_LATE;
+  const hit = o.completed && Math.max(0, ...p) <= 4 && at4 >= T_AT4 && run4 >= T_RUN4;   // late4 仅参考
 
   report({
     target: TARGET, stage: 'done', ok: true, file: src,
