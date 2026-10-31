@@ -12,6 +12,7 @@ const has = k => process.argv.includes(k);
 const TARGET = arg('--target');
 const OUTDIR = arg('--outdir');
 const ROWS = arg('--rows', '7'), COLS = arg('--cols', '7');
+const BOARDS = String(arg('--boards', '')).split(',').map(x => x.trim()).filter(Boolean);   // 如 "7x7,6x6,8x8"
 const ROUNDS = arg('--rounds', '3'), SAMPLES = arg('--samples', '120');
 const REF = arg('--ref', 'corner');
 const PLAN = has('--plan');
@@ -25,9 +26,8 @@ const SEED = arg('--seed', '20261030');
 
 fs.mkdirSync(OUTDIR, { recursive: true });
 const base = path.basename(TARGET).replace(/\.txt$/, '');
-const init = path.join(OUTDIR, base + '.init.json');
-const build = path.join(OUTDIR, base + '.build.json');
-const finalF = path.join(OUTDIR, base + '.json');
+
+
 
 function run(args) {
   const r = spawnSync('node', args, { cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', maxBuffer: 1 << 26 });
@@ -49,11 +49,18 @@ function measureFile(src) {
   return { at4, run4, late4, peak: Math.max(0, ...p2), won: !!o2.completed, steps: p2.length };
 }
 
-for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-  const seed = String(Number(SEED) + (attempt - 1) * 7);
-  const bFile = path.join(OUTDIR, base + '.a' + attempt + '.build.json');
-  // 1) 切车（只需一次，但重复无害且简单）
-  let r = run(['03_工具/正式版/SplitLevel_v722.js', '--target', TARGET, '--out', init, '--rows', ROWS, '--cols', COLS]);
+const boardList = BOARDS.length ? BOARDS : [ROWS + 'x' + COLS];
+let attemptNo = 0;
+outer:
+for (const board of boardList) {
+  const [BR, BC] = board.split('x');
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+  attemptNo++;
+  const seed = String(Number(SEED) + (attemptNo - 1) * 7);
+  const bFile = path.join(OUTDIR, base + '.a' + attemptNo + '.build.json');
+  const init = path.join(OUTDIR, base + '.' + board + '.init.json');
+  // 1) 切车（按当前棋盘尺寸）
+  let r = run(['03_工具/正式版/SplitLevel_v722.js', '--target', TARGET, '--out', init, '--rows', BR, '--cols', BC]);
   if (!fs.existsSync(init)) { report({ target: TARGET, stage: 'split', ok: false }); return; }
   // 2) 构建（换 seed、逐次加样本）
   const rounds = String(Number(ROUNDS) + (attempt - 1));
@@ -63,7 +70,7 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
   // 3) 可选分配（后几次尝试允许叠加）
   let src = bFile;
   if (PLAN) {
-    const fFile = path.join(OUTDIR, base + '.a' + attempt + '.plan.json');
+    const fFile = path.join(OUTDIR, base + '.a' + attemptNo + '.plan.json');
     const planArgs = ['03_工具/正式版/ObstaclePlan_v745.js', bFile, '--ref', REF, '--out', fFile];
     if (ALLPAIRS) planArgs.push('--all-pairs');
     const st = attempt >= 2 ? 2 : Number(STACK);
@@ -77,7 +84,8 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
   const score = m.at4 + m.run4 * 0.5 + m.late4 * 2;
   console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★达目标' : ''}`);
   if (!bestRes || score > bestRes.score) bestRes = { src, m, score, attempt };
-  if (hit) break;
+  if (hit) break outer;
+  }
 }
 if (!bestRes) { report({ target: TARGET, stage: 'all-failed', ok: false }); return; }
 const src = bestRes.src;
