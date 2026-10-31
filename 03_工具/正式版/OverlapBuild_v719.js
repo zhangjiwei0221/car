@@ -36,7 +36,7 @@ let NEW_ALLOW = [];
 const GUIDE = Number(arg('--guide-color', 0));   // 要求第 1 步必须是这个颜色（引导）
 const GUIDE_STEPS = Number(arg('--guide-steps', 0));  // 前 K 步只允许引导色
 const NO_EARLY = Number(arg('--no-early', 0));
-const W_RUN4 = Number(arg('--w-run4', 0));
+const W_RUN4 = Number(arg('--w-run4', 5));   // 奖励最长连续 >=4 的步数（默认 5）
 const OBJ = String(arg('--obj', 'low'));   // low=原目标(减少低压段) | at4=最大化 at4   // 目标里奖励最长连续 >=4
 const MODE = String(arg('--mode', 'b')).toLowerCase();   // b=瞬时连锁（默认） / a=四边入口        // 前 K 步不许到 buffer>=4（避免前期卡点）
 const ALLOW = String(arg('--allow-colors', '')).split(',').map(Number).filter(n => n > 0);
