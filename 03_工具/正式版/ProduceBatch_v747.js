@@ -63,17 +63,18 @@ function finish() {
   results.sort((a, b) => (b.at4 || 0) - (a.at4 || 0));
   const ok = results.filter(r => r.ok);
   console.log(`\n=== 批次结果：${ok.length}/${results.length} 成功 ===`);
-  console.log('图'.padEnd(30) + 'at4  run4 late4 峰值 首手落点'.padEnd(24) + '容量 用时');
+  console.log('图'.padEnd(30) + 'at4  run4 late4 峰值 首手落点'.padEnd(24) + '首手% 容量 用时');
   for (const r of results) {
     if (!r.ok) { console.log(`${r.file.slice(0, 28).padEnd(30)} ❌ ${r.stage}`); continue; }
-    console.log(`${r.file.slice(0, 28).padEnd(30)} ${String(r.at4).padStart(3)} ${String(r.run4).padStart(4)} ${String(r.late4).padStart(5)} ${String(r.peak).padStart(4)}  ${String(r.firstQuad).padEnd(22)} ${r.capacityOK ? '✅' : '❌'} ${r.wall}s`);
+    const fr = r.firstRatio != null ? Math.round(r.firstRatio * 100) + '%' : '-';
+    console.log(`${r.file.slice(0, 28).padEnd(30)} ${String(r.at4).padStart(3)} ${String(r.run4).padStart(4)} ${String(r.late4).padStart(5)} ${String(r.peak).padStart(4)}  ${String(r.firstQuad).padEnd(22)} ${fr.padStart(4)} ${r.capacityOK ? '✅' : '❌'} ${r.wall}s`);
   }
   const lines = results.map(r => r.ok
-    ? `| ${r.file} | ${r.at4} | ${r.run4} | ${r.late4} | ${r.peak} | ${r.firstQuad} | ${r.capacityOK ? '✅' : '❌'} | ${r.wall}s |`
+    ? `| ${r.file} | ${r.at4} | ${r.run4} | ${r.late4} | ${r.peak} | ${r.firstQuad} | ${Math.round((r.firstRatio || 0) * 100)}% | ${r.capacityOK ? '✅' : '❌'} | ${r.wall}s |`
     : `| ${r.file} | ❌ ${r.stage} | - | - | - | - | - | ${r.wall}s |`);
   const md = `# 批次 ${path.basename(OUT)}\n\n` +
     `参数：rows=${ROWS} cols=${COLS} rounds=${ROUNDS} samples=${SAMPLES} ref=${REF} plan=${PLAN} allPairs=${ALLPAIRS} stack=${STACK} seed=${SEED}\n\n` +
-    `| 图 | at4 | run4 | late4 | 峰值 | 首手落点 | 容量 | 用时 |\n|---|---|---|---|---|---|---|---|\n` + lines.join('\n') + '\n';
+    `| 图 | at4 | run4 | late4 | 峰值 | 首手落点 | 首手消除% | 容量 | 用时 |\n|---|---|---|---|---|---|---|---|---|\n` + lines.join('\n') + '\n';
   fs.writeFileSync(path.join(ROOT, OUT, '报告.md'), md);
   fs.writeFileSync(path.join(ROOT, OUT, 'results.json'), JSON.stringify(results, null, 2));
   console.log(`\n报告：${OUT}/报告.md`);

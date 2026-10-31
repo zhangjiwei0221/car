@@ -32,7 +32,16 @@ function metrics(f) {
     if (v >= 4) { cur++; at4++; run4 = Math.max(run4, cur); } else cur = 0;
     if (i >= from && v >= 4) late4++;
   }
-  return { won: !!o.completed, peak: Math.max(0, ...p), at4, run4, late4, steps: p.length };
+  // 首手消除比例：开局第一手必须吃掉 ≥80% 容量（前期容错高，允许留一点债）
+  let firstRatio = 1;
+  if (o.pickOrder && o.pickOrder.length) {
+    const st = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+    A.Simulator.applyPick(st, o.pickOrder[0].r, o.pickOrder[0].c);
+    let n = 0;
+    for (let y = 0; y < lv.rows; y++) for (let x = 0; x < lv.cols; x++) if (st.eliminated[y][x]) n++;
+    firstRatio = n / Math.max(1, o.pickOrder[0].count);
+  }
+  return { won: !!o.completed, peak: Math.max(0, ...p), at4, run4, late4, firstRatio: +firstRatio.toFixed(2), steps: p.length };
 }
 const run = (args) => {
   const r = spawnSync('node', args, { encoding: 'utf8', maxBuffer: 1 << 26 });
@@ -92,7 +101,7 @@ if (FAST) {
     if (fs.existsSync(out) && JSON.stringify(B.readJson(out)) !== JSON.stringify(B.readJson(bestSoFar.file))) {
       const m = metrics(out);
       cands.push({ name: bestSoFar.name + '+ice', file: out, m });
-      console.log(`  ${bestSoFar.name}+ice → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak} ${m.won ? '可解' : '不可解'}`);
+      console.log(`  ${bestSoFar.name}+ice → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak} 首手${Math.round((m.firstRatio||0)*100)}% ${m.won ? '可解' : '不可解'}`);
     } else console.log('  冰：无候选（关卡未改动）');
   }
   cands.sort((a, b) => score(b.m) - score(a.m));
@@ -100,7 +109,7 @@ if (FAST) {
   console.log('\n=== 决策树结果 ===');
   for (const c of cands) {
     const ok = c.m.won && c.m.peak <= 4 && c.m.at4 >= T_AT4 && c.m.late4 >= T_LATE;
-    console.log(`  ${c.name.padEnd(14)} at4=${String(c.m.at4).padStart(2)} run4=${String(c.m.run4).padStart(2)} late4=${String(c.m.late4).padStart(2)} 峰值${c.m.peak} ${ok ? '★达标' : ''}`);
+    console.log(`  ${c.name.padEnd(14)} at4=${String(c.m.at4).padStart(2)} run4=${String(c.m.run4).padStart(2)} late4=${String(c.m.late4).padStart(2)} 峰值${c.m.peak} 首手${String(Math.round((c.m.firstRatio||0)*100)).padStart(3)}% ${ok ? '★达标' : ''}`);
   }
   // ── 继续叠障碍：--stack N（N-1 次追加，每次在 wall/ice/pipe 里挑最好的）──
   let curFile = bestFast.file, curName = bestFast.name;
@@ -119,6 +128,7 @@ if (FAST) {
       if (JSON.stringify(B.readJson(out)) === JSON.stringify(B.readJson(curFile))) continue;
       const m = metrics(out);
       if (!m.won || m.peak > 4) continue;
+      if (m.firstRatio != null && m.firstRatio < 0.8) continue;
       if (score(m) <= score(curM)) continue;
       if (!bestAdd || score(m) > score(bestAdd.m)) bestAdd = { tag, file: out, m };
     }

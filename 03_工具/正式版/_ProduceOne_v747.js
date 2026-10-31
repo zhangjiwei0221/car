@@ -61,9 +61,11 @@ for (let i = 0; i < p.length; i++) { const v = p[i]; if (v >= 4) { cur++; at4++;
 // 首手落点
 const R = lv.rows, C = lv.cols;
 const st = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
-let firstQuad = null;
+let firstQuad = null, firstPx = 0, firstRatio = 0;
 if (o.pickOrder && o.pickOrder.length) {
   A.Simulator.applyPick(st, o.pickOrder[0].r, o.pickOrder[0].c);
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) if (st.eliminated[y][x]) firstPx++;
+  firstRatio = +(firstPx / Math.max(1, o.pickOrder[0].count)).toFixed(2);
   const q = (y, x) => (y < R / 2 ? '上' : '下') + (x < C / 2 ? '左' : '右');
   const cnt = {};
   for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) if (st.eliminated[y][x]) { const k = q(y, x); cnt[k] = (cnt[k] || 0) + 1; }
@@ -80,7 +82,7 @@ const px = g.blocks.flat().filter(v => v > 0).length;
 report({
   target: TARGET, stage: 'done', ok: true, file: src,
   at4, run4, late4, peak: Math.max(0, ...p), steps: p.length, won: !!o.completed,
-  firstQuad, capacityOK: cap + qn === px, cap: cap + qn, px,
+  firstQuad, firstPx, firstRatio, capacityOK: cap + qn === px, cap: cap + qn, px,
   seconds: Math.round((Date.now() - t0) / 1000),
 });
 
