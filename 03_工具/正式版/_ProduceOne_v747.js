@@ -15,7 +15,7 @@ const ROWS = arg('--rows', '7'), COLS = arg('--cols', '7');
 const BOARDS = String(arg('--boards', '')).split(',').map(x => x.trim()).filter(Boolean);   // 如 "7x7,6x6,8x8"
 const TIER = String(arg('--tier', 'std')).toLowerCase();
 const PRESET = {
-  easy: { at4: 12, run4: 6,  maxAt4: 18, plan: true,  wRun4: 5, rounds: 2, samples: 40,  stack: 1, attempts: 2 },
+  easy: { at4: 12, run4: 6,  maxAt4: 18, plan: true,  wRun4: 5, rounds: 2, samples: 40,  stack: 1, attempts: 3 },
   std:  { at4: 20, run4: 12, maxAt4: 99, plan: true,  wRun4: 5, rounds: 3, samples: 60,  stack: 1, attempts: 3 },
   hard: { at4: 28, run4: 20, maxAt4: 99, plan: true,  wRun4: 8, rounds: 4, samples: 100, stack: 3, attempts: 3 },
 }[TIER] || null;
@@ -95,7 +95,10 @@ for (const board of boardList) {
   const m = measureFile(src);
   // 主指标：at4 与 run4；late4 只作参考（实测与 at4/run4 互斥）
   const hit = m.won && m.peak <= 4 && m.at4 >= T_AT4 && m.run4 >= T_RUN4 && m.at4 <= T_MAX_AT4;
-  const score = m.at4 + m.run4 * 0.5 + m.late4 * 2;
+  // easy 档：优先“落在 12–18 窗口内且尽量靠近 15”，而不是越高越好
+  const score = (TIER === 'easy')
+    ? -(Math.abs(m.at4 - 15) * 10) - (m.at4 > 18 ? (m.at4 - 18) * 20 : 0) + m.run4 * 0.2
+    : (m.at4 + m.run4 * 0.5 + m.late4 * 2);
   console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★达目标' : ''}`);
   if (!bestRes || score > bestRes.score) bestRes = { src, m, score, attempt };
   if (hit) break outer;
