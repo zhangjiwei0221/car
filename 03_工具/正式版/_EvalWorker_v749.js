@@ -39,6 +39,11 @@ function evalLevel(g) {
     if (buf[s3] >= 4) late4++;
     if (buf[s3] >= 3) late3++;
   }
+  // 【分段口径】前 20% 的 4 步数、后 20% 的最长连续 4
+  const earlyN = Math.max(1, Math.round(buf.length * 0.2));
+  const early4 = buf.slice(0, earlyN).filter(v => v >= 4).length;
+  let late4run = 0, rTmp = 0;
+  for (let s8 = tailFrom; s8 < buf.length; s8++) { if (buf[s8] >= 4) { rTmp++; late4run = Math.max(late4run, rTmp); } else rTmp = 0; }
   const midA = Math.floor(buf.length * 0.4), midB = Math.floor(buf.length * 0.8);
   let mid4 = 0; for (let s7 = midA; s7 < midB; s7++) if (buf[s7] >= 4) mid4++;
   const firstColor = (o.pickOrder && o.pickOrder[0]) ? o.pickOrder[0].color : null;
@@ -59,7 +64,7 @@ function evalLevel(g) {
     }
     shellDone = SHELL.map(c => done2[c] || null);
   }
-  return { shellDone, won: !!o.completed, peak: Math.max(0, ...buf), at4, run4, late4, late3, mid4, midN: midB - midA, gapTotal, gapMax, tailFree, leadFree, lowTotal, lowRun, firstColor, firstK, firstUse, earlyHigh, steps: buf.length, itemUses: o.itemUses || 0, buf };
+  return { shellDone, early4, late4run, won: !!o.completed, peak: Math.max(0, ...buf), at4, run4, late4, late3, mid4, midN: midB - midA, gapTotal, gapMax, tailFree, leadFree, lowTotal, lowRun, firstColor, firstK, firstUse, earlyHigh, steps: buf.length, itemUses: o.itemUses || 0, buf };
 }
 
 parentPort.on('message', (msg) => {

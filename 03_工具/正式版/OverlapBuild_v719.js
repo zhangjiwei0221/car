@@ -51,7 +51,8 @@ const LOCK_SUBJECT = argv.includes('--lock-subject');
 const GATE = argv.includes('--gate');
 const PROTECT = new Set(String(arg('--protect-colors', '')).split(',').map(Number).filter(n => n > 0));  // 不许动的车（如外框壳）
 const SHELL = String(arg('--shell-colors', '')).split(',').map(Number).filter(n => n > 0);   // 外框壳色（按开口顺序）
-const MIN_GAP = Number(arg('--min-shell-gap', 0));   // 相邻两次开壳至少隔几手（0=不管）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
+const MIN_GAP = Number(arg('--min-shell-gap', 0));
+const BAN_EARLY4 = argv.includes('--ban-early4');   // 前 20% 不许出现 buffer=4   // 相邻两次开壳至少隔几手（0=不管）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
 const QMAP = new Map();
 if (LOCK_SUBJECT || GATE) {
   const blk = base.blocks || [], H = blk.length, W = H ? blk[0].length : 0;
@@ -342,6 +343,7 @@ for (let round = 0; round < ROUNDS; round++) {
     const e = evals[i]; const mv = cands[i].mv;
     if (!e || e.error) continue;
     if (!e.won || e.peak > 4 || e.itemUses > 0) continue;
+    if (BAN_EARLY4 && e.early4 > 0) continue;    // 硬约束：前期不许压到 4
     if (MIN_GAP > 0 && SHELL.length) {          // 开壳间隔硬约束：不合格直接淘汰
       const d = (e.shellDone || []).filter(v => v != null).sort((a, b) => a - b);
       let okGap = d.length === SHELL.length;
@@ -355,16 +357,18 @@ for (let round = 0; round < ROUNDS; round++) {
       if (!e.firstK.every(c => allow.includes(c))) continue;
     }
     if (e.at4 < Math.max(MIN_AT4, curE.at4 - 1)) continue;
-    const scoreOf = x => OBJ === 'at4' ? (x.at4 * 10 + x.run4) : (x.lowRun * 10 + x.lowTotal - W_RUN4 * x.run4);
+    const scoreOf = x => OBJ === 'at4' ? (x.at4 * 10 + x.run4)
+      : OBJ === 'late' ? ((x.late4run || 0) * 100 + (x.late4 || 0) * 10 + x.at4 * 0.1)
+      : (x.lowRun * 10 + x.lowTotal - W_RUN4 * x.run4);
     const scoreE = scoreOf(e), scoreC = scoreOf(curE);
-    if (OBJ !== 'at4') {
+    if (OBJ === 'low') {
       if (scoreE > scoreC) continue;
       if (scoreE === scoreC && e.at4 <= curE.at4) continue;
     } else {
-      if (scoreE <= scoreC) continue;      // at4 目标：必须严格更好
+      if (scoreE <= scoreC) continue;      // at4/late 目标：必须严格更好
     }
-    const bestScore = bestE ? scoreOf(bestE) : (OBJ === 'at4' ? -Infinity : Infinity);
-    if ((OBJ === 'at4' ? scoreE > bestScore : scoreE < bestScore)
+    const bestScore = bestE ? scoreOf(bestE) : (OBJ === 'low' ? Infinity : -Infinity);
+    if ((OBJ !== 'low' ? scoreE > bestScore : scoreE < bestScore)
       || (scoreE === bestScore && e.at4 > bestE.at4)) { best = { mv, level: cands[i].h }; bestE = e; }
   }
   if (!best) { console.log(`第${round + 1}轮：无改进，停止`); break; }
