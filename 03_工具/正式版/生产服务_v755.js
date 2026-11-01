@@ -39,6 +39,14 @@ function startJob(name, content, tier, layer) {
 
 http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    });
+    return res.end();
+  }
   if (u.pathname === '/api/files') {
     const list = fs.readdirSync(path.join(ROOT, '关卡')).filter(f => f.endsWith('.txt')).slice(0, 300);
     return json(res, list);
