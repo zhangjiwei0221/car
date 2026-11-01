@@ -32,7 +32,14 @@ function startJob(name, content, tier, layer) {
   ch.on('close', () => {
     job.running = false;
     const line = job.log.split('\n').filter(l => l.startsWith('RESULT ')).pop();
-    if (line) { try { job.result = JSON.parse(line.slice(7)); } catch (e) {} }
+    if (line) {
+      try { job.result = JSON.parse(line.slice(7)); } catch (e) {}
+      try {
+        if (job.result && job.result.file && fs.existsSync(job.result.file)) {
+          job.result.level = JSON.parse(fs.readFileSync(job.result.file, 'utf8'));
+        }
+      } catch (e) {}
+    }
   });
   return id;
 }

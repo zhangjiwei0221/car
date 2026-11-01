@@ -868,7 +868,8 @@
           + '</div>';
         document.getElementById('xp-apply').onclick = async function () {
           try {
-            var lv = await (await fetch(SVC + '/api/level?path=' + encodeURIComponent(res.file))).json();
+            var lv = res.level;
+            if (!lv) lv = await (await fetch(SVC + '/api/level?path=' + encodeURIComponent(res.file))).json();
             var fi = document.getElementById('file-input');
             if (!fi) { alert('当前页面没有关卡导入入口'); return; }
             var dt = new DataTransfer();
