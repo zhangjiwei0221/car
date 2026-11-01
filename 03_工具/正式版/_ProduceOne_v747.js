@@ -109,12 +109,25 @@ const src = bestRes.src;
 // 把“最佳尝试”复制成固定文件名，方便下游直接读取
 try { fs.copyFileSync(src, path.join(OUTDIR, base + '.json')); } catch (e) {}
 
+// 可选：按「颜色露头」分层重排（只动车的位置，压开局、保后段）
+let finalSrc = src;
+if (has('--layer')) {
+  const lFile = path.join(OUTDIR, base + '.layered.json');
+  const lArgs = ['03_工具/正式版/LayerByEdge_v754.js', src, '--out', lFile,
+    '--seeds', String(Number(arg('--layer-seeds', '12'))), '--ref', REF, '--mode', 'a'];
+  const cPath = arg('--contract', '');
+  if (cPath) lArgs.push('--contract', cPath);
+  const lr = run(lArgs);
+  if (lr.ok && fs.existsSync(lFile)) { finalSrc = lFile; console.log('  分层重排：' + path.basename(lFile)); }
+  else console.log('  分层重排：失败，保留原结果');
+}
+
 function report(o) { console.log('RESULT ' + JSON.stringify(o)); }
 
 // ── 最终指标 + 验收 ──
 {
   const A = B.loadSolver(REF);
-  const g = B.readJson(src);
+  const g = B.readJson(finalSrc);
   const lv = A.parseLevel(A.fromGameFormat(g));
   const R = lv.rows, C = lv.cols;
   const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
