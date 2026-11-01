@@ -860,9 +860,24 @@
         var rel = res.file.replace('/Users/red/Desktop/毛线汽车/', '');
         panel.innerHTML = '<div style="font-size:15px"><b>' + (ok ? '✅ 可用' : '❌ 不达标') + '</b></div>'
           + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">' + kv + '</div>'
-          + '<div><a href="http://127.0.0.1:8060/实验关/关卡6/原型_v1/play.html?level=../../' + encodeURI(rel) + '&rule=corner" target="_blank">▶ 试玩</a>'
-          + ' &nbsp; <a href="' + SVC + '/api/level?path=' + encodeURIComponent(res.file) + '" target="_blank">下载 JSON</a>'
-          + ' &nbsp; <a href="#" onclick="this.parentNode.parentNode.style.display=\'none\';return false">关闭</a></div>';
+          + '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'
+          + '<button id="xp-apply" style="border:0;border-radius:8px;padding:8px 14px;background:#5b4634;color:#fff;font-weight:700;cursor:pointer">▶ 映射到界面</button>'
+          + '<a href="http://127.0.0.1:8060/实验关/关卡6/原型_v1/play.html?level=../../../' + encodeURI(rel) + '&rule=corner" target="_blank">试玩页</a>'
+          + '<a href="' + SVC + '/api/level?path=' + encodeURIComponent(res.file) + '" target="_blank">下载 JSON</a>'
+          + '<a href="#" onclick="document.getElementById(\'xp-produce-btn\').__panel.style.display=\'none\';return false">关闭</a>'
+          + '</div>';
+        document.getElementById('xp-apply').onclick = async function () {
+          try {
+            var lv = await (await fetch(SVC + '/api/level?path=' + encodeURIComponent(res.file))).json();
+            var fi = document.getElementById('file-input');
+            if (!fi) { alert('当前页面没有关卡导入入口'); return; }
+            var dt = new DataTransfer();
+            dt.items.add(new File([JSON.stringify(lv)], '新产线.json', { type: 'application/json' }));
+            fi.files = dt.files;
+            fi.dispatchEvent(new Event('change', { bubbles: true }));
+            panel.style.display = 'none';
+          } catch (e) { alert('映射失败：' + e.message); }
+        };
       }
     }, 2000);
   };
