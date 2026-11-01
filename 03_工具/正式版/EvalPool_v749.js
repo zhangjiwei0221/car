@@ -19,7 +19,7 @@ function createPool(opts) {
 
   function spawn() {
     const w = new Worker(path.join(__dirname, '_EvalWorker_v749.js'), {
-      workerData: { ref, mode: opts.mode || 'a', guideSteps: opts.guideSteps || 3, noEarly: opts.noEarly || 0, shellColors: opts.shellColors || [] },
+      workerData: { ref, mode: opts.mode || 'a', guideSteps: opts.guideSteps || 3, noEarly: opts.noEarly || 0, shellColors: opts.shellColors || [], bufThreshold: opts.bufThreshold || 4 },
     });
     w.on('message', (msg) => {
       const res = pending.get(msg.id);

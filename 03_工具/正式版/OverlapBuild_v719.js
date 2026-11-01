@@ -52,7 +52,8 @@ const GATE = argv.includes('--gate');
 const PROTECT = new Set(String(arg('--protect-colors', '')).split(',').map(Number).filter(n => n > 0));  // 不许动的车（如外框壳）
 const SHELL = String(arg('--shell-colors', '')).split(',').map(Number).filter(n => n > 0);   // 外框壳色（按开口顺序）
 const MIN_GAP = Number(arg('--min-shell-gap', 0));
-const BAN_EARLY4 = argv.includes('--ban-early4');   // 前 20% 不许出现 buffer=4   // 相邻两次开壳至少隔几手（0=不管）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
+const BAN_EARLY4 = argv.includes('--ban-early4');
+const BUFTH = Number(arg('--buf-threshold', 4));   // 高压线（默认 4）   // 前 20% 不许出现 buffer=4   // 相邻两次开壳至少隔几手（0=不管）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
 const QMAP = new Map();
 if (LOCK_SUBJECT || GATE) {
   const blk = base.blocks || [], H = blk.length, W = H ? blk[0].length : 0;
@@ -305,7 +306,7 @@ function candidateMoves(g) {
 
 (async () => {
 const { createPool } = require('./EvalPool_v749');
-const POOL = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE, guideSteps: GUIDE_STEPS, noEarly: NO_EARLY, shellColors: SHELL });
+const POOL = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE, guideSteps: GUIDE_STEPS, noEarly: NO_EARLY, shellColors: SHELL, bufThreshold: BUFTH });
 
 let cur = base;
 let curE = await POOL.evalOne(applyGates(cur));

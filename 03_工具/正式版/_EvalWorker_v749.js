@@ -6,14 +6,15 @@ const A = B.loadSolver(workerData.ref || 'ring');
 const GUIDE_STEPS = workerData.guideSteps || 3;
 const NO_EARLY = workerData.noEarly || 0;
 const MODE = workerData.mode || 'a';
-const SHELL = workerData.shellColors || [];   // 外框壳颜色（按开口顺序）
+const SHELL = workerData.shellColors || [];
+const BUFTH = workerData.bufThreshold || 4;   // 高压线（buffer≥该值）   // 外框壳颜色（按开口顺序）
 
 function evalLevel(g) {
   const lv = A.parseLevel(A.fromGameFormat(g));
   const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: MODE !== 'a' });
   const buf = (o.pressureSamples || []).map(s => s.buf || 0);
   let run4 = 0, cur = 0, at4 = 0;
-  for (const v of buf) { if (v >= 4) { cur++; at4++; run4 = Math.max(run4, cur); } else cur = 0; }
+  for (const v of buf) { if (v >= BUFTH) { cur++; at4++; run4 = Math.max(run4, cur); } else cur = 0; }
   const cls = buf.map(v => v >= 4 ? 'H' : v >= 2 ? 'M' : 'L');
   const beats = []; let i = 0;
   while (i < buf.length) { let j = i; while (j + 1 < buf.length && cls[j + 1] === cls[i]) j++; beats.push({ k: cls[i], from: i + 1, to: j + 1 }); i = j + 1; }
@@ -36,14 +37,14 @@ function evalLevel(g) {
   let tailFree = 0, late4 = 0, late3 = 0;
   for (let s3 = tailFrom; s3 < buf.length; s3++) {
     if (buf[s3] < 3) tailFree++;
-    if (buf[s3] >= 4) late4++;
+    if (buf[s3] >= BUFTH) late4++;
     if (buf[s3] >= 3) late3++;
   }
   // 【分段口径】前 20% 的 4 步数、后 20% 的最长连续 4
   const earlyN = Math.max(1, Math.round(buf.length * 0.2));
-  const early4 = buf.slice(0, earlyN).filter(v => v >= 4).length;
+  const early4 = buf.slice(0, earlyN).filter(v => v >= BUFTH).length;
   let late4run = 0, rTmp = 0;
-  for (let s8 = tailFrom; s8 < buf.length; s8++) { if (buf[s8] >= 4) { rTmp++; late4run = Math.max(late4run, rTmp); } else rTmp = 0; }
+  for (let s8 = tailFrom; s8 < buf.length; s8++) { if (buf[s8] >= BUFTH) { rTmp++; late4run = Math.max(late4run, rTmp); } else rTmp = 0; }
   const midA = Math.floor(buf.length * 0.4), midB = Math.floor(buf.length * 0.8);
   let mid4 = 0; for (let s7 = midA; s7 < midB; s7++) if (buf[s7] >= 4) mid4++;
   const firstColor = (o.pickOrder && o.pickOrder[0]) ? o.pickOrder[0].color : null;
