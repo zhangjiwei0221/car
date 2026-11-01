@@ -6,6 +6,7 @@ const A = B.loadSolver(workerData.ref || 'ring');
 const GUIDE_STEPS = workerData.guideSteps || 3;
 const NO_EARLY = workerData.noEarly || 0;
 const MODE = workerData.mode || 'a';
+const SHELL = workerData.shellColors || [];   // 外框壳颜色（按开口顺序）
 
 function evalLevel(g) {
   const lv = A.parseLevel(A.fromGameFormat(g));
@@ -45,7 +46,20 @@ function evalLevel(g) {
   (o.pickOrder || []).forEach((p, i) => { if (firstUse[p.color] === undefined) firstUse[p.color] = i + 1; });
   const firstK = (o.pickOrder || []).slice(0, GUIDE_STEPS).map(p => p.color);
   const earlyHigh = NO_EARLY > 0 ? buf.slice(0, NO_EARLY).some(v => v >= 4) : false;
-  return { won: !!o.completed, peak: Math.max(0, ...buf), at4, run4, late4, late3, mid4, midN: midB - midA, gapTotal, gapMax, tailFree, leadFree, lowTotal, lowRun, firstColor, firstK, firstUse, earlyHigh, steps: buf.length, itemUses: o.itemUses || 0, buf };
+  // 开壳步：某外框色的像素被全部取走时的第几手
+  let shellDone = null;
+  if (SHELL.length) {
+    const tot = {};
+    for (let yy = 0; yy < g.blocks.length; yy++) for (let xx = 0; xx < g.blocks[yy].length; xx++) { const c = g.blocks[yy][xx]; tot[c] = (tot[c] || 0) + 1; }
+    const acc2 = {}, done2 = {}; let ii = 0;
+    for (const pp of (o.pickOrder || [])) {
+      ii++;
+      acc2[pp.color] = (acc2[pp.color] || 0) + (pp.count || 0);
+      if (!done2[pp.color] && acc2[pp.color] >= (tot[pp.color] || 0)) done2[pp.color] = ii;
+    }
+    shellDone = SHELL.map(c => done2[c] || null);
+  }
+  return { shellDone, won: !!o.completed, peak: Math.max(0, ...buf), at4, run4, late4, late3, mid4, midN: midB - midA, gapTotal, gapMax, tailFree, leadFree, lowTotal, lowRun, firstColor, firstK, firstUse, earlyHigh, steps: buf.length, itemUses: o.itemUses || 0, buf };
 }
 
 parentPort.on('message', (msg) => {

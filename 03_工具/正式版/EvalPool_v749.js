@@ -19,11 +19,11 @@ function createPool(opts) {
 
   function spawn() {
     const w = new Worker(path.join(__dirname, '_EvalWorker_v749.js'), {
-      workerData: { ref, mode: opts.mode || 'a', guideSteps: opts.guideSteps || 3, noEarly: opts.noEarly || 0 },
+      workerData: { ref, mode: opts.mode || 'a', guideSteps: opts.guideSteps || 3, noEarly: opts.noEarly || 0, shellColors: opts.shellColors || [] },
     });
     w.on('message', (msg) => {
       const res = pending.get(msg.id);
-      if (res) { pending.delete(msg.id); res(msg); }
+      if (res) { pending.delete(msg.id); res(msg && msg.error ? { error: msg.error } : (msg && msg.m)); }
       idle.push(w); pump();
     });
     w.on('error', (e) => { console.error('[worker error]', e && e.message); });

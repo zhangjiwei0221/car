@@ -49,7 +49,9 @@ const base = B.readJson(file);
 // 前提：目标图按象限用互不重叠的颜色（四色系图）；否则这些颜色跨象限，约束对它们不生效。
 const LOCK_SUBJECT = argv.includes('--lock-subject');
 const GATE = argv.includes('--gate');
-const PROTECT = new Set(String(arg('--protect-colors', '')).split(',').map(Number).filter(n => n > 0));  // 不许动的车（如外框壳）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
+const PROTECT = new Set(String(arg('--protect-colors', '')).split(',').map(Number).filter(n => n > 0));  // 不许动的车（如外框壳）
+const SHELL = String(arg('--shell-colors', '')).split(',').map(Number).filter(n => n > 0);   // 外框壳色（按开口顺序）
+const MIN_GAP = Number(arg('--min-shell-gap', 0));   // 相邻两次开壳至少隔几手（0=不管）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
 const QMAP = new Map();
 if (LOCK_SUBJECT || GATE) {
   const blk = base.blocks || [], H = blk.length, W = H ? blk[0].length : 0;
@@ -302,7 +304,7 @@ function candidateMoves(g) {
 
 (async () => {
 const { createPool } = require('./EvalPool_v749');
-const POOL = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE, guideSteps: GUIDE_STEPS, noEarly: NO_EARLY });
+const POOL = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE, guideSteps: GUIDE_STEPS, noEarly: NO_EARLY, shellColors: SHELL });
 
 let cur = base;
 let curE = await POOL.evalOne(applyGates(cur));
@@ -340,6 +342,12 @@ for (let round = 0; round < ROUNDS; round++) {
     const e = evals[i]; const mv = cands[i].mv;
     if (!e || e.error) continue;
     if (!e.won || e.peak > 4 || e.itemUses > 0) continue;
+    if (MIN_GAP > 0 && SHELL.length) {          // 开壳间隔硬约束：不合格直接淘汰
+      const d = (e.shellDone || []).filter(v => v != null).sort((a, b) => a - b);
+      let okGap = d.length === SHELL.length;
+      for (let gi = 1; okGap && gi < d.length; gi++) if (d[gi] - d[gi - 1] < MIN_GAP) okGap = false;
+      if (!okGap) continue;
+    }
     if (GUIDE > 0 && e.firstColor !== GUIDE) continue;
     if (NO_EARLY > 0 && e.earlyHigh) continue;
     if (GUIDE_STEPS > 0) {
