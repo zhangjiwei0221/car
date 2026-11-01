@@ -246,13 +246,13 @@ AntSolver.Solver = (function() {
         state.gameOver = true;
         state.gameWon = false;
       }
-      if (!state.gameWon && !state.gameOver && state.buffer.length > BUFFER_LIMIT) {
+      if (!state.gameWon && !state.gameOver && state.buffer.length >= BUFFER_LIMIT) {
         AntSolver.Simulator.autoReleaseBuffer(state);
         // 溢出 → 道具救场(opt-in)：连续消掉进度最低的球直到不超上限
-        while (state.buffer.length > BUFFER_LIMIT && useItems && itemUses < itemCap && useItemOmni()) {
+        while (state.buffer.length >= BUFFER_LIMIT && useItems && itemUses < itemCap && useItemOmni()) {
           AntSolver.Simulator.autoReleaseBuffer(state);
         }
-        if (state.buffer.length > BUFFER_LIMIT) {
+        if (state.buffer.length >= BUFFER_LIMIT) {
           state.gameOver = true;
           state.gameWon = false;
         }

@@ -839,6 +839,7 @@ AntSolver.Simulator = (function() {
   function processAntBox(s, antBox) {
     var trace = s.capture ? [] : null;
     var key = ++s._keySeq;
+    var completedBefore = s.completedBoxes;
     // 该球进入的暂存槽 → 决定蚂蚁起点(手动游玩起点距离优先)
     // 瞬时连锁模式必须有起点（用户裁决：全知侧也接入起点逻辑，沿用现有槽位映射），
     // 所以这里不再只看 useSlotStart —— 该模式下求解器/生成路径同样分配槽位与起点。
@@ -858,11 +859,10 @@ AntSolver.Simulator = (function() {
       s.buffer.push({ color: antBox.color, progress: result.eliminated, need: antBox.count, remaining: result.remaining, key: key, slot: slot, start: start, enterStep: s.steps });
     }
     s._enterPeak = s.buffer.length;                          // 只读观测：入场后、结算前（同 processChainGroup）
-    // 【v160·修正】"占满上限"本身**不判死**——用户 2026-10-16 明确规则是「满 5 **且一个都消不掉**」才是失败
-    //   （满格但还能消 → 仍活着）。所以这里保持原口径：只有**超过**上限（真的要多占一格）才算溢出。
-    //   "满格且消不掉"的死局由 `isDeadEnd()` + `checkWinLose()` 判（每次刷新都会结算）。
-    if (s.buffer.length > s.bufferLimit) s.overflow = true;
     autoReleaseBuffer(s);
+    // 【真机口径·2026-11-01】结算后再判：暂存仍满（≥上限）且本步没有任何车装满 → 死亡。
+    //   例：上限 5，已有 ABCD 四辆未满，选 E 后若五辆全没装满 → 死；若 A 装满离场 → 继续。
+    if (s.buffer.length >= s.bufferLimit && s.completedBoxes === completedBefore) s.overflow = true;
   }
 
   /**
@@ -871,6 +871,7 @@ AntSolver.Simulator = (function() {
    */
   function processChainGroup(s, boxes) {
     var link = (++s._linkSeq);
+    var completedBefore = s.completedBoxes;
     for (var i = 0; i < boxes.length; i++) {
       var b = boxes[i];
       var key = ++s._keySeq;
@@ -889,8 +890,8 @@ AntSolver.Simulator = (function() {
     // s._enterPeak 是【只读观测】：把这个「入场后、结算前」的占用留给 applyPick 记进求解路线。
     // 它就是本行 overflow 判定所用的同一个值 —— 以前判完即被 autoReleaseBuffer 抹掉，从未被记录。
     s._enterPeak = s.buffer.length;
-    if (s.buffer.length > s.bufferLimit) s.overflow = true;    // 【v160·修正】同普通盒：超过上限才算溢出
     autoReleaseBuffer(s);
+    if (s.buffer.length >= s.bufferLimit && s.completedBoxes === completedBefore) s.overflow = true;   // 同普通盒：结算后判
   }
 
   function autoReleaseBuffer(s) {
@@ -1261,7 +1262,7 @@ AntSolver.Simulator = (function() {
   function isDeadEnd(s) {
     if (!s || s.gameOver) return false;
     if (s.overflow) return true;
-    if (s.buffer.length > s.bufferLimit) return true;
+    if (s.buffer.length >= s.bufferLimit) return true;
     var moves = listMoves(s);
     for (var i = 0; i < moves.length; i++) if (!moves[i].blocked) return false;
     return true;
@@ -1274,7 +1275,7 @@ AntSolver.Simulator = (function() {
     if (state.eliminatedPixels >= state.totalPixels) { state.gameWon = true; state.gameOver = true; return; }
     // 暂存区超过上限（含锁链整组入场瞬时超上限）→ 死亡。严格执行"暂存满且无法消除就死亡"。
     // 溢出判据 = **超过**上限（要真的多占一格）。"满格且一个都消不掉"由 isDeadEnd 判（见下）。
-    if (state.overflow || state.buffer.length > state.bufferLimit) { state.gameOver = true; state.gameWon = false; return; }
+    if (state.overflow || state.buffer.length >= state.bufferLimit) { state.gameOver = true; state.gameWon = false; return; }
     // 【v160】"满格且一个都消不掉" = 死局（用户 2026-10-16 的规则）：由下面的 isDeadEnd 判定统一处理
     // 死局 → 死亡：**满格且一个都消不掉**（或盘面已无可取盒 / 只剩放不下的锁链组）。
     //   用户 2026-10-16 定的规则；判据统一收在 isDeadEnd()，页面每次刷新也会调它 → 死局立刻结算、不再"点了才有反应"。

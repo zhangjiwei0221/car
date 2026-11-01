@@ -29,12 +29,12 @@ AntSolver.SolverAnalysis = (function () {
   function won(s) { return !!s && (s.gameWon || s.eliminatedPixels >= s.totalPixels); }
   function dead(s) {
     if (!s || won(s)) return false;
-    if (s.overflow || s.buffer.length > s.bufferLimit) return true;
+    if (s.overflow || s.buffer.length >= s.bufferLimit) return true;
     try { return Sim.isDeadEnd(s); } catch (e) { return false; }
   }
   function finishFlags(s) {
     if (won(s)) { s.gameWon = true; s.gameOver = true; }
-    else if (s.overflow || s.buffer.length > s.bufferLimit) { s.gameOver = true; s.gameWon = false; }
+    else if (s.overflow || s.buffer.length >= s.bufferLimit) { s.gameOver = true; s.gameWon = false; }
     return s;
   }
   function actionOf(m) {
