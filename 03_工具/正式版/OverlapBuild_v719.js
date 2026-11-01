@@ -53,7 +53,9 @@ const PROTECT = new Set(String(arg('--protect-colors', '')).split(',').map(Numbe
 const SHELL = String(arg('--shell-colors', '')).split(',').map(Number).filter(n => n > 0);   // 外框壳色（按开口顺序）
 const MIN_GAP = Number(arg('--min-shell-gap', 0));
 const BAN_EARLY4 = argv.includes('--ban-early4');
-const BUFTH = Number(arg('--buf-threshold', 4));   // 高压线（默认 4）   // 前 20% 不许出现 buffer=4   // 相邻两次开壳至少隔几手（0=不管）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
+const BUFTH = Number(arg('--buf-threshold', 4));   // 高压线（默认 4）
+const LAYERED = argv.includes('--layered');        // 按"填满难度"重排整盘（易填→外层，难填→内层）
+const LAYERED_N = Number(arg('--layered-n', 24));  // 每轮生成多少个重排候选   // 前 20% 不许出现 buffer=4   // 相邻两次开壳至少隔几手（0=不管）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
 const QMAP = new Map();
 if (LOCK_SUBJECT || GATE) {
   const blk = base.blocks || [], H = blk.length, W = H ? blk[0].length : 0;
@@ -300,6 +302,39 @@ function candidateMoves(g) {
     const [r, c] = pick(plain);
     moves.push({ type: 'ice', cells: [[r, c]], param: 8 + Math.floor(rand() * 12) });
   }
+  // 【--layered】按"填满难度"整盘重排：易填→外层，难填→内层（每轮生成 LAYERED_N 个随机候选）
+  if (LAYERED) {
+    const Rr = g.spools.length, Cc = g.spools[0].length;
+    const px = {};
+    for (let y = 0; y < (base.blocks || []).length; y++) for (let x = 0; x < base.blocks[y].length; x++) {
+      const c = base.blocks[y][x]; px[c] = (px[c] || 0) + 1;
+    }
+    const cars = [], cells = [];
+    for (let r = 0; r < Rr; r++) for (let c = 0; c < Cc; c++) {
+      const s2 = g.spools[r][c];
+      if (s2 && s2.id > 0) { cars.push(JSON.parse(JSON.stringify(s2))); cells.push([r, c]); }
+    }
+    cars.forEach(s2 => { s2._d = (s2.count || 1) / (px[s2.id] || 1); });
+    const ring = (r, c) => Math.min(r, c, Rr - 1 - r, Cc - 1 - c);
+    const outer = cells.filter(([r, c]) => ring(r, c) === 0);
+    const inner = cells.filter(([r, c]) => ring(r, c) > 0);
+    const sorted = cars.slice().sort((a, b) => a._d - b._d);   // 难 → 易
+    for (let k = 0; k < LAYERED_N; k++) {
+      const lv2 = JSON.parse(JSON.stringify(g));
+      const arr = sorted.slice();
+      for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+      const o2 = outer.slice(), i2 = inner.slice();
+      for (let i = o2.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [o2[i], o2[j]] = [o2[j], o2[i]]; }
+      for (let i = i2.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [i2[i], i2[j]] = [i2[j], i2[i]]; }
+      const easy = arr.slice(0, Math.min(o2.length, arr.length));   // 最好填的一批
+      for (const [r, c] of cells) lv2.spools[r][c] = { id: 0, type: 0, param: 0, count: 0 };
+      let ii = 0;
+      for (const [r, c] of o2) if (ii < easy.length) lv2.spools[r][c] = easy[ii++];
+      for (const [r, c] of i2) if (ii < arr.length) lv2.spools[r][c] = arr[ii++];
+      for (const [r, c] of cells) if (!(lv2.spools[r][c].id > 0) && ii < arr.length) lv2.spools[r][c] = arr[ii++];
+      moves.push({ type: 'layered', level: lv2 });
+    }
+  }
   return moves;
 }
 
@@ -337,7 +372,7 @@ for (let round = 0; round < ROUNDS; round++) {
   console.log(`  第${round + 1}轮：候选 ${allMoves.length} 个，本轮评估 ${moves.length} 个`);
   // 先应用全部候选，再并行评估
   const cands = [];
-  for (const mv of moves) { const h = applyMove(cur, mv); if (h) cands.push({ mv, h, hg: applyGates(h) }); }
+  for (const mv of moves) { const h = mv.type === 'layered' ? mv.level : applyMove(cur, mv); if (h) cands.push({ mv: mv.type === 'layered' ? { type: 'layered', desc: '分层重排' } : mv, h, hg: applyGates(h) }); }
   const evals = await POOL.evalAll(cands.map(c => c.hg));
   let best = null, bestE = null;
   for (let i = 0; i < cands.length; i++) {
@@ -360,6 +395,7 @@ for (let round = 0; round < ROUNDS; round++) {
     if (e.at4 < Math.max(MIN_AT4, curE.at4 - 1)) continue;
     const scoreOf = x => OBJ === 'at4' ? (x.at4 * 10 + x.run4)
       : OBJ === 'late' ? ((x.late4run || 0) * 100 + (x.late4 || 0) * 10 + x.at4 * 0.1)
+      : OBJ === 'contract' ? (-(x.early4 || 0) * 100 + (x.late4run || 0) * 10 + (x.late4 || 0))
       : (x.lowRun * 10 + x.lowTotal - W_RUN4 * x.run4);
     const scoreE = scoreOf(e), scoreC = scoreOf(curE);
     if (OBJ === 'low') {
