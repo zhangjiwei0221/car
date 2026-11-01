@@ -48,8 +48,9 @@ const base = B.readJson(file);
 // 【--lock-subject】主体锁：容量转移/换位/成链只能在同一个主体（象限）内发生。
 // 前提：目标图按象限用互不重叠的颜色（四色系图）；否则这些颜色跨象限，约束对它们不生效。
 const LOCK_SUBJECT = argv.includes('--lock-subject');
+const GATE = argv.includes('--gate');          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
 const QMAP = new Map();
-if (LOCK_SUBJECT) {
+if (LOCK_SUBJECT || GATE) {
   const blk = base.blocks || [], H = blk.length, W = H ? blk[0].length : 0;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = blk[y][x], q = (y < H / 2 ? 0 : 2) + (x < W / 2 ? 0 : 1);
@@ -61,6 +62,28 @@ if (LOCK_SUBJECT) {
 }
 const quadOfId = id => { const s = QMAP.get(id); return (s && s.size === 1) ? [...s][0] : -1; };
 const sameQuad = (a, b) => quadOfId(a.id) !== -1 && quadOfId(a.id) === quadOfId(b.id);
+
+// 【--gate】把后三个主体的车冻到「前序主体车数累计」个盒子，返回新对象（不动搜索态）
+function applyGates(g) {
+  if (!GATE) return g;
+  const h = JSON.parse(JSON.stringify(g));
+  const cnt = [0, 0, 0, 0];
+  for (const row of h.spools) for (const s of row) {
+    if (!s || !(s.id > 0)) continue;
+    const q = quadOfId(s.id); if (q >= 0) cnt[q]++;
+  }
+  const gate = []; let acc = 0;
+  for (let q = 0; q < 4; q++) { gate[q] = acc; acc += cnt[q]; }
+  for (const row of h.spools) for (const s of row) {
+    if (!s || !(s.id > 0)) continue;
+    const q = quadOfId(s.id); if (q <= 0) continue;
+    const t = Array.isArray(s.type) ? s.type : [s.type || 0];
+    const ps = Array.isArray(s.param) ? s.param.slice() : [s.param];
+    if (t.includes(5)) s.type = [5, 7], s.param = [ps[t.indexOf(5)], gate[q]];
+    else s.type = 7, s.param = gate[q];
+  }
+  return h;
+}
 
 function evalLevel(g) {
   const lv = A.parseLevel(A.fromGameFormat(g));
@@ -273,7 +296,7 @@ const { createPool } = require('./EvalPool_v749');
 const POOL = createPool({ workers: Number(process.env.EVAL_WORKERS || 6), ref: REF, mode: MODE, guideSteps: GUIDE_STEPS, noEarly: NO_EARLY });
 
 let cur = base;
-let curE = await POOL.evalOne(cur);
+let curE = await POOL.evalOne(applyGates(cur));
 console.log(`基线：步${curE.steps} 峰值${curE.peak} at4=${curE.at4} run4=${curE.run4} 空窗总${curE.gapTotal}/最大${curE.gapMax} 前导空${curE.leadFree}`);
 const log = [];
 let _seedS = Number((process.argv[process.argv.indexOf('--seed') + 1]) || 20261030) || 20261030;
@@ -301,8 +324,8 @@ for (let round = 0; round < ROUNDS; round++) {
   console.log(`  第${round + 1}轮：候选 ${allMoves.length} 个，本轮评估 ${moves.length} 个`);
   // 先应用全部候选，再并行评估
   const cands = [];
-  for (const mv of moves) { const h = applyMove(cur, mv); if (h) cands.push({ mv, h }); }
-  const evals = await POOL.evalAll(cands.map(c => c.h));
+  for (const mv of moves) { const h = applyMove(cur, mv); if (h) cands.push({ mv, h, hg: applyGates(h) }); }
+  const evals = await POOL.evalAll(cands.map(c => c.hg));
   let best = null, bestE = null;
   for (let i = 0; i < cands.length; i++) {
     const e = evals[i]; const mv = cands[i].mv;
@@ -343,7 +366,7 @@ const ok = cliOK(cur);
 console.log(`\n终局：最长低压段${curE.lowRun} 低压步${curE.lowTotal} at4=${curE.at4} run4=${curE.run4} 峰值${curE.peak} CLI=${ok ? '✅' : '❌'}`);
 if (OUT && ok) {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify(cur, null, 2));
+  fs.writeFileSync(OUT, JSON.stringify(applyGates(cur), null, 2));
   fs.writeFileSync(OUT.replace(/\.json$/, '.moves.json'), JSON.stringify(log, null, 2));
   console.log(`已写入：${OUT}`);
 }
