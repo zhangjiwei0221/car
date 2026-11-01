@@ -627,6 +627,7 @@
       <h2>3. 开始生产与进度</h2>
       <div class="gen-row">
         <button id="btn-gen-start" class="gen-btn-primary">▶ 批量生产（每关自动落库）</button>
+        <button id="xp-produce-inline" style="margin-left:10px;border:0;border-radius:8px;padding:10px 16px;background:#b4522a;color:#fff;font-weight:700;cursor:pointer">🚀 新产线生成</button>
         <button id="btn-gen-stop" class="gen-btn-danger hidden">■ 停止</button>
         <button id="btn-gen-persist-retry" class="gen-btn-danger hidden" title="上一关写盘失败后，修好问题(如重启本地生产服务)再点此重试；服务端幂等，不会重复写">↻ 重试落库</button>
       </div>
@@ -823,62 +824,65 @@
   </div>
 
 <script>
-/* ── 新产线浮层（独立于页面原有逻辑）── */
+/* ── 新产线（按钮在「批量生产」旁边，结果浮层在右下）── */
 (function () {
-  var SVC = '';   // 与编辑器同源（同一个服务）
-  var btn = document.createElement('button');
-  btn.id = 'xp-produce-btn';
-  btn.textContent = '🚀 新产线生成';
-  btn.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:99999;border:0;border-radius:10px;padding:12px 18px;background:#b4522a;color:#fff;font:700 14px -apple-system,"PingFang SC";cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25)';
-  document.body.appendChild(btn);
-  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.txt'; inp.style.display = 'none'; document.body.appendChild(inp);
+  var SVC = '';
+  var btn = document.getElementById('xp-produce-inline');
+  if (!btn) return;
+
   var panel = document.createElement('div');
-  panel.style.cssText = 'position:fixed;right:20px;bottom:80px;z-index:99999;width:360px;max-height:60vh;overflow:auto;background:#fff;border:1px solid #e0d5c6;border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);font:13px/1.6 -apple-system,"PingFang SC";display:none';
+  panel.style.cssText = 'position:fixed;right:20px;bottom:20px;z-index:99999;width:360px;max-height:62vh;overflow:auto;background:#fff;border:1px solid #e0d5c6;border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);font:13px/1.6 -apple-system,"PingFang SC";display:none';
   document.body.appendChild(panel);
 
-  btn.onclick = function () { inp.click(); };
-  inp.onchange = async function () {
-    var f = inp.files[0]; if (!f) return;
+  function showResult(res) {
     panel.style.display = 'block';
-    panel.innerHTML = '<b>新产线生成中…</b><div style="color:#8a7a66">' + f.name + '</div><div id="xp-log" style="white-space:pre-wrap;font:11px ui-monospace;color:#666;margin-top:8px"></div>';
-    var content = await f.text();
-    var r = await fetch(SVC + '/api/produce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: f.name, content: content, tier: 'std', layer: true }) });
+    if (!res) { panel.innerHTML = '<b>❌ 生成失败</b><div style="color:#8a7a66">看终端日志</div>'; return; }
+    var ok = res.won && res.peak <= 4 && res.at4 >= 20 && res.run4 >= 12;
+    var kv = [['at4', res.at4], ['run4', res.run4], ['late4', res.late4], ['峰值', res.peak], ['步数', res.steps], ['耗时', res.seconds + 's']]
+      .map(function (x) { return '<div style="background:#f7f2ea;border-radius:8px;padding:6px 10px">' + x[0] + ' <b>' + x[1] + '</b></div>'; }).join('');
+    panel.innerHTML = '<div style="font-size:15px"><b>' + (ok ? '✅ 可用' : '❌ 不达标') + '</b></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">' + kv + '</div>'
+      + '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'
+      + '<button id="xp-apply2" style="border:0;border-radius:8px;padding:8px 14px;background:#5b4634;color:#fff;font-weight:700;cursor:pointer">▶ 映射到界面</button>'
+      + '<a href="' + SVC + '/api/level?path=' + encodeURIComponent(res.file) + '" target="_blank">下载 JSON</a>'
+      + '<a href="#" onclick="this.parentNode.parentNode.style.display=\'none\';return false">关闭</a></div>';
+    document.getElementById('xp-apply2').onclick = function () { applyToEditor(res); };
+    if (ok) applyToEditor(res);   // 达标就自动映射（和以前一样，生成完直接能玩）
+  }
+
+  function applyToEditor(res) {
+    var lv = res.level;
+    if (!lv) { alert('这次结果没有带关卡内容，请用「下载 JSON」再手动导入'); return; }
+    var fi = document.getElementById('file-input');
+    if (!fi) { alert('没找到编辑器的关卡导入入口'); return; }
+    try {
+      var dt = new DataTransfer();
+      dt.items.add(new File([JSON.stringify(lv)], '新产线.json', { type: 'application/json' }));
+      fi.files = dt.files;
+      fi.dispatchEvent(new Event('change', { bubbles: true }));
+      panel.style.display = 'none';
+    } catch (e) { alert('映射失败：' + e.message); }
+  }
+
+  btn.onclick = async function () {
+    var targets = (window.__xpTargets && window.__xpTargets()) || [];
+    if (!targets.length) { alert('请先在「1. 导入目标图」里导入一张 TXT'); return; }
+    var t = targets[0];
+    btn.disabled = true;
+    panel.style.display = 'block';
+    panel.innerHTML = '<b>新产线生成中…</b><div style="color:#8a7a66">' + (t.name || '目标图') + '</div>'
+      + '<div id="xp-log" style="white-space:pre-wrap;font:11px ui-monospace;color:#666;margin-top:8px"></div>';
+    var r = await fetch(SVC + '/api/produce', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: t.name, content: t.txt, tier: 'std', layer: true }) });
     var j = await r.json();
-    var t = setInterval(async function () {
-      var s = await (await fetch(SVC + '/api/job?id=' + j.id)).json();
-      document.getElementById('xp-log').textContent = '已运行 ' + s.seconds + ' 秒\n' + (s.log || '').slice(-500);
-      if (!s.running) {
-        clearInterval(t);
-        var res = s.result;
-        if (!res) { panel.innerHTML += '<div style="color:#b4321f;margin-top:8px">❌ 生成失败（看日志窗口）</div>'; return; }
-        var ok = res.ok && res.won && res.peak <= 4 && res.at4 >= 20 && res.run4 >= 12;
-        panel.innerHTML = '<div style="font-size:15px"><b>' + (ok ? '✅ 可用' : '❌ 不达标') + '</b></div>'
-          + '<div style="margin:8px 0;display:flex;gap:10px;flex-wrap:wrap">'
-          + ['at4', res.at4].join('') + '</div>';
-        var kv = [['at4', res.at4], ['run4', res.run4], ['late4', res.late4], ['峰值', res.peak], ['步数', res.steps], ['耗时', res.seconds + 's']]
-          .map(function (x) { return '<div style="background:#f7f2ea;border-radius:8px;padding:6px 10px">' + x[0] + ' <b>' + x[1] + '</b></div>'; }).join('');
-        var rel = res.file.replace('/Users/red/Desktop/毛线汽车/', '');
-        panel.innerHTML = '<div style="font-size:15px"><b>' + (ok ? '✅ 可用' : '❌ 不达标') + '</b></div>'
-          + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">' + kv + '</div>'
-          + '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">'
-          + '<button id="xp-apply" style="border:0;border-radius:8px;padding:8px 14px;background:#5b4634;color:#fff;font-weight:700;cursor:pointer">▶ 映射到界面</button>'
-          + '<a href="http://127.0.0.1:8060/实验关/关卡6/原型_v1/play.html?level=../../../' + encodeURI(rel) + '&rule=corner" target="_blank">试玩页</a>'
-          + '<a href="' + SVC + '/api/level?path=' + encodeURIComponent(res.file) + '" target="_blank">下载 JSON</a>'
-          + '<a href="#" onclick="document.getElementById(\'xp-produce-btn\').__panel.style.display=\'none\';return false">关闭</a>'
-          + '</div>';
-        document.getElementById('xp-apply').onclick = async function () {
-          try {
-            var lv = res.level;
-            if (!lv) lv = await (await fetch(SVC + '/api/level?path=' + encodeURIComponent(res.file))).json();
-            var fi = document.getElementById('file-input');
-            if (!fi) { alert('当前页面没有关卡导入入口'); return; }
-            var dt = new DataTransfer();
-            dt.items.add(new File([JSON.stringify(lv)], '新产线.json', { type: 'application/json' }));
-            fi.files = dt.files;
-            fi.dispatchEvent(new Event('change', { bubbles: true }));
-            panel.style.display = 'none';
-          } catch (e) { alert('映射失败：' + e.message); }
-        };
+    var timer = setInterval(async function () {
+      var st = await (await fetch(SVC + '/api/job?id=' + j.id)).json();
+      var el = document.getElementById('xp-log');
+      if (el) { el.textContent = '已运行 ' + st.seconds + ' 秒\n' + (st.log || '').slice(-400); }
+      if (!st.running) {
+        clearInterval(timer);
+        btn.disabled = false;
+        showResult(st.result);
       }
     }, 2000);
   };

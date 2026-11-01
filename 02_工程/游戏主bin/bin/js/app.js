@@ -1340,6 +1340,12 @@ AntSolver.App = (function() {
   //   usedLib     实际按哪套色库解释（= 「读图色库」下拉的选择或自动结果）
   //   convStats   官方→老 的转换统计（老色库读入时为 null）
   var levelList = []; // [{name, blocks, txt, rawBlocks, detectedLib, confident, usedLib, convStats}]
+  // 【新产线】把当前导入的目标图暴露给页面外的脚本（只读）
+  try {
+    window.__xpTargets = function () {
+      return levelList.map(function (x) { return { name: x.name, txt: x.txt, blocks: x.blocks }; });
+    };
+  } catch (e) {}
   var currentLevelIdx = -1;
 
   // ==================== 【v154】色库：读图色库 + 新老互转 ====================
