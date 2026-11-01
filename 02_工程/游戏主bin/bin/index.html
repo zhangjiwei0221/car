@@ -851,7 +851,7 @@
         clearInterval(t);
         var res = s.result;
         if (!res) { panel.innerHTML += '<div style="color:#b4321f;margin-top:8px">❌ 生成失败（看日志窗口）</div>'; return; }
-        var ok = res.ok && res.won && res.peak <= 4;
+        var ok = res.ok && res.won && res.peak <= 4 && res.at4 >= 20 && res.run4 >= 12;
         panel.innerHTML = '<div style="font-size:15px"><b>' + (ok ? '✅ 可用' : '❌ 不达标') + '</b></div>'
           + '<div style="margin:8px 0;display:flex;gap:10px;flex-wrap:wrap">'
           + ['at4', res.at4].join('') + '</div>';

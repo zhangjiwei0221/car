@@ -64,7 +64,8 @@ http.createServer(async (req, res) => {
   if (u.pathname === '/api/level') {
     const p = path.join(ROOT, u.searchParams.get('path') || '');
     if (!p.startsWith(ROOT) || !fs.existsSync(p)) return json(res, { error: 'not found' }, 404);
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); return res.end(fs.readFileSync(p));
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+    return res.end(fs.readFileSync(p));
   }
   // 静态页
   const html = path.join(__dirname, 'producer.html');
