@@ -45,6 +45,23 @@ if (!file) { console.error('用法: node OverlapBuild_v719.js <关卡.json> --ou
 
 const base = B.readJson(file);
 
+// 【--lock-subject】主体锁：容量转移/换位/成链只能在同一个主体（象限）内发生。
+// 前提：目标图按象限用互不重叠的颜色（四色系图）；否则这些颜色跨象限，约束对它们不生效。
+const LOCK_SUBJECT = argv.includes('--lock-subject');
+const QMAP = new Map();
+if (LOCK_SUBJECT) {
+  const blk = base.blocks || [], H = blk.length, W = H ? blk[0].length : 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = blk[y][x], q = (y < H / 2 ? 0 : 2) + (x < W / 2 ? 0 : 1);
+    if (!QMAP.has(c)) QMAP.set(c, new Set());
+    QMAP.get(c).add(q);
+  }
+  const multi = [...QMAP.values()].filter(s => s.size > 1).length;
+  if (multi) console.error(`[lock-subject] 警告：${multi} 个颜色跨象限，约束对它们不生效`);
+}
+const quadOfId = id => { const s = QMAP.get(id); return (s && s.size === 1) ? [...s][0] : -1; };
+const sameQuad = (a, b) => quadOfId(a.id) !== -1 && quadOfId(a.id) === quadOfId(b.id);
+
 function evalLevel(g) {
   const lv = A.parseLevel(A.fromGameFormat(g));
   const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: MODE !== 'a' });
@@ -190,6 +207,7 @@ function candidateMoves(g) {
     const a = pick(plain), b = pick(plain);
     if (a[0] === b[0] && a[1] === b[1]) continue;
     if (g.spools[a[0]][a[1]].id === g.spools[b[0]][b[1]].id) continue;
+    if (LOCK_SUBJECT && !sameQuad(g.spools[a[0]][a[1]], g.spools[b[0]][b[1]])) continue;
     swaps.push({ type: 'posswap', cells: [a, b] });
   }
   moves.push(...swaps);
@@ -206,6 +224,7 @@ function candidateMoves(g) {
     for (const b of plain) {
       const cellB = g.spools[b[0]][b[1]];
       if (cellB.id === colorA) continue;
+      if (LOCK_SUBJECT && !sameQuad(g.spools[a[0]][a[1]], cellB)) continue;
       moves.push({ type: 'memberswap', cells: [a, b] });
     }
   }
@@ -224,16 +243,21 @@ function candidateMoves(g) {
   for (const [r, c] of plain) for (const [nr, nc] of neighbors(r, c)) {
     if (!isPlain(g.spools[nr][nc])) continue;
     if (r > nr || (r === nr && c > nc)) continue;
+    if (LOCK_SUBJECT && !sameQuad(g.spools[r][c], g.spools[nr][nc])) continue;
     moves.push({ type: 'chain', cells: [[r, c], [nr, nc]], tag: moves.length });
   }
   // 三连（合法：2–3 格正交相邻），用来做更硬的组债务
   for (let r = 0; r < R; r++) for (let c = 0; c + 2 < C; c++) {
     const trio = [[r, c], [r, c + 1], [r, c + 2]];
-    if (trio.every(([y, x]) => isPlain(base.spools[y][x]))) moves.push({ type: 'chain', cells: trio });
+    if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
+    if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
+    moves.push({ type: 'chain', cells: trio });
   }
   for (let r = 0; r + 2 < R; r++) for (let c = 0; c < C; c++) {
     const trio = [[r, c], [r + 1, c], [r + 2, c]];
-    if (trio.every(([y, x]) => isPlain(base.spools[y][x]))) moves.push({ type: 'chain', cells: trio });
+    if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
+    if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
+    moves.push({ type: 'chain', cells: trio });
   }
   // 加冰（少量）
   for (let k = 0; k < 6; k++) {
