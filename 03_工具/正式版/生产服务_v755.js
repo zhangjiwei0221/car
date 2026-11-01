@@ -74,7 +74,21 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
     return res.end(fs.readFileSync(p));
   }
-  // 静态页
+  // 静态：/bin/... → 02_工程/游戏主bin/...（编辑器本体）
+  if (u.pathname.startsWith('/bin/')) {
+    const rel = decodeURIComponent(u.pathname.slice(5));
+    const fp = path.join(ROOT, '02_工程/游戏主bin/bin', rel);
+    if (fp.startsWith(path.join(ROOT, '02_工程/游戏主bin/bin')) && fs.existsSync(fp) && fs.statSync(fp).isFile()) {
+      const ext = path.extname(fp).toLowerCase();
+      const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
+        '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.txt': 'text/plain; charset=utf-8' };
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+      return res.end(fs.readFileSync(fp));
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('not found');
+  }
+  // 静态：/ → 简易造关页
   const html = path.join(__dirname, 'producer.html');
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(fs.readFileSync(html));
