@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>毛线汽车 · 造关（新产线）</title>
+<style>
+body{font:14px/1.7 -apple-system,"PingFang SC",sans-serif;background:#faf7f2;color:#3a2f26;margin:0;padding:24px;max-width:1080px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:#7a6a55;font-size:13px;margin-bottom:18px}
+.card{background:#fff;border:1px solid #e6ddd0;border-radius:10px;padding:16px;margin-bottom:16px}
+label{display:inline-block;margin-right:14px}
+select,input[type=text]{padding:6px 8px;border:1px solid #d9c8b3;border-radius:6px;background:#fffdf9;font-size:13px}
+button{border:0;border-radius:8px;padding:9px 16px;background:#5b4634;color:#fff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.sec{background:#8a6a4d}
+#log{background:#2b2620;color:#e8e0d5;border-radius:8px;padding:12px;font:12px/1.6 ui-monospace,Menlo,monospace;height:220px;overflow:auto;white-space:pre-wrap}
+.kv{display:flex;gap:22px;flex-wrap:wrap;margin:8px 0}
+.kv div{background:#f7f2ea;border-radius:8px;padding:7px 12px;font-size:13px}
+.kv b{font-size:16px}
+.ok{color:#1c7a44}.bad{color:#b4321f}
+a{color:#b4522a}
+</style>
+</head>
+<body>
+<h1>毛线汽车 · 造关（新产线）</h1>
+<div class="sub">切车 → 构建 → 配障碍 → 分层重排 → 契约验收。单张约 2–5 分钟。</div>
+
+<div class="card">
+  <label>图来源
+    <select id="src">
+      <option value="lib">从 关卡/ 选</option>
+      <option value="up">上传 txt</option>
+    </select>
+  </label>
+  <span id="libWrap"><select id="files" style="max-width:520px"></select></span>
+  <span id="upWrap" style="display:none"><input type="file" id="file" accept=".txt"></span>
+  <br><br>
+  <label>档位 <select id="tier"><option>std</option><option>easy</option><option>hard</option></select></label>
+  <label><input type="checkbox" id="layer" checked> 分层重排（前松后紧）</label>
+  <button id="go">开始生成</button>
+  <span id="stat" class="sub"></span>
+</div>
+
+<div class="card"><div id="log">等待开始…</div></div>
+<div class="card" id="resCard" style="display:none">
+  <div id="verdict"></div>
+  <div class="kv" id="kv"></div>
+  <div id="links"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let jobId = null, timer = null;
+
+fetch('/api/files').then(r => r.json()).then(list => {
+  $('files').innerHTML = list.map(f => `<option>${f}</option>`).join('');
+});
+
+$('src').onchange = () => {
+  const up = $('src').value === 'up';
+  $('libWrap').style.display = up ? 'none' : '';
+  $('upWrap').style.display = up ? '' : 'none';
+};
+
+async function start() {
+  const src = $('src').value;
+  let body = { tier: $('tier').value, layer: $('layer').checked };
+  if (src === 'up') {
+    const f = $('file').files[0];
+    if (!f) { alert('请先选择 txt 文件'); return; }
+    body.content = await f.text(); body.name = f.name;
+  } else {
+    body.name = '关卡/' + $('files').value;
+  }
+  $('go').disabled = true; $('resCard').style.display = 'none';
+  $('log').textContent = '提交中…';
+  const r = await fetch('/api/produce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json(); jobId = j.id;
+  timer = setInterval(poll, 2000); poll();
+}
+
+async function poll() {
+  const r = await fetch('/api/job?id=' + jobId); const j = await r.json();
+  $('log').textContent = j.log || ''; $('log').scrollTop = $('log').scrollHeight;
+  $('stat').textContent = '已运行 ' + j.seconds + ' 秒';
+  if (!j.running) { clearInterval(timer); $('go').disabled = false; show(j.result); }
+}
+
+function show(res) {
+  if (!res) { $('resCard').style.display = ''; $('verdict').innerHTML = '<span class="bad">❌ 生成失败（详见日志）</span>'; return; }
+  const ok = res.ok && res.won && res.peak <= 4;
+  $('resCard').style.display = '';
+  $('verdict').innerHTML = ok
+    ? '<span class="ok">✅ 可用</span>'
+    : '<span class="bad">❌ 不达标</span>（可换一张图重试）';
+  $('kv').innerHTML = [
+    ['at4', res.at4], ['run4', res.run4], ['late4', res.late4],
+    ['峰值', res.peak], ['步数', res.steps], ['首手', res.firstRatio != null ? Math.round(res.firstRatio * 100) + '%' : '-'],
+    ['容量', res.capacityOK ? '✅' : '❌'], ['耗时', res.seconds + 's']
+  ].map(([k, v]) => `<div>${k} <b>${v}</b></div>`).join('');
+  const p = encodeURIComponent(res.file.replace('/Users/red/Desktop/毛线汽车/', ''));
+  $('links').innerHTML = `<a class="sec" href="http://127.0.0.1:8060/实验关/关卡6/原型_v1/play.html?level=../../${p}&rule=corner" target="_blank">▶ 试玩</a>
+    &nbsp; <a href="/api/level?path=${encodeURIComponent(res.file)}" target="_blank">下载 JSON</a>`;
+}
+
+$('go').onclick = start;
+</script>
+</body>
+</html>
