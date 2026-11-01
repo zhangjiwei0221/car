@@ -344,7 +344,7 @@ for (let round = 0; round < ROUNDS; round++) {
     const e = evals[i]; const mv = cands[i].mv;
     if (!e || e.error) continue;
     if (!e.won || e.peak > 4 || e.itemUses > 0) continue;
-    if (BAN_EARLY4 && e.early4 > 0) continue;    // 硬约束：前期不许压到 4
+    if (BAN_EARLY4 && e.early4 > (curE.early4 || 0)) continue;   // 梯度约束：前期高压不许比当前更差（逐步压到 0）
     if (MIN_GAP > 0 && SHELL.length) {          // 开壳间隔硬约束：不合格直接淘汰
       const d = (e.shellDone || []).filter(v => v != null).sort((a, b) => a - b);
       let okGap = d.length === SHELL.length;
