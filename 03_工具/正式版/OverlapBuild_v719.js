@@ -48,7 +48,8 @@ const base = B.readJson(file);
 // 【--lock-subject】主体锁：容量转移/换位/成链只能在同一个主体（象限）内发生。
 // 前提：目标图按象限用互不重叠的颜色（四色系图）；否则这些颜色跨象限，约束对它们不生效。
 const LOCK_SUBJECT = argv.includes('--lock-subject');
-const GATE = argv.includes('--gate');          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
+const GATE = argv.includes('--gate');
+const PROTECT = new Set(String(arg('--protect-colors', '')).split(',').map(Number).filter(n => n > 0));  // 不许动的车（如外框壳）          // 评分前先按主体装闸门（数字冰），直接优化要交付的版本
 const QMAP = new Map();
 if (LOCK_SUBJECT || GATE) {
   const blk = base.blocks || [], H = blk.length, W = H ? blk[0].length : 0;
@@ -62,6 +63,7 @@ if (LOCK_SUBJECT || GATE) {
 }
 const quadOfId = id => { const s = QMAP.get(id); return (s && s.size === 1) ? [...s][0] : -1; };
 const sameQuad = (a, b) => quadOfId(a.id) !== -1 && quadOfId(a.id) === quadOfId(b.id);
+const prot = cell => PROTECT.size > 0 && PROTECT.has(cell && cell.id);
 
 // 【--gate】把后三个主体的车冻到「前序主体车数累计」个盒子，返回新对象（不动搜索态）
 function applyGates(g) {
@@ -222,6 +224,7 @@ function candidateMoves(g) {
     const a = plain[i], b = plain[j];
     if (g.spools[a[0]][a[1]].id !== g.spools[b[0]][b[1]].id) continue;
     if (g.spools[a[0]][a[1]].count === g.spools[b[0]][b[1]].count) continue;
+    if (prot(g.spools[a[0]][a[1]]) || prot(g.spools[b[0]][b[1]])) continue;
     moves.push({ type: 'capswap', cells: [a, b] });
   }
   // 位置互换（随机抽样）
@@ -231,6 +234,7 @@ function candidateMoves(g) {
     if (a[0] === b[0] && a[1] === b[1]) continue;
     if (g.spools[a[0]][a[1]].id === g.spools[b[0]][b[1]].id) continue;
     if (LOCK_SUBJECT && !sameQuad(g.spools[a[0]][a[1]], g.spools[b[0]][b[1]])) continue;
+    if (prot(g.spools[a[0]][a[1]]) || prot(g.spools[b[0]][b[1]])) continue;
     swaps.push({ type: 'posswap', cells: [a, b] });
   }
   moves.push(...swaps);
@@ -248,6 +252,7 @@ function candidateMoves(g) {
       const cellB = g.spools[b[0]][b[1]];
       if (cellB.id === colorA) continue;
       if (LOCK_SUBJECT && !sameQuad(g.spools[a[0]][a[1]], cellB)) continue;
+      if (prot(g.spools[a[0]][a[1]]) || prot(cellB)) continue;
       moves.push({ type: 'memberswap', cells: [a, b] });
     }
   }
@@ -257,6 +262,7 @@ function candidateMoves(g) {
   for (let i = 0; i < plain.length; i++) for (let j = i + 1; j < plain.length; j++) {
     const a = plain[i], b = plain[j];
     if (g.spools[a[0]][a[1]].id !== g.spools[b[0]][b[1]].id) continue;
+    if (prot(g.spools[a[0]][a[1]]) || prot(g.spools[b[0]][b[1]])) continue;
     for (const d of [2, 4, 6, 8]) {
       moves.push({ type: 'capmove', cells: [a, b], delta: d });
       moves.push({ type: 'capmove', cells: [b, a], delta: d });
@@ -267,6 +273,7 @@ function candidateMoves(g) {
     if (!isPlain(g.spools[nr][nc])) continue;
     if (r > nr || (r === nr && c > nc)) continue;
     if (LOCK_SUBJECT && !sameQuad(g.spools[r][c], g.spools[nr][nc])) continue;
+    if (prot(g.spools[r][c]) || prot(g.spools[nr][nc])) continue;
     moves.push({ type: 'chain', cells: [[r, c], [nr, nc]], tag: moves.length });
   }
   // 三连（合法：2–3 格正交相邻），用来做更硬的组债务
@@ -274,12 +281,14 @@ function candidateMoves(g) {
     const trio = [[r, c], [r, c + 1], [r, c + 2]];
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
+    if (trio.some(([y, x]) => prot(base.spools[y][x]))) continue;
     moves.push({ type: 'chain', cells: trio });
   }
   for (let r = 0; r + 2 < R; r++) for (let c = 0; c < C; c++) {
     const trio = [[r, c], [r + 1, c], [r + 2, c]];
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
+    if (trio.some(([y, x]) => prot(base.spools[y][x]))) continue;
     moves.push({ type: 'chain', cells: trio });
   }
   // 加冰（少量）
