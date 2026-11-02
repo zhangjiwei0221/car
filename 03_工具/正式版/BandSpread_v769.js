@@ -46,27 +46,39 @@ const top = [], bottom = [];
 for (const id of Object.keys(byColor).map(Number)) (centroid(id) >= 0.5 ? top : bottom).push(id);
 const freed = [];
 let merged = 0, split = 0;
+
+function donor(bottomIds) {
+  let best = null;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const s = g.spools[r][c];
+    if (!s || !(s.id > 0)) continue;
+    if (!bottomIds.includes(s.id)) continue;
+    if (s.count < CAP_MIN * 2) continue;
+    const t = Array.isArray(s.type) ? s.type : [s.type || 0];
+    if (t.includes(5) || t.includes(7)) continue;
+    if (!best || s.count > best.s.count) best = { r, c, s };
+  }
+  return best;
+}
+
+// 合并一对，并立刻把腾出的格子用"靠下颜色"拆一辆填上；填不上就回滚
 for (const id of top) {
   const cars = byColor[id].sort((a, b) => a.s.count - b.s.count);
   for (let i = 0; i + 1 < cars.length; i += 2) {
-    if (cars[i].s.count + cars[i + 1].s.count > CAP_MAX) continue;
-    cars[i].s.count += cars[i + 1].s.count;
-    freed.push({ r: cars[i + 1].r, c: cars[i + 1].c });
-    merged++;
+    const a = cars[i], b = cars[i + 1];
+    if (!a.s || !b.s || a.s.count + b.s.count > CAP_MAX) continue;
+    const oldA = a.s.count, oldB = b.s.count;
+    a.s.count = oldA + oldB;
+    b.s.count = 0;                       // 先清零，避免重复计数
+    const d = donor(bottom);
+    if (!d) { a.s.count = oldA; b.s.count = oldB; continue; }   // 没人可拆 → 回滚
+    const half = Math.floor(d.s.count / 2);
+    d.s.count -= half;
+    g.spools[b.r][b.c] = { id: d.s.id, type: 0, param: 0, count: half };
+    merged++; split++;
   }
 }
-for (const slot of freed) {
-  let best = null;
-  for (const id of bottom) for (const cd of byColor[id]) {
-    if (cd.s.count < CAP_MIN * 2) continue;
-    if (!best || cd.s.count < best.s.count) best = cd;
-  }
-  if (!best) break;
-  const half = Math.floor(best.s.count / 2);
-  best.s.count -= half;
-  g.spools[slot.r][slot.c] = { id: best.s.id, type: 0, param: 0, count: half };
-  split++;
-}
+
 fs.writeFileSync(OUT, JSON.stringify(g));
 const caps = [];
 for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const s = g.spools[r][c]; if (s && s.id > 0) caps.push(s.count); }
