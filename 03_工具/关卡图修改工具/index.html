@@ -4,13 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=28">
+<link rel="stylesheet" href="css/style.css?v=29">
 </head>
 <body class="composeMode">
 
 <header class="topbar">
   <div class="brand">蚂蚁拿块关卡图修改工具</div>
-  <div class="stage">只做目标图的修改、主体提取与拼接</div>
   <div class="meta" id="envInfo">图纸工作台</div>
   <button id="btnComposeMode" class="btn primary tiny" title="在拼接工作台与普通修图之间切换。拼接是独立工作台，不会动你正在改的图纸">🎨 回到修图</button>
   <button id="btnCollapseAll" class="btn ghost tiny" title="把所有功能卡片折叠起来，只留标题。再点一次全部展开。也可以单独点某个卡片的标题折叠它">折叠全部</button>
@@ -19,13 +18,11 @@
 
 <div class="layout">
 
-  <!-- ========== 左栏：上传与图库（2026-10-30 起参数不再放这里） ========== -->
+  <!-- ========== 左栏：修图为上传；拼接为图层与画笔（2026-11-02） ========== -->
   <aside class="side sideLeft">
 
     <section class="card" id="cardImport">
       <h3>1. 导入图纸</h3>
-      <p class="hint">导入目标图 <code>xxx.txt</code>（像素矩阵格式）。选择文件夹会递归读取子目录，一次可导入整批。
-        本工具只处理图纸本身，不读取关卡数据。</p>
       <div class="row wrap">
         <label class="fileBtn">选择 TXT<input type="file" id="fileInput" multiple accept=".txt"></label>
         <label class="fileBtn">选择文件夹<input type="file" id="dirInput" webkitdirectory directory multiple></label>
@@ -34,26 +31,22 @@
       <div class="row"><span class="muted" id="importStat">未导入</span></div>
       <div class="row"><input type="text" id="listFilter" placeholder="过滤图纸名…" style="width:100%"></div>
       <div id="levelList" class="list"></div>
-      <p class="hint">选中一张图纸后，在中间画布上直接编辑。画布下方的「3. 美术编辑」改图、「4. 主体提取」抠图，抠好的主体存进下面的「图纸库」。</p>
     </section>
 
-    <!-- ===== 图纸库：原本在「4. 主体提取」卡里，2026-10-30 移到左栏，让「上传 / 图库」都留在左边 ===== -->
-    <section class="card" id="pieceLibCard">
-      <h3>图纸库</h3>
-      <p class="hint">抠好的主体存在这里（浏览器本地，刷新不丢）。拼接时点「② 部件来源 → 从图纸库全部添加」可一次全取。</p>
+    <!-- ===== 图层与画笔：2026-11-02 取代原来的「图纸库」===== -->
+    <section class="card" id="composeLayerBrushCard">
+      <h3>图层与画笔</h3>
       <div class="row wrap">
-        <input type="text" id="inPieceName" placeholder="图纸名（留空用图名）" style="flex:1;min-width:120px">
-        <button id="btnAddPiece" class="btn primary" disabled>➕ 加入图纸库</button>
+        <button id="btnComposeNewLayer" class="btn ghost">新建空白图层</button>
+        <button id="btnComposeLayerExport" class="btn ghost" disabled>导出选中图层 TXT</button>
       </div>
-      <div id="pieceLibInfo" class="kv"></div>
-      <div id="pieceLibList" class="list"></div>
+      <div id="composeLayerInfo" class="kv"></div>
+      <div id="composeLayerList" class="list"></div>
       <div class="row wrap">
-        <button id="btnPieceExportAll" class="btn primary">导出图纸库 ZIP</button>
-        <button id="btnPieceExportJson" class="btn ghost">导出图纸库 JSON</button>
-        <label class="fileBtn">导入图纸库 JSON<input type="file" id="filePieceLib" accept=".json"></label>
-        <button id="btnPieceClear" class="btn ghost">清空图纸库</button>
+        <button id="btnComposeMerge" class="btn ghost" disabled>合并选中图层</button>
       </div>
-      <p class="hint">图纸库保存在浏览器本地，刷新不丢。一张 20×20 图纸约 1 KB，攒几百张也没问题。</p>
+      <div class="editSubhead">画笔颜色</div>
+      <div id="composePalette" class="palette"></div>
     </section>
 
   </aside>
@@ -79,7 +72,7 @@
       <div class="composeCanvasWrap">
         <canvas id="composeCv" width="600" height="600"></canvas>
       </div>
-      <div id="composeReadout" class="readout">画布已默认建好 35×35：从右边②部件列表点「放上画布」，或直接用⑤的画笔画。</div>
+      <div id="composeReadout" class="readout"></div>
     </div>
 
     <!-- 画布统计：一眼看到当前画布用了多少种颜色 -->
@@ -103,12 +96,12 @@
       </div>
     </div>
     <div class="legend" id="legend"></div>
-    <div class="readout" id="readout">把鼠标移到图纸上可查看该像素的行列与颜色。</div>
+    <div class="readout" id="readout"></div>
 
     <!-- ===== 参数区（2026-10-30：全部参数从右栏搬到画布下方） =====
          宽屏自动排成两到三列；每张卡点标题可折叠，「悬浮」可拖到任意位置。
          拼接模式下只留「5. 图纸拼接」这一张，占满整行。 -->
-    <div class="paramAreaHead">参数与工具<span class="muted">（都在画布下方 · 点卡片标题可折叠 · 右上角「悬浮」可拖到任意位置）</span></div>
+    <div class="paramAreaHead">参数与工具</div>
     <div class="paramArea" id="paramArea">
 
       <div id="viewExportDock" class="floatPanel card">
@@ -124,7 +117,6 @@
             <span id="zoomInfo" class="muted" style="font-size:11px">11 px/格</span>
             <button id="btnZoomFit" class="btn ghost" title="把格子像素调到整张图刚好装进画布区（F 键也可，在画布上按）">适应窗口</button>
           </div>
-          <p class="hint">画布上 <b>Ctrl/⌘ + 滚轮</b>可以以光标为中心缩放；普通滚轮还是滚动页面。</p>
           <div class="row wrap">
             <label><input type="checkbox" id="optGrid"> 显示格线</label>
             <label><input type="checkbox" id="optShowVoid" checked title="把值为 0 的格子画成斜纹，便于看清主体边界"> 显示空位</label>
@@ -155,30 +147,14 @@
         <label title="加到当前选区上（等同按住 Shift）"><input type="radio" name="selCombine" value="add"> 加选</label>
         <label title="从当前选区里减掉（等同按住 Alt）"><input type="radio" name="selCombine" value="subtract"> 减选</label>
         <label title="只留下两者重叠的部分。配「按色选」用 = 只选当前选区里的这个颜色，主体其它地方的同色不受影响"><input type="radio" name="selCombine" value="intersect"> <b>交集</b></label>
-        <span class="hint">按住 <b>Shift</b>／<b>Alt</b> 可临时当作加选／减选，不必先改这里</span>
       </div>
       <div class="row wrap">
         <label><input type="checkbox" id="editPaintInSelection"> 只在选区内绘制</label>
         <label title="勾上后落笔把像素涂成空位 0（等于擦除）。点一下色库里的颜色会自动取消勾选"><input type="checkbox" id="optErase"> 橡皮擦（涂成空位 0）</label>
         <button id="btnEditClearSelection" class="btn ghost">取消选区</button>
       </div>
-      <div class="hintBlock shortcutBlock">
-        <b>快捷键</b>（画布上生效，输入框里打字时不抢）：
-        <b>Ctrl/⌘+Z</b> 撤销一笔 · <b>Esc</b> 取消选区 · <b>Alt+点击</b> 吸管取色 ·
-        <b>Ctrl/⌘+滚轮</b> 缩放 · <b>Shift</b> 加选、<b>Alt</b> 减选（框选类工具）
-        <span class="muted">「撤销」按<b>一笔</b>退：按下到松开鼠标之间改的所有格子算一次。</span>
-      </div>
-      <details class="hintFold"><summary>去毛边怎么做（点开看：套索 → 交集 → 按色选 → 挖空）</summary>
-      <div class="hintBlock">
-        <b>去毛边怎么做</b>（边缘和主体共用同一个描边色时）：①套索圈住要清理的边缘一带 →
-        ②叠加方式选<b>交集</b> → ③用「按色选」点一下描边色，或在下方「选区内颜色」里点该色的
-        <b>只选</b> → ④主体提取里点「挖空选区内」。
-        <span class="muted">这样只清掉圈内的该色，主体轮廓上的同色一格不动。
-        直接用「按色选」会选中全图该色（实测熊猫图深灰 573 格），主体轮廓会被一起抹掉。</span>
-      </div>
-      </details>
       <div id="editReplaceStatus" class="replaceStatus" style="display:none"></div>
-      <div class="editSubhead">完整色库（共 34 色。边框内是这张图纸已有的颜色，边框外是当前未使用的）</div>
+      <div class="editSubhead">完整色库（34 色）</div>
       <div id="editPalette"></div>
       <div class="row">
         <button id="btnEditUndo" class="btn ghost" disabled title="Ctrl/⌘+Z。一笔（按下到松开之间改的格子）算一次撤销">撤销</button>
@@ -197,9 +173,6 @@
          所以这里**保持原尺寸**、空位写 0 —— 拼接时行列坐标才对得上。 -->
     <section class="card" id="extractCard">
       <h3>4. 主体提取</h3>
-      <p class="hint">把主体框出来 → 一键剔掉框外（或框内）→ 存进图纸库。
-        <b>剔掉的位置写 0，画布尺寸不变</b>，这样之后再导回来拼接时坐标能对上。
-        选区工具在上面「3. 美术编辑」里选，需先勾「开启编辑模式」。</p>
 
       <div class="row wrap">
         <button id="btnExtractOutside" class="btn primary" disabled>只保留选区内（剔掉框外）</button>
@@ -219,8 +192,6 @@
         <button id="btnKeepLargest" class="btn ghost" title="按非 0 像素的四连通块切分，只保留最大的一块">
           只留最大连通块
         </button>
-        <span class="hint">这两个只是加速器。实测 44 张 20×20 素材里，四角同色块一击能剔掉 ≥25% 的只有 20 张，
-          有 5 张几乎剔不动（边缘是噪点或整张密铺纹理）—— <b>主力仍是手动框选与套索</b>。</span>
       </div>
       <div class="row wrap">
         <span class="rowLabel">清零碎</span>
@@ -228,18 +199,12 @@
           选中零碎小块
         </button>
         <label class="inlineNum">不超过 <input type="number" id="inSmallCompMax" value="40" min="1" max="9999" step="1"> 格</label>
-        <span class="hint">与「只留最大连通块」的区别：这个按<b>尺寸</b>判，能留下次大的有用部件；
-          后者只留第 1 块。实测熊猫图剔完背景后有 24 块，主体 2206 格，其余 23 块合计仅 103 格、单块最大 37 格，
-          阈值 40 一次清净。</span>
       </div>
 
     </section>
 
     <section class="card" id="composeCard">
       <h3>5. 图纸拼接 · 规则 / 绘制 / 出图</h3>
-      <p class="hint">把多个部件摆到一张新画布上，做成**多主体**的目标图。
-        摆放过程中部件<b>可以叠在一起</b>（先大致摆好再调）。导出时按图层底到顶合成，
-        重叠格<b>只输出最顶层的像素 id</b>。</p>
 
       <div class="composeTiles">
       <div class="composeTile tileRules">
@@ -266,7 +231,6 @@
       <div class="row wrap">
         <button id="btnComposeRulesAll" class="btn primary">生成背景+包围</button>
       </div>
-      <p class="hint">规则生成会创建独立图层：背景在最底层，包围在主体下方。重新生成同类规则时会替换旧规则层，不会改动主体原图。</p>
       <div id="composeColorPicker" class="composeColorPicker hidden"></div>
 
       </div>
@@ -313,8 +277,6 @@
         <button id="btnStampScatter" class="btn primary">撒到背景</button>
         <button id="btnStampReseed" class="btn ghost" title="种子 +1 再撒一次（先撤掉上一批再看）">换一批</button>
       </div>
-      <p class="hint">点一个图章＝选中「贴图章」工具，之后在画布上点一下就盖一个（颜色用当前画笔色）。
-        「撒到背景」落在覆盖整张画布的绘制层上（**背景纹理之上**），一个撤销点就能整批撤回。默认**均匀**分布（网格抖动，疏密一致）；种子固定 → 同样参数撒出同样结果，改种子或点「换一批」才会变。</p>
       <div class="row wrap" id="composeBorderRow">
         <span class="rowLabel">边框形态</span>
         <select id="selComposeBorder">
@@ -327,37 +289,10 @@
         </select>
         <button id="btnComposeBorderFull" class="btn ghost">铺满整张画布</button>
       </div>
-      <details class="hintFold"><summary>边框工具怎么用（点开看）</summary>
-<p class="hint">边框：选「边框」工具后在画布上<b>拖一个范围</b>即可生成；或点「铺满整张画布」。
-        生成后下面会列出它的各个部件（田字格就是四个小口＋外框＋十字），可以<b>单独给某一部件换色</b>。</p></details>
       <div class="row wrap">
         <button id="btnComposeTianzi" class="btn primary">自动生成田字格四框</button>
-        <span class="hint">按当前画布均分成 2×2 四个独立框（中缝是两条边框）；颜色用当前画笔色，线宽用上面的「线宽」。
-          偶数边长四格完全相等，奇数边长只差 1 格。</span>
       </div>
       <div id="composeBorderParts" class="list"></div>
-      </div>
-
-      <div class="composeTile tileBrush">
-      <div class="editSubhead">图层与画笔</div>
-      <details class="hintFold"><summary>画布与绘制层怎么用（点开看）</summary>
-<p class="hint"><b>新建画布后直接就能画</b> —— 画布上还没有图层时，会自动为你新建一张覆盖整张画布的
-        「绘制层」，接着画都落在同一层上。已经选中某个部件时，就画在那个部件上。
-        画好的图层可以单独导出成模块图纸，再当部件导入回来反复用。</p></details>
-      <div class="row wrap">
-        <button id="btnComposeNewLayer" class="btn ghost">新建空白图层</button>
-        <button id="btnComposeLayerExport" class="btn ghost" disabled>把选中图层导出为模块 TXT</button>
-      </div>
-      <div class="row wrap">
-        <button id="btnComposeUndo" class="btn ghost" disabled>↶ 撤销</button>
-        <button id="btnComposeRedo" class="btn ghost" disabled>↷ 重做</button>
-        <span class="hint">快捷键 <b>Ctrl/⌘+Z</b> 撤销、<b>Ctrl/⌘+Shift+Z</b>（或 Ctrl+Y）重做。
-          <b>放上部件、生成背景/包围、拖动移动、合并、改画布规格、删图层</b>，以及画的那一笔，
-          都能一步步退回；工作台顶栏也有这两个按钮。</span>
-      </div>
-      <div class="editSubhead">当前画笔颜色</div>
-      <div id="composePalette" class="palette"></div>
-
       </div>
 
       <div class="composeTile tileOut">
@@ -372,7 +307,6 @@
       </div>
       <div class="row wrap">
         <button id="btnComposeExportTxt" class="btn primary" disabled>导出拼接图 TXT</button>
-        <button id="btnComposeToLib" class="btn ghost" disabled>存入图纸库</button>
       </div>
       <div id="composeAuditInfo" class="kv"></div>
       <div id="composeFinalPanel" class="floatPanel composeFloatPanel">
@@ -402,7 +336,6 @@
          是参数区里唯一「一栏顶三栏」的长条，拆开后参数区才能平铺开。 ===== -->
     <section class="card" id="checkCard">
       <h3>6. 图纸体检（靠色 / 碎色）</h3>
-      <p class="hint">只做检查与提示，不改图。改完像素后碎色结果会标为过期，点「重新计算」刷新。</p>
 
       <div class="editSubhead">靠色检查（固定5组，全图）</div>
       <div id="editCloseCheckFull"></div>
@@ -428,10 +361,6 @@
         <button id="btnFragCheck" class="btn ghost">重新计算</button>
         <label title="把被判为碎色的像素在图纸上高亮出来，直接看出该修哪里"><input type="checkbox" id="fragHighlight"> 高亮碎色像素</label>
       </div>
-      <div class="hint">阈值随时可改，改完立刻重判（碎色率本身不用重算），并记住到下次打开工具。
-        当前采用 18%，与生产端的碎色闸门是同一个值——这里达标的图，生产时不会因碎色被卡掉。
-        <br>⚠ 2026-08-25 起小色块判定放宽到「小于 8 像素」，同一张图的碎色率比之前低约 4.3 个百分点，
-        因此 18% 现在比较宽松（344 关实测放过约 79%）。要更严可选 11.47% 或 10.54%。</div>
       <div id="fragInfo" class="kv"></div>
       <div id="fragPerColor"></div>
     </section>
@@ -440,18 +369,14 @@
          2026-10-30 按用户要求收成一张卡（他原话：导出入口分散，收成一个导出区）。 ===== -->
     <section class="card" id="exportCard">
       <h3>7. 导出</h3>
-      <p class="hint">三个出口都在这里。导出的都是**当前这张图纸**；图纸库的 ZIP/JSON 导出在左栏「图纸库」卡里。</p>
       <div class="row wrap">
         <button id="btnEditExportTxt" class="btn primary">导出修改后 TXT</button>
-        <span class="hint">像素矩阵 txt，可直接回生产链</span>
       </div>
       <div class="row wrap">
         <button id="btnPng" class="btn ghost">导出当前视图 PNG</button>
-        <span class="hint">所见即所得：含格线/选区/碎色高亮</span>
       </div>
       <div class="row wrap">
         <button id="btnEditExportReport" class="btn ghost">导出对比报告</button>
-        <span class="hint">Markdown：改了哪些像素、逐色增减</span>
       </div>
     </section>
 
@@ -460,9 +385,9 @@
     <div class="logbox"><div class="logHead">运行日志</div><pre id="log"></pre></div>
   </main>
 
-  <!-- ===== 右栏：拼接工作台专用（2026-10-30 起 ①②③ 放这里） =====
-       画布规格、部件来源、图层列表都在画布右边：这三块是「摆」的时候一直在看的，
-       放画布右边不用上下滚，中间画布也不用被 320px 的参数列挤窄。 ===== -->
+  <!-- ===== 右栏：拼接工作台专用（2026-11-02 起只有 ①②） =====
+       画布规格与部件来源放在画布右边：摆部件时一直在看，放右边不用来回滚。
+       图层与画笔在左栏；③ 已并入左栏。 ===== -->
   <aside class="side sideRight" id="composeRightSide">
 
     <section class="card" id="composeSetupCard">
@@ -480,13 +405,7 @@
         <button class="btn ghost tiny sizePreset" data-size="40">40×40</button>
         <button class="btn ghost tiny sizePreset" data-size="48">48×48</button>
         <button class="btn ghost tiny sizePreset" data-size="55">55×55</button>
-        <span class="hint">点一下直接换尺寸</span>
       </div>
-      <p class="hint">改行列数字后<b>松手或按回车就生效</b>（不用再点按钮）；已有图层不会被清掉，落在界外的会在图层列表里标出来。</p>
-      <p class="hint">打开工具就已经建好 <b>35×35</b> 画布，可以直接摆部件或开画。</p>
-      <p class="hint">为什么默认 35：新构图方向是「简单背景 + 单主体 + 少量点缀」的 30–35 见方，
-        旧关卡目标图是 55×55、且那几张图纸体积偏大（熊猫外接 54×55 几乎占满一整张），
-        两两都放不进同一张 55×55 —— 要拼多主体或要旧尺寸，改上面的行列再点「新建画布」。</p>
 
       <div id="composeSourcePanel" class="floatPanel composeFloatPanel">
         <div class="floatHead">
@@ -497,28 +416,10 @@
           <div class="row wrap">
             <label class="fileBtn">导入 TXT 图<input type="file" id="fileComposeTxt" accept=".txt" multiple></label>
             <label class="fileBtn" title="递归读取文件夹里的所有 .txt，作为部件加入列表">导入文件夹<input type="file" id="fileComposeDir" webkitdirectory directory multiple></label>
-            <button id="btnComposeFromLib" class="btn ghost">从图纸库全部添加</button>
             <button id="btnComposeSrcClear" class="btn ghost">清空部件列表</button>
           </div>
           <div id="composeSourceInfo" class="kv"></div>
           <div id="composeSourceList" class="list"></div>
-        </div>
-      </div>
-
-      <div id="composeLayerPanel" class="floatPanel composeFloatPanel">
-        <div class="floatHead">
-          <span class="floatTitle">③ 画布上的图层</span>
-          <button class="btn tiny floatToggle" data-float="composeLayerPanel">悬浮</button>
-        </div>
-        <div class="floatBody">
-          <p class="hint">在画布上<b>拖拽</b>可以挪部件；选中后用<b>方向键</b>逐格微调（按住 Shift 一次 5 格）。
-            画布上 <b>Shift 点击</b>或列表里 Shift 点名字＝多选，多选后可合并成一个新主体。</p>
-          <div class="row wrap">
-            <button id="btnComposeMerge" class="btn ghost" disabled>合并选中图层为新主体</button>
-            <span class="hint">合并后它们变成一个整体，不能再单独拖开。</span>
-          </div>
-          <div id="composeLayerInfo" class="kv"></div>
-          <div id="composeLayerList" class="list"></div>
         </div>
       </div>
 
@@ -535,6 +436,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=30"></script>
+<script src="js/app.js?v=31"></script>
 </body>
 </html>

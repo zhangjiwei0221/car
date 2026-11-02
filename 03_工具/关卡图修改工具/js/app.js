@@ -1,8 +1,8 @@
 /**
  * 蚂蚁拿块关卡图修改工具 · 界面层（app.js）
  *
- * 职责（2026-10-28 收敛后）：导入 TXT 图纸 → 画布显示/悬停读数 → 美术编辑（绘制/框选/套索/换色）
- * → 主体提取 → 图纸库 → 图纸拼接 → 导出 TXT/PNG。
+ * 职责（2026-11-02 收敛后）：导入 TXT 图纸 → 画布显示/悬停读数 → 美术编辑（绘制/框选/套索/换色）
+ * → 主体提取 → 图纸拼接（图层与画笔）→ 导出 TXT/PNG。
  *
  * 本工具**不再包含任何游玩/关卡逻辑**：求解路线、进度区间、多路线复核、自动演示、
  * 暂存压力图、重构关卡、待导出库、棋盘/暂存对比都已从界面与启动流程移除。
@@ -49,7 +49,6 @@
     //   那个是「逐像素改色」的批次栈，这里存的是整张图的快照（剔除一次可能动几百格，
     //   逐像素记反而更大），两者互不干扰，各自的撤销按钮也分开。
     extract: { undo: [], lastResult: null },
-    pieceLib: [],          // 图纸库（type='artPiece' 的条目），见 PIECE_LIB_STORAGE_KEY
     // 界面偏好：collapsed = {卡片id:1} 折叠状态。只影响显示，持久化在 UI_PREF_STORAGE_KEY。
     ui: { collapsed: {} },
     /* 拼接工作台（任务 ANT-ARTTOOL-PIECE-COMPOSE-20260915）。
@@ -60,7 +59,7 @@
     compose: {
       active: false,
       rows: 0, cols: 0,        // 0 = 还没建画布
-      sources: [],             // 可用部件（导入的 txt / 从图纸库取的），不直接参与出图
+      sources: [],             // 可用部件（导入的 txt），不直接参与出图
       layers: [],              // 画布上的图层，数组顺序 = 层序（后面盖前面）
       selected: [],            // 选中的图层 id（多选用于合并成新主体）
       drag: null,              // 移动图层的拖拽态
@@ -85,13 +84,11 @@
     }
   };
 
-  // 图纸库持久化：只存像素矩阵与元数据，刷新/重开后仍在。
-  var PIECE_LIB_STORAGE_KEY = 'antArtTool_pieceLibrary_v1';
   // 界面偏好（各卡片折叠状态）。这是「怎么看」的偏好，不是数据。
   var UI_PREF_STORAGE_KEY = 'antArtTool_uiPrefs_v1';
 
   // 每新增一张卡片都要登记到这里，否则那张卡片点标题没反应，属于静默失效。
-  var COLLAPSIBLE_CARDS = ['cardImport', 'pieceLibCard', 'viewExportDock', 'editCard', 'extractCard', 'checkCard', 'exportCard', 'composeSetupCard', 'composeCard'];
+  var COLLAPSIBLE_CARDS = ['cardImport', 'composeLayerBrushCard', 'viewExportDock', 'editCard', 'extractCard', 'checkCard', 'exportCard', 'composeSetupCard', 'composeCard'];
 
   // ==================== 日志与遮罩 ====================
   function log(msg) {
@@ -883,13 +880,9 @@
     }
     if (!C2.layers.length) {
       log('已进入拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，还没有图层）：' +
-        '从右边②放部件，或直接用⑤的画笔画。');
+        '从右边②放部件，或用左边「图层与画笔」画笔画。');
     } else {
       log('已回到拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，' + C2.layers.length + ' 个图层还在）。');
-    }
-    // 首次进入时，如果图纸库里有东西就直接带进来，省一步手动点
-    if (!C2.sources.length && S.pieceLib && S.pieceLib.length) {
-      composeAddFromLib(true);
     }
     renderComposeAll();
   }
@@ -1013,21 +1006,6 @@
         (ignored ? '，忽略非 TXT ' + ignored + ' 个' : ''));
       renderComposeAll();
     }
-  }
-
-  /** 从图纸库把部件加进来。quiet=true 用于进入拼接时的自动带入。 */
-  function composeAddFromLib(quiet) {
-    var lib = S.pieceLib || [];
-    var pieces = lib.filter(function (p) { return p && p.type === C.ART_PIECE_TYPE && p.blocks; });
-    if (!pieces.length) {
-      if (!quiet) log('图纸库是空的。先去「4. 主体提取」抠几个部件存进图纸库，或用上面的「导入 TXT 图」。');
-      return;
-    }
-    if (!quiet) composeSnapBefore('从图纸库添加 ' + pieces.length + ' 个部件到部件列表');
-    var n = 0;
-    pieces.forEach(function (p) { composeAddSource(p.key, p.blocks, 'lib'); n++; });
-    log('已从图纸库添加 ' + n + ' 个部件到部件列表' + (quiet ? '（进入拼接时自动带入）' : '') + '。');
-    if (!quiet) renderComposeAll();
   }
 
   function composeClearSources() {
@@ -1306,7 +1284,7 @@
     var C2 = cpS();
     info.innerHTML = C2.sources.length
       ? '<div class="kvRow"><span>可用部件</span><b>' + C2.sources.length + ' 个</b></div>'
-      : '<div class="muted">还没有部件 —— 用上面的「导入 TXT 图」或「从图纸库全部添加」</div>';
+      : '<div class="muted">还没有部件 —— 用上面的「导入 TXT 图 / 导入文件夹」</div>';
     box.innerHTML = '';
     C2.sources.forEach(function (s, i) {
       var row = document.createElement('div');
@@ -1370,7 +1348,11 @@
         var row = document.createElement('div');
         row.className = 'item' + (cpIsSelected(L.id) ? ' selected' : '') + (badConf ? ' conflict' : '') +
           (L.parentId != null ? ' childLayer' : '');
-        row.appendChild(composeThumb(L.blocks, 26));
+        // 左栏只有 320px：缩略图 + 文字占第一行，11 个操作按钮单独一行自动换行。
+        // 改前全塞一行，按钮把 .grow 挤成 0 宽，文字逐字换行，一行图层能撑到 200px 高。
+        var head = document.createElement('div');
+        head.className = 'layerHead';
+        head.appendChild(composeThumb(L.blocks, 26));
         var txt = document.createElement('div');
         txt.className = 'grow';
         var parent = composeParentOf(L);
@@ -1382,10 +1364,13 @@
           (badConf ? ' <span class="layerBadge warn">覆盖 ' + badConf + '</span>' : '') +
           (L.locked ? ' <span class="layerBadge locked">已固定</span>' : '') +
           (!L.visible ? ' <span class="layerBadge">已隐藏</span>' : '');
-        txt.onclick = function (ev) { composeSelectLayer(L.id, ev && (ev.shiftKey || ev.metaKey)); };
-        txt.style.cursor = 'pointer';
         txt.title = '点击选中（Shift/Cmd 多选，多选后可合并成一个新主体）。选中后可用方向键逐格微调位置';
-        row.appendChild(txt);
+        head.onclick = function (ev) { composeSelectLayer(L.id, ev && (ev.shiftKey || ev.metaKey)); };
+        head.style.cursor = 'pointer';
+        head.appendChild(txt);
+        row.appendChild(head);
+        var acts = document.createElement('div');
+        acts.className = 'layerActions';
         [['rename', '改名', '重命名这个图层'],
         ['copy', '复制', '复制这个图层'],
         ['recolor', '换色', '把这个图层的全部非 0 像素换成当前画笔颜色'],
@@ -1403,8 +1388,9 @@
           b.textContent = spec[1];
           b.title = spec[2];
           b.onclick = function (ev) { ev.stopPropagation(); composeLayerAction(L.id, spec[0]); };
-          row.appendChild(b);
+          acts.appendChild(b);
         });
+        row.appendChild(acts);
         box.appendChild(row);
       })(C2.layers[i], i);
     }
@@ -1457,13 +1443,12 @@
     var a = C2.lastAudit;
     var can = cpHasCanvas() && C2.layers.length > 0 && a && a.pixelActual > 0;
     var clean = can && (!composeRequireBackground() || a.backgroundHoles === 0);
-    var e1 = $('btnComposeExportTxt'), e2 = $('btnComposeToLib');
+    var e1 = $('btnComposeExportTxt');
     if (e1) {
       e1.disabled = !can;
       e1.title = !can ? '先新建画布并放上部件'
         : (clean ? '导出为 TXT 目标图；重叠取最顶层像素，画布外自动裁切' : '当前背景未填满或最终图为空 —— 点了会先告诉你哪里有问题');
     }
-    if (e2) { e2.disabled = !can; }
     var em = $('btnComposeMerge');
     if (em) {
       em.disabled = C2.selected.length < 2;
@@ -2344,38 +2329,6 @@
       (a.clipped ? '有 ' + a.clipped + ' 格超出画布，已在导出时裁切。' : '') +
       (a.layersFullyOutside.length ? '有 ' + a.layersFullyOutside.length + ' 个图层完全在画布外，未写入 TXT。' : '') +
       '空位是 0，可以直接再导入回本工具或交给生产侧。');
-  }
-
-  function composeToLib() {
-    var C2 = cpS();
-    var a = composeGateForExport('存入图纸库');
-    if (!a) return;
-    var flat = C.composeFlatten(C2.layers, C2.rows, C2.cols);
-    var base = safeFileName(($('inComposeName').value || '').trim() ||
-      ('拼接_' + C2.layers.length + '主体'));
-    var nm = base, k = 2;
-    while ((S.pieceLib || []).some(function (p) { return p && p.key === nm; })) { nm = base + '_' + k; k++; }
-    var piece;
-    try {
-      piece = C.toArtPiece(flat, {
-        key: nm,
-        sourceName: '拼接：' + C2.layers.map(function (L) { return L.name; }).join(' + '),
-        ops: C2.layers.map(function (L) {
-          return { piece: L.name, offR: L.offR, offC: L.offC };
-        }),
-        note: '由拼接工作台合成，' + a.visibleLayers + ' 个主体'
-      });
-    } catch (e) { log('存入图纸库失败：' + (e && e.message)); return; }
-    S.pieceLib.push(piece);
-    savePieceLib();
-    renderPieceLib();
-    log('已把拼接结果存入图纸库：「' + nm + '」' + piece.rows + '×' + piece.cols +
-      '，' + piece.pixelCount + ' 格。' +
-      (a.conflictCount ? '其中重叠格已按最顶层像素 id 入库。' : '') +
-      (a.clipped ? '其中 ' + a.clipped + ' 格超出画布，已按画布边界裁切。' : '') +
-      (a.layersFullyOutside.length ? '有 ' + a.layersFullyOutside.length + ' 个图层完全在画布外，未入库。' : '') +
-      '它现在也能当部件再拿来拼（在部件列表里点「从图纸库全部添加」）。');
-    renderComposeAll();
   }
 
   /** 把选中的多个图层合并成一个新主体（用户需求⑤：可加选减选不同的主体成为新主体）。 */
@@ -4255,66 +4208,6 @@
     log('已导出编辑对比报告');
   }
 
-  // ==================== 完整导出打包（ZIP） ====================
-  // bin/js/zip.js（AntSolver.Zip）只支持纯文本条目（内部用 TextEncoder 编码），
-  // 完整导出需要打包 PNG（二进制），故本工具自行实现一个同样走 store（不压缩）格式的二进制 ZIP 打包函数。
-  // 这不是游戏算法，是通用的归档打包工具，写在 app.js 里（只在页面用，不需要放进 core.js 的口径层）。
-  // ZIP 格式与 bin/js/zip.js 完全一致（本地文件头 + 中央目录 + EOCD，CRC32 表也用同一套标准算法），
-  // 唯一区别是条目内容既支持字符串（自动转 UTF-8 字节）也支持 Uint8Array（PNG 等二进制直接收）。
-
-  var ZIP_CRC_TABLE = (function () {
-    var t = new Uint32Array(256);
-    for (var n = 0; n < 256; n++) {
-      var c = n;
-      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      t[n] = c >>> 0;
-    }
-    return t;
-  })();
-  function zipCrc32(bytes) {
-    var c = 0xFFFFFFFF;
-    for (var i = 0; i < bytes.length; i++) c = ZIP_CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
-    return (c ^ 0xFFFFFFFF) >>> 0;
-  }
-  /** files: [{name, bytes:Uint8Array}] 或 [{name, text:string}]（二选一） */
-  function zipCreateBinary(files) {
-    var chunks = [], central = [], offset = 0;
-    files.forEach(function (f) {
-      var nameBytes = new TextEncoder().encode(f.name);
-      var data = f.bytes ? f.bytes : new TextEncoder().encode(f.text || '');
-      var crc = zipCrc32(data), size = data.length;
-      var lh = new DataView(new ArrayBuffer(30));
-      lh.setUint32(0, 0x04034b50, true);
-      lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
-      lh.setUint16(8, 0, true); lh.setUint16(10, 0, true); lh.setUint16(12, 0, true);
-      lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
-      lh.setUint16(26, nameBytes.length, true); lh.setUint16(28, 0, true);
-      chunks.push(new Uint8Array(lh.buffer), nameBytes, data);
-
-      var ch = new DataView(new ArrayBuffer(46));
-      ch.setUint32(0, 0x02014b50, true);
-      ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
-      ch.setUint16(10, 0, true); ch.setUint16(12, 0, true); ch.setUint16(14, 0, true);
-      ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true);
-      ch.setUint16(28, nameBytes.length, true); ch.setUint16(30, 0, true); ch.setUint16(32, 0, true);
-      ch.setUint16(34, 0, true); ch.setUint16(36, 0, true); ch.setUint32(38, 0, true);
-      ch.setUint32(42, offset, true);
-      central.push(new Uint8Array(ch.buffer), nameBytes);
-      offset += 30 + nameBytes.length + size;
-    });
-    var centralSize = central.reduce(function (s, a) { return s + a.length; }, 0);
-    var eocd = new DataView(new ArrayBuffer(22));
-    eocd.setUint32(0, 0x06054b50, true);
-    eocd.setUint16(4, 0, true); eocd.setUint16(6, 0, true);
-    eocd.setUint16(8, files.length, true); eocd.setUint16(10, files.length, true);
-    eocd.setUint32(12, centralSize, true); eocd.setUint32(16, offset, true);
-    eocd.setUint16(20, 0, true);
-    return new Blob(chunks.concat(central, [new Uint8Array(eocd.buffer)]), { type: 'application/zip' });
-  }
-
-  /** 把当前 canvas 的当前画面转成 PNG 的 Uint8Array（供打包用；比 toBlob 更方便同步收集多张图）。 */
-  function kb(chars) { return (chars / 1024).toFixed(0) + ' KB'; }
-
   // 导出文件名带时间戳：同一关多次导出会得到不同文件名，新导出不会覆盖旧导出（需求 §七第7点）。
   function exportStamp() {
     var d = new Date();
@@ -4866,16 +4759,13 @@
     if ($('btnExtractInside')) $('btnExtractInside').disabled = !ok;
     if ($('btnExtractUndo')) $('btnExtractUndo').disabled = !S.extract.undo.length;
     if ($('btnExtractReset')) $('btnExtractReset').disabled = !(S.edit.original && it && it.blocks);
-    if ($('btnAddPiece')) $('btnAddPiece').disabled = !(it && it.blocks && C.bboxOfBlocks(it.blocks));
   }
 
-  /* ==================== 图纸库 ====================
-   * 与关卡数据**分开存放**，单独一个 localStorage key。
-   * 理由（实读确认）：批量导出关卡时会无条件读 `e.originalLevel` / `e.reconstructedLevel`，
-   * 一个只有像素矩阵的图纸条目混进那个数组会让批量导出直接抛错。分开存最省事也最安全。
+  /* ==================== 通用转义 / 文件名 ====================
+   * 2026-11-02 删除「图纸库」后，只保留这两个被各处共用的纯函数。
    */
 
-  /** HTML 转义（图纸名是用户输入的，直接拼进 innerHTML 会有注入风险）。 */
+  /** HTML 转义（图层名是用户输入的，直接拼进 innerHTML 会有注入风险）。 */
   function escHtml(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -4887,256 +4777,6 @@
     return String(s == null || s === '' ? 'piece' : s).replace(/[\\/:*?"<>|]/g, '_');
   }
 
-  function loadPieceLib() {
-    try {
-      var raw = localStorage.getItem(PIECE_LIB_STORAGE_KEY);
-      S.pieceLib = raw ? (JSON.parse(raw) || []) : [];
-    } catch (e) {
-      S.pieceLib = [];
-      log('图纸库读取失败（' + (e && e.message) + '），已重置为空');
-    }
-    // 只留结构完整的条目，坏条目如实报出来而不是静默丢
-    var bad = S.pieceLib.filter(function (e) { return !e || e.type !== C.ART_PIECE_TYPE || !e.blocks; });
-    if (bad.length) {
-      S.pieceLib = S.pieceLib.filter(function (e) { return e && e.type === C.ART_PIECE_TYPE && e.blocks; });
-      log('图纸库里有 ' + bad.length + ' 条结构不完整，已跳过（其余 ' + S.pieceLib.length + ' 条正常）');
-    }
-  }
-
-  function savePieceLib() {
-    try {
-      localStorage.setItem(PIECE_LIB_STORAGE_KEY, JSON.stringify(S.pieceLib));
-      return { ok: true };
-    } catch (e) {
-      var quota = /quota|exceeded/i.test(String(e && e.name) + String(e && e.message));
-      return { ok: false, error: (e && e.message) || String(e), quota: quota };
-    }
-  }
-
-  function pieceLibBytes() {
-    try { return JSON.stringify(S.pieceLib).length; } catch (e) { return 0; }
-  }
-
-  /** 把当前目标图作为一张图纸入库。 */
-  function addCurrentAsPiece() {
-    var it = cur();
-    if (!it || !it.blocks) { log('请先导入并选中一张图纸'); return; }
-    var nameInput = $('inPieceName');
-    var base = (nameInput && nameInput.value.trim()) || String(it.key || 'piece');
-    // 同名自动加序号，避免静默覆盖用户已攒的图纸
-    var key = base, n = 2;
-    while (S.pieceLib.some(function (e) { return e.key === key; })) { key = base + '_' + n; n++; }
-    var piece;
-    try {
-      piece = C.toArtPiece(it.blocks, {
-        key: key,
-        sourceName: it.key || null,
-        ops: S.extract.lastResult
-          ? [{ mode: S.extract.lastResult.mode, removed: S.extract.lastResult.removed }]
-          : []
-      });
-    } catch (e) { log('入库失败：' + e.message); return; }
-
-    S.pieceLib.push(piece);
-    var res = savePieceLib();
-    if (!res.ok) {
-      S.pieceLib.pop();
-      savePieceLib();
-      renderPieceLib();
-      log('⚠ 图纸库加入失败，已取消本次加入（内存与本地保存都没变，避免刷新后静默丢失）。原因：' + res.error +
-        (res.quota ? '。这是浏览器本地存储配额（每站点约 5 MB），当前图纸库 ' + kb(pieceLibBytes()) +
-          '。请先导出图纸库，再移除部分图纸腾空间。' : ''));
-      return;
-    }
-    if (nameInput) nameInput.value = '';
-    renderPieceLib();
-    log('图纸库：已加入「' + key + '」（' + piece.pixelCount + ' 像素，' +
-      piece.rows + '×' + piece.cols + '，外接 ' + piece.bbox.rows + '×' + piece.bbox.cols +
-      '），当前共 ' + S.pieceLib.length + ' 张');
-  }
-
-  function removePiece(key) {
-    S.pieceLib = S.pieceLib.filter(function (e) { return e.key !== key; });
-    savePieceLib();
-    renderPieceLib();
-    log('图纸库：已移除「' + key + '」');
-  }
-
-  /** 把某张图纸载回当前关的目标图（供检查，也是「再导入回来」的第一步）。 */
-  function loadPieceIntoCurrent(key) {
-    var it = cur();
-    if (!it) { log('请先导入并选中一张图纸'); return; }
-    var p = S.pieceLib.filter(function (e) { return e.key === key; })[0];
-    if (!p) return;
-    if (p.rows !== it.blocks.length || p.cols !== it.blocks[0].length) {
-      log('⚠ 图纸尺寸 ' + p.rows + '×' + p.cols + ' 与当前图纸 ' +
-        it.blocks.length + '×' + it.blocks[0].length + ' 不一致，没有载入。' +
-        '拼接需要同尺寸画布，请换一张图纸');
-      return;
-    }
-    if (!S.edit.original) S.edit.original = it.blocks.map(function (r) { return r.slice(); });
-    S.extract.undo.push(it.blocks.map(function (r) { return r.slice(); }));
-    it.blocks = p.blocks.map(function (r) { return r.slice(); });
-    clearSelection();
-    invalidateAfterBlocksChange();
-    log('已把图纸「' + key + '」载入当前画布（' + p.pixelCount + ' 像素）。可用「撤销上一步剔除」退回');
-  }
-
-  /** 图纸库面板：水位 + 列表（含缩略图）。 */
-  function renderPieceLib() {
-    var info = $('pieceLibInfo'), list = $('pieceLibList');
-    if (!info || !list) return;
-    var st = C.artPieceStats(S.pieceLib);
-    var chars = pieceLibBytes();
-    var usedMB = chars * 2 / 1024 / 1024;      // localStorage 按 UTF-16 计费
-    var rows = [
-      ['图纸数', st.count + ' 张（本地保存，刷新不丢）'],
-      ['本地占用', usedMB.toFixed(3) + ' MB（浏览器每站点约 5 MB 配额）']
-    ];
-    if (st.count) {
-      rows.push(['尺寸分布', Object.keys(st.sizes).map(function (k) { return k + '×' + st.sizes[k] + '张'; }).join('　')]);
-      rows.push(['像素数', '最少 ' + st.pixel.min + '　中位 ' + st.pixel.median + '　最多 ' + st.pixel.max +
-        '　合计 ' + st.pixel.sum]);
-      rows.push(['用到的颜色', st.colorUnion.length + ' 种：' + st.colorUnion.join(' ')]);
-    }
-    info.innerHTML = kvTable(rows);
-
-    if (!S.pieceLib.length) {
-      list.innerHTML = '<div class="item muted">还没有图纸。框出主体 → 剔除 → 「加入图纸库」</div>';
-      return;
-    }
-    list.innerHTML = S.pieceLib.map(function (e) {
-      return '<div class="item" data-key="' + escHtml(e.key) + '">' +
-        '<canvas class="pieceThumb" data-key="' + escHtml(e.key) + '" width="34" height="34"></canvas>' +
-        '<span class="nm" title="' + escHtml(e.key) + '">' + escHtml(e.key) + '</span>' +
-        '<span class="px">' + e.pixelCount + 'px</span>' +
-        '<span class="bb">' + e.rows + '×' + e.cols + '</span>' +
-        '<button class="btn tiny pieceLoad" data-key="' + escHtml(e.key) + '" title="把这张图纸载入当前画布">载入</button>' +
-        '<button class="btn tiny ghost pieceDel" data-key="' + escHtml(e.key) + '">移除</button>' +
-        '</div>';
-    }).join('');
-    // 缩略图：逐格画，尺寸小所以直接画不做缓存
-    Array.prototype.forEach.call(list.querySelectorAll('.pieceThumb'), function (cv) {
-      var e = S.pieceLib.filter(function (x) { return x.key === cv.getAttribute('data-key'); })[0];
-      if (!e) return;
-      var ctx = cv.getContext('2d');
-      var cell = Math.max(1, Math.floor(Math.min(cv.width / e.cols, cv.height / e.rows)));
-      ctx.fillStyle = '#241a12'; ctx.fillRect(0, 0, cv.width, cv.height);
-      for (var r = 0; r < e.rows; r++) for (var c = 0; c < e.cols; c++) {
-        var v = e.blocks[r][c];
-        if (v <= 0) continue;
-        ctx.fillStyle = window.AntSolver.getColorCSS(v);
-        ctx.fillRect(c * cell, r * cell, cell, cell);
-      }
-    });
-    Array.prototype.forEach.call(list.querySelectorAll('.pieceDel'), function (el) {
-      el.onclick = function () { removePiece(el.getAttribute('data-key')); };
-    });
-    Array.prototype.forEach.call(list.querySelectorAll('.pieceLoad'), function (el) {
-      el.onclick = function () { loadPieceIntoCurrent(el.getAttribute('data-key')); };
-    });
-  }
-
-  /** 导出图纸库 ZIP：图纸/<名>.txt + 清单.csv + 说明.md。 */
-  function exportPieceLibZip() {
-    if (!S.pieceLib.length) { log('图纸库是空的'); return; }
-    var files = [];
-    var head = ['图纸名', '画布行', '画布列', '非空像素', '外接行起', '外接行止', '外接列起', '外接列止',
-      '外接高', '外接宽', '颜色数', '来源图', '提取操作', '入库时间'];
-    var csv = [head.join(',')];
-    S.pieceLib.forEach(function (e) {
-      files.push({ name: '图纸/' + safeFileName(e.key) + '.txt', text: C.serializeTxt(e.blocks) });
-      var bb = e.bbox || {};
-      csv.push([
-        '"' + String(e.key).replace(/"/g, '""') + '"',
-        e.rows, e.cols, e.pixelCount,
-        bb.r0, bb.r1, bb.c0, bb.c1, bb.rows, bb.cols,
-        e.colorCount,
-        '"' + String((e.source && e.source.sourceName) || '').replace(/"/g, '""') + '"',
-        '"' + ((e.source && e.source.ops) || []).map(function (o) {
-          return (o.mode === 'inside' ? '挖空选区内' : o.mode === 'outside' ? '剔掉选区外' : (o.mode || '')) +
-            (o.removed != null ? '(' + o.removed + ')' : '');
-        }).join(';') + '"',
-        (e.source && e.source.extractedAt) || ''
-      ].join(','));
-    });
-    files.push({ name: '清单.csv', text: csv.join('\n') + '\n' });
-
-    var st = C.artPieceStats(S.pieceLib);
-    var L = [];
-    L.push('# 主体图纸库导出');
-    L.push('');
-    L.push('- 导出时间：' + new Date().toISOString());
-    L.push('- 图纸数：' + st.count);
-    L.push('- 尺寸分布：' + Object.keys(st.sizes).map(function (k) { return k + ' × ' + st.sizes[k] + ' 张'; }).join('、'));
-    if (st.pixel) L.push('- 非空像素：最少 ' + st.pixel.min + '　中位 ' + st.pixel.median + '　最多 ' + st.pixel.max + '　合计 ' + st.pixel.sum);
-    L.push('- 用到的颜色：' + st.colorUnion.join(' '));
-    L.push('');
-    L.push('## 目录');
-    L.push('');
-    L.push('```');
-    L.push('图纸/    <名>.txt   只含主体的像素图纸（首行「像素矩阵」+ 空格分隔色号）');
-    L.push('清单.csv            逐张一行，含画布尺寸、非空像素、外接矩形、来源与提取操作');
-    L.push('说明.md             本文件');
-    L.push('```');
-    L.push('');
-    L.push('## 口径');
-    L.push('');
-    L.push('- **画布保持原尺寸**，被剔除的位置写 `0`。这样多张图纸的行列坐标是同一套，');
-    L.push('  之后再导入回来做**拼接**时能直接叠加，不需要平移换算。');
-    L.push('- `0` 在本项目里就是「空、不参与」：正式 `parseLevel` 只统计 `> 0` 的像素。');
-    L.push('- 清单里的**外接矩形**是主体的实际占位，拼接时判断两个部件会不会重叠、要不要平移，看它。');
-    L.push('- 本工具只做美术侧提取，**不生成关卡**。关卡生产侧的适配另行处理。');
-    files.push({ name: '说明.md', text: L.join('\n') + '\n' });
-
-    download('主体图纸库_' + S.pieceLib.length + '张_' + exportStamp() + '.zip', zipCreateBinary(files));
-    log('已导出图纸库 ZIP：' + S.pieceLib.length + ' 张，' + files.length + ' 个文件');
-  }
-
-  function exportPieceLibJson() {
-    if (!S.pieceLib.length) { log('图纸库是空的'); return; }
-    download('主体图纸库_' + S.pieceLib.length + '张_' + exportStamp() + '.json',
-      new Blob([JSON.stringify({
-        type: 'antArtPieceLibrary', version: 1,
-        count: S.pieceLib.length, exported: new Date().toISOString(),
-        pieces: S.pieceLib
-      }, null, 1)], { type: 'application/json' }));
-    log('已导出图纸库 JSON（' + S.pieceLib.length + ' 张）');
-  }
-
-  function importPieceLibJson(file) {
-    var fr = new FileReader();
-    fr.onload = function () {
-      var j = null;
-      try { j = JSON.parse(fr.result); } catch (e) { log('图纸库 JSON 解析失败：' + (e && e.message)); return; }
-      var arr = (j && Array.isArray(j.pieces)) ? j.pieces : (Array.isArray(j) ? j : null);
-      if (!arr) { log('这个文件里找不到 pieces 数组，没有导入'); return; }
-      var okN = 0, skip = 0, renamed = 0;
-      arr.forEach(function (p) {
-        if (!p || p.type !== C.ART_PIECE_TYPE || !p.blocks || !p.blocks.length) { skip++; return; }
-        var key = p.key || 'piece', n = 2;
-        while (S.pieceLib.some(function (e) { return e.key === key; })) { key = (p.key || 'piece') + '_' + n; n++; renamed++; }
-        p.key = key;
-        S.pieceLib.push(p); okN++;
-      });
-      var res = savePieceLib();
-      renderPieceLib();
-      log('图纸库导入：成功 ' + okN + ' 张' + (renamed ? '（其中 ' + renamed + ' 张同名已改名）' : '') +
-        (skip ? '，跳过 ' + skip + ' 条结构不完整' : '') +
-        (res.ok ? '' : '　⚠ 本地保存失败：' + res.error));
-    };
-    fr.readAsText(file);
-  }
-
-  function clearPieceLib() {
-    if (!S.pieceLib.length) return;
-    if (!window.confirm('清空图纸库？共 ' + S.pieceLib.length + ' 张，此操作不可撤销。建议先「导出图纸库」。')) return;
-    S.pieceLib = [];
-    savePieceLib();
-    renderPieceLib();
-    log('图纸库已清空');
-  }
-
   // ==================== 绑定 ====================
   function init() {
     if (!window.AntSolver || !window.AntSolver.getColorCSS || !window.ArtToolCore) {
@@ -5144,7 +4784,7 @@
       log('无法启动：缺少 color/解析依赖（bin/js/utils.js、generator.js 或 js/core.js 未载入）');
       return;
     }
-    $('envInfo').textContent = '图纸工作台 · 只做修改、主体提取与拼接';
+    $('envInfo').textContent = '图纸工作台';
 
     // ---- 1. 导入 ----
     $('fileInput').onchange = function (e) { readFiles(e.target.files, false); e.target.value = ''; };
@@ -5334,7 +4974,7 @@
     $('btnEditExportReport').onclick = exportEditReport;
     renderEditPalette();
 
-    // ---- 4. 主体提取 + 图纸库 ----
+    // ---- 4. 主体提取 ----
     $('btnExtractOutside').onclick = function () { doExtract('outside'); };
     $('btnExtractInside').onclick = function () { doExtract('inside'); };
     $('btnExtractUndo').onclick = undoExtract;
@@ -5346,17 +4986,6 @@
     $('btnPickBgCorners').onclick = pickBgCorners;
     $('btnKeepLargest').onclick = selectLargestComponent;
     $('btnPickSmallComps').onclick = selectSmallComponents;
-    $('btnAddPiece').onclick = addCurrentAsPiece;
-    $('btnPieceExportAll').onclick = exportPieceLibZip;
-    $('btnPieceExportJson').onclick = exportPieceLibJson;
-    $('filePieceLib').onchange = function (e) {
-      var f = e.target.files[0];
-      if (f) importPieceLibJson(f);
-      e.target.value = '';
-    };
-    $('btnPieceClear').onclick = clearPieceLib;
-    loadPieceLib();
-    renderPieceLib();
     renderExtractPanel();
     syncCanvasToolClass();
 
@@ -5428,7 +5057,6 @@
       composeImportTxt(ev.target.files);
       ev.target.value = '';
     };
-    $('btnComposeFromLib').onclick = function () { composeAddFromLib(false); };
     $('btnComposeSrcClear').onclick = composeClearSources;
     $('composeCellSize').oninput = drawCompose;
     ['optComposeGrid', 'optComposeConflict', 'optComposeOutline'].forEach(function (id) {
@@ -5451,7 +5079,6 @@
       if (cpS().sparseScan) composeRunSparseCheck();
     };
     $('btnComposeExportTxt').onclick = composeExportTxt;
-    $('btnComposeToLib').onclick = composeToLib;
     $('btnComposeMerge').onclick = composeMergeSelected;
     $('btnComposeHalo').onclick = composeGenerateHalo;
     $('btnComposeBackground').onclick = composeGenerateBackground;

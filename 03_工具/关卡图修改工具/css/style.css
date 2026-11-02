@@ -306,24 +306,9 @@ body.composeMode #canvasColorStats { display: none !important; }
 #extractInfo .warnText { color: #ffcf7a; }
 #extractInfo .badText { color: #ff9d7a; }
 
-/* 图纸库列表：比关卡列表更密，因为条目会多很多 */
-#pieceLibList { max-height: 300px; }
-#pieceLibList .item { padding: 3px 6px; gap: 5px; }
-#pieceLibList .item .nm { font-size: 12px; }
-#pieceLibList .item .px { color: #b09378; font-size: 11px; white-space: nowrap; }
-#pieceLibList .item .bb { color: #8f7963; font-size: 10px; white-space: nowrap; }
-/* 缩略图：用 canvas 画，固定高度，宽度按图的长宽比走 */
-#pieceLibList .item canvas {
-  border: 1px solid #4d3627; border-radius: 2px; background: #241a12;
-  image-rendering: pixelated; flex: 0 0 auto;
-}
-
 /* 选区工具当前生效时给画布一个提示边框，避免用户以为没开编辑模式 */
 #cv.selecting { outline: 2px solid #3fb6c4; outline-offset: 1px; }
 #cv.lassoing { outline: 2px dashed #3fb6c4; outline-offset: 1px; }
-
-/* 图纸库为空时的引导文字 */
-#pieceLibList .item.muted { color: #8f7963; justify-content: center; }
 
 /* ===== 13. 区域内同色选取与去毛边（任务 ANT-ARTTOOL-EDGE-TRIM-20260915）=====
    沿用既有暖棕底 + 橙强调，不引入新色系。
@@ -393,7 +378,7 @@ body.composeMode .mainCanvasRow,
 body.composeMode #legend,
 body.composeMode .main > .readout { display: none !important; }
 /* 拼接时让位的是**修图专用的东西**，不是整条左栏：
-   左栏 2026-10-30 起只放「上传 + 图纸库」，图纸库正是拼接的部件来源（② 里有「从图纸库全部添加」），
+   左栏 2026-11-02 起在拼接模式显示「图层与画笔」（#composeLayerBrushCard），
    所以左栏留着；让位的是修图的导入列表、美术编辑、主体提取、显示与导出这些只服务于 #cv 的面板。 */
 body.composeMode #cardImport,
 body.composeMode #editCard,
@@ -439,6 +424,10 @@ body.composeMode #btnComposeMode { background: #6b4a9e; border-color: #a98bd8; c
 }
 #composeLayerList .item.selected { background: #3d2f52; border-color: #a98bd8; }
 #composeLayerList .item.conflict { border-left: 3px solid #ff5a5a; }
+/* 左栏 320px：图层正文第一行，11 个操作按钮第二行自动换行，避免把文字挤成 0 宽 */
+#composeLayerList .item { display: block; }
+#composeLayerList .layerHead { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#composeLayerList .layerActions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 #composeLayerList .item .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .layerBadge {
   font-size: 10px; padding: 0 4px; border-radius: 3px; flex: 0 0 auto;
@@ -595,9 +584,15 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
    做法：三栏 → 两栏（左栏 + 主区），参数卡（2 显示与导出 / 3 美术编辑 / 4 主体提取 / 5 图纸拼接）
    统一收进 .paramArea，排在画布下方；宽度从 320px 的窄栏解放出来，行内控件不再疯狂折行。 */
 
-/* 左栏跟着滚动固定住：参数搬到画布下方后主区变长，滚动时上传与本地图库始终在左边够得到。
+/* 左栏跟着滚动固定住：参数搬到画布下方后主区变长，滚动时上传与图层画笔始终在左边够得到。
    sticky 而不是 fixed —— 不改文档流，窄屏（溢出滚动）时退回普通定位。 */
 .sideLeft { position: sticky; top: 10px; align-self: flex-start; }
+
+/* 2026-11-02：拼接模式下左栏换成「图层与画笔」；修图模式隐藏它，仍显示「1. 导入图纸」。 */
+#composeLayerBrushCard { display: none; }
+body.composeMode #composeLayerBrushCard { display: block; }
+#composeLayerBrushCard #composeLayerList { max-height: 320px; }
+#composeLayerBrushCard .palette { max-height: 240px; overflow-y: auto; }
 
 /* 参数区：宽屏自动 2–3 列，笔记本单列。
    用 auto-fit 而不是写死列数：1600px 屏（左栏 320 + 主区约 1250）排 3 列，
@@ -631,10 +626,10 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
 /* 拼接模式下参数区只剩「5. 图纸拼接」一张卡（④⑤⑥ 已在卡内平铺），多栏会把它压成一栏宽，退回块级 */
 body.composeMode .paramArea { display: block; columns: auto; }   /* columns:auto 必须一起清，否则仍是多栏 */
 
-/* ==================== 18. 2026-10-30 拼接台右栏：① 新建画布 / ② 部件来源 / ③ 画布上的图层 ====================
-   用户原话：「新建画布、部件来源，和画布上的图层放到右侧」。
-   这三块是摆部件时一直在看的东西，放画布右边不用上下滚，中间画布也不必被窄参数列挤着。
-   它们只服务于拼接，修图视图整体隐藏（修图时画布右侧只留「编辑改动统计」）。 */
+/* ==================== 18. 拼接台右栏：① 新建画布 / ② 部件来源（③ 图层 2026-11-02 移到左栏） ====================
+   用户原话（2026-10-30）：「新建画布、部件来源，和画布上的图层放到右侧」。
+   2026-11-02 用户又要求把左栏「图纸库」换成「图层与画笔」，于是 ③ 图层列表与画笔一起移到左栏，
+   右栏只留画布规格和部件来源；中间画布不必被窄参数列挤着。 */
 .sideRight { display: none; width: 340px; flex: 0 0 340px; }
 body.composeMode .sideRight { display: block; }
 /* 右栏里 ②③ 两个悬浮面板跟卡片同宽，别再把内边距叠一层 */
