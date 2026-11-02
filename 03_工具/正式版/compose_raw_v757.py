@@ -22,6 +22,35 @@ def load(p):
         lines = lines[1:]
     return [[int(x) for x in l.split()] for l in lines]
 
+def patch_size(g):
+    """主体的平均色块大小（越小越碎）"""
+    H, W = len(g), len(g[0])
+    cnt, comp = {}, {}
+    seen = [[False] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            c = g[y][x]
+            if not c:
+                continue
+            cnt[c] = cnt.get(c, 0) + 1
+            if seen[y][x]:
+                continue
+            comp[c] = comp.get(c, 0) + 1
+            st = [(y, x)]
+            seen[y][x] = True
+            while st:
+                cy, cx = st.pop()
+                for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    ny, nx = cy + dy, cx + dx
+                    if 0 <= ny < H and 0 <= nx < W and not seen[ny][nx] and g[ny][nx] == c:
+                        seen[ny][nx] = True
+                        st.append((ny, nx))
+    cs = [c for c in cnt if cnt[c] >= 8]
+    if not cs:
+        return 18.0
+    return sum(cnt[c] / comp[c] for c in cs) / len(cs)
+
+
 def compose(subjects, bg, frames, subj=18, block=2):
     canvas = [[bg[((y // block) + (x // block)) % 2] for x in range(CANVAS)] for y in range(CANVAS)]
     cells = [(0, 0), (0, CELL), (CELL, 0), (CELL, CELL)]
@@ -73,14 +102,28 @@ if __name__ == '__main__':
     ap.add_argument('--bg', default='31,32')
     ap.add_argument('--frame', default='13,25,20,1')
     ap.add_argument('--subj', type=int, default=18)
-    ap.add_argument('--order', default='tl,tr,bl,br', help='主体放到哪个象限：tl,tr,bl,br 顺序对应 --subjects')
+    ap.add_argument('--order', default='', help='手动指定象限顺序（tl,tr,bl,br），留空=按碎度自动排')
+    ap.add_argument('--no-auto', action='store_true', help='关闭自动排序，按 --subjects 原顺序 tl,tr,bl,br')
     ap.add_argument('--out', default='')
     ap.add_argument('--png', default='')
     a = ap.parse_args()
     subs = [s.strip() for s in a.subjects.split(',')]
     bg = [int(x) for x in a.bg.split(',')]
     fr = [int(x) for x in a.frame.split(',')]
-    # 按 --order 把主体摆到指定象限：tl/tr/bl/br
+    # 默认逻辑：按主体碎度自动落位
+    #   最整 → 下左（最先被消）；次整 → 上左；次碎 → 下右；最碎 → 上右（最后被消）
+    if not a.order and not a.no_auto:
+        scored = []
+        for nm in subs:
+            g = load(os.path.join(SPR, nm if nm.endswith('.txt') else nm + '.txt'))
+            scored.append((patch_size(g), nm))
+        scored.sort(key=lambda t: -t[0])          # 整 → 碎
+        slots = ['bl', 'tl', 'br', 'tr']
+        subs = [scored[i][1] for i in range(min(4, len(scored)))]
+        a.order = ','.join(slots[:len(subs)])
+        print('自动排序（碎度 → 象限）：', ' '.join('%s=%.1f' % (n, p) for p, n in scored))
+    if not a.order:
+        a.order = 'tl,tr,bl,br'
     slot = {'tl': 0, 'tr': 1, 'bl': 2, 'br': 3}
     order = [slot[x.strip()] for x in a.order.split(',')]
     placed = [None] * 4
