@@ -76,8 +76,16 @@ let best = JSON.parse(JSON.stringify(g)), bestM = cur, bestS = score(cur);
 for (let it = 1; it <= ITERS; it++) {
   const cand = JSON.parse(JSON.stringify(best));
   const rows = cand.spools.length, cols = cand.spools[0].length;
+  // 【修复】只允许交换"普通车"：锁链组(type 5)与冰(type 7)都不能移动，
+  // 否则锁链会被拆散到棋盘各处（用户 2026-11-02 实测发现）。
   const cells = [];
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (cand.spools[r][c] && cand.spools[r][c].id > 0) cells.push([r, c]);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const s = cand.spools[r][c];
+    if (!s || !(s.id > 0)) continue;
+    const t = Array.isArray(s.type) ? s.type : [s.type || 0];
+    if (t.includes(5) || t.includes(7)) continue;   // 锁链 / 冰 → 不动
+    cells.push([r, c]);
+  }
   if (cells.length < 2) break;
   const i = Math.floor(Math.random() * cells.length);
   let j = Math.floor(Math.random() * cells.length);
