@@ -27,13 +27,37 @@ def load(p):
         lines = lines[1:]
     return [[int(x) for x in l.split()] for l in lines]
 
+def make_patchwork(size, colors, seed, min_side=7, max_side=13):
+    """拼布背景：用若干大色块矩形铺满，颜色多、块大、不规则"""
+    rnd = random.Random(seed)
+    cv = [[colors[0]] * size for _ in range(size)]
+    covered = [[False] * size for _ in range(size)]
+    tries = 0
+    while tries < 4000:
+        tries += 1
+        w = rnd.randint(min_side, max_side); h = rnd.randint(min_side, max_side)
+        y = rnd.randint(0, max(0, size - 1)); x = rnd.randint(0, max(0, size - 1))
+        c = colors[rnd.randrange(len(colors))]
+        for yy in range(y, min(size, y + h)):
+            for xx in range(x, min(size, x + w)):
+                cv[yy][xx] = c; covered[yy][xx] = True
+        # 覆盖率够了就停
+        unc = sum(row.count(False) for row in covered)
+        if unc == 0: break
+    return cv
+
 def make_bg(size, colors, block, pattern, seed):
     rnd = random.Random(seed)
+    if pattern == 'patchwork':
+        return make_patchwork(size, colors, seed)
     cv = [[0] * size for _ in range(size)]
     for y in range(size):
         for x in range(size):
             bi, bj = y // block, x // block
-            if pattern == 'checker':
+            if pattern == 'grid':
+                # 规律网格：(行*2 + 列) 取模，形成斜向重复的色带
+                c = colors[(bi * 2 + bj) % len(colors)]
+            elif pattern == 'checker':
                 c = colors[(bi + bj) % len(colors)]
             elif pattern == 'stripe':
                 c = colors[bi % len(colors)]
@@ -86,7 +110,7 @@ if __name__ == '__main__':
     ap.add_argument('--size', type=int, default=36)
     ap.add_argument('--blocks', default='6,32,34', help='背景用的色号，逗号分隔')
     ap.add_argument('--block-size', type=int, default=4)
-    ap.add_argument('--pattern', default='checker', choices=['checker', 'stripe', 'vstripe', 'random'])
+    ap.add_argument('--pattern', default='patchwork', choices=['checker', 'stripe', 'vstripe', 'random', 'patchwork', 'grid'])
     ap.add_argument('--subjects', default='')
     ap.add_argument('--scale', type=int, default=14)
     ap.add_argument('--seed', type=int, default=7)

@@ -89,17 +89,20 @@ for (const [R, C] of boards) {
       if (s2.ok) f = f2;
     }
     const fb = path.join(d, 'c_build.json');
-    run([`${T}/OverlapBuild_v719.js`, f, '--out', fb, '--rounds', '2', '--samples', '30', '--mode', 'a', '--ref', REF]);
+    run([`${T}/OverlapBuild_v719.js`, f, '--out', fb, '--rounds', '2', '--samples', '30', '--mode', 'a', '--ref', REF, '--no-chain']);
     if (!fs.existsSync(fb)) { console.log(`  ${tag} 构建失败`); continue; }
-    const fi = path.join(d, 'd_ice.json');
-    run([`${T}/IceFill_v761.js`, fb, '--out', fi, '--count', '6', '--delay', '6', '--delay-bottom', '10']);
-    let cur = fs.existsSync(fi) ? fi : fb;
+    let cur = fb;
     const ff = path.join(d, 'e_feel.json');
     run([`${T}/FeelBuild_v766.js`, cur, '--out', ff, '--iters', '60']);
     if (fs.existsSync(ff)) cur = ff;
-    const fbd = path.join(d, 'f_budget.json');
-    run([`${T}/ObstacleBudget_v770.js`, cur, '--out', fbd, '--chain-groups', '2', '--ice', '6']);
-    if (fs.existsSync(fbd)) cur = fbd;
+    // 【2026-11-02 用户要求】障碍是标配，不再等提醒：先补基础预算（链≥2组、冰≥4）
+    const fbud = path.join(d, 'f_budget.json');
+    run([`${T}/ObstacleBudget_v770.js`, cur, '--out', fbud, '--chain-groups', '2', '--ice', '4']);
+    if (fs.existsSync(fbud)) cur = fbud;
+    // 再按症状开处方（补峰值/前段/后段）
+    const frx = path.join(d, 'f_rx.json');
+    run([`${T}/ObstacleRx_v774.js`, cur, '--out', frx]);
+    if (fs.existsSync(frx)) cur = frx;
     const g = B.readJson(cur);
     const m = score(g);
     const hardOK = m.won && m.peak <= 4 && m.empty === 0 && m.sum === m.px;
