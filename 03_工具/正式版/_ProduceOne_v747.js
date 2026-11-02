@@ -128,8 +128,8 @@ if (!has('--no-ice')) {
   const iFile = path.join(OUTDIR, base + '.iced.json');
   const ir = run(['03_工具/正式版/IceFill_v761.js', finalSrc, '--out', iFile,
     '--count', String(Number(arg('--ice-count', '6'))),
-    '--param', String(Number(arg('--ice-param', '8'))),
-    '--param-bottom', String(Number(arg('--ice-param-bottom', '18'))),
+    '--delay', String(Number(arg('--ice-delay', '6'))),
+    '--delay-bottom', String(Number(arg('--ice-delay-bottom', '10'))),
     '--ref', REF]);
   if (ir.ok && fs.existsSync(iFile)) { icedSrc = iFile; console.log('  配额补冰：' + path.basename(iFile)); }
   else console.log('  配额补冰：跳过');

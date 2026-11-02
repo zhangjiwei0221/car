@@ -18,27 +18,37 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const FILE = process.argv.slice(2).find(a => !a.startsWith('--') && !['--out', '--count', '--param', '--ref'].includes(process.argv[process.argv.indexOf(a) - 1]));
 const OUT = arg('--out', '/tmp/icefill.json');
 const COUNT = Number(arg('--count', 6));
-const PARAM = Number(arg('--param', 8));
 const BOTTOM_ROWS = 2;      // 棋盘最后 2 行 = 底层：可以加，但数字要大（用户 2026-11-02）
-const PARAM_BOTTOM = Number((() => { const i = process.argv.indexOf('--param-bottom'); return i > 0 ? process.argv[i + 1] : 18; })());
+// 延迟量（手）：冰的数字 = 该车自然手数 + 延迟
+const DELAY = Number((() => { const i = process.argv.indexOf('--delay'); return i > 0 ? process.argv[i + 1] : 6; })());
+const DELAY_BOTTOM = Number((() => { const i = process.argv.indexOf('--delay-bottom'); return i > 0 ? process.argv[i + 1] : 10; })());
 
 function metrics(g) {
   const o = A.Solver.runSolver(A.parseLevel(A.fromGameFormat(g)), 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
   const buf = (o.pressureSamples || []).map(s => s.buf || 0);
   let a4 = 0, c = 0, r = 0;
   for (const v of buf) { if (v >= 4) { c++; a4++; r = Math.max(r, c); } else c = 0; }
-  return { a4, run4: r, peak: Math.max(0, ...buf), won: !!o.completed, steps: buf.length };
+  const n = buf.length, b0 = Math.round(n * 0.8);
+  const late4 = buf.slice(b0).filter(v => v >= 4).length;
+  const early3 = buf.slice(0, Math.round(n * 0.2)).filter(v => v >= 3).length;
+  return { a4, run4: r, late4, early3, peak: Math.max(0, ...buf), won: !!o.completed, steps: n,
+           score: a4 + 2 * late4 + r };
 }
 
 const base = B.readJson(FILE);
 const m0 = metrics(base);
 console.log(`基线：at4=${m0.a4} run4=${m0.run4} 峰值=${m0.peak} 可通=${m0.won}`);
 
-// 1) 求前 20% 被取的车（这些"用得到"，避开）
+// 1) 求每辆车的"自然手数"（不加冰时它第几手被取）与前 20% 用到的车
 const o0 = A.Solver.runSolver(A.parseLevel(A.fromGameFormat(base)), 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
 const early = new Set();
+const naturalStep = new Map();          // "r,c" → 自然手数
 const limit = Math.round((o0.pressureSamples || []).length * 0.2);
-for (const p of (o0.pickOrder || [])) if (p.step <= limit) early.add(p.r + ',' + p.c);
+for (const p of (o0.pickOrder || [])) {
+  naturalStep.set(p.r + ',' + p.c, p.step);
+  if (p.step <= limit) early.add(p.r + ',' + p.c);
+}
+const totalSteps = (o0.pressureSamples || []).length;
 
 // 2) 候选：普通车、不在底层、不在前 20%、容量偏小
 const rows = base.spools.length;
@@ -61,12 +71,16 @@ for (const cd of cands) {
   if (added >= COUNT) break;
   const cell = g.spools[cd.r][cd.c];
   const old = { type: cell.type, param: cell.param };
-  cell.type = 7; cell.param = cd.bottom ? PARAM_BOTTOM : PARAM;   // 底层用大数字
+  // 数字 = 这辆车的自然手数 + 延迟；底层（本来就很晚）额外加 DELAY_BOTTOM
+  const nat = naturalStep.get(cd.r + ',' + cd.c) || 1;
+  const want = nat + (cd.bottom ? DELAY_BOTTOM : DELAY);
+  cell.type = 7; cell.param = Math.max(1, Math.min(totalSteps - 1, want));
   const m = metrics(g);
-  if (m.won && m.peak <= 4 && m.a4 >= m0.a4 - 2) { added++; continue; }
+  // 接受条件：可通关、峰值≤4、复合分不降、前期高压不增加（否则回退）
+  if (m.won && m.peak <= 4 && m.score >= m0.score - 1 && m.early3 <= m0.early3) { added++; continue; }
   cell.type = old.type; cell.param = old.param;      // 回退
 }
 const m1 = metrics(g);
 fs.writeFileSync(OUT, JSON.stringify(g));
-console.log(`加冰 ${added} 块（普通行 param=${PARAM}、底层 param=${PARAM_BOTTOM}；避开开局车）→ at4=${m1.a4} run4=${m1.run4} 峰值=${m1.peak} 可通=${m1.won}`);
+console.log(`加冰 ${added} 块（数字=自然手数+${DELAY}，底层+${DELAY_BOTTOM}）→ at4=${m1.a4} run4=${m1.run4} 峰值=${m1.peak} 可通=${m1.won}`);
 console.log('已写入', OUT);
