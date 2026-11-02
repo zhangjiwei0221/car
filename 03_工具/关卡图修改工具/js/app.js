@@ -2871,6 +2871,7 @@
   function composeGenerateBackground() {
     var C2 = cpS();
     if (!cpHasCanvas()) { log('先新建画布'); return; }
+    syncComposeBgLabels();
     var colorA = composeColorNumber('inComposeBgColorA', 14);
     var colorB = composeColorNumber('inComposeBgColorB', 31);
     var pattern = ($('selComposeBgPattern') || {}).value || 'diagonal';
@@ -2884,6 +2885,10 @@
       params: { colorA: colorA, colorB: colorB, pattern: pattern },
       generatedAt: new Date().toISOString()
     });
+    if (pattern === 'stripes') {
+      log('条纹背景：主色1 ' + composeColorLabel(colorA) + ' 与主色2 ' + composeColorLabel(colorB) +
+        ' 竖向交替（2 格一条）。');
+    }
   }
 
   function composeGenerateAllRules() {
@@ -3347,9 +3352,31 @@
     });
   }
 
+  function composeBgIsStripes() {
+    return (($('selComposeBgPattern') || {}).value === 'stripes');
+  }
+
   function composeColorInputMeta(id) {
-    for (var i = 0; i < COMPOSE_COLOR_INPUTS.length; i++) if (COMPOSE_COLOR_INPUTS[i].id === id) return COMPOSE_COLOR_INPUTS[i];
-    return null;
+    var meta = null;
+    for (var i = 0; i < COMPOSE_COLOR_INPUTS.length; i++) {
+      if (COMPOSE_COLOR_INPUTS[i].id === id) { meta = COMPOSE_COLOR_INPUTS[i]; break; }
+    }
+    if (!meta) return null;
+    // 条纹模式下，A/B 两个输入都是主色（主色1 / 主色2），不再叫「辅色」
+    if (composeBgIsStripes()) {
+      if (id === 'inComposeBgColorA') return { id: meta.id, label: '背景主色1' };
+      if (id === 'inComposeBgColorB') return { id: meta.id, label: '背景主色2' };
+    }
+    return meta;
+  }
+
+  /** 条纹时把两个颜色输入改名为「主色1 / 主色2」，其它纹理恢复「主色 / 辅色」。 */
+  function syncComposeBgLabels() {
+    var stripes = composeBgIsStripes();
+    var a = $('lblComposeBgColorA'), b = $('lblComposeBgColorB');
+    if (a) a.textContent = stripes ? '主色1' : '主色';
+    if (b) b.textContent = stripes ? '主色2' : '辅色';
+    composeRefreshRuleColorChips();
   }
 
   function composeRefreshRuleColorChips() {
@@ -3359,8 +3386,9 @@
       var id = composeColorNumber(m.id, 0);
       var chip = $('chip_' + m.id);
       if (!chip) return;
+      var meta = composeColorInputMeta(m.id) || m;
       chip.style.background = id > 0 ? window.AntSolver.getColorCSS(id) : 'transparent';
-      chip.title = m.label + '：' + composeColorLabel(id) + '。点击打开颜色列表';
+      chip.title = meta.label + '：' + composeColorLabel(id) + '。点击打开颜色列表';
       var label = $('label_' + m.id);
       if (label) label.textContent = composeColorLabel(id);
     });
@@ -5084,6 +5112,8 @@
     $('btnComposeRulesAll').onclick = composeGenerateAllRules;
     $('optComposeRequireBg').onchange = function () { composeRunAudit(false); syncComposeButtons(); };
     initComposeColorPickers();
+    if ($('selComposeBgPattern')) $('selComposeBgPattern').onchange = syncComposeBgLabels;
+    syncComposeBgLabels();
     $('btnComposeNewLayer').onclick = composeNewBlankLayer;
     $('btnComposeLayerExport').onclick = composeExportLayer;
     $('btnComposeBorderFull').onclick = composeBorderFull;

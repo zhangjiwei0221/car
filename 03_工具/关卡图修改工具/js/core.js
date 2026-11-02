@@ -1334,7 +1334,9 @@
       var v = a;
       if (pattern === 'checker') v = ((r + c) % 2 === 0) ? a : b;
       else if (pattern === 'dots') v = ((r % 5 === 0 && c % 5 === 0) || ((r + 2) % 7 === 0 && (c + 3) % 7 === 0)) ? b : a;
-      else if (pattern === 'stripes') v = (Math.floor((r + c) / 3) % 2 === 0) ? a : b;
+      // 2026-11-02 用户要求：条纹用两个主色交替穿插。
+      // 改前 (r+c) 是斜向 3 格带，与「斜纹」区分不开；改成竖向 2 格带，两色交替。
+      else if (pattern === 'stripes') v = (Math.floor(c / 2) % 2 === 0) ? a : b;
       else if (pattern === 'diagonal') v = ((r + c) % 6 < 2) ? b : a;
       out[r][c] = v;
     }
