@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=29">
+<link rel="stylesheet" href="css/style.css?v=30">
 </head>
 <body class="composeMode">
 
@@ -18,7 +18,7 @@
 
 <div class="layout">
 
-  <!-- ========== 左栏：修图为上传；拼接为图层与画笔（2026-11-02） ========== -->
+  <!-- ========== 左栏：修图为上传；拼接为画布与部件（2026-11-02） ========== -->
   <aside class="side sideLeft">
 
     <section class="card" id="cardImport">
@@ -33,20 +33,39 @@
       <div id="levelList" class="list"></div>
     </section>
 
-    <!-- ===== 图层与画笔：2026-11-02 取代原来的「图纸库」===== -->
-    <section class="card" id="composeLayerBrushCard">
-      <h3>图层与画笔</h3>
+    <section class="card" id="composeSetupCard">
+      <h3>5. 图纸拼接 · 画布与部件</h3>
+      <div class="editSubhead">① 画布规格（决定导出 txt 的尺寸）</div>
       <div class="row wrap">
-        <button id="btnComposeNewLayer" class="btn ghost">新建空白图层</button>
-        <button id="btnComposeLayerExport" class="btn ghost" disabled>导出选中图层 TXT</button>
+        <label class="inlineNum">行 <input type="number" id="inComposeRows" value="35" min="4" max="200" step="1"></label>
+        <label class="inlineNum">列 <input type="number" id="inComposeCols" value="35" min="4" max="200" step="1"></label>
+        <button id="btnComposeNew" class="btn primary" title="按上面的行列重设画布；改完数字松手/回车也会自动生效">应用尺寸</button>
+        <button id="btnComposeClear" class="btn ghost">清空画布</button>
       </div>
-      <div id="composeLayerInfo" class="kv"></div>
-      <div id="composeLayerList" class="list"></div>
       <div class="row wrap">
-        <button id="btnComposeMerge" class="btn ghost" disabled>合并选中图层</button>
+        <span class="rowLabel">常用</span>
+        <button class="btn ghost tiny sizePreset" data-size="35">35×35</button>
+        <button class="btn ghost tiny sizePreset" data-size="40">40×40</button>
+        <button class="btn ghost tiny sizePreset" data-size="48">48×48</button>
+        <button class="btn ghost tiny sizePreset" data-size="55">55×55</button>
       </div>
-      <div class="editSubhead">画笔颜色</div>
-      <div id="composePalette" class="palette"></div>
+
+      <div id="composeSourcePanel" class="floatPanel composeFloatPanel">
+        <div class="floatHead">
+          <span class="floatTitle">② 部件来源</span>
+          <button class="btn tiny floatToggle" data-float="composeSourcePanel">悬浮</button>
+        </div>
+        <div class="floatBody">
+          <div class="row wrap">
+            <label class="fileBtn">导入 TXT 图<input type="file" id="fileComposeTxt" accept=".txt" multiple></label>
+            <label class="fileBtn" title="递归读取文件夹里的所有 .txt，作为部件加入列表">导入文件夹<input type="file" id="fileComposeDir" webkitdirectory directory multiple></label>
+            <button id="btnComposeSrcClear" class="btn ghost">清空部件列表</button>
+          </div>
+          <div id="composeSourceInfo" class="kv"></div>
+          <div id="composeSourceList" class="list"></div>
+        </div>
+      </div>
+
     </section>
 
   </aside>
@@ -385,44 +404,24 @@
     <div class="logbox"><div class="logHead">运行日志</div><pre id="log"></pre></div>
   </main>
 
-  <!-- ===== 右栏：拼接工作台专用（2026-11-02 起只有 ①②） =====
-       画布规格与部件来源放在画布右边：摆部件时一直在看，放右边不用来回滚。
-       图层与画笔在左栏；③ 已并入左栏。 ===== -->
+  <!-- ===== 右栏：拼接工作台专用（2026-11-02 起是图层与画笔） =====
+       图层列表与 34 色画笔放在画布右边：摆部件、补画时一直在用。
+       画布规格与部件来源在左栏。 ===== -->
   <aside class="side sideRight" id="composeRightSide">
 
-    <section class="card" id="composeSetupCard">
-      <h3>5. 图纸拼接 · 画布与部件</h3>
-      <div class="editSubhead">① 画布规格（决定导出 txt 的尺寸）</div>
+    <section class="card" id="composeLayerBrushCard">
+      <h3>图层与画笔</h3>
       <div class="row wrap">
-        <label class="inlineNum">行 <input type="number" id="inComposeRows" value="35" min="4" max="200" step="1"></label>
-        <label class="inlineNum">列 <input type="number" id="inComposeCols" value="35" min="4" max="200" step="1"></label>
-        <button id="btnComposeNew" class="btn primary" title="按上面的行列重设画布；改完数字松手/回车也会自动生效">应用尺寸</button>
-        <button id="btnComposeClear" class="btn ghost">清空画布</button>
+        <button id="btnComposeNewLayer" class="btn ghost">新建空白图层</button>
+        <button id="btnComposeLayerExport" class="btn ghost" disabled>导出选中图层 TXT</button>
       </div>
+      <div id="composeLayerInfo" class="kv"></div>
+      <div id="composeLayerList" class="list"></div>
       <div class="row wrap">
-        <span class="rowLabel">常用</span>
-        <button class="btn ghost tiny sizePreset" data-size="35">35×35</button>
-        <button class="btn ghost tiny sizePreset" data-size="40">40×40</button>
-        <button class="btn ghost tiny sizePreset" data-size="48">48×48</button>
-        <button class="btn ghost tiny sizePreset" data-size="55">55×55</button>
+        <button id="btnComposeMerge" class="btn ghost" disabled>合并选中图层</button>
       </div>
-
-      <div id="composeSourcePanel" class="floatPanel composeFloatPanel">
-        <div class="floatHead">
-          <span class="floatTitle">② 部件来源</span>
-          <button class="btn tiny floatToggle" data-float="composeSourcePanel">悬浮</button>
-        </div>
-        <div class="floatBody">
-          <div class="row wrap">
-            <label class="fileBtn">导入 TXT 图<input type="file" id="fileComposeTxt" accept=".txt" multiple></label>
-            <label class="fileBtn" title="递归读取文件夹里的所有 .txt，作为部件加入列表">导入文件夹<input type="file" id="fileComposeDir" webkitdirectory directory multiple></label>
-            <button id="btnComposeSrcClear" class="btn ghost">清空部件列表</button>
-          </div>
-          <div id="composeSourceInfo" class="kv"></div>
-          <div id="composeSourceList" class="list"></div>
-        </div>
-      </div>
-
+      <div class="editSubhead">画笔颜色</div>
+      <div id="composePalette" class="palette"></div>
     </section>
 
   </aside>
@@ -436,6 +435,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=16"></script>
-<script src="js/app.js?v=31"></script>
+<script src="js/app.js?v=32"></script>
 </body>
 </html>

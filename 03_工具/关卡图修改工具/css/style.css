@@ -378,7 +378,7 @@ body.composeMode .mainCanvasRow,
 body.composeMode #legend,
 body.composeMode .main > .readout { display: none !important; }
 /* 拼接时让位的是**修图专用的东西**，不是整条左栏：
-   左栏 2026-11-02 起在拼接模式显示「图层与画笔」（#composeLayerBrushCard），
+   左栏 2026-11-02 起在拼接模式显示「画布与部件」（#composeSetupCard），
    所以左栏留着；让位的是修图的导入列表、美术编辑、主体提取、显示与导出这些只服务于 #cv 的面板。 */
 body.composeMode #cardImport,
 body.composeMode #editCard,
@@ -424,7 +424,7 @@ body.composeMode #btnComposeMode { background: #6b4a9e; border-color: #a98bd8; c
 }
 #composeLayerList .item.selected { background: #3d2f52; border-color: #a98bd8; }
 #composeLayerList .item.conflict { border-left: 3px solid #ff5a5a; }
-/* 左栏 320px：图层正文第一行，11 个操作按钮第二行自动换行，避免把文字挤成 0 宽 */
+/* 右栏 340px：图层正文第一行，11 个操作按钮第二行自动换行，避免把文字挤成 0 宽 */
 #composeLayerList .item { display: block; }
 #composeLayerList .layerHead { display: flex; align-items: center; gap: 6px; min-width: 0; }
 #composeLayerList .layerActions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -584,13 +584,11 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
    做法：三栏 → 两栏（左栏 + 主区），参数卡（2 显示与导出 / 3 美术编辑 / 4 主体提取 / 5 图纸拼接）
    统一收进 .paramArea，排在画布下方；宽度从 320px 的窄栏解放出来，行内控件不再疯狂折行。 */
 
-/* 左栏跟着滚动固定住：参数搬到画布下方后主区变长，滚动时上传与图层画笔始终在左边够得到。
+/* 左栏跟着滚动固定住：参数搬到画布下方后主区变长，滚动时上传与画布/部件始终在左边够得到。
    sticky 而不是 fixed —— 不改文档流，窄屏（溢出滚动）时退回普通定位。 */
 .sideLeft { position: sticky; top: 10px; align-self: flex-start; }
 
-/* 2026-11-02：拼接模式下左栏换成「图层与画笔」；修图模式隐藏它，仍显示「1. 导入图纸」。 */
-#composeLayerBrushCard { display: none; }
-body.composeMode #composeLayerBrushCard { display: block; }
+/* 右栏 340px 在拼接模式放图层与画笔；修图模式整条右栏隐藏 */
 #composeLayerBrushCard #composeLayerList { max-height: 320px; }
 #composeLayerBrushCard .palette { max-height: 240px; overflow-y: auto; }
 
@@ -626,15 +624,15 @@ body.composeMode #composeLayerBrushCard { display: block; }
 /* 拼接模式下参数区只剩「5. 图纸拼接」一张卡（④⑤⑥ 已在卡内平铺），多栏会把它压成一栏宽，退回块级 */
 body.composeMode .paramArea { display: block; columns: auto; }   /* columns:auto 必须一起清，否则仍是多栏 */
 
-/* ==================== 18. 拼接台右栏：① 新建画布 / ② 部件来源（③ 图层 2026-11-02 移到左栏） ====================
-   用户原话（2026-10-30）：「新建画布、部件来源，和画布上的图层放到右侧」。
-   2026-11-02 用户又要求把左栏「图纸库」换成「图层与画笔」，于是 ③ 图层列表与画笔一起移到左栏，
-   右栏只留画布规格和部件来源；中间画布不必被窄参数列挤着。 */
+/* ==================== 18. 拼接台两侧：左 ① 画布规格 / ② 部件来源，右 图层与画笔 ====================
+   2026-11-02 用户要求左右对调：左＝画布与部件，右＝图层与画笔。
+   右栏 340px 放图层列表更宽；左栏 320px 放画布规格与部件来源。 */
 .sideRight { display: none; width: 340px; flex: 0 0 340px; }
 body.composeMode .sideRight { display: block; }
-/* 右栏里 ②③ 两个悬浮面板跟卡片同宽，别再把内边距叠一层 */
-.sideRight .composeFloatPanel { margin: 8px 0 0; }
-.sideRight .composeFloatPanel .list { max-height: 220px; }
+
+/* 画布与部件卡搬进左栏：修图模式左栏只显示导入，拼接模式才显示它 */
+#composeSetupCard { display: none; }
+body.composeMode #composeSetupCard { display: block; }
 
 /* ==================== 19. 2026-10-30 交互修复配套样式 ====================
    ① 没开编辑模式就点画布：画布闪一圈橙色边框（改前是毫无反应）；
@@ -645,14 +643,27 @@ body.composeMode .sideRight { display: block; }
 .shortcutBlock { border-left-color: #2f6fae; }
 .shortcutBlock b { color: #1f5f9e; }
 
-/* ==================== 20. 2026-10-30（五）拼接卡内部平铺：④ / ⑤ / ⑥ 三块并排 ====================
-   改前这三块竖着摞，整张卡 1186px（1600px 屏），中间区域长得要滚三屏。
-   平铺后同一屏能同时看到「规则生成 / 画布绘制 / 出图」，高度约降到 1/3。 */
+/* ==================== 20. 拼接卡内部：④ 规则生成 / ⑥ 出图 固定在左列，⑤ 在右列 ====================
+   2026-11-02 用户要求「把 ⑥ 出图放到 ④ 规则生成的整下方」。
+   用 grid-template-areas 写死：左列 rules → out，右列 draw 跨两行。
+   窄屏（主区放不下两列 300px）退回单列，顺序仍是 ④ → ⑥ → ⑤。 */
 .composeTiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 0 18px;
+  grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr);
+  grid-template-areas:
+    "rules draw"
+    "out   draw";
+  gap: 14px 18px;
   align-items: start;
+}
+.tileRules { grid-area: rules; }
+.tileDraw { grid-area: draw; }
+.tileOut { grid-area: out; }
+@media (max-width: 1360px) {
+  .composeTiles {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "rules" "out" "draw";
+  }
 }
 .composeTile { min-width: 0; }
 /* 每块顶部自带 editSubhead 的分隔线；第一行的线在卡片标题下重复，去掉 */

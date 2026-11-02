@@ -880,7 +880,7 @@
     }
     if (!C2.layers.length) {
       log('已进入拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，还没有图层）：' +
-        '从右边②放部件，或用左边「图层与画笔」画笔画。');
+        '从左边②放部件，或用右边「图层与画笔」画笔画。');
     } else {
       log('已回到拼接工作台（画布 ' + C2.rows + '×' + C2.cols + '，' + C2.layers.length + ' 个图层还在）。');
     }
@@ -1087,7 +1087,7 @@
       cv.width = 600; cv.height = 160;
       composePaintChecker(ctx, cv.width, cv.height, 16);
       ctx.fillStyle = '#68707a'; ctx.font = '13px sans-serif';
-      ctx.fillText('还没有画布 —— 在右边「5. 图纸拼接 · 画布与部件」①设定规格并点「新建画布」', 20, 40);
+      ctx.fillText('还没有画布 —— 在左边「5. 图纸拼接 · 画布与部件」①设定规格并点「新建画布」', 20, 40);
       return;
     }
     var cell = composeCell(), rows = C2.rows, cols = C2.cols;
@@ -1348,7 +1348,7 @@
         var row = document.createElement('div');
         row.className = 'item' + (cpIsSelected(L.id) ? ' selected' : '') + (badConf ? ' conflict' : '') +
           (L.parentId != null ? ' childLayer' : '');
-        // 左栏只有 320px：缩略图 + 文字占第一行，11 个操作按钮单独一行自动换行。
+        // 右栏 340px：缩略图 + 文字占第一行，11 个操作按钮单独一行自动换行。
         // 改前全塞一行，按钮把 .grow 挤成 0 宽，文字逐字换行，一行图层能撑到 200px 高。
         var head = document.createElement('div');
         head.className = 'layerHead';
@@ -1410,8 +1410,7 @@
 
   /**
    * 撤销 / 重做按钮的同步。
-   * 两处按钮共用：拼接工作台顶栏（看得见的地方，顶栏顺带显示还能撤几步）
-   * 与画布下方「⑤ 在画布上画」那张卡片里的按钮（①–③ 在画布右侧）。
+   * 两处按钮共用：拼接工作台顶栏；旧的卡内撤销/重做按钮已删除，这里仍做存在性判断以兼容。
    */
   function syncComposeHistoryButtons() {
     var C2 = cpS();
@@ -1539,7 +1538,7 @@
     if (!cpHasCanvas()) {
       // 原先这里是静默 return —— 用户在没建画布时点画布，什么反应都没有，
       // 只能自己猜是哪里不对。改成如实说清下一步。
-      log('还没有画布，点不了。先在右边「5. 图纸拼接 · 画布与部件」①填好行列，点「新建画布」。');
+      log('还没有画布，点不了。先在左边「5. 图纸拼接 · 画布与部件」①填好行列，点「新建画布」。');
       return;
     }
     var p = composeEventToCell(ev);
