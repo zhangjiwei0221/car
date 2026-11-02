@@ -122,6 +122,20 @@ if (has('--layer')) {
   else console.log('  分层重排：失败，保留原结果');
 }
 
+// 可选：配额补冰（影响不大时补 6 块，增加障碍厚度；底层用大数字）
+let icedSrc = finalSrc;
+if (!has('--no-ice')) {
+  const iFile = path.join(OUTDIR, base + '.iced.json');
+  const ir = run(['03_工具/正式版/IceFill_v761.js', finalSrc, '--out', iFile,
+    '--count', String(Number(arg('--ice-count', '6'))),
+    '--param', String(Number(arg('--ice-param', '8'))),
+    '--param-bottom', String(Number(arg('--ice-param-bottom', '18'))),
+    '--ref', REF]);
+  if (ir.ok && fs.existsSync(iFile)) { icedSrc = iFile; console.log('  配额补冰：' + path.basename(iFile)); }
+  else console.log('  配额补冰：跳过');
+}
+finalSrc = icedSrc;
+
 function report(o) { console.log('RESULT ' + JSON.stringify(o)); }
 
 // ── 最终指标 + 验收 ──
