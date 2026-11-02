@@ -54,7 +54,7 @@ function createPool(opts) {
       while (idx < list.length) {
         const i = idx++;
         const r = await evalOne(list[i]);
-        out[i] = r.error ? { error: r.error } : r.m;
+        out[i] = (r && r.error) ? { error: r.error } : (r && r.m ? r.m : r);   // evalOne 已解包，这里兼容两种
       }
     }
     await Promise.all(Array.from({ length: width }, workerLoop));
