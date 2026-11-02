@@ -746,7 +746,6 @@
    * 独立 canvas（#composeCv）、独立状态（S.compose），不碰 draw() 与 S.items。
    */
 
-  var COMPOSE_CONFLICT_COLOR = '#ff5a5a';
   var COMPOSE_SELECT_COLOR = '#a98bd8';
   var COMPOSE_TYPE_LABEL = {
     subject: '主体',
@@ -1167,24 +1166,34 @@
       });
     }
 
-    // 覆盖高亮：摆放期不拦，导出也不拦，但必须看得见哪些格会取最顶层像素。
+    // 覆盖高亮：摆放期不拦，导出也不拦。
+    // 2026-11-02 用户要求「画布上重叠的地方不要打叉叉」：
+    //   重叠是正常摆法，之前逐格画红框 + ✕ 会把整片重叠区变成红叉阵，既挡画面又像报错。
+    //   现在只在勾选时淡淡着色，并沿重叠区外边界描一圈虚线 —— 不再有 ✕，也不再逐格切红格子。
     if ($('optComposeConflict').checked) {
       var cf = C.composeConflicts(C2.layers, rows, cols, 4000);
       if (cf.count) {
-        ctx.fillStyle = 'rgba(255,48,48,0.16)';
-        ctx.strokeStyle = COMPOSE_CONFLICT_COLOR;
-        ctx.lineWidth = 1;
+        var confIdx = [];
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,72,72,0.14)';
         cf.cells.forEach(function (x) {
-          var X = x.c * cell, Y = x.r * cell;
-          ctx.fillRect(X, Y, cell, cell);
-          ctx.strokeRect(X + .5, Y + .5, cell - 1, cell - 1);
-          if (cell >= 7) {
-            ctx.beginPath();
-            ctx.moveTo(X + 2, Y + 2); ctx.lineTo(X + cell - 2, Y + cell - 2);
-            ctx.moveTo(X + cell - 2, Y + 2); ctx.lineTo(X + 2, Y + cell - 2);
-            ctx.stroke();
-          }
+          ctx.fillRect(x.c * cell, x.r * cell, cell, cell);
+          confIdx.push(x.r * cols + x.c);
         });
+        if (cell >= 5) {
+          var confSegs = C.outlineSegments(confIdx, rows, cols);
+          ctx.strokeStyle = 'rgba(216,59,50,0.85)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          confSegs.forEach(function (s) {
+            ctx.moveTo(s[0] * cell, s[1] * cell);
+            ctx.lineTo(s[2] * cell, s[3] * cell);
+          });
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.restore();
       }
     }
 
