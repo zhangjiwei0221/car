@@ -51,8 +51,15 @@ def patch_size(g):
     return sum(cnt[c] / comp[c] for c in cs) / len(cs)
 
 
-def compose(subjects, bg, frames, subj=18, block=2):
-    canvas = [[bg[((y // block) + (x // block)) % 2] for x in range(CANVAS)] for y in range(CANVAS)]
+def compose(subjects, bg, frames, subj=18, block=2, bg4=None):
+    # bg4: 每个象限一对背景色（让背景色也按象限独占）
+    def bgpair(x, y):
+        if bg4:
+            q = (0 if y < CELL else 2) + (0 if x < CELL else 1)
+            p = bg4[q]
+            return p[((y // block) + (x // block)) % 2]
+        return bg[((y // block) + (x // block)) % 2]
+    canvas = [[bgpair(x, y) for x in range(CANVAS)] for y in range(CANVAS)]
     cells = [(0, 0), (0, CELL), (CELL, 0), (CELL, CELL)]
     for i, ((oy, ox), name) in enumerate(zip(cells, subjects)):
         g = load(os.path.join(SPR, name if name.endswith('.txt') else name + '.txt'))
@@ -100,6 +107,7 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--subjects', default='三角饭团-1,草莓-1,煎蛋-1,单块披萨-1')
     ap.add_argument('--bg', default='31,32')
+    ap.add_argument('--bg4', default='', help='四象限各自背景色对，如 31,32;27,28;3,4;15,16')
     ap.add_argument('--frame', default='13,25,20,1')
     ap.add_argument('--subj', type=int, default=18)
     ap.add_argument('--order', default='', help='手动指定象限顺序（tl,tr,bl,br），留空=按碎度自动排')
@@ -131,7 +139,8 @@ if __name__ == '__main__':
         if i < len(subs):
             placed[q] = subs[i]
     placed = [p if p else subs[i % len(subs)] for i, p in enumerate(placed)]
-    cv = compose(placed, bg, fr, a.subj)
+    bg4 = [[int(x) for x in pair.split(',')] for pair in a.bg4.split(';')] if a.bg4 else None
+    cv = compose(placed, bg, fr, a.subj, bg4=bg4)
     out = a.out or os.path.join(ROOT, '实验关/目标图_拼接/拼接_原始色_40x40.txt')
     png = a.png or os.path.join(ROOT, '实验关/renders/拼接_原始色.png')
     write_txt(cv, out); write_png(cv, png)
