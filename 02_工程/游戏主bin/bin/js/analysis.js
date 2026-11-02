@@ -677,7 +677,9 @@ AntSolver.Analysis = (function() {
     // 【v159】前期门可放宽：opts.earlyCap 默认 = 卡点线 high（**与改动前逐值一致**）。
     //   生成器在"卡点判据 v2"开启时传 earlyCap = 上限 − 0.8（5 → 4.2）：允许前期走到中压(3~4)、
     //   仍禁止爆压与触顶（触顶由 safeEdge 独立把关）。用户 2026-10-16：「允许到 3~4，但仍禁止爆压/触顶」。
-    var earlyCap = (opts.earlyCap != null) ? opts.earlyCap : high;
+    // 【2026-11-02 用户裁决】允许早期卡点：前期门槛从"卡点线"放宽到"死亡线"——
+    //   前期可以压到 4，只要不触顶（5）。原口径"前期不得出现卡点"作废。
+    var earlyCap = (opts.earlyCap != null) ? opts.earlyCap : L;
     res.earlyCap = +earlyCap.toFixed(2);
     res.earlyMax = early.max; res.lateMax = late.max; res.lateAt = late.at;
     res.midLateMax = midLate.max; res.midLateAt = midLate.at;
