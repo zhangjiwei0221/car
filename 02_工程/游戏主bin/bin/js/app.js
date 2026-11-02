@@ -22,7 +22,7 @@ AntSolver.App = (function() {
   // 当前单关的【目标图入口模式】：'fourSide'|'bottomOnly'|'fourSideInstantChain'。
   // 生成时按当次配置记下；导入/换关时按实机默认回到四方向瞬时连锁。
   // 只用于单关导出记录与显示；关卡 JSON 本体不含该字段（用户决定 D1）。
-  var currentEntryMode = 'fourSideInstantChain';
+  var currentEntryMode = 'corner';   // 【2026-11-02】用户要求：模拟游玩默认左下角消除
   // v99：三种玩法模式互斥，统一从 config 推导 entryMode，避免各处各写一遍三元表达式导致漏改。
   function entryModeOf(cfg) {
     if (cfg && cfg.instantChain) return 'fourSideInstantChain';
@@ -55,6 +55,8 @@ AntSolver.App = (function() {
     if (em === 'fourSideInstantChain') return '四方向瞬时连锁';
     if (em === 'bottomOnly') return '仅底部入口';
     if (em === 'fourSide') return '四边入口';
+    if (em === 'corner') return '左下角（曼哈顿距离）';
+    if (em === 'bottomEdge') return '底边（从下往上）';
     return '未知玩法';
   }
   /** entryMode → 求解器入口（按本关玩法求全知解，而不是一律走四边） */
@@ -1765,7 +1767,7 @@ AntSolver.App = (function() {
       currentGenerationEval = entry.generationEval || null;
       // ===== v121·任务AK① 按导入数据里记录的玩法加载 =====
       // loadLevel 会把 currentEntryMode 复位成实机默认瞬时连锁；导入数据有明确玩法时覆盖它。
-      currentEntryMode = entry.entryMode || 'fourSideInstantChain';
+      currentEntryMode = entry.entryMode || 'corner';   // 未指定玩法时默认左下角
       // 同步手点消除模式下拉：enterSimulation / doReset 都按下拉取值套用模式，
       // 这里不同步的话，进入模拟后手点消除仍按四边入口走。
       syncElimModeSelect(elimModeOfEntry(currentEntryMode));
@@ -2116,7 +2118,7 @@ AntSolver.App = (function() {
     currentGenerationEval = null;
     currentChokeInfo = null;      // v120：换关先清空卡点信息，避免把上一关的卡点显示到这一关上
     // 入口模式回实机默认；生成路径会在 loadLevel 之后按本次配置重设。
-    currentEntryMode = 'fourSideInstantChain';
+    currentEntryMode = 'corner';
     currentLevel = AntSolver.parseLevel(json);
     document.getElementById('btn-simulate').disabled = false;
     document.getElementById('btn-export').disabled = false;
@@ -8376,7 +8378,7 @@ AntSolver.App = (function() {
     if (enterSim) { stopAutoPlay(); stopAnim(); stopFlash(); stopLive(); }
     // loadLevel 会清空生成侧缓存并复位为瞬时默认，所以玩法赋值必须【在它之后】。
     loadLevel(lv);
-    currentEntryMode = rec.entryMode || 'fourSideInstantChain';
+    currentEntryMode = rec.entryMode || 'corner';
     syncElimModeSelect(elimModeOfEntry(currentEntryMode));
     currentGenerationEval = rec.generationEval || null;
     currentImportedSolve = (rec.solve && rec.solve.pressureSamples && rec.solve.pressureSamples.length) ? {
