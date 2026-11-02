@@ -32,7 +32,7 @@ if (!FILE) { console.error('用法: node WindowCheck_v753.js <关卡.json> [--co
 const DEFAULT_CONTRACT = {
   bufferLine: 3,
   segments: [
-    { from: 0.00, to: 0.20, max4: 0 },
+    { from: 0.00, to: 0.20, max4: 1 },   // 前期允许 1 步挂账（2026-11-02 用户定）
     { from: 0.20, to: 0.80 },
     { from: 0.80, to: 1.00, minRun: 3 },
   ],
