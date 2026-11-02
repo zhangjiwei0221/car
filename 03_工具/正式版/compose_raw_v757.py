@@ -70,11 +70,12 @@ def compose(subjects, bg, frames, subj=18, block=2, bg4=None, framew=1, fw4=None
             for x in range(CELL):
                 if y < fw or y >= CELL - fw or x < fw or x >= CELL - fw:
                     canvas[oy + y][ox + x] = frame
-        off = (CELL - 2 * framew - subj) // 2 + (0 if framew == 1 else 0)
-        for y in range(subj):
-            for x in range(subj):
-                sy = min(h - 1, int(y * h / subj))
-                sx = min(w - 1, int(x * w / subj))
+        subj_eff = min(subj, CELL - 2 * fw)          # 框厚时自动收缩，避免越界
+        off = max(0, (CELL - 2 * fw - subj_eff) // 2)
+        for y in range(subj_eff):
+            for x in range(subj_eff):
+                sy = min(h - 1, int(y * h / subj_eff))
+                sx = min(w - 1, int(x * w / subj_eff))
                 v = g[sy][sx]
                 if v != 0:                      # 保留原始色号
                     canvas[oy + fw + off + y][ox + fw + off + x] = v
