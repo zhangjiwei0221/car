@@ -65,13 +65,18 @@ for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++
     let mn = 999;
     for (let a = 0; a < sub.length; a++) for (let b = a + 1; b < sub.length; b++) mn = Math.min(mn, dist(rgb[sub[a]], rgb[sub[b]]));
     if (mn < MIN_D) continue;
+    // 共用色号数量（越少越好：共用色会让车跨象限 → 目标感变差）
+    const idCount = {};
+    for (const it of four) for (const c of it.cs) idCount[c] = (idCount[c] || 0) + 1;
+    const shared = Object.values(idCount).filter(n => n > 1).length;
     const fr = four.map(x => x.frag).sort((a, b) => a - b);
     const spread = fr[3] - fr[0];
-    const score = spread * 10 + mn;
-    if (!best || score > best.score) best = { score, mn, spread, names: four.map(x => x.name), frags: fr, cs: sub };
+    const score = -shared * 100 + spread * 10 + mn;   // 先减少共用色，再要碎度跨度与色距
+    if (!best || score > best.score) best = { score, mn, spread, shared, names: four.map(x => x.name), frags: fr, cs: sub };
   }
 
 if (!best) { console.error(`❌ 没有任意 4 主体组合满足 ≥${MIN_D}`); process.exit(1); }
+console.log(`共用色号 = ${best.shared} 个`);
 
 // 背景/边框：从离主体最远的色号里挑 12 个（不强制 85）
 const free = [];

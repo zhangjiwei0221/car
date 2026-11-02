@@ -51,7 +51,7 @@ def patch_size(g):
     return sum(cnt[c] / comp[c] for c in cs) / len(cs)
 
 
-def compose(subjects, bg, frames, subj=18, block=2, bg4=None):
+def compose(subjects, bg, frames, subj=18, block=2, bg4=None, framew=1, fw4=None):
     # bg4: 每个象限一对背景色（让背景色也按象限独占）
     def bgpair(x, y):
         if bg4:
@@ -65,18 +65,19 @@ def compose(subjects, bg, frames, subj=18, block=2, bg4=None):
         g = load(os.path.join(SPR, name if name.endswith('.txt') else name + '.txt'))
         h, w = len(g), len(g[0])
         frame = frames[i % len(frames)]
+        fw = fw4[i] if fw4 and i < len(fw4) else framew   # 按象限指定框厚
         for y in range(CELL):
             for x in range(CELL):
-                if y in (0, CELL - 1) or x in (0, CELL - 1):
+                if y < fw or y >= CELL - fw or x < fw or x >= CELL - fw:
                     canvas[oy + y][ox + x] = frame
-        off = (CELL - 2 - subj) // 2
+        off = (CELL - 2 * framew - subj) // 2 + (0 if framew == 1 else 0)
         for y in range(subj):
             for x in range(subj):
                 sy = min(h - 1, int(y * h / subj))
                 sx = min(w - 1, int(x * w / subj))
                 v = g[sy][sx]
                 if v != 0:                      # 保留原始色号
-                    canvas[oy + 1 + off + y][ox + 1 + off + x] = v
+                    canvas[oy + fw + off + y][ox + fw + off + x] = v
     return canvas
 
 def write_txt(canvas, path):
@@ -110,6 +111,8 @@ if __name__ == '__main__':
     ap.add_argument('--bg4', default='', help='四象限各自背景色对，如 31,32;27,28;3,4;15,16')
     ap.add_argument('--frame', default='13,25,20,1')
     ap.add_argument('--subj', type=int, default=18)
+    ap.add_argument('--frame-w', type=int, default=1)
+    ap.add_argument('--fw4', default='', help='按象限框厚，顺序 tl,tr,bl,br，如 2,1,3,2')
     ap.add_argument('--order', default='', help='手动指定象限顺序（tl,tr,bl,br），留空=按碎度自动排')
     ap.add_argument('--no-auto', action='store_true', help='关闭自动排序，按 --subjects 原顺序 tl,tr,bl,br')
     ap.add_argument('--out', default='')
@@ -140,7 +143,8 @@ if __name__ == '__main__':
             placed[q] = subs[i]
     placed = [p if p else subs[i % len(subs)] for i, p in enumerate(placed)]
     bg4 = [[int(x) for x in pair.split(',')] for pair in a.bg4.split(';')] if a.bg4 else None
-    cv = compose(placed, bg, fr, a.subj, bg4=bg4)
+    fw4 = [int(x) for x in a.fw4.split(',')] if a.fw4 else None
+    cv = compose(placed, bg, fr, a.subj, bg4=bg4, framew=a.frame_w, fw4=fw4)
     out = a.out or os.path.join(ROOT, '实验关/目标图_拼接/拼接_原始色_40x40.txt')
     png = a.png or os.path.join(ROOT, '实验关/renders/拼接_原始色.png')
     write_txt(cv, out); write_png(cv, png)
