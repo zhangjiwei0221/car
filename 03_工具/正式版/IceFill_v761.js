@@ -19,7 +19,8 @@ const FILE = process.argv.slice(2).find(a => !a.startsWith('--') && !['--out', '
 const OUT = arg('--out', '/tmp/icefill.json');
 const COUNT = Number(arg('--count', 6));
 const PARAM = Number(arg('--param', 8));
-const BOTTOM_ROWS = 2;      // 棋盘最后 2 行视为"底层"，不加冰
+const BOTTOM_ROWS = 2;      // 棋盘最后 2 行 = 底层：可以加，但数字要大（用户 2026-11-02）
+const PARAM_BOTTOM = Number((() => { const i = process.argv.indexOf('--param-bottom'); return i > 0 ? process.argv[i + 1] : 18; })());
 
 function metrics(g) {
   const o = A.Solver.runSolver(A.parseLevel(A.fromGameFormat(g)), 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
@@ -47,9 +48,9 @@ for (let r = 0; r < rows; r++) for (let c = 0; c < base.spools[r].length; c++) {
   if (!s || !(s.id > 0)) continue;
   const t = Array.isArray(s.type) ? s.type : [s.type || 0];
   if (t.includes(5) || t.includes(7)) continue;
-  if (r >= rows - BOTTOM_ROWS) continue;              // 底层不加
+  const bottom = r >= rows - BOTTOM_ROWS;             // 底层：可以加，但用大数字
   if (early.has(r + ',' + c)) continue;               // 前 20% 用得到的不加
-  cands.push({ r, c, count: s.count, score: s.count }); // 容量小的优先
+  cands.push({ r, c, count: s.count, score: s.count, bottom }); // 容量小的优先
 }
 cands.sort((a, b) => a.score - b.score);
 
@@ -60,12 +61,12 @@ for (const cd of cands) {
   if (added >= COUNT) break;
   const cell = g.spools[cd.r][cd.c];
   const old = { type: cell.type, param: cell.param };
-  cell.type = 7; cell.param = PARAM;
+  cell.type = 7; cell.param = cd.bottom ? PARAM_BOTTOM : PARAM;   // 底层用大数字
   const m = metrics(g);
   if (m.won && m.peak <= 4 && m.a4 >= m0.a4 - 2) { added++; continue; }
   cell.type = old.type; cell.param = old.param;      // 回退
 }
 const m1 = metrics(g);
 fs.writeFileSync(OUT, JSON.stringify(g));
-console.log(`加冰 ${added} 块（param=${PARAM}，避开底层与开局车）→ at4=${m1.a4} run4=${m1.run4} 峰值=${m1.peak} 可通=${m1.won}`);
+console.log(`加冰 ${added} 块（普通行 param=${PARAM}、底层 param=${PARAM_BOTTOM}；避开开局车）→ at4=${m1.a4} run4=${m1.run4} 峰值=${m1.peak} 可通=${m1.won}`);
 console.log('已写入', OUT);
