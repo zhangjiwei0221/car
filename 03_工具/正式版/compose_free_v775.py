@@ -52,16 +52,18 @@ def compose(size, bg, subjects, dot_specs, seed=7, bg2=None, bgmode='wave', chok
                 if 0 <= py < size and 0 <= px < size:
                     cv[py][px] = v
     # 2) 点缀：随机撒点/短条（避开已有主体像素，只落在背景上）
+    # 主体包围盒 + 2px 保护区：点缀/卡点色不许进这里，保证主体清楚
     occupied = set()
+    guard = 2
     for name, (oy, ox), scale in subjects:
-        for y in range(scale):
-            for x in range(scale):
+        for y in range(-guard, scale + guard):
+            for x in range(-guard, scale + guard):
                 occupied.add((oy + y, ox + x))
     for color, count in dot_specs:
         placed = 0; tries = 0
         while placed < count and tries < count * 60:
             tries += 1
-            y = rnd.randrange(size); x = rnd.randrange(size)
+            y = rnd.randrange(1, size - 1); x = rnd.randrange(1, size - 1)   # 不贴边
             if (y, x) in occupied: continue
             if cv[y][x] != bg: continue
             L = rnd.choice([1, 1, 1, 2, 3])       # 点或短条
@@ -82,7 +84,7 @@ def compose(size, bg, subjects, dot_specs, seed=7, bg2=None, bgmode='wave', chok
             placed = 0; tries = 0
             while placed < count and tries < count * 200:
                 tries += 1
-                y = rnd.randrange(size); x = rnd.randrange(size)
+                y = rnd.randrange(1, size - 1); x = rnd.randrange(1, size - 1)   # 不贴边
                 if (y, x) in occupied or cv[y][x] not in (bg, bg2 or bg): continue
                 # 与其它同色点保持距离，保证"散"
                 near = False
