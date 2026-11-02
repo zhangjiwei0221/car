@@ -82,14 +82,20 @@ function check(g) {
 }
 
 const g0 = B.readJson(FILE);
-let best = null;
+let best = null, tried = 0, wonAny = 0;
 for (let s = 1; s <= (C ? SEEDS : 1); s++) {
+  tried++;
   const { out, easy } = layered(g0, s);
   const r = check(out);
+  if (r.won) wonAny++;
   if (r.ok) { best = { out, seed: s, buf: r.buf, easy }; break; }
-  if (!best && r.won) best = { out, seed: s, buf: r.buf, easy };
 }
-if (!best) { console.error('❌ 所有种子都不可通关'); process.exit(1); }
+// 【2026-11-02】契约不通过时**不写产物**：分层会把好关的压力毁掉（实测 T3v1 22→0），
+// 不能"总是替换"，否则 --layer 反而劣化结果。
+if (!best) {
+  console.error(`❌ 分层未通过契约（试了 ${tried} 个种子，其中 ${wonAny} 个可通关）→ 保留原关卡`);
+  process.exit(1);
+}
 fs.writeFileSync(OUT, JSON.stringify(best.out));
 const N = best.buf.length, a = Math.round(N * 0.2), b = Math.round(N * 0.8);
 const c = x => x.filter(v => v >= LINE).length;

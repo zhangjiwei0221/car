@@ -73,13 +73,22 @@ if __name__ == '__main__':
     ap.add_argument('--bg', default='31,32')
     ap.add_argument('--frame', default='13,25,20,1')
     ap.add_argument('--subj', type=int, default=18)
+    ap.add_argument('--order', default='tl,tr,bl,br', help='主体放到哪个象限：tl,tr,bl,br 顺序对应 --subjects')
     ap.add_argument('--out', default='')
     ap.add_argument('--png', default='')
     a = ap.parse_args()
     subs = [s.strip() for s in a.subjects.split(',')]
     bg = [int(x) for x in a.bg.split(',')]
     fr = [int(x) for x in a.frame.split(',')]
-    cv = compose(subs, bg, fr, a.subj)
+    # 按 --order 把主体摆到指定象限：tl/tr/bl/br
+    slot = {'tl': 0, 'tr': 1, 'bl': 2, 'br': 3}
+    order = [slot[x.strip()] for x in a.order.split(',')]
+    placed = [None] * 4
+    for i, q in enumerate(order):
+        if i < len(subs):
+            placed[q] = subs[i]
+    placed = [p if p else subs[i % len(subs)] for i, p in enumerate(placed)]
+    cv = compose(placed, bg, fr, a.subj)
     out = a.out or os.path.join(ROOT, '实验关/目标图_拼接/拼接_原始色_40x40.txt')
     png = a.png or os.path.join(ROOT, '实验关/renders/拼接_原始色.png')
     write_txt(cv, out); write_png(cv, png)
