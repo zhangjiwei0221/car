@@ -52,22 +52,28 @@ function check(f) {
     gone[y - 1][x] || gone[y + 1][x] || gone[y][x - 1] || gone[y][x + 1];
   const picks = (o.pickOrder || []).filter(p => p.chainIndex === 0);
   const taken = new Set(); let good = 0, dead = 0;
+  // 【v793 修正】只有"棋盘上暴露的格子"才能选：边框行/列，或与已取走的空位相邻
+  const tc = g.spools.map(r => r.map(() => false));
+  const exposedAt = (r, c) => (r === 0 || c === 0 || r === rows - 1 || c === cols - 1) ||
+    tc[r - 1] && tc[r - 1][c] || tc[r + 1] && tc[r + 1][c] || tc[r][c - 1] || tc[r][c + 1];
   for (const p of picks) {
     const cnt = {};
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || !reach(y, x)) continue; const cc = col[y][x]; cnt[cc] = (cnt[cc] || 0) + 1; }
     let avail = 0, fill = 0;
     for (let r = 0; r < rows; r++) for (let c2 = 0; c2 < cols; c2++) {
       const s = g.spools[r][c2]; if (!s || !(s.id > 0) || taken.has(r + ',' + c2)) continue;
+      if (!exposedAt(r, c2)) continue;
       const t = Array.isArray(s.type) ? s.type : [s.type || 0]; if (t.includes(7)) continue;
       avail++; if (!s.q && (cnt[s.id] || 0) >= s.count) fill++;
     }
-    if (avail >= 3 && fill >= 1 && fill <= 2) good++;
+    if (avail >= 2 && fill >= 1 && fill < avail) good++;
     if (fill === 0) dead++;
     const c0 = p.color, list = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || col[y][x] !== c0 || !reach(y, x)) continue; list.push([(H - 1 - y) + x, y, x]); }
     list.sort((a, b) => a[0] - b[0]); let n = 0;
     for (const [d, y, x] of list) { if (n >= p.count) break; gone[y][x] = true; n++; }
     taken.add(p.r + ',' + p.c);
+    tc[p.r][p.c] = true;
   }
 
   // 容量/空格
