@@ -41,6 +41,10 @@ const NO_CHAIN = argv.includes('--no-chain');
 // 【2026-11-03】链必须锁「一次吃不完」的车：组总容量 >= 该色开局可达像素 × 该系数。
 // 否则锁链无效——取一端整组进场，全都能吃满就立刻消掉，只是"爽快清场"，不是压力。
 const CHAIN_MIN_RATIO = Number(arg('--chain-min-ratio', '1.1'));
+// 【2026-11-03 用户指出】开局 13 步全是免费车 —— 链要摆在「开局看得见」的地方才有用。
+// 默认只在边框（第一行/最后一行/第一列/最后一列）成链；--chain-anywhere 可关掉。
+const CHAIN_EDGE = !argv.includes('--chain-anywhere');
+const onEdge = (r, c, R2, C2) => r === 0 || c === 0 || r === R2 - 1 || c === C2 - 1;
 const W_RUN4 = Number(arg('--w-run4', 5));   // 奖励最长连续 >=4 的步数（默认 5）
 const OBJ = String(arg('--obj', 'low'));   // low=原目标(减少低压段) | at4=最大化 at4   // 目标里奖励最长连续 >=4
 const MODE = String(arg('--mode', 'b')).toLowerCase();   // b=瞬时连锁（默认） / a=四边入口        // 前 K 步不许到 buffer>=4（避免前期卡点）
@@ -304,6 +308,7 @@ function candidateMoves(g) {
     if (r > nr || (r === nr && c > nc)) continue;
     if (LOCK_SUBJECT && !sameQuad(g.spools[r][c], g.spools[nr][nc])) continue;
     if (prot(g.spools[r][c]) || prot(g.spools[nr][nc])) continue;
+    if (CHAIN_EDGE && (!onEdge(r, c, R, C) || !onEdge(nr, nc, R, C))) continue;   // 两端都要开局可见
     if (!chainWorthLocking(g, [[r, c], [nr, nc]])) continue;   // 同上：能吃光的锁无效
     moves.push({ type: 'chain', cells: [[r, c], [nr, nc]], tag: moves.length });
   }
@@ -313,6 +318,7 @@ function candidateMoves(g) {
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
     if (trio.some(([y, x]) => prot(base.spools[y][x]))) continue;
+    if (CHAIN_EDGE && !trio.every(([y, x]) => onEdge(y, x, R, C))) continue;   // 整组都要开局可见
     if (!chainWorthLocking(base, trio)) continue;   // 一次能吃光的组，锁了也没用
     moves.push({ type: 'chain', cells: trio });
   }
@@ -321,6 +327,7 @@ function candidateMoves(g) {
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
     if (trio.some(([y, x]) => prot(base.spools[y][x]))) continue;
+    if (CHAIN_EDGE && !trio.every(([y, x]) => onEdge(y, x, R, C))) continue;   // 整组都要开局可见
     if (!chainWorthLocking(base, trio)) continue;   // 一次能吃光的组，锁了也没用
     moves.push({ type: 'chain', cells: trio });
   }

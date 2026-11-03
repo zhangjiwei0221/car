@@ -42,6 +42,9 @@ function check(f) {
   let tailRun = 0, c = 0;
   for (const v of buf.slice(tN)) { if (v >= 3) { c++; tailRun = Math.max(tailRun, c); } else c = 0; }
   const peak = Math.max(0, ...buf);
+  // 【2026-11-03 用户指出】开局"13 步全是免费车"——前段占比检查抓不到，必须单独量最长连续空转。
+  let freeRun = 0, _fr = 0;
+  for (const v of buf) { if (v === 0) { _fr++; freeRun = Math.max(freeRun, _fr); } else _fr = 0; }
 
   // 【2026-11-03 用户定】20 种打法的曲线 —— 验收用「玩家视角」，不是全知最优路线。
   // 实测差距很大：G 关全知中段 30 步，20 种打法平均只有 7.7 步。
@@ -120,6 +123,7 @@ function check(f) {
     ['前10% at4≤1', early4 <= 1, early4 + ' 步'],
     ['前10% 免费步', true, earlyFree + '/' + eN, true],   // 软项：只提示，不参与通过判定
     // 【2026-11-03 用户定】压力改用「20 种打法的中位数」——玩家不是全知
+    ['最长连续免费≤5', freeRun <= 5, freeRun + ' 步'],
     ['玩家中段 at3≥50%', pMidRatio >= 0.5, pMid3 + ' 步（占比 ' + Math.round(pMidRatio * 100) + '%）'],
     ['玩家后20% at3≥2', pTail3 >= 2, pTail3 + ' 步'],
     ['玩家后20% 连续≥2', pTailRun >= 2, pTailRun],

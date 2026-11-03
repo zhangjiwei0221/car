@@ -27,6 +27,9 @@ const boxMin = Number(arg('--box-min', 18));
 // 【2026-11-03】--by-order：按消除顺序（corner 的 D 值）切车，容量递减
 // 动机：现在每辆车都切 25，但中后段各色只剩 4~25 像素 → 永远吃不满 → 「没得选」
 const BY_ORDER = process.argv.includes('--by-order');
+// 【2026-11-03 用户定】边框放「吃不满的大车」：开局牌面上能吃满的少，玩家才被迫犹豫。
+// 吃满比 = 车容量 / 该色在图边框上的像素数；>1 表示开局吃不满。
+const EDGE_BIG = !process.argv.includes('--no-edge-big');
 const ORDER_RATIO = Number(arg('--order-ratio', '0.75'));
 const boxMax = Number(arg('--box-max', 46));
 const seed = Number(arg('--seed', 1001));
@@ -119,7 +122,11 @@ function splitAll(targetSize) {
       // 【2026-11-03 用户指出】必须限幅：否则小色（1~2 辆车）会出现 210 这种吃不满的死车。
       // 溢出/缺口匀给还没到边界的那几辆，而不是全塞给第一辆。
       const CAP_LO = Number(arg('--cap-low', '8'));
-      const CAP_HI = Number(arg('--cap-high', '60'));
+      // 【2026-11-03 用户指出】写死 60 会抹掉设计意图：开局白色可达 76，车只有 60 → 怎么点都吃满 → 白送 11 步。
+      // 上限改为跟着该色总像素走（取 60 与 该色像素×0.6 的较大者，再封顶 120），
+      // 这样前几辆车会大于"开局可达量"，注定吃不满 → 才有开局压力。
+      const CAP_HI = Math.min(Number(arg('--cap-high', '120')),
+        Math.max(60, Math.round(pool.length * 0.6)));
       const counts = w.map(x => Math.min(CAP_HI, Math.max(CAP_LO, Math.round(pool.length * x / ws))));
       let diff = pool.length - counts.reduce((a, b) => a + b, 0);
       let guard2 = 0;
@@ -237,6 +244,31 @@ if (buryColors.length > 0) {
     if (i >= slots.length) break;
     const [sr, sc] = slots[i++];
     placed[sr * cols + sc] = b;
+  }
+} else if (EDGE_BIG) {
+  // 边框（开局可见）放大车 → 开局没几个能一口吃满的；内部放小车当后段奖励
+  const edge = [], inner2 = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (r === 0 || c === 0 || r === rows - 1 || c === cols - 1) edge.push([r, c]); else inner2.push([r, c]);
+  }
+  const reach = {};
+  for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
+    if (y === 0 || x === 0 || y === R - 1 || x === C - 1) reach[g[y][x]] = (reach[g[y][x]] || 0) + 1;
+  }
+  const ratio = b => (b.count || 1) / Math.max(1, reach[b.color] || 1);
+  const sorted = boxes.slice().sort((a, b) => ratio(b) - ratio(a));   // 最「吃不满」的排前面
+  // 边框上只放一部分大车（比例可调）：全放 → 太脆（实测容错掉到 30%）
+  const BIG_RATIO = Number(arg('--edge-big-ratio', '0.6'));
+  const edgeBigN = Math.max(0, Math.min(edge.length, Math.round(edge.length * BIG_RATIO)));
+  const bigCars = sorted.slice(0, edgeBigN);
+  // 剩余格子从「最容易吃满」的开始填：否则边框全是大车 → 开局必死（实测不可通关）
+  const restCars = sorted.slice(edgeBigN).sort((a, b) => ratio(a) - ratio(b));
+  placed = new Array(rows * cols).fill(null);
+  let idx = 0;
+  for (const [sr, sc] of edge.slice(0, edgeBigN)) { if (bigCars[idx]) placed[sr * cols + sc] = bigCars[idx]; idx++; }
+  for (const [sr, sc] of edge.slice(edgeBigN).concat(inner2)) {
+    if (restCars.length) { placed[sr * cols + sc] = restCars[(idx - edgeBigN) % restCars.length]; }
+    idx++;
   }
 } else {
   placed = boxes;
