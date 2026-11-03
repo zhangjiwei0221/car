@@ -15,6 +15,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const IMG = process.argv[2];
 const CELLS = Number(arg('--cells', 60));
 const ITERS = Number(arg('--iters', 300));
+const WIDTH = Number(arg('--width', 1));
 
 const m = fs.readFileSync(IMG, 'utf8').trim().split(/\r?\n/).slice(1).map(l => l.trim().split(/\s+/).map(Number));
 const H = m.length, W = m[0].length, TOT = H * W;
@@ -41,10 +42,13 @@ function makePool() {
 }
 
 function build(seq) {
-  const N = seq.length + 4, COL = Math.floor(N / 2);
+  const N = Math.ceil(seq.length / WIDTH) + 4, COL = Math.floor((N - WIDTH) / 2);
   const spools = Array.from({ length: N }, () => Array(N).fill(null));
   for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) spools[r][c] = { id: -1, type: 0, param: 0, count: 0 };
-  for (let r = 0; r < seq.length; r++) spools[r][COL] = { id: seq[r].id, type: 0, param: 0, count: seq[r].count };
+  for (let k = 0; k < seq.length; k++) {
+    const r = Math.floor(k / WIDTH), c = COL + (k % WIDTH);
+    spools[r][c] = { id: seq[k].id, type: 0, param: 0, count: seq[k].count };
+  }
   return { toprow: H, blocks: m, maprow: N, mapcol: N, spools };
 }
 
@@ -65,8 +69,38 @@ function score(seq) {
   return { sc, won: true, L, a3, a4, peak, e4, t3, buf };
 }
 
-let seq = makePool();
-seq.sort((a, b) => (a.count / px[a.id]) - (b.count / px[b.id]));   // 难的在前
+// 初值：用"跟踪可达性"的贪心生成（参考 ColorSpread 的思路）
+function designInit() {
+  const pool = makePool();
+  const col = m.map(r => r.slice()), gone = m.map(r => r.map(() => false));
+  const reach = (y, x) => y === 0 || x === 0 || y === H - 1 || x === W - 1 ||
+    gone[y - 1][x] || gone[y + 1][x] || gone[y][x - 1] || gone[y][x + 1];
+  const rc = () => { const c = {}; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || !reach(y, x)) continue; const v = col[y][x]; c[v] = (c[v] || 0) + 1; } return c; };
+  const eat = (c0, n0) => { const l = []; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || col[y][x] !== c0 || !reach(y, x)) continue; l.push([(H - 1 - y) + x, y, x]); } l.sort((a, b) => a[0] - b[0]); let n = 0; for (const [d, y, x] of l) { if (n >= n0) break; gone[y][x] = true; n++; } return n; };
+  const buffer = [], seq = [], rest = pool.slice();
+  const absorb = () => { let ch = true; while (ch) { ch = false; for (let i = 0; i < buffer.length; i++) { const b = buffer[i]; const c = rc(); const av = c[b.id] || 0; if (av > 0) { const t = Math.min(av, b.remain); eat(b.id, t); b.remain -= t; if (b.remain <= 0) { buffer.splice(i, 1); ch = true; break; } } } } };
+  for (let st = 0; st < CELLS; st++) {
+    const c = rc();
+    const fillable = rest.filter(x => (c[x.id] || 0) >= x.count && !buffer.some(b => b.id === x.id));
+    const notFill = rest.filter(x => !fillable.includes(x) && !buffer.some(b => b.id === x.id));
+    let pick = null;
+    if (buffer.length < 2 && notFill.length) pick = notFill[0];
+    else if (fillable.length) pick = fillable[0];
+    else if (notFill.length) pick = notFill[0];
+    else pick = rest[0];
+    if (!pick) break;
+    rest.splice(rest.indexOf(pick), 1); seq.push(pick);
+    const got = eat(pick.id, pick.count);
+    if (got < pick.count) buffer.push({ id: pick.id, remain: pick.count - got });
+    absorb();
+    if (buffer.length >= 5) { /* 继续，让爬山去修 */ }
+  }
+  while (seq.length < CELLS) { const x = makePool()[seq.length % renderLen()]; seq.push(x); }
+  return seq.slice(0, CELLS);
+}
+function renderLen() { return CELLS; }
+
+let seq = designInit();
 let cur = score(seq);
 console.log('起点: 通关=' + cur.won + ' 步=' + cur.L + ' at3=' + cur.a3 + ' at4=' + cur.a4 + ' 峰值=' + cur.peak + ' → 分 ' + cur.sc.toFixed(0));
 

@@ -77,7 +77,7 @@ function decision(g) {
 
 function score(m, d) {
   if (!m.won) return -1e9;
-  return m.tol * 400 + d.good * 8 + m.a3 * 3 + m.mid3 * 6 + m.tailRun * 12 - d.dead * 15 - (m.early < 0.8 ? 200 : 0);
+  return m.tol * 300 + d.good * 14 + m.mid3 * 16 + m.tailRun * 12 - d.dead * 45 - (m.early < 0.8 ? 250 : 0) - (m.steps < 40 ? 200 : 0);
 }
 
 let cur = JSON.parse(JSON.stringify(g0));

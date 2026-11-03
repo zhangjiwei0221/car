@@ -36,6 +36,8 @@ let NEW_ALLOW = [];
 const GUIDE = Number(arg('--guide-color', 0));   // 要求第 1 步必须是这个颜色（引导）
 const GUIDE_STEPS = Number(arg('--guide-steps', 0));  // 前 K 步只允许引导色
 const NO_EARLY = Number(arg('--no-early', 0));
+// 【2026-11-02】--no-chain：不许构建器自己加链。链只能由"处方"（ObstacleRx）按症状开。
+const NO_CHAIN = argv.includes('--no-chain');
 const W_RUN4 = Number(arg('--w-run4', 5));   // 奖励最长连续 >=4 的步数（默认 5）
 const OBJ = String(arg('--obj', 'low'));   // low=原目标(减少低压段) | at4=最大化 at4   // 目标里奖励最长连续 >=4
 const MODE = String(arg('--mode', 'b')).toLowerCase();   // b=瞬时连锁（默认） / a=四边入口        // 前 K 步不许到 buffer>=4（避免前期卡点）
@@ -274,8 +276,8 @@ function candidateMoves(g) {
       moves.push({ type: 'capmove', cells: [b, a], delta: d });
     }
   }
-  // 相邻成链
-  for (const [r, c] of plain) for (const [nr, nc] of neighbors(r, c)) {
+  // 相邻成链（--no-chain 时整段跳过）
+  for (const [r, c] of (NO_CHAIN ? [] : plain)) for (const [nr, nc] of neighbors(r, c)) {
     if (!isPlain(g.spools[nr][nc])) continue;
     if (r > nr || (r === nr && c > nc)) continue;
     if (LOCK_SUBJECT && !sameQuad(g.spools[r][c], g.spools[nr][nc])) continue;
@@ -283,14 +285,14 @@ function candidateMoves(g) {
     moves.push({ type: 'chain', cells: [[r, c], [nr, nc]], tag: moves.length });
   }
   // 三连（合法：2–3 格正交相邻），用来做更硬的组债务
-  for (let r = 0; r < R; r++) for (let c = 0; c + 2 < C; c++) {
+  for (let r = 0; r < (NO_CHAIN ? 0 : R); r++) for (let c = 0; c + 2 < C; c++) {
     const trio = [[r, c], [r, c + 1], [r, c + 2]];
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
     if (trio.some(([y, x]) => prot(base.spools[y][x]))) continue;
     moves.push({ type: 'chain', cells: trio });
   }
-  for (let r = 0; r + 2 < R; r++) for (let c = 0; c < C; c++) {
+  for (let r = 0; r + 2 < (NO_CHAIN ? 0 : R); r++) for (let c = 0; c < C; c++) {
     const trio = [[r, c], [r + 1, c], [r + 2, c]];
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
@@ -399,8 +401,8 @@ for (let round = 0; round < ROUNDS; round++) {
       : (x.lowRun * 10 + x.lowTotal - W_RUN4 * x.run4);
     const scoreE = scoreOf(e), scoreC = scoreOf(curE);
     if (OBJ === 'low') {
-      if (scoreE > scoreC) continue;
-      if (scoreE === scoreC && e.at4 <= curE.at4) continue;
+      // 允许等分候选（随机游走）：否则一旦进入平台期就永远停住（2026-11-02 实测：00011 从 at4=20 掉到 0）
+      if (scoreE > scoreC + 1e-9) continue;
     } else {
       if (scoreE <= scoreC) continue;      // at4/late 目标：必须严格更好
     }

@@ -74,16 +74,18 @@ function evaluate(g) {
   const peak = Math.max(0, ...buf);
   const earlyN = Math.max(1, Math.floor(buf.length * 0.2));
   const early4 = buf.slice(0, earlyN).filter(v => v >= 4).length;
+  // 前段"轻压"步数：buffer 在 1~3 之间的完成数（用户要求：开局要有轻微压力，但不能到 4）
+  const earlyMid = buf.slice(0, earlyN).filter(v => v >= 1 && v <= 3).length;
   const tailN = Math.floor(buf.length * 0.8);
   const tail3 = buf.slice(tailN).filter(v => v >= 3).length;
-  return { midCanFill, fillRatio, forcedZero, forcedRatio, forcedTail, earlyForced, a4, r4, early4, tail3, peak, won: !!o.completed, steps: buf.length };
+  return { midCanFill, fillRatio, forcedZero, forcedRatio, forcedTail, earlyForced, a4, r4, early4, earlyMid, tail3, peak, won: !!o.completed, steps: buf.length };
 }
 
 let g = B.readJson(FILE);
 let cur = evaluate(g);
 // 主目标：被迫欠债比例（越高越好）；次：可吃满率（越低越好）；再次：at4
-// 【2026-11-02 用户定稿】目标改成 at4/run4（全知路线）：高压步数要多、要连续，且前 20% 不许压
-const score = m => m.a4 * 10 + m.r4 * 30 - m.early4 * 200 + m.tail3 * 5;
+// 【2026-11-02 用户定稿】at4/run4 为主；前 20% 要有 3~5 步轻压（buffer 1~3），但一次都不许到 4
+const score = m => m.a4 * 10 + m.r4 * 30 + Math.min(m.earlyMid, 5) * 15 - m.early4 * 300 + m.tail3 * 5;
 console.log(`基线：被迫欠债 ${cur.forcedZero} 步(${(cur.forcedRatio * 100).toFixed(0)}%)、可吃满率 ${(cur.fillRatio * 100).toFixed(0)}%、at4=${cur.a4}、峰值=${cur.peak}`);
 
 let best = JSON.parse(JSON.stringify(g)), bestM = cur, bestS = score(cur);
@@ -110,8 +112,8 @@ for (let it = 1; it <= ITERS; it++) {
   if (!m.won || m.peak > 4) continue;
   const s = score(m);
   if (s > bestS) { bestS = s; bestM = m; best = cand; }
-  if (it % 40 === 0) console.log(`  ${it} 轮：at4=${bestM.a4} run4=${bestM.r4} 前段at4=${bestM.early4} 后段at3=${bestM.tail3}`);
+  if (it % 40 === 0) console.log(`  ${it} 轮：at4=${bestM.a4} run4=${bestM.r4} 前段轻压=${bestM.earlyMid} 前段at4=${bestM.early4} 后段at3=${bestM.tail3}`);
 }
 fs.writeFileSync(OUT, JSON.stringify(best));
-console.log(`\n结果：at4=${bestM.a4} run4=${bestM.r4} 前段at4=${bestM.early4} 后段at3=${bestM.tail3} 峰值=${bestM.peak} 可通=${bestM.won}`);
+console.log(`\n结果：at4=${bestM.a4} run4=${bestM.r4} 前段轻压=${bestM.earlyMid} 前段at4=${bestM.early4} 后段at3=${bestM.tail3} 峰值=${bestM.peak} 可通=${bestM.won}`);
 console.log('已写入', OUT);
