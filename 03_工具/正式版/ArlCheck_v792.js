@@ -135,7 +135,8 @@ function check(f) {
     ['（参考）全知 中段', true, mid3 + '/' + (tN - eN), true],
     ['（参考）全知 at4', true, a4, true],
     ['决策度≥15', good >= 15, good + '/' + picks.length],
-    ['没得选≤1', dead <= 1, dead],
+    // 【2026-11-03 用户选 B】改软项：用户已明确「必须选某色解锁不是问题」
+    ['没得选', true, dead, true],
     ['at4≥5', a4 >= 5, a4],
     ['可通关', !!o.completed, o.completed ? '✓' : '✗'],
     ['无空格', empty === 0, empty],
