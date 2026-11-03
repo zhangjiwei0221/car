@@ -116,12 +116,21 @@ function splitAll(targetSize) {
       const N = Math.max(1, Math.ceil(pool.length / targetSize));
       const w = []; for (let i = 0; i < N; i++) w.push(Math.pow(ORDER_RATIO, i));
       const ws = w.reduce((a, b) => a + b, 0);
-      const counts = w.map(x => Math.max(4, Math.round(pool.length * x / ws)));
+      // 【2026-11-03 用户指出】必须限幅：否则小色（1~2 辆车）会出现 210 这种吃不满的死车。
+      // 溢出/缺口匀给还没到边界的那几辆，而不是全塞给第一辆。
+      const CAP_LO = Number(arg('--cap-low', '8'));
+      const CAP_HI = Number(arg('--cap-high', '60'));
+      const counts = w.map(x => Math.min(CAP_HI, Math.max(CAP_LO, Math.round(pool.length * x / ws))));
       let diff = pool.length - counts.reduce((a, b) => a + b, 0);
       let guard2 = 0;
-      while (diff !== 0 && guard2++ < 500) {
-        if (diff > 0) { counts[0] += diff; diff = 0; }
-        else { const j = counts.findIndex(c => c > 4); if (j < 0) break; counts[j]--; diff++; }
+      while (diff !== 0 && guard2++ < 5000) {
+        let moved = false;
+        if (diff > 0) {
+          for (let i = 0; i < counts.length && diff > 0; i++) if (counts[i] < CAP_HI) { counts[i]++; diff--; moved = true; }
+        } else {
+          for (let i = counts.length - 1; i >= 0 && diff < 0; i--) if (counts[i] > CAP_LO) { counts[i]--; diff++; moved = true; }
+        }
+        if (!moved) break;
       }
       let idx2 = 0;
       for (const cnt of counts) {

@@ -30,6 +30,7 @@ const SEED = Number(arg('--seed', '20261030'));
 const RATIOS = String(arg('--ratios', '1,0.9,0.8,0.7')).split(',').map(Number);
 const TOPO_SEEDS = String(arg('--topo-seeds', '1,2')).split(',').map(Number);
 const RX_SEEDS = String(arg('--rx-seeds', '3,4')).split(',').map(Number);
+const USE_PLAN = !process.argv.includes('--no-plan');   // 障碍预算（墙/管道/冰自动选优）
 
 if (!TARGET) { console.error('用法：node JointSearch_v799.js --target <图.txt> --outdir <目录>'); process.exit(2); }
 const OUTDIR_ABS = path.isAbsolute(OUTDIR) ? OUTDIR : path.join(ROOT, OUTDIR);
@@ -58,7 +59,7 @@ let n = 0;
 for (const ratio of RATIOS) {
   const tag = ratio >= 1 ? 'default' : 'r' + ratio;
   const sp = path.join(OUTDIR_ABS, `${base}.${tag}.split.json`);
-  const bl = path.join(OUTDIR_ABS, `${base}.${tag}.build.json`);
+  let bl = path.join(OUTDIR_ABS, `${base}.${tag}.build.json`);
   n++;
 
   // 1) 切车
@@ -72,6 +73,12 @@ for (const ratio of RATIOS) {
   const r2 = run(['03_工具/正式版/OverlapBuild_v719.js', sp, '--out', bl,
     '--rounds', '3', '--samples', '60', '--mode', 'a', '--ref', REF, '--seed', String(SEED)]);
   if (!fs.existsSync(abs(bl))) { console.log(`[${tag}] 构建失败`); continue; }
+  // 障碍预算（原来漏了这一步；_ProduceOne 里是有的）
+  if (USE_PLAN) {
+    const pl = path.join(OUTDIR_ABS, `${base}.${tag}.plan.json`);
+    run(['03_工具/正式版/ObstaclePlan_v745.js', bl, '--ref', REF, '--out', pl]);
+    if (fs.existsSync(abs(pl))) bl = pl;
+  }
   const s0 = scoreOf(bl);
   report.push({ stage: 'build', ratio, tag, p: s0.p, fail: s0.fail });
   console.log(`[${tag}] 仅构建：${s0.p}/13`);
