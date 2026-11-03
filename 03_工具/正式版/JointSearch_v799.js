@@ -31,6 +31,9 @@ const RATIOS = String(arg('--ratios', '1,0.9,0.8,0.7')).split(',').map(Number);
 const TOPO_SEEDS = String(arg('--topo-seeds', '1,2')).split(',').map(Number);
 const RX_SEEDS = String(arg('--rx-seeds', '3,4')).split(',').map(Number);
 const USE_PLAN = !process.argv.includes('--no-plan');   // 障碍预算（墙/管道/冰自动选优）
+const TRAPS = String(arg('--traps', '')).split(',').filter(Boolean).map(Number);   // 顺序陷阱比例
+const EDGE_BIG = Number(arg('--edge-big', '0.25'));
+const WITH_TOPO = process.argv.includes('--with-topo');   // 默认只扫切车，加速
 
 if (!TARGET) { console.error('用法：node JointSearch_v799.js --target <图.txt> --outdir <目录>'); process.exit(2); }
 const OUTDIR_ABS = path.isAbsolute(OUTDIR) ? OUTDIR : path.join(ROOT, OUTDIR);
@@ -57,8 +60,11 @@ const report = [];
 let best = null;
 let n = 0;
 
-for (const ratio of RATIOS) {
-  const tag = ratio >= 1 ? 'default' : 'r' + ratio;
+const COMBOS = [];
+for (const ratio of RATIOS) for (const trap of (TRAPS.length ? TRAPS : [0])) COMBOS.push({ ratio, trap });
+
+for (const { ratio, trap } of COMBOS) {
+  const tag = (ratio >= 1 ? 'default' : 'r' + ratio) + (trap ? '.t' + trap : '');
   const sp = path.join(OUTDIR_ABS, `${base}.${tag}.split.json`);
   let bl = path.join(OUTDIR_ABS, `${base}.${tag}.build.json`);
   n++;
@@ -67,6 +73,8 @@ for (const ratio of RATIOS) {
   const spArgs = ['03_工具/正式版/SplitLevel_v722.js', '--target', TARGET, '--out', sp,
     '--rows', ROWS, '--cols', COLS];
   if (ratio < 1) spArgs.push('--by-order', '--order-ratio', String(ratio));
+  if (trap > 0) { spArgs.push('--trap-ratio', String(trap), '--edge-big-ratio', String(EDGE_BIG)); }
+  else if (ratio < 1) spArgs.push('--edge-big-ratio', String(EDGE_BIG));
   const r1 = run(spArgs);
   if (!fs.existsSync(abs(sp))) { console.log(`[${tag}] 切车失败`); continue; }
 
@@ -85,7 +93,8 @@ for (const ratio of RATIOS) {
   console.log(`[${tag}] 仅构建：${s0.p}/${s0.total}`);
   if (!best || s0.p > best.p) best = { file: bl, p: s0.p, tag, fail: s0.fail };
 
-  // 3) 拓扑 + 处方
+  // 3) 拓扑 + 处方（默认跳过，先只扫切车参数）
+  if (!WITH_TOPO) continue;
   for (const ts of TOPO_SEEDS) {
     const tp = path.join(OUTDIR_ABS, `${base}.${tag}.topo${ts}.json`);
     const r3 = run(['03_工具/正式版/TopoSearch_v797.js', bl, '--out', tp,
