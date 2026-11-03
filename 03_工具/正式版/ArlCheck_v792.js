@@ -17,6 +17,7 @@
  * 用法：node ArlCheck_v792.js <关卡.json> [...]
  */
 const B = require('./Build006Thickness_v688');
+const { detect: detectSubjects } = require('./SubjectDetect_v800');
 const A = B.loadSolver('corner');
 const fs = require('fs');
 
@@ -96,6 +97,44 @@ function check(f) {
     }
     quadAvg = n ? sum / n : 0; quadSteps = n;
     blobAvg = blobN ? blobSum / blobN : 0;
+  }
+
+  // 【2026-11-03 用户+mentor】主体级并行度：任何时候有几个「主体」在动、还剩几个完全没动。
+  // 这比象限口径准——象限会把背景色算进去（食物图象限 3.98，但主体其实只动了 2.95 个）。
+  let subjAvg = null, subjN = 0, minUntouched = null, avgUntouched = null;
+  {
+    const subs = detectSubjects(g.blocks);
+    subjN = subs.length;
+    if (subjN >= 2) {
+      const col3 = g.blocks.map(r => r.slice()), gone3 = g.blocks.map(r => r.map(() => false));
+      const H3 = g.blocks.length, W3 = g.blocks[0].length;
+      const reach3 = (y, x) => y === 0 || x === 0 || y === H3 - 1 || x === W3 - 1 ||
+        gone3[y - 1][x] || gone3[y + 1][x] || gone3[y][x - 1] || gone3[y][x + 1];
+      const done = subs.map(() => 0);
+      let sSum = 0, sN = 0, uSum = 0, uMin = 1e9;
+      for (const p of (o.pickOrder || [])) {
+        if (p.chainIndex !== 0) continue;
+        const c0 = p.color, list3 = [];
+        for (let y = 0; y < H3; y++) for (let x = 0; x < W3; x++) { if (gone3[y][x] || col3[y][x] !== c0 || !reach3(y, x)) continue; list3.push([(H3 - 1 - y) + x, y, x]); }
+        list3.sort((a, b) => a[0] - b[0]);
+        let k3 = 0;
+        for (const [, y, x] of list3) {
+          if (k3 >= p.count) break;
+          gone3[y][x] = true;
+          for (let i = 0; i < subs.length; i++) if (subs[i].cells.has(y + ',' + x)) done[i]++;
+          k3++;
+        }
+        let inflight = 0, untouched = 0;
+        for (let i = 0; i < subs.length; i++) {
+          const r = done[i] / (subs[i].size || 1);
+          if (r > 0.02 && r < 0.98) inflight++;
+          if (r <= 0.02) untouched++;
+        }
+        sSum += inflight; sN++;
+        uSum += untouched; uMin = Math.min(uMin, untouched);
+      }
+      if (sN) { subjAvg = sSum / sN; avgUntouched = uSum / sN; minUntouched = uMin; }
+    }
   }
   // 【2026-11-03 用户指出】开局"13 步全是免费车"——前段占比检查抓不到，必须单独量最长连续空转。
   let freeRun = 0, _fr = 0;
@@ -192,6 +231,13 @@ function check(f) {
     ['象限并行度≤3.6', quadAvg <= 3.6, quadAvg.toFixed(2) + '（' + quadSteps + ' 步）'],
     // 象限内部碎度：进行中的象限里，已消除区域平均几块（1=从一角连续推进，越大越"多点开花"）
     ['象限内部碎度', true, blobAvg.toFixed(1) + ' 块/象限', true],
+    // 【核心·目标感】主体级：任何时候至少还有几个主体完全没被碰过
+    subjAvg == null
+      ? ['主体级并行度', true, '识别不出主体（非图库拼图）', true]
+      : ['主体并行度≤60%', subjAvg / subjN <= 0.60, (subjAvg.toFixed(2) + '/' + subjN + '，' + Math.round(100 * subjAvg / subjN) + '%')],
+    subjAvg == null
+      ? ['未动主体数', true, '—', true]
+      : ['全程最少未动主体≥2', minUntouched >= 2, '最少 ' + minUntouched + '，平均 ' + avgUntouched.toFixed(2) + '/' + subjN],
     ['玩家后20% at3≥2', pTail3 >= 2, pTail3 + ' 步'],
     ['玩家后20% 连续≥2', pTailRun >= 2, pTailRun],
     // 【2026-11-03 用户选 B】允许玩家死：峰值=4 只约束最优路线，玩家视角放宽到 5。
