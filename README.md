@@ -98,7 +98,7 @@ cd 02_工程/游戏主bin && python3 -m http.server 8060
 桌面客户端（实际在用的那个）：
 
 ```
-/Users/red/Desktop/ParkPassenger_patched.app/Contents/Resources/bin/G1_bq_level_N.json
+/Users/red/Desktop/游戏版本/ParkPassenger_patched.app/Contents/Resources/bin/G1_bq_level_N.json
 ```
 
 关卡总量由同目录 `棋盘分组配置.csv` 的「关卡上限」控制。导入前先备份，导入后 **⌘Q 完全退出再打开**。
