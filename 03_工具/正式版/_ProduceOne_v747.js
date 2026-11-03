@@ -6,6 +6,7 @@
 const fs = require('fs'), path = require('path');
 const { spawnSync } = require('child_process');
 const B = require('./Build006Thickness_v688');
+const { check: arlCheck } = require('./ArlCheck_v792');   // 【2026-11-03】停止条件改用 13 项
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const has = k => process.argv.includes(k);
 
@@ -93,13 +94,16 @@ for (const board of boardList) {
     if (fs.existsSync(fFile)) src = fFile;
   }
   const m = measureFile(src);
-  // 主指标：at4 与 run4；late4 只作参考（实测与 at4/run4 互斥）
-  const hit = m.won && m.peak <= 4 && m.at4 >= T_AT4 && m.run4 >= T_RUN4 && m.at4 <= T_MAX_AT4;
-  // easy 档：优先“落在 12–18 窗口内且尽量靠近 15”，而不是越高越好
+  // 【2026-11-03 用户定 A 方案】停止条件 = ArlCheck 13 项全过，不再是旧的 at4/run4。
+  // 旧判据会"自认达标"：实测 at4=27 判 hitTarget=true，但 13 项只有 11/13。
+  const arl = arlCheck(src);
+  const passN = arl.rules.filter(r => r[1]).length;
+  const hit = arl.pass;
+  // best 选法：通过项数优先；同项数时再看压力（easy 档保留窗口偏好）
   const score = (TIER === 'easy')
-    ? -(Math.abs(m.at4 - 15) * 10) - (m.at4 > 18 ? (m.at4 - 18) * 20 : 0) + m.run4 * 0.2
-    : (m.at4 + m.run4 * 0.5 + m.late4 * 2);
-  console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★达目标' : ''}`);
+    ? passN * 10000 - (Math.abs(m.at4 - 15) * 10) - (m.at4 > 18 ? (m.at4 - 18) * 20 : 0) + m.run4 * 0.2
+    : passN * 10000 + (m.at4 + m.run4 * 0.5 + m.late4 * 2);
+  console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：13项 ${passN}/13 at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★13项全过' : ''}`);
   if (!bestRes || score > bestRes.score) bestRes = { src, m, score, attempt };
   if (hit) break outer;
   }
@@ -181,11 +185,15 @@ function report(o) { console.log('RESULT ' + JSON.stringify(o)); }
     if (Array.isArray(x.param)) for (const b of x.param) if (b && b.count) qn += b.count;
   }
   const px = g.blocks.flat().filter(v => v > 0).length;
-  const hit = o.completed && Math.max(0, ...p) <= 4 && at4 >= T_AT4 && run4 >= T_RUN4 && at4 <= T_MAX_AT4;   // late4 仅参考
+  // 【2026-11-03 A 方案】最终判定同样以 13 项为准
+  const arlF = arlCheck(finalSrc);
+  const passN = arlF.rules.filter(r => r[1]).length;
+  const hit = arlF.pass;
 
   report({
     target: TARGET, stage: 'done', ok: true, file: src,
     at4, run4, late4, peak: Math.max(0, ...p), steps: p.length, won: !!o.completed,
+    rules13: passN, rules13Pass: arlF.pass, rules13Fail: arlF.rules.filter(r => !r[1]).map(r => r[0]),
     firstQuad, firstPx, firstRatio, hitTarget: hit, attempt: bestRes.attempt,
     capacityOK: cap + qn === px, cap: cap + qn, px,
     seconds: Math.round((Date.now() - t0) / 1000),
