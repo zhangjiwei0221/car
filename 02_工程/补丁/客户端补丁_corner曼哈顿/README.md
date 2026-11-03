@@ -2,18 +2,16 @@
 
 > 对象：`~/Desktop/游戏版本/ParkPassenger_corner/ParkPassenger.app/Contents/MacOS/ParkPassenger`
 > 目标文档：`01_项目文档/需求_消除逻辑_小车选像素小人_corner.md`
-> 执行日期：2026-11-03　｜　改前 sha256 `8af9a0e1…a4ad0` → 改后 `ae799229…56524`
+> 执行日期：2026-11-03　｜　改前 sha256 `8af9a0e1…a4ad0` → 改后 `4c844ac5…44054`（**只含排序键**；逐格重算那版崩了，见 §9）
 
 ## 1. 结论先说
 
 corner 包原来（2026-10-30）的取用顺序不是曼哈顿，是**欧氏距离**：分数 `(r·A)² + (c·A)²`。
-本补丁改两处：
+本补丁实际只保留**一处**（逐格重算那版已因闪退回退，见 §9）：
 
 1. **排序键** → `r + c`（内部坐标，行 0 = 底行），平手规则（行升序 = 屏幕下方优先、列升序 = 左侧优先）
    原比较器自带、不动。改后与文档 10×10 验收用例**逐格一致（0/100 不符）**。
-2. **逐格重算** → 原来一次调用把一批挑完（可达图只建一次）；改成"一次只挑 1 个 → 立刻置为已消
-   （state=2）→ 再挑下一个"，最多挑 limit 个。效果就是你要的：**先被选中的 A 小人会把它挡着的
-   A 邻居解锁，只要那个邻居 D 最短，就在同一批里被选走**。
+2. ~~**逐格重算**~~ → 试过，闪退，已回退（见 §9）。现在仍是"一次把一批挑完"。
 
 **候选集合（阻挡关系）一个字没动**：`_findMatchedBlocks` 仍然只把"能通到边缘"的同色格
 算作候选（`_canBlockReachExit`），被挡住的小人不会被取。
@@ -146,3 +144,36 @@ cp -p ~/Desktop/游戏版本/ParkPassenger_corner.bak_20261030/ParkPassenger.app
 
 （`…bak_20261103b` = 「曼哈顿 + 旧的一批取完」版，`4c844ac5…`；现役是 `ae799229…`。
 那次被否决的"全图候选"实验版只在 `/tmp`，没有留档、也不该再装。）
+
+## 9. 试过、闪退的改动：逐格重算（2026-11-03 14:05）
+
+**目标**：同一批里"先选中的人把被它挡住的同色邻居解锁"，即文档 §一.2。
+
+**做法**：在 `tryReceiveTargetElements` 调用 `_findMatchedBlocks` 处挂钩，跳到代码洞里的循环：
+每次只挑 1 个 → 立刻 `setElementState(ptr, 2)` → 再挑，最多 limit 个。
+
+**结果**：进关卡、车开始接人时 **SIGSEGV 闪退**（两份 .ips：14:05:05 / 14:05:15）。
+崩溃报告给出的关键信息：
+
+```
+EXC_BAD_ACCESS (SIGSEGV), KERN_INVALID_ADDRESS at 0x41a0000000000028
+thread 0 栈（由内到外）：
+  0  0x10ec75c68（无符号）
+  1  ParkPassenger  +0xe8ef8d      ← 我们循环里的 inc %r12d（setElementState 的返回点）
+  2  ParkPassengerBoard::tryReceiveTargetElements
+  3  ...
+  4  HoldingAreaBoard::onTargetElementReady()
+  5  ParkPassengerBoard::onTargetElementsMoveEnd()
+  6  TargetBoard::tryReceiveTargetElements::$_1::operator()(int)   ← 动画结束回调
+寄存器：rax = 0x41a0000000000028，r13 = 0x28（= limit 40），rsi = 2
+```
+
+即：**上一辆车的动画结束回调里又调起了下一辆车的取人**（正常流程），在这次重入里我们标记
+"已消"之后，取到的对象指针是坏的，`setElementState` 一解引用就崩。
+
+**判断**：问题不在排序，在"提前把对象置成已消"这个手法——它和动画回调的重入撞上了。
+要么改成不碰对象状态的做法（例如给 `_findMatchedBlocks` 传一份"本批已选"的掩码，
+让它把已选的同色格当作可通行），要么在重入处加保护。前者要改函数签名/内部逻辑，后者要加锁。
+
+**现状**：已回退到 `4c844ac5…`（曼哈顿 + 阻挡 + 一批取完），可正常游玩。
+`make_corner_manhattan.py` 里的这段补丁**暂时用 `--per-pick` 开关关掉了**，别误开。

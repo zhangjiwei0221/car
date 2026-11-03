@@ -145,11 +145,14 @@ def va_to_off(segs, va):
 
 
 def main():
-    if len(sys.argv) != 4 or sys.argv[2] != "-o":
+    args = [a for a in sys.argv[1:] if a != "--per-pick"]
+    per_pick = "--per-pick" in sys.argv
+    if len(args) != 3 or args[1] != "-o":
         print(__doc__)
-        print("用法: python3 make_corner_manhattan.py <输入可执行> -o <输出可执行>")
+        print("用法: python3 make_corner_manhattan.py <输入可执行> -o <输出可执行> [--per-pick]")
+        print("      --per-pick：逐格重算那版（**2026-11-03 试过会闪退，默认关闭，别开**）")
         return 2
-    src, dst = sys.argv[1], sys.argv[3]
+    src, dst = args[0], args[2]
     data = bytearray(open(src, "rb").read())
     segs, uuid_off = parse_segments(bytes(data))
     CAVE_VA_OFF = va_to_off(segs, CAVE_VA)
@@ -170,7 +173,10 @@ def main():
         raise SystemExit("打分函数既不是原版也不是补丁版，拒绝改（版本漂移？）")
 
     # 3) 逐格重算（一次只挑 1 个，选完立刻标记已消，再挑下一个）
-    if bytes(data[CAVE_VA_OFF:CAVE_VA_OFF + 6]) == STUB_SIG:
+    #    ⚠ 2026-11-03 试过：进关卡后车接人时 SIGSEGV 闪退（见 README §9），默认关闭
+    if not per_pick:
+        print("· 逐格重算：默认跳过（该版会闪退，需显式 --per-pick 才装）")
+    elif bytes(data[CAVE_VA_OFF:CAVE_VA_OFF + 6]) == STUB_SIG:
         print("· 逐格重算已是补丁版，跳过")
     else:
         cur = bytes(data[CAVE_VA_OFF:CAVE_VA_OFF + len(OLD_STUB)])
