@@ -319,19 +319,18 @@ if (buryColors.length > 0) {
   // 边框上只放一部分大车（比例可调）：全放 → 太脆（实测容错掉到 30%）
   const BIG_RATIO = Number(arg('--edge-big-ratio', '0.6'));
   const edgeBigN = Math.max(0, Math.min(edge.length, Math.round(edge.length * BIG_RATIO)));
-  const bigCars = sorted.slice(0, edgeBigN);
-  // 剩余格子从「最容易吃满」的开始填：否则边框全是大车 → 开局必死（实测不可通关）
-  // 保持降序（次大的在前）：边框应当整体偏大，小车留给内部。
-  // 之前按升序会让「边缘两列全是 10 左右的小车」（用户：全是免费的）
-  const restCars = sorted.slice(edgeBigN);
+  // 【2026-11-03 修】原来的 bigCars/restCars 是连续切两段，拼起来永远是 sorted 的前 24 个
+  // → --edge-big-ratio 设 0.3 还是 0.9，边框完全一样（参数从没生效过）。
+  // 正确：边框 = 最大的 N 个 + 最小的 (24-N) 个；中间那批放内部。
+  const edgeSmallN = Math.max(0, edge.length - edgeBigN);
+  const edgeCars = sorted.slice(0, edgeBigN)
+    .concat(edgeSmallN > 0 ? sorted.slice(sorted.length - edgeSmallN) : []);
+  const innerCars = sorted.slice(edgeBigN, sorted.length - edgeSmallN);
+  if (process.env.EDGE_DEBUG) console.error('[edge] cars='+boxes.length+' edge='+edge.length+' 边框大'+edgeBigN+' 边框小'+edgeSmallN+' 内部'+innerCars.length);
   placed = new Array(rows * cols).fill(null);
   let idx = 0;
-  for (const [sr, sc] of edge.slice(0, edgeBigN)) { if (bigCars[idx]) placed[sr * cols + sc] = bigCars[idx]; idx++; }
-  for (const [sr, sc] of edge.slice(edgeBigN).concat(inner2)) {
-    const b = restCars[idx - edgeBigN];       // 不循环取：重复取同一辆车会重复计算容量（实测 1438 vs 1225）
-    if (b) placed[sr * cols + sc] = b;
-    idx++;
-  }
+  for (const [sr, sc] of edge) { const b = edgeCars[idx]; if (b) placed[sr * cols + sc] = b; idx++; }
+  for (const [sr, sc] of inner2) { const b = innerCars[idx - edge.length]; if (b) placed[sr * cols + sc] = b; idx++; }
 } else {
   placed = boxes;
 }
