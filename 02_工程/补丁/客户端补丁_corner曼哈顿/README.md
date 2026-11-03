@@ -2,13 +2,18 @@
 
 > 对象：`~/Desktop/游戏版本/ParkPassenger_corner/ParkPassenger.app/Contents/MacOS/ParkPassenger`
 > 目标文档：`01_项目文档/需求_消除逻辑_小车选像素小人_corner.md`
-> 执行日期：2026-11-03　｜　改前 sha256 `8af9a0e1…a4ad0` → 改后 `4c844ac5…44054`
+> 执行日期：2026-11-03　｜　改前 sha256 `8af9a0e1…a4ad0` → 改后 `ae799229…56524`
 
 ## 1. 结论先说
 
 corner 包原来（2026-10-30）的取用顺序不是曼哈顿，是**欧氏距离**：分数 `(r·A)² + (c·A)²`。
-本补丁只改打分函数 → `r + c`（内部坐标，行 0 = 底行），平手规则（行升序 = 屏幕下方优先、
-列升序 = 左侧优先）原比较器自带、不动。改后与文档 10×10 验收用例**逐格一致（0/100 不符）**。
+本补丁改两处：
+
+1. **排序键** → `r + c`（内部坐标，行 0 = 底行），平手规则（行升序 = 屏幕下方优先、列升序 = 左侧优先）
+   原比较器自带、不动。改后与文档 10×10 验收用例**逐格一致（0/100 不符）**。
+2. **逐格重算** → 原来一次调用把一批挑完（可达图只建一次）；改成"一次只挑 1 个 → 立刻置为已消
+   （state=2）→ 再挑下一个"，最多挑 limit 个。效果就是你要的：**先被选中的 A 小人会把它挡着的
+   A 邻居解锁，只要那个邻居 D 最短，就在同一批里被选走**。
 
 **候选集合（阻挡关系）一个字没动**：`_findMatchedBlocks` 仍然只把"能通到边缘"的同色格
 算作候选（`_canBlockReachExit`），被挡住的小人不会被取。
@@ -31,7 +36,7 @@ std::partial_sort(..., lambda$_0 / lambda$_1)
 
 `_getCandidateScore` 只有这 2 个调用点（都在上面的比较器里），没有别的用法。
 
-## 3. 改法（一处，234 字节）
+## 3. 改法（两处 + 代码洞）
 
 函数体（`0x1003f19c0`–`0x1003f1aa9`）整体换成：
 
@@ -44,6 +49,23 @@ c3           ret
 
 同时**重换 `LC_UUID`**：Rosetta 按 UUID 复用翻译缓存，不换可能还跑旧代码。
 （上一版 corner 包没换 UUID，与原始包 UUID 完全相同。）
+
+**② 逐格重算**：把 `tryReceiveTargetElements` 里调用 `_findMatchedBlocks` 那一行
+（`0x1003eeed3` 的 `lea -0xb8(%rbp),%rdi`）换成跳板，跳到 `__TEXT` 里一段全零区
+（`0x100e8ef15`，前面是上一版留下的死桩）：
+
+```
+loop:  if (taken >= limit) goto done;
+       findMatchedBlocks(out, this, X, Y, color, /*limit=*/1, bool);
+       if (out.end == 上次的 out.end) goto done;   // 没挑到新的
+       setElementState(*(out.end-16), 2);          // 选中即视为已消 → 下一轮可达图会把它当通路
+       taken++; goto loop;
+done:  jmp 回原流程
+```
+
+因为 `_isOpenPathCell` 把 `state==2` 当作"可通行"，所以标记之后下一轮 `_buildExitPathMap`
+就会把它的邻居解锁 —— 这正是文档 §一.2 那句"被解锁的格子会立即参与下一次比较"。
+每轮只挑 1 个，所以 `min(limit, 可达数)` 与"逐格重算"完全一致。
 
 改前那两处「把 X 强制成 0」（`0x1003f1b20` / `0x1003f1b41`）**保留不动**：X 已被完全忽略。
 
@@ -82,8 +104,8 @@ cp /tmp/ParkPassenger_corner_manhattan \
 `selftest_score.c` 把补丁后的 7 字节 mmap 成可执行页、用 121 组 `(r,c)` × 2 种 `(X,Y)` 真跑：
 **242 次调用 0 次不符**（X/Y 故意传互相矛盾的垃圾值，验证起点确实不随槽位变化）。
 
-二进制层面：与改前 corner 包的差异只有 **2 段共 250 字节** —— `LC_UUID`(16B) + 打分函数(234B)；
-长度不变、无新增段。启动冒烟正常。
+二进制层面：与改前 corner 包的差异是 **7 段共 387 字节** —— `LC_UUID`(16B) + 跳板(5B) +
+打分函数(234B) + 代码洞里的循环(约 132B)；长度不变、无新增段。启动冒烟正常（46% CPU / 658MB RSS）。
 
 ## 6. 试过、被用户否决的改动（别再试）
 
@@ -95,16 +117,24 @@ cp /tmp/ParkPassenger_corner_manhattan \
 教训：验收表里的 `-` 只说明"容量不够"，不代表"没有阻挡"——
 那张 10×10 图上，内部格（r8c1 等）正好在前一个格子被取走后露出来，所以**带阻挡的规则同样能复现全表**。
 
-## 7. 还差的一条（未做，需要真机确认）
+## 7. 逐格重算的验证边界
 
-文档 §一.2 要求"每确定一个，立刻视为已消除、重算可选集合，被解锁的格子马上参与下一次比较"。
-客户端是"一次算出 N 个候选再一起播动画"：可达图在 `_findMatchedBlocks` 里只建一次。
-若一辆车一次取多个，则"被自己的第一个小人让出来的格子"要等下一辆车。
-这条要不要改、怎么改，取决于真机上一辆车到底是一次取一批还是一个一个取 —— **待确认**。
+这条**没有单元测试**：它依赖游戏对象（`TargetBlockElement` 的虚表、棋盘向量），
+脱离游戏跑不起来。目前只做了：
+- 反汇编逐条核对跳板/循环/返回地址（见 §3 的伪代码）；
+- 与原包的差异段、长度校验；
+- 启动冒烟（进程正常起来、不掉）。
+
+**真机验证只能靠玩**：选一个颜色，车一次能吃 N 个时，看"刚被吃掉的那个所挡住的同色邻居"
+会不会在同一批里跟着走。会 → 对；不会 → 退回 §8 的第三行。
 
 ## 8. 回退
 
 ```bash
+# 回到「曼哈顿 + 保留旧的一批取完」（上一版，无逐格重算）
+cp -p ~/Desktop/游戏版本/ParkPassenger_corner.bak_20261103b/ParkPassenger.app/Contents/MacOS/ParkPassenger \
+      ~/Desktop/游戏版本/ParkPassenger_corner/ParkPassenger.app/Contents/MacOS/ParkPassenger
+
 # 回到 2026-10-30 的欧氏版（什么都没改）
 cp -p ~/Desktop/游戏版本/ParkPassenger_corner.bak_20261103/ParkPassenger.app/Contents/MacOS/ParkPassenger \
       ~/Desktop/游戏版本/ParkPassenger_corner/ParkPassenger.app/Contents/MacOS/ParkPassenger
@@ -114,5 +144,5 @@ cp -p ~/Desktop/游戏版本/ParkPassenger_corner.bak_20261030/ParkPassenger.app
       ~/Desktop/游戏版本/ParkPassenger_corner/ParkPassenger.app/Contents/MacOS/ParkPassenger
 ```
 
-（`…bak_20261103b` = 现在这一版「曼哈顿 + 保留阻挡」的完整副本，与现役二进制逐字节相同，
-`4c844ac5…`；那次被否决的"全图候选"实验版只留在 `/tmp`，没有再装回去。）
+（`…bak_20261103b` = 「曼哈顿 + 旧的一批取完」版，`4c844ac5…`；现役是 `ae799229…`。
+那次被否决的"全图候选"实验版只在 `/tmp`，没有留档、也不该再装。）
