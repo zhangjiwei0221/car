@@ -98,7 +98,7 @@ for (const [key, n] of base.fillableCount) {
 cands.sort((a, b) => b.n - a.n);
 const want = Math.max(1, Math.round(cands.length * RATIO));
 const pick = cands.slice(0, want);
-for (const p of pick) g.spools[p.r][p.c].q = true;
+for (const p of pick) { const s = g.spools[p.r][p.c]; s.q = true; const t = Array.isArray(s.type) ? s.type.slice() : (s.type ? [s.type] : []); if (!t.includes(6)) t.push(6); s.type = t; }
 
 const after = analyze(g);
 fs.writeFileSync(OUT, JSON.stringify(g));
