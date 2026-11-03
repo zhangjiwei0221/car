@@ -42,6 +42,33 @@ function check(f) {
   let tailRun = 0, c = 0;
   for (const v of buf.slice(tN)) { if (v >= 3) { c++; tailRun = Math.max(tailRun, c); } else c = 0; }
   const peak = Math.max(0, ...buf);
+
+  // 【2026-11-03 用户定】目标感：不能四个象限同时挖（中期主体会碎）。
+  // 象限进度并行度 = 每一步有多少个象限处于「进行中」(2%<进度<98%)，取平均。理想→1。
+  let quadAvg = 0, quadSteps = 0;
+  {
+    const H2 = g.blocks.length, W2 = g.blocks[0].length;
+    const quadOf = (y, x) => (y >= H2 / 2 ? '下' : '上') + (x < W2 / 2 ? '左' : '右');
+    const totQ = {};
+    for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const v = g.blocks[y][x]; if (v > 0) { const q = quadOf(y, x); totQ[q] = (totQ[q] || 0) + 1; } }
+    const col2 = g.blocks.map(r => r.slice()), gone2 = g.blocks.map(r => r.map(() => false));
+    const reach2 = (y, x) => y === 0 || x === 0 || y === H2 - 1 || x === W2 - 1 ||
+      gone2[y - 1][x] || gone2[y + 1][x] || gone2[y][x - 1] || gone2[y][x + 1];
+    const doneQ = {}; Object.keys(totQ).forEach(q => doneQ[q] = 0);
+    let sum = 0, n = 0;
+    for (const p of (o.pickOrder || [])) {
+      if (p.chainIndex !== 0) continue;
+      const c0 = p.color, list2 = [];
+      for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { if (gone2[y][x] || col2[y][x] !== c0 || !reach2(y, x)) continue; list2.push([(H2 - 1 - y) + x, y, x]); }
+      list2.sort((a, b) => a[0] - b[0]);
+      let k2 = 0;
+      for (const [, y, x] of list2) { if (k2 >= p.count) break; gone2[y][x] = true; doneQ[quadOf(y, x)]++; k2++; }
+      let inflight = 0;
+      for (const q of Object.keys(totQ)) { const r = doneQ[q] / (totQ[q] || 1); if (r > 0.02 && r < 0.98) inflight++; }
+      sum += inflight; n++;
+    }
+    quadAvg = n ? sum / n : 0; quadSteps = n;
+  }
   // 【2026-11-03 用户指出】开局"13 步全是免费车"——前段占比检查抓不到，必须单独量最长连续空转。
   let freeRun = 0, _fr = 0;
   for (const v of buf) { if (v === 0) { _fr++; freeRun = Math.max(freeRun, _fr); } else _fr = 0; }
@@ -129,14 +156,18 @@ function check(f) {
     // 【2026-11-03 用户定】压力改用「20 种打法的中位数」——玩家不是全知
     ['最长连续免费≤5', freeRun <= 5, freeRun + ' 步'],
     // 【2026-11-03 用户定】50% → 45%：40×40 的图实测上限 46%，50% 只能靠 35×35 的图达到
-    ['玩家中段 at3≥45%', pMidRatio >= 0.45, pMid3 + ' 步（占比 ' + Math.round(pMidRatio * 100) + '%）'],
+    // 【体验优先】中段是区间不是越高越好：太低没紧张感，太高会一直绷着（006 的 95% 就属于过火）
+    ['玩家中段 45–80%', pMidRatio >= 0.45 && pMidRatio <= 0.80, pMid3 + ' 步（占比 ' + Math.round(pMidRatio * 100) + '%）'],
     ['中段最长低压≤5', lowRun <= 5, lowRun + ' 步（buf≤1 连续）'],
+    // 【目标感】其他象限可以动，但不能四个一起挖到一半（用户：只要主体不乱）
+    // 【2026-11-03 用户 mentor】『主体不会很散、知道自己要消除哪个』是首要，难度不是关键
+    ['象限并行度≤3.6', quadAvg <= 3.6, quadAvg.toFixed(2) + '（' + quadSteps + ' 步）'],
     ['玩家后20% at3≥2', pTail3 >= 2, pTail3 + ' 步'],
     ['玩家后20% 连续≥2', pTailRun >= 2, pTailRun],
     // 【2026-11-03 用户选 B】允许玩家死：峰值=4 只约束最优路线，玩家视角放宽到 5。
     ['玩家峰值≤5', pPeak <= 5, pPeak + '（最优路线仍须=4）'],
     // 容错改成区间：100% = 太松（随便玩都能过），<40% = 太脆
-    ['容错 40–70%', tol >= 8 && tol <= 14, tol + '/20'],
+    ['容错 55–75%', tol >= 11 && tol <= 15, tol + '/20'],
     // 参考项（不判定）：全知最优路线的数据，用来对比"理想 vs 真实"
     ['（参考）全知 中段', true, mid3 + '/' + (tN - eN), true],
     ['（参考）全知 at4', true, a4, true],
