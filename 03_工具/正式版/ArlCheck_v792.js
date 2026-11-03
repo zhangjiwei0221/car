@@ -24,7 +24,11 @@ function check(f) {
   const g = B.readJson(f);
   const lv = A.parseLevel(A.fromGameFormat(g));
   const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
-  const buf = (o.pressureSamples || []).map(s => s.buf || 0);
+  // 【2026-11-03 用户定口径】压力 = 每次选择「结算后」的暂存占用（stepBufferHistory），
+  // 不是「每完成一辆车」的样本（pressureSamples）。区别：一次取 3 辆（链）只算 1 步。
+  const buf = (Array.isArray(o.stepBufferHistory) && o.stepBufferHistory.length)
+    ? o.stepBufferHistory.slice()
+    : (o.pressureSamples || []).map(s => s.buf || 0);
   const L = buf.length;
   // 【2026-11-03 用户放宽】前段门槛 20% → 10%，且允许前段 at4 ≤ 1。
   // 理由：不必死磕"开局绝对不碰 4"，只要整体有难度、逼玩家思考即可。

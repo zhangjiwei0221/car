@@ -38,6 +38,9 @@ const GUIDE_STEPS = Number(arg('--guide-steps', 0));  // 前 K 步只允许引�
 const NO_EARLY = Number(arg('--no-early', 0));
 // 【2026-11-02】--no-chain：不许构建器自己加链。链只能由"处方"（ObstacleRx）按症状开。
 const NO_CHAIN = argv.includes('--no-chain');
+// 【2026-11-03】链必须锁「一次吃不完」的车：组总容量 >= 该色开局可达像素 × 该系数。
+// 否则锁链无效——取一端整组进场，全都能吃满就立刻消掉，只是"爽快清场"，不是压力。
+const CHAIN_MIN_RATIO = Number(arg('--chain-min-ratio', '1.1'));
 const W_RUN4 = Number(arg('--w-run4', 5));   // 奖励最长连续 >=4 的步数（默认 5）
 const OBJ = String(arg('--obj', 'low'));   // low=原目标(减少低压段) | at4=最大化 at4   // 目标里奖励最长连续 >=4
 const MODE = String(arg('--mode', 'b')).toLowerCase();   // b=瞬时连锁（默认） / a=四边入口        // 前 K 步不许到 buffer>=4（避免前期卡点）
@@ -223,6 +226,25 @@ function applyMove(g, mv) {
   }
   return null;
 }
+// 开局可达 = 边框一圈上该色的像素数（corner 开局能看到的量）
+function edgeCountOf(blocks, color) {
+  if (!blocks || !blocks.length) return 0;
+  const H = blocks.length, W = blocks[0].length;
+  let n = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (y === 0 || x === 0 || y === H - 1 || x === W - 1) if (blocks[y][x] === color) n++;
+  }
+  return n;
+}
+// 这组链是否值得锁：合计容量够大，整组一次吃不掉
+function chainWorthLocking(base, cells) {
+  const color = base.spools[cells[0][0]][cells[0][1]].id;
+  const total = cells.reduce((sum, [r, c]) => sum + (base.spools[r][c].count || 0), 0);
+  const edge = edgeCountOf(base.blocks, color);
+  if (edge <= 0) return true;                       // 开局看不到该色，无法判断，放行
+  return total >= edge * CHAIN_MIN_RATIO;
+}
+
 function candidateMoves(g) {
   const moves = [];
   const plain = [];
@@ -282,6 +304,7 @@ function candidateMoves(g) {
     if (r > nr || (r === nr && c > nc)) continue;
     if (LOCK_SUBJECT && !sameQuad(g.spools[r][c], g.spools[nr][nc])) continue;
     if (prot(g.spools[r][c]) || prot(g.spools[nr][nc])) continue;
+    if (!chainWorthLocking(g, [[r, c], [nr, nc]])) continue;   // 同上：能吃光的锁无效
     moves.push({ type: 'chain', cells: [[r, c], [nr, nc]], tag: moves.length });
   }
   // 三连（合法：2–3 格正交相邻），用来做更硬的组债务
@@ -290,6 +313,7 @@ function candidateMoves(g) {
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
     if (trio.some(([y, x]) => prot(base.spools[y][x]))) continue;
+    if (!chainWorthLocking(base, trio)) continue;   // 一次能吃光的组，锁了也没用
     moves.push({ type: 'chain', cells: trio });
   }
   for (let r = 0; r + 2 < (NO_CHAIN ? 0 : R); r++) for (let c = 0; c < C; c++) {
@@ -297,6 +321,7 @@ function candidateMoves(g) {
     if (!trio.every(([y, x]) => isPlain(base.spools[y][x]))) continue;
     if (LOCK_SUBJECT && new Set(trio.map(([y, x]) => quadOfId(base.spools[y][x].id))).size !== 1) continue;
     if (trio.some(([y, x]) => prot(base.spools[y][x]))) continue;
+    if (!chainWorthLocking(base, trio)) continue;   // 一次能吃光的组，锁了也没用
     moves.push({ type: 'chain', cells: trio });
   }
   // 加冰（少量）
