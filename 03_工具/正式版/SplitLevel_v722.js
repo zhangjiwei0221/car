@@ -305,13 +305,17 @@ if (buryColors.length > 0) {
     if (y === 0 || x === 0 || y === R - 1 || x === C - 1) reach[g[y][x]] = (reach[g[y][x]] || 0) + 1;
   }
   const ratio = b => (b.count || 1) / Math.max(1, reach[b.color] || 1);
-  const sorted = boxes.slice().sort((a, b) => ratio(b) - ratio(a));   // 最「吃不满」的排前面
+  // 按「容量本身」降序：大车放边框、小车进内部。
+  // 用 ratio 排序是错的——79 的车对白色(可达76) ratio 只有 1.04，反而被排到内部（用户看到边缘全是小车）
+  const sorted = boxes.slice().sort((a, b) => (b.count || 0) - (a.count || 0));
   // 边框上只放一部分大车（比例可调）：全放 → 太脆（实测容错掉到 30%）
   const BIG_RATIO = Number(arg('--edge-big-ratio', '0.6'));
   const edgeBigN = Math.max(0, Math.min(edge.length, Math.round(edge.length * BIG_RATIO)));
   const bigCars = sorted.slice(0, edgeBigN);
   // 剩余格子从「最容易吃满」的开始填：否则边框全是大车 → 开局必死（实测不可通关）
-  const restCars = sorted.slice(edgeBigN).sort((a, b) => ratio(a) - ratio(b));
+  // 保持降序（次大的在前）：边框应当整体偏大，小车留给内部。
+  // 之前按升序会让「边缘两列全是 10 左右的小车」（用户：全是免费的）
+  const restCars = sorted.slice(edgeBigN);
   placed = new Array(rows * cols).fill(null);
   let idx = 0;
   for (const [sr, sc] of edge.slice(0, edgeBigN)) { if (bigCars[idx]) placed[sr * cols + sc] = bigCars[idx]; idx++; }
