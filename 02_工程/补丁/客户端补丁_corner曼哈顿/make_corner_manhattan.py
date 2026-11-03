@@ -10,16 +10,16 @@ make_corner_manhattan.py —— 把 ParkPassenger_corner 的目标像素取用�
 - 次序 = D 升序，D = |r_disp-(R-1)| + c；同 D 时行号降序、列号升序；
 - 取前 N 个（N = 这辆车这一次能吃几个），容量截断。
 
-本脚本打两处补丁
+本脚本打一处补丁
 ----------------
 1) 次序：`TargetBoard::_getCandidateScore`（0x1003f19c0，234 字节函数体）改成返回 r+c。
    客户端内部行 0 = 底行（`_parseBoardConfig` 里 `rows-1-i_json`），故 r_int+c 就是文档的 D；
    平手"行升序→列升序"由原比较器 `_isCandidateHigherPriority` 自带，不用改。
    改前那版 corner 包只把参数 X 归零，公式退化成 A²(r²+c²)（欧氏），不是曼哈顿。
 
-2) 候选集合：`TargetBoard::tryReceiveTargetElements` 里传给 `_findMatchedBlocks` 的
-   `bool` 钉成 1（全图同色格）。传 0 时那条分支只收"能通到任一边缘"的格子，
-   会多出"够不着所以没消"这种文档里没有的状态。
+注意：候选集合**不要动**。2026-11-03 试过把 `tryReceiveTargetElements` 传给
+`_findMatchedBlocks` 的 bool 钉成 1（全图同色格、不管阻挡），用户当场否决：
+「怎么小人的逻辑忽略了阻挡关系」。已全部回退，本脚本不再包含那一处。
 
 另：重换 LC_UUID（Rosetta 按 UUID 复用翻译缓存，不换可能还跑旧代码）。
 文件长度不变、无新增段。
@@ -39,10 +39,6 @@ SCORE_ORIG_PREFIX = bytes.fromhex(
 )
 SCORE_BODY = bytes.fromhex("8d0416" "4863c0" "c3")   # lea eax,[rsi+rdx]; movsxd rax,eax; ret
 
-# ---- 补丁 2：候选集合 -----------------------------------------------------
-# 原: movzbl -0x99(%rbp),%edi ; andl $1,%edi
-BOOL_ORIG = bytes.fromhex("0fb6bd67ffffff83e701")
-BOOL_NEW = bytes.fromhex("bf01000000" "9090909090")  # mov $1,%edi ; 5×nop（与原 10 字节等长）
 
 
 def parse_segments(data):
@@ -93,24 +89,7 @@ def main():
     else:
         raise SystemExit("打分函数既不是原版也不是补丁版，拒绝改（版本漂移？）")
 
-    # 2) 候选集合
-    hits = []
-    i = data.find(BOOL_ORIG)
-    while i >= 0:
-        hits.append(i)
-        i = data.find(BOOL_ORIG, i + 1)
-    if len(hits) == 1:
-        off2 = hits[0]
-        assert len(BOOL_NEW) == len(BOOL_ORIG)
-        data[off2: off2 + len(BOOL_ORIG)] = BOOL_NEW
-        changed.append(("候选集合 bool→1", off2, len(BOOL_ORIG),
-                        BOOL_ORIG.hex(), BOOL_NEW.hex()))
-    elif len(hits) == 0 and data.count(BOOL_NEW) == 1:
-        print("· 候选集合已是全图版，跳过")
-    else:
-        raise SystemExit("候选集合法调用点命中 %d 处，拒绝改" % len(hits))
-
-    # 3) LC_UUID
+    # 2) LC_UUID
     if uuid_off is not None:
         newuuid = uuid.uuid5(uuid.NAMESPACE_URL,
                              "corner-manhattan:" + hashlib.sha256(bytes(data)).hexdigest())
