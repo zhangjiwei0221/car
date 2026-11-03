@@ -134,11 +134,12 @@ function splitAll(targetSize) {
         .sort((a, b) => (edgeReach[a] || 0) - (edgeReach[b] || 0));
       const _trapN = Math.max(1, Math.round(_sortedCols.length * TRAP_RATIO));
       const _rank = _sortedCols.indexOf(String(col));
-      const isTrap = (pool.length >= 40) && _rank >= 0 && _rank < _trapN;
+      const isTrap = (pool.length >= Math.max(40, targetSize * 2)) && _rank >= 0 && _rank < _trapN;
       if (isTrap) {
         const _reach = edgeReach[col] || 0;
         const _capBig = _reach > 0 ? Math.round(_reach * 1.3) : Math.round(pool.length * 0.55);
-        const bigN = Math.max(targetSize, Math.min(Math.round(pool.length * 0.55), _capBig));
+        // 必须小于该色像素数，否则超切 → 像素丢失（实测色24 只有6像素却要切25）
+        const bigN = Math.min(pool.length - 4, Math.max(targetSize, Math.min(Math.round(pool.length * 0.55), _capBig)));
         const restN = pool.length - bigN;
         const k = Math.max(2, Math.round(restN / targetSize));
         const counts2 = [bigN];
@@ -171,7 +172,9 @@ function splitAll(targetSize) {
       // 这样前几辆车会大于"开局可达量"，注定吃不满 → 才有开局压力。
       const CAP_HI = Math.min(Number(arg('--cap-high', '120')),
         Math.max(60, Math.round(pool.length * 0.6)));
-      const counts = w.map(x => Math.min(CAP_HI, Math.max(CAP_LO, Math.round(pool.length * x / ws))));
+      // 下限不能超过该色像素数：色24 只有 6 像素，CAP_LO=8 会把容量切多（实测 1219 vs 1225）
+      const LO = Math.min(CAP_LO, pool.length);
+      const counts = w.map(x => Math.min(CAP_HI, Math.max(LO, Math.round(pool.length * x / ws))));
       let diff = pool.length - counts.reduce((a, b) => a + b, 0);
       let guard2 = 0;
       while (diff !== 0 && guard2++ < 5000) {
@@ -179,7 +182,7 @@ function splitAll(targetSize) {
         if (diff > 0) {
           for (let i = 0; i < counts.length && diff > 0; i++) if (counts[i] < CAP_HI) { counts[i]++; diff--; moved = true; }
         } else {
-          for (let i = counts.length - 1; i >= 0 && diff < 0; i--) if (counts[i] > CAP_LO) { counts[i]--; diff++; moved = true; }
+          for (let i = counts.length - 1; i >= 0 && diff < 0; i--) if (counts[i] > LO) { counts[i]--; diff++; moved = true; }
         }
         if (!moved) break;
       }
@@ -227,11 +230,16 @@ while (boxes.length < rows * cols && targetSize > boxMin && guard++ < 400) {
   boxes = splitAll(targetSize);
 }
 // 若仍超出，只能同色合并（绝不跨色）
-boxes.sort((a, b) => a.count - b.count);
 while (boxes.length > rows * cols) {
-  const small = boxes.shift();
+  boxes.sort((a, b) => a.count - b.count);
+  // 不能直接 shift 最小车：它可能独苗（如露营的色24 只有 1 辆）→ 无法合并 → break → 整车丢失
+  let pick = -1;
+  for (let i = 0; i < boxes.length; i++) {
+    if (boxes.some((b, j) => j !== i && b.color === boxes[i].color)) { pick = i; break; }
+  }
+  if (pick < 0) break;
+  const small = boxes.splice(pick, 1)[0];
   const sameIdx = boxes.findIndex(b => b.color === small.color);
-  if (sameIdx < 0) { boxes.push(small); break; }
   boxes[sameIdx].count += small.count;
   boxes[sameIdx].cells = boxes[sameIdx].cells.concat(small.cells);
 }
