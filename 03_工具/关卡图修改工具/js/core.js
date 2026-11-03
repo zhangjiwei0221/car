@@ -1328,19 +1328,24 @@
     opts = opts || {};
     var a = Math.max(0, opts.colorA | 0) || 14;
     var b = Math.max(0, opts.colorB | 0) || a;
+    var aux = Math.max(0, opts.colorC | 0) || b;
     var pattern = opts.pattern || 'diagonal';
     var out = composeNewCanvas(rows, cols);
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
       var v = a;
       if (pattern === 'checker') v = ((r + c) % 2 === 0) ? a : b;
       else if (pattern === 'dots') v = ((r % 5 === 0 && c % 5 === 0) || ((r + 2) % 7 === 0 && (c + 3) % 7 === 0)) ? b : a;
-      // 2026-11-02 用户要求：条纹用两个主色交替穿插。
-      // 改前 (r+c) 是斜向 3 格带，与「斜纹」区分不开；改成竖向 2 格带，两色交替。
-      else if (pattern === 'stripes') v = (Math.floor(c / 2) % 2 === 0) ? a : b;
-      else if (pattern === 'diagonal') v = ((r + c) % 6 < 2) ? b : a;
+      // 条纹保持原样：斜向 3 格带，主色 / 辅色交替（2026-11-02 的竖向改动已撤回）
+      else if (pattern === 'stripes') v = (Math.floor((r + c) / 3) % 2 === 0) ? a : b;
+      // 斜纹（2026-11-03 用户要求）：两个主色宽斜带 + 一个辅色细线。
+      // 周期 10：2 格辅色细线 → 4 格主色1 → 4 格主色2。
+      else if (pattern === 'diagonal') {
+        var k = (r + c) % 10;
+        v = (k < 2) ? aux : (k < 6 ? a : b);
+      }
       out[r][c] = v;
     }
-    return { blocks: out, colorA: a, colorB: b, pattern: pattern };
+    return { blocks: out, colorA: a, colorB: b, colorC: aux, pattern: pattern };
   }
 
   function composeLayerPlacedBBox(layer, rows, cols) {

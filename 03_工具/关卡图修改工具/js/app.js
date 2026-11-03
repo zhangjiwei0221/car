@@ -754,7 +754,8 @@
   var COMPOSE_COLOR_INPUTS = [
     { id: 'inComposeHaloColor', label: '包围色' },
     { id: 'inComposeBgColorA', label: '背景主色' },
-    { id: 'inComposeBgColorB', label: '背景辅色' }
+    { id: 'inComposeBgColorB', label: '背景辅色' },
+    { id: 'inComposeBgColorC', label: '背景辅色细线' }
   ];
 
   function cpS() { return S.compose; }
@@ -2874,20 +2875,22 @@
     syncComposeBgLabels();
     var colorA = composeColorNumber('inComposeBgColorA', 14);
     var colorB = composeColorNumber('inComposeBgColorB', 31);
+    var colorC = composeColorNumber('inComposeBgColorC', 33);
     var pattern = ($('selComposeBgPattern') || {}).value || 'diagonal';
     var res = C.composeBackgroundBlocks(C2.layers, C2.rows, C2.cols, {
       colorA: colorA,
       colorB: colorB,
+      colorC: colorC,
       pattern: pattern
     });
     composeAddOrReplaceGeneratedLayer('background', '自动背景_' + pattern, res.blocks, {
       kind: 'background',
-      params: { colorA: colorA, colorB: colorB, pattern: pattern },
+      params: { colorA: colorA, colorB: colorB, colorC: colorC, pattern: pattern },
       generatedAt: new Date().toISOString()
     });
-    if (pattern === 'stripes') {
-      log('条纹背景：主色1 ' + composeColorLabel(colorA) + ' 与主色2 ' + composeColorLabel(colorB) +
-        ' 竖向交替（2 格一条）。');
+    if (pattern === 'diagonal') {
+      log('斜纹背景：主色1 ' + composeColorLabel(colorA) + ' / 主色2 ' + composeColorLabel(colorB) +
+        ' 交替，辅色 ' + composeColorLabel(colorC) + ' 作 2 格细线。');
     }
   }
 
@@ -3352,8 +3355,8 @@
     });
   }
 
-  function composeBgIsStripes() {
-    return (($('selComposeBgPattern') || {}).value === 'stripes');
+  function composeBgIsDiagonal() {
+    return (($('selComposeBgPattern') || {}).value === 'diagonal');
   }
 
   function composeColorInputMeta(id) {
@@ -3362,20 +3365,24 @@
       if (COMPOSE_COLOR_INPUTS[i].id === id) { meta = COMPOSE_COLOR_INPUTS[i]; break; }
     }
     if (!meta) return null;
-    // 条纹模式下，A/B 两个输入都是主色（主色1 / 主色2），不再叫「辅色」
-    if (composeBgIsStripes()) {
+    // 斜纹模式：A/B 是两个主色，C 是辅色细线；其它纹理仍只有主色 / 辅色
+    if (composeBgIsDiagonal()) {
       if (id === 'inComposeBgColorA') return { id: meta.id, label: '背景主色1' };
       if (id === 'inComposeBgColorB') return { id: meta.id, label: '背景主色2' };
+      if (id === 'inComposeBgColorC') return { id: meta.id, label: '背景辅色细线' };
     }
     return meta;
   }
 
-  /** 条纹时把两个颜色输入改名为「主色1 / 主色2」，其它纹理恢复「主色 / 辅色」。 */
+  /** 斜纹时显示第三个色（辅色细线），A/B 改名为「主色1 / 主色2」；其它纹理恢复主色 / 辅色两个输入。 */
   function syncComposeBgLabels() {
-    var stripes = composeBgIsStripes();
-    var a = $('lblComposeBgColorA'), b = $('lblComposeBgColorB');
-    if (a) a.textContent = stripes ? '主色1' : '主色';
-    if (b) b.textContent = stripes ? '主色2' : '辅色';
+    var diag = composeBgIsDiagonal();
+    var a = $('lblComposeBgColorA'), b = $('lblComposeBgColorB'), c = $('lblComposeBgColorC');
+    if (a) a.textContent = diag ? '主色1' : '主色';
+    if (b) b.textContent = diag ? '主色2' : '辅色';
+    if (c) c.textContent = '辅色';
+    var wrapC = $('wrapComposeBgColorC');
+    if (wrapC) wrapC.style.display = diag ? '' : 'none';
     composeRefreshRuleColorChips();
   }
 
