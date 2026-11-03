@@ -81,19 +81,23 @@ def _build_stub(S):
     emit(b"\x0f\xb6\x85\x67\xff\xff\xff")            # movzbl eax,[rbp-0x99] bool
     emit(b"\x83\xe0\x01")                                # and eax,1
     emit(b"\x89\x04\x24")                                # mov [rsp],eax      第7个参数
-    emit(b"\x4c\x8b\xb5\x50\xff\xff\xff")            # mov r14,[rbp-0xb0] 旧 end
+    emit(b"\x48\x8b\x85\x50\xff\xff\xff")            # mov rax,[rbp-0xb0] end
+    emit(b"\x48\x2b\x85\x48\xff\xff\xff")            # sub rax,[rbp-0xb8] begin → 旧元素数
+    emit(b"\x49\x89\xc6")                                # mov r14,rax
     emit(b"\x48\x8d\xbd\x48\xff\xff\xff")            # lea rdi,[rbp-0xb8] out
     call1 = len(c); emit(b"\xe8\x00\x00\x00\x00")
-    emit(b"\x48\x8b\x85\x50\xff\xff\xff")            # mov rax,[rbp-0xb0] 新 end
+    emit(b"\x48\x8b\x85\x50\xff\xff\xff")            # mov rax,[rbp-0xb0] end
+    emit(b"\x48\x2b\x85\x48\xff\xff\xff")            # sub rax,[rbp-0xb8] begin → 新元素数
     emit(b"\x4c\x39\xf0")                                # cmp r14,rax
     je1 = len(c); emit(b"\x74\x00")
-    emit(b"\x48\x8b\x78\xf0")                            # mov rdi,[rax-0x10] 最后加入的 shared_ptr
+    emit(b"\x48\x8b\x8d\x50\xff\xff\xff")            # mov rcx,[rbp-0xb0] end
+    emit(b"\x48\x8b\x79\xf0")                            # mov rdi,[rcx-0x10] 最后加入的 shared_ptr
     emit(b"\x48\x85\xff")                                # test rdi,rdi
     je2 = len(c); emit(b"\x74\x00")
     emit(b"\xbe\x02\x00\x00\x00")                      # mov esi,2
     call2 = len(c); emit(b"\xe8\x00\x00\x00\x00")
     emit(b"\x41\xff\xc4")                                # inc r12d
-    jmp_loop = len(c); emit(b"\xeb\x00")
+    jmp_loop = len(c); emit(b"\xe9\x00\x00\x00\x00")
     done = here()
     emit(b"\x48\x83\xc4\x08")                          # add rsp,8
     emit(b"\x41\x5e\x41\x5d\x41\x5c")                # pop r14; r13; r12
@@ -110,7 +114,7 @@ def _build_stub(S):
     rel8(jge, done)
     rel8(je1, done)
     rel8(je2, done)
-    rel8(jmp_loop, loop)
+    rel32(jmp_loop, loop)
     rel32(call1, 0x1003EF300)      # _findMatchedBlocks
     rel32(call2, 0x1003FD340)      # TargetBlockElement::setElementState
     rel32(jmp_out, 0x1003EEEE1)    # 回到原流程（out.empty() 检查）

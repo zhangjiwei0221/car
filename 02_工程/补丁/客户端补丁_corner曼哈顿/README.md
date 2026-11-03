@@ -145,35 +145,42 @@ cp -p ~/Desktop/游戏版本/ParkPassenger_corner.bak_20261030/ParkPassenger.app
 （`…bak_20261103b` = 「曼哈顿 + 旧的一批取完」版，`4c844ac5…`；现役是 `ae799229…`。
 那次被否决的"全图候选"实验版只在 `/tmp`，没有留档、也不该再装。）
 
-## 9. 试过、闪退的改动：逐格重算（2026-11-03 14:05）
+## 9. 逐格重算：第一版闪退，根因已定位并修好
 
-**目标**：同一批里"先选中的人把被它挡住的同色邻居解锁"，即文档 §一.2。
+**目标**：同一批里"先选中的人把被它挡住的同色邻居解锁"（文档 §一.2）。
 
-**做法**：在 `tryReceiveTargetElements` 调用 `_findMatchedBlocks` 处挂钩，跳到代码洞里的循环：
-每次只挑 1 个 → 立刻 `setElementState(ptr, 2)` → 再挑，最多 limit 个。
+**做法**：在 `tryReceiveTargetElements` 调 `_findMatchedBlocks` 处挂钩，跳到代码洞里的循环：
+每轮 `limit=1` 只挑 1 个 → 立刻 `setElementState(ptr,2)` → 再挑，最多 limit 个。
+`_isOpenPathCell` 本来就把 `state==2` 当"可通行"，下一轮的可达图自然把邻居解锁。
 
-**结果**：进关卡、车开始接人时 **SIGSEGV 闪退**（两份 .ips：14:05:05 / 14:05:15）。
-崩溃报告给出的关键信息：
+### 9.1 第一次崩（14:05，两份 .ips）
 
 ```
-EXC_BAD_ACCESS (SIGSEGV), KERN_INVALID_ADDRESS at 0x41a0000000000028
-thread 0 栈（由内到外）：
-  0  0x10ec75c68（无符号）
-  1  ParkPassenger  +0xe8ef8d      ← 我们循环里的 inc %r12d（setElementState 的返回点）
-  2  ParkPassengerBoard::tryReceiveTargetElements
-  3  ...
-  4  HoldingAreaBoard::onTargetElementReady()
-  5  ParkPassengerBoard::onTargetElementsMoveEnd()
-  6  TargetBoard::tryReceiveTargetElements::$_1::operator()(int)   ← 动画结束回调
-寄存器：rax = 0x41a0000000000028，r13 = 0x28（= limit 40），rsi = 2
+KERN_INVALID_ADDRESS at 0x41a0000000000028
+栈：0 无符号 → 1 +0xe8ef8d（循环里 setElementState 的返回点）
+   → ParkPassengerBoard::tryReceiveTargetElements → HoldingAreaBoard::onTargetElementReady
+```
+当时的判断（"对象被上一批释放了"）**是错的**。
+
+### 9.2 真根因：把"预分配"当成"挑到了"
+
+循环靠"这一轮有没有挑到新人"决定继续/退出。第一版比的是**结束指针**：
+
+```
+旧 end == 新 end ? 退出
 ```
 
-即：**上一辆车的动画结束回调里又调起了下一辆车的取人**（正常流程），在这次重入里我们标记
-"已消"之后，取到的对象指针是坏的，`setElementState` 一解引用就崩。
+但 `_findMatchedBlocks` 一进门就 `reserve(limit)`。对**空向量**来说，`reserve(1)` 会把
+`begin/end` 从 `0` 变成一个合法地址 —— 于是"一个都没挑到"也被判成"挑到了"，
+接着去读 `end-16`，读到的是**堆块头**（`0x41a0…` 正是这种值），当指针一解引用就 SIGSEGV。
 
-**判断**：问题不在排序，在"提前把对象置成已消"这个手法——它和动画回调的重入撞上了。
-要么改成不碰对象状态的做法（例如给 `_findMatchedBlocks` 传一份"本批已选"的掩码，
-让它把已选的同色格当作可通行），要么在重入处加保护。前者要改函数签名/内部逻辑，后者要加锁。
+**修法**：改成比**元素个数**（`(end-begin)`），不再是结束指针。个数没变才算"没挑到"。
 
-**现状**：已回退到 `4c844ac5…`（曼哈顿 + 阻挡 + 一批取完），可正常游玩。
-`make_corner_manhattan.py` 里的这段补丁**暂时用 `--per-pick` 开关关掉了**，别误开。
+### 9.3 现状
+
+- 已修好并安装：sha256 `1b78d5b8…37b3`。
+- 静态核对：跳板、循环、返回地址都逐条反汇编看过；差异 7 段，长度不变。
+- **还没真机玩过**（我这边的 Computer Use 对该 app 没有授权）。看一次就知道：
+  车吃人时，刚被吃掉那个位置旁边的同色小人会不会在同一批里跟着走。
+
+**回退**：`cp ParkPassenger_corner.bak_20261103b/…/ParkPassenger`（`4c844ac5…`，曼哈顿+阻挡+一批取完）。
