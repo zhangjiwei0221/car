@@ -34,6 +34,7 @@ const USE_PLAN = !process.argv.includes('--no-plan');   // 障碍预算（墙/�
 const TRAPS = String(arg('--traps', '')).split(',').filter(Boolean).map(Number);   // 顺序陷阱比例
 const EDGE_BIG = Number(arg('--edge-big', '0.25'));
 const WITH_TOPO = process.argv.includes('--with-topo');   // 默认只扫切车，加速
+const SEEDS = String(arg('--seeds', String(SEED))).split(',').filter(Boolean).map(Number);  // 多 seed 取最好
 
 if (!TARGET) { console.error('用法：node JointSearch_v799.js --target <图.txt> --outdir <目录>'); process.exit(2); }
 const OUTDIR_ABS = path.isAbsolute(OUTDIR) ? OUTDIR : path.join(ROOT, OUTDIR);
@@ -61,10 +62,10 @@ let best = null;
 let n = 0;
 
 const COMBOS = [];
-for (const ratio of RATIOS) for (const trap of (TRAPS.length ? TRAPS : [0])) COMBOS.push({ ratio, trap });
+for (const ratio of RATIOS) for (const trap of (TRAPS.length ? TRAPS : [0])) for (const sd of SEEDS) COMBOS.push({ ratio, trap, sd });
 
-for (const { ratio, trap } of COMBOS) {
-  const tag = (ratio >= 1 ? 'default' : 'r' + ratio) + (trap ? '.t' + trap : '');
+for (const { ratio, trap, sd } of COMBOS) {
+  const tag = (ratio >= 1 ? 'default' : 'r' + ratio) + (trap ? '.t' + trap : '') + (SEEDS.length > 1 ? '.s' + sd : '');
   const sp = path.join(OUTDIR_ABS, `${base}.${tag}.split.json`);
   let bl = path.join(OUTDIR_ABS, `${base}.${tag}.build.json`);
   n++;
@@ -80,7 +81,7 @@ for (const { ratio, trap } of COMBOS) {
 
   // 2) 构建
   const r2 = run(['03_工具/正式版/OverlapBuild_v719.js', sp, '--out', bl,
-    '--rounds', '3', '--samples', '60', '--mode', 'a', '--ref', REF, '--seed', String(SEED)]);
+    '--rounds', '3', '--samples', '60', '--mode', 'a', '--ref', REF, '--seed', String(sd)]);
   if (!fs.existsSync(abs(bl))) { console.log(`[${tag}] 构建失败`); continue; }
   // 障碍预算（原来漏了这一步；_ProduceOne 里是有的）
   if (USE_PLAN) {

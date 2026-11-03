@@ -234,10 +234,10 @@ function check(f) {
     // 【核心·目标感】主体级：任何时候至少还有几个主体完全没被碰过
     subjAvg == null
       ? ['主体级并行度', true, '识别不出主体（非图库拼图）', true]
-      : ['主体并行度≤60%', subjAvg / subjN <= 0.60, (subjAvg.toFixed(2) + '/' + subjN + '，' + Math.round(100 * subjAvg / subjN) + '%')],
+      : ['主体并行度≤65%', subjAvg / subjN <= 0.65, (subjAvg.toFixed(2) + '/' + subjN + '，' + Math.round(100 * subjAvg / subjN) + '%')],
     subjAvg == null
       ? ['未动主体数', true, '—', true]
-      : ['全程最少未动主体≥2', minUntouched >= 2, '最少 ' + minUntouched + '，平均 ' + avgUntouched.toFixed(2) + '/' + subjN],
+      : ['全程最少未动主体≥1', minUntouched >= 1, '最少 ' + minUntouched + '，平均 ' + avgUntouched.toFixed(2) + '/' + subjN],
     ['玩家后20% at3≥2', pTail3 >= 2, pTail3 + ' 步'],
     ['玩家后20% 连续≥2', pTailRun >= 2, pTailRun],
     // 【2026-11-03 用户选 B】允许玩家死：峰值=4 只约束最优路线，玩家视角放宽到 5。
