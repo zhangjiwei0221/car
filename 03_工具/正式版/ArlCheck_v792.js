@@ -25,7 +25,10 @@ function check(f) {
   const lv = A.parseLevel(A.fromGameFormat(g));
   const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
   const buf = (o.pressureSamples || []).map(s => s.buf || 0);
-  const L = buf.length, eN = Math.max(1, Math.round(L * 0.2)), tN = Math.floor(L * 0.8);
+  const L = buf.length;
+  // 【2026-11-03 用户放宽】前段门槛 20% → 10%，且允许前段 at4 ≤ 1。
+  // 理由：不必死磕"开局绝对不碰 4"，只要整体有难度、逼玩家思考即可。
+  const eN = Math.max(1, Math.round(L * 0.1)), tN = Math.floor(L * 0.8);
   let a3 = 0, a4 = 0;
   for (const v of buf) { if (v >= 3) a3++; if (v >= 4) a4++; }
   const early4 = buf.slice(0, eN).filter(v => v >= 4).length;
@@ -89,8 +92,8 @@ function check(f) {
 
   const rules = [
     ['峰值=4', peak === 4, peak],
-    ['前20% at4=0', early4 === 0, early4 + ' 步'],
-    ['前20% 免费步≤6', earlyFree <= 6, earlyFree + '/' + eN],
+    ['前10% at4≤1', early4 <= 1, early4 + ' 步'],
+    ['前10% 免费步', true, earlyFree + '/' + eN, true],   // 软项：只提示，不参与通过判定
     ['中段 at3≥15', mid3 >= 15, mid3 + '/' + (tN - eN)],
     ['后20% at3≥3', tail3 >= 3, tail3],
     ['后20% 连续≥3', tailRun >= 3, tailRun],
@@ -102,7 +105,7 @@ function check(f) {
     ['无空格', empty === 0, empty],
     ['容量守恒', sum === px, sum + '/' + px],
   ];
-  const pass = rules.every(r => r[1]);
+  const pass = rules.filter(r => !r[3]).every(r => r[1]);   // r[3]=true 的是软项
   return { f, rules, pass, L };
 }
 
@@ -111,7 +114,7 @@ if (require.main === module) {
   for (const f of process.argv.slice(2)) {
     const r = check(f);
     console.log('\n=== ' + f.split('/').pop() + '（' + r.L + ' 步）===');
-    for (const [name, ok, val] of r.rules) console.log('  ' + (ok ? '✅' : '❌') + ' ' + name.padEnd(16) + String(val));
+    for (const [name, ok, val, soft] of r.rules) console.log('  ' + (soft ? '⚪' : ok ? '✅' : '❌') + ' ' + name.padEnd(16) + String(val));
     console.log('  → ' + (r.pass ? '通过' : '不通过'));
     if (!r.pass) bad++;
   }

@@ -151,6 +151,20 @@ if (!has('--no-ice') && !has('--rx')) {
 }
 finalSrc = icedSrc;
 
+// 可选：黑块布局搜索（改棋盘拓扑，专治"没得选/决策度低"）
+if (has('--topo')) {
+  const tFile = path.join(OUTDIR, base + '.topo.json');
+  const tr = run(['03_工具/正式版/TopoSearch_v797.js', finalSrc, '--out', tFile,
+    '--iters', String(Number(arg('--topo-iters', '120'))),
+    '--max-black', String(Number(arg('--topo-black', '3'))),
+    '--seed', String(Number(SEED) + attemptNo * 17), '--ref', REF]);
+  if (tr.ok && fs.existsSync(tFile)) {
+    finalSrc = tFile;
+    console.log('  拓扑搜索：' + path.basename(tFile));
+    for (const line of tr.out.split('\n')) if (/^(爬完|结果|13 项)/.test(line.trim())) console.log('   ' + line.trim());
+  } else console.log('  拓扑搜索：跳过');
+}
+
 // 可选：按症状开障碍处方（冰/三连/问号，位置随 seed 变化）
 if (has('--rx')) {
   const rFile = path.join(OUTDIR, base + '.rx.json');
