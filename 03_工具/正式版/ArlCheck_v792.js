@@ -45,7 +45,7 @@ function check(f) {
 
   // 【2026-11-03 用户定】目标感：不能四个象限同时挖（中期主体会碎）。
   // 象限进度并行度 = 每一步有多少个象限处于「进行中」(2%<进度<98%)，取平均。理想→1。
-  let quadAvg = 0, quadSteps = 0;
+  let quadAvg = 0, quadSteps = 0, blobAvg = 0;
   {
     const H2 = g.blocks.length, W2 = g.blocks[0].length;
     const quadOf = (y, x) => (y >= H2 / 2 ? '下' : '上') + (x < W2 / 2 ? '左' : '右');
@@ -55,7 +55,29 @@ function check(f) {
     const reach2 = (y, x) => y === 0 || x === 0 || y === H2 - 1 || x === W2 - 1 ||
       gone2[y - 1][x] || gone2[y + 1][x] || gone2[y][x - 1] || gone2[y][x + 1];
     const doneQ = {}; Object.keys(totQ).forEach(q => doneQ[q] = 0);
-    let sum = 0, n = 0;
+    // 连通块数：某象限已消除区域是不是"一整块"（从一角连续推进）
+    const blobsInQuad = (q) => {
+      const y0 = q.startsWith('下') ? Math.floor(H2 / 2) : 0, y1 = q.startsWith('下') ? H2 : Math.floor(H2 / 2);
+      const x0 = q.endsWith('左') ? 0 : Math.floor(W2 / 2), x1 = q.endsWith('左') ? Math.floor(W2 / 2) : W2;
+      const seen = new Set(); let blobs = 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        if (!gone2[y][x] || seen.has(y * W2 + x)) continue;
+        blobs++;
+        const st = [[y, x]]; seen.add(y * W2 + x);
+        while (st.length) {
+          const [cy, cx] = st.pop();
+          for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const ny = cy + dy, nx = cx + dx;
+            if (ny < y0 || ny >= y1 || nx < x0 || nx >= x1) continue;
+            if (!gone2[ny][nx] || seen.has(ny * W2 + nx)) continue;
+            seen.add(ny * W2 + nx); st.push([ny, nx]);
+          }
+        }
+      }
+      return blobs;
+    };
+
+    let sum = 0, n = 0, blobSum = 0, blobN = 0;
     for (const p of (o.pickOrder || [])) {
       if (p.chainIndex !== 0) continue;
       const c0 = p.color, list2 = [];
@@ -66,8 +88,14 @@ function check(f) {
       let inflight = 0;
       for (const q of Object.keys(totQ)) { const r = doneQ[q] / (totQ[q] || 1); if (r > 0.02 && r < 0.98) inflight++; }
       sum += inflight; n++;
+      // 碎度只在「进行中」的象限上统计，避免收尾时全部并成 1 块把平均值拉低
+      for (const q of Object.keys(totQ)) {
+        const r = doneQ[q] / (totQ[q] || 1);
+        if (r > 0.05 && r < 0.95) { blobSum += blobsInQuad(q); blobN++; }
+      }
     }
     quadAvg = n ? sum / n : 0; quadSteps = n;
+    blobAvg = blobN ? blobSum / blobN : 0;
   }
   // 【2026-11-03 用户指出】开局"13 步全是免费车"——前段占比检查抓不到，必须单独量最长连续空转。
   let freeRun = 0, _fr = 0;
@@ -162,6 +190,8 @@ function check(f) {
     // 【目标感】其他象限可以动，但不能四个一起挖到一半（用户：只要主体不乱）
     // 【2026-11-03 用户 mentor】『主体不会很散、知道自己要消除哪个』是首要，难度不是关键
     ['象限并行度≤3.6', quadAvg <= 3.6, quadAvg.toFixed(2) + '（' + quadSteps + ' 步）'],
+    // 象限内部碎度：进行中的象限里，已消除区域平均几块（1=从一角连续推进，越大越"多点开花"）
+    ['象限内部碎度', true, blobAvg.toFixed(1) + ' 块/象限', true],
     ['玩家后20% at3≥2', pTail3 >= 2, pTail3 + ' 步'],
     ['玩家后20% 连续≥2', pTailRun >= 2, pTailRun],
     // 【2026-11-03 用户选 B】允许玩家死：峰值=4 只约束最优路线，玩家视角放宽到 5。
