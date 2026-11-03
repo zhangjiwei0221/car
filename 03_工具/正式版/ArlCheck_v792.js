@@ -43,13 +43,34 @@ function check(f) {
   for (const v of buf.slice(tN)) { if (v >= 3) { c++; tailRun = Math.max(tailRun, c); } else c = 0; }
   const peak = Math.max(0, ...buf);
 
-  // 容错
-  let tol = 0;
+  // 【2026-11-03 用户定】20 种打法的曲线 —— 验收用「玩家视角」，不是全知最优路线。
+  // 实测差距很大：G 关全知中段 30 步，20 种打法平均只有 7.7 步。
+  const runs = [];
   for (let i = 0; i < 20; i++) {
     const nz = i === 0 ? 0 : 0.2 + (i % 5) * 0.2;
     const oo = A.Solver.runSolver(lv, nz, 1000 + i * 37, false, false, { capturePreviewStats: false, instantChain: false });
-    if (oo.completed) tol++;
+    const ss = (Array.isArray(oo.stepBufferHistory) && oo.stepBufferHistory.length)
+      ? oo.stepBufferHistory.slice()
+      : (oo.pressureSamples || []).map(x => x.buf || 0);
+    const len = ss.length || 1;
+    const e2 = Math.max(1, Math.round(len * 0.1)), t2 = Math.floor(len * 0.8);
+    const tl = ss.slice(t2);
+    let rn = 0, cc = 0;
+    for (const v of tl) { if (v >= 3) { cc++; rn = Math.max(rn, cc); } else cc = 0; }
+    runs.push({
+      won: !!oo.completed, len,
+      mid3: ss.slice(e2, t2).filter(v => v >= 3).length, midN: Math.max(1, t2 - e2),
+      tail3: tl.filter(v => v >= 3).length, tailRun: rn,
+      max: Math.max(0, ...ss),
+    });
   }
+  const tol = runs.filter(r => r.won).length;
+  const med = a => { const b = a.slice().sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
+  const pMidRatio = med(runs.map(r => r.mid3 / r.midN));   // 每局中段占比的中位数
+  const pMid3 = med(runs.map(r => r.mid3));
+  const pTail3 = med(runs.map(r => r.tail3));
+  const pTailRun = med(runs.map(r => r.tailRun));
+  const pPeak = med(runs.map(r => r.max));
 
   // 决策度
   const H = g.blocks.length, W = g.blocks[0].length, rows = g.spools.length, cols = g.spools[0].length;
@@ -98,10 +119,16 @@ function check(f) {
     ['峰值=4', peak === 4, peak],
     ['前10% at4≤1', early4 <= 1, early4 + ' 步'],
     ['前10% 免费步', true, earlyFree + '/' + eN, true],   // 软项：只提示，不参与通过判定
-    ['中段 at3≥15', mid3 >= 15, mid3 + '/' + (tN - eN)],
-    ['后20% at3≥3', tail3 >= 3, tail3],
-    ['后20% 连续≥3', tailRun >= 3, tailRun],
-    ['容错≥80%', tol >= 16, tol + '/20'],
+    // 【2026-11-03 用户定】压力改用「20 种打法的中位数」——玩家不是全知
+    ['玩家中段 at3≥50%', pMidRatio >= 0.5, pMid3 + ' 步（占比 ' + Math.round(pMidRatio * 100) + '%）'],
+    ['玩家后20% at3≥2', pTail3 >= 2, pTail3 + ' 步'],
+    ['玩家后20% 连续≥2', pTailRun >= 2, pTailRun],
+    ['玩家峰值≤4', pPeak <= 4, pPeak],
+    // 容错改成区间：100% = 太松（随便玩都能过），<40% = 太脆
+    ['容错 40–70%', tol >= 8 && tol <= 14, tol + '/20'],
+    // 参考项（不判定）：全知最优路线的数据，用来对比"理想 vs 真实"
+    ['（参考）全知 中段', true, mid3 + '/' + (tN - eN), true],
+    ['（参考）全知 at4', true, a4, true],
     ['决策度≥15', good >= 15, good + '/' + picks.length],
     ['没得选≤1', dead <= 1, dead],
     ['at4≥5', a4 >= 5, a4],

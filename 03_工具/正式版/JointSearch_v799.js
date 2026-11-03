@@ -46,8 +46,9 @@ const { check } = require('./ArlCheck_v792');
 function scoreOf(file) {
   try {
     const r = check(file);
-    const p = r.rules.filter(x => x[1]).length;
-    return { p, pass: r.pass, fail: r.rules.filter(x => !x[1]).map(x => x[0]) };
+    const hard = r.rules.filter(x => !x[3]);            // 排除软项/参考项
+    const p = hard.filter(x => x[1]).length;
+    return { p, total: hard.length, pass: r.pass, fail: hard.filter(x => !x[1]).map(x => x[0]) };
   } catch (e) { return { p: 0, pass: false, fail: ['解析失败'] }; }
 }
 
@@ -81,7 +82,7 @@ for (const ratio of RATIOS) {
   }
   const s0 = scoreOf(bl);
   report.push({ stage: 'build', ratio, tag, p: s0.p, fail: s0.fail });
-  console.log(`[${tag}] 仅构建：${s0.p}/13`);
+  console.log(`[${tag}] 仅构建：${s0.p}/${s0.total}`);
   if (!best || s0.p > best.p) best = { file: bl, p: s0.p, tag, fail: s0.fail };
 
   // 3) 拓扑 + 处方
@@ -92,7 +93,7 @@ for (const ratio of RATIOS) {
     if (!fs.existsSync(abs(tp))) continue;
     const s1 = scoreOf(tp);
     report.push({ stage: 'topo', ratio, tag, topoSeed: ts, p: s1.p, fail: s1.fail });
-    console.log(`[${tag}] +拓扑(seed ${ts})：${s1.p}/13${s1.p > s0.p ? ' ↑' : ''}`);
+    console.log(`[${tag}] +拓扑(seed ${ts})：${s1.p}/${s1.total}${s1.p > s0.p ? ' ↑' : ''}`);
     if (s1.p > best.p) best = { file: tp, p: s1.p, tag, fail: s1.fail };
 
     for (const rs of RX_SEEDS) {
@@ -101,7 +102,7 @@ for (const ratio of RATIOS) {
       if (!fs.existsSync(abs(rx))) continue;
       const s2 = scoreOf(rx);
       report.push({ stage: 'rx', ratio, tag, topoSeed: ts, rxSeed: rs, p: s2.p, fail: s2.fail });
-      console.log(`[${tag}] +拓扑+处方(seed ${rs})：${s2.p}/13${s2.p > s1.p ? ' ↑' : ''}`);
+      console.log(`[${tag}] +拓扑+处方(seed ${rs})：${s2.p}/${s2.total}${s2.p > s1.p ? ' ↑' : ''}`);
       if (s2.p > best.p) best = { file: rx, p: s2.p, tag, fail: s2.fail };
     }
   }
@@ -109,7 +110,7 @@ for (const ratio of RATIOS) {
 
 if (best) {
   fs.copyFileSync(abs(best.file), abs(path.join(OUTDIR_ABS, 'best.json')));
-  console.log(`\n=== 最好：${best.p}/13（${best.tag}）${best.fail.length ? '，仍差：' + best.fail.join('、') : '，全部通过'}`);
+  console.log(`\n=== 最好：${best.p}/${best.total||13}（${best.tag}）${best.fail.length ? '，仍差：' + best.fail.join('、') : '，全部通过'}`);
   console.log('已写', path.join(OUTDIR_ABS, 'best.json'));
 }
 fs.writeFileSync(abs(path.join(OUTDIR_ABS, 'report.json')), JSON.stringify({ target: TARGET, best, report }, null, 2));
