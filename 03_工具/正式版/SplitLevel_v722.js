@@ -95,6 +95,7 @@ for (let x = 0; x < C; x++) { exposed.add(g[0][x]); exposed.add(g[R - 1][x]); }
 for (let y = 0; y < R; y++) { exposed.add(g[y][0]); exposed.add(g[y][C - 1]); }
 // ---------- 每色切成块（精确划分，不丢像素） ----------
 // 通过调整 targetSize 让块数 <= 格子数；只允许同色相邻块合并
+let _trapDbg = { calls: 0, pushes: {} };
 function splitAll(targetSize) {
   const out = [];
   for (const col of Object.keys(reg)) {
@@ -116,6 +117,38 @@ function splitAll(targetSize) {
     let idx = 0;
     if (BY_ORDER) {
       // 固定车数，容量按几何级数递减：前面的车大（开局像素多），最后一辆很小（只剩几个）
+      // 【2026-11-03 用户选 C′】顺序陷阱：部分颜色切成「1 大 + N 小」。
+      // 先取大车 → 开局可达量不够 → 吃不满占格；后面小车把像素抢光 → 大车永远差一点 → 死。
+      // 但先取小车则大车最终能吃满（总量守恒），所以最优路线仍然可通。
+      const TRAP_RATIO = Number(arg('--trap-ratio', '0.3'));
+      // 陷阱色取「最大的几个颜色」——小色设陷阱玩家根本碰不到，等于没设
+      const _sortedCols = Object.keys(reg).sort((a, b) => totals[b] - totals[a]);
+      const _trapN = Math.max(1, Math.round(_sortedCols.length * TRAP_RATIO));
+      const _rank = _sortedCols.indexOf(String(col));
+      const isTrap = (pool.length >= 40) && _rank >= 0 && _rank < _trapN;
+      if (isTrap) {
+        const bigN = Math.max(targetSize, Math.round(pool.length * 0.55));
+        const restN = pool.length - bigN;
+        const k = Math.max(2, Math.round(restN / targetSize));
+        const counts2 = [bigN];
+        let acc = 0;
+        for (let i = 0; i < k; i++) {
+          const take = i === k - 1 ? restN - acc : Math.round(restN / k);
+          if (take > 0) counts2.push(take);   // 不能 Math.max(4,…)：会把容量放大，破坏守恒
+          acc += take;
+        }
+        _trapDbg.calls++; _trapDbg.pushes[col] = (_trapDbg.pushes[col]||0) + counts2.length;
+        if (process.env.SPLIT_DEBUG) console.error('[trap] 色'+col, '像素'+pool.length, 'targetSize'+targetSize, 'counts2='+counts2.join(','), '第'+_trapDbg.calls+'次');
+        let idx2 = 0;
+        for (const cnt of counts2) {
+          if (idx2 >= pool.length) break;
+          const take = Math.min(cnt, pool.length - idx2);
+          const chunk = pool.slice(idx2, idx2 + take);
+          idx2 += take;
+          if (chunk.length) out.push({ color: Number(col), cells: chunk, count: chunk.length, first: chunk[0] });
+        }
+        continue;
+      }
       const N = Math.max(1, Math.ceil(pool.length / targetSize));
       const w = []; for (let i = 0; i < N; i++) w.push(Math.pow(ORDER_RATIO, i));
       const ws = w.reduce((a, b) => a + b, 0);
@@ -175,6 +208,11 @@ let boxes = splitAll(targetSize);
 let guard = 0;
 while (boxes.length > rows * cols && targetSize < boxMax && guard++ < 200) {
   targetSize++;
+  boxes = splitAll(targetSize);
+}
+// 【2026-11-03】陷阱会减少车数（大车吸收更多像素）→ 车数不足会留空格，反向缩小切块
+while (boxes.length < rows * cols && targetSize > boxMin && guard++ < 400) {
+  targetSize--;
   boxes = splitAll(targetSize);
 }
 // 若仍超出，只能同色合并（绝不跨色）
@@ -267,7 +305,8 @@ if (buryColors.length > 0) {
   let idx = 0;
   for (const [sr, sc] of edge.slice(0, edgeBigN)) { if (bigCars[idx]) placed[sr * cols + sc] = bigCars[idx]; idx++; }
   for (const [sr, sc] of edge.slice(edgeBigN).concat(inner2)) {
-    if (restCars.length) { placed[sr * cols + sc] = restCars[(idx - edgeBigN) % restCars.length]; }
+    const b = restCars[idx - edgeBigN];       // 不循环取：重复取同一辆车会重复计算容量（实测 1438 vs 1225）
+    if (b) placed[sr * cols + sc] = b;
     idx++;
   }
 } else {
@@ -329,3 +368,5 @@ console.log(`棋盘 ${rows}×${cols} / 车 ${boxes.length} / 容量和 ${sum} / 
 console.log(`每色核对：${bad.length ? '❌ 不一致 ' + bad.map(c => `${c}:${perColor[c] || 0}/${totals[c]}`).join(' ') : '✅ 全部吻合'}`);
 console.log(`首测：步 ${buf.length} / 峰值 ${Math.max(0, ...buf)} / at4 ${at4} / run4 ${run4} / 通关 ${!!o.completed}`);
 console.log(`已写：${out}`);
+
+if (process.env.SPLIT_DEBUG) console.error('[trap 汇总] 调用次数', _trapDbg.calls, JSON.stringify(_trapDbg.pushes));
