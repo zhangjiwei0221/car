@@ -106,12 +106,16 @@ function check(f) {
   return { f, rules, pass, L };
 }
 
-let bad = 0;
-for (const f of process.argv.slice(2)) {
-  const r = check(f);
-  console.log('\n=== ' + f.split('/').pop() + '（' + r.L + ' 步）===');
-  for (const [name, ok, val] of r.rules) console.log('  ' + (ok ? '✅' : '❌') + ' ' + name.padEnd(16) + String(val));
-  console.log('  → ' + (r.pass ? '通过' : '不通过'));
-  if (!r.pass) bad++;
+if (require.main === module) {
+  let bad = 0;
+  for (const f of process.argv.slice(2)) {
+    const r = check(f);
+    console.log('\n=== ' + f.split('/').pop() + '（' + r.L + ' 步）===');
+    for (const [name, ok, val] of r.rules) console.log('  ' + (ok ? '✅' : '❌') + ' ' + name.padEnd(16) + String(val));
+    console.log('  → ' + (r.pass ? '通过' : '不通过'));
+    if (!r.pass) bad++;
+  }
+  process.exit(bad ? 1 : 0);
 }
-process.exit(bad ? 1 : 0);
+
+module.exports = { check };

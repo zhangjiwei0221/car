@@ -123,8 +123,10 @@ if (has('--layer')) {
 }
 
 // 可选：配额补冰（影响不大时补 6 块，增加障碍厚度；底层用大数字）
+// 【2026-11-03】--rx 时跳过配额补冰：固定 6 块冰本身就是"公式化"的一部分，
+// 改由 RxPrescribe_v796 按症状开药（见下）。
 let icedSrc = finalSrc;
-if (!has('--no-ice')) {
+if (!has('--no-ice') && !has('--rx')) {
   const iFile = path.join(OUTDIR, base + '.iced.json');
   const ir = run(['03_工具/正式版/IceFill_v761.js', finalSrc, '--out', iFile,
     '--count', String(Number(arg('--ice-count', '6'))),
@@ -135,6 +137,18 @@ if (!has('--no-ice')) {
   else console.log('  配额补冰：跳过');
 }
 finalSrc = icedSrc;
+
+// 可选：按症状开障碍处方（冰/三连/问号，位置随 seed 变化）
+if (has('--rx')) {
+  const rFile = path.join(OUTDIR, base + '.rx.json');
+  const rr = run(['03_工具/正式版/RxPrescribe_v796.js', finalSrc, '--out', rFile,
+    '--seed', String(Number(SEED) + attemptNo * 13), '--ref', REF]);
+  if (rr.ok && fs.existsSync(rFile)) {
+    finalSrc = rFile;
+    console.log('  处方：' + path.basename(rFile));
+    for (const line of rr.out.split('\n')) if (line.trim().startsWith('·')) console.log('   ' + line.trim());
+  } else console.log('  处方：跳过');
+}
 
 function report(o) { console.log('RESULT ' + JSON.stringify(o)); }
 

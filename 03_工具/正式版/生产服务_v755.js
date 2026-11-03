@@ -14,7 +14,7 @@ const jobs = new Map(); let seq = 0;
 function json(res, obj, code = 200) { const b = JSON.stringify(obj); res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' }); res.end(b); }
 function readBody(req) { return new Promise(r => { let d = ''; req.on('data', c => d += c); req.on('end', () => r(d)); }); }
 
-function startJob(name, content, tier, layer) {
+function startJob(name, content, tier, layer, useRx = true) {
   const id = ++seq;
   const job = { id, name, log: '', result: null, running: true, t0: Date.now() };
   jobs.set(id, job);
@@ -25,6 +25,9 @@ function startJob(name, content, tier, layer) {
     target = tmp;
   }
   const args = ['03_工具/正式版/_ProduceOne_v747.js', '--target', target, '--outdir', '输出/网页批次/' + id, '--tier', tier || 'std'];
+  // 【2026-11-03】默认启用障碍处方（RxPrescribe_v796）：按症状随机开冰/三连/问号，
+  // 不再走"固定 6 块配额冰 + 恒等障碍构成"。传 ?norx=1 可退回旧行为做对照。
+  if (!useRx) { /* 旧行为：不做处方 */ } else args.push('--rx');
   if (layer) args.push('--layer', '--contract', '输出/契约_默认.json');
   const ch = spawn(process.execPath, args, { cwd: ROOT });
   ch.stdout.on('data', d => { job.log += d.toString(); });
@@ -60,7 +63,7 @@ http.createServer(async (req, res) => {
   }
   if (u.pathname === '/api/produce' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
-    const id = startJob(body.name || '', body.content || '', body.tier || 'std', !!body.layer);
+    const id = startJob(body.name || '', body.content || '', body.tier || 'std', !!body.layer, body.norx !== true);
     return json(res, { id });
   }
   if (u.pathname === '/api/job') {
