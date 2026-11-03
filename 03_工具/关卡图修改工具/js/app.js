@@ -58,8 +58,13 @@
      *   —— 位置只由 offR/offC 表示，拖拽不动像素，所以拖来拖去是无损的。 */
     compose: {
       active: false,
+      // 2026-11-03 多画布：canvases 存每张画布的完整状态，S.compose 自身始终是「当前画布」。
+      // 切换 / 新增前先 composeSaveActiveCanvas()，切换后 composeLoadCanvas()。
+      canvases: [],
+      activeCanvas: 0,
+      nextCanvasId: 1,
       rows: 0, cols: 0,        // 0 = 还没建画布
-      sources: [],             // 可用部件（导入的 txt），不直接参与出图
+      sources: [],             // 可用部件（导入的 txt），不直接参与出图；所有画布共用
       layers: [],              // 画布上的图层，数组顺序 = 层序（后面盖前面）
       selected: [],            // 选中的图层 id（多选用于合并成新主体）
       drag: null,              // 移动图层的拖拽态
@@ -766,6 +771,200 @@
     return null;
   }
   function cpIsSelected(id) { return cpS().selected.indexOf(id) >= 0; }
+
+  /* ---------- 多画布：S.compose 始终是「当前画布」，canvases 存其它画布的完整快照 ----------
+   * 这样既有 compose 代码（cpS().rows / layers / undo…）一行都不用改。
+   * 切换 / 新增前先保存当前画布，切换后把目标快照装回 S.compose。
+   * sources（部件列表）是全局共用，不进快照。 */
+
+  function composeMakeCanvasState(rows, cols, name) {
+    var C2 = cpS();
+    var id = C2.nextCanvasId++;
+    return {
+      id: id,
+      name: name || ('画布 ' + id),
+      rows: rows || COMPOSE_DEFAULT_ROWS,
+      cols: cols || COMPOSE_DEFAULT_COLS,
+      layers: [],
+      selected: [],
+      undo: [],
+      redo: [],
+      historyGroup: 0,
+      nextId: 1,
+      lastAudit: null,
+      sparseColorId: null,
+      sparseScan: null,
+      lastBorder: null
+    };
+  }
+
+  function composeCurrentCanvasState() {
+    var C2 = cpS();
+    var cur = C2.canvases[C2.activeCanvas] || {};
+    return {
+      id: cur.id,
+      name: cur.name,
+      rows: C2.rows,
+      cols: C2.cols,
+      layers: C2.layers,
+      selected: C2.selected,
+      undo: C2.undo,
+      redo: C2.redo,
+      historyGroup: C2.historyGroup,
+      nextId: C2.nextId,
+      lastAudit: C2.lastAudit,
+      sparseColorId: C2.sparseColorId,
+      sparseScan: C2.sparseScan,
+      lastBorder: C2.lastBorder
+    };
+  }
+
+  function composeSaveActiveCanvas() {
+    var C2 = cpS();
+    if (!C2.canvases.length || !C2.canvases[C2.activeCanvas]) return;
+    C2.canvases[C2.activeCanvas] = composeCurrentCanvasState();
+  }
+
+  function composeLoadCanvas(idx) {
+    var C2 = cpS();
+    var st = C2.canvases[idx];
+    if (!st) return;
+    C2.activeCanvas = idx;
+    C2.rows = st.rows || 0;
+    C2.cols = st.cols || 0;
+    C2.layers = st.layers || [];
+    C2.selected = (st.selected || []).slice();
+    C2.undo = st.undo || [];
+    C2.redo = st.redo || [];
+    C2.historyGroup = st.historyGroup || 0;
+    C2.nextId = st.nextId || 1;
+    C2.lastAudit = st.lastAudit || null;
+    C2.sparseColorId = st.sparseColorId != null ? st.sparseColorId : null;
+    C2.sparseScan = st.sparseScan || null;
+    C2.lastBorder = st.lastBorder || null;
+    // 切换画布时清掉所有「拖拽中」的临时态，避免把上一张画布的坐标带过来
+    C2.drag = null;
+    C2.selectBox = null;
+    C2.hitCycle = null;
+    C2.paintDrag = null;
+    C2.shapeDrag = null;
+    C2.colorPickerTarget = null;
+    if ($('inComposeRows')) $('inComposeRows').value = C2.rows;
+    if ($('inComposeCols')) $('inComposeCols').value = C2.cols;
+    var picker = $('composeColorPicker');
+    if (picker) picker.classList.add('hidden');
+    renderComposeAll();
+    if (C2.sparseScan) composeRenderSparseScan(C2.sparseScan);
+    else {
+      var si = $('composeSparseInfo'), sl = $('composeSparseList');
+      if (si) si.innerHTML = '';
+      if (sl) sl.innerHTML = '';
+    }
+  }
+
+  function composeSwitchCanvas(idx) {
+    var C2 = cpS();
+    if (idx === C2.activeCanvas || idx < 0 || idx >= C2.canvases.length) return;
+    composeSaveActiveCanvas();
+    composeLoadCanvas(idx);
+    log('已切换到「' + C2.canvases[idx].name + '」（' + C2.rows + '×' + C2.cols + '）。');
+  }
+
+  /** 顶部「＋ 新画布」：尺寸跟当前画布一致，空白图层，自动切过去。 */
+  function composeAddCanvas() {
+    var C2 = cpS();
+    composeSaveActiveCanvas();
+    var rows = C2.rows || COMPOSE_DEFAULT_ROWS;
+    var cols = C2.cols || COMPOSE_DEFAULT_COLS;
+    var st = composeMakeCanvasState(rows, cols);
+    C2.canvases.push(st);
+    composeLoadCanvas(C2.canvases.length - 1);
+    log('已新建「' + st.name + '」（' + rows + '×' + cols + '），点击顶部标签切换。');
+  }
+
+  /* ---------- 顶部：画布标签 + 各颜色像素统计 ---------- */
+
+  function composeStatsStates() {
+    var C2 = cpS();
+    if (!C2.canvases.length) return [{ rows: C2.rows, cols: C2.cols, layers: C2.layers }];
+    return C2.canvases.map(function (st, idx) {
+      if (idx === C2.activeCanvas) return { rows: C2.rows, cols: C2.cols, layers: C2.layers };
+      return st;
+    });
+  }
+
+  function composeCanvasColorCount(st) {
+    var counts = {}, total = 0;
+    if (!st || !st.rows || !st.cols) return { counts: counts, total: total };
+    var flat = C.composeFlatten(st.layers || [], st.rows, st.cols);
+    for (var r = 0; r < st.rows; r++) {
+      for (var c = 0; c < st.cols; c++) {
+        var v = flat[r][c];
+        if (v > 0) { counts[v] = (counts[v] || 0) + 1; total++; }
+      }
+    }
+    return { counts: counts, total: total };
+  }
+
+  function composeColorStatsRowHtml(label, counts, total) {
+    var ids = Object.keys(counts).map(Number).sort(function (a, b) {
+      return (counts[b] - counts[a]) || (a - b);
+    });
+    var chips = ids.map(function (id) {
+      var name = window.AntSolver.getColorName(id);
+      return '<span class="colorStatChip" title="' + escHtml(name) + '(' + id + ')">' +
+        '<i style="background:' + window.AntSolver.getColorCSS(id) + '"></i>' +
+        escHtml(name) + '(' + id + ') <b>' + counts[id] + '</b></span>';
+    }).join('');
+    return '<div class="colorStatsRow">' +
+      '<span class="colorStatsLabel">' + escHtml(label) + '</span>' +
+      (chips || '<span class="muted">还没有像素</span>') +
+      '<span class="colorStatsTotal">' + total + ' px</span>' +
+      '</div>';
+  }
+
+  function composeRenderColorStats() {
+    var box = $('composeColorStats');
+    if (!box) return;
+    var C2 = cpS();
+    if (!C2.canvases.length) { box.innerHTML = ''; return; }
+    var states = composeStatsStates();
+    var active = composeCanvasColorCount(states[C2.activeCanvas] || { rows: C2.rows, cols: C2.cols, layers: C2.layers });
+    var html = composeColorStatsRowHtml('本图', active.counts, active.total);
+    if (states.length > 1) {
+      var totalCounts = {}, totalPx = 0;
+      states.forEach(function (st) {
+        var one = composeCanvasColorCount(st);
+        totalPx += one.total;
+        Object.keys(one.counts).forEach(function (k) {
+          totalCounts[k] = (totalCounts[k] || 0) + one.counts[k];
+        });
+      });
+      html += composeColorStatsRowHtml('合计 ' + states.length + ' 张', totalCounts, totalPx);
+    }
+    box.innerHTML = html;
+  }
+
+  function composeRenderTabs() {
+    var box = $('composeTabList');
+    if (!box) return;
+    var C2 = cpS();
+    box.innerHTML = '';
+    C2.canvases.forEach(function (st, idx) {
+      var active = idx === C2.activeCanvas;
+      var rows = active ? C2.rows : st.rows;
+      var cols = active ? C2.cols : st.cols;
+      var n = active ? C2.layers.length : (st.layers || []).length;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'composeTab' + (active ? ' active' : '');
+      b.textContent = st.name || ('画布 ' + (idx + 1));
+      b.title = rows + '×' + cols + '，' + n + ' 个图层';
+      b.onclick = function () { composeSwitchCanvas(idx); };
+      box.appendChild(b);
+    });
+  }
+
   function composeLayerType(L) { return (L && L.type) || 'subject'; }
   function composeTypeLabel(L) { return COMPOSE_TYPE_LABEL[composeLayerType(L)] || composeLayerType(L); }
   function composeColorNumber(id, fallback) {
@@ -889,6 +1088,7 @@
   }
 
   function exitCompose() {
+    composeSaveActiveCanvas();
     cpS().active = false;
     document.body.classList.remove('composeMode');
     syncComposeModeButton();
@@ -910,6 +1110,10 @@
    */
   function composeInitDefaultCanvas() {
     var C2 = cpS();
+    if (!C2.canvases.length) {
+      C2.canvases.push(composeMakeCanvasState(COMPOSE_DEFAULT_ROWS, COMPOSE_DEFAULT_COLS));
+      C2.activeCanvas = 0;
+    }
     if (cpHasCanvas()) return;
     C2.rows = COMPOSE_DEFAULT_ROWS; C2.cols = COMPOSE_DEFAULT_COLS;
     C2.lastAudit = null;
@@ -1482,6 +1686,8 @@
     renderComposeLayers();
     renderComposeBorderParts();
     renderComposePalette();
+    composeRenderTabs();
+    composeRenderColorStats();
     drawCompose();
     composeRenderFinalPreview(false);
   }
@@ -5026,6 +5232,7 @@
     // ---- 5. 拼接 ----
     $('btnComposeMode').onclick = function () { cpS().active ? exitCompose() : enterCompose(); };
     $('btnComposeExit').onclick = exitCompose;
+    if ($('btnComposeAddCanvas')) $('btnComposeAddCanvas').onclick = composeAddCanvas;
     $('btnComposeNew').onclick = composeNewCanvas;
     // 装饰图章（2026-10-30）：选图章 / 随机撒到背景
     if ($('btnStampScatter')) $('btnStampScatter').onclick = composeScatterStamps;

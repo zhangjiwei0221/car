@@ -401,6 +401,42 @@ body.composeMode #btnComposeMode { background: #6b4a9e; border-color: #a98bd8; c
 .composeCanvasInfo { color: #f0d9bf; }
 .composeBar label { display: inline-flex; align-items: center; gap: 4px; }
 
+/* ===== 2026-11-03 多画布标签 + 顶部各颜色像素统计 ===== */
+.composeTabs {
+  display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
+  margin-bottom: 8px; padding-bottom: 2px;
+}
+.composeTabsLabel { flex: 0 0 auto; color: #c9a98a; font-size: 12px; }
+.composeTabList {
+  display: flex; align-items: center; gap: 6px;
+  flex: 0 1 auto; min-width: 0; overflow-x: auto; padding-bottom: 2px;
+}
+.composeTab {
+  flex: 0 0 auto; padding: 4px 10px; border-radius: 5px; cursor: pointer;
+  background: #2f2115; border: 1px solid #4d3627; color: #e6d2ba;
+  font-size: 12px; white-space: nowrap;
+}
+.composeTab:hover { background: #3f2c1c; }
+.composeTab.active { background: #5b3f6e; border-color: #a98bd8; color: #ffffff; font-weight: 600; }
+.composeTab.add { border-style: dashed; color: #c9a3ff; }
+.composeColorStats { display: flex; flex-direction: column; gap: 4px; margin: 0 0 8px; }
+.colorStatsRow {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  background: #2f2115; border: 1px solid #4d3627; border-radius: 5px;
+  font-size: 11px; white-space: nowrap; overflow-x: auto;
+}
+.colorStatsLabel { flex: 0 0 auto; color: #c9a98a; font-weight: 600; }
+.colorStatChip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; border: 1px solid #4d3627; border-radius: 10px; color: #e6d2ba;
+}
+.colorStatChip i { width: 10px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,.25); }
+.colorStatChip b { color: #ffb066; font-weight: 700; }
+.colorStatsTotal {
+  position: sticky; right: 0; margin-left: auto; padding-left: 6px;
+  flex: 0 0 auto; color: #9c8168; background: #2f2115;
+}
+
 .composeCanvasWrap {
   overflow: auto; max-width: 100%; padding: 8px;
   background: #17100a; border: 1px solid #4d3627; border-radius: 5px;
@@ -492,6 +528,16 @@ input[type=number], input[type=text], select, .inlineNum input[type="number"] {
 }
 .composeTitle { color: #3746b3; }
 .composeCanvasInfo { color: #637083; }
+.composeTabsLabel { color: #6f7b8d; }
+.composeTab { background: #f1f4f8; border-color: #cbd3dd; color: #27313d; }
+.composeTab:hover { background: #e7edf5; }
+.composeTab.active { background: #e8eaff; border-color: #5b6fe5; color: #3746b3; }
+.composeTab.add { color: #2f6fae; }
+.colorStatsRow { background: #f8fafc; border-color: #d8dde4; color: #27313d; }
+.colorStatsLabel { color: #6f7b8d; }
+.colorStatChip { border-color: #d8dde4; color: #27313d; }
+.colorStatChip b { color: #1f5f9e; }
+.colorStatsTotal { color: #6f7b8d; background: #f8fafc; }
 .composeCanvasWrap {
   background: #bfc3c7; border-color: #aeb6bf;
 }

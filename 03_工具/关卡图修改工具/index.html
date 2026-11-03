@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>蚂蚁拿块关卡图修改工具</title>
-<link rel="stylesheet" href="css/style.css?v=30">
+<link rel="stylesheet" href="css/style.css?v=31">
 </head>
 <body class="composeMode">
 
@@ -77,6 +77,11 @@
          刻意用**独立 canvas** 而不是复用 #cv：拼接要画多图层、选中框、拖拽预览、覆盖提示，
          与目标图那套（碎色高亮/选区描边/空位斜纹）诉求完全不同。 -->
     <div id="composeView" class="composeView">
+      <div class="composeTabs">
+        <span class="composeTabsLabel">画布</span>
+        <div id="composeTabList" class="composeTabList"></div>
+        <button id="btnComposeAddCanvas" class="composeTab add" title="新建一张画布（尺寸同当前画布）">＋ 新画布</button>
+      </div>
       <div class="composeBar">
         <span class="composeTitle">🧩 拼接工作台</span>
         <span id="composeCanvasInfo" class="composeCanvasInfo">还没有画布</span>
@@ -88,6 +93,7 @@
         <label><input type="checkbox" id="optComposeOutline" checked> 描各部件边界</label>
         <button id="btnComposeExit" class="btn ghost tiny">退出拼接</button>
       </div>
+      <div id="composeColorStats" class="composeColorStats"></div>
       <div class="composeCanvasWrap">
         <canvas id="composeCv" width="600" height="600"></canvas>
       </div>
@@ -436,6 +442,6 @@
 <script src="bin/js/generator.js?v=114"></script>
 <script src="js/fragment.js?v=10"></script>
 <script src="js/core.js?v=18"></script>
-<script src="js/app.js?v=34"></script>
+<script src="js/app.js?v=35"></script>
 </body>
 </html>
