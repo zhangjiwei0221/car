@@ -76,6 +76,12 @@ function regions() {
 }
 const reg = regions();
 const totals = {};
+// 【2026-11-03】图边框（开局可达）每色像素数——陷阱大车不能超过这个的 1.3 倍，
+// 否则 167 这种车会又大又没用（玩家一看就知道吃不满，直接懵）
+const edgeReach = {};
+for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
+  if (y === 0 || x === 0 || y === R - 1 || x === C - 1) edgeReach[g[y][x]] = (edgeReach[g[y][x]] || 0) + 1;
+}
 for (const col of Object.keys(reg)) totals[col] = reg[col].reduce((a, r) => a + r.length, 0);
 
 // ---------- 债注入计划（可选） ----------
@@ -122,12 +128,17 @@ function splitAll(targetSize) {
       // 但先取小车则大车最终能吃满（总量守恒），所以最优路线仍然可通。
       const TRAP_RATIO = Number(arg('--trap-ratio', '0.3'));
       // 陷阱色取「最大的几个颜色」——小色设陷阱玩家根本碰不到，等于没设
-      const _sortedCols = Object.keys(reg).sort((a, b) => totals[b] - totals[a]);
+      // 陷阱色改选「开局可达量小」的颜色：陷阱车只要略大于可达量就有效，
+      // 选大色会逼出 94/167 这种大得离谱的车（用户：太巨大了）
+      const _sortedCols = Object.keys(reg).filter(c2 => (edgeReach[c2] || 0) > 0)
+        .sort((a, b) => (edgeReach[a] || 0) - (edgeReach[b] || 0));
       const _trapN = Math.max(1, Math.round(_sortedCols.length * TRAP_RATIO));
       const _rank = _sortedCols.indexOf(String(col));
       const isTrap = (pool.length >= 40) && _rank >= 0 && _rank < _trapN;
       if (isTrap) {
-        const bigN = Math.max(targetSize, Math.round(pool.length * 0.55));
+        const _reach = edgeReach[col] || 0;
+        const _capBig = _reach > 0 ? Math.round(_reach * 1.3) : Math.round(pool.length * 0.55);
+        const bigN = Math.max(targetSize, Math.min(Math.round(pool.length * 0.55), _capBig));
         const restN = pool.length - bigN;
         const k = Math.max(2, Math.round(restN / targetSize));
         const counts2 = [bigN];
