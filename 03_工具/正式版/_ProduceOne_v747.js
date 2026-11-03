@@ -24,6 +24,7 @@ if (PRESET) console.log(`档位 ${TIER}：目标 at4≥${PRESET.at4}${PRESET.max
 const ROUNDS = arg('--rounds', '3'), SAMPLES = arg('--samples', '120');
 const REF = arg('--ref', 'corner');
 const PLAN = has('--plan');
+const SCRIPT = arg('--script', '');   // 【2026-11-03】剧本文件（分段压力契约）
 let ATTEMPTS = Number(arg('--attempts', PRESET ? String(PRESET.attempts) : '3'));
 let T_AT4 = Number(arg('--target-at4', PRESET ? String(PRESET.at4) : '20'));
 let T_RUN4 = Number(arg('--target-run4', PRESET ? String(PRESET.run4) : '12'));
@@ -99,11 +100,19 @@ for (const board of boardList) {
   const arl = arlCheck(src);
   const passN = arl.rules.filter(r => r[1]).length;
   const hit = arl.pass;
-  // best 选法：通过项数优先；同项数时再看压力（easy 档保留窗口偏好）
-  const score = (TIER === 'easy')
-    ? passN * 10000 - (Math.abs(m.at4 - 15) * 10) - (m.at4 > 18 ? (m.at4 - 18) * 20 : 0) + m.run4 * 0.2
-    : passN * 10000 + (m.at4 + m.run4 * 0.5 + m.late4 * 2);
-  console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：13项 ${passN}/13 at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★13项全过' : ''}`);
+  // best 选法：剧本匹配度优先（若给了剧本），其次通过项数，最后看压力
+  let scriptScore = null;
+  if (SCRIPT) {
+    const sr = spawnSync('node', ['03_工具/正式版/ScriptScore_v798.js', src, '--script', SCRIPT, '--json'],
+      { cwd: path.resolve(__dirname, '../..'), encoding: 'utf8' });
+    try { scriptScore = JSON.parse(sr.stdout).score; } catch (e) { scriptScore = null; }
+  }
+  const score = (scriptScore != null)
+    ? scriptScore * 100000 + passN * 10000 + (m.at4 + m.run4 * 0.5)
+    : (TIER === 'easy')
+      ? passN * 10000 - (Math.abs(m.at4 - 15) * 10) - (m.at4 > 18 ? (m.at4 - 18) * 20 : 0) + m.run4 * 0.2
+      : passN * 10000 + (m.at4 + m.run4 * 0.5 + m.late4 * 2);
+  console.log(`  尝试${attempt}（seed=${seed} rounds=${rounds} samples=${samples}）：13项 ${passN}/13${scriptScore != null ? ' 剧本' + scriptScore + '%' : ''} at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}${hit ? ' ★13项全过' : ''}`);
   if (!bestRes || score > bestRes.score) bestRes = { src, m, score, attempt };
   if (hit) break outer;
   }
