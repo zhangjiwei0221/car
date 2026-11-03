@@ -24,6 +24,10 @@ const out = arg('--out', '实验关/关卡拼接/v14_self/关卡_自切_v722.jso
 const rows = Number(arg('--rows', 7));
 const cols = Number(arg('--cols', 7));
 const boxMin = Number(arg('--box-min', 18));
+// 【2026-11-03】--by-order：按消除顺序（corner 的 D 值）切车，容量递减
+// 动机：现在每辆车都切 25，但中后段各色只剩 4~25 像素 → 永远吃不满 → 「没得选」
+const BY_ORDER = process.argv.includes('--by-order');
+const ORDER_RATIO = Number(arg('--order-ratio', '0.75'));
 const boxMax = Number(arg('--box-max', 46));
 const seed = Number(arg('--seed', 1001));
 const debtColors = Number(arg('--debt-colors', 0));
@@ -100,8 +104,40 @@ function splitAll(targetSize) {
     const debtNeed = debtPlan[col];
     const pool = [];
     for (const region of reg[col]) for (const p of region) pool.push(p);
-    pool.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+    if (BY_ORDER) {
+      // D 值 = (最后一行-行) + 列，升序 = 先被消的在前
+      pool.sort((a, b) => (((R - 1 - a[0]) + a[1]) - ((R - 1 - b[0]) + b[1])) || (a[0] - b[0]));
+    } else {
+      pool.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+    }
     let idx = 0;
+    if (BY_ORDER) {
+      // 固定车数，容量按几何级数递减：前面的车大（开局像素多），最后一辆很小（只剩几个）
+      const N = Math.max(1, Math.ceil(pool.length / targetSize));
+      const w = []; for (let i = 0; i < N; i++) w.push(Math.pow(ORDER_RATIO, i));
+      const ws = w.reduce((a, b) => a + b, 0);
+      const counts = w.map(x => Math.max(4, Math.round(pool.length * x / ws)));
+      let diff = pool.length - counts.reduce((a, b) => a + b, 0);
+      let guard2 = 0;
+      while (diff !== 0 && guard2++ < 500) {
+        if (diff > 0) { counts[0] += diff; diff = 0; }
+        else { const j = counts.findIndex(c => c > 4); if (j < 0) break; counts[j]--; diff++; }
+      }
+      let idx2 = 0;
+      for (const cnt of counts) {
+        if (idx2 >= pool.length) break;
+        const take = Math.min(cnt, pool.length - idx2);
+        const chunk = pool.slice(idx2, idx2 + take);
+        idx2 += take;
+        if (chunk.length) out.push({ color: Number(col), cells: chunk, count: chunk.length, first: chunk[0] });
+      }
+      if (idx2 < pool.length) {
+        const rest = pool.slice(idx2);
+        if (out.length && out[out.length - 1].color === Number(col)) { out[out.length - 1].count += rest.length; out[out.length - 1].cells = out[out.length - 1].cells.concat(rest); }
+        else out.push({ color: Number(col), cells: rest, count: rest.length, first: rest[0] });
+      }
+      continue;
+    }
     if (debtNeed && debtNeed > 0) {
       const chunk = pool.slice(0, debtNeed);
       out.push({ color: Number(col), cells: chunk, count: chunk.length, first: chunk[0] });
