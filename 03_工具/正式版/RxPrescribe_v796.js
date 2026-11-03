@@ -44,6 +44,7 @@ const rand = () => {
 };
 const shuffle = a => { const x = a.slice(); for (let i = x.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [x[i], x[j]] = [x[j], x[i]]; } return x; };
 
+const colorOf = (gg, r, c) => (gg.spools[r] && gg.spools[r][c] ? gg.spools[r][c].id : '?');
 const typesOf = s => (s ? (Array.isArray(s.type) ? s.type : [s.type || 0]) : []);
 const isPlain = s => { if (!s || !(s.id > 0)) return false; const t = typesOf(s); return !t.includes(5) && !t.includes(6) && !t.includes(7); };
 const isIce = s => typesOf(s).includes(7);
@@ -185,7 +186,7 @@ if (!HARD(cur)) {
   if (!HARD(quick(g)) && quick(g).mid3 < 15) {
     const useIce = rand() < 0.5;
     if (useIce) {
-      for (const [r, c, delay] of shuffle(iceCandidates(g))) {
+      for (const [r, c, delay, st] of iceCandidates(g)) {   // 已按被取步数排序，不 shuffle
         const old = { type: g.spools[r][c].type, param: g.spools[r][c].param };
         if (tryDrug(`冰(${r},${c})`,
           () => { g.spools[r][c].type = 7; g.spools[r][c].param = delay; },
@@ -220,9 +221,9 @@ if (!HARD(cur)) {
   for (const kind of shuffle(plan)) {
     if (!HARD(quick(g))) { log.push('硬门被破坏，停止加药'); break; }
     if (kind === 'ice') {
-      for (const [r, c, delay] of shuffle(iceCandidates(g))) {
+      for (const [r, c, delay, st] of iceCandidates(g)) {   // 已按被取步数排序，不 shuffle
         const old = { type: g.spools[r][c].type, param: g.spools[r][c].param };
-        if (tryDrug(`冰(${r},${c}) 数字${delay}`,
+        if (tryDrug(`冰(${r},${c})【色${colorOf(g,r,c)} 原本第${st}步就被取，冻结到第${delay}步】`,
           () => { g.spools[r][c].type = 7; g.spools[r][c].param = delay; },
           () => { g.spools[r][c].type = old.type; g.spools[r][c].param = old.param; },
           (b, a) => HARD(a))) { nIce++; break; }
@@ -236,12 +237,14 @@ if (!HARD(cur)) {
           (b, a) => HARD(a))) { nChain++; break; }
       }
     } else {
+      const freq = fillFrequency(g);
       const marks = [];
-      for (let r = 1; r < rows; r++) for (let c = 0; c < cols; c++) if (isPlain(g.spools[r][c])) marks.push([r, c]);
-      for (const [r, c] of shuffle(marks)) {
+      for (let r = 1; r < rows; r++) for (let c = 0; c < cols; c++) if (isPlain(g.spools[r][c])) marks.push([r, c, freq.get(r + ',' + c) || 0]);
+      marks.sort((a, b) => b[2] - a[2]);   // 【有理有据】优先给「最常能吃满」的车
+      for (const [r, c, fq] of marks) {
         const s = g.spools[r][c];
         const old = { type: s.type, param: s.param, q: s.q };
-        if (tryDrug(`问号(${r},${c})`,
+        if (tryDrug(`问号(${r},${c})【色${colorOf(g,r,c)} 在 ${fq} 个时刻都能一口吃满，隐藏它】`,
           () => { const t = typesOf(s); if (!t.includes(6)) t.push(6); s.type = t; s.q = true; },
           () => { s.type = old.type; s.param = old.param; s.q = old.q; },
           (b, a) => HARD(a))) { nQ++; break; }
@@ -271,10 +274,39 @@ function iceCandidates(gg) {
     if (!isPlain(s)) continue;
     const st = map.get(r + ',' + c);
     if (!st) continue;
-    if (st < steps * 0.2 || st > steps * 0.8) continue;   // 只冻中段的车
-    out.push([r, c, Math.min(steps - 1, st + 4 + Math.floor(rand() * 6))]);
+    if (st < steps * 0.2 || st > steps * 0.8) continue;
+    out.push([r, c, Math.min(steps - 1, st + 4 + Math.floor(rand() * 6)), st, s.id]);
   }
+  // 【有理有据】按「被取步数」升序：越早被取的车，冻住它越能推迟第一波债务
+  out.sort((a, b) => a[3] - b[3]);
   return out;
+}
+
+/** 每辆车「能吃满」的步数（越多越容易被玩家一眼看中 → 适合加问号） */
+function fillFrequency(gg) {
+  const { o } = solve(gg);
+  const H = gg.blocks.length, W = gg.blocks[0].length, rows = gg.spools.length, cols = gg.spools[0].length;
+  const col = gg.blocks.map(r => r.slice()), gone = gg.blocks.map(r => r.map(() => false));
+  const reach = (y, x) => y === 0 || x === 0 || y === H - 1 || x === W - 1 ||
+    gone[y - 1][x] || gone[y + 1][x] || gone[y][x - 1] || gone[y][x + 1];
+  const picks = (o.pickOrder || []).filter(p => p.chainIndex === 0);
+  const taken = new Set(), freq = new Map();
+  for (const p of picks) {
+    const cnt = {};
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || !reach(y, x)) continue; cnt[col[y][x]] = (cnt[col[y][x]] || 0) + 1; }
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const s = gg.spools[r][c];
+      if (!s || !(s.id > 0) || taken.has(r + ',' + c) || s.q) continue;
+      if ((cnt[s.id] || 0) >= s.count) freq.set(r + ',' + c, (freq.get(r + ',' + c) || 0) + 1);
+    }
+    const c0 = p.color, list = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || col[y][x] !== c0 || !reach(y, x)) continue; list.push([(H - 1 - y) + x, y, x]); }
+    list.sort((a, b) => a[0] - b[0]);
+    let n = 0;
+    for (const [, y, x] of list) { if (n >= p.count) break; gone[y][x] = true; n++; }
+    taken.add(p.r + ',' + p.c);
+  }
+  return freq;
 }
 function nextGroup(gg) {
   let n = 1;
