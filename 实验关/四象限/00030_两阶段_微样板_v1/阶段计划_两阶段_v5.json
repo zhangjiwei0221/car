@@ -1,0 +1,126 @@
+{
+  "name": "香肠→香蕉两阶段微样板（玩家稳定版）",
+  "source": "目标图_香肠香蕉_40x20.txt",
+  "stageOrder": [
+    "香肠",
+    "香蕉"
+  ],
+  "stages": [
+    {
+      "subject": "香肠",
+      "frameColor": 1,
+      "doorCar": {
+        "color": 1,
+        "count": 35,
+        "position": [
+          0,
+          0
+        ],
+        "ice": false
+      },
+      "allowedFrameColors": [
+        1
+      ],
+      "forbiddenFrameColors": [
+        15
+      ],
+      "allowedNonFrameColors": [
+        32,
+        33,
+        26,
+        27,
+        30,
+        13,
+        19,
+        24,
+        29,
+        7,
+        22,
+        28
+      ],
+      "intent": "红门先开；白车和异色车在主体内形成半消债务；香蕉框车不得进入可选池",
+      "completionGate": {
+        "subject": "香肠",
+        "progressPct": 65
+      }
+    },
+    {
+      "subject": "香蕉",
+      "frameColor": 15,
+      "doorCar": {
+        "color": 15,
+        "count": 35,
+        "position": [
+          4,
+          4
+        ],
+        "ice": false
+      },
+      "allowedFrameColors": [
+        15,
+        1
+      ],
+      "forbiddenFrameColors": [
+        1
+      ],
+      "allowedNonFrameColors": [
+        32,
+        33,
+        26,
+        27,
+        30,
+        13,
+        19,
+        24,
+        29,
+        7,
+        22,
+        28
+      ],
+      "intent": "香蕉框车在香肠达到阶段门槛后才可进入；香蕉背景用于偿还跨阶段债务",
+      "completionGate": {
+        "subject": "香蕉",
+        "progressPct": 100
+      }
+    }
+  ],
+  "verification": {
+    "minBufferRoute": {
+      "steps": 43,
+      "peak": 4,
+      "completed": 43,
+      "total": 43,
+      "capacity": 800,
+      "capacityOk": true
+    },
+    "frame15FirstSelectableStep": 20,
+    "atStep20": {
+      "sausageProgressPct": 76.8,
+      "bananaProgressPct": 5.8,
+      "buffer": 3
+    },
+    "doorIce": {
+      "1": false,
+      "15": false
+    },
+    "note": "ArlCheck 全量仍未通过；此样板只验证阶段框车时机和两阶段因果链。"
+  },
+  "debtEvents": [
+    {
+      "id": "blue_33_long_debt",
+      "color": 33,
+      "need": 49,
+      "enterStage": "香肠",
+      "releaseStage": "香蕉",
+      "minHoldSteps": 10
+    },
+    {
+      "id": "white_32_cross_stage",
+      "color": 32,
+      "need": 50,
+      "enterStage": "香肠",
+      "releaseStage": "香蕉",
+      "minHoldSteps": 2
+    }
+  ]
+}
