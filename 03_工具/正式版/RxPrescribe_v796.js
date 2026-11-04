@@ -346,7 +346,7 @@ fs.writeFileSync(OUT, JSON.stringify(out));
 // ── 13 项总闸：处方后"通过的项数"必须不少于处方前，否则整体回滚 ──
 // 局部判据（HARD）只能看到曲线，看不到容错/决策度；这一步兜底，保证不会把好关改坏。
 if (!QUIET) {
-  const { check } = require('./ArlCheck_v792');
+  const { check } = require('./ArlCheck_v793');
   const passed = f => check(f).rules.filter(r => r[1]).length;
   let p0 = null, p1 = null;
   try { p0 = passed(FILE); p1 = passed(OUT); } catch (e) { /* 校验失败就不拦 */ }

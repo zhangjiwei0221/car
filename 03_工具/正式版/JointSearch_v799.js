@@ -47,7 +47,7 @@ function run(args) {
   return { ok: r.status === 0, out: (r.stdout || '') + (r.stderr || '') };
 }
 
-const { check } = require('./ArlCheck_v792');
+const { check } = require('./ArlCheck_v793');
 function scoreOf(file) {
   try {
     const r = check(file);
