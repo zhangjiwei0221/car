@@ -34,6 +34,7 @@ const USE_PLAN = !process.argv.includes('--no-plan');   // 障碍预算（墙/�
 const TRAPS = String(arg('--traps', '')).split(',').filter(Boolean).map(Number);   // 顺序陷阱比例
 const EDGE_BIG = Number(arg('--edge-big', '0.25'));
 const WITH_TOPO = process.argv.includes('--with-topo');   // 默认只扫切车，加速
+const PIPE = Number(arg('--pipe', '2'));   // 【2026-11-04】管道数量（用户要 1–2；0=不加）
 const SEEDS = String(arg('--seeds', String(SEED))).split(',').filter(Boolean).map(Number);  // 多 seed 取最好
 
 if (!TARGET) { console.error('用法：node JointSearch_v799.js --target <图.txt> --outdir <目录>'); process.exit(2); }
@@ -86,7 +87,9 @@ for (const { ratio, trap, sd } of COMBOS) {
   // 障碍预算（原来漏了这一步；_ProduceOne 里是有的）
   if (USE_PLAN) {
     const pl = path.join(OUTDIR_ABS, `${base}.${tag}.plan.json`);
-    run(['03_工具/正式版/ObstaclePlan_v745.js', bl, '--ref', REF, '--out', pl]);
+    // 【2026-11-04】--no-ice：跳过 ObstaclePlan 里的慢速冰搜索（LateIceSearch 每关要跑 1-2 分钟），
+    // 冰改由 RxPrescribe 统一加（4–8 块，带理由、带复测）
+    run(['03_工具/正式版/ObstaclePlan_v745.js', bl, '--ref', REF, '--out', pl, '--no-ice']);
     if (fs.existsSync(abs(pl))) bl = pl;
   }
   const s0 = scoreOf(bl);
@@ -107,9 +110,15 @@ for (const { ratio, trap, sd } of COMBOS) {
     if (s1.p > best.p) best = { file: tp, p: s1.p, tag, fail: s1.fail };
 
     for (const rs of RX_SEEDS) {
-      const rx = path.join(OUTDIR_ABS, `${base}.${tag}.topo${ts}.rx${rs}.json`);
+      let rx = path.join(OUTDIR_ABS, `${base}.${tag}.topo${ts}.rx${rs}.json`);
       run(['03_工具/正式版/RxPrescribe_v796.js', tp, '--out', rx, '--seed', String(SEED + rs), '--ref', REF]);
       if (!fs.existsSync(abs(rx))) continue;
+      // 【2026-11-04 用户】加管道 1–2 个（原来产线从不加）
+      if (PIPE > 0) {
+        const pip = path.join(OUTDIR_ABS, `${base}.${tag}.topo${ts}.rx${rs}.pipe.json`);
+        run(['03_工具/正式版/PipeConvert_v772.js', rx, '--out', pip, '--count', String(PIPE), '--ref', REF]);
+        if (fs.existsSync(abs(pip))) rx = pip;
+      }
       const s2 = scoreOf(rx);
       report.push({ stage: 'rx', ratio, tag, topoSeed: ts, rxSeed: rs, p: s2.p, fail: s2.fail });
       console.log(`[${tag}] +拓扑+处方(seed ${rs})：${s2.p}/${s2.total}${s2.p > s1.p ? ' ↑' : ''}`);

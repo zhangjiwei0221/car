@@ -9,6 +9,7 @@ const B = require('./Build006Thickness_v688');
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const FILE = process.argv[2];
 const REF = String(arg('--ref', 'ring'));
+const NO_ICE = process.argv.includes('--no-ice');   // 【2026-11-04】跳过慢速冰搜索（改由 RxPrescribe 加冰）
 const MODE = 'a';
 const NO_EMPTY = !process.argv.includes('--allow-empty');
 const STACK = Number(arg('--stack', '1'));   // 在最优结果上继续叠障碍的次数上限   // 默认不允许棋盘出现空格
@@ -75,10 +76,13 @@ else console.log('  墙：无候选');
 
 // 2) 单障碍：冰
 console.log('\n[2/3] 冰搜索…');
+if (NO_ICE) { console.log('  冰：跳过（--no-ice，交给 RxPrescribe）'); }
+else {
 const iOut = `${TMPDIR}/ice.json`;
 run([`${TOOL}/LateIceSearch_v743.js`, FILE, '--out', iOut, '--ref', REF, '--mode', MODE, '--max-ice', '3']);
 if (fs.existsSync(iOut)) { const m = metrics(iOut); cands.push({ name: 'ice', file: iOut, m }); console.log(`  冰 → at4=${m.at4} run4=${m.run4} late4=${m.late4} 峰值${m.peak}`); }
 else console.log('  冰：无候选');
+}
 
 // 3) 单障碍：管道
 console.log('\n[3/3] 管道搜索…');
@@ -94,7 +98,7 @@ if (FAST) {
   const base0 = cands.find(c => c.name === 'base');
   let bestSoFar = cands[0];
   if (NEED_AT4 && spaceBest && score(spaceBest.m) > score(base0.m)) bestSoFar = spaceBest;
-  if (NEED_LATE) {
+  if (NEED_LATE && !NO_ICE) {
     const out = `${TMPDIR}/fast_ice.json`;
     console.log(`\n[决策] 在 ${bestSoFar.name} 上补冰（只跑一次）…`);
     run([`${TOOL}/LateIceSearch_v743.js`, bestSoFar.file, '--out', out, '--ref', REF, '--mode', MODE, '--max-ice', '2']);

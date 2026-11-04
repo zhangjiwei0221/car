@@ -113,6 +113,7 @@ function tryDrug(name, apply, undo, better) {
   if (!cap.ok) { undo(); log.push(`${name}：破坏容量/空格，撤回`); return false; }
   const after = quick(g);
   if (!after.won) { undo(); log.push(`${name}：导致不可通关，撤回`); return false; }
+  if (process.env.RX_DEBUG) log.push(`[dbg] ${name} won=${after.won} better=${better(before, after)} peak ${before.peak}->${after.peak} mid ${before.mid3}->${after.mid3}`);
   if (!better(before, after)) { undo(); log.push(`${name}：复测无改善，撤回`); return false; }
   log.push(`${name}：✅ 保留（${describe(before)} → ${describe(after)}）`);
   return true;
@@ -124,6 +125,15 @@ const describe = m => `峰${m.peak} 中${m.mid3} 后${m.tail3}/${m.tailRun}`;
 // 让它卡在硬门里只会让整关放弃加药，所以单独当症状处理，不阻塞后面的多样化。
 const HARD = m => m.won && m.peak === 4 && m.early4 === 0 &&
   m.mid3 >= 15 && m.tail3 >= 3 && m.tailRun >= 3 && m.at4 >= 5;
+
+/**
+ * 【2026-11-04 用户】放宽判据：原来加冰必须"硬门全过"，而冰几乎必然让某项变差 →
+ * 冰永远被撤回（实测 10 张里只有 1 张留下冰）。
+ * 现在：只要能通关 + 别比原来差太多，就保留。
+ */
+// 【2026-11-04 用户】再放宽到"只要还能通关就留"——用户明确要冰 4–8 块，
+// 之前的三重条件让 9/10 张图一块冰都留不下（实测：全是"复测无改善，撤回"）。
+const LOOSE = (a, b) => a.won;
 
 let cur = quick(g);
 log.push(`基线：${describe(cur)} 硬门${HARD(cur) ? '过' : '不过'}`);
@@ -208,7 +218,8 @@ if (!HARD(cur)) {
 // ═══ 二、多样化（硬门过了 → 随机组合，仍然守住硬门）═══
 // 这一步才是"公式化"的解药：同一张图用不同障碍组合达成同样的硬门。
 {
-  const wantIce = Math.floor(rand() * 3);     // 0–2 块
+  // 【2026-11-04 用户】冰 0–2 → 4–8 块（用户喜欢障碍多；每块仍要复测，破了就撤）
+  const wantIce = 4 + Math.floor(rand() * 5); // 4–8 块
   const wantChain = Math.floor(rand() * 3);   // 0–2 组
   const wantQ = 1 + Math.floor(rand() * 4);   // 1–4 个
   const plan = [];
@@ -219,14 +230,16 @@ if (!HARD(cur)) {
 
   let nIce = 0, nChain = 0, nQ = 0;
   for (const kind of shuffle(plan)) {
-    if (!HARD(quick(g))) { log.push('硬门被破坏，停止加药'); break; }
+    // 【2026-11-04 用户】原来这里用 HARD 拦：基线硬门本就不过的关（mid3<15）会直接 break，
+    // 一块药都加不上（实测 9/10 张图冰=0 的真凶）。改为只要还能通关就继续加。
+    if (!quick(g).won) { log.push('关卡已不可通关，停止加药'); break; }
     if (kind === 'ice') {
       for (const [r, c, delay, st] of iceCandidates(g)) {   // 已按被取步数排序，不 shuffle
         const old = { type: g.spools[r][c].type, param: g.spools[r][c].param };
         if (tryDrug(`冰(${r},${c})【色${colorOf(g,r,c)} 原本第${st}步就被取，冻结到第${delay}步】`,
           () => { g.spools[r][c].type = 7; g.spools[r][c].param = delay; },
           () => { g.spools[r][c].type = old.type; g.spools[r][c].param = old.param; },
-          (b, a) => HARD(a))) { nIce++; break; }
+          (b, a) => LOOSE(a, b))) { nIce++; break; }   // 【2026-11-04 用户】放宽：不再要求"硬门全过"，只要不整体变差
       }
     } else if (kind === 'chain') {
       for (const trio of shuffle(chainCandidates(g))) {
@@ -234,7 +247,7 @@ if (!HARD(cur)) {
         if (tryDrug(`三连(${trio[0]})`,
           () => { const grp = nextGroup(g); trio.forEach(([r, c]) => { g.spools[r][c].type = 5; g.spools[r][c].param = grp; }); },
           () => trio.forEach(([r, c], i) => { g.spools[r][c].type = old[i].type; g.spools[r][c].param = old[i].param; }),
-          (b, a) => HARD(a))) { nChain++; break; }
+          (b, a) => LOOSE(a, b))) { nChain++; break; }
       }
     } else {
       const freq = fillFrequency(g);
@@ -247,7 +260,7 @@ if (!HARD(cur)) {
         if (tryDrug(`问号(${r},${c})【色${colorOf(g,r,c)} 在 ${fq} 个时刻都能一口吃满，隐藏它】`,
           () => { const t = typesOf(s); if (!t.includes(6)) t.push(6); s.type = t; s.q = true; },
           () => { s.type = old.type; s.param = old.param; s.q = old.q; },
-          (b, a) => HARD(a))) { nQ++; break; }
+          (b, a) => LOOSE(a, b))) { nQ++; break; }
       }
     }
   }
