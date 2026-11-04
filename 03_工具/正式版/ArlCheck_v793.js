@@ -193,35 +193,24 @@ function check(f) {
   const pPeak = med(runs.map(r => r.max));
 
   // 决策度
-  const H = g.blocks.length, W = g.blocks[0].length, rows = g.spools.length, cols = g.spools[0].length;
-  const col = g.blocks.map(r => r.slice());
-  const gone = g.blocks.map(r => r.map(() => false));
-  const reach = (y, x) => y === 0 || x === 0 || y === H - 1 || x === W - 1 ||
-    gone[y - 1][x] || gone[y + 1][x] || gone[y][x - 1] || gone[y][x + 1];
-  const picks = (o.pickOrder || []).filter(p => p.chainIndex === 0);
-  const taken = new Set(); let good = 0, dead = 0;
-  // 【v793 修正】只有"棋盘上暴露的格子"才能选：边框行/列，或与已取走的空位相邻
-  const tc = g.spools.map(r => r.map(() => false));
-  const exposedAt = (r, c) => (r === 0 || c === 0 || r === rows - 1 || c === cols - 1) ||
-    tc[r - 1] && tc[r - 1][c] || tc[r + 1] && tc[r + 1][c] || tc[r][c - 1] || tc[r][c + 1];
-  for (const p of picks) {
-    const cnt = {};
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || !reach(y, x)) continue; const cc = col[y][x]; cnt[cc] = (cnt[cc] || 0) + 1; }
-    let avail = 0, fill = 0;
-    for (let r = 0; r < rows; r++) for (let c2 = 0; c2 < cols; c2++) {
-      const s = g.spools[r][c2]; if (!s || !(s.id > 0) || taken.has(r + ',' + c2)) continue;
-      if (!exposedAt(r, c2)) continue;
-      const t = Array.isArray(s.type) ? s.type : [s.type || 0]; if (t.includes(7)) continue;
-      avail++; if (!s.q && (cnt[s.id] || 0) >= s.count) fill++;
+  // 【2026-11-04 用户】原实现只数"暴露格"（7×7 边框有 24 格 → 动不动报"可选16辆"），
+  // 但真正能点的只有 listMoves 过滤 blocked 之后的那几辆（暂存满/链组放不下会被排除）。
+  // 现在改用 Simulator 真实逐步模拟：每步看"能吃满的有几种颜色"。
+  let good = 0, dead = 0, simErr = null;
+  const totalPicks = (o.pickOrder || []).filter(p => p.chainIndex === 0).length;
+  {
+    const Sim = A.Simulator;
+    const st = Sim.enter(lv, { useSlotStart: true, instantChain: false });
+    const picks = (o.pickOrder || []).filter(p => p.chainIndex === 0);
+    for (const p of picks) {
+      if (!st || st.gameOver) break;
+      const moves = Sim.listMoves(st).filter(m => !m.blocked);
+      const canFill = moves.filter(m => m.canConsume);
+      const colorSet = new Set(canFill.map(m => m.antBox.color));
+      if (colorSet.size >= 2) good++;   // 至少两种颜色都能吃满 = 真选择
+      if (colorSet.size <= 1) dead++;   // 0 或 1 种 = 没得选
+      try { Sim.applyPick(st, p.r, p.c); } catch (e) { simErr = e.message; break; }
     }
-    if (avail >= 2 && fill >= 1 && fill < avail) good++;
-    if (fill === 0) dead++;
-    const c0 = p.color, list = [];
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || col[y][x] !== c0 || !reach(y, x)) continue; list.push([(H - 1 - y) + x, y, x]); }
-    list.sort((a, b) => a[0] - b[0]); let n = 0;
-    for (const [d, y, x] of list) { if (n >= p.count) break; gone[y][x] = true; n++; }
-    taken.add(p.r + ',' + p.c);
-    tc[p.r][p.c] = true;
   }
 
   // 容量/空格
@@ -271,7 +260,7 @@ function check(f) {
       return ob.slice(e2, t2).filter(v => v >= 3).length + '/' + (t2 - e2);
     })(), true],
     ['（参考）全知 at4', true, a4, true],
-    ['决策度≥15', good >= 15, good + '/' + picks.length],
+    ['决策度≥15', good >= 15, good + '/' + totalPicks],
     // 【2026-11-03 用户选 B】改软项：用户已明确「必须选某色解锁不是问题」
     ['没得选', true, dead, true],
     ['at4≥5', a4 >= 5, a4],
