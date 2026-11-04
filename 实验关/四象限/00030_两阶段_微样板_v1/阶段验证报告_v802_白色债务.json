@@ -1,0 +1,211 @@
+{
+  "tool": "StagePlanCheck_v802",
+  "level": "实验关/四象限/00030_两阶段_微样板_v1/关卡_两阶段_白色债务_v2.json",
+  "plan": "实验关/四象限/00030_两阶段_微样板_v1/阶段计划_两阶段_v2.json",
+  "minRoute": {
+    "completed": true,
+    "steps": 43,
+    "maxBuffer": 4,
+    "completedBoxes": 43,
+    "totalBoxes": 43
+  },
+  "stages": [
+    {
+      "stage": 1,
+      "subject": "香肠",
+      "frameColor": 1,
+      "frameFirstSelectableStep": 1,
+      "completionGatePct": 76.8,
+      "gateReachedStep": 40,
+      "progressAtGate": {
+        "香肠": {
+          "name": "主体图纸库_50张/烤肠-1",
+          "done": 120,
+          "total": 155,
+          "pct": 77.4
+        },
+        "香蕉": {
+          "name": "主体图纸库_50张/香蕉-1",
+          "done": 173,
+          "total": 173,
+          "pct": 100
+        }
+      },
+      "doorIced": false,
+      "allowedFrameColors": [
+        1
+      ],
+      "allowedNonFrameColors": [
+        32,
+        33,
+        26,
+        27,
+        30,
+        13,
+        19,
+        24,
+        29,
+        7,
+        22,
+        28
+      ],
+      "forbiddenFramesBeforeGate": [
+        15
+      ],
+      "unlistedColors": []
+    },
+    {
+      "stage": 2,
+      "subject": "香蕉",
+      "frameColor": 15,
+      "frameFirstSelectableStep": 22,
+      "completionGatePct": 100,
+      "gateReachedStep": 40,
+      "progressAtGate": {
+        "香肠": {
+          "name": "主体图纸库_50张/烤肠-1",
+          "done": 120,
+          "total": 155,
+          "pct": 77.4
+        },
+        "香蕉": {
+          "name": "主体图纸库_50张/香蕉-1",
+          "done": 173,
+          "total": 173,
+          "pct": 100
+        }
+      },
+      "doorIced": false,
+      "allowedFrameColors": [
+        15,
+        1
+      ],
+      "allowedNonFrameColors": [
+        32,
+        33,
+        26,
+        27,
+        30,
+        13,
+        19,
+        24,
+        29,
+        7,
+        22,
+        28
+      ],
+      "forbiddenFramesBeforeGate": [
+        15
+      ],
+      "unlistedColors": []
+    }
+  ],
+  "debtEvents": [
+    {
+      "id": "blue_33_long_debt",
+      "color": 33,
+      "need": 49,
+      "enterStep": 23,
+      "enterStage": 2,
+      "releaseStep": 24,
+      "releaseStage": 2,
+      "holdSteps": 1,
+      "expectedEnterStage": "香肠",
+      "expectedReleaseStage": "香蕉",
+      "minHoldSteps": 10,
+      "pass": false
+    },
+    {
+      "id": "white_32_cross_stage",
+      "color": 32,
+      "need": 80,
+      "enterStep": 14,
+      "enterStage": 1,
+      "releaseStep": 23,
+      "releaseStage": 2,
+      "holdSteps": 9,
+      "expectedEnterStage": "香肠",
+      "expectedReleaseStage": "香蕉",
+      "minHoldSteps": 5,
+      "pass": true
+    }
+  ],
+  "bufferEvents": [
+    {
+      "type": "enter",
+      "step": 14,
+      "key": 14,
+      "color": 32,
+      "need": 80,
+      "progress": 40,
+      "remaining": 40
+    },
+    {
+      "type": "enter",
+      "step": 23,
+      "key": 23,
+      "color": 33,
+      "need": 49,
+      "progress": 48,
+      "remaining": 1
+    },
+    {
+      "type": "release",
+      "step": 23,
+      "key": 14,
+      "color": 32,
+      "need": 80,
+      "progress": 58,
+      "remaining": 22
+    },
+    {
+      "type": "enter",
+      "step": 24,
+      "key": 24,
+      "color": 32,
+      "need": 12,
+      "progress": 7,
+      "remaining": 5
+    },
+    {
+      "type": "release",
+      "step": 24,
+      "key": 23,
+      "color": 33,
+      "need": 49,
+      "progress": 48,
+      "remaining": 1
+    },
+    {
+      "type": "release",
+      "step": 29,
+      "key": 24,
+      "color": 32,
+      "need": 12,
+      "progress": 8,
+      "remaining": 4
+    }
+  ],
+  "finalProgress": {
+    "香肠": {
+      "name": "主体图纸库_50张/烤肠-1",
+      "done": 155,
+      "total": 155,
+      "pct": 100
+    },
+    "香蕉": {
+      "name": "主体图纸库_50张/香蕉-1",
+      "done": 173,
+      "total": 173,
+      "pct": 100
+    }
+  },
+  "violations": [
+    "stage1: 后续框车在阶段门槛前提前进入 15",
+    "stage2: 框车 15 在第22步提前进入，上一阶段第40步才达到门槛",
+    "stage2: 框车 15 在上一阶段门槛前已进入可选池",
+    "debt blue_33_long_debt: 进入/释放阶段或持有步数不符合计划"
+  ],
+  "pass": false,
+  "note": "这是阶段结构验证，不等同于 ArlCheck 全量验收。"
+}
