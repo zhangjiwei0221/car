@@ -196,7 +196,7 @@ function check(f) {
   // 【2026-11-04 用户】原实现只数"暴露格"（7×7 边框有 24 格 → 动不动报"可选16辆"），
   // 但真正能点的只有 listMoves 过滤 blocked 之后的那几辆（暂存满/链组放不下会被排除）。
   // 现在改用 Simulator 真实逐步模拟：每步看"能吃满的有几种颜色"。
-  let good = 0, dead = 0, simErr = null;
+  let good = 0, dead = 0, simErr = null, openingPickable = 0;
   const totalPicks = (o.pickOrder || []).filter(p => p.chainIndex === 0).length;
   {
     const H = g.blocks.length, W = g.blocks[0].length;
@@ -206,6 +206,9 @@ function check(f) {
       gone[y - 1][x] || gone[y + 1][x] || gone[y][x - 1] || gone[y][x + 1];
     const Sim = A.Simulator;
     const st = Sim.enter(lv, { useSlotStart: true, instantChain: false });
+    // 【2026-11-04 用户】开局可点数量：字面意义"开局能看见几辆车"。
+    // 太窄（≤3）= "规定好的路"，用户实测 00025 就是这种。
+    openingPickable = Sim.listMoves(st).length;
     const picks = (o.pickOrder || []).filter(p => p.chainIndex === 0);
     for (const p of picks) {
       if (!st || st.gameOver) break;
@@ -281,6 +284,7 @@ function check(f) {
     })(), true],
     ['（参考）全知 at4', true, a4, true],
     // 【2026-11-04 用户定】决策度换成更直观的判据：没得选的步数 ≤ 总步数一半
+    ['开局可点≥5', openingPickable >= 5, openingPickable + ' 辆'],
     ['没得选≤一半', dead <= totalPicks / 2, dead + '/' + totalPicks],
     ['（参考）决策度', true, good + '/' + totalPicks, true],
     // 【2026-11-03 用户选 B】改软项：用户已明确「必须选某色解锁不是问题」
