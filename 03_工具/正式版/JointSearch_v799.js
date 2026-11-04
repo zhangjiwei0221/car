@@ -34,7 +34,12 @@ const USE_PLAN = !process.argv.includes('--no-plan');   // 障碍预算（墙/�
 const TRAPS = String(arg('--traps', '')).split(',').filter(Boolean).map(Number);   // 顺序陷阱比例
 const EDGE_BIG = Number(arg('--edge-big', '0.25'));
 const WITH_TOPO = process.argv.includes('--with-topo');   // 默认只扫切车，加速
-const PIPE = Number(arg('--pipe', '2'));   // 【2026-11-04】管道数量（用户要 1–2；0=不加）
+// 【2026-11-04 用户定 · 主线产线 v1.0】管道**默认不加**（--pipe 0）。
+// 原因：① 还没有"加管道是为了什么"的逻辑，硬加就是为加而加；
+//       ② 实测只放 1 辆车时，管道几乎只是把车推后，反而挤占了选择面；
+//       ③ 要加就得"一个管道里装 3 辆车"，那是另一套设计（未做）。
+// 想试的话仍可 --pipe N 手动开。
+const PIPE = Number(arg('--pipe', '0'));
 const SEEDS = String(arg('--seeds', String(SEED))).split(',').filter(Boolean).map(Number);  // 多 seed 取最好
 
 if (!TARGET) { console.error('用法：node JointSearch_v799.js --target <图.txt> --outdir <目录>'); process.exit(2); }
