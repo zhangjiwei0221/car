@@ -260,7 +260,9 @@ function check(f) {
       return ob.slice(e2, t2).filter(v => v >= 3).length + '/' + (t2 - e2);
     })(), true],
     ['（参考）全知 at4', true, a4, true],
-    ['决策度≥15', good >= 15, good + '/' + totalPicks],
+    // 【2026-11-04 用户定】决策度换成更直观的判据：没得选的步数 ≤ 总步数一半
+    ['没得选≤一半', dead <= totalPicks / 2, dead + '/' + totalPicks],
+    ['（参考）决策度', true, good + '/' + totalPicks, true],
     // 【2026-11-03 用户选 B】改软项：用户已明确「必须选某色解锁不是问题」
     ['没得选', true, dead, true],
     ['at4≥5', a4 >= 5, a4],
