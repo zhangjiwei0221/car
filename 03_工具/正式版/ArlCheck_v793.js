@@ -199,17 +199,37 @@ function check(f) {
   let good = 0, dead = 0, simErr = null;
   const totalPicks = (o.pickOrder || []).filter(p => p.chainIndex === 0).length;
   {
+    const H = g.blocks.length, W = g.blocks[0].length;
+    const col = g.blocks.map(r => r.slice());
+    const gone = g.blocks.map(r => r.map(() => false));
+    const reach = (y, x) => y === 0 || x === 0 || y === H - 1 || x === W - 1 ||
+      gone[y - 1][x] || gone[y + 1][x] || gone[y][x - 1] || gone[y][x + 1];
     const Sim = A.Simulator;
     const st = Sim.enter(lv, { useSlotStart: true, instantChain: false });
     const picks = (o.pickOrder || []).filter(p => p.chainIndex === 0);
     for (const p of picks) {
       if (!st || st.gameOver) break;
       const moves = Sim.listMoves(st).filter(m => !m.blocked);
-      const canFill = moves.filter(m => m.canConsume);
-      const colorSet = new Set(canFill.map(m => m.antBox.color));
-      if (colorSet.size >= 2) good++;   // 至少两种颜色都能吃满 = 真选择
-      if (colorSet.size <= 1) dead++;   // 0 或 1 种 = 没得选
+      // 【2026-11-04 用户定】"没得选"的真口径：
+      //   ① 只有 1 辆车能点；或
+      //   ② 能点的车都"吃不到什么"（该色可达像素 < 容量的一半）。
+      // 注意：5 辆车里 2 辆吃一半、1 辆吃得满 —— 这算**有得选**（看玩家会不会选错）。
+      // 所以「能吃满的车有几辆/几种颜色」都不能当判据，要看"能吃到多少"。
+      const cnt = {};
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || !reach(y, x)) continue; const cc = col[y][x]; cnt[cc] = (cnt[cc] || 0) + 1; }
+      const useful = moves.filter(m => {
+        const got = cnt[m.antBox.color] || 0;
+        return m.antBox.count > 0 && got / m.antBox.count >= 0.5;   // 能吃到一半以上
+      });
+      if (moves.length > 1 && useful.length > 0) good++;
+      else dead++;
       try { Sim.applyPick(st, p.r, p.c); } catch (e) { simErr = e.message; break; }
+      // 同步"已消除"到图上（口径同 corner：按 D 值升序吃）
+      const c0 = p.color, list = [];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || col[y][x] !== c0 || !reach(y, x)) continue; list.push([(H - 1 - y) + x, y, x]); }
+      list.sort((a, b) => a[0] - b[0]);
+      let n = 0;
+      for (const [, y, x] of list) { if (n >= p.count) break; gone[y][x] = true; n++; }
     }
   }
 
