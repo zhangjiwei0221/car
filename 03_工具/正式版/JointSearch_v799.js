@@ -116,7 +116,8 @@ for (const { ratio, trap, sd } of COMBOS) {
       // 【2026-11-04 用户】加管道 1–2 个（原来产线从不加）
       if (PIPE > 0) {
         const pip = path.join(OUTDIR_ABS, `${base}.${tag}.topo${ts}.rx${rs}.pipe.json`);
-        run(['03_工具/正式版/PipeConvert_v772.js', rx, '--out', pip, '--count', String(PIPE), '--ref', REF]);
+        // 【2026-11-04】改用 PipeSearch（会评估位置）；旧的 PipeConvert 只从左上角取前 N 个，一加就崩
+        run(['03_工具/正式版/PipeSearch_v808.js', rx, '--out', pip, '--count', String(PIPE), '--ref', REF]);
         if (fs.existsSync(abs(pip))) rx = pip;
       }
       const s2 = scoreOf(rx);
