@@ -280,9 +280,127 @@ AntSolver.Solver = (function() {
     };
   }
 
+  /**
+   * 【v635】最小暂存路线（深度 N rollout 近似）。
+   *
+   * 这不是“完成更多盒”的全知求解器，而是玩家更可能走的低暂存路线：
+   * 每步枚举当前可取车，各自向前 rollout N 步，优先选择“未来最大暂存最低”的第一步。
+   * 不使用道具，不改变模拟器的真实消除规则。
+   *
+   * 返回结构与 runSolver 对齐，额外提供 bufHistory（每 pick 结算后的暂存）。
+   */
+  function runMinBuffer(level, opts) {
+    opts = opts || {};
+    var DEPTH = Math.max(1, Number(opts.depth || 3));
+    var Sim = AntSolver.Simulator;
+    var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
+    function rollout(s0, depth) {
+      var s = clone(s0), maxBuf = s.buffer.length;
+      for (var d = 0; d < depth; d++) {
+        var mv = Sim.listMoves(s).filter(function (m) { return !m.blocked; });
+        if (!mv.length) return { maxBuf: 99 };
+        mv.sort(function (a, b) {
+          return (b.canConsume ? 1 : 0) - (a.canConsume ? 1 : 0) || a.groupSize - b.groupSize;
+        });
+        Sim.applyPick(s, mv[0].r, mv[0].c);
+        if (s.gameOver) return { maxBuf: 99 };
+        maxBuf = Math.max(maxBuf, s.buffer.length);
+        if (s.completedBoxes >= s.totalBoxes) break;
+      }
+      return { maxBuf: maxBuf };
+    }
+
+    var state = Sim.enter(level, {
+      useSlotStart: true,
+      bottomOnly: !!opts.bottomOnly,
+      instantChain: !!opts.instantChain,
+      capturePreviewStats: true
+    });
+    var samples = [], pickOrder = [], stepStats = [], bufHistory = [];
+    var dead = false, guard = 0;
+    while (!state.gameOver && guard++ < 300) {
+      var moves = Sim.listMoves(state).filter(function (m) { return !m.blocked; });
+      if (!moves.length) { dead = true; break; }
+      var best = null, bestScore = Infinity;
+      for (var i = 0; i < moves.length; i++) {
+        var m = moves[i], s2 = clone(state);
+        Sim.applyPick(s2, m.r, m.c);
+        if (s2.gameOver) continue;
+        var rr = rollout(s2, DEPTH);
+        var peak = Math.max(s2.buffer.length, rr.maxBuf);
+        var score = peak * 100 - (s2.completedBoxes - state.completedBoxes) * 10 + s2.buffer.length;
+        if (score < bestScore) { bestScore = score; best = m; }
+      }
+      if (!best) { dead = true; break; }
+      Sim.applyPick(state, best.r, best.c);
+
+      var lp = state.lastPick;
+      if (lp && lp.picked && lp.picked.length) {
+        for (var bx = 0; bx < lp.picked.length; bx++) {
+          var pk = lp.picked[bx];
+          pickOrder.push({
+            step: state.steps, r: pk.r, c: pk.c,
+            color: pk.color, count: pk.count,
+            chain: lp.chain || 0, chainSize: lp.boxes,
+            chainIndex: bx
+          });
+        }
+        stepStats.push({
+          step: state.steps, boxes: lp.boxes,
+          bufBefore: lp.bufBefore, bufEnter: lp.bufEnter,
+          bufAfter: lp.bufAfter, isChain: !!lp.isChain
+        });
+      } else {
+        pickOrder.push({
+          step: state.steps, r: best.r, c: best.c,
+          color: best.antBox.color, count: best.antBox.count,
+          chain: 0, chainSize: 1, chainIndex: 0
+        });
+        stepStats.push({
+          step: state.steps, boxes: 1, bufBefore: null,
+          bufEnter: null, bufAfter: state.buffer.length, isChain: false
+        });
+      }
+      bufHistory.push(state.buffer.length);
+      var sample = { done: state.completedBoxes, buf: state.buffer.length };
+      if (state.capturePreviewStats) {
+        var preview = Sim.previewNextEliminationOrder(state);
+        sample.nextSlot = preview.slot;
+        sample.reachable = preview.reachable;
+        sample.locked = preview.lockedCount;
+        sample.remaining = preview.remaining;
+        sample.lockRatio = preview.stats.lockRatio;
+      }
+      samples.push(sample);
+      if (state.completedBoxes >= state.totalBoxes) break;
+      if (state.gameOver) { dead = !state.gameWon; break; }
+    }
+
+    var won = !dead && state.completedBoxes >= state.totalBoxes;
+    var progress = state.totalPixels > 0 ? Math.round(state.eliminatedPixels / state.totalPixels * 100) : 0;
+    return {
+      completed: won, won: won,
+      steps: state.steps,
+      eliminatedPixels: state.eliminatedPixels,
+      totalPixels: state.totalPixels,
+      completedBoxes: state.completedBoxes,
+      totalBoxes: state.totalBoxes,
+      maxBuffer: Math.max.apply(null, bufHistory.concat([0])),
+      avgBuffer: bufHistory.length ? +(bufHistory.reduce(function (a, b) { return a + b; }, 0) / bufHistory.length).toFixed(2) : 0,
+      progress: progress,
+      pickOrder: pickOrder,
+      stepStats: stepStats,
+      stepBufferHistory: bufHistory,
+      bufHistory: bufHistory,
+      pressureSamples: samples,
+      itemUses: 0, itemMarks: []
+    };
+  }
+
   return {
     solve: solve,
     runSolver: runSolver,
+    runMinBuffer: runMinBuffer,
     solveBottom: solveBottom,
     solveInstantChain: solveInstantChain,   // 第三种玩法模式：四方向瞬时连锁消除（需求 08.03）
     resetPerf: resetPerf,      // 性能埋点(阶段1)：外部重置/读取，不影响求解行为

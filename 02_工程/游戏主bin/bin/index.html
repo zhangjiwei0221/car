@@ -6,13 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>车接小人 v634 · 目标生产全链路</title>
-  <link rel="stylesheet" href="css/style.css?v=633">
+  <title>车接小人 v635 · 最小暂存曲线</title>
+  <link rel="stylesheet" href="css/style.css?v=635">
 </head>
 <body>
   <header>
     <!-- 【v273·用户要求】标题直接显示版本号，一眼能确认跑的是哪一版 -->
-    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v634</span></h1>
+    <h1 title="参数窗口精简·容量/切法自动·目标模式·体检报告·圈序v8·摆盒v6">🐜 车接小人 <span id="app-ver" style="font-size:13px;font-weight:600;color:#c96a2b;background:#fdf0e4;border:1px solid #e8c9a8;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">v635</span></h1>
     <a href="http://127.0.0.1:8061/" target="_blank" style="margin-left:12px;font-size:13px;font-weight:600;color:#fff;background:#b4522a;border-radius:6px;padding:4px 10px;text-decoration:none">🚀 新产线造关</a>
     <!-- 【v150】顶栏的「🎮 模拟器 / 🏭 生成器」两个按钮已去掉：
          右栏不再靠按钮切，而是跟着状态走 —— 点「模拟游玩」时右栏变模拟控制+压力图，
@@ -310,9 +310,12 @@
       <!-- 暂存压力复合图（原在棋盘右侧，随控制栏一起移到右栏，给棋盘让出宽度） -->
       <div id="board-charts" class="hidden">
         <div style="margin-bottom:4px"><button id="btn-chart-mode" style="font-size:11px;padding:2px 8px;background:#6b4f34;color:#f3e9db;border:none;border-radius:3px;cursor:pointer">图形: 都显示</button></div>
-        <div class="chart-title">全知求解器 · 暂存压力</div>
+        <div class="chart-title">全知求解器 · 参考暂存压力</div>
         <canvas id="chart-omni" width="300" height="180"></canvas>
         <div id="chart-omni-cap" class="chart-cap"></div>
+        <div class="chart-title" style="margin-top:10px">最小暂存路线 · 深度3近似（不使用道具）</div>
+        <canvas id="chart-min" width="300" height="180"></canvas>
+        <div id="chart-min-cap" class="chart-cap"></div>
         <div class="chart-title" style="margin-top:10px">玩家模拟 · 暂存压力</div>
         <canvas id="chart-player" width="300" height="180"></canvas>
         <div id="chart-player-cap" class="chart-cap"></div>
@@ -792,31 +795,31 @@
     </div>
   </div>
 
-  <script src="js/zip.js?v=633"></script>
-  <script src="js/utils.js?v=633"></script>
+  <script src="js/zip.js?v=635"></script>
+  <script src="js/utils.js?v=635"></script>
   <!-- 【v154】色库模块：utils.js 之后、其余模块之前（app.js 导入 TXT 时要用它识别/转换色库） -->
-  <script src="js/color-libs.js?v=633"></script>
-  <script src="js/simulator.js?v=634"></script>
+  <script src="js/color-libs.js?v=635"></script>
+  <script src="js/simulator.js?v=635"></script>
   <!-- 【v137】锚点切盒（AntSolver.AnchorCut）：必须在 generator.js 之前加载 -->
-  <script src="js/anchor-cut.js?v=633"></script>
-  <script src="js/solver-strategy.js?v=633"></script>
-  <script src="js/solver.js?v=633"></script>
-  <script src="js/playersim.js?v=633"></script>
+  <script src="js/anchor-cut.js?v=635"></script>
+  <script src="js/solver-strategy.js?v=635"></script>
+  <script src="js/solver.js?v=635"></script>
+  <script src="js/playersim.js?v=635"></script>
   <!-- 【v483】只读解法结构分析：多路线/反事实，不参与现有生产找解 -->
-  <script src="js/solver-analysis.js?v=633"></script>
-  <script src="js/car-sequencer.js?v=633"></script>
-  <script src="js/experience-goal.js?v=633"></script>
-  <script src="js/release-route-constructor.js?v=633"></script>
-  <script src="js/capacity-tuner.js?v=633"></script>
-  <script src="js/instant-playout.js?v=633"></script>
-  <script src="js/generator.js?v=633"></script>
-  <script src="js/story-compiler.js?v=633"></script>
-  <script src="js/route-obstacle-planner.js?v=633"></script>
-  <script src="js/source-preflight.js?v=633"></script>
-  <script src="js/analysis.js?v=633"></script>
+  <script src="js/solver-analysis.js?v=635"></script>
+  <script src="js/car-sequencer.js?v=635"></script>
+  <script src="js/experience-goal.js?v=635"></script>
+  <script src="js/release-route-constructor.js?v=635"></script>
+  <script src="js/capacity-tuner.js?v=635"></script>
+  <script src="js/instant-playout.js?v=635"></script>
+  <script src="js/generator.js?v=635"></script>
+  <script src="js/story-compiler.js?v=635"></script>
+  <script src="js/route-obstacle-planner.js?v=635"></script>
+  <script src="js/source-preflight.js?v=635"></script>
+  <script src="js/analysis.js?v=635"></script>
   <!-- 手动摆盒编辑器：必须在 app.js 之前（app.js 的 init() 里会调用 AntSolver.LevelEditor.init） -->
-  <script src="js/level-editor.js?v=633"></script>
-  <script src="js/app.js?v=634"></script>
+  <script src="js/level-editor.js?v=635"></script>
+  <script src="js/app.js?v=635"></script>
   <div id="gen-report-toast" class="hidden" style="position:fixed;right:18px;bottom:18px;z-index:9999;background:#3c2e1f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;display:flex;gap:10px;align-items:center">
     体检报告已生成
     <button id="gen-report-toast-btn" class="gen-btn-sm" style="background:#fdf0e4;color:#3c2e1f;border:1px solid #e8c9a8">查看</button>

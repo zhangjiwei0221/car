@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "634";
+var APP_BUILD = "635";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -3367,7 +3367,8 @@ AntSolver.App = (function() {
   // ==================== 暂存压力复合图（折线/柱状/都显示；全知/玩家两幅）====================
   // 横轴=进度(完成盒数/总盒数 → 0-100%，5%一个点位刻度)，纵轴=暂存压力(0..N，N=暂存上限)
   var chartMode = 'both';      // both | line | bar
-  var chartCache = null;       // 缓存两幅图数据，供切换模式/演示游标重绘
+  var chartCache = null;       // 缓存压力图数据，供切换模式/演示游标重绘
+  var minBufferCache = { level: null, mode: null, data: null }; // 最小暂存路线按关卡/模式缓存
   function toggleChartMode() {
     chartMode = chartMode === 'both' ? 'line' : (chartMode === 'line' ? 'bar' : 'both');
     var btn = document.getElementById('btn-chart-mode');
@@ -3603,6 +3604,8 @@ AntSolver.App = (function() {
     var co = cur('omni'), cp = cur('player');
     drawPressureChart('chart-omni', c.omni.samples, c.limit, c.totalBoxes, 'chart-omni-cap', c.omni.won, c.omni.choke, c.omni.itemUses,
       { audit: c.omni.audit, items: c.omni.items, preview: c.omni.preview, ruleMode: c.mode, cursorProgress: co.p, cursorStep: co.step });
+    drawPressureChart('chart-min', c.min.samples, c.limit, c.totalBoxes, 'chart-min-cap', c.min.won, c.min.choke, c.min.itemUses,
+      { audit: c.min.audit, items: c.min.items, preview: c.min.preview, ruleMode: c.mode, cursorProgress: co.p, cursorStep: co.step });
     drawPressureChart('chart-player', c.player.samples, c.limit, c.totalBoxes, 'chart-player-cap', c.player.won, c.player.choke, c.player.itemUses,
       { audit: c.player.audit, items: c.player.items, preview: c.player.preview, revives: c.player.reviveEvents || [], ruleMode: c.mode, cursorProgress: cp.p, cursorStep: cp.step });
     drawStepChart('chart-steps', 'chart-steps-cap', c.steps);   // 【v147】逐次取盒 × 暂存
@@ -3631,6 +3634,7 @@ AntSolver.App = (function() {
     }
     chartCache = { limit: limit, totalBoxes: totalBoxes, mode: chartEntryMode,
       omni: { samples: [], won: false, items: [], itemUses: 0 },
+      min: { samples: [], won: false, items: [], itemUses: 0 },
       player: { samples: [], won: false, items: [], itemUses: 0, reviveEvents: [], trajectory: [] }, steps: null };
     try {
       // 旧导入审核数据仍可复用；现场新算时显式采集动态封锁快照，才显示封锁热度带。
@@ -3665,6 +3669,28 @@ AntSolver.App = (function() {
         audit: AntSolver.Analysis.chokepointAudit(oSamples, totalBoxes, limit),
         preview: previewMetrics(oSamples), items: oItems, itemUses: oItemUses, reused: reused
       };
+    } catch (e) { }
+    try {
+      // 【v635】第三条曲线：最小暂存路线（深度3近似），不使用道具，不覆盖上面的全知参考线。
+      var minData = null;
+      if (minBufferCache.level === currentLevel && minBufferCache.mode === chartEntryMode && minBufferCache.data) {
+        minData = minBufferCache.data;
+      } else if (AntSolver.Solver.runMinBuffer) {
+        var mmo = playerModeOpts(chartEntryMode);
+        minData = AntSolver.Solver.runMinBuffer(currentLevel, {
+          depth: 3, bottomOnly: mmo.bottomOnly, instantChain: mmo.instantChain
+        });
+        minBufferCache = { level: currentLevel, mode: chartEntryMode, data: minData };
+      }
+      if (minData) {
+        var minSamples = minData.pressureSamples || [];
+        chartCache.min = {
+          samples: minSamples, won: !!minData.completed,
+          choke: AntSolver.Analysis.chokepointMetric(minSamples, totalBoxes, limit),
+          audit: AntSolver.Analysis.chokepointAudit(minSamples, totalBoxes, limit),
+          preview: previewMetrics(minSamples), items: [], itemUses: 0, reused: false
+        };
+      }
     } catch (e) { }
     try {
       var pl = null;

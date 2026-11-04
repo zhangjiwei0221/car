@@ -23,53 +23,17 @@ const fs = require('fs');
 
 /**
  * 【2026-11-04 用户定】「暂存区最少」路线——这才是玩家会走的路。
- *
- * 原求解器目标是「完成尽可能多的车」，会为了凑满车主动点锁链 → 走高压力路线；
- * 玩家遇到「锁链 vs 免费车」会点免费车 → 低压力路线。
- * 实测同一张关：全知贪心峰值 4、中段 77%；最小暂存峰值 3、几乎全程 0，且能通关。
- *
- * 做法：每步对每个候选做 N 步 rollout（优先 canConsume、其次 groupSize 小），
- *      按「路径最大暂存最小」选步。
+ * v635：统一调用编辑器同一个 Solver.runMinBuffer，避免两套实现漂移。
  */
 function minBufferRun(lv, DEPTH = 3) {
-  const Sim = A.Simulator;
-  const clone = o => JSON.parse(JSON.stringify(o));
-  function rollout(s0, depth) {
-    let s = clone(s0);
-    let maxBuf = s.buffer.length;
-    for (let d = 0; d < depth; d++) {
-      const mv = Sim.listMoves(s).filter(m => !m.blocked);
-      if (!mv.length) return { maxBuf: 99 };
-      mv.sort((a, b) => (b.canConsume ? 1 : 0) - (a.canConsume ? 1 : 0) || a.groupSize - b.groupSize);
-      Sim.applyPick(s, mv[0].r, mv[0].c);
-      if (s.gameOver) return { maxBuf: 99 };
-      maxBuf = Math.max(maxBuf, s.buffer.length);
-      if (s.completedBoxes >= s.totalBoxes) break;
-    }
-    return { maxBuf };
-  }
-  const s = Sim.enter(lv, { useSlotStart: true, instantChain: false });
-  const buf = []; let dead = false, guard = 0;
-  while (guard++ < 300) {
-    const mv = Sim.listMoves(s).filter(m => !m.blocked);
-    if (!mv.length) { dead = true; break; }
-    let best = null, bestScore = Infinity;
-    for (const m of mv) {
-      const s2 = clone(s);
-      Sim.applyPick(s2, m.r, m.c);
-      if (s2.gameOver) continue;
-      const r = rollout(s2, DEPTH);
-      const peak = Math.max(s2.buffer.length, r.maxBuf);
-      const score = peak * 100 - (s2.completedBoxes - s.completedBoxes) * 10 + s2.buffer.length;
-      if (score < bestScore) { bestScore = score; best = m; }
-    }
-    if (!best) { dead = true; break; }
-    Sim.applyPick(s, best.r, best.c);
-    buf.push(s.buffer.length);
-    if (s.gameOver) { dead = true; break; }
-    if (s.completedBoxes >= s.totalBoxes) break;
-  }
-  return { buf, won: !dead && s.completedBoxes >= s.totalBoxes, done: s.completedBoxes, total: s.totalBoxes };
+  const r = A.Solver.runMinBuffer(lv, { depth: DEPTH, instantChain: false });
+  return {
+    buf: r.bufHistory || r.stepBufferHistory || [],
+    won: !!r.won,
+    done: r.completedBoxes || 0,
+    total: r.totalBoxes || 0,
+    detail: r
+  };
 }
 
 function check(f) {
