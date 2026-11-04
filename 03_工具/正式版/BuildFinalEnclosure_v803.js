@@ -48,20 +48,20 @@ put(0, 6, 32, 40, 1, 'stage1-white');
 put(1, 0, 1, 25, 1, 'stage1');
 put(1, 1, 22, 37, 1, 'stage1');
 put(1, 2, 27, 37, 1, 'stage1');
-put(1, 4, 28, 37, 1, 'stage1');
+put(1, 4, 28, 18, 1, 'stage1');
 put(1, 5, 33, 37, 1, 'stage1');
 put(2, 0, 32, 40, 1, 'stage1-white');
-put(2, 1, 26, 35, 1, 'stage1');
+put(2, 1, 26, 60, 1, 'stage1');
 put(2, 2, 33, 36, 1, 'stage1');
 put(2, 4, 22, 37, 1, 'stage1');
 put(3, 0, 1, 25, 1, 'stage1');
 put(3, 2, 13, 23, 1, 'stage1');
-put(3, 3, 33, 29, 1, 'stage1-ice-blocker', 10);
+put(3, 3, 26, 6, 1, 'stage1-ice-blocker', 14);
 put(3, 4, 32, 35, 1, 'stage1-white');
-put(3, 5, 26, 35, 1, 'stage1');
+put(3, 5, 28, 19, 1, 'stage1');
 
 // 第二段：香蕉。门 15 在 c3，左右是黑块，只有上面的冰柱能打开它。
-put(4, 0, 24, 36, 2, 'stage2');
+put(4, 0, 24, 1, 2, 'stage2');
 put(4, 1, 15, 45, 2, 'stage2');
 put(4, 3, 15, 44, 2, 'stage2-door-15');
 put(4, 5, 30, 28, 2, 'stage2');
@@ -71,32 +71,39 @@ put(5, 2, 30, 28, 2, 'stage2');
 put(5, 3, 29, 34, 2, 'stage2');
 put(5, 4, 7, 23, 2, 'stage2');
 put(5, 5, 15, 45, 2, 'stage2');
-put(5, 6, 24, 26, 2, 'stage2');
+put(5, 6, 24, 61, 2, 'stage2');
 
 // 第三段：奶茶。25 车全部藏在门 25 后面；门上方只有一根非门冰柱。
 // 行 6 的 c2/c4 是黑墙，防止侧向提前露出 25。
 put(6, 0, 33, 36, 3, 'stage3');
 put(6, 1, 14, 33, 3, 'stage3');
-put(6, 3, 26, 34, 3, 'stage3-ice-blocker', 30);
+put(6, 3, 26, 38, 3, 'stage3-ice-blocker', 30);
 put(6, 5, 22, 37, 3, 'stage3');
 put(6, 6, 28, 36, 3, 'stage3');
-put(7, 0, 33, 43, 3, 'stage3');
+put(7, 0, 33, 72, 3, 'stage3');
 put(7, 2, 25, 37, 3, 'stage3');
 put(7, 3, 25, 36, 3, 'stage3-door-25');
 put(7, 4, 25, 36, 3, 'stage3');
 put(7, 5, 13, 30, 3, 'stage3');
-put(7, 6, 27, 38, 3, 'stage3');
-put(8, 3, 32, 46, 3, 'stage3-white-final-debt', 6);
+put(7, 6, 27, 12, 3, 'stage3');
+put(8, 3, 32, 46, 3, 'stage3-white-final-debt', 40);
 
 // 第四段：猕猴桃。最后一行才有 19/31/5；31 在门 19 的右侧，
 // 门 19 未取走前不会被暴露。
 put(9, 0, 5, 3, 4, 'stage4');
-put(9, 1, 19, 31, 4, 'stage4');
+put(9, 1, 27, 26, 4, 'stage4');
 put(9, 2, 19, 31, 4, 'stage4');
-put(9, 3, 19, 30, 4, 'stage4-door-19');
+put(9, 3, 19, 61, 4, 'stage4-door-19');
 put(9, 4, 19, 31, 4, 'stage4');
 put(9, 5, 31, 16, 4, 'stage4-enclosure');
 put(9, 6, 19, 30, 4, 'stage4');
+
+// 阶段2可控双车链：两辆车必须同时进入暂存，制造可见压力；
+// 它们的容量在香蕉段内可释放，不承担最终包围债务。
+grid[5][0].type = 5;
+grid[5][0].param = 901;
+grid[5][1].type = 5;
+grid[5][1].param = 901;
 
 const spools = grid.map(row => row.map(x => x ? ({ id: x.id, type: x.type, param: x.param, count: x.count }) : ({ id: -1, type: 0, param: 0, count: 0 })));
 const level = { toprow: R, blocks, maprow: ROWS, mapcol: COLS, spools };
@@ -140,11 +147,11 @@ const plan = {
       allowedFrameColors: [1, 15, 25], forbiddenFrameColors: [19],
       allowedNonFrameColors: S3.filter(x => x !== 1 && x !== 15 && x !== 25),
       intent: '25 门在第二根非门冰柱后；14 与共享色作为奶茶段普通车',
-      completionGate: { subject: '奶茶', progressPct: 60 }
+      completionGate: { subject: '奶茶', progressPct: 45 }
     },
     {
       subject: '猕猴桃', frameColor: 19,
-      doorCar: { color: 19, count: 30, position: [9, 3], ice: false },
+      doorCar: { color: 19, count: 61, position: [9, 3], ice: false },
       allowedFrameColors: [1, 15, 25, 19], forbiddenFrameColors: [],
       allowedNonFrameColors: S4.filter(x => ![1, 15, 25, 19].includes(x)),
       intent: '最后一行才是 19 门；31 在门后，白色 32 的未完成债务必须等 31 包围打开',
@@ -152,7 +159,7 @@ const plan = {
     }
   ],
   debtEvents: [
-    { id: 'white_32_final_enclosure', color: 32, need: 46, enterStage: '奶茶', releaseStage: '猕猴桃', minHoldSteps: 9, releaseRequiresColor: 31, expectedReleaseRemaining: 9 }
+    { id: 'white_32_final_enclosure', color: 32, need: 46, enterStage: '奶茶', releaseStage: '猕猴桃', minHoldSteps: 4, releaseRequiresColor: 31, expectedReleaseRemaining: 9 }
   ],
   verification: {
     targetFile,
