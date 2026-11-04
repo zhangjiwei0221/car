@@ -30,6 +30,16 @@ const BY_ORDER = process.argv.includes('--by-order');
 // 【2026-11-03 用户定】边框放「吃不满的大车」：开局牌面上能吃满的少，玩家才被迫犹豫。
 // 吃满比 = 车容量 / 该色在图边框上的像素数；>1 表示开局吃不满。
 const EDGE_BIG = !process.argv.includes('--no-edge-big');
+// 【2026-11-04 用户定】按色号指定切法（剧本化切车）：
+//   --color-plan "22:small,32:small,1:door30,30:tag5"
+//   small  = 切成多辆 5–10px 的小车（免费过渡车）
+//   doorN  = 第一辆切 N px（门：吃不满但占位少）
+//   tagN   = 第一辆切 N px（被锁链带着走的"签"）
+const COLOR_PLAN = {};
+String(arg('--color-plan', '')).split(',').filter(Boolean).forEach(function (x) {
+  const kv = x.split(':');
+  if (kv.length === 2) COLOR_PLAN[Number(kv[0])] = kv[1];
+});
 const ORDER_RATIO = Number(arg('--order-ratio', '0.75'));
 const boxMax = Number(arg('--box-max', 46));
 const seed = Number(arg('--seed', 1001));
@@ -121,6 +131,49 @@ function splitAll(targetSize) {
       pool.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
     }
     let idx = 0;
+    // ---- 剧本化切车（优先于 by-order / trap）----
+    if (process.env.PLAN_DEBUG) console.error('[plan] 色'+col+' 命中='+!!COLOR_PLAN[Number(col)]+' 全表='+JSON.stringify(COLOR_PLAN));
+    if (COLOR_PLAN[Number(col)]) {
+      const rule = COLOR_PLAN[Number(col)];
+      const T = pool.length;
+      let counts = [];
+      if (rule === 'small') {
+        // 小车要"多但别太多"：每色最多 5 辆，每辆 10–16px（再多就会被车数上限合并回去）
+        const maxN = Math.max(2, Math.min(5, Math.round(T / 12)));
+        let left = T;
+        for (let i = 0; i < maxN && left > 0; i++) {
+          const take = i === maxN - 1 ? left : Math.round(left / (maxN - i));
+          if (take > 0) counts.push(take);
+          left -= take;
+        }
+      } else {
+        const m = rule.match(/^(door|tag)(\d+)$/);
+        if (m) {
+          const n = Math.max(4, Math.min(T - 4, Number(m[2])));
+          counts = [n];
+          let left = T - n;
+          // 剩下的切成 2–3 辆
+          const k = Math.max(1, Math.min(3, Math.ceil(left / Math.max(20, targetSize))));
+          for (let i = 0; i < k && left > 0; i++) {
+            const take = i === k - 1 ? left : Math.round(left / (k - i));
+            if (take > 0) counts.push(take);
+            left -= take;
+          }
+        }
+      }
+      if (process.env.PLAN_DEBUG) console.error('[plan]   色'+col+' rule='+rule+' T='+T+' counts='+counts.join(','));
+      if (counts.length) {
+        let idx3 = 0;
+        for (const cnt of counts) {
+          if (idx3 >= pool.length) break;
+          const take = Math.min(cnt, pool.length - idx3);
+          const chunk = pool.slice(idx3, idx3 + take);
+          idx3 += take;
+          if (chunk.length) out.push({ color: Number(col), cells: chunk, count: chunk.length, first: chunk[0] });
+        }
+        continue;
+      }
+    }
     if (BY_ORDER) {
       // 固定车数，容量按几何级数递减：前面的车大（开局像素多），最后一辆很小（只剩几个）
       // 【2026-11-03 用户选 C′】顺序陷阱：部分颜色切成「1 大 + N 小」。
