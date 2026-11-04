@@ -196,7 +196,7 @@ function check(f) {
   // 【2026-11-04 用户】原实现只数"暴露格"（7×7 边框有 24 格 → 动不动报"可选16辆"），
   // 但真正能点的只有 listMoves 过滤 blocked 之后的那几辆（暂存满/链组放不下会被排除）。
   // 现在改用 Simulator 真实逐步模拟：每步看"能吃满的有几种颜色"。
-  let good = 0, dead = 0, simErr = null, openingPickable = 0;
+  let good = 0, dead = 0, simErr = null, openingPickable = 0, curDeadRun = 0, maxDeadRun = 0;
   const totalPicks = (o.pickOrder || []).filter(p => p.chainIndex === 0).length;
   {
     const H = g.blocks.length, W = g.blocks[0].length;
@@ -225,7 +225,8 @@ function check(f) {
       // 连点三个 0/23、0/27、3/27 的"没用的车"，那一辆能吃满的都没有。
       // 真口径：**一辆能吃满的都没有** = 没得选（或只有 1 辆车能点）。
       if (moves.length > 1 && canFill > 0) good++;
-      else dead++;
+      else { dead++; curDeadRun++; maxDeadRun = Math.max(maxDeadRun, curDeadRun); }
+      if (moves.length > 1 && canFill > 0) curDeadRun = 0;
       try { Sim.applyPick(st, p.r, p.c); } catch (e) { simErr = e.message; break; }
       // 同步"已消除"到图上（口径同 corner：按 D 值升序吃）
       const c0 = p.color, list = [];
@@ -286,6 +287,8 @@ function check(f) {
     // 【2026-11-04 用户定】决策度换成更直观的判据：没得选的步数 ≤ 总步数一半
     ['开局可点≥5', openingPickable >= 5, openingPickable + ' 辆'],
     ['没得选≤一半', dead <= totalPicks / 2, dead + '/' + totalPicks],
+    // 【2026-11-04 用户】连续性也要管：连续 6 步被迫背债 = 难受（实测 00011 步6-11）
+    ['最长连续没得选≤2', maxDeadRun <= 2, maxDeadRun + ' 步'],
     ['（参考）决策度', true, good + '/' + totalPicks, true],
     // 【2026-11-03 用户选 B】改软项：用户已明确「必须选某色解锁不是问题」
     ['没得选', true, dead, true],
