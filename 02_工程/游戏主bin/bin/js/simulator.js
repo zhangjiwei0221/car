@@ -1262,7 +1262,11 @@ AntSolver.Simulator = (function() {
   function isDeadEnd(s) {
     if (!s || s.gameOver) return false;
     if (s.overflow) return true;
-    if (s.buffer.length >= s.bufferLimit) return true;
+    // 【2026-11-04 修 bug】不能只看"暂存满"就判死。
+    // 原实现 `if (s.buffer.length >= s.bufferLimit) return true;` 会在
+    // "第 5 辆车刚进场、还没结算消除"时立刻判死 —— 但若这辆车能吃满，它会马上离场，根本不该死。
+    // 正确口径：满格时仍要检查"盘面上还有没有未阻塞的车"（listMoves 里 blocked 已含
+    // "满格且此盒消不完" 的判断），有能吃满的车就不是死局。
     var moves = listMoves(s);
     for (var i = 0; i < moves.length; i++) if (!moves[i].blocked) return false;
     return true;

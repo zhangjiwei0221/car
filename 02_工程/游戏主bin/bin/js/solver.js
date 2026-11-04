@@ -295,19 +295,19 @@ AntSolver.Solver = (function() {
     var Sim = AntSolver.Simulator;
     var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
     function rollout(s0, depth) {
-      var s = clone(s0), maxBuf = s.buffer.length;
+      var s = clone(s0), maxBuf = s.buffer.length, baseDone = s0.completedBoxes;
       for (var d = 0; d < depth; d++) {
         var mv = Sim.listMoves(s).filter(function (m) { return !m.blocked; });
-        if (!mv.length) return { maxBuf: 99 };
+        if (!mv.length) return { maxBuf: 99, done: 0 };
         mv.sort(function (a, b) {
           return (b.canConsume ? 1 : 0) - (a.canConsume ? 1 : 0) || a.groupSize - b.groupSize;
         });
         Sim.applyPick(s, mv[0].r, mv[0].c);
-        if (s.gameOver) return { maxBuf: 99 };
+        if (s.gameOver) return { maxBuf: 99, done: 0 };
         maxBuf = Math.max(maxBuf, s.buffer.length);
         if (s.completedBoxes >= s.totalBoxes) break;
       }
-      return { maxBuf: maxBuf };
+      return { maxBuf: maxBuf, done: s.completedBoxes - baseDone };
     }
 
     var state = Sim.enter(level, {
@@ -328,7 +328,10 @@ AntSolver.Solver = (function() {
         if (s2.gameOver) continue;
         var rr = rollout(s2, DEPTH);
         var peak = Math.max(s2.buffer.length, rr.maxBuf);
-        var score = peak * 100 - (s2.completedBoxes - state.completedBoxes) * 10 + s2.buffer.length;
+        // 【2026-11-04 用户】推进优先、暂存次之。
+        // 原来 peak*100 让策略只顾短期省格子，把难车留到最后 → 卡死（实测 00154 峰值4但走不完 39/49）
+        var advanced = (s2.completedBoxes - state.completedBoxes) + (rr.done || 0);
+        var score = -advanced * 100 + peak * 10 + s2.buffer.length;
         if (score < bestScore) { bestScore = score; best = m; }
       }
       if (!best) { dead = true; break; }
