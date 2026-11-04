@@ -213,6 +213,7 @@ function check(f) {
     for (const p of picks) {
       if (!st || st.gameOver) break;
       const moves = Sim.listMoves(st).filter(m => !m.blocked);
+      const canFill = moves.filter(m => m.canConsume).length;
       // 【2026-11-04 用户定】"没得选"的真口径：
       //   ① 只有 1 辆车能点；或
       //   ② 能点的车都"吃不到什么"（该色可达像素 < 容量的一半）。
@@ -220,11 +221,10 @@ function check(f) {
       // 所以「能吃满的车有几辆/几种颜色」都不能当判据，要看"能吃到多少"。
       const cnt = {};
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { if (gone[y][x] || !reach(y, x)) continue; const cc = col[y][x]; cnt[cc] = (cnt[cc] || 0) + 1; }
-      const useful = moves.filter(m => {
-        const got = cnt[m.antBox.color] || 0;
-        return m.antBox.count > 0 && got / m.antBox.count >= 0.5;   // 能吃到一半以上
-      });
-      if (moves.length > 1 && useful.length > 0) good++;
+      // 【2026-11-04 用户·第二次修正】"能吃一半" 不算有选择 —— 用户实测 00011 步 6-11
+      // 连点三个 0/23、0/27、3/27 的"没用的车"，那一辆能吃满的都没有。
+      // 真口径：**一辆能吃满的都没有** = 没得选（或只有 1 辆车能点）。
+      if (moves.length > 1 && canFill > 0) good++;
       else dead++;
       try { Sim.applyPick(st, p.r, p.c); } catch (e) { simErr = e.message; break; }
       // 同步"已消除"到图上（口径同 corner：按 D 值升序吃）
