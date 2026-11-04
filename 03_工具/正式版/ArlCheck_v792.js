@@ -37,6 +37,7 @@ function minBufferRun(lv, DEPTH = 3) {
 }
 
 function check(f) {
+  const SOFT_TOLERANCE = process.argv.includes('--soft-tolerance');
   const g = B.readJson(f);
   const lv = A.parseLevel(A.fromGameFormat(g));
   const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
@@ -258,7 +259,7 @@ function check(f) {
     // 【2026-11-03 用户选 B】允许玩家死：峰值=4 只约束最优路线，玩家视角放宽到 5。
     ['玩家峰值≤5', pPeak <= 5, pPeak + '（最优路线仍须=4）'],
     // 容错改成区间：100% = 太松（随便玩都能过），<40% = 太脆
-    ['容错 55–75%', tol >= 11 && tol <= 15, tol + '/20'],
+    ['容错 55–75%' + (SOFT_TOLERANCE ? '（参考）' : ''), tol >= 11 && tol <= 15, tol + '/20', SOFT_TOLERANCE],
     // 参考项（不判定）：全知最优路线的数据，用来对比"理想 vs 真实"
     ['（参考）最小暂存路线 通/完成', true, (mb.won ? '通' : '不通') + ' ' + mb.done + '/' + mb.total, true],
     ['（参考）求解器路线 中段', true, (() => {
@@ -281,7 +282,7 @@ function check(f) {
 
 if (require.main === module) {
   let bad = 0;
-  for (const f of process.argv.slice(2)) {
+  for (const f of process.argv.slice(2).filter(x => !x.startsWith('--'))) {
     const r = check(f);
     console.log('\n=== ' + f.split('/').pop() + '（' + r.L + ' 步）===');
     for (const [name, ok, val, soft] of r.rules) console.log('  ' + (soft ? '⚪' : ok ? '✅' : '❌') + ' ' + name.padEnd(16) + String(val));
