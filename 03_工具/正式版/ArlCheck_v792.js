@@ -21,15 +21,66 @@ const { detect: detectSubjects } = require('./SubjectDetect_v800');
 const A = B.loadSolver('corner');
 const fs = require('fs');
 
+/**
+ * 【2026-11-04 用户定】「暂存区最少」路线——这才是玩家会走的路。
+ *
+ * 原求解器目标是「完成尽可能多的车」，会为了凑满车主动点锁链 → 走高压力路线；
+ * 玩家遇到「锁链 vs 免费车」会点免费车 → 低压力路线。
+ * 实测同一张关：全知贪心峰值 4、中段 77%；最小暂存峰值 3、几乎全程 0，且能通关。
+ *
+ * 做法：每步对每个候选做 N 步 rollout（优先 canConsume、其次 groupSize 小），
+ *      按「路径最大暂存最小」选步。
+ */
+function minBufferRun(lv, DEPTH = 3) {
+  const Sim = A.Simulator;
+  const clone = o => JSON.parse(JSON.stringify(o));
+  function rollout(s0, depth) {
+    let s = clone(s0);
+    let maxBuf = s.buffer.length;
+    for (let d = 0; d < depth; d++) {
+      const mv = Sim.listMoves(s).filter(m => !m.blocked);
+      if (!mv.length) return { maxBuf: 99 };
+      mv.sort((a, b) => (b.canConsume ? 1 : 0) - (a.canConsume ? 1 : 0) || a.groupSize - b.groupSize);
+      Sim.applyPick(s, mv[0].r, mv[0].c);
+      if (s.gameOver) return { maxBuf: 99 };
+      maxBuf = Math.max(maxBuf, s.buffer.length);
+      if (s.completedBoxes >= s.totalBoxes) break;
+    }
+    return { maxBuf };
+  }
+  const s = Sim.enter(lv, { useSlotStart: true, instantChain: false });
+  const buf = []; let dead = false, guard = 0;
+  while (guard++ < 300) {
+    const mv = Sim.listMoves(s).filter(m => !m.blocked);
+    if (!mv.length) { dead = true; break; }
+    let best = null, bestScore = Infinity;
+    for (const m of mv) {
+      const s2 = clone(s);
+      Sim.applyPick(s2, m.r, m.c);
+      if (s2.gameOver) continue;
+      const r = rollout(s2, DEPTH);
+      const peak = Math.max(s2.buffer.length, r.maxBuf);
+      const score = peak * 100 - (s2.completedBoxes - s.completedBoxes) * 10 + s2.buffer.length;
+      if (score < bestScore) { bestScore = score; best = m; }
+    }
+    if (!best) { dead = true; break; }
+    Sim.applyPick(s, best.r, best.c);
+    buf.push(s.buffer.length);
+    if (s.gameOver) { dead = true; break; }
+    if (s.completedBoxes >= s.totalBoxes) break;
+  }
+  return { buf, won: !dead && s.completedBoxes >= s.totalBoxes, done: s.completedBoxes, total: s.totalBoxes };
+}
+
 function check(f) {
   const g = B.readJson(f);
   const lv = A.parseLevel(A.fromGameFormat(g));
   const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
-  // 【2026-11-03 用户定口径】压力 = 每次选择「结算后」的暂存占用（stepBufferHistory），
-  // 不是「每完成一辆车」的样本（pressureSamples）。区别：一次取 3 辆（链）只算 1 步。
-  const buf = (Array.isArray(o.stepBufferHistory) && o.stepBufferHistory.length)
+  // 【2026-11-04 用户定】压力口径 = 「暂存区最少」的路线（玩家会走的路），不是原求解器的贪心路线。
+  const mb = minBufferRun(lv, 3);
+  const buf = mb.buf.length ? mb.buf.slice() : ((Array.isArray(o.stepBufferHistory) && o.stepBufferHistory.length)
     ? o.stepBufferHistory.slice()
-    : (o.pressureSamples || []).map(s => s.buf || 0);
+    : (o.pressureSamples || []).map(s => s.buf || 0));
   const L = buf.length;
   // 【2026-11-03 用户放宽】前段门槛 20% → 10%，且允许前段 at4 ≤ 1。
   // 理由：不必死磕"开局绝对不碰 4"，只要整体有难度、逼玩家思考即可。
@@ -245,7 +296,12 @@ function check(f) {
     // 容错改成区间：100% = 太松（随便玩都能过），<40% = 太脆
     ['容错 55–75%', tol >= 11 && tol <= 15, tol + '/20'],
     // 参考项（不判定）：全知最优路线的数据，用来对比"理想 vs 真实"
-    ['（参考）全知 中段', true, mid3 + '/' + (tN - eN), true],
+    ['（参考）最小暂存路线 通/完成', true, (mb.won ? '通' : '不通') + ' ' + mb.done + '/' + mb.total, true],
+    ['（参考）求解器路线 中段', true, (() => {
+      const ob = (Array.isArray(o.stepBufferHistory) && o.stepBufferHistory.length) ? o.stepBufferHistory : (o.pressureSamples || []).map(x => x.buf || 0);
+      const L2 = ob.length, e2 = Math.max(1, Math.round(L2 * 0.1)), t2 = Math.floor(L2 * 0.8);
+      return ob.slice(e2, t2).filter(v => v >= 3).length + '/' + (t2 - e2);
+    })(), true],
     ['（参考）全知 at4', true, a4, true],
     ['决策度≥15', good >= 15, good + '/' + picks.length],
     // 【2026-11-03 用户选 B】改软项：用户已明确「必须选某色解锁不是问题」
