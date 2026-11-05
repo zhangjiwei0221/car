@@ -90,7 +90,8 @@ function evalLevel(g) {
 function main() {
   const archFile = process.argv[2], targetFile = process.argv[3];
   const out = arg('--out', ''), recipeOut = arg('--recipe', '');
-  if (!archFile || !targetFile) { console.error('用法: node RouteFirst_v1.js <骨架.json> <目标图.txt> --out <关卡.json> [--recipe <配方.json>]'); process.exit(2); }
+  const iceMode = arg('--ice', 'derived'); // copy=沿用骨架参数 | derived=按本关 ready 步重推 | none=不放冰
+  if (!archFile || !targetFile) { console.error('用法: node RouteFirst_v1.js <骨架.json> <目标图.txt> --out <关卡.json> [--recipe <配方.json>] [--ice derived|copy|none] [--group N]'); process.exit(2); }
   const arch = JSON.parse(fs.readFileSync(archFile, 'utf8'));
   const blocks = parse(targetFile);
   const H = blocks.length, W = blocks[0].length;
@@ -101,6 +102,8 @@ function main() {
   const reachAt = (c, s) => (curve[Math.min(s, curve.length - 1)] || { reach: {} }).reach[c] || 0;
   const maxReachIn = (c, a, b) => { let m = 0; for (let s = a; s <= b && s < curve.length; s++) m = Math.max(m, reachAt(c, s)); return m; };
   const firstTouch = c => { for (let s = 0; s < curve.length; s++) if (reachAt(c, s) > 0) return s; return 99; };
+  // 该色在该容量下“最早能填满”的步；冰参数 = ready-1（到这一步才解锁）
+  const firstReady = (c, n) => { for (let s = 0; s < curve.length; s++) if (reachAt(c, s) >= n) return s; return curve.length - 1; };
   const newQuad = {}; subs.forEach(s => { newQuad[quadOf(s, H, W)] = s; });
   // 主体/框色候选
   const quads = ['BL', 'TL', 'TR', 'BR'];
@@ -180,11 +183,23 @@ function main() {
   while (sumN < freeCells.length) { const x = counts.slice().sort((a, b) => st[b.c].px - st[a.c].px)[0]; x.n++; sumN++; }
   // 车序：按“车序轮次”交错——每色第 1 辆先按首次触达排，然后各色第 2 辆……
   // （避免整色一段、主体串行；交错让多个主体同时在飞，玩家拿错也有别的债可还）
+  // 分组交错：每 group 个色一组做轮次交错，组间顺序推进（group=0 即全色交错）
+  const groupSize = Math.max(0, +arg('--group', '3'));
   const carSeq = [];
   const sortedColors = counts.slice().sort((a, b) => firstTouch(a.c) - firstTouch(b.c) || st[b.c].px - st[a.c].px);
-  const maxN = sortedColors.reduce((m, x) => Math.max(m, x.n), 0);
-  for (let round = 0; round < maxN; round++) {
-    for (const x of sortedColors) if (round < x.n) carSeq.push({ color: x.c, idx: round, n: x.n });
+  if (groupSize === 0) {
+    const maxN = sortedColors.reduce((m, x) => Math.max(m, x.n), 0);
+    for (let round = 0; round < maxN; round++) {
+      for (const x of sortedColors) if (round < x.n) carSeq.push({ color: x.c, idx: round, n: x.n });
+    }
+  } else {
+    for (let i0 = 0; i0 < sortedColors.length; i0 += groupSize) {
+      const chunk = sortedColors.slice(i0, i0 + groupSize);
+      const mx = chunk.reduce((m, x) => Math.max(m, x.n), 0);
+      for (let round = 0; round < mx; round++) {
+        for (const x of chunk) if (round < x.n) carSeq.push({ color: x.c, idx: round, n: x.n });
+      }
+    }
   }
   const slots = freeCells.slice().sort((a, b) => (a.r - b.r) || (a.c - b.c));
   const byColor = {};
@@ -218,7 +233,10 @@ function main() {
       const a = cl.a, color = assigned[key(cl.r, cl.c)]; if (color == null) continue;
       const count = cap[key(cl.r, cl.c)] || 1;
       const types = [], params = [];
-      if (a.ice) { types.push(7); params.push(a.ice); }
+      if (a.ice && iceMode !== 'none') {
+        types.push(7);
+        params.push(iceMode === 'copy' ? a.ice : Math.max(1, Math.min(28, firstReady(color, count) - 1)));
+      }
       if (a.chain) { types.push(5); params.push(a.chain); }
       if (a.q) { types.push(6); params.push(0); }
       spools[cl.r][cl.c] = { id: color, type: types.length === 0 ? 0 : types.length === 1 ? types[0] : types, param: params.length === 0 ? 0 : params.length === 1 ? params[0] : params, count };
