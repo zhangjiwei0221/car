@@ -91,7 +91,7 @@ function main() {
   const archFile = process.argv[2], targetFile = process.argv[3];
   const out = arg('--out', ''), recipeOut = arg('--recipe', '');
   const iceMode = arg('--ice', 'derived'); // copy=沿用骨架参数 | derived=按本关 ready 步重推 | none=不放冰
-  if (!archFile || !targetFile) { console.error('用法: node RouteFirst_v1.js <骨架.json> <目标图.txt> --out <关卡.json> [--recipe <配方.json>] [--ice derived|copy|none] [--group N]'); process.exit(2); }
+  if (!archFile || !targetFile) { console.error('用法: node RouteFirst_v1.js <骨架.json> <目标图.txt> --out <关卡.json> [--recipe <配方.json>] [--ice derived|copy|none] [--group N] [--order stage|touch]'); process.exit(2); }
   const arch = JSON.parse(fs.readFileSync(archFile, 'utf8'));
   const blocks = parse(targetFile);
   const H = blocks.length, W = blocks[0].length;
@@ -186,7 +186,20 @@ function main() {
   // 分组交错：每 group 个色一组做轮次交错，组间顺序推进（group=0 即全色交错）
   const groupSize = Math.max(0, +arg('--group', '3'));
   const carSeq = [];
-  const sortedColors = counts.slice().sort((a, b) => firstTouch(a.c) - firstTouch(b.c) || st[b.c].px - st[a.c].px);
+  // 颜色的主导象限 → 阶段序；让同一阶段/象限的颜色成簇推进，避免四象限同时被啃
+  const quadCount = {};
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = blocks[y][x]; if (c <= 0) continue;
+    const q = (y < H / 2 ? 'T' : 'B') + (x < W / 2 ? 'L' : 'R');
+    (quadCount[c] = quadCount[c] || {})[q] = (quadCount[c][q] || 0) + 1;
+  }
+  const domQuad = c => { const o = quadCount[c] || {}; let best = 'TL', bn = -1; for (const q of Object.keys(o)) if (o[q] > bn) { bn = o[q]; best = q; } return best; };
+  const stageRank = {}; subjectPlan.forEach((s, i) => { if (stageRank[s.quad] == null) stageRank[s.quad] = i; });
+  const qRank = c => { const q = domQuad(c); return stageRank[q] == null ? 99 : stageRank[q]; };
+  const orderMode = arg('--order', 'stage');
+  const sortedColors = counts.slice().sort((a, b) => orderMode === 'touch'
+    ? (firstTouch(a.c) - firstTouch(b.c)) || (qRank(a.c) - qRank(b.c)) || (st[b.c].px - st[a.c].px)
+    : (qRank(a.c) - qRank(b.c)) || (firstTouch(a.c) - firstTouch(b.c)) || (st[b.c].px - st[a.c].px));
   if (groupSize === 0) {
     const maxN = sortedColors.reduce((m, x) => Math.max(m, x.n), 0);
     for (let round = 0; round < maxN; round++) {
