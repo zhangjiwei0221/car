@@ -156,41 +156,51 @@ function main() {
     }
     return { toprow: H, blocks, maprow: arch.maprow, mapcol: arch.mapcol, spools };
   };
-  let best = null;
-  for (let iter = 0; iter < 3; iter++) {
-    const g = build(); const ev = evalLevel(g);
-    if (!best || ev.score > best.ev.score) best = { g: JSON.parse(JSON.stringify(g)), ev };
+  let best = null, bestFull = null;
+  for (let iter = 0; iter < 20; iter++) {
+    const g = build();
     const lv = A.parseLevel(A.fromGameFormat(g));
+    const mb = A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false });
+    const peak = Math.max(0, ...(mb.stepBufferHistory || []));
+    const won = !!mb.won;
+    if (!best || (won && !best.won) || (won === best.won && peak < best.peak)) best = { g: JSON.parse(JSON.stringify(g)), won, peak };
+    if (won) {
+      const ev = evalLevel(g);
+      if (!bestFull || ev.score > bestFull.ev.score) bestFull = { g: JSON.parse(JSON.stringify(g)), ev };
+      break;
+    }
     const reach = reachMap(lv);
-    for (const c of Object.keys(cellsByColor)) {
-      const list = cellsByColor[c], total = st[c].px;
-      const targets = list.map(x => {
-        const rc = reach[key(x.r, x.c)];
-        const isKey = x.a.role === 'door' || x.a.role === 'frame2' || x.a.role === 'fill';
-        if (rc == null) return cap[key(x.r, x.c)] || 1;
-        return isKey ? Math.max(1, rc) : Math.max(1, Math.round(rc * 1.8));
-      });
-      let sum = targets.reduce((a, b) => a + b, 0);
-      if (sum > total) {
-        const debtIdx = list.map((x, i) => (x.a.role.startsWith('debt') ? i : -1)).filter(i => i >= 0);
-        const pool = debtIdx.length ? debtIdx : list.map((_, i) => i);
-        const poolSum = pool.reduce((a, i) => a + targets[i], 0) || 1;
-        let excess = sum - total;
-        for (const i of pool) { const cut = Math.round(excess * targets[i] / poolSum); targets[i] = Math.max(1, targets[i] - cut); }
-        sum = targets.reduce((a, b) => a + b, 0);
-        if (sum > total) { const scale = total / sum; for (let i = 0; i < targets.length; i++) targets[i] = Math.max(1, Math.floor(targets[i] * scale)); }
-      } else if (sum < total) {
-        const debtIdx = list.map((x, i) => (x.a.role.startsWith('debt') ? i : -1)).filter(i => i >= 0);
-        const pool = debtIdx.length ? debtIdx : [targets.indexOf(Math.max(...targets))];
-        targets[pool[0]] += total - sum;
-      }
-      let diff = total - targets.reduce((a, b) => a + b, 0);
-      const adj = list.map((x, i) => (x.a.role.startsWith('debt') ? i : -1)).filter(i => i >= 0);
-      targets[(adj.length ? adj[0] : targets.indexOf(Math.max(...targets)))] += diff;
-      list.forEach((x, i) => { cap[key(x.r, x.c)] = Math.max(1, targets[i]); });
+    const picks = (mb.pickOrder || []).filter(p => p.chainIndex == null || p.chainIndex === 0);
+    let culprit = null;
+    for (let i = picks.length - 1; i >= 0; i--) {
+      const p = picks[i], rc = reach[p.r + ',' + p.c];
+      if (rc == null) continue;
+      const cp = cap[p.r + ',' + p.c];
+      if (cp > rc) { culprit = { p, rc, cp }; break; }
+    }
+    if (!culprit) {
+      const p = picks[picks.length - 1];
+      if (!p) break;
+      const k = p.r + ',' + p.c;
+      if (cap[k] > 1) { cap[k]--; continue; }
+      break;
+    }
+    const color = assigned[culprit.p.r + ',' + culprit.p.c];
+    const over = culprit.cp - culprit.rc;
+    cap[culprit.p.r + ',' + culprit.p.c] = Math.max(1, culprit.rc);
+    const later = (cellsByColor[color] || []).filter(x => !(x.r === culprit.p.r && x.c === culprit.p.c))
+      .sort((a, b) => (b.r + b.c) - (a.r + a.c))[0];
+    if (later) {
+      const lk = later.r + ',' + later.c;
+      cap[lk] = (cap[lk] || 1) + over;
+    } else {
+      cap[culprit.p.r + ',' + culprit.p.c] += over;
+      break;
     }
   }
-  const g = best.g;
+  const g = (bestFull || best).g;
+  const ev = bestFull ? bestFull.ev : { minWon: best.won, boxes: '', peak: best.peak, pass: '?', score: best.won ? 100 : -20 };
+
   if (out) fs.writeFileSync(out, JSON.stringify(g));
   if (recipeOut) {
     const cars = [], black = [], obstacles = [];
@@ -206,7 +216,7 @@ function main() {
   }
   console.log('骨架=' + arch.name + ' 图=' + targetFile.split('/').pop());
   console.log('框色: ' + [1, 2, 3, 4].map(i => frame[i]).join('/'));
-  console.log('best: min=' + (best.ev.minWon ? '通' : '不通') + ' ' + best.ev.boxes + ' peak=' + best.ev.peak + ' player2=' + best.ev.pass + '/5 score=' + best.ev.score);
+  console.log('best: min=' + (ev.minWon ? '通' : '不通') + ' ' + ev.boxes + ' peak=' + ev.peak + ' player2=' + ev.pass + '/5 score=' + ev.score);
   if (out) console.log('已写：' + out);
 }
 
