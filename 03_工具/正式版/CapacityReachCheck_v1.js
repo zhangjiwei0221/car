@@ -40,7 +40,7 @@ for (const file of files) {
   try { g = B.readJson(file); } catch (e) { rows.push({ file, error: 'read: ' + e.message }); continue; }
   if (!isLevel(g)) { rows.push({ file, error: 'not a level' }); continue; }
   const lv = A.parseLevel(A.fromGameFormat(g));
-  const p0 = A.PlayerSim.run(lv, { seed: 7, instantChain: false, reviveCap: 0 });
+  const p0 = A.PlayerSim.run(lv, { seed: 7, instantChain: false, reviveCap: 0, trackReach: true });
   const p2 = A.PlayerSim.run(lv, { seed: 7, instantChain: false, reviveCap: 2 });
 
   const singleOver = [];
@@ -68,6 +68,22 @@ for (const file of files) {
       });
     }
   }
+  // 债务时序：该车拿之后，同色可达量第一次 ≥ count 的步；晚于死亡或没有 → 可能 fatal。
+  const deathStep = p0.deathSnapshot ? p0.deathSnapshot.step : null;
+  const deathBuf = (p0.deathSnapshot && p0.deathSnapshot.buffer) || [];
+  const timeline = p0.reachTimeline || [];
+  function catchupStep(color, count, afterStep) {
+    const hits = timeline.filter(e => e.color === color && e.step > afterStep && e.reach >= count);
+    return hits.length ? Math.min.apply(null, hits.map(e => e.step)) : null;
+  }
+  function isFatal(car, step) {
+    if (!deathStep) return false;
+    const cu = catchupStep(car.color, car.count, step);
+    const inDeath = deathBuf.some(b => b.color === car.color && b.rem > 0);
+    return inDeath && (cu == null || cu > deathStep);
+  }
+  const fatalSingleOver = singleOver.filter(c => isFatal(c, c.step));
+  const fatalChain = chainSuspect.filter(cs => cs.members.some(m => isFatal(m, cs.step)));
   const maxOver = singleOver.reduce((a, x) => Math.max(a, x.over), 0);
   const row = {
     file: path.basename(file),
@@ -77,6 +93,11 @@ for (const file of files) {
     maxOver,
     singleOver,
     chainSuspect,
+    fatalSingleOverCount: fatalSingleOver.length,
+    fatalChainCount: fatalChain.length,
+    fatalEither: fatalSingleOver.length + fatalChain.length > 0,
+    fatalSingleOver,
+    fatalChain,
     p0Won: !!p0.won,
     p0Death: p0.deathSnapshot ? p0.deathSnapshot.step : null,
     p0Progress: p0.progress,
@@ -84,7 +105,7 @@ for (const file of files) {
     p2Revives: p2.revivesUsed || 0
   };
   rows.push(row);
-  console.log(`${row.file.padEnd(30)} picks=${row.picks} singleOver=${row.singleOverCount} chainSuspect=${row.chainSuspectCount} maxOver=${row.maxOver} p0=${row.p0Won ? 'Y' : 'N'}${row.p0Death ? '(d' + row.p0Death + ',' + row.p0Progress + '%)' : ''} p2=${row.p2Won ? 'Y' : 'N'}(r${row.p2Revives})`);
+  console.log(`${row.file.padEnd(30)} picks=${row.picks} singleOver=${row.singleOverCount} chainSuspect=${row.chainSuspectCount} fatal=${row.fatalSingleOverCount}+${row.fatalChainCount} maxOver=${row.maxOver} p0=${row.p0Won ? 'Y' : 'N'}${row.p0Death ? '(d' + row.p0Death + ',' + row.p0Progress + '%)' : ''} p2=${row.p2Won ? 'Y' : 'N'}(r${row.p2Revives})`);
 }
 
 const ok = rows.filter(r => !r.error);
@@ -98,7 +119,10 @@ const summary = {
   p0FailWithSingleOver: ok.filter(r => !r.p0Won && r.singleOverCount > 0).length,
   p0FailWithChainSuspect: ok.filter(r => !r.p0Won && r.chainSuspectCount > 0).length,
   p0FailWithEither: ok.filter(r => !r.p0Won && (r.singleOverCount > 0 || r.chainSuspectCount > 0)).length,
-  p0FailTotal: ok.filter(r => !r.p0Won).length
+  p0FailTotal: ok.filter(r => !r.p0Won).length,
+  withFatal: ok.filter(r => r.fatalEither).length,
+  p0FailWithFatal: ok.filter(r => !r.p0Won && r.fatalEither).length,
+  p0WinWithFatal: ok.filter(r => r.p0Won && r.fatalEither).length
 };
 console.log('\n=== summary ===');
 console.log(JSON.stringify(summary, null, 2));

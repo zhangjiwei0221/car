@@ -62,6 +62,9 @@ AntSolver.PlayerSim = (function () {
     var pickHistory = [];
     var capture = !!opts.capture;             // 记录逐 tick 帧供前端并发回放
     var capturePreviewStats = !!opts.capturePreviewStats; // 图表/调试才采集下一槽位可消/封锁快照
+    // 只读观测（默认关）：记录暂存中每个颜色后续每一步的可达量，用于「债务时序」检查。
+    var trackReach = !!opts.trackReach;
+    var reachTimeline = [];
     var bottomOnly = !!opts.bottomOnly;       // 仅底部入口(见上)；透传给 Simulator 并用于本文件自有可达判定
     // 第三种玩法模式：四方向瞬时连锁消除（需求 08.03，用户 2026-08-03 批准改玩家模拟）。
     // 与 bottomOnly 互斥，固定四方向可达；开启后玩家侧的消除结算改为：
@@ -595,6 +598,18 @@ AntSolver.PlayerSim = (function () {
               });
             }
             if (thought) { /* 认为可消，稍后校验是否误判 */ }
+            // 只读观测：本步之后，暂存里每个颜色的可达量（供债务时序检查）。
+            if (trackReach) {
+              var _tracked = {};
+              for (var _bi = 0; _bi < balls.length; _bi++) _tracked[balls[_bi].color] = 1;
+              for (var _tc in _tracked) {
+                var _emT = s.eliminated.map(function (row) { return row.slice(); });
+                reachTimeline.push({
+                  step: picks, tick: curOpTick, color: +_tc,
+                  reach: Sim.floodFillCount(_emT, s.blocks, s.rows, s.cols, +_tc, s.bottomOnly)
+                });
+              }
+            }
           }
         }
       }
@@ -852,6 +867,7 @@ AntSolver.PlayerSim = (function () {
       frames: frames, bufferLimit: bufferLimit, cols: cols, rows: rows,
       // 【v121·任务AK③】玩家版棋盘取盒序列（一条=一个盒，同 step 共享）。供前端画「玩家版求解路线」。
       pickOrder: pickOrderPS,
+      reachTimeline: reachTimeline,           // 只读观测（trackReach 开启时）
       pressureSamples: pressureSamples, itemUses: itemUses, itemMarks: itemMarks,
       revivesUsed: revivesUsed, reviveCap: reviveCap,
       // 玩法模式与瞬时连锁的操作事件流（需求 §八.2、§十.2）。
