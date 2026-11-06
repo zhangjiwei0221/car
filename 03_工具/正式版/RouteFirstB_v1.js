@@ -15,7 +15,7 @@
  *   7) 输出关卡 + ModeBCheck 指标。
  *
  * 用法：node RouteFirstB_v1.js <目标图.txt> --out <关卡.json>
- *   [--avg 50] [--floor 10] [--maxrow 8] [--maxcol 8] [--maxcar 140] [--iters 6]
+ *   [--avg 50] [--floor 10] [--layout 骨架.json] [--rows R --cols C] [--maxrow 8] [--maxcol 8] [--maxcar 140] [--iters 6]
  */
 const B = require('./Build006Thickness_v688');
 const A = B.loadSolver('corner');
@@ -73,7 +73,7 @@ function evalLevel(g) {
 
 function main() {
   const targetFile = process.argv[2];
-  if (!targetFile) { console.error('用法: node RouteFirstB_v1.js <目标图.txt> --out <关卡.json> [--avg 50] [--floor 10] [--maxrow 8] [--maxcol 8] [--maxcar 140] [--iters 6]'); process.exit(2); }
+  if (!targetFile) { console.error('用法: node RouteFirstB_v1.js <目标图.txt> --out <关卡.json> [--avg 50] [--floor 10] [--layout 骨架.json] [--rows R --cols C] [--maxrow 8] [--maxcol 8] [--maxcar 140] [--iters 6]'); process.exit(2); }
   const out = arg('--out', '');
   const avg = +arg('--avg', '50'), floor = +arg('--floor', '10');
   const maxRow = +arg('--maxrow', '8'), maxCol = +arg('--maxcol', '8'), maxCar = +arg('--maxcar', '140');
@@ -87,41 +87,64 @@ function main() {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const c = blocks[y][x]; if (c > 0) px[c] = (px[c] || 0) + 1; }
   const colors = Object.keys(px).map(Number).sort((a, b) => px[b] - px[a]);
 
-  // 车数：体量 / 目标均量，且每辆不低于 floor；同色最多按体量
-  const counts = colors.map(c => {
-    let n = Math.max(1, Math.round(px[c] / avg));
-    const maxN = Math.max(1, Math.floor(px[c] / floor));
-    n = Math.min(n, maxN);
-    // 均分后单辆不超过 maxCar
-    while (n > 1 && px[c] / n > maxCar) n++;
-    return { c, n };
-  });
-  const N = counts.reduce((s, x) => s + x.n, 0);
-
-  // 棋盘：可强制 --rows/--cols；否则取 rows*cols 最接近 N 且 ≤ maxRow/maxCol
-  const forceRows = +arg('--rows', '0'), forceCols = +arg('--cols', '0');
-  let bestGrid = null;
-  if (forceRows >= 3 && forceCols >= 3) {
-    const cells = forceRows * forceCols, black = cells - N;
-    if (cells >= N && black <= Math.max(4, Math.round(cells * 0.15))) bestGrid = { r: forceRows, c: forceCols, black, score: 0 };
+  // 棋盘与车数：--layout 用现成 7×7 布局（只取黑块/障碍位置，不取门/主体）；
+  // 否则按 avg 推车数、自动找棋盘
+  const layoutFile = arg('--layout', '');
+  const arch = layoutFile ? JSON.parse(fs.readFileSync(layoutFile, 'utf8')) : null;
+  let counts, N, rows, cols, slotCells, blackCells;
+  if (arch) {
+    rows = arch.maprow; cols = arch.mapcol;
+    slotCells = []; blackCells = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const a = arch.cells[r] && arch.cells[r][c];
+      if (a && a.role === 'black') blackCells.push({ r, c });
+      else if (a) slotCells.push({ r, c, a });
+      else blackCells.push({ r, c });
+    }
+    N = slotCells.length;
+    const pxTotal = colors.reduce((s2, c) => s2 + px[c], 0);
+    const avg2 = Math.max(1, pxTotal / Math.max(1, N));
+    counts = colors.map(c => {
+      let n = Math.max(1, Math.round(px[c] / avg2));
+      const maxN = Math.max(1, Math.floor(px[c] / floor));
+      n = Math.min(n, maxN);
+      return { c, n };
+    });
+    let sum = counts.reduce((s2, x) => s2 + x.n, 0);
+    const byPx = counts.slice().sort((a, b) => px[b.c] - px[a.c]);
+    while (sum > N) { const x = byPx.find(y => y.n > 1); if (!x) break; x.n--; sum--; }
+    while (sum < N) { byPx[0].n++; sum++; }
+  } else {
+    counts = colors.map(c => {
+      let n = Math.max(1, Math.round(px[c] / avg));
+      const maxN = Math.max(1, Math.floor(px[c] / floor));
+      n = Math.min(n, maxN);
+      while (n > 1 && px[c] / n > maxCar) n++;
+      return { c, n };
+    });
+    N = counts.reduce((s2, x) => s2 + x.n, 0);
+    const forceRows = +arg('--rows', '0'), forceCols = +arg('--cols', '0');
+    let bestGrid = null;
+    if (forceRows >= 3 && forceCols >= 3) {
+      const cells = forceRows * forceCols, black = cells - N;
+      if (cells >= N && black <= Math.max(4, Math.round(cells * 0.15))) bestGrid = { r: forceRows, c: forceCols, black, score: 0 };
+    }
+    if (!bestGrid) for (let r = 3; r <= maxRow; r++) for (let c = 3; c <= maxCol; c++) {
+      const cells = r * c;
+      if (cells < N) continue;
+      const black = cells - N;
+      if (black > Math.max(4, Math.round(cells * 0.15))) continue;
+      const aspect = Math.abs(r - c);
+      const score = black * 3 + aspect;
+      if (!bestGrid || score < bestGrid.score) bestGrid = { r, c, black, score };
+    }
+    if (!bestGrid) throw new Error('找不到合适的棋盘（车数 ' + N + '）');
+    rows = bestGrid.r; cols = bestGrid.c;
+    const allCells = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) allCells.push({ r, c });
+    slotCells = allCells.slice(0, rows * cols - bestGrid.black);
+    blackCells = allCells.slice(rows * cols - bestGrid.black);
   }
-  if (!bestGrid) for (let r = 3; r <= maxRow; r++) for (let c = 3; c <= maxCol; c++) {
-    const cells = r * c;
-    if (cells < N) continue;
-    const black = cells - N;
-    if (black > Math.max(4, Math.round(cells * 0.15))) continue;
-    const aspect = Math.abs(r - c);
-    const score = black * 3 + aspect;
-    if (!bestGrid || score < bestGrid.score) bestGrid = { r, c, black, score };
-  }
-  if (!bestGrid) throw new Error('找不到合适的棋盘（车数 ' + N + '）');
-  const { r: rows, c: cols, black } = bestGrid;
-
-  // 黑块放在最后几格（最深处），其余按行优先作为暴露顺序
-  const allCells = [];
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) allCells.push({ r, c });
-  const slotCells = allCells.slice(0, rows * cols - black);
-  const blackCells = allCells.slice(rows * cols - black);
 
   // 暴露深度（棋盘边界 BFS）——先算，摆车要用
   const depth = {};
@@ -178,7 +201,17 @@ function main() {
     const spools = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({ id: -1, type: 0, param: 0, count: 0 })));
     for (const s of slotCells) {
       const k = s.r + ',' + s.c, color = assigned[k]; if (color == null) continue;
-      spools[s.r][s.c] = { id: color, type: 0, param: 0, count: cap[k] || floor };
+      const types = [], params = [];
+      const a = s.a;
+      if (a && a.ice) { types.push(7); params.push(Math.max(1, Math.min(28, firstReady(color, cap[k] || floor) - 1))); }
+      if (a && a.chain) { types.push(5); params.push(a.chain); }
+      if (a && a.q) { types.push(6); params.push(0); }
+      spools[s.r][s.c] = {
+        id: color,
+        type: types.length === 0 ? 0 : types.length === 1 ? types[0] : types,
+        param: params.length === 0 ? 0 : params.length === 1 ? params[0] : params,
+        count: cap[k] || floor
+      };
     }
     for (const s of blackCells) spools[s.r][s.c] = { id: -1, type: 0, param: 0, count: 0 };
     return { toprow: H, blocks, maprow: rows, mapcol: cols, spools };
@@ -239,7 +272,7 @@ function main() {
   }
   const g = bestTry.g;
   if (out) fs.writeFileSync(out, JSON.stringify(g));
-  console.log('图=' + targetFile.split('/').pop() + ' 车数=' + N + ' 棋盘=' + rows + 'x' + cols + ' 黑块=' + black + ' 最小车=' + Math.min(...Object.values(cap)));
+  console.log('图=' + targetFile.split('/').pop() + ' 车数=' + N + ' 棋盘=' + rows + 'x' + cols + ' 黑块=' + blackCells.length + ' 最小车=' + Math.min(...Object.values(cap)));
   console.log('best: min=' + (bestTry.ev.minWon ? '通' : '不通') + ' ' + bestTry.ev.boxes + ' peak=' + bestTry.ev.peak + ' player=' + bestTry.ev.pass + '/5 容错=' + bestTry.ev.tol + '/20');
   if (out) console.log('已写：' + out);
 }
