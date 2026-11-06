@@ -22,6 +22,12 @@ const B = require('./Build006Thickness_v688');
 const { detect } = require('./SubjectDetect_v800');
 const fs = require('fs');
 
+function quadOf(s, H, W) {
+  let sy = 0, sx = 0, n = 0;
+  for (const key of s.cells) { const [y, x] = key.split(',').map(Number); sy += y; sx += x; n++; }
+  return (sy / n >= H / 2 ? 'B' : 'T') + (sx / n < W / 2 ? 'L' : 'R');
+}
+
 function arg(k, d) {
   const i = process.argv.indexOf(k);
   return i > 0 ? process.argv[i + 1] : d;
@@ -70,7 +76,7 @@ function main() {
     if (!s) { cells[r][c] = { role: 'black' }; continue; }
     if (s.id === -1) { cells[r][c] = { role: 'black' }; continue; }
     const role = doorAt[r + ',' + c] ? 'door' : (frameStage[s.id] ? 'frame2' : classOf(s.id));
-    const cell = { role };
+    const cell = { role, refCount: s.count, refColor: s.id };
     if (role === 'door' || role === 'frame2') cell.stage = doorAt[r + ',' + c] || frameStage[s.id];
     if (st[s.id]) {
       cell.material = classOf(s.id);
@@ -84,8 +90,14 @@ function main() {
     if (t.includes(6)) cell.q = true;
     cells[r][c] = cell;
   }
+  const subjectQuads = subs.map(s => quadOf(s, H, W));
+  const stageQuadrants = (plan.stages || []).map(st => {
+    const idx = subs.findIndex(x => x.name.split('/').pop().startsWith(st.subject));
+    return idx >= 0 ? subjectQuads[idx] : null;
+  });
   const archetype = {
     name: (g.name || levelFile.split('/').pop()) + '_archetype',
+    subjectQuads, stageQuadrants,
     sourceLevel: levelFile,
     sourcePlan: planFile,
     maprow: g.maprow, mapcol: g.mapcol,
