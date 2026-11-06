@@ -98,9 +98,14 @@ function main() {
   });
   const N = counts.reduce((s, x) => s + x.n, 0);
 
-  // 棋盘：rows*cols 最接近 N（且 ≤ maxRow/maxCol），多余格做黑块
+  // 棋盘：可强制 --rows/--cols；否则取 rows*cols 最接近 N 且 ≤ maxRow/maxCol
+  const forceRows = +arg('--rows', '0'), forceCols = +arg('--cols', '0');
   let bestGrid = null;
-  for (let r = 3; r <= maxRow; r++) for (let c = 3; c <= maxCol; c++) {
+  if (forceRows >= 3 && forceCols >= 3) {
+    const cells = forceRows * forceCols, black = cells - N;
+    if (cells >= N && black <= Math.max(4, Math.round(cells * 0.15))) bestGrid = { r: forceRows, c: forceCols, black, score: 0 };
+  }
+  if (!bestGrid) for (let r = 3; r <= maxRow; r++) for (let c = 3; c <= maxCol; c++) {
     const cells = r * c;
     if (cells < N) continue;
     const black = cells - N;
