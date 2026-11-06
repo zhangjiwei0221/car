@@ -37,6 +37,21 @@ const limit = Number(arg('--limit', 0)) || 0;
 const thresholds = useFamily ? [0.4, 0.6, 0.8] : [0.6];
 const lookaheads = useLookahead ? [false, true] : [false];
 
+// 实验开关：同色争用平手规则改为「剩余升序 → 最左侧暂存」。
+// 默认不启用；用于和代码现有的「剩余 → 距离 → 先进暂存」对账。
+if (has('--contend-leftmost')) {
+  A.Simulator.contendOrder = function (items) {
+    const idx = items.map((_, i) => i);
+    const rem = items.map(it => {
+      const r = it.need - it.progress;
+      return r > 0 ? r : Infinity;
+    });
+    idx.sort((a, b) => (rem[a] - rem[b]) || ((items[a].slot || 0) - (items[b].slot || 0)));
+    return idx;
+  };
+  console.log('# contendOrder = leftmost (experimental)');
+}
+
 function collect(p) {
   const st = fs.statSync(p);
   if (st.isFile()) return [p];
