@@ -113,6 +113,15 @@ function main() {
   let empty = 0;
   for (const row of g.spools) for (const s of row) {
     if (!s) { empty++; continue; }
+    const types = Array.isArray(s.type) ? s.type : [s.type || 0];
+    const isPipe = types.some(x => x >= 11 && x <= 14);
+    if (isPipe) {
+      // 管道队列也算进该色总容量（AGENTS.md 红线：sum(count) 含管道队列）
+      const ps = Array.isArray(s.param) ? s.param : [];
+      for (const q of ps) if (q && q.id > 0) sums[q.id] = (sums[q.id] || 0) + (q.count || 0);
+      if (s.id > 0) { sums[s.id] = (sums[s.id] || 0) + s.count; caps.push(s.count); }
+      continue;
+    }
     if (s.id > 0) { sums[s.id] = (sums[s.id] || 0) + s.count; caps.push(s.count); }
     else if (s.id !== -1) empty++;
   }
