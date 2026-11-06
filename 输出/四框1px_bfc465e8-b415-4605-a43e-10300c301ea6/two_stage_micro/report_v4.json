@@ -1,0 +1,193 @@
+{
+  "tool": "StagePlanCheck_v802",
+  "level": "输出/四框1px_bfc465e8-b415-4605-a43e-10300c301ea6/two_stage_micro/two_stage_blue_white_v4.json",
+  "plan": "实验关/四象限/00030_两阶段_微样板_v1/阶段计划_两阶段_v3.json",
+  "minRoute": {
+    "completed": true,
+    "steps": 43,
+    "maxBuffer": 5,
+    "completedBoxes": 43,
+    "totalBoxes": 43
+  },
+  "stages": [
+    {
+      "stage": 1,
+      "subject": "香肠",
+      "frameColor": 1,
+      "frameFirstSelectableStep": 1,
+      "completionGatePct": 76.8,
+      "gateReachedStep": 41,
+      "progressAtGate": {
+        "香肠": {
+          "name": "主体图纸库_50张/烤肠-1",
+          "done": 132,
+          "total": 155,
+          "pct": 85.2
+        },
+        "香蕉": {
+          "name": "主体图纸库_50张/香蕉-1",
+          "done": 172,
+          "total": 173,
+          "pct": 99.4
+        }
+      },
+      "doorIced": false,
+      "allowedFrameColors": [
+        1
+      ],
+      "allowedNonFrameColors": [
+        32,
+        33,
+        26,
+        27,
+        30,
+        13,
+        19,
+        24,
+        29,
+        7,
+        22,
+        28
+      ],
+      "forbiddenFramesBeforeGate": [
+        15
+      ],
+      "unlistedColors": []
+    },
+    {
+      "stage": 2,
+      "subject": "香蕉",
+      "frameColor": 15,
+      "frameFirstSelectableStep": 20,
+      "completionGatePct": 100,
+      "gateReachedStep": 43,
+      "progressAtGate": {
+        "香肠": {
+          "name": "主体图纸库_50张/烤肠-1",
+          "done": 151,
+          "total": 155,
+          "pct": 97.4
+        },
+        "香蕉": {
+          "name": "主体图纸库_50张/香蕉-1",
+          "done": 173,
+          "total": 173,
+          "pct": 100
+        }
+      },
+      "doorIced": false,
+      "allowedFrameColors": [
+        15,
+        1
+      ],
+      "allowedNonFrameColors": [
+        32,
+        33,
+        26,
+        27,
+        30,
+        13,
+        19,
+        24,
+        29,
+        7,
+        22,
+        28
+      ],
+      "forbiddenFramesBeforeGate": [
+        15
+      ],
+      "unlistedColors": []
+    }
+  ],
+  "debtEvents": [
+    {
+      "id": "blue_33_long_debt",
+      "color": 33,
+      "need": 49,
+      "enterStep": 2,
+      "enterStage": 1,
+      "releaseStep": 20,
+      "releaseStage": 2,
+      "holdSteps": 18,
+      "expectedEnterStage": "香肠",
+      "expectedReleaseStage": "香蕉",
+      "minHoldSteps": 10,
+      "pass": true
+    },
+    {
+      "id": "white_32_cross_stage",
+      "color": 32,
+      "need": 60,
+      "enterStep": 18,
+      "enterStage": 1,
+      "releaseStep": 20,
+      "releaseStage": 2,
+      "holdSteps": 2,
+      "expectedEnterStage": "香肠",
+      "expectedReleaseStage": "香蕉",
+      "minHoldSteps": 3,
+      "pass": false
+    }
+  ],
+  "bufferEvents": [
+    {
+      "type": "enter",
+      "step": 2,
+      "key": 2,
+      "color": 33,
+      "need": 49,
+      "progress": 7,
+      "remaining": 42
+    },
+    {
+      "type": "enter",
+      "step": 18,
+      "key": 18,
+      "color": 32,
+      "need": 60,
+      "progress": 41,
+      "remaining": 19
+    },
+    {
+      "type": "release",
+      "step": 20,
+      "key": 2,
+      "color": 33,
+      "need": 49,
+      "progress": 42,
+      "remaining": 7
+    },
+    {
+      "type": "release",
+      "step": 20,
+      "key": 18,
+      "color": 32,
+      "need": 60,
+      "progress": 42,
+      "remaining": 18
+    }
+  ],
+  "finalProgress": {
+    "香肠": {
+      "name": "主体图纸库_50张/烤肠-1",
+      "done": 155,
+      "total": 155,
+      "pct": 100
+    },
+    "香蕉": {
+      "name": "主体图纸库_50张/香蕉-1",
+      "done": 173,
+      "total": 173,
+      "pct": 100
+    }
+  },
+  "violations": [
+    "stage1: 后续框车在阶段门槛前提前进入 15",
+    "stage2: 框车 15 在第20步提前进入，上一阶段第41步才达到门槛",
+    "stage2: 框车 15 在上一阶段门槛前已进入可选池",
+    "debt white_32_cross_stage: 进入/释放阶段或持有步数不符合计划"
+  ],
+  "pass": false,
+  "note": "这是阶段结构验证，不等同于 ArlCheck 全量验收。"
+}

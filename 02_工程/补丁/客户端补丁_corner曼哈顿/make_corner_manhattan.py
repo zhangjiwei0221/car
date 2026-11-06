@@ -57,7 +57,12 @@ STUB_SIG = bytes.fromhex("415441554156")
 
 
 def _build_stub(S):
-    """在 S 处生成「每次只挑 1 个 + 选中即标记已消」的循环。"""
+    """在 S 处生成「每次挑 1 个 → 追加进本批 → 标记已消 → 再挑」的循环。
+
+    要点：_findMatchedBlocks 是**返回值**语义（sret），每次调用都会覆盖结果向量。
+    所以这里用一个临时向量 scratch 接收每次的结果，再把里面那一个 push_back 进 out，
+    最后在 scratch 上补一次析构，避免泄漏。
+    """
     c = bytearray()
 
     def emit(b):
@@ -66,41 +71,56 @@ def _build_stub(S):
     def here():
         return S + len(c)
 
-    emit(b"\x41\x54\x41\x55\x41\x56")                # push r12; r13; r14
-    emit(b"\x48\x83\xec\x08")                          # sub rsp,8（放第 7 个参数 + 对齐）
-    emit(b"\x45\x31\xe4")                                # xor r12d,r12d      taken=0
-    emit(b"\x44\x8b\xad\x70\xff\xff\xff")            # mov r13d,[rbp-0x90] limit
+    emit(b"\x41\x54\x41\x55")                    # push r12; push r13
+    emit(b"\x48\x83\xec\x30")                    # sub rsp,0x30（[rsp]=第7参数, [rsp+0x10]=scratch 向量）
+    emit(b"\x31\xc0")                              # xor eax,eax
+    # out 在调用方是「未初始化的栈空间」（sret 由被调用方构造），先把它置成空向量
+    for disp in (0x48, 0x50, 0x58):
+        emit(b"\x48\x89\x85" + bytes([disp, 0xff, 0xff, 0xff]))
+    for off in (0x10, 0x18, 0x20):
+        emit(b"\x48\x89\x44\x24" + bytes([off]))  # mov [rsp+off],rax  → scratch 清空
+    emit(b"\x45\x31\xe4")                          # xor r12d,r12d   taken=0
+    emit(b"\x44\x8b\xad\x70\xff\xff\xff")      # mov r13d,[rbp-0x90] limit
     loop = here()
-    emit(b"\x45\x39\xec")                                # cmp r13d,r12d
-    jge = len(c); emit(b"\x7d\x00")
-    emit(b"\x48\x8b\xb5\x80\xff\xff\xff")            # mov rsi,[rbp-0x80] this
-    emit(b"\x8b\x95\x7c\xff\xff\xff")                  # mov edx,[rbp-0x84] X
-    emit(b"\x8b\x8d\x78\xff\xff\xff")                  # mov ecx,[rbp-0x88] Y
-    emit(b"\x44\x8b\x85\x74\xff\xff\xff")            # mov r8d,[rbp-0x8c] colorID
-    emit(b"\x41\xb9\x01\x00\x00\x00")                  # mov r9d,1          limit=1
-    emit(b"\x0f\xb6\x85\x67\xff\xff\xff")            # movzbl eax,[rbp-0x99] bool
-    emit(b"\x83\xe0\x01")                                # and eax,1
-    emit(b"\x89\x04\x24")                                # mov [rsp],eax      第7个参数
-    emit(b"\x48\x8b\x85\x50\xff\xff\xff")            # mov rax,[rbp-0xb0] end
-    emit(b"\x48\x2b\x85\x48\xff\xff\xff")            # sub rax,[rbp-0xb8] begin → 旧元素数
-    emit(b"\x49\x89\xc6")                                # mov r14,rax
-    emit(b"\x48\x8d\xbd\x48\xff\xff\xff")            # lea rdi,[rbp-0xb8] out
+    emit(b"\x45\x39\xec")                          # cmp r13d,r12d
+    jl_body = len(c); emit(b"\x7c\x00")             # jl .body（没到上限就继续）
+    jmp_done = len(c); emit(b"\xe9\x00\x00\x00\x00")  # 否则跳到收尾
+    body_lbl = here()
+    emit(b"\x48\x8b\xb5\x80\xff\xff\xff")      # mov rsi,[rbp-0x80] this
+    emit(b"\x8b\x95\x7c\xff\xff\xff")            # mov edx,[rbp-0x84] X
+    emit(b"\x8b\x8d\x78\xff\xff\xff")            # mov ecx,[rbp-0x88] Y
+    emit(b"\x44\x8b\x85\x74\xff\xff\xff")      # mov r8d,[rbp-0x8c] colorID
+    emit(b"\x41\xb9\x01\x00\x00\x00")            # mov r9d,1         limit=1
+    emit(b"\x0f\xb6\x85\x67\xff\xff\xff")      # movzx eax,[rbp-0x99] bool
+    emit(b"\x83\xe0\x01")                          # and eax,1
+    emit(b"\x89\x04\x24")                          # mov [rsp],eax     第7参数
+    emit(b"\x48\x8d\x7c\x24\x10")                # lea rdi,[rsp+0x10] scratch
     call1 = len(c); emit(b"\xe8\x00\x00\x00\x00")
-    emit(b"\x48\x8b\x85\x50\xff\xff\xff")            # mov rax,[rbp-0xb0] end
-    emit(b"\x48\x2b\x85\x48\xff\xff\xff")            # sub rax,[rbp-0xb8] begin → 新元素数
-    emit(b"\x4c\x39\xf0")                                # cmp r14,rax
-    je1 = len(c); emit(b"\x74\x00")
-    emit(b"\x48\x8b\x8d\x50\xff\xff\xff")            # mov rcx,[rbp-0xb0] end
-    emit(b"\x48\x8b\x79\xf0")                            # mov rdi,[rcx-0x10] 最后加入的 shared_ptr
-    emit(b"\x48\x85\xff")                                # test rdi,rdi
+    emit(b"\x48\x8b\x44\x24\x18")                # mov rax,[rsp+0x18] scratch.end
+    emit(b"\x48\x3b\x44\x24\x10")                # cmp rax,[rsp+0x10] scratch.begin
+    je_empty = len(c); emit(b"\x74\x00")
+    emit(b"\x48\x8d\xbd\x48\xff\xff\xff")      # lea rdi,[rbp-0xb8] out
+    emit(b"\x48\x8b\x74\x24\x10")                # mov rsi,[rsp+0x10] &scratch[0]
+    call2 = len(c); emit(b"\xe8\x00\x00\x00\x00")  # out.push_back(scratch[0])
+    emit(b"\x48\x8d\x7c\x24\x10")                # lea rdi,[rsp+0x10]
+    call3 = len(c); emit(b"\xe8\x00\x00\x00\x00")  # ~vector(scratch)
+    emit(b"\x31\xc0")                              # xor eax,eax
+    for off in (0x10, 0x18, 0x20):
+        emit(b"\x48\x89\x44\x24" + bytes([off]))  # 再清空 scratch
+    emit(b"\x48\x8b\x8d\x50\xff\xff\xff")      # mov rcx,[rbp-0xb0] out.end
+    emit(b"\x48\x8b\x79\xf0")                      # mov rdi,[rcx-0x10] 刚追加的那个
+    emit(b"\x48\x85\xff")                          # test rdi,rdi
     je2 = len(c); emit(b"\x74\x00")
-    emit(b"\xbe\x02\x00\x00\x00")                      # mov esi,2
-    call2 = len(c); emit(b"\xe8\x00\x00\x00\x00")
-    emit(b"\x41\xff\xc4")                                # inc r12d
+    emit(b"\xbe\x02\x00\x00\x00")                # mov esi,2
+    call4 = len(c); emit(b"\xe8\x00\x00\x00\x00")  # setElementState(pick,2)
+    emit(b"\x41\xff\xc4")                          # inc r12d
     jmp_loop = len(c); emit(b"\xe9\x00\x00\x00\x00")
+    empty_lbl = here()
+    emit(b"\x48\x8d\x7c\x24\x10")                # lea rdi,[rsp+0x10]
+    call5 = len(c); emit(b"\xe8\x00\x00\x00\x00")  # ~vector(空)
     done = here()
-    emit(b"\x48\x83\xc4\x08")                          # add rsp,8
-    emit(b"\x41\x5e\x41\x5d\x41\x5c")                # pop r14; r13; r12
+    emit(b"\x48\x83\xc4\x30")                    # add rsp,0x30
+    emit(b"\x41\x5d\x41\x5c")                    # pop r13; pop r12
     jmp_out = len(c); emit(b"\xe9\x00\x00\x00\x00")
 
     def rel8(at, target):
@@ -111,13 +131,17 @@ def _build_stub(S):
     def rel32(at, target):
         struct.pack_into("<i", c, at + 1, target - (S + at + 5))
 
-    rel8(jge, done)
-    rel8(je1, done)
+    rel8(jl_body, body_lbl)
+    rel32(jmp_done, done)
+    rel8(je_empty, empty_lbl)
     rel8(je2, done)
     rel32(jmp_loop, loop)
-    rel32(call1, 0x1003EF300)      # _findMatchedBlocks
-    rel32(call2, 0x1003FD340)      # TargetBlockElement::setElementState
-    rel32(jmp_out, 0x1003EEEE1)    # 回到原流程（out.empty() 检查）
+    rel32(call1, 0x1003EF300)     # _findMatchedBlocks
+    rel32(call2, 0x102C97E42)     # vector<shared_ptr>::push_back(const&)
+    rel32(call3, 0x1001664B0)     # ~vector<shared_ptr>
+    rel32(call4, 0x1003FD340)     # setElementState
+    rel32(call5, 0x1001664B0)     # ~vector<shared_ptr>（空）
+    rel32(jmp_out, 0x1003EEEE1)
     return bytes(c)
 
 

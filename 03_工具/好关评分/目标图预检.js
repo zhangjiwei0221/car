@@ -1,6 +1,0 @@
-#!/usr/bin/env node
-'use strict';
-const fs=require('fs'),path=require('path'),vm=require('vm');const ROOT=path.join(__dirname,'..','..'),BIN=path.join(ROOT,'02_工程','游戏主bin','bin','js');
-const files=['utils.js','color-libs.js','simulator.js','solver-strategy.js','solver.js','playersim.js','analysis.js','car-sequencer.js','solver-analysis.js','experience-goal.js','capacity-tuner.js','generator.js','source-preflight.js'];const sb={console:{log(){},warn(){},error(){}},WeakMap,Map,Set,Date,Math,JSON};vm.createContext(sb);for(const f of files)vm.runInContext(fs.readFileSync(path.join(BIN,f),'utf8'),sb,{filename:f});const A=sb.AntSolver;
-const args=process.argv.slice(2),inputs=args.filter((x,i)=>!x.startsWith('--')&&(i===0||args[i-1]!=='--out')),oi=args.indexOf('--out'),out=oi>=0?args[oi+1]:'';if(!inputs.length)throw new Error('需要TXT');
-const rows=inputs.map(file=>{const blocks=A.Generator.blocksFromTXT(fs.readFileSync(file,'utf8')),result=A.SourcePreflight.analyze(blocks);console.log(JSON.stringify({file,status:result.status,warnings:result.warnings,capacity:result.capacity,demand:result.demand,estimate:result.estimate,suggestions:result.suggestions}));return {file,result};});if(out)fs.writeFileSync(out,JSON.stringify({schema:'source-preflight-batch-v1',rows},null,2)+'\n');
