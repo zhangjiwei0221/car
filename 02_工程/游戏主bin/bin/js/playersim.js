@@ -579,11 +579,16 @@ AntSolver.PlayerSim = (function () {
             var pkList = (lpd.picked && lpd.picked.length)
               ? lpd.picked : [{ r: mv.r, c: mv.c, color: cell.color, count: cell.count }];
             for (var pk = 0; pk < pkList.length; pk++) {
+              // 只读观测：该盒被拿时，其颜色在目标图上还有多少可达像素。
+              // floodFillCount 会原地修改消除矩阵，必须传拷贝；不参与任何决策。
+              var _emForReach = s.eliminated.map(function (row) { return row.slice(); });
+              var _reachAtPick = Sim.floodFillCount(_emForReach, s.blocks, s.rows, s.cols, pkList[pk].color, s.bottomOnly);
               pickOrderPS.push({
                 step: picks,                       // picks 已在上面自增 → 1 起算，与 solver 侧 step 同口径
                 tick: curOpTick,
                 r: pkList[pk].r, c: pkList[pk].c,
                 color: pkList[pk].color, count: pkList[pk].count,
+                reachAtPick: _reachAtPick,
                 chain: lpd.isChain ? 1 : 0,        // 是否锁链整组（0 = 单盒）
                 chainSize: tickPickInfo.boxes || pkList.length,   // 这一步共取几盒
                 chainIndex: pk                     // 组内序号，0 = 触发盒
