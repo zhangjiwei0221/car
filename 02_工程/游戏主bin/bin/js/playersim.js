@@ -47,6 +47,8 @@ AntSolver.PlayerSim = (function () {
   function run(level, opts) {
     opts = opts || {};
     var pickThreshold = opts.pickThreshold != null ? opts.pickThreshold : 0.6;
+    // 实验开关（默认关）：所有候选都不可消时，优先小容量（小债），而不是行号。
+    var preferSmallDebt = !!opts.preferSmallDebt;
     // 【v373·P2】学会后：上一局死在这个颜色上 → 下一局给它降权（不是禁止，没别的可点还会点）
     var avoidColor = (opts.avoidColor != null) ? opts.avoidColor : null;
     // 【v381·P6】可绕开性测试：避开指定格（但不禁同色）
@@ -220,6 +222,7 @@ AntSolver.PlayerSim = (function () {
           score -= mv.r * 0.05;
         }
         if (highPressure && !consumable) score -= 40;          // 高压不接不可消的球
+        if (preferSmallDebt && !consumable) score -= cell.count * 0.1;  // 全不可消时优先小债
         if (debugScoreStep && picks + 1 === debugScoreStep) {
           debugScores.push({
             step: picks + 1, r: mv.r, c: mv.c, color: cell.color, count: cell.count,

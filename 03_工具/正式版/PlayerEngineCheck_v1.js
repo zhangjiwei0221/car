@@ -33,6 +33,8 @@ const outFile = arg('--out', null);
 const reviveCaps = String(arg('--revives', '0,2')).split(',').map(Number).filter(Number.isFinite);
 const useFamily = has('--family');
 const useLookahead = has('--lookahead');
+const preferSmallDebt = has('--prefer-small-debt');
+const preferVariants = preferSmallDebt ? [false, true] : [false];
 const limit = Number(arg('--limit', 0)) || 0;
 const thresholds = useFamily ? [0.4, 0.6, 0.8] : [0.6];
 const lookaheads = useLookahead ? [false, true] : [false];
@@ -71,7 +73,7 @@ function forcedFromMin(lv, min) {
   for (const p of min.pickOrder || []) if (!byStep[p.step]) byStep[p.step] = { r: p.r, c: p.c };
   const fp = {};
   for (const k of Object.keys(byStep)) fp[+k - 1] = byStep[k];
-  const res = A.PlayerSim.run(lv, { seed: 7, instantChain: false, reviveCap: 0, forcedPicks: fp });
+  const res = A.PlayerSim.run(lv, { seed: 7, instantChain: false, reviveCap: 0, forcedPicks: fp, preferSmallDebt: false });
   let mismatch = 0;
   for (const k of Object.keys(byStep)) {
     const s = +k, at = res.pickOrder.filter(p => p.step === s);
@@ -84,17 +86,20 @@ function policyRuns(lv, caps) {
   const runs = [];
   for (const t of thresholds) {
     for (const la of lookaheads) {
-      for (const cap of caps) {
-        const r = A.PlayerSim.run(lv, {
-          seed: 7, instantChain: false, reviveCap: cap,
-          pickThreshold: t, lookahead2: la, lookaheadLimit: 6
-        });
-        runs.push({
-          threshold: t, lookahead: la, reviveCap: cap,
-          won: !!r.won, picks: r.picks, revivesUsed: r.revivesUsed || 0,
-          deathStep: r.deathSnapshot ? r.deathSnapshot.step : null,
-          progress: r.progress
-        });
+      for (const psd of preferVariants) {
+        for (const cap of caps) {
+          const r = A.PlayerSim.run(lv, {
+            seed: 7, instantChain: false, reviveCap: cap,
+            pickThreshold: t, lookahead2: la, lookaheadLimit: 6,
+            preferSmallDebt: psd
+          });
+          runs.push({
+            threshold: t, lookahead: la, reviveCap: cap, preferSmallDebt: psd,
+            won: !!r.won, picks: r.picks, revivesUsed: r.revivesUsed || 0,
+            deathStep: r.deathSnapshot ? r.deathSnapshot.step : null,
+            progress: r.progress
+          });
+        }
       }
     }
   }
