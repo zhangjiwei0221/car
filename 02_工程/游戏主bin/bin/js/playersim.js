@@ -65,6 +65,9 @@ AntSolver.PlayerSim = (function () {
     // 只读观测（默认关）：记录暂存中每个颜色后续每一步的可达量，用于「债务时序」检查。
     var trackReach = !!opts.trackReach;
     var reachTimeline = [];
+    // 只读观测（默认关）：记录指定步的所有候选评分，用于排查「为什么选这辆」。
+    var debugScoreStep = opts.debugScoreStep != null ? +opts.debugScoreStep : 0;
+    var debugScores = [];
     var bottomOnly = !!opts.bottomOnly;       // 仅底部入口(见上)；透传给 Simulator 并用于本文件自有可达判定
     // 第三种玩法模式：四方向瞬时连锁消除（需求 08.03，用户 2026-08-03 批准改玩家模拟）。
     // 与 bottomOnly 互斥，固定四方向可达；开启后玩家侧的消除结算改为：
@@ -217,6 +220,13 @@ AntSolver.PlayerSim = (function () {
           score -= mv.r * 0.05;
         }
         if (highPressure && !consumable) score -= 40;          // 高压不接不可消的球
+        if (debugScoreStep && picks + 1 === debugScoreStep) {
+          debugScores.push({
+            step: picks + 1, r: mv.r, c: mv.c, color: cell.color, count: cell.count,
+            isQ: isQ, consumable: consumable, score: score,
+            highPressure: highPressure, groupSize: mv.groupSize || 1, chain: cell.chain || 0
+          });
+        }
         if (score > bestScore) { secondScore = bestScore; second = best; bestScore = score; best = mv; }
         else if (score > secondScore) { secondScore = score; second = mv; }
         if (!_avoidMap[mv.r + ',' + mv.c] && score > bestSafeScore) { bestSafeScore = score; bestSafe = mv; }
@@ -868,6 +878,7 @@ AntSolver.PlayerSim = (function () {
       // 【v121·任务AK③】玩家版棋盘取盒序列（一条=一个盒，同 step 共享）。供前端画「玩家版求解路线」。
       pickOrder: pickOrderPS,
       reachTimeline: reachTimeline,           // 只读观测（trackReach 开启时）
+      debugScores: debugScores,               // 只读观测（debugScoreStep 开启时）
       pressureSamples: pressureSamples, itemUses: itemUses, itemMarks: itemMarks,
       revivesUsed: revivesUsed, reviveCap: reviveCap,
       // 玩法模式与瞬时连锁的操作事件流（需求 §八.2、§十.2）。
