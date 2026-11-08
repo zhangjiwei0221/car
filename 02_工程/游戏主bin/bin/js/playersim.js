@@ -385,6 +385,16 @@ AntSolver.PlayerSim = (function () {
       // 有效操作 tick（需求 §3.1/§3.6）：取了盒、或有推进、或发生复活。
       // 纯空转的停滞检测 tick 不计入 f1 平均，避免同一个暂存状态被反复加权。
       var effective = !!tickPickInfo || !!progressed || !!pendingRevive;
+      // 只读观测：本 tick 结束后，「吃不动的车」= 未完成且该色当前无任何可达像素。
+      // 用于区分「暂存里有几辆」（含免费/正在吃的车）和「真正欠了几辆」。
+      var _stuckCars = 0, _stuckPx = 0;
+      for (var _si = 0; _si < balls.length; _si++) {
+        var _sb = balls[_si];
+        if (_sb.progress < _sb.need && !colorHasReach(_sb.color)) {
+          _stuckCars++;
+          _stuckPx += _sb.need - _sb.progress;
+        }
+      }
       tickTrajectory.push({
         tick: curOpTick,
         effective: effective,
@@ -394,6 +404,8 @@ AntSolver.PlayerSim = (function () {
         progress: totalPixels ? +(s.eliminatedPixels / totalPixels).toFixed(4) : 0,
         pick: tickPickInfo || null,
         picked: !!tickPickInfo,
+        stuckCars: _stuckCars,                 // 未完成且当前无路可吃的车（真债）
+        stuckPx: _stuckPx,                     // 这些车还差多少像素
         revive: !!pendingRevive,
         reviveIndex: pendingRevive ? pendingRevive.index : 0,
         bufferBeforeRevive: pendingRevive ? pendingRevive.bufferBefore : null,
