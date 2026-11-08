@@ -52,6 +52,7 @@ AntSolver.PlayerSim = (function () {
     // 信息受限玩家（M2）：用「看得见的剩余像素」估计能否吃满，而不是真实可达。
     var useVisibleReach = !!opts.useVisibleReach;
     var visibleReachFactor = opts.visibleReachFactor != null ? +opts.visibleReachFactor : 1;
+    var visibleModel = opts.visibleModel || 'all'; // all | edge | component
     // 【v373·P2】学会后：上一局死在这个颜色上 → 下一局给它降权（不是禁止，没别的可点还会点）
     var avoidColor = (opts.avoidColor != null) ? opts.avoidColor : null;
     // 【v381·P6】可绕开性测试：避开指定格（但不禁同色）
@@ -198,9 +199,44 @@ AntSolver.PlayerSim = (function () {
       }
       return n;
     }
+    // visible-edge：只算露出来的该色像素（贴目标图边缘，或相邻已消格）。
+    function visibleEdgeOf(color) {
+      var n = 0;
+      for (var vr = 0; vr < s.rows; vr++) for (var vc = 0; vc < s.cols; vc++) {
+        if (s.eliminated[vr][vc] || s.blocks[vr][vc] !== color) continue;
+        if (vr === 0 || vr === s.rows - 1 || vc === 0 || vc === s.cols - 1) { n++; continue; }
+        if (s.eliminated[vr - 1][vc] || s.eliminated[vr + 1][vc] || s.eliminated[vr][vc - 1] || s.eliminated[vr][vc + 1]) n++;
+      }
+      return n;
+    }
+    // visible-component：该色最大的同色连通块。
+    function visibleComponentOf(color) {
+      var rows = s.rows, cols = s.cols, seen = new Uint8Array(rows * cols), best = 0;
+      for (var vr = 0; vr < rows; vr++) for (var vc = 0; vc < cols; vc++) {
+        var id = vr * cols + vc;
+        if (seen[id] || s.eliminated[vr][vc] || s.blocks[vr][vc] !== color) continue;
+        var stack = [[vr, vc]], size = 0; seen[id] = 1;
+        while (stack.length) {
+          var cur = stack.pop(), r = cur[0], c = cur[1]; size++;
+          var dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+          for (var d = 0; d < 4; d++) {
+            var nr = r + dirs[d][0], nc = c + dirs[d][1];
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+            var nid = nr * cols + nc;
+            if (seen[nid] || s.eliminated[nr][nc] || s.blocks[nr][nc] !== color) continue;
+            seen[nid] = 1; stack.push([nr, nc]);
+          }
+        }
+        if (size > best) best = size;
+      }
+      return best;
+    }
     function perceivedConsumable(color, need) {
       if (!useVisibleReach) return optimisticConsumable(color, need);
-      return visibleRemainOf(color) * visibleReachFactor >= need;
+      var vis = visibleModel === 'edge' ? visibleEdgeOf(color)
+        : visibleModel === 'component' ? visibleComponentOf(color)
+        : visibleRemainOf(color);
+      return vis * visibleReachFactor >= need;
     }
 
     // ---- 玩家取球决策(有限信息、乐观、贪心；探索窄路/清可达区/问号试探) ----

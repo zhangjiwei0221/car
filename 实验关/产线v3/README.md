@@ -38,7 +38,7 @@
 5. **中段压力**用多车色的「大+小」容量拆分；容错也用同样的拆分/陷阱调。
 6. **at4 以玩家路线为准**；19 项的最小路线 at4 是诊断口径，不是体验。
 7. **暂存占用 ≠ 真债**：at3/at4 要用 `stuck`（未完成且当前无路可吃），不能用 raw buffer；一次性拿 4 辆免费车是 raw4 / stuck0。
-8. **可见 reach ≠ 真实 reach**：`visible` 是该色剩余像素（玩家看得见），`trueReach` 是实际可达；差大 = 信息陷阱。当前 `PlayerSim` 用 `trueReach`（全知）；`VisibleReach` 策略（用 visible）在 110 张上 **0/110 0 复活、55/110 2 复活**，是下界；真人在 oracle 与 visible 之间。F2 的 color30 是 visible 陷阱（229/0）。
+8. **可见 reach ≠ 真实 reach**：`visible` 是该色剩余像素（玩家看得见），`trueReach` 是实际可达；差大 = 信息陷阱。`VisibleReach` 模型在 110 张上：visible-all **0/55**、visible-edge **5/92**（0/2 复活），visible-component（30 样本）0/16；oracle 16/103。真人在 edge 与 oracle 之间。F2 的 color30 是 visible 陷阱（229/0），edge 也会在第 28 步死。
 
 **计划状态**：
 
@@ -48,7 +48,7 @@
 | M1 决策图谱（G2_9_0023 / 00154） | ✅ v3-05、v3-12～v3-13 |
 | 资源层（Reach / Capacity / Timing） | ✅ v3-07～v3-11 |
 | 局部修复（early/never/split/swap） | ✅ v3-15～v3-22（F2） |
-| M2 信息层（可见 reach） | 🟡 VisibleReach 已建：纯 visible **0/110**（0复活）、**55/110**（2复活）；全知 16/103；下一步 visible-edge/component 校准 |
+| M2 信息层（可见 reach） | 🟡 visible-all **0/55**、visible-edge **5/92**、visible-component **0/16**（30 样本）；oracle **16/103**；真人在 edge 与 oracle 之间 |
 | M3 障碍契约 + 消融 | ⬜ |
 | M4 语法 + 路线证书 | ⬜ |
 | M5 批量 | ⬜ |
