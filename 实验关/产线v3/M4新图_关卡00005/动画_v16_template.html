@@ -151,6 +151,10 @@
 
 <script>
 const D = __DATA__;
+// 真正的初始局面：暂存为空、目标图完整、车场未被取走。
+// 原始 capture 的第 0 帧已经是「第 1 步取车 + 吃第 1 个像素」的 tick，不能当初始态。
+D.frames.unshift({i:-1,tick:-1,initial:true,progress:0,bufferAfter:0,stuckCars:0,stuckPx:0,pick:null,eats:[],done:[],buffer:[]});
+D.frames.forEach((f,i)=>{ f.i = i; });
 const N = D.frames.length;
 const PALETTE = ['#e05d5d','#e0a15d','#d8d45d','#8fd45d','#5dd48f','#5dd4c8','#5da8e0','#6f6fe0','#a86fe0','#e06fc8','#e06f8f','#b0b0b0','#8a6d3b','#4f9d69','#c06060','#7a7ad0'];
 const colorOf = id => PALETTE[Math.abs(id) % PALETTE.length];
@@ -272,7 +276,8 @@ function render(){
   document.getElementById('kvInstant').style.color = p && p.instant ? 'var(--good)' : 'var(--ink)';
   // 帧说明
   const note = document.getElementById('frameNote');
-  if (p) note.innerHTML = '第 <b>'+p.step+'</b> 步：取 <b>'+p.colors.join('+')+'</b>（'+p.needs.join('+')+' px，'+p.group+' 盒）。这一步结束时 buffer=<b>'+p.bufferAfter+'</b>，真债 <b>'+p.stuckCars+'</b> 辆 / '+p.stuckPx+' px。';
+  if (f.initial) note.innerHTML = '<b>初始局面</b>：暂存区空，目标图完整，车场未取走。按播放开始第 1 步。';
+  else if (p) note.innerHTML = '第 <b>'+p.step+'</b> 步：取 <b>'+p.colors.join('+')+'</b>（'+p.needs.join('+')+' px，'+p.group+' 盒）。这一步结束时 buffer=<b>'+p.bufferAfter+'</b>，真债 <b>'+p.stuckCars+'</b> 辆 / '+p.stuckPx+' px。';
   else note.textContent = '正在逐像素吃：当前帧消除 '+((f.eats||[]).length)+' px，buffer='+f.bufferAfter+'。';
   // 时间轴高亮
   stepBtns.forEach((b,i)=>{
@@ -281,7 +286,7 @@ function render(){
   if (step>0 && stepBtns[step-1]) stepBtns[step-1].scrollIntoView({block:'nearest',inline:'nearest'});
   // 控件
   document.getElementById('scrub').value = frame;
-  document.getElementById('tickLabel').textContent = 'tick '+f.tick+' / '+D.frames[N-1].tick;
+  document.getElementById('tickLabel').textContent = f.tick<0 ? ('初始 · 0 / '+D.picks.length+' 步') : ('tick '+f.tick+' / '+D.frames[N-1].tick);
   drawProgress();
 }
 function drawProgress(){
@@ -291,6 +296,7 @@ function drawProgress(){
 function setFrame(i){ frame = Math.max(0, Math.min(N-1, i)); render(); }
 function nextFrame(){
   if (frame >= N-1){ pause(); return; }
+  if (frame === 0){ setFrame(1); return; }
   const mult = +document.getElementById('speed').value;
   setFrame(frame + mult);
 }
