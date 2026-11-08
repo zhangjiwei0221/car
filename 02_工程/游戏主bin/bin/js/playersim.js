@@ -49,6 +49,9 @@ AntSolver.PlayerSim = (function () {
     var pickThreshold = opts.pickThreshold != null ? opts.pickThreshold : 0.6;
     // 实验开关（默认关）：所有候选都不可消时，优先小容量（小债），而不是行号。
     var preferSmallDebt = !!opts.preferSmallDebt;
+    // 信息受限玩家（M2）：用「看得见的剩余像素」估计能否吃满，而不是真实可达。
+    var useVisibleReach = !!opts.useVisibleReach;
+    var visibleReachFactor = opts.visibleReachFactor != null ? +opts.visibleReachFactor : 1;
     // 【v373·P2】学会后：上一局死在这个颜色上 → 下一局给它降权（不是禁止，没别的可点还会点）
     var avoidColor = (opts.avoidColor != null) ? opts.avoidColor : null;
     // 【v381·P6】可绕开性测试：避开指定格（但不禁同色）
@@ -187,6 +190,18 @@ AntSolver.PlayerSim = (function () {
       var set = reachSet[color]; if (!set) return need <= 0;
       return Sim.canConsumeReach(s, { color: color, count: need }, currentOpen());
     }
+    // M2：信息受限玩家的估计——只看画面上该色还剩多少像素，不判断连通性。
+    function visibleRemainOf(color) {
+      var n = 0;
+      for (var vr = 0; vr < s.rows; vr++) for (var vc = 0; vc < s.cols; vc++) {
+        if (!s.eliminated[vr][vc] && s.blocks[vr][vc] === color) n++;
+      }
+      return n;
+    }
+    function perceivedConsumable(color, need) {
+      if (!useVisibleReach) return optimisticConsumable(color, need);
+      return visibleRemainOf(color) * visibleReachFactor >= need;
+    }
 
     // ---- 玩家取球决策(有限信息、乐观、贪心；探索窄路/清可达区/问号试探) ----
     var _lastSecond = null;
@@ -212,7 +227,7 @@ AntSolver.PlayerSim = (function () {
           consumable = false;
         } else {
           var need = cell.count;
-          consumable = optimisticConsumable(cell.color, need); // 玩家乐观估计(可能错)
+          consumable = perceivedConsumable(cell.color, need); // 玩家估计(visible 模式用可见量)
           score += consumable ? 30 : -12;
           if (avoidColor != null && cell.color === avoidColor) score -= 60;   // 【v373】避开上局死色
           if (_avoidMap[mv.r + ',' + mv.c]) score -= 1000;                    // 【v381】可绕开性测试
@@ -246,7 +261,7 @@ AntSolver.PlayerSim = (function () {
       if (best) {
         var bc = s.cells[best.r][best.c];
         var bIsQ = bc.q && !Sim.isRevealed(s, best.r, best.c);
-        if (balls.length >= bufferLimit - 1 && !bIsQ && !optimisticConsumable(bc.color, bc.count)) {
+        if (balls.length >= bufferLimit - 1 && !bIsQ && !perceivedConsumable(bc.color, bc.count)) {
           // 【v323·死亡归因】"高压且不可消"→ 宁可不取，这就是卡死前最后一次拒绝
           s.lastRefuse = { reason: 'highPressure', r: best.r, c: best.c, need: best.groupSize || 1, free: freeSlotCount(), color: bc.color, chain: bc.chain || 0 };
           return null;
@@ -319,7 +334,7 @@ AntSolver.PlayerSim = (function () {
         var st = slotStart(slot, rows, cols, bufferLimit);
         // enterTick（需求 §4.2）：该盒进入暂存区的玩家操作 tick。滞留步数 = 离场 tick − enterTick。
         // 取盒发生在本 tick 的开头，此时 ticks 已是本 tick 的序号，故直接用 ticks。
-        var ball = { color: b.color, need: b.count, progress: 0, slot: slot, ar: st.r, ac: st.c, link: link, key: (++keySeq), enterTick: curOpTick, thought: optimisticConsumable(b.color, b.count) };
+        var ball = { color: b.color, need: b.count, progress: 0, slot: slot, ar: st.r, ac: st.c, link: link, key: (++keySeq), enterTick: curOpTick, thought: perceivedConsumable(b.color, b.count) };
         slotUsed[slot] = ball; balls.push(ball);
         if (curFrame) curFrame.picks.push({ key: ball.key, slot: slot, color: b.color, need: b.count, sr: st.r, sc: st.c, link: link });
       }
@@ -592,7 +607,7 @@ AntSolver.PlayerSim = (function () {
         if (mv) {
           var cell = s.cells[mv.r][mv.c];
           var wasQ = cell.q && !Sim.isRevealed(s, mv.r, mv.c);
-          var thought = wasQ ? false : optimisticConsumable(cell.color, cell.count);
+          var thought = wasQ ? false : perceivedConsumable(cell.color, cell.count);
           if (doPick(mv)) {
             picks++;
             pickHistory.push({ r: mv.r, c: mv.c });

@@ -35,6 +35,8 @@ const useFamily = has('--family');
 const useLookahead = has('--lookahead');
 const preferSmallDebt = has('--prefer-small-debt');
 const preferVariants = preferSmallDebt ? [false, true] : [false];
+const useVisibleReach = has('--visible-reach');
+const visibleReachFactor = Number(arg('--visible-factor', 1));
 const limit = Number(arg('--limit', 0)) || 0;
 const thresholds = useFamily ? [0.4, 0.6, 0.8] : [0.6];
 const lookaheads = useLookahead ? [false, true] : [false];
@@ -91,7 +93,7 @@ function policyRuns(lv, caps) {
           const r = A.PlayerSim.run(lv, {
             seed: 7, instantChain: false, reviveCap: cap,
             pickThreshold: t, lookahead2: la, lookaheadLimit: 6,
-            preferSmallDebt: psd
+            preferSmallDebt: psd, useVisibleReach, visibleReachFactor
           });
           runs.push({
             threshold: t, lookahead: la, reviveCap: cap, preferSmallDebt: psd,

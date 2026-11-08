@@ -38,7 +38,7 @@
 5. **中段压力**用多车色的「大+小」容量拆分；容错也用同样的拆分/陷阱调。
 6. **at4 以玩家路线为准**；19 项的最小路线 at4 是诊断口径，不是体验。
 7. **暂存占用 ≠ 真债**：at3/at4 要用 `stuck`（未完成且当前无路可吃），不能用 raw buffer；一次性拿 4 辆免费车是 raw4 / stuck0。
-8. **可见 reach ≠ 真实 reach**：`visible` 是该色剩余像素（玩家看得见），`trueReach` 是实际可达；差大 = 信息陷阱。当前 `PlayerSim` 用 `trueReach`，是全知口径；M2 要建 `VisibleReach` 策略。
+8. **可见 reach ≠ 真实 reach**：`visible` 是该色剩余像素（玩家看得见），`trueReach` 是实际可达；差大 = 信息陷阱。当前 `PlayerSim` 用 `trueReach`（全知）；`VisibleReach` 策略（用 visible）在 110 张上 **0/110 0 复活、55/110 2 复活**，是下界；真人在 oracle 与 visible 之间。F2 的 color30 是 visible 陷阱（229/0）。
 
 **计划状态**：
 
@@ -48,7 +48,7 @@
 | M1 决策图谱（G2_9_0023 / 00154） | ✅ v3-05、v3-12～v3-13 |
 | 资源层（Reach / Capacity / Timing） | ✅ v3-07～v3-11 |
 | 局部修复（early/never/split/swap） | ✅ v3-15～v3-22（F2） |
-| M2 信息层（可见 reach） | 🟡 第一步完成（visible vs true 对照）；VisibleReach 策略待做 |
+| M2 信息层（可见 reach） | 🟡 VisibleReach 已建：纯 visible **0/110**（0复活）、**55/110**（2复活）；全知 16/103；下一步 visible-edge/component 校准 |
 | M3 障碍契约 + 消融 | ⬜ |
 | M4 语法 + 路线证书 | ⬜ |
 | M5 批量 | ⬜ |
@@ -64,7 +64,7 @@
 1. ~~用户试玩 F2~~ ✅ 手感通过；
 2. ~~体验证书改用 stuck（真债）~~ ✅（证书 §1/§4 已用 stuck）；
 3. ~~F2 路线证书 + 排版检查~~ ✅（`F2_路线证书.md`；LayoutScore hard 0 / warn 0）；
-4. **M2 信息层**：可见 reach vs 真实 reach；在 F2/00154 上量化误判；
+4. **M2 校准**：`visible-edge` / `visible-component` / 你的试玩对账；F2/00154 + 110 张（纯 visible 已跑：0/110）。
 5. **M3 障碍契约 + 消融**：F2 的冰/链/管道/黑块逐个移除/移位，测 Δ；
 6. **M4 语法 + 证书**：把 F2 的 ice / split / swap / 容量拆分写成语法；`BuildFromRecipe` 复现（deep equal）；证书模板化；
 7. **M5 批量**：M2–M4 完成后再批量。**现在不开始批量。**
