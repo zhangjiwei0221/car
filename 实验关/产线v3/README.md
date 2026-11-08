@@ -63,9 +63,10 @@
 1. ~~用户试玩 F2~~ ✅ 手感通过；
 2. ~~体验证书改用 stuck（真债）~~ ✅（证书 §1/§4 已用 stuck）；
 3. ~~F2 路线证书 + 排版检查~~ ✅（`F2_路线证书.md`；LayoutScore hard 0 / warn 0）；
-4. 把 F2 固化成**配方**（`BuildFromRecipe_v1`），验证可复现（deep equal）；
-5. 接编译器（early / never / chain-pipe、split / swap、容量拆分）；
-6. M2 信息层。
+4. **M2 信息层**：可见 reach vs 真实 reach；在 F2/00154 上量化误判；
+5. **M3 障碍契约 + 消融**：F2 的冰/链/管道/黑块逐个移除/移位，测 Δ；
+6. **M4 语法 + 证书**：把 F2 的 ice / split / swap / 容量拆分写成语法；`BuildFromRecipe` 复现（deep equal）；证书模板化；
+7. **M5 批量**：M2–M4 完成后再批量。**现在不开始批量。**
 
 > 软项（最长连续免费 13、中段低压 16、象限 3.87、未动主体 0）留作后续 Pareto，不在当前阻塞。
 
