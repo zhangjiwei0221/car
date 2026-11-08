@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>关卡00005 v16 · 逐步回放</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b23; --panel2:#1c232d; --line:#2a3340;
+    --ink:#e8edf5; --muted:#94a3b8; --dim:#5b6778;
+    --accent:#63b3ff; --good:#4ade80; --warn:#fbbf24; --bad:#fb7185;
+    --gone:#0a0d12;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB",sans-serif}
+  header{padding:18px 22px 10px;border-bottom:1px solid var(--line)}
+  h1{font-size:18px;margin:0 0 4px;font-weight:650}
+  .sub{color:var(--muted);font-size:12.5px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-size:12.5px;color:var(--muted)}
+  .chip b{color:var(--ink);font-weight:650}
+  .chip.bad b{color:var(--bad)} .chip.good b{color:var(--good)} .chip.warn b{color:var(--warn)}
+  main{display:grid;grid-template-columns:minmax(320px,380px) minmax(520px,1fr) minmax(300px,340px);gap:16px;padding:16px 22px 8px;align-items:start}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+  .panel h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .board{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cell{position:relative;aspect-ratio:1;border-radius:7px;background:var(--panel2);border:1px solid #26303d;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#fff;transition:opacity .12s, transform .12s, box-shadow .12s}
+  .cell .id{font-weight:750;font-size:13px;text-shadow:0 1px 2px rgba(0,0,0,.45)}
+  .cell .n{font-size:9.5px;opacity:.85}
+  .cell .tag{position:absolute;top:2px;right:3px;font-size:9px;background:rgba(0,0,0,.45);padding:0 3px;border-radius:3px}
+  .cell.removed{opacity:.16;filter:grayscale(1)}
+  .cell.picked{outline:2px solid #fff;box-shadow:0 0 0 3px rgba(99,179,255,.55),0 0 18px rgba(99,179,255,.55);transform:scale(1.04);z-index:2}
+  .cell.pipe{background:#233042;border-style:dashed}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;color:var(--dim);font-size:11px}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .targetWrap{display:flex;justify-content:center}
+  .target{display:grid;grid-template-columns:repeat(40,12px);gap:1px;background:#070a0e;padding:6px;border-radius:8px}
+  .px{width:12px;height:12px;border-radius:2px;background:var(--gone);transition:opacity .18s, transform .18s}
+  .px.gone{opacity:.18}
+  .px.eatNow{outline:2px solid #fff;transform:scale(1.35);z-index:2;position:relative}
+  .staging{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:10px}
+  .slot{min-height:74px;border:1px dashed #334155;border-radius:8px;background:#121821;padding:6px;display:flex;flex-direction:column;justify-content:space-between}
+  .slot.empty{opacity:.45}
+  .slot .top{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+  .slot .bar{height:6px;background:#0b0f15;border-radius:99px;overflow:hidden;margin-top:4px}
+  .slot .fill{height:100%;background:var(--accent);border-radius:99px;transition:width .1s}
+  .slot .meta{font-size:10px;color:var(--dim);margin-top:4px}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .kv{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 9px}
+  .kv .k{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .kv .v{font-size:16px;font-weight:700;margin-top:1px}
+  .kv .v small{font-size:11px;font-weight:500;color:var(--muted)}
+  .note{font-size:11.5px;color:var(--muted);background:#121821;border:1px solid var(--line);border-radius:9px;padding:9px 10px;margin-top:10px}
+  .note b{color:var(--warn)}
+  .controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 22px;border-top:1px solid var(--line);position:sticky;bottom:0;background:rgba(14,17,22,.95);backdrop-filter:blur(8px)}
+  button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font:inherit;font-size:12.5px;cursor:pointer}
+  button:hover{border-color:#3b4a5e}
+  button.primary{background:var(--accent);color:#062033;border-color:var(--accent);font-weight:700}
+  select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:12.5px}
+  input[type=range]{flex:1;min-width:160px;accent-color:var(--accent)}
+  .timeline{display:flex;gap:5px;overflow-x:auto;padding:10px 22px 14px;border-top:1px solid var(--line);min-width:0;max-width:100%}
+  .stepBtn{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:11.5px;color:var(--muted);cursor:pointer;text-align:left}
+  .stepBtn b{display:block;color:var(--ink);font-size:12px}
+  .stepBtn.cur{border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,179,255,.2)}
+  .stepBtn.debt b{color:var(--bad)}
+  .stepBtn.free b{color:var(--good)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  @media (max-width:1100px){
+    main{grid-template-columns:minmax(0,1fr);max-width:720px;margin:0 auto}
+    .panel.targetPanel{order:-1}
+    main section:first-child{order:1}
+    main section:last-child{order:2}
+    .board{max-width:420px;margin:0 auto}
+    .targetWrap{overflow-x:auto;justify-content:flex-start}
+  }
+  @media (max-width:760px){main{grid-template-columns:1fr;padding:12px}.panel.targetPanel{order:-1}.target{grid-template-columns:repeat(40,8px)}.px{width:8px;height:8px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>关卡00005 v16 · 玩家路线逐步回放</h1>
+  <div class="sub">图源 <span class="mono">关卡/关卡00005_原图013-021-014-023_分图4色_40x40.txt</span> · 策略 <span class="mono">threshold=0.8 / preferSmallDebt=true / revive=0 / seed=7</span></div>
+  <div class="chips">
+    <div class="chip">玩家路线免费步 <b class="bad" id="chipFree">0</b></div>
+    <div class="chip">ArlCheck 最长连续免费 <b class="warn">27</b> <span style="color:var(--dim)">（求解器最小路线口径）</span></div>
+    <div class="chip">真债峰值 <b class="bad" id="chipStuck">3</b></div>
+    <div class="chip good">0 复活 <b>48 步 100%</b></div>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>车场 7×7</h2>
+    <div class="board" id="board"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:#fbbf24"></i>冰 / 数字</span>
+      <span><i class="dot" style="background:#fb7185"></i>锁链组</span>
+      <span><i class="dot" style="background:#63b3ff"></i>管道</span>
+      <span>已取走 = 变暗</span>
+    </div>
+    <h2 style="margin-top:14px">暂存区</h2>
+    <div class="staging" id="staging"></div>
+    <div class="info">
+      <div class="kv"><div class="k">原始 buffer</div><div class="v" id="kvBuf">0 <small>/ 5</small></div></div>
+      <div class="kv"><div class="k">真债（stuck）</div><div class="v" id="kvStuck">0 <small>辆</small></div></div>
+      <div class="kv"><div class="k">已消除</div><div class="v" id="kvProg">0%</div></div>
+      <div class="kv"><div class="k">tick</div><div class="v" id="kvTick">0</div></div>
+    </div>
+  </section>
+
+  <section class="panel targetPanel">
+    <h2>目标图 · 已吃掉 = 变暗，当前帧 = 白框</h2>
+    <div class="targetWrap"><div class="target" id="target"></div></div>
+    <div class="note" id="frameNote">按播放开始；也可以用下方时间轴跳到任意一步。</div>
+  </section>
+
+  <section class="panel">
+    <h2>当前操作</h2>
+    <div class="info">
+      <div class="kv"><div class="k">步</div><div class="v" id="kvStep">0 <small>/ 48</small></div></div>
+      <div class="kv"><div class="k">取车</div><div class="v" id="kvColor">—</div></div>
+      <div class="kv"><div class="k">本步完成</div><div class="v" id="kvInstant">—</div></div>
+      <div class="kv"><div class="k">本步免费</div><div class="v" id="kvFree">—</div></div>
+    </div>
+    <div class="note" style="margin-top:12px">
+      <b>口径说明</b><br>
+      ArlCheck 的“最长连续免费 27”取的是 <b>min 路线</b>：求解器一次取车 = 完整结算，buffer 回到 0 才算一步免费。<br>
+      这张图回放的是 <b>玩家引擎</b>：每个 tick 每辆车只吃 1px，所以一旦有车进暂存，buffer 基本不会回到 0。玩家路线里“本步免费”= 0 步，“本步当场完成”= 0 步——和你体验到的“没有那么多免费车”一致。
+    </div>
+    <h2 style="margin-top:14px">路线</h2>
+    <div class="timeline" id="timeline" style="padding:0;border:0"></div>
+  </section>
+</main>
+
+<div class="controls">
+  <button class="primary" id="play">▶ 播放</button>
+  <button id="prevStep">◀ 上一步</button>
+  <button id="nextStep">下一步 ▶</button>
+  <button id="restart">⟲ 重播</button>
+  <select id="speed">
+    <option value="1">1×（逐 tick）</option>
+    <option value="2" selected>2×</option>
+    <option value="4">4×</option>
+    <option value="8">8×</option>
+    <option value="16">16×</option>
+  </select>
+  <input type="range" id="scrub" min="0" max="0" value="0">
+  <span class="mono" id="tickLabel" style="color:var(--muted);font-size:12px"></span>
+</div>
+
+<script>
+const D = __DATA__;
+const N = D.frames.length;
+const PALETTE = ['#e05d5d','#e0a15d','#d8d45d','#8fd45d','#5dd48f','#5dd4c8','#5da8e0','#6f6fe0','#a86fe0','#e06fc8','#e06f8f','#b0b0b0','#8a6d3b','#4f9d69','#c06060','#7a7ad0'];
+const colorOf = id => PALETTE[Math.abs(id) % PALETTE.length];
+
+// 每个像素被吃掉的帧号
+const goneAt = new Map();
+D.frames.forEach(f => (f.eats||[]).forEach(([r,c]) => goneAt.set(r+','+c, f.i)));
+// 车场格子被取走的帧号
+const removedAt = new Map();
+D.frames.forEach(f => { if (f.pick && f.pick.board) f.pick.board.forEach(({r,c}) => removedAt.set(r+','+c, f.i)); });
+// 每帧对应的操作步
+const stepAt = new Array(N); let s = 0;
+D.frames.forEach((f,i) => { if (f.pick) s = f.pick.step; stepAt[i] = s; });
+// 每步第一帧
+const pickFrames = [];
+D.frames.forEach((f,i) => { if (f.pick) pickFrames.push(i); });
+
+// --- 构建目标图 ---
+const targetEl = document.getElementById('target');
+const pxEls = [];
+const H = D.blocks.length, W = D.blocks[0].length;
+for (let r=0;r<H;r++) for (let c=0;c<W;c++){
+  const v = D.blocks[r][c];
+  const el = document.createElement('div');
+  el.className = 'px';
+  if (v>0) el.style.background = colorOf(v);
+  el.dataset.r=r; el.dataset.c=c;
+  targetEl.appendChild(el);
+  pxEls.push({el,r,c,v});
+}
+
+// --- 构建车场 ---
+const boardEl = document.getElementById('board');
+const cellEls = new Map();
+for (let r=0;r<D.maprow;r++) for (let c=0;c<D.mapcol;c++){
+  const sp = D.spools[r][c];
+  const el = document.createElement('div');
+  el.className = 'cell';
+  const types = Array.isArray(sp.type) ? sp.type : (sp.type ? [sp.type] : []);
+  const isPipe = sp.id===0 && types.some(t=>t>=11&&t<=14);
+  if (isPipe){
+    el.classList.add('pipe');
+    el.innerHTML = '<div class="id">P</div><div class="n">'+(sp.param||[]).length+' 辆</div>';
+  } else if (sp.id === -1) {
+    el.style.background = '#0b0f15';
+    el.innerHTML = '<div class="n" style="color:#475569">黑</div>';
+  } else if (sp.id === 0) {
+    el.style.background = '#0b0f15';
+    el.innerHTML = '<div class="n" style="color:#475569">空</div>';
+  } else {
+    el.style.background = colorOf(sp.id);
+    let tag = '';
+    if (types.includes(7)) tag = '❄' + (Array.isArray(sp.param) ? sp.param[types.indexOf(7)] : sp.param);
+    else if (types.includes(5)) tag = '链' + (Array.isArray(sp.param) ? sp.param[types.indexOf(5)] : sp.param);
+    else if (types.includes(6)) tag = '?';
+    el.innerHTML = '<div class="id">'+sp.id+'</div><div class="n">'+sp.count+'</div>'+(tag?'<div class="tag">'+tag+'</div>':'');
+  }
+  el.dataset.r=r; el.dataset.c=c;
+  boardEl.appendChild(el);
+  cellEls.set(r+','+c, el);
+}
+
+// --- 时间轴 ---
+const timelineEl = document.getElementById('timeline');
+const stepBtns = [];
+D.picks.forEach((p,idx) => {
+  const b = document.createElement('button');
+  b.className = 'stepBtn' + (p.free?' free':'') + (p.stuckCars>=3?' debt':'');
+  b.innerHTML = '<b>#'+p.step+' · '+p.colors.join('+')+'</b><span>'+p.needs.join('+')+' px · buf '+p.bufferAfter+'</span>';
+  b.onclick = () => { pause(); setFrame(pickFrames[idx]); };
+  timelineEl.appendChild(b);
+  stepBtns.push(b);
+});
+
+// --- 渲染 ---
+let frame = 0, timer = null, playing = false;
+function render(){
+  const f = D.frames[frame];
+  // 目标图
+  const eatSet = new Set((f.eats||[]).map(([r,c])=>r+','+c));
+  for (const p of pxEls){
+    if (p.v<=0) continue;
+    const key = p.r+','+p.c;
+    const g = goneAt.get(key);
+    const gone = g!==undefined && g<=frame;
+    p.el.classList.toggle('gone', gone);
+    p.el.classList.toggle('eatNow', eatSet.has(key));
+  }
+  // 车场
+  const picked = new Set((f.pick&&f.pick.board||[]).map(x=>x.r+','+x.c));
+  for (const [key, el] of cellEls){
+    const at = removedAt.get(key);
+    el.classList.toggle('removed', at!==undefined && at<=frame);
+    el.classList.toggle('picked', picked.has(key));
+  }
+  // 暂存区
+  const st = document.getElementById('staging');
+  let html = '';
+  const buf = f.buffer.slice(0,5);
+  for (let i=0;i<5;i++){
+    const b = buf[i];
+    if (!b){ html += '<div class="slot empty"><div class="top"><span>槽 '+(i+1)+'</span><span>空</span></div></div>'; continue; }
+    const pct = Math.max(0, Math.min(100, b.need? b.progress/b.need*100 : 0));
+    html += '<div class="slot"><div class="top"><span style="color:'+colorOf(b.color)+';font-weight:750">'+b.color+'</span><span>'+b.progress+'/'+b.need+'</span></div><div class="bar"><div class="fill" style="width:'+pct.toFixed(1)+'%"></div></div><div class="meta">key '+b.key+' · '+(b.need-b.progress)+' px left</div></div>';
+  }
+  st.innerHTML = html;
+  // 数字
+  document.getElementById('kvBuf').innerHTML = (f.bufferAfter||0)+' <small>/ 5</small>';
+  document.getElementById('kvStuck').innerHTML = (f.stuckCars||0)+' <small>辆</small>';
+  document.getElementById('kvProg').textContent = Math.round((f.progress||0)*100)+'%';
+  document.getElementById('kvTick').textContent = f.tick;
+  const step = stepAt[frame] || 0;
+  document.getElementById('kvStep').innerHTML = step+' <small>/ '+D.picks.length+'</small>';
+  const p = f.pick;
+  document.getElementById('kvColor').textContent = p ? p.colors.join('+') : '（吃像素）';
+  document.getElementById('kvInstant').textContent = p ? (p.instant?'是':'否') : '—';
+  document.getElementById('kvFree').textContent = p ? (p.free?'是':'否') : '—';
+  document.getElementById('kvFree').style.color = p && p.free ? 'var(--good)' : 'var(--ink)';
+  document.getElementById('kvInstant').style.color = p && p.instant ? 'var(--good)' : 'var(--ink)';
+  // 帧说明
+  const note = document.getElementById('frameNote');
+  if (p) note.innerHTML = '第 <b>'+p.step+'</b> 步：取 <b>'+p.colors.join('+')+'</b>（'+p.needs.join('+')+' px，'+p.group+' 盒）。这一步结束时 buffer=<b>'+p.bufferAfter+'</b>，真债 <b>'+p.stuckCars+'</b> 辆 / '+p.stuckPx+' px。';
+  else note.textContent = '正在逐像素吃：当前帧消除 '+((f.eats||[]).length)+' px，buffer='+f.bufferAfter+'。';
+  // 时间轴高亮
+  stepBtns.forEach((b,i)=>{
+    b.classList.toggle('cur', i+1===step);
+  });
+  if (step>0 && stepBtns[step-1]) stepBtns[step-1].scrollIntoView({block:'nearest',inline:'nearest'});
+  // 控件
+  document.getElementById('scrub').value = frame;
+  document.getElementById('tickLabel').textContent = 'tick '+f.tick+' / '+D.frames[N-1].tick;
+  drawProgress();
+}
+function drawProgress(){
+  document.getElementById('chipFree').textContent = D.summary.freePicks;
+  document.getElementById('chipStuck').textContent = D.summary.stuckPeak;
+}
+function setFrame(i){ frame = Math.max(0, Math.min(N-1, i)); render(); }
+function nextFrame(){
+  if (frame >= N-1){ pause(); return; }
+  const mult = +document.getElementById('speed').value;
+  setFrame(frame + mult);
+}
+function play(){
+  if (playing) return;
+  playing = true;
+  document.getElementById('play').textContent = '⏸ 暂停';
+  timer = setInterval(nextFrame, 40);
+}
+function pause(){
+  playing = false;
+  if (timer) clearInterval(timer);
+  timer = null;
+  document.getElementById('play').textContent = '▶ 播放';
+}
+document.getElementById('play').onclick = () => playing ? pause() : play();
+document.getElementById('restart').onclick = () => { pause(); setFrame(0); };
+document.getElementById('prevStep').onclick = () => { pause(); const cur = stepAt[frame]||1; const target = D.picks[Math.max(0,cur-2)]; setFrame(pickFrames[Math.max(0,cur-2)]); };
+document.getElementById('nextStep').onclick = () => { pause(); const cur = stepAt[frame]||0; const target = Math.min(D.picks.length-1, cur); setFrame(pickFrames[target]); };
+document.getElementById('scrub').max = N-1;
+document.getElementById('scrub').oninput = e => { pause(); setFrame(+e.target.value); };
+window.addEventListener('keydown', e => {
+  if (e.code==='Space'){ e.preventDefault(); playing?pause():play(); }
+  if (e.code==='ArrowRight'){ pause(); nextFrame(); }
+  if (e.code==='ArrowLeft'){ pause(); setFrame(frame - (+document.getElementById('speed').value)); }
+});
+render();
+</script>
+</body>
+</html>

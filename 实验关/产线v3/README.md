@@ -41,6 +41,7 @@
 8. **可见 reach ≠ 真实 reach**：`visible` 是该色剩余像素（玩家看得见），`trueReach` 是实际可达；差大 = 信息陷阱。`VisibleReach` 模型在 110 张上：visible-all **0/55**、visible-edge **5/92**（0/2 复活），visible-component（30 样本）0/16；oracle 16/103。真人在 edge 与 oracle 之间。F2 的 color30 是 visible 陷阱（229/0），edge 也会在第 28 步死。
 9. **障碍按契约评估**：同一个冰可能是 win gate / peak gate / rhythm；消融 Δ 必须成组看。F2：冰 r0c0/r1c1=0复活硬门，r1c4=峰值硬门，r0c2=中段/容错；链=中段；管道=供给/队列顺序（去管道峰值3/中段29，31先默认路线死29步）；问号=无决策（装饰，待 Q-aware/真人）。
 10. **语法可复现**：M3 契约写进 `语法库_v1.md`；F2 固化为 `F2_配方_v1.json`，`BuildFromRecipe_v1` 重建后与 F2 **深比较相等**（工具已支持 `pipes` / `q`）。
+11. **“免费步”必须标路线口径**：`ArlCheck` 的“最长连续免费”取 **min 路线**（一次取车完整结算，buffer=0）；玩家路线逐步结算，一旦有车进暂存 buffer 基本不回 0。00005 v16：min 路线最长 27 步，玩家路线免费步 **0**。不能把 27 说成“前 27 步免费”。
 
 **计划状态**：
 
