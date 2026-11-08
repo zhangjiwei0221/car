@@ -16,12 +16,15 @@
  *     "toprow": 40, "maprow": 7, "mapcol": 7,
  *     "cars":   [{"r":0,"c":0,"id":29,"count":80}, ...],
  *     "black":  [[0,2],[0,6], ...],
- *     "obstacles": [{"r":3,"c":5,"types":[{"type":7,"param":20}]}, ...]
+ *     "obstacles": [{"r":3,"c":5,"types":[{"type":7,"param":20}]}, ...],
+ *     "pipes":  [{"r":2,"c":2,"type":11,"param":[{"id":23,"count":23}]}]
  *   }
+ *   障碍也支持 {"r":3,"c":0,"type":5,"param":1} 原样覆盖，
+ *   以及 {"r":6,"c":2,"type":[0,6],"param":0,"q":true} 问号标记。
  *
  * 校验：
- *   - 格子全部是车或黑格（无空格）
- *   - 每色容量合计 == 该色像素数（含黑格不算）
+ *   - 格子全部是车/黑格/管道格（无空格）
+ *   - 每色容量合计 == 该色像素数（含管道队列里的车）
  *   - 车格/黑格不重复、不越界
  */
 const fs = require('fs');
@@ -80,6 +83,16 @@ function main() {
     put(car.r, car.c, '车 ' + car.id + ':' + car.count);
     spools[car.r][car.c] = { id: car.id, type: 0, param: 0, count: car.count };
   }
+  // 管道格：id=0，type=11–14，param=队列 [{id,count},...]
+  for (const pipe of recipe.pipes || []) {
+    put(pipe.r, pipe.c, '管道');
+    spools[pipe.r][pipe.c] = {
+      id: 0,
+      type: pipe.type,
+      param: pipe.param != null ? pipe.param : 0,
+      count: 0
+    };
+  }
   for (const ob of recipe.obstacles || []) {
     const cell = spools[ob.r] && spools[ob.r][ob.c];
     if (!cell || cell.id <= 0) throw new Error('障碍目标不是车：' + ob.r + ',' + ob.c);
@@ -87,6 +100,7 @@ function main() {
     if (ob.type != null) {
       cell.type = ob.type;
       cell.param = ob.param != null ? ob.param : 0;
+      if (ob.q) cell.q = true;
       continue;
     }
     const types = (ob.types || []).filter(x => x && x.type);
@@ -98,19 +112,25 @@ function main() {
       cell.type = types.map(x => x.type);
       cell.param = types.map(x => x.param || 0);
     }
+    if (ob.q) cell.q = true;
   }
 
-  // 无空格
+  // 无空格（管道格 id=0 且 type=11–14 算合法）
   let empty = 0;
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const s = spools[r][c];
-    if (!s || (s.id <= 0 && s.id !== -1)) empty++;
+    const isPipe = s && s.id === 0 && s.type >= 11 && s.type <= 14;
+    if (!s || (s.id <= 0 && s.id !== -1 && !isPipe)) empty++;
   }
-  // 每色守恒
+  // 每色守恒（管道队列里的车也算容量）
   const px = {};
   for (const row of blocks) for (const v of row) if (v > 0) px[v] = (px[v] || 0) + 1;
   const by = {};
   for (const row of spools) for (const s of row) if (s.id > 0) (by[s.id] = by[s.id] || []).push(s.count);
+  for (const pipe of recipe.pipes || []) {
+    const q = Array.isArray(pipe.param) ? pipe.param : [];
+    for (const car of q) if (car && car.id > 0) (by[car.id] = by[car.id] || []).push(car.count);
+  }
   const bad = [];
   for (const k of Object.keys(px)) {
     const sum = (by[k] || []).reduce((a, b) => a + b, 0);
