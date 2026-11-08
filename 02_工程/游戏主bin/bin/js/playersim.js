@@ -224,9 +224,17 @@ AntSolver.PlayerSim = (function () {
         if (highPressure && !consumable) score -= 40;          // 高压不接不可消的球
         if (preferSmallDebt && !consumable) score -= cell.count * 0.1;  // 全不可消时优先小债
         if (debugScoreStep && picks + 1 === debugScoreStep) {
+          // 只读：玩家看得见的该色剩余像素（整张图，不判断可达） vs 真实可达像素。
+          var _vis = 0;
+          for (var _vr = 0; _vr < s.rows; _vr++) for (var _vc = 0; _vc < s.cols; _vc++) {
+            if (!s.eliminated[_vr][_vc] && s.blocks[_vr][_vc] === cell.color) _vis++;
+          }
+          var _emC = s.eliminated.map(function (row) { return row.slice(); });
+          var _true = Sim.floodFillCount(_emC, s.blocks, s.rows, s.cols, cell.color, s.bottomOnly);
           debugScores.push({
             step: picks + 1, r: mv.r, c: mv.c, color: cell.color, count: cell.count,
             isQ: isQ, consumable: consumable, score: score,
+            visibleRemain: _vis, trueReach: _true, hidden: isQ,
             highPressure: highPressure, groupSize: mv.groupSize || 1, chain: cell.chain || 0
           });
         }

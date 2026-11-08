@@ -38,6 +38,7 @@
 5. **中段压力**用多车色的「大+小」容量拆分；容错也用同样的拆分/陷阱调。
 6. **at4 以玩家路线为准**；19 项的最小路线 at4 是诊断口径，不是体验。
 7. **暂存占用 ≠ 真债**：at3/at4 要用 `stuck`（未完成且当前无路可吃），不能用 raw buffer；一次性拿 4 辆免费车是 raw4 / stuck0。
+8. **可见 reach ≠ 真实 reach**：`visible` 是该色剩余像素（玩家看得见），`trueReach` 是实际可达；差大 = 信息陷阱。当前 `PlayerSim` 用 `trueReach`，是全知口径；M2 要建 `VisibleReach` 策略。
 
 **计划状态**：
 
@@ -47,7 +48,7 @@
 | M1 决策图谱（G2_9_0023 / 00154） | ✅ v3-05、v3-12～v3-13 |
 | 资源层（Reach / Capacity / Timing） | ✅ v3-07～v3-11 |
 | 局部修复（early/never/split/swap） | ✅ v3-15～v3-22（F2） |
-| M2 信息层（可见 reach） | ⬜ |
+| M2 信息层（可见 reach） | 🟡 第一步完成（visible vs true 对照）；VisibleReach 策略待做 |
 | M3 障碍契约 + 消融 | ⬜ |
 | M4 语法 + 路线证书 | ⬜ |
 | M5 批量 | ⬜ |
