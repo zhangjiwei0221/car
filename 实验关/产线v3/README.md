@@ -39,7 +39,7 @@
 6. **at4 以玩家路线为准**；19 项的最小路线 at4 是诊断口径，不是体验。
 7. **暂存占用 ≠ 真债**：at3/at4 要用 `stuck`（未完成且当前无路可吃），不能用 raw buffer；一次性拿 4 辆免费车是 raw4 / stuck0。
 8. **可见 reach ≠ 真实 reach**：`visible` 是该色剩余像素（玩家看得见），`trueReach` 是实际可达；差大 = 信息陷阱。`VisibleReach` 模型在 110 张上：visible-all **0/55**、visible-edge **5/92**（0/2 复活），visible-component（30 样本）0/16；oracle 16/103。真人在 edge 与 oracle 之间。F2 的 color30 是 visible 陷阱（229/0），edge 也会在第 28 步死。
-9. **障碍按契约评估**：同一个冰可能是 win gate / peak gate / rhythm；消融 Δ 必须成组看。F2：冰 r0c0/r1c1=0复活硬门，r1c4=峰值硬门，r0c2=中段/容错；链=中段；问号=无Δ；管道=供给。
+9. **障碍按契约评估**：同一个冰可能是 win gate / peak gate / rhythm；消融 Δ 必须成组看。F2：冰 r0c0/r1c1=0复活硬门，r1c4=峰值硬门，r0c2=中段/容错；链=中段；管道=供给/队列顺序（去管道峰值3/中段29，31先默认路线死29步）；问号=无决策（装饰，待 Q-aware/真人）。
 
 **计划状态**：
 
@@ -50,7 +50,7 @@
 | 资源层（Reach / Capacity / Timing） | ✅ v3-07～v3-11 |
 | 局部修复（early/never/split/swap） | ✅ v3-15～v3-22（F2） |
 | M2 信息层（可见 reach） | 🟡 visible-all **0/55**、visible-edge **5/92**、visible-component **0/16**（30 样本）；oracle **16/103**；真人在 edge 与 oracle 之间 |
-| M3 障碍契约 + 消融 | 🟡 F2 冰/链/问号已消融；管道/问号信息待补 |
+| M3 障碍契约 + 消融 | ✅ 冰/链/管道契约完成；问号在 F2 无决策（装饰），待 Q-aware/真人 |
 | M4 语法 + 路线证书 | ⬜ |
 | M5 批量 | ⬜ |
 
@@ -66,7 +66,7 @@
 2. ~~体验证书改用 stuck（真债）~~ ✅（证书 §1/§4 已用 stuck）；
 3. ~~F2 路线证书 + 排版检查~~ ✅（`F2_路线证书.md`；LayoutScore hard 0 / warn 0）；
 4. **M2 校准**：`visible-edge` / `visible-component` / 你的试玩对账；F2/00154 + 110 张（纯 visible 已跑：0/110）。
-5. **M3 补**：管道契约（容量重分配后消融）+ 问号信息测试；F2 冰/链/问号已消融（见 `M3_障碍契约_消融.md`）。
+5. ~~M3 补：管道契约 + 问号信息~~ ✅（`M3_管道契约_问号信息.md`；问号在 F2 无决策，待 Q-aware/真人）。
 6. **M4 语法 + 证书**：把 F2 的 ice / split / swap / 容量拆分写成语法；`BuildFromRecipe` 复现（deep equal）；证书模板化；
 7. **M5 批量**：M2–M4 完成后再批量。**现在不开始批量。**
 
