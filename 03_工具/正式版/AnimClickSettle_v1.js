@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * AnimClickSettle_v1 —— 按「点击一次车 → 当前可达像素一次吃满」输出逐步动画数据
+ * AnimClickSettle_v1 —— 点击结算：点一次车 → 当前可达像素一次吃满
  *
- * 与 AnimPlayerRoute_v1（逐 tick）不同：
- *   - 这里不展示 1px/1px 的吃东西过程；
- *   - 每一步 = 一次点击，调用 Simulator.applyPick（一次取车 + autoReleaseBuffer 完整结算）；
- *   - 结算后 buffer 里只剩「还有剩余、但当前无路可吃」的车，即用户口径的真债；
- *   - 能吃完的车不会留在暂存区。
+ * 两种路线来源：
+ *   默认（推荐）：click-settle-greedy —— 每一步枚举合法车，逐只 applyPick 试算，
+ *                选“吃掉像素最多、且不爆仓”的车；同分再比结算后暂存和剩余债务。
+ *   --from-player：沿用 PlayerSim 的点击顺序（只作对照，不再用于验收）。
  *
- * 点击顺序来自 PlayerSim（逐步引擎）的实际路线；只取它的选择，不取它的 tick 过程。
+ * 结算口径：
+ *   - 不展示 1px/tick 的吃东西过程；
+ *   - 一次点击后 buffer 里只剩“有剩余、但当前无路可吃”的车（真债）；
+ *   - 能吃完的车直接离开暂存，不计债。
  *
  * 用法：
  *   node AnimClickSettle_v1.js <关卡.json> --out <动画数据.json>
- *        [--threshold 0.8] [--seed 7] [--revive 0] [--no-psd]
+ *        [--from-player] [--threshold 0.8] [--seed 7] [--revive 0] [--no-psd]
  */
 const fs = require('fs');
 const path = require('path');
@@ -26,7 +28,7 @@ const has = k => process.argv.indexOf(k) > 0;
 const levelFile = process.argv[2];
 const out = arg('--out', '');
 if (!levelFile || !out) {
-  console.error('用法: node AnimClickSettle_v1.js <关卡.json> --out <动画数据.json> [--threshold 0.8] [--seed 7] [--revive 0] [--no-psd]');
+  console.error('用法: node AnimClickSettle_v1.js <关卡.json> --out <动画数据.json> [--from-player]');
   process.exit(2);
 }
 const g = JSON.parse(fs.readFileSync(levelFile, 'utf8'));
@@ -36,26 +38,75 @@ const seed = +arg('--seed', 7);
 const reviveCap = +arg('--revive', 0);
 const preferSmallDebt = !has('--no-psd');
 
-// 1) 拿玩家路线的点击顺序（只取选择）
-const ps = A.PlayerSim.run(lv, { seed, instantChain: false, reviveCap, pickThreshold: threshold, preferSmallDebt, capture: true });
-if (!ps.won) throw new Error('玩家路线没有通关：picks=' + ps.picks);
-const clicks = [];
-for (const t of ps.tickTrajectory) {
-  if (t.pick && t.pick.picked && t.pick.picked.length) clicks.push(t.pick.picked);
+function fresh() {
+  return A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+}
+function clone(s) { return JSON.parse(JSON.stringify(s)); }
+function isDead(s) {
+  return s.overflow || s.gameOver || s.buffer.length >= s.bufferLimit || A.Simulator.isDeadEnd(s);
 }
 
-// 2) 在完整结算引擎上回放这些点击
-const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+// ---------- 路线 1：点击结算贪心 ----------
+function greedyRoute() {
+  let s = fresh();
+  const route = [];
+  const limit = 200;
+  while (s.eliminatedPixels < s.totalPixels) {
+    if (route.length >= limit) throw new Error('贪心路线超过 ' + limit + ' 步');
+    const moves = A.Simulator.listMoves(s).filter(m => !m.blocked);
+    if (!moves.length) throw new Error('贪心走到死局：step ' + (route.length + 1));
+    let best = null;
+    for (const m of moves) {
+      const c = clone(s);
+      const before = c.eliminatedPixels;
+      if (!A.Simulator.applyPick(c, m.r, m.c)) continue;
+      if (c.eliminatedPixels < c.totalPixels && isDead(c)) continue;
+      const gain = c.eliminatedPixels - before;
+      const buf = c.buffer.length;
+      const stuckPx = c.buffer.reduce((a, b) => a + (b.need - b.progress), 0);
+      // 合理玩家：先拿“点了能吃完”的车（buffer=0），再比吃得多；都不吃完时比债少。
+      const score = [buf === 0 ? 1 : 0, gain, -buf, -stuckPx, -m.r, -m.c];
+      if (!best || cmp(score, best.score) > 0) best = { m, c, score, gain, buf, stuckPx };
+    }
+    if (!best) throw new Error('贪心没有可用走法：step ' + (route.length + 1));
+    s = best.c;
+    route.push({ r: best.m.r, c: best.m.c, gain: best.gain, bufferAfter: best.buf, stuckPx: best.stuckPx });
+  }
+  return route;
+}
+function cmp(a, b) {
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+
+// ---------- 路线 2：PlayerSim 点击顺序（对照） ----------
+function playerRoute() {
+  const ps = A.PlayerSim.run(lv, { seed, instantChain: false, reviveCap, pickThreshold: threshold, preferSmallDebt, capture: true });
+  if (!ps.won) throw new Error('PlayerSim 路线没有通关：picks=' + ps.picks);
+  const route = [];
+  for (const t of ps.tickTrajectory) {
+    if (t.pick && t.pick.picked && t.pick.picked.length) {
+      const p = t.pick.picked[0];
+      route.push({ r: p.r, c: p.c });
+    }
+  }
+  return route;
+}
+
+const fromPlayer = has('--from-player');
+const route = fromPlayer ? playerRoute() : greedyRoute();
+
+// ---------- 回放路线并抓每一步快照 ----------
+const s = fresh();
 const H = s.rows, W = s.cols;
 const steps = [];
 let freeSteps = 0, freeRun = 0, curFree = 0, maxBuffer = 0, stuckPeak = 0, stuckSteps = 0;
 
-for (let i = 0; i < clicks.length; i++) {
-  const picked = clicks[i];
-  const trigger = picked[0];
+for (let i = 0; i < route.length; i++) {
+  const mv = route[i];
   const before = s.eliminated.map(row => row.slice());
-  const ok = A.Simulator.applyPick(s, trigger.r, trigger.c);
-  if (!ok) throw new Error('第 ' + (i + 1) + ' 次点击在完整结算引擎上不合法：' + trigger.r + ',' + trigger.c);
+  if (!A.Simulator.applyPick(s, mv.r, mv.c)) throw new Error('第 ' + (i + 1) + ' 次点击不合法：' + mv.r + ',' + mv.c);
+  const picked = s.lastPick && s.lastPick.picked ? s.lastPick.picked : [{ r: mv.r, c: mv.c }];
 
   const eaten = [];
   for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
@@ -97,10 +148,10 @@ const data = {
   meta: {
     level: path.basename(levelFile),
     sha: crypto.createHash('sha256').update(fs.readFileSync(levelFile)).digest('hex'),
-    policy: `threshold=${threshold}, preferSmallDebt=${preferSmallDebt}, revive=${reviveCap}, seed=${seed}`,
     mode: 'click-settle',
+    routeSource: fromPlayer ? 'PlayerSim (legacy comparison)' : 'click-settle-greedy (free-first)',
     clicks: steps.length,
-    boxes: clicks.reduce((a, x) => a + x.length, 0),
+    boxes: steps.reduce((a, x) => a + x.group, 0),
     won: true
   },
   blocks: g.blocks, maprow: g.maprow, mapcol: g.mapcol, spools: g.spools,
@@ -108,4 +159,4 @@ const data = {
   summary: { freeSteps, freeRun, maxBuffer, stuckPeak, stuckSteps }
 };
 fs.writeFileSync(out, JSON.stringify(data));
-console.log(JSON.stringify({ clicks: steps.length, ...data.summary, bytes: fs.statSync(out).size }));
+console.log(JSON.stringify({ routeSource: data.meta.routeSource, clicks: steps.length, ...data.summary, bytes: fs.statSync(out).size }));

@@ -69,12 +69,12 @@
 <body>
 <header>
   <h1>关卡00005 v16 · 点击结算回放</h1>
-  <div class="sub">每点一次车 → 当前可达的同色像素一次吃满 → 暂存只留“吃不掉”的车。点击顺序来自玩家路线，结算用 <span class="mono">Simulator.applyPick</span>。</div>
+  <div class="sub">每点一次车 → 当前可达的同色像素一次吃满 → 暂存只留“吃不掉”的车。路线来源：<span class="mono" id="routeSource">—</span>；结算用 <span class="mono">Simulator.applyPick</span>。</div>
   <div class="chips">
-    <div class="chip good">暂存为 0 的步 <b>6 / 48</b></div>
-    <div class="chip">最长连续免费 <b>3 步</b></div>
-    <div class="chip bad">真债峰值 <b>5 辆</b></div>
-    <div class="chip good">0 复活 <b>48 步 100%</b></div>
+    <div class="chip good">暂存为 0 的步 <b id="chipFree">—</b></div>
+    <div class="chip">最长连续免费 <b id="chipRun">—</b></div>
+    <div class="chip bad">真债峰值 <b id="chipStuck">—</b></div>
+    <div class="chip good">0 复活 <b id="chipSteps">—</b></div>
   </div>
 </header>
 
@@ -280,6 +280,11 @@ window.addEventListener('keydown', e=>{
   if (e.code==='ArrowRight'){ pause(); setStep(idx+1); }
   if (e.code==='ArrowLeft'){ pause(); setStep(idx-1); }
 });
+document.getElementById('routeSource').textContent = D.meta.routeSource || '—';
+document.getElementById('chipFree').textContent = D.summary.freeSteps + ' / ' + N;
+document.getElementById('chipRun').textContent = D.summary.freeRun + ' 步';
+document.getElementById('chipStuck').textContent = D.summary.stuckPeak + ' 辆';
+document.getElementById('chipSteps').textContent = N + ' 步 100%';
 render();
 </script>
 </body>
