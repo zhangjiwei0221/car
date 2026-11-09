@@ -10,9 +10,10 @@
  *
  * 结算口径：
  *   - 不展示 1px/tick 的吃东西过程；
- *   - 一次点击后只把“未吃完（progress < need）”的车算作债/暂存；
- *     锁链组里已经吃完、只是被组占位留住的成员不算债；
- *   - 能吃完的车直接离开暂存，不计债。
+ *   - 一次点击后，暂存里所有成员都算债；
+ *     锁链组里已经吃完、但整组未完成、仍占槽的成员也算债（锁链的债务意义）；
+ *   - 能吃完且不占组的车直接离开暂存，不计债；
+ *   - 本步有车吃满时链组允许短暂超 5；没有车吃满且已满才判死。
  *
  * 路线：
  *   默认 free-first 贪心：先拿“点了能吃完”的车；没有时比吃得多、债少、位置稳定。
@@ -47,14 +48,15 @@ function fresh() {
   return A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
 }
 function clone(s) { return JSON.parse(JSON.stringify(s)); }
-// 点击结算的债 = 结算后仍未吃完的车；链组里已经吃完、只是被组占位留住的成员不算债。
-function debtOf(s) { return s.buffer.filter(b => b.progress < b.need); }
-function isDead(s) {
+// 点击结算的债 = 结算后暂存里的所有成员（含已吃满但仍被链组占槽的成员）。
+function debtOf(s) { return s.buffer; }
+function isDead(s, completedBefore) {
   if (s.eliminatedPixels >= s.totalPixels) return false;
-  if (debtOf(s).length > s.bufferLimit) return true;
-  // 在“点击结算”口径下不把物理 buffer 的 blocked 当死；只看还有没有可取盒。
-  const moves = A.Simulator.listMoves(s);
-  return moves.length === 0;
+  const buf = s.buffer.length;
+  const completedDelta = s.completedBoxes - (completedBefore == null ? s.completedBoxes : completedBefore);
+  // 真机规则：暂存满/超且本步没有任何车吃满 → 死；有车吃满时链组允许短暂超额。
+  if (buf >= s.bufferLimit && completedDelta === 0) return true;
+  return A.Simulator.listMoves(s).length === 0;
 }
 
 // ---------- 路线 1：点击结算贪心 ----------
@@ -71,7 +73,7 @@ function greedyRoute() {
       const c = clone(s);
       const before = c.eliminatedPixels;
       if (!A.Simulator.applyPick(c, m.r, m.c)) continue;
-      if (c.eliminatedPixels < c.totalPixels && isDead(c)) continue;
+      if (c.eliminatedPixels < c.totalPixels && isDead(c, s.completedBoxes)) continue;
       const gain = c.eliminatedPixels - before;
       const debt = debtOf(c);
       const buf = debt.length;
@@ -136,7 +138,7 @@ function beamRoute(width) {
         const before = c.eliminatedPixels;
         if (!A.Simulator.applyPick(c, m.r, m.c)) continue;
         const won = c.eliminatedPixels >= c.totalPixels;
-        if (!won && isDead(c)) continue;
+        if (!won && isDead(c, node.s.completedBoxes)) continue;
         const gain = c.eliminatedPixels - before;
         const st = routeStatsAfter(node, c, gain);
         const route = node.route.concat([{ r: m.r, c: m.c }]);
