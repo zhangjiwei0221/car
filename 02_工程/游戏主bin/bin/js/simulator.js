@@ -1262,11 +1262,17 @@ AntSolver.Simulator = (function() {
   function isDeadEnd(s) {
     if (!s || s.gameOver) return false;
     if (s.overflow) return true;
-    // 【2026-11-04 修 bug】不能只看"暂存满"就判死。
-    // 原实现 `if (s.buffer.length >= s.bufferLimit) return true;` 会在
-    // "第 5 辆车刚进场、还没结算消除"时立刻判死 —— 但若这辆车能吃满，它会马上离场，根本不该死。
-    // 正确口径：满格时仍要检查"盘面上还有没有未阻塞的车"（listMoves 里 blocked 已含
-    // "满格且此盒消不完" 的判断），有能吃满的车就不是死局。
+    // 【v636】暂存里的车还有可达像素 → 它们还能继续吃，不能判死。
+    // 旧实现只看棋盘 listMoves：满 5 但暂存车还能吃时会误判；反过来“满 5 且一个都吃不到”又会漏判。
+    for (var bi = 0; bi < s.buffer.length; bi++) {
+      var b = s.buffer[bi];
+      if (b.progress >= b.need) continue;
+      var em = s.eliminated.map(function (row) { return row.slice(); });
+      if (floodFillCount(em, s.blocks, s.rows, s.cols, b.color, s.bottomOnly) > 0) return false;
+    }
+    // 暂存里没有可继续吃的车；满格就是死局（真机此时也点不动新盒）。
+    if (s.buffer.length >= s.bufferLimit) return true;
+    // 未满格：再看棋盘上还有没有非阻塞的取盒。
     var moves = listMoves(s);
     for (var i = 0; i < moves.length; i++) if (!moves[i].blocked) return false;
     return true;
@@ -1277,9 +1283,9 @@ AntSolver.Simulator = (function() {
 
   function checkWinLose() {
     if (state.eliminatedPixels >= state.totalPixels) { state.gameWon = true; state.gameOver = true; return; }
-    // 暂存区超过上限（含锁链整组入场瞬时超上限）→ 死亡。严格执行"暂存满且无法消除就死亡"。
-    // 溢出判据 = **超过**上限（要真的多占一格）。"满格且一个都消不掉"由 isDeadEnd 判（见下）。
-    if (state.overflow || state.buffer.length >= state.bufferLimit) { state.gameOver = true; state.gameWon = false; return; }
+    // 暂存区超过上限（要真的多占一格）→ 死亡。满格但还有车能吃时不能判死：
+    // 那种情况由 isDeadEnd 看“所有暂存车都无路可吃”才结算。
+    if (state.overflow || state.buffer.length > state.bufferLimit) { state.gameOver = true; state.gameWon = false; return; }
     // 【v160】"满格且一个都消不掉" = 死局（用户 2026-10-16 的规则）：由下面的 isDeadEnd 判定统一处理
     // 死局 → 死亡：**满格且一个都消不掉**（或盘面已无可取盒 / 只剩放不下的锁链组）。
     //   用户 2026-10-16 定的规则；判据统一收在 isDeadEnd()，页面每次刷新也会调它 → 死局立刻结算、不再"点了才有反应"。

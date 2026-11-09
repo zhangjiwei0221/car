@@ -310,7 +310,10 @@ AntSolver.Solver = (function() {
       return { maxBuf: maxBuf, done: s.completedBoxes - baseDone };
     }
 
-    var state = Sim.enter(level, {
+    // 【v636】不能再用 Sim.enter：它会替换全局模拟状态。
+    // 编辑器进入模拟后 renderPressureCharts 会调 runMinBuffer，旧实现把全局 state 换成
+    // 求解器的“已完成态”（steps=47/消除=1600），随后玩家第一次点击就落在终局状态上直接判结束。
+    var state = Sim.createState(level, {
       useSlotStart: true,
       bottomOnly: !!opts.bottomOnly,
       instantChain: !!opts.instantChain,

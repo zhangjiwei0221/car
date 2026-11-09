@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "635";
+var APP_BUILD = "636";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -2119,7 +2119,10 @@ AntSolver.App = (function() {
     currentChokeInfo = null;      // v120：换关先清空卡点信息，避免把上一关的卡点显示到这一关上
     // 入口模式回实机默认；生成路径会在 loadLevel 之后按本次配置重设。
     currentEntryMode = 'corner';
-    currentLevel = AntSolver.parseLevel(json);
+    // 官方关卡 JSON 是 {toprow, blocks, spools}，parseLevel 只认内部 board。
+    // 不先转 fromGameFormat 会得到 board 0×0；进入模拟游玩时 isDeadEnd 立刻判「暂存已满且无法消除」。
+    var parsed = (json && json.spools && !json.board) ? AntSolver.fromGameFormat(json) : json;
+    currentLevel = AntSolver.parseLevel(parsed);
     document.getElementById('btn-simulate').disabled = false;
     document.getElementById('btn-export').disabled = false;
     document.getElementById('solve-result').classList.add('hidden');
@@ -2625,6 +2628,11 @@ AntSolver.App = (function() {
     var r = Math.floor((e.clientY - rect.top) / ELIM_BOARD_STEP);
     if (r < 0 || c < 0 || r >= state.boardRows || c >= state.boardCols) return;
     if (!AntSolver.isBox(state.cells[r][c])) return;
+    // 就地模拟的手点也要过容量门：4 辆时不能点 2/3 连锁链（整组一次占 N 格）。
+    if (AntSolver.Simulator.pickCapacityOf) {
+      var cap = AntSolver.Simulator.pickCapacityOf(state, r, c);
+      if (!cap.ok) return;
+    }
     elimSimPick(r, c); // 真实状态立即结算，目标图按 capOps 的逐像素 trace 慢放跟进
   }
   function elimSimRender() {
@@ -3027,6 +3035,21 @@ AntSolver.App = (function() {
   function handleBoxClick(r, c) {
     if (!simulating) return;
     if (isNaN(r) || isNaN(c)) return;
+    // 【v636】手点统一先过容量门：真机上暂存没有足够空位就点不动。
+    // 锁链整组要一次占 N 格；4 辆时点 2/3 连必须拒绝，不能先取进来再判溢出。
+    // 旧逻辑只有 liveMode 才走这道门，串行手点会允许锁链瞬间超 5，随后 checkWinLose 直接判死。
+    var stCap = AntSolver.Simulator.getState();
+    if (stCap && AntSolver.Simulator.pickCapacityOf) {
+      var cap = AntSolver.Simulator.pickCapacityOf(stCap, r, c);
+      if (!cap.ok) {
+        if (cap.reason === 'noSlot' || cap.reason === 'noSlotChain') {
+          showNoSlotHint(cap);
+          // 满格且已经无路可走时，点不动也应该立刻判负（不能只提示“放不下”）。
+          if (settleDeadEnd()) refreshSimUI();
+        } else if (settleDeadEnd()) refreshSimUI();
+        return;
+      }
+    }
     if (liveMode) {
       // 时间驱动：只入场占槽，不做消除；放不下则被 pickBoxLive 拒绝（棋盘一格不动）
       var res = AntSolver.Simulator.pickBoxLive(r, c);
@@ -3039,7 +3062,13 @@ AntSolver.App = (function() {
     var ok = AntSolver.Simulator.pickBox(r, c);
     // 【2026-10-13】手点改走「顺序闪白」：车先进轨道 → 即将被选走的小人按消除顺序依次闪白 →
     //   全部闪完一起消失（与「单步(全知)」同一条视觉路径）。闪白关闭(速度=0)时退回原整批动画。
-    if (ok) { renderQueues(AntSolver.Simulator.getState()); playPickAnim(); }
+    if (ok) {
+      renderQueues(AntSolver.Simulator.getState());
+      playPickAnim();
+      // 串行路径 checkWinLose 可能已把状态判负；旧实现只在下一次刷新才弹窗，玩家会看到「没反应」。
+      var stAfter = AntSolver.Simulator.getState();
+      if (stAfter && stAfter.gameOver) showGameMsg(stAfter.gameWon);
+    }
   }
   function showNoSlotHint(res) {
     var st = AntSolver.Simulator.getState();

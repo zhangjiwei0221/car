@@ -5990,7 +5990,7 @@ AntSolver.Generator = (function() {
   function initialPickableCells(board, blocks, config) {
     try {
       var parsed = AntSolver.parseLevel({ blocks: blocks, bufferLimit: (config && config.bufferLimit) || 5, board: board });
-      var st = AntSolver.Simulator.enter(parsed, { useSlotStart: true });
+      var st = AntSolver.Simulator.createState(parsed, { useSlotStart: true });
       var mv = AntSolver.Simulator.listMoves(st);
       var out = {};
       for (var i = 0; i < mv.length; i++) {
