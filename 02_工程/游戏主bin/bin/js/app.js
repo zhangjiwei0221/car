@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "636";
+var APP_BUILD = "637";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -635,6 +635,10 @@ AntSolver.App = (function() {
     document.getElementById('btn-undo').addEventListener('click', doUndo);
     document.getElementById('btn-reset').addEventListener('click', doReset);
     document.getElementById('btn-auto-step').addEventListener('click', autoStep);
+    var pathExport = document.getElementById('btn-path-export');
+    if (pathExport) pathExport.addEventListener('click', exportClickPath);
+    var pathClear = document.getElementById('btn-path-clear');
+    if (pathClear) pathClear.addEventListener('click', function () { clickPathReset(); });
     bindClick('btn-omni', runOmniDemo);          // 自动求解·全知版(子按钮)
     bindClick('btn-omni-bottom', runBottomDemo); // 自动求解·底部专用版(子按钮)
     bindClick('btn-omni-chain', runChainDemo);   // 自动求解·四方向瞬时连锁版(v99 第三种玩法)
@@ -2123,6 +2127,7 @@ AntSolver.App = (function() {
     // 不先转 fromGameFormat 会得到 board 0×0；进入模拟游玩时 isDeadEnd 立刻判「暂存已满且无法消除」。
     var parsed = (json && json.spools && !json.board) ? AntSolver.fromGameFormat(json) : json;
     currentLevel = AntSolver.parseLevel(parsed);
+    currentLevel.name = (parsed && parsed.name) || (json && json.name) || null;
     document.getElementById('btn-simulate').disabled = false;
     document.getElementById('btn-export').disabled = false;
     document.getElementById('solve-result').classList.add('hidden');
@@ -3032,6 +3037,77 @@ AntSolver.App = (function() {
     handleBoxClick(r, c);
   }
 
+  // ==================== 用户点击路径记录（模拟游玩） ====================
+  // 只记录“有效点击”：点击被拒绝（放不下/锁住）不记；撤销删最后一条。
+  // 导出 JSON 后可直接交给分析脚本，用真实玩家路径对账，而不是拿求解器路线代替。
+  var userClickPath = [];
+  var clickPathSession = null;
+  function clickPathReset() {
+    userClickPath = [];
+    clickPathSession = {
+      startedAt: new Date().toISOString(),
+      level: currentLevel ? { name: currentLevel.name || null, rows: currentLevel.rows, cols: currentLevel.cols, totalPixels: currentLevel.totalPixels, bufferLimit: currentLevel.bufferLimit } : null,
+      mode: elimModeSelected(),
+      layout: currentLevel && currentLevel.board ? { rows: currentLevel.board.rows, cols: currentLevel.board.cols } : null
+    };
+    window.__clickPath = userClickPath;
+    clickPathStatus();
+  }
+  function clickPathStatus() {
+    var el = document.getElementById('path-status');
+    if (el) el.textContent = '记录 ' + userClickPath.length + ' 步';
+  }
+  function clickPathRecord(r, c, kind, picked) {
+    var st = AntSolver.Simulator.getState();
+    if (!st) return;
+    var list = picked || [];
+    userClickPath.push({
+      n: userClickPath.length + 1,
+      at: new Date().toISOString(),
+      kind: kind,
+      r: r, c: c,
+      picked: list.map(function (b) {
+        return { r: b.r != null ? b.r : r, c: b.c != null ? b.c : c, color: b.color, count: b.count != null ? b.count : b.need, slot: b.slot };
+      }),
+      group: list.length || 1,
+      steps: st.steps,
+      bufferAfter: st.buffer.length,
+      buffer: st.buffer.map(function (b) {
+        return { color: b.color, progress: b.progress, need: b.need, link: b.link || 0, slot: b.slot };
+      }),
+      eliminatedPixels: st.eliminatedPixels,
+      totalPixels: st.totalPixels,
+      progress: st.totalPixels ? +(st.eliminatedPixels / st.totalPixels).toFixed(4) : 0,
+      gameOver: !!st.gameOver,
+      gameWon: !!st.gameWon
+    });
+    window.__clickPath = userClickPath;
+    clickPathStatus();
+  }
+  function clickPathUndo() {
+    if (userClickPath.length) { userClickPath.pop(); window.__clickPath = userClickPath; clickPathStatus(); }
+  }
+  function exportClickPath() {
+    if (!userClickPath.length) { alert('还没有记录到有效点击。先进入模拟游玩点几辆车。'); return; }
+    var data = {
+      tool: '编辑器模拟游玩点击路径',
+      build: APP_BUILD,
+      exportedAt: new Date().toISOString(),
+      session: clickPathSession,
+      clicks: userClickPath
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    var ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = url;
+    a.download = '点击路径_' + ts + '.json';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); if (a.parentNode) a.parentNode.removeChild(a); }, 2000);
+  }
+
   function handleBoxClick(r, c) {
     if (!simulating) return;
     if (isNaN(r) || isNaN(c)) return;
@@ -3055,6 +3131,7 @@ AntSolver.App = (function() {
       var res = AntSolver.Simulator.pickBoxLive(r, c);
       if (!res.ok) { showNoSlotHint(res); return; }
       var st2 = AntSolver.Simulator.getState();
+      clickPathRecord(r, c, 'live', res.added);
       renderLive(st2, true);          // 取盒必然改变棋盘 → 强制重绘一次
       startLive();
       return;
@@ -3063,10 +3140,12 @@ AntSolver.App = (function() {
     // 【2026-10-13】手点改走「顺序闪白」：车先进轨道 → 即将被选走的小人按消除顺序依次闪白 →
     //   全部闪完一起消失（与「单步(全知)」同一条视觉路径）。闪白关闭(速度=0)时退回原整批动画。
     if (ok) {
-      renderQueues(AntSolver.Simulator.getState());
+      var stAfter = AntSolver.Simulator.getState();
+      var lp = stAfter && stAfter.lastPick;
+      clickPathRecord(r, c, 'serial', lp && lp.picked ? lp.picked : null);
+      renderQueues(stAfter);
       playPickAnim();
       // 串行路径 checkWinLose 可能已把状态判负；旧实现只在下一次刷新才弹窗，玩家会看到「没反应」。
-      var stAfter = AntSolver.Simulator.getState();
       if (stAfter && stAfter.gameOver) showGameMsg(stAfter.gameWon);
     }
   }
@@ -3864,6 +3943,7 @@ AntSolver.App = (function() {
     //   想回到"时间驱动(真机速率一滴一滴)"，把这里改成 true 即可。
     liveMode = false;
     lastBoardSig = null;   // v123：进入模拟先作废签名，保证首帧一定绘制棋盘
+    clickPathReset();      // 新一局：记录本次模拟游玩的点击路径
     refreshSimUI();
     renderPressureCharts();   // 进入模拟即计算并绘制 全知/玩家 暂存压力复合图
   }
@@ -4336,9 +4416,14 @@ AntSolver.App = (function() {
   // 必须先 stopLive，否则撤销完表还在跑、会立刻在旧状态上继续吃像素。
   function doUndo() {
     stopAutoPlay(); stopAnim(); stopLive();
+    var stBefore = AntSolver.Simulator.getState();
+    var stepsBefore = stBefore ? stBefore.steps : 0;
     AntSolver.Simulator.undo(); removeGameMsg();
+    var stAfter = AntSolver.Simulator.getState();
+    // 撤销确实回退了一步，才删掉点击记录的最后一条；避免空撤销把记录吃掉。
+    if (stAfter && stAfter.steps < stepsBefore) clickPathUndo();
     lastBoardSig = null;   // 撤销后签名可能与撤销前相同（steps 回退）→ 必须作废，否则棋盘漏绘
-    if (liveMode) { var st = AntSolver.Simulator.getState(); if (st) renderLive(st, true); else refreshSimUI(); }
+    if (liveMode) { if (stAfter) renderLive(stAfter, true); else refreshSimUI(); }
     else refreshSimUI();
   }
   // 重置：Simulator.reset() 会重建状态、把模式开关清成默认（四边入口）。
@@ -4350,6 +4435,7 @@ AntSolver.App = (function() {
     applyElimModeToState(elimModeSelected());
     liveMode = false;             // 【2026-10-13】重置也回到经典串行路径（与「单步」一致）
     lastBoardSig = null;          // v123：重置后棋盘必须重绘
+    clickPathReset();             // 重置 = 新一局点击记录
     removeGameMsg(); refreshSimUI();
   }
 
