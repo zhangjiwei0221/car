@@ -13,7 +13,8 @@
  *   - 一次点击后，暂存里所有成员都算债；
  *     锁链组里已经吃完、但整组未完成、仍占槽的成员也算债（锁链的债务意义）；
  *   - 能吃完且不占组的车直接离开暂存，不计债；
- *   - 本步有车吃满时链组允许短暂超 5；没有车吃满且已满才判死。
+ *   - 暂存区最多 5：锁链组入场需 N 个空位，buffer+N>5 即不可选（点击前拒绝）；
+ *     结算后满 5 且本步没有任何车吃满才判死；不存在“本步有车吃满可短暂超 5”。
  *
  * 路线：
  *   默认 free-first 贪心：先拿“点了能吃完”的车；没有时比吃得多、债少、位置稳定。
@@ -54,7 +55,9 @@ function isDead(s, completedBefore) {
   if (s.eliminatedPixels >= s.totalPixels) return false;
   const buf = s.buffer.length;
   const completedDelta = s.completedBoxes - (completedBefore == null ? s.completedBoxes : completedBefore);
-  // 真机规则：暂存满/超且本步没有任何车吃满 → 死；有车吃满时链组允许短暂超额。
+  // 暂存区不能超过 5：超过即死，不因本步有车吃满而豁免（用户 2026-11-09 §1014 / 2026-11-10）。
+  if (buf > s.bufferLimit) return true;
+  // 真机规则：结算后满 5 且本步没有任何车吃满 → 死。
   if (buf >= s.bufferLimit && completedDelta === 0) return true;
   return A.Simulator.listMoves(s).length === 0;
 }
@@ -70,6 +73,7 @@ function greedyRoute() {
     if (!moves.length) throw new Error('贪心走到死局：step ' + (route.length + 1));
     let best = null;
     for (const m of moves) {
+      if (m.blocked) continue;   // 暂存放不下（含链组 buffer+N>5）→ 点击前就不可选
       const c = clone(s);
       const before = c.eliminatedPixels;
       if (!A.Simulator.applyPick(c, m.r, m.c)) continue;
@@ -134,6 +138,7 @@ function beamRoute(width) {
     for (const node of beam) {
       const moves = A.Simulator.listMoves(node.s);
       for (const m of moves) {
+        if (m.blocked) continue;   // 暂存放不下（含链组 buffer+N>5）→ 点击前就不可选
         const c = clone(node.s);
         const before = c.eliminatedPixels;
         if (!A.Simulator.applyPick(c, m.r, m.c)) continue;
@@ -213,7 +218,12 @@ let freeSteps = 0, freeRun = 0, curFree = 0, maxBuffer = 0, stuckPeak = 0, stuck
 for (let i = 0; i < route.length; i++) {
   const mv = route[i];
   const before = s.eliminated.map(row => row.slice());
+  const live = A.Simulator.listMoves(s).find(x => x.r === mv.r && x.c === mv.c);
+  if (!live || live.blocked) throw new Error('第 ' + (i + 1) + ' 次点击在暂存上限下不可选：' + mv.r + ',' + mv.c);
+  const completedBefore = s.completedBoxes;
   if (!A.Simulator.applyPick(s, mv.r, mv.c)) throw new Error('第 ' + (i + 1) + ' 次点击不合法：' + mv.r + ',' + mv.c);
+  if (s.buffer.length > s.bufferLimit) throw new Error('第 ' + (i + 1) + ' 次点击后暂存超 5：' + s.buffer.length);
+  if (s.buffer.length >= s.bufferLimit && s.completedBoxes === completedBefore) throw new Error('第 ' + (i + 1) + ' 次点击后满 5 且无车完成');
   const picked = s.lastPick && s.lastPick.picked ? s.lastPick.picked : [{ r: mv.r, c: mv.c }];
 
   const eaten = [];
