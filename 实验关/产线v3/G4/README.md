@@ -67,22 +67,37 @@ node 03_工具/正式版/KnobPlan_v1.js /Users/red/Desktop/正常关卡/G8_bq_le
 - G8_118：`raise-mid` 3 个候选都未过；C0=2 和 mid 低没同时解决。
 - G8_125：`ease` 3 个候选都未过；layout hard1/C0=2/tol2 是结构问题。
 
-## 5. 结论
+## 5. 第一关：底边重排
+
+源图 G8_12，用 `G4Build_v1` 按底边轮次切车、合并同色大车、拆 19 色成链：
+
+```bash
+node 03_工具/正式版/G4Build_v1.js /Users/red/Desktop/正常关卡/G8_bq_level_12.json \
+  --out 实验关/产线v3/G4/第一关/G4_第一关_底边重排.json \
+  --rows 7 --cols 7 --box-min 20 --box-max 120 --lump \
+  --split-colors 19 --split-max 80 --auto-chain 8
+```
+
+指标（`--bottom-only`）：peak4 / mid40 / tol11 / open7 / C0=0 / F0=0 / 点击 policy0=Y / free-first 0复活=Y / 排版 hard0。**19 项不通过**：mid40、后20% at3=0、at4=3、象限3.87、主体80%、未动主体0。PlayerSim：`solver=Y / forced=N / policy0=N / policy2=Y`。
+
+这是第一张“底边重排骨架”，不是成品；详见 `第一关/README.md`。
+
+## 6. 结论
 
 1. **正常关卡不能直接搬到“仅底边出口”**：7/8 可通关，但 0/8 过 19 项；第二批 0/4。
 2. 失败不是“完全不可玩”，而是**曲线/选项/容错同时偏**：底边入口改变了像素暴露顺序，原来的顶部车盘布局不再匹配。
 3. 单旋钮只能救很小的一步：G8_121 的管道顺序能降 D 约 2 分，但 tol20、PlayerSim policy0 N 没变；G8_98/118/125 单旋钮不够。
-4. 下一步不是继续从正常关卡里挑，而是**按底边规则重排车盘/开局**：
-   - 用正常关卡的 `blocks` 作为目标图材料；
-   - 按底边消除顺序重新切车/摆盘（优先底边色、晚暴露上/左/右色）；
-   - 再跑 `--bottom-only` 全套检查。
-5. 目前 G4 还没有可上线候选；L121 只能作为“底边曲线参考”，不是成品。
+4. 已按底边规则重排做出第一关（§5）：用 `blocks` 作目标图、按底边消除轮次切车/摆盘；详见 `第一关/README.md`。
+5. 第一关是骨架，不是成品：peak4/mid40/tol11/open7/C0=F0=0 已成立，但 mid40、后20% at3=0、at4=3 未过，PlayerSim `forced=N/policy0=N`。下一步补中段/后段可恢复债，再谈上线。
 
-## 6. 文件
+## 7. 文件
 
 - `G4/manifest.json`：第一批 8 关；
 - `G4/关卡/`：第一批关卡副本（G4_bq_level_*.json）；
 - `G4/checks_bottom.json`：第一批完整检查；
 - `G4/第二批_筛后/`：第二批 4 关 + manifest；
 - `G4/checks_bottom_second.json`：第二批完整检查；
-- `G4/KnobPlan_G8_98_open/`、`G4/KnobPlan_G8_118_mid/`、`G4/KnobPlan_G8_121_ease/`、`G4/KnobPlan_G8_125_ease/`：底边单旋钮试跑。
+- `G4/KnobPlan_G8_98_open/`、`G4/KnobPlan_G8_118_mid/`、`G4/KnobPlan_G8_121_ease/`、`G4/KnobPlan_G8_125_ease/`：底边单旋钮试跑；
+- `G4/第一关/G4_第一关_底边重排.json`：第一张按底边重排的关卡；
+- `G4/第一关/README.md`：第一关指标/PlayerSim/下一步；
+- `03_工具/正式版/G4Build_v1.js`：底边轮次切车 + 同色大车 + 可选成链。
