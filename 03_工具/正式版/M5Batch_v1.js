@@ -129,7 +129,14 @@ function check(one) {
     fs.writeFileSync(path.join(cdir, 'opening.log'), or.out);
     try {
       const j = JSON.parse(or.out);
-      opening = j.summary || {};
+      const s = j.summary || {};
+      const v = s.violations || {};
+      opening = Object.assign({}, s, {
+        f0AtBuf3: Number(v.f0AtBuf3 || 0),
+        maxF0AtBuf3: Number(s.maxF0AtBuf3 || 0),
+        c0AtBufLt5: Number(s.c0AtBufLt5 != null ? s.c0AtBufLt5 : (v.c0AtBufLt5 || 0)),
+        f0RunAtBuf3Gt1: !!v.f0RunAtBuf3Gt1
+      });
       opening.openM = j.rows && j.rows[0] ? j.rows[0].M : null;
     } catch (e) { opening.error = String(e.message || e); }
   } else {
