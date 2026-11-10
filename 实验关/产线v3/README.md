@@ -296,6 +296,7 @@ C. **结论**：
 | v3-30 | 点击结算策略族：v7/拼接四策略 0 复活全过；F2 仅 solver/small-debt；G2 2–13 12/12 policy0=Y，policy0 单独不是分界 |
 | v3-31 | free-first 前段：C0@buf<5 与 F0@buf≥3≥3 只命中 L2/L5；L7 长磨型 PASS；L6/L10/L13 低流失轻微 FAIL → PASS/FAIL 不能单独当门 |
 | v3-32 | ChoiceSpace：entropy vs 流失 -0.75（M -0.64、tol -0.57）；批次 top12 hard 全过，00005_v27_w14_m8 熵1.43 最优 |
+| v3-33 | G2 2–13 总表：线上+设计+选择空间；LevelToRecipe 12/12 round-trip；G2 是 v1 产物，v3 是分析/修复层 |
 
 > 每份报告在 `实验关/产线v3/v3-NN_报告.md`；过程证据在工作日志 §970–§994。 |
 
