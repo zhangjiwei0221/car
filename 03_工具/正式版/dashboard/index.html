@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>关卡指标仪表盘 · MetricDashboard v1</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>关卡指标仪表盘</h1>
+    <span class="sub">M/C/F/D 时间线 · 两条路线 · 难度分</span>
+  </div>
+  <div class="uploads">
+    <div id="examples" class="examples"></div>
+    <label class="btn">导入单关<input id="fileSingle" type="file" accept=".json,application/json" hidden></label>
+    <label class="btn">导入目录<input id="fileDir" type="file" webkitdirectory directory multiple hidden></label>
+    <span id="status" class="status"></span>
+  </div>
+</header>
+<main>
+  <aside>
+    <div class="panel">
+      <div class="panel-title">关卡</div>
+      <ul id="levelList" class="level-list"></ul>
+    </div>
+    <div class="panel">
+      <div class="panel-title">显示</div>
+      <div class="route-tabs">
+        <button data-route="freefirst" class="active">free-first</button>
+        <button data-route="solver">solver-min</button>
+      </div>
+      <label class="check"><input id="overlaySolver" type="checkbox" checked> 图表叠加 solver-min</label>
+      <div class="series-toggles">
+        <label class="check"><input data-series="buffer" type="checkbox" checked> buffer</label>
+        <label class="check"><input data-series="M" type="checkbox" checked> M</label>
+        <label class="check"><input data-series="C" type="checkbox" checked> C</label>
+        <label class="check"><input data-series="F" type="checkbox" checked> F</label>
+        <label class="check"><input data-series="D" type="checkbox" checked> D</label>
+      </div>
+      <div class="hint">
+        <b>M</b>=合法选项数 · <b>C</b>=至少消1px · <b>F</b>=不新增未完成车 · <b>D</b>=新增未完成车<br>
+        红三角 = buffer≥3 且 F=0；橙圈 = buffer&lt;5 且 C=0。
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">路线摘要</div>
+      <div id="routeSummary" class="route-summary"></div>
+    </div>
+  </aside>
+  <section class="content">
+    <div id="metrics" class="metrics"></div>
+    <div class="panel chart-panel">
+      <div class="panel-title">压力 / 暂存（buffer） <span class="tiny">点击曲线选步</span></div>
+      <svg id="chartBuffer" viewBox="0 0 1000 220" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="panel chart-panel">
+      <div class="panel-title">选择空间 M/C/F/D <span class="tiny">实线 free-first · 虚线 solver-min</span></div>
+      <svg id="chartChoice" viewBox="0 0 1000 240" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="panel step-panel">
+      <div class="step-head">
+        <div class="panel-title">第 <span id="stepNo">1</span> 步 <span id="stepMeta" class="tiny"></span></div>
+        <div class="step-nav">
+          <button id="prevStep">上一步</button>
+          <button id="nextStep">下一步</button>
+        </div>
+      </div>
+      <div class="step-body">
+        <div class="board-wrap">
+          <div class="board-title">目标图</div>
+          <canvas id="targetCanvas" width="320" height="320"></canvas>
+          <div class="board-title" style="margin-top:10px">车盘（7×7）</div>
+          <div id="carGrid" class="car-grid"></div>
+        </div>
+        <div class="detail-wrap">
+          <div class="detail-block">
+            <div class="detail-title">暂存 buffer（<span id="bufCount">0</span>）</div>
+            <div id="bufferList" class="buffer-list"></div>
+          </div>
+          <div class="detail-block">
+            <div class="detail-title">本步选项（<span id="optionCount">0</span>）</div>
+            <div class="table-scroll"><table id="optionTable">
+              <thead><tr><th>位置</th><th>颜色</th><th>容量</th><th>本步消</th><th>结算后 buffer</th><th>剩余债</th><th>类型</th><th>下一步 M</th><th>死亡?</th></tr></thead>
+              <tbody></tbody>
+            </table></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="tooltip" class="tooltip"></div>
+<script src="/app.js"></script>
+</body>
+</html>
