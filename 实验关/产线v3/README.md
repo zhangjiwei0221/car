@@ -293,6 +293,7 @@ C. **结论**：
 | v3-28 | M4.5 消融：顶行链 Δ=0（去掉 free3/峰值4/容错15 不变），冰12 有效；v27 去链采用；蓝车冰6→8 塌成 free36/峰值2 |
 | v3-29 | 点击结算 forced：v7/拼接/F2 全 Y；PlayerSim forcedN 是模型差异；solver overflow 检查已修（L3/L11 转 N、L12 转 Y，9/9 solver=Y 全部 clickForced=Y） |
 | v3-30 | 点击结算策略族：v7/拼接四策略 0 复活全过；F2 仅 solver/small-debt；G2 2–13 12/12 policy0=Y，policy0 单独不是分界 |
+| v3-31 | free-first 前段：C0@buf<5 与 F0@buf≥3≥3 只命中 L2/L5；L7 长磨型 PASS；L6/L10/L13 低流失轻微 FAIL → PASS/FAIL 不能单独当门 |
 
 > 每份报告在 `实验关/产线v3/v3-NN_报告.md`；过程证据在工作日志 §970–§994。 |
 

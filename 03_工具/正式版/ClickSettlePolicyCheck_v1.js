@@ -20,8 +20,8 @@
  *          无视可达性直接消掉它们的剩余像素；与 PlayerSim.revivePS 同一语义。
  *
  * 用法：
- *   node ClickSettlePolicyCheck_v1.js <关卡.json | 目录> [--out report.json] [--limit N] [--beam N]
- *
+ *   node ClickSettlePolicyCheck_v1.js <关卡.json | 目录> [--out report.json] [--limit N] [--beam N] [--route-dir DIR]
+ *   --route-dir：把每关 free-first cap0 的路线写成 OpeningCheck 可读的 click JSON。
  * 输出：每关一行 policy0=Y/N policy2=Y/N + 每个策略的胜负/死亡步。
  * 只读，不改关卡。
  */
@@ -35,6 +35,7 @@ const input = process.argv[2];
 const outFile = arg('--out', null);
 const limit = Number(arg('--limit', 0)) || 0;
 const beamWidth = Number(arg('--beam', 0)) || 0;
+const routeDir = arg('--route-dir', null);
 if (!input) {
   console.error('用法: node ClickSettlePolicyCheck_v1.js <关卡.json | 目录> [--out report.json] [--limit N] [--beam N]');
   process.exit(2);
@@ -154,10 +155,11 @@ function deadNow(s, completedBefore) {
 function runOne(lv, strategy, cap, sp) {
   const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
   let revives = 0, picks = 0, bufferPeak = 0, solverIdx = 0, fallbacks = 0;
+  const route = [];
   const maxPicks = s.totalBoxes + 20;
   for (let step = 0; step < maxPicks; step++) {
     if (s.eliminatedPixels >= s.totalPixels) {
-      return { strategy, cap, won: true, picks, revivesUsed: revives, deathStep: null, progress: 1, bufferPeak, fallbacks };
+      return { strategy, cap, won: true, picks, revivesUsed: revives, deathStep: null, progress: 1, bufferPeak, fallbacks, route };
     }
     let chosen = null;
     if (strategy === 'solver') {
@@ -175,24 +177,26 @@ function runOne(lv, strategy, cap, sp) {
     }
     if (!chosen) {
       if (revives < cap && revive(s)) { revives++; continue; }
-      return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: picks + 1, progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks };
+      return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: picks + 1, progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks, route };
     }
     const completedBefore = s.completedBoxes;
+    const bufferBefore = s.buffer.length;
     if (!A.Simulator.applyPick(s, chosen.m.r, chosen.m.c)) {
       if (revives < cap && revive(s)) { revives++; continue; }
-      return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: picks + 1, progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks };
+      return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: picks + 1, progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks, route };
     }
     picks++;
+    route.push({ step: picks, r: chosen.m.r, c: chosen.m.c, bufferBefore, bufferAfter: s.buffer.length, revives });
     if (s.buffer.length > bufferPeak) bufferPeak = s.buffer.length;
     if (s.eliminatedPixels >= s.totalPixels) {
-      return { strategy, cap, won: true, picks, revivesUsed: revives, deathStep: null, progress: 1, bufferPeak, fallbacks };
+      return { strategy, cap, won: true, picks, revivesUsed: revives, deathStep: null, progress: 1, bufferPeak, fallbacks, route };
     }
     if (deadNow(s, completedBefore)) {
       if (revives < cap && revive(s)) { revives++; continue; }
-      return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: picks + 1, progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks };
+      return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: picks + 1, progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks, route };
     }
   }
-  return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: 'limit', progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks };
+  return { strategy, cap, won: false, picks, revivesUsed: revives, deathStep: 'limit', progress: s.eliminatedPixels / s.totalPixels, bufferPeak, fallbacks, route };
 }
 function runBeam(lv, width) {
   const start = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
@@ -250,6 +254,23 @@ for (const file of files) {
   const wins2 = results.filter(r => r.cap === 2 && r.won);
   const best0 = wins0[0] || results.filter(r => r.cap === 0).sort((a, b) => b.progress - a.progress)[0];
   const best2 = wins2[0] || results.filter(r => r.cap === 2).sort((a, b) => b.progress - a.progress)[0];
+  if (routeDir) {
+    fs.mkdirSync(routeDir, { recursive: true });
+    const ff = results.find(r => r.strategy === 'free-first' && r.cap === 0);
+    if (ff) {
+      const outName = path.basename(file).replace(/\.json$/i, '') + '.freefirst.click.json';
+      fs.writeFileSync(path.join(routeDir, outName), JSON.stringify({
+        level: file,
+        source: 'ClickSettlePolicyCheck_v1',
+        strategy: 'free-first',
+        cap: 0,
+        won: ff.won,
+        deathStep: ff.deathStep,
+        steps: (ff.route || []).map(s => ({ step: s.step, picked: [{ r: s.r, c: s.c }], bufferAfter: s.bufferAfter, revives: s.revives }))
+      }, null, 2));
+    }
+  }
+  for (const r of results) delete r.route;
   const row = {
     file: path.basename(file),
     policy0: wins0.length > 0,
