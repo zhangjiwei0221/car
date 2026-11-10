@@ -302,6 +302,7 @@ C. **结论**：
 | v3-36 | 难度分 DifficultyScore：D vs 胜率 -0.86；组3 第一版改 L2/L4/L5/L7（L2_relief2/L4_ice50/L5_relief/L7_ice50） |
 | v3-37 | 组3A 温和（4关） vs 组3B 激进（9关全改）；3B 保样本但 L3/L10/L11/L12 压平（mid0-10） |
 | v3-38 | MetricDashboard v1：本地仪表盘，free-first/solver 时间线 M/C/F/D + 步详情 + 难度分；示例 G2/G3A/G3B L2 |
+| v3-39 | G3 指标复核：3A 只有 L2 偏低，L4/L5/L7 mid 仍 74/47/84；3B 有 5 关 mid0–13，接近无脑 |
 
 > 每份报告在 `实验关/产线v3/v3-NN_报告.md`；过程证据在工作日志 §970–§994。 |
 
