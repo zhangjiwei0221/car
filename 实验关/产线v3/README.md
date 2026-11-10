@@ -26,6 +26,7 @@
 > 详细证书：`M5批次/00045_v7/M5_00045_v7_证书.md`；报告：`M5批次/M5Build_v7_报告.md`。
 > **点击结算 forced（2026-11-10）**：v7、拼接 `pin15_32+pipe53`、F2 全部 **Y(peak4)**；F2 的 PlayerSim forcedN 是模型差异。G2 2–13 修复后 solver=Y 9 张、clickForced=Y 9 张、fail 0（L3/L11 转 N，L12 转 Y）；`solver=Y ⇒ clickForced=Y`。详见 `ClickSettle_forced_20261110.md`。
 > **点击结算策略族（2026-11-10）**：v7/拼接四策略（solver/free-first/max-eat/small-debt）0 复活全过；F2 仅 solver/small-debt，free-first 2 复活仍 95%；G2 2–13 **12/12 policy0=Y** → `policy0` 单独不是分界。详见 `ClickSettle_policy_20261110.md`。
+> **ChoiceSpace + 批次（2026-11-10）**：`entropy` vs 流失 **-0.75**（M -0.64、tol -0.57）；4×15 批次 top12 hard 全过，`00005_v27_w14_m8` 熵1.43、`w14_m10` 熵1.37；试玩优先这两张 + `pin15_w10_m6`。详见 `ChoiceSpace_20261110.md`、`批次_低流失_20261110_110317/ranking_fixed.md`。
 
 **F2 早期基线（历史，不是当前候选）**：`实验关/产线v3/00154中段/F2_68_36_30_25_19_25_21_42.json`
 
@@ -294,6 +295,7 @@ C. **结论**：
 | v3-29 | 点击结算 forced：v7/拼接/F2 全 Y；PlayerSim forcedN 是模型差异；solver overflow 检查已修（L3/L11 转 N、L12 转 Y，9/9 solver=Y 全部 clickForced=Y） |
 | v3-30 | 点击结算策略族：v7/拼接四策略 0 复活全过；F2 仅 solver/small-debt；G2 2–13 12/12 policy0=Y，policy0 单独不是分界 |
 | v3-31 | free-first 前段：C0@buf<5 与 F0@buf≥3≥3 只命中 L2/L5；L7 长磨型 PASS；L6/L10/L13 低流失轻微 FAIL → PASS/FAIL 不能单独当门 |
+| v3-32 | ChoiceSpace：entropy vs 流失 -0.75（M -0.64、tol -0.57）；批次 top12 hard 全过，00005_v27_w14_m8 熵1.43 最优 |
 
 > 每份报告在 `实验关/产线v3/v3-NN_报告.md`；过程证据在工作日志 §970–§994。 |
 

@@ -60,11 +60,13 @@ function parseClick(out) {
 }
 function parseArl(out) {
   const can = /可通关（最小路线）[\s\S]{0,60}?([✓✗])/.exec(out);
+  const midM = /玩家中段 45–80%\s+\d+ 步（占比 (\d+)%）/.exec(out);
+  const tolM = /容错 55–75%\s+(\d+)\/20/.exec(out);
   return {
     pass: /→\s*通过/.test(out) && !/→\s*不通过/.test(out),
     peak: num(/峰值=4\s+(\d+)/, out),
-    mid: num(/玩家中段 45–80%\s+\d+ 步（占比 (\d+)%）/, out),
-    tol: num(/容错 55–75%\s+(\d+)\/20/, out),
+    mid: midM ? Number(midM[1]) : -1,
+    tol: tolM ? Number(tolM[1]) : -1,
     open: num(/开局可点≥5\s+(\d+)/, out),
     at4: num(/at4≥5\s+(\d+)/, out),
     canPass: can ? can[1] : '?'
@@ -154,8 +156,8 @@ function check(one) {
   if (Number(opening.f0AtBuf3) === 2) flags.push('F0@buf3=2');
   if (opening.openM != null && opening.openM <= 3) flags.push('openM<=3');
   if (policy.win0.length <= 2) flags.push('breadth<=2');
-  if (arl.mid > 0 && (arl.mid < 40 || arl.mid > 80)) flags.push('mid=' + arl.mid);
-  if (arl.tol > 0 && (arl.tol < 8 || arl.tol > 18)) flags.push('tol=' + arl.tol);
+  if (arl.mid < 40 || arl.mid > 80) flags.push('mid=' + arl.mid);
+  if (arl.tol < 8 || arl.tol > 18) flags.push('tol=' + arl.tol);
   if (!policy.freeFirst0) flags.push('freeFirstN');
   if (arl.peak !== 4) flags.push('peak=' + arl.peak);
 
