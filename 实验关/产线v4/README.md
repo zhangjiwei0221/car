@@ -36,11 +36,11 @@
 
 - **底边检查链已打通**：`ArlCheck`、`ClickSettleEngineCheck`、`ClickSettlePolicyCheck`、`OpeningCheck`、`ChoiceSpaceCheck`、`PlayerEngineCheck`、`RecoveryVariantCheck`、`KnobPlan` 均支持 `--bottom-only`。
 - **正常关直搬失败**：212 个正常关里 depth1 底边可通 93 个；第一批 8 关 7/8 可通关、**0/8 过 19 项**；第二批 4 关 **0/4**。
-- **第一关（底边重排，v2）**：`分组4/第一关/G4_第一关_底边重排_v2.json`
-  - peak4 / mid64 / tol11 / open7 / C0=F0=0 / 点击 policy0=Y / free-first 0复活=Y / 排版 hard0；
-  - 19 项仍不过（5 项）：后20% at3=1、at4=4、象限3.88、主体82%、未动主体0；
+- **第一关（底边重排，v3）**：`分组4/第一关/G4_第一关_底边重排_v3.json`
+  - peak4 / mid60 / tol11 / open7 / C0=F0=0 / 点击 policy0=Y / free-first 0复活=Y / 排版 hard0；
+  - 19 项仍不过（4 项）：at4=2、象限3.88、主体81%、未动主体0；
   - PlayerSim：`solver=Y / forced=N / policy0=N / policy2=Y`。
-- **结论**：v2 中段已补起来，后段只到 at3=1；v4 还没有可上线候选。
+- **结论**：v3 中段/后段 at3 已补起来，剩 at4 和目标感；v4 还没有可上线候选。
 
 ## 3. v4 生成流程（简版）
 
