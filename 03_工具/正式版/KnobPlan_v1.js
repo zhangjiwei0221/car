@@ -716,6 +716,15 @@ function effectiveProfile(p, base, mode) {
   }
   return q;
 }
+function softWarnings(m, base, D, baseD) {
+  const out = [];
+  if (baseD - D > 15) out.push('Ddrop>15');
+  if (m.arl.tol > 15) out.push('tolLoose');
+  if (base.arl.mid >= 80 && m.arl.mid < 80) out.push('midCross80(D惩罚)');
+  if (m.choice.entropy < 1.0) out.push('entropy<1');
+  if (m.arl.mid >= 0 && m.arl.mid < 45 && base.arl.mid >= 0 && base.arl.mid < 45) out.push('baselineFlat');
+  return out;
+}
 function checkProfile(m, p) {  const issues = [];
   const a = m.arl || {}, o = m.opening || {}, c = m.choice || {}, l = m.layout || {};
   if (p.hard.canPass && a.canPass !== '✓') issues.push('can=' + a.canPass);
@@ -746,12 +755,15 @@ function checkGuards(m, base, p, mode, D, baseD) {
   if (mode === 'ease' && D >= baseD) issues.push(`DNotDown=${D}`);
   return { pass: issues.length === 0, issues };
 }
-function rankScore(m, base, mode, profileResult, guardResult, D) {
+function rankScore(m, base, mode, profileResult, guardResult, D, warnings) {
   let s = 0;
   if (profileResult.pass) s += 1000;
   if (guardResult.pass) s += 200; else s -= 100;
-  if (mode === 'ease') s += (100 - D);
-  else if (mode === 'fix-opening') s += (m.opening.openM || 0) * 10 - D * 0.1;
+  if (mode === 'ease') {
+    s += (100 - D);
+    // D 大降但跨过 mid=80 多半是公式惩罚，不是真的更简单；排序时降权，报告仍保留候选。
+    for (const w of warnings || []) if (w === 'Ddrop>15' || w.startsWith('midCross80')) s -= 50;
+  } else if (mode === 'fix-opening') s += (m.opening.openM || 0) * 10 - D * 0.1;
   else if (mode === 'raise-mid') s += (m.arl.mid || 0) * 2 - D * 0.1;
   else if (mode === 'more-choice') s += (m.choice.entropy || 0) * 100 - D * 0.1;
   else s += (100 - D);
@@ -778,7 +790,7 @@ function describeBase(file, m) {
 function candidateLine(c, rank) {
   const m = c.metrics, D = c.D, p = c.profile, g = c.guards;
   const mark = p.pass && g.pass ? '✅ 推荐' : p.pass ? '🟡 合格但压平' : '❌ 未过';
-  return `| ${rank} | \`${c.id}\` | ${c.kind} | ${mark} | ${D} | ${m.arl.peak}/${m.arl.mid}/${m.arl.tol} | ${m.opening.openM} | ${m.opening.c0AtBufLt5}/${m.opening.f0AtBuf3} | ${m.click.clickForcedWon ? 'Y' : 'N'}/${m.policy.policy0 ? 'Y' : 'N'} | ${m.choice.entropy.toFixed(2)} | ${(p.issues.concat(g.issues)).join(',') || '—'} |`;
+  return `| ${rank} | \`${c.id}\` | ${c.kind} | ${mark} | ${D} | ${m.arl.peak}/${m.arl.mid}/${m.arl.tol} | ${m.opening.openM} | ${m.opening.c0AtBufLt5}/${m.opening.f0AtBuf3} | ${m.click.clickForcedWon ? 'Y' : 'N'}/${m.policy.policy0 ? 'Y' : 'N'} | ${m.choice.entropy.toFixed(2)} | ${(p.issues.concat(g.issues)).join(',') || '—'} | ${(c.warnings || []).join(',') || '—'} |`;
 }
 
 async function processLevel(file, levelOut) {
@@ -814,14 +826,15 @@ async function processLevel(file, levelOut) {
       const D = difficultyScore(metrics).D;
       const p = checkProfile(metrics, effProfile);
       const g = checkGuards(metrics, base, effProfile, intent, D, baseD);
-      const rank = rankScore(metrics, base, intent, p, g, D);
+      const warnings = softWarnings(metrics, base, D, baseD);
+      const rank = rankScore(metrics, base, intent, p, g, D, warnings);
       const row = {
         id: c.id, kind: c.kind, label: c.label, reason: c.reason, targets: c.targets, risk: c.risk,
         file: path.relative(ROOT, cfile), level: c.level, metrics, D,
-        profile: p, guards: g, rank
+        profile: p, guards: g, warnings, rank
       };
       rows.push(row);
-      console.log(`    D=${D} peak=${metrics.arl.peak} mid=${metrics.arl.mid} tol=${metrics.arl.tol} open=${metrics.opening.openM} C0=${metrics.opening.c0AtBufLt5} F0=${metrics.opening.f0AtBuf3} ${p.pass && g.pass ? 'RECOMMEND' : 'not-pass'} ${p.issues.concat(g.issues).join(',')}`);
+      console.log(`    D=${D} peak=${metrics.arl.peak} mid=${metrics.arl.mid} tol=${metrics.arl.tol} open=${metrics.opening.openM} C0=${metrics.opening.c0AtBufLt5} F0=${metrics.opening.f0AtBuf3} ${p.pass && g.pass ? 'RECOMMEND' : 'not-pass'} ${p.issues.concat(g.issues).join(',')}${warnings.length ? ' warn=' + warnings.join(',') : ''}`);
     }
   }
 
@@ -850,8 +863,8 @@ async function processLevel(file, levelOut) {
   } else if (!rows.length) {
     md.push('（没有候选跑出结果）');
   } else {
-    md.push('| # | 候选 | 类型 | 结论 | D | peak/mid/tol | openM | C0/F0 | clickForced/policy0 | H | 未过项 |');
-    md.push('|---:|---|---|---|---:|---|---:|---|---|---|---|');
+    md.push('| # | 候选 | 类型 | 结论 | D | peak/mid/tol | openM | C0/F0 | clickForced/policy0 | H | 未过项 | 提示 |');
+    md.push('|---:|---|---|---|---:|---|---:|---|---|---|---|---|');
     rows.forEach((r, i) => md.push(candidateLine(r, i + 1)));
   }
   md.push('');
@@ -870,6 +883,7 @@ async function processLevel(file, levelOut) {
       md.push(`- 文件：\`${r.file}\``);
       md.push(`- 指标：D **${r.D}**（基线 ${baseD}），peak/mid/tol=${r.metrics.arl.peak}/${r.metrics.arl.mid}/${r.metrics.arl.tol}，openM=${r.metrics.opening.openM}，C0/F0=${r.metrics.opening.c0AtBufLt5}/${r.metrics.opening.f0AtBuf3}，clickForced=${r.metrics.click.clickForcedWon ? 'Y' : 'N'}，policy0=${r.metrics.policy.policy0 ? 'Y' : 'N'}，H=${r.metrics.choice.entropy.toFixed(2)}`);
       md.push(`- 风险：${r.risk.length ? r.risk.join('、') : '无'}`);
+      md.push(`- 提示：${r.warnings && r.warnings.length ? r.warnings.join('、') : '无'}`);
       md.push('');
     });
   }
@@ -878,6 +892,7 @@ async function processLevel(file, levelOut) {
   md.push('- 这是“单旋钮”候选，不是自动最优解；每个候选只改一个 motif。');
   md.push('- `链组软化` 保留链结构，只降成员容量；`链组拆除` 默认不生成，需 `--allow-chain-remove`。');
   md.push('- 所有指标沿用现有模型：ArlCheck 19 项、点击结算 forced/policy、free-first OpeningCheck、ChoiceSpace、LayoutScore。`--player` 才额外跑 PlayerSim。');
+  md.push('- **口径提醒**：默认的 `clickForced/policy0` 是点击结算口径；它不等于 PlayerSim 的 `forced/policy0`。L2/L7 的基线就是“点击结算 policy0=Y、PlayerSim policy0=N”的反例；要判真实玩家 0 复活，必须加 `--player`。');
   md.push('- `profile` 的 mid 区间和 `guards` 是防“降难度=压平”的护栏；D 降低但 mid/entropy 掉了，会被标成“合格但压平”。');
   md.push('');
   md.push('## 5. 复现');
