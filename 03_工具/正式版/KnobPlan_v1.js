@@ -44,6 +44,8 @@ const maxLevels = Number(arg('--max-levels', 0)) || 0;
 const allowChainRemove = has('--allow-chain-remove');
 const allowIce50 = has('--allow-ice50');
 const runPlayer = has('--player');
+const BOTTOM_ONLY = has('--bottom-only');
+const EXTRA = BOTTOM_ONLY ? ['--bottom-only'] : [];
 const outArg = arg('--out', null);
 
 const INTENTS = new Set(['diagnose', 'ease', 'fix-opening', 'raise-mid', 'more-choice']);
@@ -310,31 +312,31 @@ function difficultyScore(m) {
 // ---------- 跑一关的全部检查 ----------
 function evaluateLevel(file, dir) {
   fs.mkdirSync(dir, { recursive: true });
-  const arlRun = runTool('ArlCheck_v793.js', [file], 300000);
+  const arlRun = runTool('ArlCheck_v793.js', [file, ...EXTRA], 300000);
   const arl = parseArl(arlRun.out);
   if (arlRun.error) arl.error = arlRun.error;
 
   const clickFile = path.join(dir, 'click.json');
-  const clickRun = runTool('ClickSettleEngineCheck_v1.js', [file, '--out', clickFile], 300000);
+  const clickRun = runTool('ClickSettleEngineCheck_v1.js', [file, '--out', clickFile, ...EXTRA], 300000);
   const click = parseClick(tryReadJson(clickFile));
   if (clickRun.error) click.error = clickRun.error;
 
   const routeDir = path.join(dir, 'routes');
   const policyFile = path.join(dir, 'policy.json');
-  const policyRun = runTool('ClickSettlePolicyCheck_v1.js', [file, '--out', policyFile, '--route-dir', routeDir], 300000);
+  const policyRun = runTool('ClickSettlePolicyCheck_v1.js', [file, '--out', policyFile, '--route-dir', routeDir, ...EXTRA], 300000);
   const policy = parsePolicy(tryReadJson(policyFile));
   if (policyRun.error) policy.error = policyRun.error;
 
   const routeFile = path.join(routeDir, path.basename(file).replace(/\.json$/i, '') + '.freefirst.click.json');
   let opening = { error: 'no route' };
   if (fs.existsSync(routeFile)) {
-    const oRun = runTool('OpeningCheck_v1.js', [file, '--click', routeFile, '--json'], 120000);
+    const oRun = runTool('OpeningCheck_v1.js', [file, '--click', routeFile, '--json', ...EXTRA], 120000);
     opening = parseOpening(extractJson(oRun.out));
     if (oRun.error) opening.error = oRun.error;
   }
 
   const choiceFile = path.join(dir, 'choice.json');
-  const choiceRun = runTool('ChoiceSpaceCheck_v1.js', [file, '--out', choiceFile], 300000);
+  const choiceRun = runTool('ChoiceSpaceCheck_v1.js', [file, '--out', choiceFile, ...EXTRA], 300000);
   const choice = parseChoice(tryReadJson(choiceFile));
   if (choiceRun.error) choice.error = choiceRun.error;
 
@@ -344,7 +346,7 @@ function evaluateLevel(file, dir) {
   let player = null;
   if (runPlayer) {
     const playerFile = path.join(dir, 'player.json');
-    const pRun = runTool('PlayerEngineCheck_v1.js', [file, '--out', playerFile, '--family'], 300000);
+    const pRun = runTool('PlayerEngineCheck_v1.js', [file, '--out', playerFile, '--family', ...EXTRA], 300000);
     player = parsePlayer(tryReadJson(playerFile));
     if (pRun.error) player.error = pRun.error;
   }
@@ -847,7 +849,7 @@ async function processLevel(file, levelOut) {
   const md = [];
   md.push(`# KnobPlan：${path.basename(file)}`);
   md.push('');
-  md.push(`> 意图：\`${intent}\`；profile：\`${effProfile.name}\`；生成 ${all.length} 个候选，检查 ${rows.length} 个。`);
+  md.push(`> 意图：\`${intent}\`；profile：\`${effProfile.name}\`；规则：\`${BOTTOM_ONLY ? 'bottomOnly（仅底边出口）' : 'fourSide（四边出口）'}\`；生成 ${all.length} 个候选，检查 ${rows.length} 个。`);
   md.push('');
   md.push('## 1. 基线诊断');
   md.push('');

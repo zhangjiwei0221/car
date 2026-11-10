@@ -28,6 +28,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const input = process.argv[2];
 const outFile = arg('--out', null);
 const limit = Number(arg('--limit', 0)) || 0;
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
 if (!input) {
   console.error('用法: node ClickSettleEngineCheck_v1.js <关卡.json | 目录> [--out report.json] [--limit N]');
   process.exit(2);
@@ -42,7 +43,7 @@ function isLevel(g) {
   return g && g.toprow && Array.isArray(g.blocks) && Array.isArray(g.spools);
 }
 function minRoute(lv) {
-  return A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false });
+  return A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false, bottomOnly: BOTTOM_ONLY });
 }
 
 // 点击结算 forced：逐步重放求解器最小路线。
@@ -53,7 +54,7 @@ function forcedClickSettle(lv, min) {
     if (!byStep[p.step]) byStep[p.step] = p;
   }
   const stepNos = Object.keys(byStep).map(Number).sort((a, b) => a - b);
-  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   const trace = [];
   let death = null;
   let bufferPeak = 0;

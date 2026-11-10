@@ -31,6 +31,7 @@ const levelFile = process.argv[2];
 const clickFile = arg('--click', null);
 const pathFile = arg('--path', null);
 const asJson = process.argv.includes('--json');
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
 if (!levelFile || (!clickFile && !pathFile)) {
   console.error('用法: node OpeningCheck_v1.js <关卡.json> --click <click.json> | --path <用户路径.json> [--json]');
   process.exit(2);
@@ -52,7 +53,7 @@ if (clickFile) {
   }));
 }
 
-let s = S.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+let s = S.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
 const rows = [];
 
 for (const st of route) {

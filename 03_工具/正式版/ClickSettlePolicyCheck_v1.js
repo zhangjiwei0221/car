@@ -36,6 +36,7 @@ const outFile = arg('--out', null);
 const limit = Number(arg('--limit', 0)) || 0;
 const beamWidth = Number(arg('--beam', 0)) || 0;
 const routeDir = arg('--route-dir', null);
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
 if (!input) {
   console.error('用法: node ClickSettlePolicyCheck_v1.js <关卡.json | 目录> [--out report.json] [--limit N] [--beam N]');
   process.exit(2);
@@ -61,7 +62,7 @@ function cmp(a, b) {
   return 0;
 }
 function solverPicks(lv) {
-  const min = A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false });
+  const min = A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false, bottomOnly: BOTTOM_ONLY });
   const byStep = {};
   for (const p of min.pickOrder || []) if (!byStep[p.step]) byStep[p.step] = p;
   return {
@@ -153,7 +154,7 @@ function deadNow(s, completedBefore) {
   return A.Simulator.listMoves(s).filter(m => !m.blocked).length === 0;
 }
 function runOne(lv, strategy, cap, sp) {
-  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   let revives = 0, picks = 0, bufferPeak = 0, solverIdx = 0, fallbacks = 0;
   const route = [];
   const maxPicks = s.totalBoxes + 20;

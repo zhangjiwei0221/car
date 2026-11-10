@@ -30,6 +30,7 @@ const input = process.argv[2];
 const outFile = arg('--out', null);
 const limit = Number(arg('--limit', 0)) || 0;
 const maxSteps = Number(arg('--max-steps', 0)) || 80;
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
 if (!input) {
   console.error('用法: node ChoiceSpaceCheck_v1.js <关卡.json | 目录> [--out report.json] [--limit N] [--max-steps N]');
   process.exit(2);
@@ -117,7 +118,7 @@ function analyzeStep(s, step) {
 function cmp(a, b) { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1; return 0; }
 
 function analyzeLevel(lv) {
-  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   const steps = [];
   for (let i = 0; i < maxSteps; i++) {
     if (s.eliminatedPixels >= s.totalPixels) break;

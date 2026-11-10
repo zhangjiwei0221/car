@@ -38,6 +38,7 @@ const preferVariants = preferSmallDebt ? [false, true] : [false];
 const useVisibleReach = has('--visible-reach');
 const visibleReachFactor = Number(arg('--visible-factor', 1));
 const visibleModel = arg('--visible-model', 'all');
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
 const limit = Number(arg('--limit', 0)) || 0;
 const thresholds = useFamily ? [0.4, 0.6, 0.8] : [0.6];
 const lookaheads = useLookahead ? [false, true] : [false];
@@ -68,7 +69,7 @@ function isLevel(g) {
 }
 
 function minRoute(lv) {
-  return A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false });
+  return A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false, bottomOnly: BOTTOM_ONLY });
 }
 
 function forcedFromMin(lv, min) {
@@ -76,7 +77,7 @@ function forcedFromMin(lv, min) {
   for (const p of min.pickOrder || []) if (!byStep[p.step]) byStep[p.step] = { r: p.r, c: p.c };
   const fp = {};
   for (const k of Object.keys(byStep)) fp[+k - 1] = byStep[k];
-  const res = A.PlayerSim.run(lv, { seed: 7, instantChain: false, reviveCap: 0, forcedPicks: fp, preferSmallDebt: false });
+  const res = A.PlayerSim.run(lv, { seed: 7, instantChain: false, bottomOnly: BOTTOM_ONLY, reviveCap: 0, forcedPicks: fp, preferSmallDebt: false });
   let mismatch = 0;
   for (const k of Object.keys(byStep)) {
     const s = +k, at = res.pickOrder.filter(p => p.step === s);
@@ -92,7 +93,7 @@ function policyRuns(lv, caps) {
       for (const psd of preferVariants) {
         for (const cap of caps) {
           const r = A.PlayerSim.run(lv, {
-            seed: 7, instantChain: false, reviveCap: cap,
+            seed: 7, instantChain: false, bottomOnly: BOTTOM_ONLY, reviveCap: cap,
             pickThreshold: t, lookahead2: la, lookaheadLimit: 6,
             preferSmallDebt: psd, useVisibleReach, visibleReachFactor, visibleModel
           });

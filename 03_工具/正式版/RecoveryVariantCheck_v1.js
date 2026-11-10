@@ -20,6 +20,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? proces
 const input = process.argv[2];
 const outFile = arg('--out', null);
 const limit = Number(arg('--limit', 0)) || 0;
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
+const EXTRA = BOTTOM_ONLY ? ['--bottom-only'] : [];
 if (!input) { console.error('用法: node RecoveryVariantCheck_v1.js <变体目录> [--out report.json]'); process.exit(2); }
 
 const run = (tool, args, timeout) => {
@@ -49,11 +51,11 @@ const rows = [];
 for (const f of selected) {
   const file = path.join(input, f);
   const tag = path.basename(f, '.json');
-  const click = parseClick(run('ClickSettleEngineCheck_v1.js', [file], 120000).out);
+  const click = parseClick(run('ClickSettleEngineCheck_v1.js', [file, ...EXTRA], 120000).out);
   const routeDir = path.join(input, '.routes', tag);
   const policyFile = path.join(input, '.checks', tag + '.policy.json');
   fs.mkdirSync(path.dirname(policyFile), { recursive: true });
-  const polOut = run('ClickSettlePolicyCheck_v1.js', [file, '--out', policyFile, '--route-dir', routeDir], 300000).out;
+  const polOut = run('ClickSettlePolicyCheck_v1.js', [file, '--out', policyFile, '--route-dir', routeDir, ...EXTRA], 300000).out;
   let policy = {};
   try {
     const j = JSON.parse(fs.readFileSync(policyFile, 'utf8'));
@@ -67,7 +69,7 @@ for (const f of selected) {
   const routeFile = path.join(routeDir, path.basename(file).replace(/\.json$/i, '') + '.freefirst.click.json');
   let opening = {};
   if (fs.existsSync(routeFile)) {
-    const or = run('OpeningCheck_v1.js', [file, '--click', routeFile, '--json'], 120000).out;
+    const or = run('OpeningCheck_v1.js', [file, '--click', routeFile, '--json', ...EXTRA], 120000).out;
     try {
       const j = JSON.parse(or);
       const s = j.summary || {};
@@ -81,10 +83,10 @@ for (const f of selected) {
       opening.openM = j.rows && j.rows[0] ? j.rows[0].M : null;
     } catch (e) { opening = { error: String(e.message || e) }; }
   } else opening = { error: 'no route' };
-  const arl = parseArl(run('ArlCheck_v793.js', [file], 300000).out);
+  const arl = parseArl(run('ArlCheck_v793.js', [file, ...EXTRA], 300000).out);
   const layout = parseLayout(run('LayoutScore_v1.js', [file], 120000).out);
   const choiceFile = path.join(input, '.checks', tag + '.choice.json');
-  const choiceOut = run('ChoiceSpaceCheck_v1.js', [file, '--out', choiceFile], 300000).out;
+  const choiceOut = run('ChoiceSpaceCheck_v1.js', [file, '--out', choiceFile, ...EXTRA], 300000).out;
   let choice = {};
   try { const j = JSON.parse(fs.readFileSync(choiceFile, 'utf8')); const r = j.rows[0] || {}; choice = { M: r.avgM, entropy: r.avgEntropy, fake: r.fakeChoiceSteps, forced: r.forcedSteps }; } catch (e) { choice = { error: String(e.message || e) }; }
   const row = { tag, file: path.relative(ROOT, file), click, policy, opening: { pass: opening.pass, openM: opening.openM, f0AtBuf3: opening.f0AtBuf3, c0AtBufLt5: opening.c0AtBufLt5 }, arl, layout, choice };

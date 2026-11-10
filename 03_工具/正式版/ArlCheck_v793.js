@@ -23,13 +23,14 @@ const B = require('./Build006Thickness_v688');
 const { detect: detectSubjects } = require('./SubjectDetect_v800');
 const A = B.loadSolver('corner');
 const fs = require('fs');
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
 
 /**
  * 【2026-11-04 用户定】「暂存区最少」路线——这才是玩家会走的路。
  * v635：统一调用编辑器同一个 Solver.runMinBuffer，避免两套实现漂移。
  */
 function minBufferRun(lv, DEPTH = 3) {
-  const r = A.Solver.runMinBuffer(lv, { depth: DEPTH, instantChain: false });
+  const r = A.Solver.runMinBuffer(lv, { depth: DEPTH, instantChain: false, bottomOnly: BOTTOM_ONLY });
   return {
     buf: r.bufHistory || r.stepBufferHistory || [],
     won: !!r.won,
@@ -43,7 +44,7 @@ function check(f) {
   const SOFT_TOLERANCE = process.argv.includes('--soft-tolerance');
   const g = B.readJson(f);
   const lv = A.parseLevel(A.fromGameFormat(g));
-  const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: false });
+  const o = A.Solver.runSolver(lv, 0, 1, false, BOTTOM_ONLY, { capturePreviewStats: true, instantChain: false });
   // 【2026-11-04 用户定】压力口径 = 「暂存区最少」的路线（玩家会走的路），不是原求解器的贪心路线。
   const mb = minBufferRun(lv, 3);
   const buf = mb.buf.length ? mb.buf.slice() : ((Array.isArray(o.stepBufferHistory) && o.stepBufferHistory.length)
@@ -168,7 +169,7 @@ function check(f) {
   const runs = [];
   for (let i = 0; i < 20; i++) {
     const nz = i === 0 ? 0 : 0.2 + (i % 5) * 0.2;
-    const oo = A.Solver.runSolver(lv, nz, 1000 + i * 37, false, false, { capturePreviewStats: false, instantChain: false });
+    const oo = A.Solver.runSolver(lv, nz, 1000 + i * 37, false, BOTTOM_ONLY, { capturePreviewStats: false, instantChain: false });
     const ss = (Array.isArray(oo.stepBufferHistory) && oo.stepBufferHistory.length)
       ? oo.stepBufferHistory.slice()
       : (oo.pressureSamples || []).map(x => x.buf || 0);
@@ -202,10 +203,13 @@ function check(f) {
     const H = g.blocks.length, W = g.blocks[0].length;
     const col = g.blocks.map(r => r.slice());
     const gone = g.blocks.map(r => r.map(() => false));
-    const reach = (y, x) => y === 0 || x === 0 || y === H - 1 || x === W - 1 ||
-      gone[y - 1][x] || gone[y + 1][x] || gone[y][x - 1] || gone[y][x + 1];
+    const reach = (y, x) => {
+      if (BOTTOM_ONLY ? y === H - 1 : (y === 0 || x === 0 || y === H - 1 || x === W - 1)) return true;
+      return (y > 0 && gone[y - 1][x]) || (y < H - 1 && gone[y + 1][x]) ||
+        (x > 0 && gone[y][x - 1]) || (x < W - 1 && gone[y][x + 1]);
+    };
     const Sim = A.Simulator;
-    const st = Sim.enter(lv, { useSlotStart: true, instantChain: false });
+    const st = Sim.enter(lv, { useSlotStart: true, instantChain: false, bottomOnly: BOTTOM_ONLY });
     // 【2026-11-04 用户】开局可点数量：字面意义"开局能看见几辆车"。
     // 太窄（≤3）= "规定好的路"，用户实测 00025 就是这种。
     openingPickable = Sim.listMoves(st).length;
