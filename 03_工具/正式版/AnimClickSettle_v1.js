@@ -7,6 +7,8 @@
  *   默认（推荐）：click-settle-greedy —— 每一步枚举合法车，逐只 applyPick 试算，
  *                选“吃掉像素最多、且不爆仓”的车；同分再比结算后暂存和剩余债务。
  *   --from-player：沿用 PlayerSim 的点击顺序（只作对照，不再用于验收）。
+ *   --from-solver：用 Solver.runMinBuffer 的最小暂存路线（点击结算口径）；F2 这类
+ *                  自由贪心/beam 找不到、但 solver 有解的关用它出动画。
  *
  * 结算口径：
  *   - 不展示 1px/tick 的吃东西过程；
@@ -175,9 +177,20 @@ function beamRoute(width) {
   return win.route;
 }
 
+// ---------- 路线 1c：Solver 最小暂存路线（点击结算口径） ----------
+function solverRoute() {
+  const min = A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false });
+  if (!min.won) throw new Error('solver 最小路线没有通关：' + (min.steps || '?'));
+  const byStep = {};
+  for (const p of min.pickOrder || []) {
+    // 同一步链组会展开多条；第一条是触发盒（chainIndex 0）。
+    if (!byStep[p.step]) byStep[p.step] = p;
+  }
+  return Object.keys(byStep).map(Number).sort((a, b) => a - b).map(s => ({ r: byStep[s].r, c: byStep[s].c }));
+}
+
 // ---------- 路线 2：PlayerSim 点击顺序（对照） ----------
-function playerRoute() {
-  const ps = A.PlayerSim.run(lv, { seed, instantChain: false, reviveCap, pickThreshold: threshold, preferSmallDebt, capture: true });
+function playerRoute() {  const ps = A.PlayerSim.run(lv, { seed, instantChain: false, reviveCap, pickThreshold: threshold, preferSmallDebt, capture: true });
   if (!ps.won) throw new Error('PlayerSim 路线没有通关：picks=' + ps.picks);
   const route = [];
   for (const t of ps.tickTrajectory) {
@@ -190,8 +203,12 @@ function playerRoute() {
 }
 
 const fromPlayer = has('--from-player');
+const fromSolver = has('--from-solver');
 let route, routeSource;
-if (fromPlayer) {
+if (fromSolver) {
+  route = solverRoute();
+  routeSource = 'solver-min (click-settle)';
+} else if (fromPlayer) {
   route = playerRoute();
   routeSource = 'PlayerSim (legacy comparison)';
 } else if (has('--beam-first')) {

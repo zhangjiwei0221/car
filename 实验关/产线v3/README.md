@@ -25,6 +25,7 @@
 
 > 详细证书：`M5批次/00045_v7/M5_00045_v7_证书.md`；报告：`M5批次/M5Build_v7_报告.md`。
 > **点击结算 forced（2026-11-10）**：v7、拼接 `pin15_32+pipe53`、F2 全部 **Y(peak4)**；F2 的 PlayerSim forcedN 是模型差异。G2 2–13 修复后 solver=Y 9 张、clickForced=Y 9 张、fail 0（L3/L11 转 N，L12 转 Y）；`solver=Y ⇒ clickForced=Y`。详见 `ClickSettle_forced_20261110.md`。
+> **点击结算策略族（2026-11-10）**：v7/拼接四策略（solver/free-first/max-eat/small-debt）0 复活全过；F2 仅 solver/small-debt，free-first 2 复活仍 95%；G2 2–13 **12/12 policy0=Y** → `policy0` 单独不是分界。详见 `ClickSettle_policy_20261110.md`。
 
 **F2 早期基线（历史，不是当前候选）**：`实验关/产线v3/00154中段/F2_68_36_30_25_19_25_21_42.json`
 
@@ -291,6 +292,7 @@ C. **结论**：
 | v3-27 | M4.5 早期债：00005 v24 顶行 13+22 2 连 + 冰 r1c5 12；第17步 buffer3、20–34步4；峰值4/中段48/容错15/0复活5seeds/排版过 |
 | v3-28 | M4.5 消融：顶行链 Δ=0（去掉 free3/峰值4/容错15 不变），冰12 有效；v27 去链采用；蓝车冰6→8 塌成 free36/峰值2 |
 | v3-29 | 点击结算 forced：v7/拼接/F2 全 Y；PlayerSim forcedN 是模型差异；solver overflow 检查已修（L3/L11 转 N、L12 转 Y，9/9 solver=Y 全部 clickForced=Y） |
+| v3-30 | 点击结算策略族：v7/拼接四策略 0 复活全过；F2 仅 solver/small-debt；G2 2–13 12/12 policy0=Y，policy0 单独不是分界 |
 
 > 每份报告在 `实验关/产线v3/v3-NN_报告.md`；过程证据在工作日志 §970–§994。 |
 
