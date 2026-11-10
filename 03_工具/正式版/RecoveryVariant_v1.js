@@ -9,6 +9,7 @@
  *   easy    ：ice50 + noChain
  *   openIce ：只移除 row0 的冰（补开局；不动其他冰/链）
  *   openIce1：只移除 row0 第一辆冰车（温和补开局）
+ *   ice75   ：只把冰 param 减 25%（保留链、保留结构；真正的“轻度降难度”）
  *
  * 只改 spools 里的 type/param；id/count 不变，所以逐色容量守恒不变。
  *
@@ -26,11 +27,12 @@ if (!levelFile || !outFile) {
   process.exit(2);
 }
 const doIce = mode === 'ice50' || mode === 'easy';
+const doIce75 = mode === 'ice75';
 const doChain = mode === 'noChain' || mode === 'easy';
 const doOpenIce = mode === 'openIce' || mode === 'openIce1';
 const g = JSON.parse(fs.readFileSync(levelFile, 'utf8'));
 if (!g || !Array.isArray(g.spools)) throw new Error('不是关卡 JSON');
-let iceChanged = 0, chainChanged = 0, openIceDone = 0;
+let iceChanged = 0, chainChanged = 0, openIceDone = 0, ice75Changed = 0;
 for (let r = 0; r < g.spools.length; r++) for (let c = 0; c < g.spools[r].length; c++) {
   const s = g.spools[r][c];
   if (!s) continue;
@@ -51,6 +53,13 @@ for (let r = 0; r < g.spools.length; r++) for (let c = 0; c < g.spools[r].length
     iceChanged++;
     type = s.type;
   }
+  if (doIce75 && type === 7) {
+    const p = Number(s.param) || 0;
+    const np = Math.round(p * 0.75);
+    if (np <= 0) { s.type = 0; s.param = 0; } else { s.param = np; }
+    ice75Changed++;
+    type = s.type;
+  }
   if (doChain) {
     if (type === 5) {
       s.type = 0; s.param = 0; chainChanged++;
@@ -62,4 +71,4 @@ for (let r = 0; r < g.spools.length; r++) for (let c = 0; c < g.spools[r].length
   }
 }
 fs.writeFileSync(outFile, JSON.stringify(g));
-console.log('已写：' + outFile + '（ice ' + iceChanged + '，chain ' + chainChanged + '，openIce ' + openIceDone + '）');
+console.log('已写：' + outFile + '（ice ' + iceChanged + '，ice75 ' + ice75Changed + '，chain ' + chainChanged + '，openIce ' + openIceDone + '）');
