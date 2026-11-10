@@ -38,7 +38,13 @@ function clickRoute(lf, tag) {
   try {
     cp.execSync(`node 03_工具/正式版/AnimClickSettle_v1.js ${lf} --out ${jf}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000 });
     return JSON.parse(fs.readFileSync(jf, 'utf8'));
-  } catch (e) { return null; }
+  } catch (e) {
+    // 自由贪心/beam 找不到时，退回 solver 最小路线（点击结算口径）
+    try {
+      cp.execSync(`node 03_工具/正式版/AnimClickSettle_v1.js ${lf} --from-solver --out ${jf}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000 });
+      return JSON.parse(fs.readFileSync(jf, 'utf8'));
+    } catch (e2) { return null; }
+  }
 }
 function metrics(lf) {
   let arl = '';
