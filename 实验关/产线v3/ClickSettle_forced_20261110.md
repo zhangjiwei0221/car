@@ -31,27 +31,27 @@
 | 关 | 流失② | solver | PlayerSim forced | 点击结算 forced | 点击死亡 |
 |---:|---:|---|---|---|---|
 | 2 | 45.77% | Y(45) | N(8) | **Y(45)** | — |
-| 3 | 30.64% | Y(40) | N(8) | N(12) | overflow：buffer5、本步无完成 |
+| 3 | 30.64% | **N(12)** | N(8) | N(12) | solver 无有效路线（修复后转 N） |
 | 4 | 14.17% | Y(46) | Y | Y(46) | — |
 | 5 | 36.89% | Y(47) | N(41) | **Y(47)** | — |
 | 6 | 9.23% | Y(45) | Y | Y(45) | — |
-| 7 | 20.34% | N(40) | N(35) | N(40) | solver 本身无路线 |
+| 7 | 20.34% | **N(39)** | N(35) | N(39) | solver 无有效路线 |
 | 8 | 10.64% | Y(40) | N(6) | **Y(40)** | — |
 | 9 | 7.14% | Y(45) | Y | Y(45) | — |
 | 10 | 15.38% | Y(36) | N(19) | **Y(36)** | — |
-| 11 | 9.09% | Y(41) | N(8) | N(9) | overflow |
-| 12 | 20.00% | Y(43) | N(13) | N(25) | overflow |
+| 11 | 9.09% | **N(13)** | N(13) | N(13) | solver 无有效路线（修复后转 N） |
+| 12 | 20.00% | Y(43) | N(13) | **Y(43)** | — |
 | 13 | 4.17% | Y(40) | Y | Y(40) | — |
 
-**点击结算 forced 汇总：11 张 solver=Y 里 8 张 Y、3 张 N（3/11/12）；L7 solver=N。**
+**修复后汇总：12 关里 solver=Y 9 张、clickForced=Y 9 张、fail 0；solver=N 3 张（3/7/11）。所有 solver=Y 路线在点击结算下都走得通。**
 
-- 高流失 5 关：L2/L5 **Y**，L3/L7/L12 N → **forced 不再是干净分界**。
+- 高流失 5 关：L2/L5/L12 **Y**，L3/L7 N → **forced 仍不是干净分界**。
 - PlayerSim forcedN 的 L2/L5/L8/L10 在点击结算下全部翻成 Y。
-- L11 是低流失（9.09%）但点击结算 N → forced 单独也不能判死。
+- L11 低流失（9.09%）但 solver=N；Policy0 仍 Y（换一条玩家路线能过）。
 
-## 3. 关键发现：求解器自己的路线会溢出，但仍报 solver=Y
+## 3. 已修复：`runMinBuffer` 忽略 overflow 导致 solver=Y 假阳性
 
-L3/L11/L12 的点击结算死亡不是“关卡无解”，而是 **`runMinBuffer` 的最小路线本身越过了暂存上限**：
+修复前，L3/L11/L12 的点击结算死亡不是“关卡无解”，而是 **`runMinBuffer` 的最小路线本身越过了暂存上限**：
 
 - L3：第 12 步 `bufferBefore=4 → bufferAfter=5`，本步无车完成 → 溢出；
 - L11：第 9 步同样；
@@ -65,22 +65,35 @@ L3/L11/L12 的点击结算死亡不是“关卡无解”，而是 **`runMinBuffe
 
 > 实现注意：`applyPick` 是低层函数，不做容量门；调用方必须先过 `Simulator.listMoves` 的 `blocked`（或编辑器 `pickCapacityOf`）。本工具和 `AnimClickSettle_v1` 已按此执行。
 
-这意味着 `ArlCheck_v793` 的“可通关（最小路线）”对 L3/L11/L12 是**假阳性**。需要修 `runMinBuffer`：
+**修复（2026-11-10）**：`solver.js` 的 `runMinBuffer` 三处加检查：
 
-1. 候选试算 `s2`：`s2.overflow || s2.buffer.length > limit` → 跳过；
+1. 候选试算 `s2`：`s2.gameOver || s2.overflow || s2.buffer.length > limit` → 跳过；
 2. rollout：同样条件 → 返回无效；
 3. 主循环落地后：`state.overflow || state.buffer.length > limit` → `dead=true; break`。
 
-修完必须重跑 2–13 + 三张候选的 `ArlCheck` / `PlayerEngineCheck` / 本工具，确认数字变化。
+**修复后验证**：
+
+| 关 | solver 前 | solver 后 | 点击结算 forced | ArlCheck 可通关 |
+|---|---|---|---|---|
+| 3 | Y(40)（假阳性） | **N(12)** | N(12) | **✗**（原来假 ✓） |
+| 11 | Y(41)（假阳性） | **N(13)** | N(13) | **✗**（原来假 ✓） |
+| 12 | Y(43)（路线溢出） | **Y(43)** | **Y(43)** | ✓ |
+
+- G2 2–13 修复后：solver=Y **9** 张、clickForced=Y **9** 张、fail **0**；solver=N 3 张（3/7/11）。
+- **不变式：修复后 `solver=Y ⇒ clickForced=Y`**（求解器和点击结算现在是同一套 applyPick 口径）。
+- L11 虽 solver=N，但 PlayerSim `policy0=Y` —— 关卡仍可通过另一条玩家路线通关；只是“最小路线”不成立。
+- 三张候选（v7/拼接/F2）修复前后都是 clickForced=Y。
+
+历史结果需要重读：`ArlCheck_v793` 之前对 L3/L11 的“可通关 ✓”是假阳性；19 项报告里这两关的通关项应改为 ✗。同一次重跑还纠正了指标：**L3/L7/L11/L12 的峰值 5→4**（旧峰值来自溢出路线），at4 也变化（L3 12→5、L11 7→1、L12 4→3）。详见 `研究_总关卡分组2_2-13/结果.md §8`。
 
 ## 4. 结论
 
 1. **PlayerSim forcedN ≠ 点击结算 forcedN**；F2 就是反例（PlayerSim N，点击结算 Y）。
 2. 点击结算口径下，v7/拼接/F2 三张候选的 solver 路线都走得通（peak4）。
-3. G2 2–13 的点击结算 forced 仍不是干净分界；高流失 L2/L5 是 Y。
-4. 当前 `solver=Y` 有假阳性（L3/L11/L12），先修 `runMinBuffer`，再谈用 forced 当硬门。
+3. G2 2–13 的点击结算 forced 仍不是干净分界；高流失 5 关里 L2/L5/L12 是 Y，L3/L7 是 N；低流失 L11 也是 N。
+4. **`runMinBuffer` 的 overflow 检查已修**：L3/L11 从假阳性 solver=Y 转 N（ArlCheck 可通关改 ✗），L12 找到有效路线 Y；修复后 `solver=Y ⇒ clickForced=Y`，G2 2–13 的 9 张 solver=Y 全部 clickForced=Y。
 5. 现有 `AnimClickSettle_v1` 的“链组本步有车吃满可短暂超 5”已删除：暂存区最多 5；链组点击前检查 `buffer+N>5`。严格口径重跑后，拼接 free 24→14、peak6→4；F2 贪心/beam 找不到路线但 solver 路线 Y；v7 free 9→8。旧点击结算数字作废。
-6. 下一步：先修 `runMinBuffer` 的 overflow 检查；再给 `AnimClickSettle` 加 `--from-solver` 回退，让 F2 这类“贪心找不到、solver 有解”的关能出动画。
+6. 下一步：给 `AnimClickSettle` 加 `--from-solver` 回退，让 F2 这类“贪心找不到、solver 有解”的关能出动画；再补点击结算口径的 policy0/2。
 
 ## 5. 复现
 
@@ -88,4 +101,4 @@ L3/L11/L12 的点击结算死亡不是“关卡无解”，而是 **`runMinBuffe
 node 03_工具/正式版/ClickSettleEngineCheck_v1.js <关卡.json | 目录> [--out report.json]
 ```
 
-G2 2–13 的中间目录必须只放 2–13 这 12 个文件（总目录里有 100+ 关）；结果 JSON：`click_forced_20261110.json`。
+G2 2–13 的中间目录必须只放 2–13 这 12 个文件（总目录里有 100+ 关）；修复前结果 JSON：`click_forced_20261110.json`，修复后：`click_forced_20261110_after_solverfix.json`。

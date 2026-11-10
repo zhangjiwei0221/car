@@ -303,7 +303,8 @@ AntSolver.Solver = (function() {
           return (b.canConsume ? 1 : 0) - (a.canConsume ? 1 : 0) || a.groupSize - b.groupSize;
         });
         Sim.applyPick(s, mv[0].r, mv[0].c);
-        if (s.gameOver) return { maxBuf: 99, done: 0 };
+        // 暂存溢出/超上限同样是死：applyPick 只置 overflow，不置 gameOver。
+        if (s.gameOver || s.overflow || s.buffer.length > s.bufferLimit) return { maxBuf: 99, done: 0 };
         maxBuf = Math.max(maxBuf, s.buffer.length);
         if (s.completedBoxes >= s.totalBoxes) break;
       }
@@ -328,7 +329,8 @@ AntSolver.Solver = (function() {
       for (var i = 0; i < moves.length; i++) {
         var m = moves[i], s2 = clone(state);
         Sim.applyPick(s2, m.r, m.c);
-        if (s2.gameOver) continue;
+        // overflow / 超上限 = 取则死亡，不能进候选。
+        if (s2.gameOver || s2.overflow || s2.buffer.length > s2.bufferLimit) continue;
         var rr = rollout(s2, DEPTH);
         var peak = Math.max(s2.buffer.length, rr.maxBuf);
         // 【2026-11-04 用户】推进优先、暂存次之。
@@ -339,6 +341,8 @@ AntSolver.Solver = (function() {
       }
       if (!best) { dead = true; break; }
       Sim.applyPick(state, best.r, best.c);
+      // 暂存溢出/超上限：本步即死，不能继续记路线后报 won。
+      if (state.overflow || state.buffer.length > state.bufferLimit) { dead = true; break; }
 
       var lp = state.lastPick;
       if (lp && lp.picked && lp.picked.length) {

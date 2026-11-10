@@ -24,7 +24,7 @@
 | 排版 | hard0/warn0；车 12/23/86 | L1–L6 | ✅ |
 
 > 详细证书：`M5批次/00045_v7/M5_00045_v7_证书.md`；报告：`M5批次/M5Build_v7_报告.md`。
-> **点击结算 forced（2026-11-10）**：v7、拼接 `pin15_32+pipe53`、F2 全部 **Y(peak4)**；F2 的 PlayerSim forcedN 是模型差异。G2 2–13 的 11 张 solver=Y 里 8 张 Y；另有 solver=Y 假阳性（L3/L11/L12 路线自身 overflow）待修。详见 `ClickSettle_forced_20261110.md`。
+> **点击结算 forced（2026-11-10）**：v7、拼接 `pin15_32+pipe53`、F2 全部 **Y(peak4)**；F2 的 PlayerSim forcedN 是模型差异。G2 2–13 修复后 solver=Y 9 张、clickForced=Y 9 张、fail 0（L3/L11 转 N，L12 转 Y）；`solver=Y ⇒ clickForced=Y`。详见 `ClickSettle_forced_20261110.md`。
 
 **F2 早期基线（历史，不是当前候选）**：`实验关/产线v3/00154中段/F2_68_36_30_25_19_25_21_42.json`
 
@@ -290,7 +290,7 @@ C. **结论**：
 | v3-26 | M4.5 后段债：00005 v17 后排 2 连链组，最后 8 步暂存 2 辆；免费 3/47、峰值4、容错14、排版过；v18 三连否决 |
 | v3-27 | M4.5 早期债：00005 v24 顶行 13+22 2 连 + 冰 r1c5 12；第17步 buffer3、20–34步4；峰值4/中段48/容错15/0复活5seeds/排版过 |
 | v3-28 | M4.5 消融：顶行链 Δ=0（去掉 free3/峰值4/容错15 不变），冰12 有效；v27 去链采用；蓝车冰6→8 塌成 free36/峰值2 |
-| v3-29 | 点击结算 forced：v7/拼接/F2 全 Y；PlayerSim forcedN 是模型差异；G2 2–13 8/11 Y；solver=Y 假阳性（L3/L11/L12）待修 |
+| v3-29 | 点击结算 forced：v7/拼接/F2 全 Y；PlayerSim forcedN 是模型差异；solver overflow 检查已修（L3/L11 转 N、L12 转 Y，9/9 solver=Y 全部 clickForced=Y） |
 
 > 每份报告在 `实验关/产线v3/v3-NN_报告.md`；过程证据在工作日志 §970–§994。 |
 
