@@ -104,6 +104,19 @@
     </div>
     <div class="sub" style="margin:-2px 0 6px">⚠ 这一项**不看内容**，只认"四边出现最多的那个色" —— 如果美术自己带了一圈边框（比如整圈粉色勾边），
       它会被当成背景整片挖掉。转换后下面会报「本图会挖掉 N 格」，数字大得离谱就说明挖错了，把它取消勾选。</div>
+    <!-- 【v155】中性色不染彩：34 色表按 L* 排是 33 号纯黑(0.3) → 15 号深棕(41.8)，中间没有中性色，
+         带蓝的深灰描边会被吸附成深蓝绿（用户实测"黑描边整圈变蓝"）。这条规则让深中性色只落到中性色。 -->
+    <div class="row">
+      <label title="源色色度 C*&lt;12 且亮度 L*&lt;50（也就是「看起来是深灰/黑」的格子）只允许吸附到色表里的中性色。&#10;&#10;为什么需要：34 色表里 L*=0 只有纯黑 #010101，下一个颜色直接跳到 L*=41.8 的深棕 #256A85，中间一个中性色都没有。所以带蓝的深灰描边 #434B5B（L*=31.8）会被算成「离深棕最近」→ 整圈黑描边变深蓝绿。&#10;&#10;关掉它 = 回到 v154 的纯最近色口径。">深灰不染彩（中性色只配中性色）</label>
+      <input type="checkbox" id="neutralMode" checked>
+    </div>
+    <div class="sub" style="margin:-2px 0 6px">深灰描边被染成深蓝绿时勾着它；如果画面里的深蓝阴影被吃成黑色，把它取消。</div>
+    <!-- 【v155】色相门控：钢蓝在 34 色表里卡在 深棕(青,240°) 和 深蓝(蓝紫,293°) 中间，RGB 距离只差 4 -->
+    <div class="row">
+      <label title="源色与候选色的色相差超过 40° 时，这个色号不许用。&#10;&#10;为什么需要：钢蓝 #3888B0（h=248°）在 34 色表里正好卡在 15 深棕（青，h=240°）和 16 深蓝（蓝紫，h=293°）中间，两边 RGB 距离只差 4 —— 谁赢取决于用哪种距离口径，所以会出现「深蓝变成紫色」。&#10;&#10;按 CIEDE2000 应该是 深棕 12.0 < 天蓝 12.8 < 深蓝 17.3，紫根本不该赢。&#10;&#10;关掉它 = 不判色相，只按距离。">色相不跑偏（蓝不许变紫）</label>
+      <input type="checkbox" id="hueMode" checked>
+    </div>
+    <div class="sub" style="margin:-2px 0 6px">钢蓝被吸成紫色时勾着它；如果本来就想要"偏紫的蓝"，把它取消。</div>
     <!-- 【2026-10-15 v153】取色窗口：AI 放大图/带阴影描边的图，格子四边有抗锯齿与立体倒角，
          整格参与投票会让深色倒角多投票（实测黑块比真值多约 10%、描边变粗一格）。默认改成格内 75%。 -->
     <div class="row">
@@ -195,6 +208,7 @@ function setLib(lib){
   PAL = (LIB === 'official') ? PAL_OFFICIAL : PAL_OLDER;
   ALL_IDS = PAL.map(function(p){ return p.id; });
   if (typeof FIRST_ID !== 'undefined') FIRST_ID = PAL[0].id;   // 兜底色号跟着换，否则切到 22 色后 31 会越界
+  if (typeof _neutralPool !== 'undefined') _neutralPool = {};  // 【v155】色表换了，中性色池必须重算
 }
 /* 导出时才换算：官方 → 空位写 -1、色号 = 内部号 - 1；老色库 → 原样（空位 0） */
 function libTagText(){ return LIB === 'official' ? '官方色库0-21' : '老色库34色'; }
@@ -207,9 +221,48 @@ function dist2(c, p){
 }
 // 注意：idx（旧名 ids）是 **0-based 的 PAL 下标数组**（调用方用 id-1 换来）；返回的是 **1-based 色号**。
 // 【v154】色号语义跟色表走：老色库 1..34、官方 1..22（= 官方色号 + 1）。
+/* 【v155】中性色不染彩：深中性色（C*<NEUTRAL_C 且 L*<NEUTRAL_L）只许吸附到色表里的中性色。
+   起因：34 色表按 L* 是 33 号纯黑(0.3) → 15 号深棕(41.8)，中间没有任何中性色；
+   带蓝的深灰描边（实测 #434B5B，L*=31.8 / C*=10.5）因此被吸附成深蓝绿 #256A85，
+   整圈描边"黑变蓝"。RGB / Lab / CIEDE2000 三种口径都选深棕，换距离公式救不回来。 */
+var NEUTRAL_C = 12, NEUTRAL_L = 50;
+var HUE_CAP = 40, HUE_MIN_C = 20;   // 【v155】色相门控：色相差 >40° 的色号不许用；源色度 <20 时不判（近灰的色相没意义）
+var _labCache = {};
+function labOf(rgb){
+  var key = (rgb[0]<<16)|(rgb[1]<<8)|rgb[2];
+  var v = _labCache[key]; if (v) return v;
+  function lin(c){ c/=255; return c<=0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4); }
+  var r=lin(rgb[0]), g=lin(rgb[1]), b=lin(rgb[2]);
+  var X=(r*0.4124564+g*0.3575761+b*0.1804375)/0.95047, Y=(r*0.2126729+g*0.7151522+b*0.0721750),
+      Z=(r*0.0193339+g*0.1191920+b*0.9503041)/1.08883;
+  var f=function(t){ return t>Math.pow(6/29,3) ? Math.cbrt(t) : (t/(3*Math.pow(6/29,2))+4/29); };
+  var fx=f(X), fy=f(Y), fz=f(Z);
+  var A=500*(fx-fy), B=200*(fy-fz);
+  var h=Math.atan2(B,A)*180/Math.PI; if (h<0) h+=360;
+  v = { L:116*fy-16, C:Math.hypot(A,B), h:h };
+  _labCache[key]=v; return v;
+}
+// 中性色池按"当前可用的下标集合"现算并缓存；切色库/改色板时要清空（setLib 里会清）。
+var _neutralPool = {};
+function neutralIdx(idx){
+  var key = idx.join(',');
+  var p = _neutralPool[key];
+  if (!p){
+    p = idx.filter(function(i){ return labOf(PAL[i].rgb).C < NEUTRAL_C; });
+    if (!p.length) p = idx;
+    _neutralPool[key] = p;
+  }
+  return p;
+}
 function nearestId(rgb, idx){
+  var pool = idx, gated = false, q = (NEUTRAL_C > 0 || HUE_CAP > 0) ? labOf(rgb) : null;
+  if (q && NEUTRAL_C > 0 && q.C < NEUTRAL_C && q.L < NEUTRAL_L){ pool = neutralIdx(idx); gated = true; }
+  if (q && HUE_CAP > 0 && !gated && q.C >= HUE_MIN_C){
+    var f = pool.filter(function(i){ var h = labOf(PAL[i].rgb).h, d = Math.abs(h - q.h); return (d>180?360-d:d) <= HUE_CAP; });
+    if (f.length) pool = f;          // 空池就退回不过滤（用户把色板关掉大半时可能发生）
+  }
   var best = -1, bd = Infinity;
-  for (var i=0;i<idx.length;i++){ var p = PAL[idx[i]]; var d = dist2(rgb, p.rgb); if (d<bd){ bd=d; best=p.id; } }
+  for (var i=0;i<pool.length;i++){ var p = PAL[pool[i]]; var d = dist2(rgb, p.rgb); if (d<bd){ bd=d; best=p.id; } }
   return best;
 }
 function idToRgb(id){ return (PAL[id-1]||{rgb:[0,0,0]}).rgb; }
@@ -218,6 +271,8 @@ var FIRST_ID = PAL[0].id;   // 兜底色号（原来是写死的 31，跟色表�
 /* 主转换：imgData{data,width,height} + opts → {grid, cols, rows, counts, fragRate} */
 function convert(imgData, opts){
   var cols = opts.cols, rows = opts.rows, ids = opts.ids;
+  NEUTRAL_C = +opts.neutralC || 0;      // 【v155】0 = 关，回到纯最近色口径
+  HUE_CAP = +opts.hueCap || 0;          // 【v155】色相门控（0=关）
   var W = imgData.width, H = imgData.height, D = imgData.data;
   // ===== ① 分格取色 =====
   // 【2026-10-14 新默认】主色聚类投票：格内像素先各自吸附到色表 → 把"相近色"聚成一簇 → 取最大那簇的代表色。
@@ -470,6 +525,8 @@ $('go').onclick=function(){
              precise:!!($('preciseMode')||{}).checked,                           // 像素图精准模式
              mergeDist:+(($('mergeMode')||{}).value||0),                         // 全图同色归并阈值（redmean 距离）
              sampleMode:($('sampleMode')||{}).value==='avg'?'avg':'mode',        // 取色方式：默认主色聚类投票
+             neutralC:($('neutralMode')||{}).checked ? 12 : 0,                   // 【v155】中性色不染彩
+             hueCap:($('hueMode')||{}).checked ? 40 : 0,                         // 【v155】色相门控
              protect:parseFloat(($('protectMode')||{}).value)||0 };              // 细线保护阈值（0=关）
   var t0=Date.now(); var res=convert(imgData, opts); var ms=Date.now()-t0;
   lastResult=res;

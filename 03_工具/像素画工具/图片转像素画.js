@@ -10,6 +10,10 @@
  *   --sample mode|avg  取色方式：mode=主色聚类投票（默认，同一条线的抗锯齿像素会合成一个颜色）；
  *                      avg=旧的整格平均色口径
  *   --protect N     细线保护阈值（默认 0=关；0.3=中；0.2=强）：格内占比≥N 的「对比色」在连续两格以上时保留
+ *   --neutral N     【v155】中性色不染彩：源色色度 C*<N 且亮度 L*<50 时，只许吸附到色表里的中性色
+ *                   （默认 12，0=关）。解决"深灰描边被染成深蓝绿"——34 色表在 L* 0→41.8 之间没有中性色
+ *   --hue N         【v155】色相门控：源色与候选色的色相差超过 N° 就不许用（默认 40，0=关）。
+ *                   解决"钢蓝被吸成蓝紫"——34 色表里钢蓝正好卡在 深棕(青,240°) 和 深蓝(蓝紫,293°) 中间
  *   --outdir 目录   输出目录（默认当前目录）
  *   --name 名字     输出文件名前缀（默认用输入文件名）
  *   --bin 目录      工程 bin/js 目录（默认取交接包里的快照，用于色表 + 碎色闸门判定）
@@ -42,6 +46,21 @@ const PROTECT = +opt('protect', 0);                                  // 细线�
 // 【v153】取色窗口：格内取中间多大一片投票。默认 0.75 —— AI 放大图/带阴影描边的图，
 //   格子四边有一圈抗锯齿与立体倒角，整格投进去会让深色倒角多投票（实测黑块比真值多约 10%、描边变粗一格）。
 const INNER = (() => { const v = +opt('inner', 0.75); return v > 0 && v <= 1 ? v : 0.75; })();
+// 【v155】中性色不染彩：深中性色（低色度）只许吸附到色表里的中性色。0 = 关，推荐 12。
+//   起因：34 色表按 L* 排是 33 号纯黑(0.3) → 15 号深棕(41.8)，中间一个中性色都没有；
+//   带蓝的深灰描边（实测 #434B5B，L*=31.8 / C*=10.5）于是被吸附成深蓝绿 #256A85，
+//   "黑描边整圈变蓝"。RGB / Lab / CIEDE2000 三种口径都选深棕（16.3 vs 22.6），
+//   换距离公式救不回来，只能靠"中性色不染色"这条规则兜住。
+const NEUTRAL_C = Math.max(0, +opt('neutral', 12));  // 色度阈值 C*（0=关；默认 12）
+const NEUTRAL_L = 50;                                // 只处理深中性色；浅米色/浅灰维持原样
+// 【v155】色相门控：源色与候选色的色相差超过 N° 就不许用（0=关，默认 40）。
+//   起因：钢蓝（实测 #3888B0，L*=53.6 / C*=30.4 / h=248°）在 34 色表里正好卡在
+//   15 深棕(青,h=240°) 和 16 深蓝(蓝紫,h=293°) 中间，两边 RGB 距离只差 4 —— 谁赢看口径：
+//   命令行用欧氏、网页版用 redmean，同一张图会给出不同的蓝。按 CIEDE2000 应该是
+//   深棕 12.0 < 天蓝 12.8 < 深蓝 17.3，紫根本不该赢。色相门控就是把这层"色相别跑偏"显式化。
+//   34 色表的色相最大空档是 257°→293°（36°），所以 40° 之内永远有候选，不会空池。
+const HUE_CAP = Math.max(0, +opt('hue', 40));        // 色相最大偏差（度；0=关）
+const HUE_MIN_C = 20;                                 // 源色度低于此值时色相无意义，不做门控
 const OUTDIR = opt('outdir', '.');
 // 【v154】色库：--lib auto|older|official
 //   older  = 真实毛线 34 色（1-34，0=空位），本工程一直用的那套
@@ -245,10 +264,49 @@ if (lower.endsWith('.txt')) {
 //   同一条线会被识别成一节一节的不同色（用户实测）。聚类投票把相近色并成一簇再取最大簇，线就合成一个颜色。
 const hexOf = id => ID2HEX.get(id) || null;
 const nameOf = id => ID2NAME.get(id) || ('色' + id);
+
+// 【v155】Lab 色度：用来判断"这格是不是中性色"。sRGB → XYZ(D65) → L*a*b*，C* = √(a*²+b*²)。
+const _labCache = new Map();
+function labOf(rgb) {
+  const key = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+  let v = _labCache.get(key);
+  if (v) return v;
+  const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const r = lin(rgb[0]), g = lin(rgb[1]), b = lin(rgb[2]);
+  const X = (r * 0.4124564 + g * 0.3575761 + b * 0.1804375) / 0.95047;
+  const Y = (r * 0.2126729 + g * 0.7151522 + b * 0.0721750);
+  const Z = (r * 0.0193339 + g * 0.1191920 + b * 0.9503041) / 1.08883;
+  const f = t => t > Math.pow(6 / 29, 3) ? Math.cbrt(t) : (t / (3 * Math.pow(6 / 29, 2)) + 4 / 29);
+  const fx = f(X), fy = f(Y), fz = f(Z);
+  const A = 500 * (fx - fy), B = 200 * (fy - fz);
+  let h = Math.atan2(B, A) * 180 / Math.PI; if (h < 0) h += 360;
+  v = { L: 116 * fy - 16, C: Math.hypot(A, B), h };
+  _labCache.set(key, v);
+  return v;
+}
+// 中性色池：色表里 C* < NEUTRAL_C 的那几个（34 色表里只有 33 号纯黑、34 号中灰）。
+//   按 ids 现算并缓存 —— 限色那一步传的是 keep 子集，必须在这个子集里挑，否则会返回被砍掉的色号。
+const _neutralPool = new WeakMap();
+function neutralPool(ids) {
+  let p = _neutralPool.get(ids);
+  if (!p) {
+    p = ids.filter(id => labOf(rgbOf(hexOf(id))).C < NEUTRAL_C);
+    if (!p.length) p = ids;
+    _neutralPool.set(ids, p);
+  }
+  return p;
+}
 function nearest(colorArr, ids) {
+  let pool = ids, gated = false;
+  const q = (NEUTRAL_C > 0 || HUE_CAP > 0) ? labOf(colorArr) : null;
+  if (q && NEUTRAL_C > 0 && q.C < NEUTRAL_C && q.L < NEUTRAL_L) { pool = neutralPool(ids); gated = true; }
+  if (q && HUE_CAP > 0 && !gated && q.C >= HUE_MIN_C) {
+    const f = pool.filter(id => { const h = labOf(rgbOf(hexOf(id))).h; const d = Math.abs(h - q.h); return (d > 180 ? 360 - d : d) <= HUE_CAP; });
+    if (f.length) pool = f;      // 空池就退回不过滤（色表被用户关掉大半时可能发生）
+  }
   let best = null, bd = Infinity;
-  for (const id of ids) { const q = rgbOf(hexOf(id));
-    const d = (q[0] - colorArr[0]) ** 2 + (q[1] - colorArr[1]) ** 2 + (q[2] - colorArr[2]) ** 2;
+  for (const id of pool) { const q2 = rgbOf(hexOf(id));
+    const d = (q2[0] - colorArr[0]) ** 2 + (q2[1] - colorArr[1]) ** 2 + (q2[2] - colorArr[2]) ** 2;
     if (d < bd) { bd = d; best = id; } }
   return best;
 }
@@ -434,6 +492,11 @@ console.log('输出色库：' + (OUTLIB === 'official'
   ? '官方 22 色（色号 0-21，空位 -1）—— 每个色号都是游戏里真有的颜色，可直接上实机'
   : '老色库 34 色（色号 1-34，空位 0）'));
 console.log('保真度：' + (fidelity * 100).toFixed(1) + '%（与「每格格心 3×3 中位色」逐格比，不一致 ' + diffCells + ' 格；取色窗口 格内 ' + Math.round(INNER * 100) + '%）');
+if (NEUTRAL_C > 0) {
+  const nids = neutralPool(ALL_IDS).map(id => showNo(id) + ' ' + nameOf(id)).join('、');
+  console.log('中性色不染彩：开（C*<' + NEUTRAL_C + ' 且 L*<' + NEUTRAL_L + ' → 只能落到 ' + nids + '）');
+}
+if (HUE_CAP > 0) console.log('色相门控：开（与源色色相差 >' + HUE_CAP + '° 的色号不许用；色度 <' + HUE_MIN_C + ' 的源色不判）');
 if (bgDug) console.log('⚠ 背景挖空吃掉了 ' + bgDug + ' 格（' + (100 * bgDug / (COLS * ROWS)).toFixed(1) + '%，颜色 ' +
   bgDugId + ' ' + nameOf(bgDugId) + '）—— 如果这是美术自带的边框/底色，请加 --bg none 再转一次。');
 console.log('每色格数：');
