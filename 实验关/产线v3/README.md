@@ -27,6 +27,7 @@
 > **点击结算 forced（2026-11-10）**：v7、拼接 `pin15_32+pipe53`、F2 全部 **Y(peak4)**；F2 的 PlayerSim forcedN 是模型差异。G2 2–13 修复后 solver=Y 9 张、clickForced=Y 9 张、fail 0（L3/L11 转 N，L12 转 Y）；`solver=Y ⇒ clickForced=Y`。详见 `ClickSettle_forced_20261110.md`。
 > **点击结算策略族（2026-11-10）**：v7/拼接四策略（solver/free-first/max-eat/small-debt）0 复活全过；F2 仅 solver/small-debt，free-first 2 复活仍 95%；G2 2–13 **12/12 policy0=Y** → `policy0` 单独不是分界。详见 `ClickSettle_policy_20261110.md`。
 > **ChoiceSpace + 批次（2026-11-10）**：`entropy` vs 流失 **-0.75**（M -0.64、tol -0.57）；4×15 批次 top12 hard 全过，`00005_v27_w14_m8` 熵1.43、`w14_m10` 熵1.37；试玩优先这两张 + `pin15_w10_m6`。详见 `ChoiceSpace_20261110.md`、`批次_低流失_20261110_110317/ranking_fixed.md`。
+> **KnobPlan v1（2026-11-10）**：`03_工具/正式版/KnobPlan_v1.js` 把“诊断→单旋钮候选→全套复测”固化。输入关卡/目录 + `--intent diagnose|ease|fix-opening|raise-mid|more-choice`；默认 `low-churn` profile，按意图动态放宽基线已偏的项。候选只改一个 motif：冰75/50、链组软化（保链，只降成员容量）、同色容量重分配、开局换位、开局拆冰、加冰、管道顺序；**拆链默认不生成**，`--allow-chain-remove` 才给。已在 L2 诊断、L3/L4 ease、原始 L5 fix-opening、目录批量、`--player` 跑通；L2/L5 仍无单旋钮全过。详见工作日志 §1065。
 
 **F2 早期基线（历史，不是当前候选）**：`实验关/产线v3/00154中段/F2_68_36_30_25_19_25_21_42.json`
 
@@ -304,6 +305,7 @@ C. **结论**：
 | v3-38 | MetricDashboard v1：本地仪表盘，free-first/solver 时间线 M/C/F/D + 步详情 + 难度分；示例 G2/G3A/G3B L2 |
 | v3-39 | G3 指标复核：3A 只有 L2 偏低，L4/L5/L7 mid 仍 74/47/84；3B 有 5 关 mid0–13，接近无脑 |
 | v3-40 | 纠正 3B：noChain 撤回，改 3B_保链；L3/L6/L11/L12 恢复原关，L10 用 ice75；只改 5 关 |
+| v3-41 | KnobPlan v1：诊断→单旋钮候选→全套复测；冰75/链组软化/容量重分配/换位/拆冰/加冰/管道顺序；拆链默认不给 |
 
 > 每份报告在 `实验关/产线v3/v3-NN_报告.md`；过程证据在工作日志 §970–§994。 |
 
@@ -321,6 +323,7 @@ C. **结论**：
 | M4.6 opening/recovery | `M4.6_opening_recovery_v1.md`、`03_工具/正式版/OpeningCheck_v1.js` |
 | M5 批量 | `M5批次/M5Build_v1…v6_报告.md`、`M5批次/00045_v5|v6/…证书` |
 | G2 分组2 正确数据 | `研究_总关卡分组2_2-13/结果.md` |
+| 单旋钮造关/修复 | `03_工具/正式版/KnobPlan_v1.js`；日志 §1065 |
 | G2 旧错误映射 | `研究_拟导入G2_2-13/结果.md`（顶部已标作废） |
 | 完整过程/负结果 | `01_项目文档/工作日志_20261012.md`（按 `### 节号` 查） |
 
