@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "637";
+var APP_BUILD = "638";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -53,7 +53,7 @@ AntSolver.App = (function() {
   /** entryMode → 中文名（面板显示用） */
   function entryModeLabel(em) {
     if (em === 'fourSideInstantChain') return '四方向瞬时连锁';
-    if (em === 'bottomOnly') return '仅底部入口';
+    if (em === 'bottomOnly') return '仅底部入口（左下角）';
     if (em === 'fourSide') return '四边入口';
     if (em === 'corner') return '左下角（曼哈顿距离）';
     if (em === 'bottomEdge') return '底边（从下往上）';
@@ -3880,6 +3880,9 @@ AntSolver.App = (function() {
   function pickRefOfMode(mode) {
     if (mode === 'corner') return 'corner';
     if (mode === 'bottomEdge') return 'bottom';
+    // 【v638·分组4口径】仅底部入口 = 只把上/左/右改成墙，原消除顺序仍是「左下角(corner)」。
+    // 旧实现这里回落 ring(圈序)，和需求文档“内层像素不受影响、原消除逻辑不变”不一致，已对齐。
+    if (mode === 'bottomOnly') return 'corner';
     return 'ring';
   }
   // 【2026-10-14】「圈」多久重算一次：frozen（整盒冻结，默认）| layer（每层重算）| pixel（每人重算）
@@ -4614,7 +4617,7 @@ AntSolver.App = (function() {
   function modeCN(m) {
     if (m === 'corner') return '左下角（曼哈顿距离）';
     if (m === 'bottomEdge') return '底边（从下往上）';
-    return m === 'instantChain' ? '四方向瞬时连锁' : (m === 'bottomOnly' ? '仅底部入口' : '四边入口（层号）');
+    return m === 'instantChain' ? '四方向瞬时连锁' : (m === 'bottomOnly' ? '仅底部入口（左下角）' : '四边入口（层号）');
   }
   function toggleRouteOverlay() {
     var btn = document.getElementById('btn-show-route');
@@ -4690,6 +4693,8 @@ AntSolver.App = (function() {
     stopPlayerDemo();
     stopLive(); liveMode = false;   // v121 同 runOmniDemo：演示走原串行路径
     if (!AntSolver.Solver.solveBottom) { alert('底部专用求解模块未加载'); return; }
+    // 【v638·分组4口径】底部版 = 底边可达 + corner 顺序；求解与回放必须同一口径。
+    if (AntSolver.Simulator.setPickRef) AntSolver.Simulator.setPickRef('corner');
     var result = AntSolver.Solver.solveBottom(currentLevel);
     displaySolveResult(result);
     AntSolver.Simulator.reset();
@@ -8115,7 +8120,7 @@ AntSolver.App = (function() {
     // 入口模式中文名（CSV/报告统一口径）：四边入口 / 仅底部入口
     function entryModeCN(m) {
       if (m === 'fourSideInstantChain') return '四方向瞬时连锁';
-      if (m === 'bottomOnly') return '仅底部入口';
+      if (m === 'bottomOnly') return '仅底部入口（左下角）';
       return '四边入口';
     }
 
