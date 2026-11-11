@@ -100,11 +100,11 @@ function round(x, n) { const p = Math.pow(10, n); return Math.round(x * p) / p; 
 // —— free-first（原样搬运 PressureBuild_v5.freePath；额外记录终态进度/maxBuffer）——
 function freePath(lv) {
   const s0 = Sim.createState(lv, { useSlotStart: true, instantChain: false });
-  let s = s0; const hs = [], bufs = [];
+  let s = s0; const bufs = [];
   let maxBuffer = s.buffer.length;
   for (let i = 0; i < 80 && !isWon(s); i++) {
     const opts = expand(s);
-    if (!opts.length) return { won: false, H: 0, bufs, maxBuffer, progress: s.eliminatedPixels / s.totalPixels };
+    if (!opts.length) return { won: false, bufs, maxBuffer, progress: s.eliminatedPixels / s.totalPixels };
     let best = null, bestKey = null;
     for (const o of opts) {
       const t = o.t, bufAfter = t.buffer.length;
@@ -114,7 +114,6 @@ function freePath(lv) {
       const key = [dead ? 0 : 1, bufAfter === 0 ? 1 : 0, o.gain, -bufAfter, -debtPx, -o.r, -o.c];
       if (!best || cmpArr(key, bestKey) > 0) { best = o; bestKey = key; }
     }
-    hs.push(0); // H 不在本工具口径内，仅保持数组长度与压力步数一致
     bufs.push(s.buffer.length);
     if (s.buffer.length > maxBuffer) maxBuffer = s.buffer.length;
     const done0 = s.completedBoxes;
@@ -122,10 +121,10 @@ function freePath(lv) {
     if (s.buffer.length > maxBuffer) maxBuffer = s.buffer.length;
     if (isWon(s)) break;
     if (s.overflow || s.buffer.length > s.bufferLimit || (s.buffer.length >= s.bufferLimit && s.completedBoxes === done0) || legalN(s) === 0) {
-      return { won: false, H: mean(hs), bufs, maxBuffer, progress: s.eliminatedPixels / s.totalPixels };
+      return { won: false, bufs, maxBuffer, progress: s.eliminatedPixels / s.totalPixels };
     }
   }
-  return { won: isWon(s), H: mean(hs), bufs, maxBuffer, progress: s.eliminatedPixels / s.totalPixels };
+  return { won: isWon(s), bufs, maxBuffer, progress: s.eliminatedPixels / s.totalPixels };
 }
 
 // —— lure：原样搬运 PressureBuild_v5.playPath('lure') ——

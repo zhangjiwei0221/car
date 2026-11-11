@@ -1,40 +1,43 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * ImageLayerMap_v1 —— 目标图的颜色层次 + 图的上限指标（T1，只读分析，不是生成器）
+ * ImageLayerMap_v2 —— 目标图的「需求曲线 + 需求峰 + 门候补」（T1，只读分析）
  *
  * 用途
- *   回答「这张图能不能做供给卡口」。只分析目标图本身，与车盘、切车、摆位无关：
- *   - 每色像素数、E 的分位数（10/50/90）、该色 80% 像素可吃时的进度；
- *   - 需求曲线：进度每 5% 一桶，桶内「首次变得可吃」的像素数（按颜色）；
- *   - 卡口候选色：E 落在 [0.30, 0.85] 的像素数 ≥ 30（暂定阈值）；
- *   - 图的上限（v5 README §21.2）：layerDepth、maxBorderBlobShare、verdict。
+ *   回答「这张图能提供几个需求卡点（门候补）」。只分析目标图本身，与车盘、切车、
+ *   摆位、锁链/冰/管道无关：图只能提供“进度到 X% 时正在吃哪些颜色”，不能提供“挡”。
  *
- * 口径
- *   corner；只依赖目标图。数字=颜色号，0=空位（已经空的格子，穿过代价 0）。
- *   不读关卡 JSON，不看车盘、容量、暂存 5 格。
+ * v2 口径（替代 v1 的 block-Dijkstra / layerDepth）
+ *   1) corner 消融序列（纯图，不含车）：
+ *      - 初始“已吃”为空；0 空位视为已经空的格子（与已吃格同样可穿过）。
+ *      - 暴露 = 与图四边相邻、或与已吃格/已空 0 格 4 邻接的彩色格。
+ *      - 每步在暴露的未吃彩色格中选 D = (行数-1-r) + c 最小的那个吃掉；
+ *        平手先 r 大（更靠底），再 c 小。重复到吃完。
+ *   2) 每个被吃的格子记录 (进度 = 已吃彩色像素 / 总彩色像素, 颜色)。
+ *   3) 需求曲线：进度每 5% 一个窗口，输出每色在该窗口被吃的像素数；
+ *      另输出每色 progress 的 10%/50%/90% 分位。
+ *   4) 需求峰：窗口 W 里某色占该窗口像素数 ≥30% 且 ≥40px，记为一个峰。
+ *      20%–90% 区间有峰、且该色总像素 ≥60，列为门候补（gate candidate）。
+ *      额外要求该色“开局不可达”（没有贴边像素、也不能经 0 连通到图边）：
+ *      否则它从 0% 就能吃，无法靠后置的门卡住（否则单色/左右两色图会被误判）。
+ *   5) verdict 三档：
+ *      - ≥2 个不同窗口有门候补 → “图可以”
+ *      - 只有 1 个窗口 → “图一般（最多一个门）”
+ *      - 0 个 → “图不行”
+ *   v1 的 block-Dijkstra 结果保留在 diagnostics.blockModel，仅作参考，不参与 verdict。
  *
- * E(p) 的定义（本工具的实现口径）
- *   E(p) = 从图边走到 p、「必须先吃掉」的像素数 ÷ 全图像素数（H×W）。
- *   实现为「色块依赖最短路」：
- *     - 把图切成同色 4 连通块（色块；0 也切块，权重 0）；
- *     - 以贴图边的色块为源，在色块邻接图上做 Dijkstra；
- *     - 进入一个色块要先吃掉它，代价 = 该色块像素数；
- *     - 到 p 所在色块的累计代价（不含 p 自己的色块）= E 的分子。
- *   这与 v5 README §21.2 的「逐层剥离」、工作日志 §83「按色块剥」同一口径；
- *   同色大块内部的像素 E 不变（依赖层算的是「清掉几个别的色块」，见工作日志 §82）。
- *   注意：任务书字面写的「每进入一个彩色格计 1」的逐格 BFS 在 40×40 图上
- *   最大只能到约 min(H,W)/2 格（≈1.2%），永远进不了 30–85% 窗口，阳性对照不可能通过；
- *   因此本工具把「必须先吃掉的像素数」按色块整块计费。逐格口径作为诊断值
- *   diagnostics.eCell 一并输出（不参与候选/结论）。
+ * 为什么 v1 的 layerDepth 不能用于选图
+ *   逐格 BFS 的 E = 从图边到 p 必须吃掉的格数 / 总像素；图里没有不可吃的格子，
+ *   最短路只能到“最近图边的距离”（40×40 实测 max 1.19%，48×48 0.998%），
+ *   数学上永远到不了 30% 进度。也就是说“像素被别的颜色挡住”拖不出 30% 的卡点；
+ *   卡点只能靠供给（车/锁链/管道/冰），图能提供的是需求。v1 的 layerDepth 把
+ *   “整色块计费”的抽象当成了层次，既会误判大背景图，也不能回答需求在哪。
  *
- * E 是乐观下界（README §21.2 口径）
- *   只依赖图：假定「需要哪个颜色，就一定有一辆该颜色的车可用」，忽略供给、容量、
- *   暂存 5 格、锁链/冰/管道；按最省的一条色块依赖路径计「必须先吃掉的量」。
- *   所以 E 是偏乐观的估计：真实关卡只会因为供给/容量不够而更晚。
- *   注意计费单位是整色块（S0「逐层剥离」口径）；若玩家能在色块里只吃一条隧道，
- *   真实最早进度可能早于 E。这个方向的偏差在输出目录的 说明.md 里写明。
- *   E 大 = 不管玩家怎么走，这部分都得晚吃 → 天然卡口候选。不是对某一关的预测。
+ * 局限（详见输出目录 说明.md）
+ *   - 消融顺序是“无车自由吃”的固定顺序；真人会换顺序，需求峰可能被绕开。
+ *   - 峰阈值 30% / 40px、门候补总量 60px 都是暂定值。
+ *   - 只依赖图，不含供给；门候补只说明“图上在这个进度需要这个颜色”，
+ *     不保证能造出供给卡口。
  *
  * 用法
  *   node 03_工具/正式版/ImageLayerMap_v1.js <目标图.txt|目录> --out <输出目录>
@@ -43,18 +46,19 @@
  *        --out 实验关/产线v5/A1_图分析
  *   每张图写 <图名>.json，并在控制台打一行摘要。
  *
- * 判定
- *   layerDepth = 卡口候选色个数；≥2 → 图可以，≤1 → 图不行（任务书阈值）。
- *   只看「图能不能做供给卡口」，不判断整关好坏。
+ * 输出
+ *   colors[]、demandCurve[20]、demandPeaks[]、gateCandidates[]、
+ *   imageUpperBound{verdict,level,gateWindows,gateBands,...}、diagnostics{eCell,blockModel}。
  */
 const fs = require('fs');
 const path = require('path');
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-const WINDOW_LO = 0.30;   // 卡口候选窗口（暂定）
-const WINDOW_HI = 0.85;
-const MIN_WINDOW_PX = 30; // 一辆门后车的容量下限（暂定）
-const PEAK_NEEDED_VERDICT = 2;
+const PEAK_SHARE = 0.30;    // 峰：某色占窗口像素比例（暂定）
+const PEAK_PX = 40;         // 峰：窗口内最少像素（暂定）
+const GATE_TOTAL_PX = 60;   // 门候补：该色总像素下限（暂定）
+const GATE_W_FROM = 4;      // 20%（5% 窗口索引 4）
+const GATE_W_TO = 17;       // 85–90% 仍算 20–90% 区间
 
 /** 照抄 ImageDebtScan_v1.js：首行中文标题等非数字行跳过。 */
 function parse(file) {
@@ -88,13 +92,13 @@ function quantile(sorted, q) {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
 }
 
-/** 小顶堆（Dijkstra 用）。 */
+/** 小顶堆（按数值 key）。 */
 class MinHeap {
   constructor() { this.a = []; }
   get size() { return this.a.length; }
-  push(d, id) {
+  push(key, id) {
     const a = this.a;
-    a.push([d, id]);
+    a.push([key, id]);
     let i = a.length - 1;
     while (i > 0) {
       const p = (i - 1) >> 1;
@@ -125,9 +129,247 @@ class MinHeap {
 }
 
 /**
- * 同色 4 连通块：彩色块权重=像素数，0 块权重=0（已经空的格子，可自由穿过）。
- * 返回 uid / units / adj。
+ * corner 消融序列（v2 主口径）。
+ * 返回 { order: [{color, progress}], startExposedPx: {color: n}, totalColored }。
  */
+function cornerAblation(grid, H, W) {
+  const N = grid.reduce((s, row) => s + row.filter(v => v > 0).length, 0);
+  if (!N) throw new Error('图上没有彩色像素');
+  const eaten = new Uint8Array(H * W);
+  const inHeap = new Uint8Array(H * W);
+  const open = new Uint8Array(H * W); // 已吃的彩色格 + 与外界连通的 0 格
+  const startExposedPx = {};
+  const heap = new MinHeap();
+  let initializing = true;
+
+  // D 最小；平手 r 大（H-1-r 小）；再 c 小。编码后字典序等价。
+  const keyOf = (r, c) => {
+    const D = (H - 1 - r) + c;
+    return ((D * H) + (H - 1 - r)) * W + c;
+  };
+  const expose = (r, c) => {
+    const id = r * W + c;
+    const col = grid[r][c];
+    if (col <= 0 || eaten[id] || inHeap[id]) return;
+    inHeap[id] = 1;
+    if (initializing) startExposedPx[col] = (startExposedPx[col] || 0) + 1;
+    heap.push(keyOf(r, c), id);
+  };
+  const openZeroRegion = (r0, c0) => {
+    const id0 = r0 * W + c0;
+    if (open[id0]) return;
+    open[id0] = 1;
+    const stack = [[r0, c0]];
+    while (stack.length) {
+      const [r, c] = stack.pop();
+      for (const [dr, dc] of DIRS) {
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= H || nc < 0 || nc >= W) continue;
+        const id = nr * W + nc;
+        if (grid[nr][nc] === 0) {
+          if (!open[id]) { open[id] = 1; stack.push([nr, nc]); }
+        } else {
+          expose(nr, nc);
+        }
+      }
+    }
+  };
+
+  // 初始暴露：贴边的彩色格；贴边 0 格所在的 0 连通区（与图边连通 = 外界）
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    if (r !== 0 && r !== H - 1 && c !== 0 && c !== W - 1) continue;
+    if (grid[r][c] > 0) expose(r, c);
+    else openZeroRegion(r, c);
+  }
+  initializing = false;
+
+  const order = [];
+  let k = 0;
+  while (heap.size) {
+    const [, id] = heap.pop();
+    if (eaten[id]) continue;
+    const r = Math.floor(id / W), c = id % W;
+    eaten[id] = 1;
+    open[id] = 1;
+    k++;
+    order.push({ color: grid[r][c], progress: k / N });
+    for (const [dr, dc] of DIRS) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= H || nc < 0 || nc >= W) continue;
+      if (grid[nr][nc] === 0) openZeroRegion(nr, nc);
+      else expose(nr, nc);
+    }
+  }
+  if (k !== N) throw new Error(`消融未吃完：${k}/${N}`);
+  return { order, startExposedPx, totalColored: N };
+}
+
+/** v2 主分析：需求曲线、需求峰、门候补、三档 verdict。 */
+function analyzeDemand(grid, H, W) {
+  const { order, startExposedPx, totalColored } = cornerAblation(grid, H, W);
+  const totalPx = H * W;
+
+  const windows = Array.from({ length: 20 }, (_, w) => ({
+    from: round(w / 20, 4),
+    to: round((w + 1) / 20, 4),
+    label: `${w * 5}-${(w + 1) * 5}%`,
+    total: 0,
+    byColor: {},
+    peaks: []
+  }));
+  const progressByColor = new Map();
+  for (const x of order) {
+    let w = Math.floor(x.progress * 20);
+    if (w < 0) w = 0;
+    if (w > 19) w = 19;
+    windows[w].total++;
+    windows[w].byColor[x.color] = (windows[w].byColor[x.color] || 0) + 1;
+    if (!progressByColor.has(x.color)) progressByColor.set(x.color, []);
+    progressByColor.get(x.color).push(x.progress);
+  }
+
+  const colors = [...progressByColor.keys()].sort((a, b) => a - b);
+  const colorRows = [];
+  const demandPeaks = [];
+  for (const c of colors) {
+    const arr = progressByColor.get(c).slice().sort((a, b) => a - b);
+    colorRows.push({
+      color: c,
+      px: arr.length,
+      startExposedPx: startExposedPx[c] || 0,
+      progressQuantiles: {
+        p10: round(quantile(arr, 0.10), 6),
+        p50: round(quantile(arr, 0.50), 6),
+        p90: round(quantile(arr, 0.90), 6)
+      },
+      firstProgress: round(arr[0], 6),
+      lastProgress: round(arr[arr.length - 1], 6),
+      peaks: [],
+      isGateCandidate: false
+    });
+  }
+  const rowOf = new Map(colorRows.map(r => [r.color, r]));
+
+  for (let wi = 0; wi < windows.length; wi++) {
+    const w = windows[wi];
+    const entries = Object.entries(w.byColor).map(([c, n]) => ({ color: +c, px: n, share: n / w.total }));
+    entries.sort((a, b) => b.px - a.px || a.color - b.color);
+    const sortedByColor = {};
+    for (const c of Object.keys(w.byColor).map(Number).sort((a, b) => a - b)) sortedByColor[c] = w.byColor[c];
+    w.byColor = sortedByColor;
+    for (const e of entries) {
+      if (e.px < PEAK_PX || e.share < PEAK_SHARE) continue;
+      const peak = {
+        windowIndex: wi,
+        window: w.label,
+        from: w.from,
+        to: w.to,
+        color: e.color,
+        pxInWindow: e.px,
+        shareInWindow: round(e.share, 4)
+      };
+      w.peaks.push({ color: e.color, pxInWindow: e.px, shareInWindow: peak.shareInWindow });
+      demandPeaks.push(peak);
+      const row = rowOf.get(e.color);
+      row.peaks.push({
+        window: w.label,
+        windowIndex: wi,
+        from: w.from,
+        to: w.to,
+        pxInWindow: e.px,
+        shareInWindow: peak.shareInWindow
+      });
+    }
+  }
+
+  // 门候补：总像素 ≥60、开局不可达、在 20–90% 有峰
+  const gateCandidates = [];
+  for (const row of colorRows) {
+    if (row.px < GATE_TOTAL_PX) continue;
+    if (row.startExposedPx > 0) continue; // 开局就能吃到，门卡不住
+    const gatePeaks = row.peaks.filter(p => p.windowIndex >= GATE_W_FROM && p.windowIndex <= GATE_W_TO);
+    if (!gatePeaks.length) continue;
+    row.isGateCandidate = true;
+    gateCandidates.push({
+      color: row.color,
+      totalPx: row.px,
+      startExposedPx: row.startExposedPx,
+      peaks: gatePeaks,
+      gateWindows: gatePeaks.map(p => p.window)
+    });
+  }
+  gateCandidates.sort((a, b) => b.peaks.length - a.peaks.length || a.color - b.color);
+
+  // 不同窗口 / 不同需求带（同一色的连续窗口算一条带）
+  const gateWindowSet = new Set();
+  for (const g of gateCandidates) for (const p of g.peaks) gateWindowSet.add(p.window);
+  const gateWindows = [...gateWindowSet].sort((a, b) => parseInt(a) - parseInt(b));
+  const gateBands = [];
+  for (const g of gateCandidates) {
+    const idxs = [...new Set(g.peaks.map(p => p.windowIndex))].sort((a, b) => a - b);
+    let start = null, prev = null;
+    for (const w of idxs) {
+      if (start === null) { start = prev = w; continue; }
+      if (w === prev + 1) { prev = w; continue; }
+      gateBands.push({ color: g.color, from: `${start * 5}%`, to: `${(prev + 1) * 5}%` });
+      start = prev = w;
+    }
+    if (start !== null) gateBands.push({ color: g.color, from: `${start * 5}%`, to: `${(prev + 1) * 5}%` });
+  }
+
+  let level, verdict;
+  if (gateWindows.length >= 2) { level = 2; verdict = '图可以'; }
+  else if (gateWindows.length === 1) { level = 1; verdict = '图一般（最多一个门）'; }
+  else { level = 0; verdict = '图不行'; }
+
+  let reason;
+  if (level === 0) {
+    const midPeaks = demandPeaks.filter(p => p.windowIndex >= GATE_W_FROM && p.windowIndex <= GATE_W_TO);
+    reason = midPeaks.length
+      ? `20–90% 有 ${midPeaks.length} 个需求峰，但对应颜色开局可达或总像素 <${GATE_TOTAL_PX}，不能作为门候补`
+      : '20–90% 区间没有颜色形成需求峰（该色占窗口 ≥30% 且 ≥40px）';
+  } else {
+    const parts = gateCandidates.map(g =>
+      `色${g.color} 在 ${g.peaks.map(p => p.window).join('/')}（${g.peaks.map(p => p.pxInWindow).join('/')}px）`);
+    reason = `${gateWindows.length} 个不同窗口有门候补：${parts.join('；')}`;
+  }
+
+  const notes = [];
+  if (level === 2 && gateBands.length < 2) {
+    notes.push(`门候补窗口连在一起（${gateBands.map(b => b.from + '–' + b.to).join(',')}），` +
+      '按“不同窗口”算是 ≥2，但实际更像 1 条连续需求带；是否算 2 个门要人工判断。');
+  }
+  const startReachable = colorRows.filter(r => r.startExposedPx > 0).length;
+  if (startReachable) {
+    notes.push(`${startReachable} 个颜色开局就有像素可达（贴边或经 0 连通到图边），按规则不作为门候补；` +
+      '它们从 0% 就能吃，不能被后置的门整体卡住。');
+  }
+  notes.push(`峰阈值：窗口内占比 ≥${PEAK_SHARE * 100}% 且 ≥${PEAK_PX}px；门候补总量 ≥${GATE_TOTAL_PX}px（均为暂定值）。`);
+
+  return {
+    totalColored,
+    totalPx,
+    colorCount: colors.length,
+    colors: colorRows,
+    demandCurve: windows,
+    demandPeaks,
+    gateCandidates,
+    imageUpperBound: {
+      verdict,
+      level,
+      gateWindowCount: gateWindows.length,
+      gateWindows,
+      gateBands,
+      distinctGateBands: gateBands.length,
+      reason,
+      notes
+    }
+  };
+}
+
+/* ============================ v1 诊断（不参与 verdict） ============================ */
+
+/** v1：同色 4 连通块；彩色块权重=像素数，0 块权重=0。 */
 function buildUnits(grid, H, W) {
   const uid = Array.from({ length: H }, () => new Int32Array(W).fill(-1));
   const units = [];
@@ -150,11 +392,7 @@ function buildUnits(grid, H, W) {
         stack.push([ny, nx]);
       }
     }
-    units.push({
-      id, color, size, borderPx,
-      weight: color > 0 ? size : 0,
-      onBorder: borderPx > 0
-    });
+    units.push({ id, color, size, borderPx, weight: color > 0 ? size : 0, onBorder: borderPx > 0 });
   }
   const adj = units.map(() => new Set());
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -171,16 +409,11 @@ function buildUnits(grid, H, W) {
   return { uid, units, adj };
 }
 
-/**
- * 色块依赖最短路：源=贴边色块（E=0）；离开色块 u 进入 v 的代价 = w(u)。
- * dist(v) = 进入 v 之前必须先吃掉的像素数。
- */
+/** v1：色块依赖最短路（源=贴边色块；离开 u 的代价=w(u)）。 */
 function unitDijkstra(units, adj) {
   const dist = new Array(units.length).fill(Infinity);
   const heap = new MinHeap();
-  for (const u of units) {
-    if (u.onBorder) { dist[u.id] = 0; heap.push(0, u.id); }
-  }
+  for (const u of units) if (u.onBorder) { dist[u.id] = 0; heap.push(0, u.id); }
   while (heap.size) {
     const [d, id] = heap.pop();
     if (d !== dist[id]) continue;
@@ -192,10 +425,65 @@ function unitDijkstra(units, adj) {
   return dist;
 }
 
-/**
- * 诊断：任务书字面的「每个彩色格代价 1」逐格 4 邻接 BFS。
- * 0-1 BFS，离开格子 u 的代价 = 1（彩色）或 0（空位）。
- */
+function analyzeBlockModel(grid, H, W) {
+  const totalPx = H * W;
+  const { uid, units, adj } = buildUnits(grid, H, W);
+  const dist = unitDijkstra(units, adj);
+  const eOfUnit = units.map(u => dist[u.id] / totalPx);
+  const eByColor = new Map();
+  const borderByColor = new Map();
+  const pxByColor = new Map();
+  for (const u of units) {
+    if (u.color <= 0) continue;
+    pxByColor.set(u.color, (pxByColor.get(u.color) || 0) + u.size);
+    borderByColor.set(u.color, (borderByColor.get(u.color) || 0) + u.borderPx);
+  }
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = grid[y][x];
+    if (c <= 0) continue;
+    if (!eByColor.has(c)) eByColor.set(c, []);
+    eByColor.get(c).push(eOfUnit[uid[y][x]]);
+  }
+  const colors = [...eByColor.keys()].sort((a, b) => a - b);
+  const rows = [];
+  const candidateColors = [];
+  for (const c of colors) {
+    const arr = eByColor.get(c).slice().sort((a, b) => a - b);
+    let win = 0;
+    for (const e of arr) if (e >= 0.30 - 1e-12 && e <= 0.85 + 1e-12) win++;
+    const cand = win >= 30;
+    if (cand) candidateColors.push(c);
+    rows.push({
+      color: c,
+      px: arr.length,
+      borderPx: borderByColor.get(c) || 0,
+      eQuantiles: {
+        p10: round(quantile(arr, 0.10), 6),
+        p50: round(quantile(arr, 0.50), 6),
+        p90: round(quantile(arr, 0.90), 6)
+      },
+      chokeWindowPx30to85: win,
+      isCandidate: cand
+    });
+  }
+  let largest = null;
+  for (const u of units) {
+    if (u.color <= 0) continue;
+    if (!largest || u.size > largest.size) largest = u;
+  }
+  const layerDepth = candidateColors.length;
+  return {
+    layerDepth,
+    candidateColors,
+    maxBorderBlobShare: largest ? round(largest.borderPx / totalPx, 6) : 0,
+    largestBorderBlob: largest ? { color: largest.color, size: largest.size, borderPx: largest.borderPx } : null,
+    verdict: layerDepth >= 2 ? '图可以' : '图不行',
+    colors: rows,
+    note: '已被 v2 取代：挡不住的证明见逐格 BFS 的 E 上限（只能到最近图边的距离，40×40 实测 1.19%、48×48 0.998%），永远到不了 30%。v1 layerDepth 不参与 v2 verdict。'
+  };
+}
+
+/** 诊断：字面“每个彩色格代价 1”的逐格 4 邻接 BFS（离开 u 的代价 = 1/0）。 */
 function cellE(grid, H, W) {
   const dist = Array.from({ length: H }, () => new Array(W).fill(Infinity));
   const heap = new MinHeap();
@@ -225,208 +513,63 @@ function analyze(file) {
   const H = grid.length, W = grid[0].length;
   const totalPx = H * W;
   let coloredPx = 0;
-  const colorPx = new Map();
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const c = grid[y][x];
-    if (c > 0) {
-      coloredPx++;
-      colorPx.set(c, (colorPx.get(c) || 0) + 1);
-    }
-  }
-  const colors = [...colorPx.keys()].sort((a, b) => a - b);
+  for (const row of grid) for (const v of row) if (v > 0) coloredPx++;
 
-  const { uid, units, adj } = buildUnits(grid, H, W);
-  const dist = unitDijkstra(units, adj);
-  const eOfUnit = units.map(u => dist[u.id] / totalPx);
+  const v2 = analyzeDemand(grid, H, W);
+  const blockModel = analyzeBlockModel(grid, H, W);
 
-  // 每色像素的 E 列表 + 色块/贴边统计
-  const eByColor = new Map(colors.map(c => [c, []]));
-  const blocksByColor = new Map(colors.map(c => [c, 0]));
-  const borderPxByColor = new Map(colors.map(c => [c, 0]));
-  for (const u of units) {
-    if (u.color <= 0) continue;
-    blocksByColor.set(u.color, blocksByColor.get(u.color) + 1);
-    borderPxByColor.set(u.color, borderPxByColor.get(u.color) + u.borderPx);
-  }
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const c = grid[y][x];
-    if (c > 0) eByColor.get(c).push(eOfUnit[uid[y][x]]);
-  }
-
-  const colorRows = [];
-  const chokeCandidates = [];
-  for (const c of colors) {
-    const arr = eByColor.get(c).slice().sort((a, b) => a - b);
-    const px = arr.length;
-    const p10 = quantile(arr, 0.10);
-    const p50 = quantile(arr, 0.50);
-    const p90 = quantile(arr, 0.90);
-    const p80 = quantile(arr, 0.80);
-    const minE = arr[0], maxE = arr[arr.length - 1];
-    let windowPx = 0;
-    for (const e of arr) {
-      if (e >= WINDOW_LO - 1e-12 && e <= WINDOW_HI + 1e-12) windowPx++;
-    }
-    const isCandidate = windowPx >= MIN_WINDOW_PX;
-    let reason;
-    if (isCandidate) {
-      reason = `E 在 30–85% 的像素 ${windowPx}/${px}，够做门后车（阈值 ${MIN_WINDOW_PX}px，暂定）`;
-    } else if (windowPx > 0) {
-      reason = `E 在 30–85% 的像素只有 ${windowPx}/${px}（<${MIN_WINDOW_PX}px），厚度不够`;
-    } else {
-      reason = '没有像素的 E 落在 30–85%（不是被挡在深处）';
-    }
-    const row = {
-      color: c,
-      px,
-      blocks: blocksByColor.get(c),
-      borderPx: borderPxByColor.get(c),
-      eMin: round(minE, 6),
-      eQuantiles: { p10: round(p10, 6), p50: round(p50, 6), p90: round(p90, 6) },
-      progressAt80PctEatable: round(p80, 6),
-      eMax: round(maxE, 6),
-      chokeWindowPx30to85: windowPx,
-      isChokeCandidate: isCandidate,
-      reason
-    };
-    colorRows.push(row);
-    if (isCandidate) {
-      chokeCandidates.push({
-        color: c,
-        pxInWindow30to85: windowPx,
-        totalPx: px,
-        shareInWindow: round(windowPx / px, 4),
-        eQuantiles: row.eQuantiles,
-        reason
-      });
-    }
-  }
-  chokeCandidates.sort((a, b) => b.pxInWindow30to85 - a.pxInWindow30to85 || a.color - b.color);
-
-  // 诊断：候选色按「E 中位数」归到 5% 桶，看它们是不是同一层。
-  // layerDepth 是候选色个数（任务书定义）；distinctCandidateBands 才近似「几个卡点层」。
-  const bandMap = new Map();
-  for (const c of chokeCandidates) {
-    const b = Math.max(0, Math.min(19, Math.floor(c.eQuantiles.p50 * 20)));
-    if (!bandMap.has(b)) {
-      bandMap.set(b, {
-        from: round(b / 20, 4),
-        to: round((b + 1) / 20, 4),
-        label: `${b * 5}-${(b + 1) * 5}%`,
-        colors: [],
-        pxInWindow: 0
-      });
-    }
-    const band = bandMap.get(b);
-    band.colors.push(c.color);
-    band.pxInWindow += c.pxInWindow30to85;
-  }
-  const candidateBands = [...bandMap.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([, v]) => v);
-
-  // 需求曲线：20 个 5% 桶，按颜色分
-  const demandCurve = [];
-  for (let b = 0; b < 20; b++) {
-    demandCurve.push({ from: round(b / 20, 4), to: round((b + 1) / 20, 4), label: `${b * 5}-${(b + 1) * 5}%`, total: 0, byColor: {} });
-  }
-  for (const c of colors) {
-    for (const e of eByColor.get(c)) {
-      let b = Math.floor(e * 20);
-      if (b < 0) b = 0;
-      if (b > 19) b = 19;
-      demandCurve[b].total++;
-      demandCurve[b].byColor[c] = (demandCurve[b].byColor[c] || 0) + 1;
-    }
-  }
-
-  // 图的上限：最大的同色 4 连通块
-  let largest = null;
-  for (const u of units) {
-    if (u.color <= 0) continue;
-    if (!largest || u.size > largest.size) largest = u;
-  }
-  const maxBorderBlobShare = largest ? round(largest.borderPx / totalPx, 6) : 0;
-
-  const layerDepth = chokeCandidates.length;
-  const verdict = layerDepth >= PEAK_NEEDED_VERDICT ? '图可以' : '图不行';
-  let verdictReason;
-  if (verdict === '图可以') {
-    verdictReason = `有 ${layerDepth} 个颜色在 30–85% 区间可卡：${chokeCandidates.map(x => x.color).join(', ')}`;
-  } else if (layerDepth === 1) {
-    verdictReason = `只有一个颜色在 30–85% 区间可卡（${chokeCandidates[0].color}），按上限判“图不行”`;
-  } else {
-    verdictReason = '没有颜色在 30–85% 区间有 ≥30px 可卡；无论怎么切车摆车都做不出供给卡口';
-  }
-
-  // 诊断：字面逐格 BFS 的 E 上限（不参与判定）
   const dcell = cellE(grid, H, W);
   let cellMax = 0, cellAtLeast30 = 0;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     if (grid[y][x] <= 0) continue;
     const e = dcell[y][x] / totalPx;
     if (e > cellMax) cellMax = e;
-    if (e >= WINDOW_LO) cellAtLeast30++;
-  }
-
-  const notes = [];
-  if (largest && largest.borderPx > 0 && largest.size / totalPx >= 0.25) {
-    notes.push(`最大同色块 ${largest.color} 占全图 ${round(largest.size / totalPx * 100, 1)}%（贴边 ${largest.borderPx}px）：` +
-      '这是大块（可能是背景或外圈）；要跨过它才能到的颜色，E 会被“整色块计费”抬高（方向对、绝对进度偏保守）。');
-  }
-  if (layerDepth >= PEAK_NEEDED_VERDICT && candidateBands.length < 2) {
-    notes.push(`${layerDepth} 个候选色的 E 中位数都落在同一 5% 桶（${candidateBands.map(b => b.label).join(',')}），` +
-      '它们其实是同一层；layerDepth 按任务书定义是候选色数，不代表这么多个独立卡点。');
-  }
-  if (candidateBands.some(b => b.from === 0)) {
-    notes.push('有候选色的中位 E 在 0–5%（靠窗口内的少量深处像素入选）；这种候选要人工确认是不是真的卡口。');
+    if (e >= 0.30) cellAtLeast30++;
   }
 
   return {
-    tool: 'ImageLayerMap_v1',
-    version: 'v1',
+    tool: 'ImageLayerMap_v2',
+    version: 'v2',
+    supersedes: 'ImageLayerMap_v1（block-Dijkstra / layerDepth 口径）',
     generatedAt: new Date().toISOString(),
     file: path.basename(file),
     size: `${H}x${W}`,
     totalPx,
     coloredPx,
-    colorCount: colors.length,
+    colorCount: v2.colorCount,
     model: {
-      name: 'block-dependency-shortest-path',
-      caliber: 'corner / 只看目标图',
-      eDefinition: 'E(p) = 从图边到 p 的最省路径上、必须先吃掉的像素数 ÷ 全图像素数；同色 4 连通块为计费单位，空位 0 不计费。',
-      optimisticLowerBound: 'E 是乐观估计：只依赖图，忽略车供给/容量/暂存 5 格/障碍；假定需要哪个颜色就一定有车。计费单位为整色块；若能只吃色块内一条隧道，真实最早进度可能更早。'
+      name: 'corner-ablation-demand',
+      caliber: 'corner / 只看目标图 / 无车自由吃',
+      sequence: '初始已吃为空；暴露=贴图边或与已吃格/已空0格4邻接；每步吃 D=(H-1-r)+c 最小的暴露彩色格，平手 r 大、c 小；直到吃完。',
+      progress: '已吃彩色像素 / 总彩色像素',
+      peak: `窗口内某色占该窗口像素 ≥${PEAK_SHARE * 100}% 且 ≥${PEAK_PX}px`,
+      gateCandidate: `总像素 ≥${GATE_TOTAL_PX}、开局不可达、且在 20–90% 区间有峰`,
+      note: '图只能提供需求；供给（车/锁链/管道/冰）不在本工具内。'
     },
-    colors: colorRows,
-    demandCurve,
-    chokeCandidates,
-    imageUpperBound: {
-      layerDepth,
-      candidateColors: chokeCandidates.map(x => x.color),
-      candidateBands,
-      distinctCandidateBands: candidateBands.length,
-      maxBorderBlobShare,
-      largestBorderBlob: largest ? { color: largest.color, size: largest.size, borderPx: largest.borderPx } : null,
-      verdict,
-      reason: verdictReason,
-      notes
-    },
+    colors: v2.colors,
+    demandCurve: v2.demandCurve,
+    demandPeaks: v2.demandPeaks,
+    gateCandidates: v2.gateCandidates,
+    imageUpperBound: v2.imageUpperBound,
     diagnostics: {
       eCell: {
         model: 'literal-per-cell-bfs',
         maxE: round(cellMax, 6),
         pxAtLeast30Pct: cellAtLeast30,
-        note: '任务书字面“每进入一个彩色格计 1”的 4 邻接 BFS。40×40 图上最大约 min(H,W)/2 格，E 上限 ≈1%，进不了 30–85% 窗口；仅作对照，不参与候选/判定。'
-      }
+        note: '任务书字面“每进入一个彩色格计 1”的 4 邻接 BFS。图里没有不可吃格，最短路只能到最近图边，E 上限约 min(H,W)/2 ÷ H×W；40×40 实测 1.19%、48×48 0.998%。仅作“挡不住”的证明，不参与 v2 判定。'
+      },
+      blockModel
     }
   };
 }
 
 function summaryLine(r) {
-  const ub = r.imageUpperBound;
-  const cand = r.chokeCandidates.map(x => `${x.color}(${x.pxInWindow30to85}/${x.totalPx},p50=${x.eQuantiles.p50})`).join(' ');
-  return `${r.file} ${r.size} totalPx=${r.totalPx} colors=${r.colorCount} layerDepth=${ub.layerDepth} bands=${ub.distinctCandidateBands} ${ub.verdict}` +
-    ` | choke=${cand || '无'} | maxBorderBlobShare=${ub.maxBorderBlobShare}`;
+  const u = r.imageUpperBound;
+  const gates = r.gateCandidates.map(g =>
+    `${g.color}@${g.peaks.map(p => p.window).join('/')}(${g.peaks.map(p => p.pxInWindow).join('/')}px)`).join(' ');
+  return `${r.file} ${r.size} colored=${r.coloredPx} colors=${r.colorCount} ${u.verdict}` +
+    ` | gateWindows=${u.gateWindowCount}[${u.gateWindows.join(',') || '无'}]` +
+    ` | gates=${gates || '无'} | peaks=${r.demandPeaks.length}`;
 }
 
 function main() {

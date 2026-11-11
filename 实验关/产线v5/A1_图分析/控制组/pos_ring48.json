@@ -1,69 +1,283 @@
 {
-  "tool": "ImageLayerMap_v1",
-  "version": "v1",
-  "generatedAt": "2026-11-11T17:50:07.799Z",
+  "tool": "ImageLayerMap_v2",
+  "version": "v2",
+  "supersedes": "ImageLayerMap_v1（block-Dijkstra / layerDepth 口径）",
+  "generatedAt": "2026-11-11T18:04:59.548Z",
   "file": "pos_ring48.txt",
   "size": "48x48",
   "totalPx": 2304,
   "coloredPx": 2304,
   "colorCount": 3,
   "model": {
-    "name": "block-dependency-shortest-path",
-    "caliber": "corner / 只看目标图",
-    "eDefinition": "E(p) = 从图边到 p 的最省路径上、必须先吃掉的像素数 ÷ 全图像素数；同色 4 连通块为计费单位，空位 0 不计费。",
-    "optimisticLowerBound": "E 是乐观估计：只依赖图，忽略车供给/容量/暂存 5 格/障碍；假定需要哪个颜色就一定有车。计费单位为整色块；若能只吃色块内一条隧道，真实最早进度可能更早。"
+    "name": "corner-ablation-demand",
+    "caliber": "corner / 只看目标图 / 无车自由吃",
+    "sequence": "初始已吃为空；暴露=贴图边或与已吃格/已空0格4邻接；每步吃 D=(H-1-r)+c 最小的暴露彩色格，平手 r 大、c 小；直到吃完。",
+    "progress": "已吃彩色像素 / 总彩色像素",
+    "peak": "窗口内某色占该窗口像素 ≥30% 且 ≥40px",
+    "gateCandidate": "总像素 ≥60、开局不可达、且在 20–90% 区间有峰",
+    "note": "图只能提供需求；供给（车/锁链/管道/冰）不在本工具内。"
   },
   "colors": [
     {
       "color": 11,
       "px": 860,
-      "blocks": 1,
-      "borderPx": 188,
-      "eMin": 0,
-      "eQuantiles": {
-        "p10": 0,
-        "p50": 0,
-        "p90": 0
+      "startExposedPx": 188,
+      "progressQuantiles": {
+        "p10": 0.040321,
+        "p50": 0.500217,
+        "p90": 0.960113
       },
-      "progressAt80PctEatable": 0,
-      "eMax": 0,
-      "chokeWindowPx30to85": 0,
-      "isChokeCandidate": false,
-      "reason": "没有像素的 E 落在 30–85%（不是被挡在深处）"
+      "firstProgress": 0.000434,
+      "lastProgress": 1,
+      "peaks": [
+        {
+          "window": "0-5%",
+          "windowIndex": 0,
+          "from": 0,
+          "to": 0.05,
+          "pxInWindow": 100,
+          "shareInWindow": 0.8696
+        },
+        {
+          "window": "5-10%",
+          "windowIndex": 1,
+          "from": 0.05,
+          "to": 0.1,
+          "pxInWindow": 64,
+          "shareInWindow": 0.5565
+        },
+        {
+          "window": "10-15%",
+          "windowIndex": 2,
+          "from": 0.1,
+          "to": 0.15,
+          "pxInWindow": 46,
+          "shareInWindow": 0.4
+        },
+        {
+          "window": "15-20%",
+          "windowIndex": 3,
+          "from": 0.15,
+          "to": 0.2,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        },
+        {
+          "window": "20-25%",
+          "windowIndex": 4,
+          "from": 0.2,
+          "to": 0.25,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        },
+        {
+          "window": "80-85%",
+          "windowIndex": 16,
+          "from": 0.8,
+          "to": 0.85,
+          "pxInWindow": 41,
+          "shareInWindow": 0.3565
+        },
+        {
+          "window": "85-90%",
+          "windowIndex": 17,
+          "from": 0.85,
+          "to": 0.9,
+          "pxInWindow": 45,
+          "shareInWindow": 0.3913
+        },
+        {
+          "window": "90-95%",
+          "windowIndex": 18,
+          "from": 0.9,
+          "to": 0.95,
+          "pxInWindow": 64,
+          "shareInWindow": 0.5565
+        },
+        {
+          "window": "95-100%",
+          "windowIndex": 19,
+          "from": 0.95,
+          "to": 1,
+          "pxInWindow": 101,
+          "shareInWindow": 0.8707
+        }
+      ],
+      "isGateCandidate": false
     },
     {
       "color": 22,
       "px": 660,
-      "blocks": 1,
-      "borderPx": 0,
-      "eMin": 0.373264,
-      "eQuantiles": {
-        "p10": 0.373264,
-        "p50": 0.373264,
-        "p90": 0.373264
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.103255,
+        "p50": 0.500217,
+        "p90": 0.897179
       },
-      "progressAt80PctEatable": 0.373264,
-      "eMax": 0.373264,
-      "chokeWindowPx30to85": 660,
-      "isChokeCandidate": true,
-      "reason": "E 在 30–85% 的像素 660/660，够做门后车（阈值 30px，暂定）"
+      "firstProgress": 0.026476,
+      "lastProgress": 0.973958,
+      "peaks": [
+        {
+          "window": "5-10%",
+          "windowIndex": 1,
+          "from": 0.05,
+          "to": 0.1,
+          "pxInWindow": 50,
+          "shareInWindow": 0.4348
+        },
+        {
+          "window": "10-15%",
+          "windowIndex": 2,
+          "from": 0.1,
+          "to": 0.15,
+          "pxInWindow": 49,
+          "shareInWindow": 0.4261
+        },
+        {
+          "window": "15-20%",
+          "windowIndex": 3,
+          "from": 0.15,
+          "to": 0.2,
+          "pxInWindow": 41,
+          "shareInWindow": 0.3565
+        },
+        {
+          "window": "80-85%",
+          "windowIndex": 16,
+          "from": 0.8,
+          "to": 0.85,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        },
+        {
+          "window": "85-90%",
+          "windowIndex": 17,
+          "from": 0.85,
+          "to": 0.9,
+          "pxInWindow": 50,
+          "shareInWindow": 0.4348
+        },
+        {
+          "window": "90-95%",
+          "windowIndex": 18,
+          "from": 0.9,
+          "to": 0.95,
+          "pxInWindow": 50,
+          "shareInWindow": 0.4348
+        }
+      ],
+      "isGateCandidate": true
     },
     {
       "color": 33,
       "px": 784,
-      "blocks": 1,
-      "borderPx": 0,
-      "eMin": 0.659722,
-      "eQuantiles": {
-        "p10": 0.659722,
-        "p50": 0.659722,
-        "p90": 0.659722
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.234071,
+        "p50": 0.500217,
+        "p90": 0.766363
       },
-      "progressAt80PctEatable": 0.659722,
-      "eMax": 0.659722,
-      "chokeWindowPx30to85": 784,
-      "isChokeCandidate": true,
-      "reason": "E 在 30–85% 的像素 784/784，够做门后车（阈值 30px，暂定）"
+      "firstProgress": 0.09592,
+      "lastProgress": 0.904514,
+      "peaks": [
+        {
+          "window": "20-25%",
+          "windowIndex": 4,
+          "from": 0.2,
+          "to": 0.25,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        },
+        {
+          "window": "25-30%",
+          "windowIndex": 5,
+          "from": 0.25,
+          "to": 0.3,
+          "pxInWindow": 56,
+          "shareInWindow": 0.4828
+        },
+        {
+          "window": "30-35%",
+          "windowIndex": 6,
+          "from": 0.3,
+          "to": 0.35,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "35-40%",
+          "windowIndex": 7,
+          "from": 0.35,
+          "to": 0.4,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "40-45%",
+          "windowIndex": 8,
+          "from": 0.4,
+          "to": 0.45,
+          "pxInWindow": 64,
+          "shareInWindow": 0.5565
+        },
+        {
+          "window": "45-50%",
+          "windowIndex": 9,
+          "from": 0.45,
+          "to": 0.5,
+          "pxInWindow": 66,
+          "shareInWindow": 0.5739
+        },
+        {
+          "window": "50-55%",
+          "windowIndex": 10,
+          "from": 0.5,
+          "to": 0.55,
+          "pxInWindow": 68,
+          "shareInWindow": 0.5862
+        },
+        {
+          "window": "55-60%",
+          "windowIndex": 11,
+          "from": 0.55,
+          "to": 0.6,
+          "pxInWindow": 63,
+          "shareInWindow": 0.5478
+        },
+        {
+          "window": "60-65%",
+          "windowIndex": 12,
+          "from": 0.6,
+          "to": 0.65,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "65-70%",
+          "windowIndex": 13,
+          "from": 0.65,
+          "to": 0.7,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "70-75%",
+          "windowIndex": 14,
+          "from": 0.7,
+          "to": 0.75,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "75-80%",
+          "windowIndex": 15,
+          "from": 0.75,
+          "to": 0.8,
+          "pxInWindow": 42,
+          "shareInWindow": 0.3621
+        }
+      ],
+      "isGateCandidate": true
     }
   ],
   "demandCurve": [
@@ -71,212 +285,824 @@
       "from": 0,
       "to": 0.05,
       "label": "0-5%",
-      "total": 860,
+      "total": 115,
       "byColor": {
-        "11": 860
-      }
+        "11": 100,
+        "22": 15
+      },
+      "peaks": [
+        {
+          "color": 11,
+          "pxInWindow": 100,
+          "shareInWindow": 0.8696
+        }
+      ]
     },
     {
       "from": 0.05,
       "to": 0.1,
       "label": "5-10%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 64,
+        "22": 50,
+        "33": 1
+      },
+      "peaks": [
+        {
+          "color": 11,
+          "pxInWindow": 64,
+          "shareInWindow": 0.5565
+        },
+        {
+          "color": 22,
+          "pxInWindow": 50,
+          "shareInWindow": 0.4348
+        }
+      ]
     },
     {
       "from": 0.1,
       "to": 0.15,
       "label": "10-15%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 46,
+        "22": 49,
+        "33": 20
+      },
+      "peaks": [
+        {
+          "color": 22,
+          "pxInWindow": 49,
+          "shareInWindow": 0.4261
+        },
+        {
+          "color": 11,
+          "pxInWindow": 46,
+          "shareInWindow": 0.4
+        }
+      ]
     },
     {
       "from": 0.15,
       "to": 0.2,
       "label": "15-20%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 40,
+        "22": 41,
+        "33": 34
+      },
+      "peaks": [
+        {
+          "color": 22,
+          "pxInWindow": 41,
+          "shareInWindow": 0.3565
+        },
+        {
+          "color": 11,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        }
+      ]
     },
     {
       "from": 0.2,
       "to": 0.25,
       "label": "20-25%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 40,
+        "22": 35,
+        "33": 40
+      },
+      "peaks": [
+        {
+          "color": 11,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        },
+        {
+          "color": 33,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        }
+      ]
     },
     {
       "from": 0.25,
       "to": 0.3,
       "label": "25-30%",
-      "total": 0,
-      "byColor": {}
+      "total": 116,
+      "byColor": {
+        "11": 30,
+        "22": 30,
+        "33": 56
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 56,
+          "shareInWindow": 0.4828
+        }
+      ]
     },
     {
       "from": 0.3,
       "to": 0.35,
       "label": "30-35%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 30,
+        "22": 30,
+        "33": 55
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        }
+      ]
     },
     {
       "from": 0.35,
       "to": 0.4,
       "label": "35-40%",
-      "total": 660,
+      "total": 115,
       "byColor": {
-        "22": 660
-      }
+        "11": 30,
+        "22": 30,
+        "33": 55
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        }
+      ]
     },
     {
       "from": 0.4,
       "to": 0.45,
       "label": "40-45%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 26,
+        "22": 25,
+        "33": 64
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 64,
+          "shareInWindow": 0.5565
+        }
+      ]
     },
     {
       "from": 0.45,
       "to": 0.5,
       "label": "45-50%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 24,
+        "22": 25,
+        "33": 66
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 66,
+          "shareInWindow": 0.5739
+        }
+      ]
     },
     {
       "from": 0.5,
       "to": 0.55,
       "label": "50-55%",
-      "total": 0,
-      "byColor": {}
+      "total": 116,
+      "byColor": {
+        "11": 23,
+        "22": 25,
+        "33": 68
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 68,
+          "shareInWindow": 0.5862
+        }
+      ]
     },
     {
       "from": 0.55,
       "to": 0.6,
       "label": "55-60%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 27,
+        "22": 25,
+        "33": 63
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 63,
+          "shareInWindow": 0.5478
+        }
+      ]
     },
     {
       "from": 0.6,
       "to": 0.65,
       "label": "60-65%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 30,
+        "22": 30,
+        "33": 55
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        }
+      ]
     },
     {
       "from": 0.65,
       "to": 0.7,
       "label": "65-70%",
-      "total": 784,
+      "total": 115,
       "byColor": {
-        "33": 784
-      }
+        "11": 30,
+        "22": 30,
+        "33": 55
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        }
+      ]
     },
     {
       "from": 0.7,
       "to": 0.75,
       "label": "70-75%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 30,
+        "22": 30,
+        "33": 55
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        }
+      ]
     },
     {
       "from": 0.75,
       "to": 0.8,
       "label": "75-80%",
-      "total": 0,
-      "byColor": {}
+      "total": 116,
+      "byColor": {
+        "11": 39,
+        "22": 35,
+        "33": 42
+      },
+      "peaks": [
+        {
+          "color": 33,
+          "pxInWindow": 42,
+          "shareInWindow": 0.3621
+        }
+      ]
     },
     {
       "from": 0.8,
       "to": 0.85,
       "label": "80-85%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 41,
+        "22": 40,
+        "33": 34
+      },
+      "peaks": [
+        {
+          "color": 11,
+          "pxInWindow": 41,
+          "shareInWindow": 0.3565
+        },
+        {
+          "color": 22,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        }
+      ]
     },
     {
       "from": 0.85,
       "to": 0.9,
       "label": "85-90%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 45,
+        "22": 50,
+        "33": 20
+      },
+      "peaks": [
+        {
+          "color": 22,
+          "pxInWindow": 50,
+          "shareInWindow": 0.4348
+        },
+        {
+          "color": 11,
+          "pxInWindow": 45,
+          "shareInWindow": 0.3913
+        }
+      ]
     },
     {
       "from": 0.9,
       "to": 0.95,
       "label": "90-95%",
-      "total": 0,
-      "byColor": {}
+      "total": 115,
+      "byColor": {
+        "11": 64,
+        "22": 50,
+        "33": 1
+      },
+      "peaks": [
+        {
+          "color": 11,
+          "pxInWindow": 64,
+          "shareInWindow": 0.5565
+        },
+        {
+          "color": 22,
+          "pxInWindow": 50,
+          "shareInWindow": 0.4348
+        }
+      ]
     },
     {
       "from": 0.95,
       "to": 1,
       "label": "95-100%",
-      "total": 0,
-      "byColor": {}
+      "total": 116,
+      "byColor": {
+        "11": 101,
+        "22": 15
+      },
+      "peaks": [
+        {
+          "color": 11,
+          "pxInWindow": 101,
+          "shareInWindow": 0.8707
+        }
+      ]
     }
   ],
-  "chokeCandidates": [
+  "demandPeaks": [
+    {
+      "windowIndex": 0,
+      "window": "0-5%",
+      "from": 0,
+      "to": 0.05,
+      "color": 11,
+      "pxInWindow": 100,
+      "shareInWindow": 0.8696
+    },
+    {
+      "windowIndex": 1,
+      "window": "5-10%",
+      "from": 0.05,
+      "to": 0.1,
+      "color": 11,
+      "pxInWindow": 64,
+      "shareInWindow": 0.5565
+    },
+    {
+      "windowIndex": 1,
+      "window": "5-10%",
+      "from": 0.05,
+      "to": 0.1,
+      "color": 22,
+      "pxInWindow": 50,
+      "shareInWindow": 0.4348
+    },
+    {
+      "windowIndex": 2,
+      "window": "10-15%",
+      "from": 0.1,
+      "to": 0.15,
+      "color": 22,
+      "pxInWindow": 49,
+      "shareInWindow": 0.4261
+    },
+    {
+      "windowIndex": 2,
+      "window": "10-15%",
+      "from": 0.1,
+      "to": 0.15,
+      "color": 11,
+      "pxInWindow": 46,
+      "shareInWindow": 0.4
+    },
+    {
+      "windowIndex": 3,
+      "window": "15-20%",
+      "from": 0.15,
+      "to": 0.2,
+      "color": 22,
+      "pxInWindow": 41,
+      "shareInWindow": 0.3565
+    },
+    {
+      "windowIndex": 3,
+      "window": "15-20%",
+      "from": 0.15,
+      "to": 0.2,
+      "color": 11,
+      "pxInWindow": 40,
+      "shareInWindow": 0.3478
+    },
+    {
+      "windowIndex": 4,
+      "window": "20-25%",
+      "from": 0.2,
+      "to": 0.25,
+      "color": 11,
+      "pxInWindow": 40,
+      "shareInWindow": 0.3478
+    },
+    {
+      "windowIndex": 4,
+      "window": "20-25%",
+      "from": 0.2,
+      "to": 0.25,
+      "color": 33,
+      "pxInWindow": 40,
+      "shareInWindow": 0.3478
+    },
+    {
+      "windowIndex": 5,
+      "window": "25-30%",
+      "from": 0.25,
+      "to": 0.3,
+      "color": 33,
+      "pxInWindow": 56,
+      "shareInWindow": 0.4828
+    },
+    {
+      "windowIndex": 6,
+      "window": "30-35%",
+      "from": 0.3,
+      "to": 0.35,
+      "color": 33,
+      "pxInWindow": 55,
+      "shareInWindow": 0.4783
+    },
+    {
+      "windowIndex": 7,
+      "window": "35-40%",
+      "from": 0.35,
+      "to": 0.4,
+      "color": 33,
+      "pxInWindow": 55,
+      "shareInWindow": 0.4783
+    },
+    {
+      "windowIndex": 8,
+      "window": "40-45%",
+      "from": 0.4,
+      "to": 0.45,
+      "color": 33,
+      "pxInWindow": 64,
+      "shareInWindow": 0.5565
+    },
+    {
+      "windowIndex": 9,
+      "window": "45-50%",
+      "from": 0.45,
+      "to": 0.5,
+      "color": 33,
+      "pxInWindow": 66,
+      "shareInWindow": 0.5739
+    },
+    {
+      "windowIndex": 10,
+      "window": "50-55%",
+      "from": 0.5,
+      "to": 0.55,
+      "color": 33,
+      "pxInWindow": 68,
+      "shareInWindow": 0.5862
+    },
+    {
+      "windowIndex": 11,
+      "window": "55-60%",
+      "from": 0.55,
+      "to": 0.6,
+      "color": 33,
+      "pxInWindow": 63,
+      "shareInWindow": 0.5478
+    },
+    {
+      "windowIndex": 12,
+      "window": "60-65%",
+      "from": 0.6,
+      "to": 0.65,
+      "color": 33,
+      "pxInWindow": 55,
+      "shareInWindow": 0.4783
+    },
+    {
+      "windowIndex": 13,
+      "window": "65-70%",
+      "from": 0.65,
+      "to": 0.7,
+      "color": 33,
+      "pxInWindow": 55,
+      "shareInWindow": 0.4783
+    },
+    {
+      "windowIndex": 14,
+      "window": "70-75%",
+      "from": 0.7,
+      "to": 0.75,
+      "color": 33,
+      "pxInWindow": 55,
+      "shareInWindow": 0.4783
+    },
+    {
+      "windowIndex": 15,
+      "window": "75-80%",
+      "from": 0.75,
+      "to": 0.8,
+      "color": 33,
+      "pxInWindow": 42,
+      "shareInWindow": 0.3621
+    },
+    {
+      "windowIndex": 16,
+      "window": "80-85%",
+      "from": 0.8,
+      "to": 0.85,
+      "color": 11,
+      "pxInWindow": 41,
+      "shareInWindow": 0.3565
+    },
+    {
+      "windowIndex": 16,
+      "window": "80-85%",
+      "from": 0.8,
+      "to": 0.85,
+      "color": 22,
+      "pxInWindow": 40,
+      "shareInWindow": 0.3478
+    },
+    {
+      "windowIndex": 17,
+      "window": "85-90%",
+      "from": 0.85,
+      "to": 0.9,
+      "color": 22,
+      "pxInWindow": 50,
+      "shareInWindow": 0.4348
+    },
+    {
+      "windowIndex": 17,
+      "window": "85-90%",
+      "from": 0.85,
+      "to": 0.9,
+      "color": 11,
+      "pxInWindow": 45,
+      "shareInWindow": 0.3913
+    },
+    {
+      "windowIndex": 18,
+      "window": "90-95%",
+      "from": 0.9,
+      "to": 0.95,
+      "color": 11,
+      "pxInWindow": 64,
+      "shareInWindow": 0.5565
+    },
+    {
+      "windowIndex": 18,
+      "window": "90-95%",
+      "from": 0.9,
+      "to": 0.95,
+      "color": 22,
+      "pxInWindow": 50,
+      "shareInWindow": 0.4348
+    },
+    {
+      "windowIndex": 19,
+      "window": "95-100%",
+      "from": 0.95,
+      "to": 1,
+      "color": 11,
+      "pxInWindow": 101,
+      "shareInWindow": 0.8707
+    }
+  ],
+  "gateCandidates": [
     {
       "color": 33,
-      "pxInWindow30to85": 784,
       "totalPx": 784,
-      "shareInWindow": 1,
-      "eQuantiles": {
-        "p10": 0.659722,
-        "p50": 0.659722,
-        "p90": 0.659722
-      },
-      "reason": "E 在 30–85% 的像素 784/784，够做门后车（阈值 30px，暂定）"
+      "startExposedPx": 0,
+      "peaks": [
+        {
+          "window": "20-25%",
+          "windowIndex": 4,
+          "from": 0.2,
+          "to": 0.25,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        },
+        {
+          "window": "25-30%",
+          "windowIndex": 5,
+          "from": 0.25,
+          "to": 0.3,
+          "pxInWindow": 56,
+          "shareInWindow": 0.4828
+        },
+        {
+          "window": "30-35%",
+          "windowIndex": 6,
+          "from": 0.3,
+          "to": 0.35,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "35-40%",
+          "windowIndex": 7,
+          "from": 0.35,
+          "to": 0.4,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "40-45%",
+          "windowIndex": 8,
+          "from": 0.4,
+          "to": 0.45,
+          "pxInWindow": 64,
+          "shareInWindow": 0.5565
+        },
+        {
+          "window": "45-50%",
+          "windowIndex": 9,
+          "from": 0.45,
+          "to": 0.5,
+          "pxInWindow": 66,
+          "shareInWindow": 0.5739
+        },
+        {
+          "window": "50-55%",
+          "windowIndex": 10,
+          "from": 0.5,
+          "to": 0.55,
+          "pxInWindow": 68,
+          "shareInWindow": 0.5862
+        },
+        {
+          "window": "55-60%",
+          "windowIndex": 11,
+          "from": 0.55,
+          "to": 0.6,
+          "pxInWindow": 63,
+          "shareInWindow": 0.5478
+        },
+        {
+          "window": "60-65%",
+          "windowIndex": 12,
+          "from": 0.6,
+          "to": 0.65,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "65-70%",
+          "windowIndex": 13,
+          "from": 0.65,
+          "to": 0.7,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "70-75%",
+          "windowIndex": 14,
+          "from": 0.7,
+          "to": 0.75,
+          "pxInWindow": 55,
+          "shareInWindow": 0.4783
+        },
+        {
+          "window": "75-80%",
+          "windowIndex": 15,
+          "from": 0.75,
+          "to": 0.8,
+          "pxInWindow": 42,
+          "shareInWindow": 0.3621
+        }
+      ],
+      "gateWindows": [
+        "20-25%",
+        "25-30%",
+        "30-35%",
+        "35-40%",
+        "40-45%",
+        "45-50%",
+        "50-55%",
+        "55-60%",
+        "60-65%",
+        "65-70%",
+        "70-75%",
+        "75-80%"
+      ]
     },
     {
       "color": 22,
-      "pxInWindow30to85": 660,
       "totalPx": 660,
-      "shareInWindow": 1,
-      "eQuantiles": {
-        "p10": 0.373264,
-        "p50": 0.373264,
-        "p90": 0.373264
-      },
-      "reason": "E 在 30–85% 的像素 660/660，够做门后车（阈值 30px，暂定）"
+      "startExposedPx": 0,
+      "peaks": [
+        {
+          "window": "80-85%",
+          "windowIndex": 16,
+          "from": 0.8,
+          "to": 0.85,
+          "pxInWindow": 40,
+          "shareInWindow": 0.3478
+        },
+        {
+          "window": "85-90%",
+          "windowIndex": 17,
+          "from": 0.85,
+          "to": 0.9,
+          "pxInWindow": 50,
+          "shareInWindow": 0.4348
+        }
+      ],
+      "gateWindows": [
+        "80-85%",
+        "85-90%"
+      ]
     }
   ],
   "imageUpperBound": {
-    "layerDepth": 2,
-    "candidateColors": [
-      33,
-      22
+    "verdict": "图可以",
+    "level": 2,
+    "gateWindowCount": 14,
+    "gateWindows": [
+      "20-25%",
+      "25-30%",
+      "30-35%",
+      "35-40%",
+      "40-45%",
+      "45-50%",
+      "50-55%",
+      "55-60%",
+      "60-65%",
+      "65-70%",
+      "70-75%",
+      "75-80%",
+      "80-85%",
+      "85-90%"
     ],
-    "candidateBands": [
+    "gateBands": [
       {
-        "from": 0.35,
-        "to": 0.4,
-        "label": "35-40%",
-        "colors": [
-          22
-        ],
-        "pxInWindow": 660
+        "color": 33,
+        "from": "20%",
+        "to": "80%"
       },
       {
-        "from": 0.65,
-        "to": 0.7,
-        "label": "65-70%",
-        "colors": [
-          33
-        ],
-        "pxInWindow": 784
+        "color": 22,
+        "from": "80%",
+        "to": "90%"
       }
     ],
-    "distinctCandidateBands": 2,
-    "maxBorderBlobShare": 0.081597,
-    "largestBorderBlob": {
-      "color": 11,
-      "size": 860,
-      "borderPx": 188
-    },
-    "verdict": "图可以",
-    "reason": "有 2 个颜色在 30–85% 区间可卡：33, 22",
+    "distinctGateBands": 2,
+    "reason": "14 个不同窗口有门候补：色33 在 20-25%/25-30%/30-35%/35-40%/40-45%/45-50%/50-55%/55-60%/60-65%/65-70%/70-75%/75-80%（40/56/55/55/64/66/68/63/55/55/55/42px）；色22 在 80-85%/85-90%（40/50px）",
     "notes": [
-      "最大同色块 11 占全图 37.3%（贴边 188px）：这是大块（可能是背景或外圈）；要跨过它才能到的颜色，E 会被“整色块计费”抬高（方向对、绝对进度偏保守）。"
+      "1 个颜色开局就有像素可达（贴边或经 0 连通到图边），按规则不作为门候补；它们从 0% 就能吃，不能被后置的门整体卡住。",
+      "峰阈值：窗口内占比 ≥30% 且 ≥40px；门候补总量 ≥60px（均为暂定值）。"
     ]
   },
   "diagnostics": {
@@ -284,7 +1110,60 @@
       "model": "literal-per-cell-bfs",
       "maxE": 0.009983,
       "pxAtLeast30Pct": 0,
-      "note": "任务书字面“每进入一个彩色格计 1”的 4 邻接 BFS。40×40 图上最大约 min(H,W)/2 格，E 上限 ≈1%，进不了 30–85% 窗口；仅作对照，不参与候选/判定。"
+      "note": "任务书字面“每进入一个彩色格计 1”的 4 邻接 BFS。图里没有不可吃格，最短路只能到最近图边，E 上限约 min(H,W)/2 ÷ H×W；40×40 实测 1.19%、48×48 0.998%。仅作“挡不住”的证明，不参与 v2 判定。"
+    },
+    "blockModel": {
+      "layerDepth": 2,
+      "candidateColors": [
+        22,
+        33
+      ],
+      "maxBorderBlobShare": 0.081597,
+      "largestBorderBlob": {
+        "color": 11,
+        "size": 860,
+        "borderPx": 188
+      },
+      "verdict": "图可以",
+      "colors": [
+        {
+          "color": 11,
+          "px": 860,
+          "borderPx": 188,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0,
+            "p90": 0
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 22,
+          "px": 660,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.373264,
+            "p50": 0.373264,
+            "p90": 0.373264
+          },
+          "chokeWindowPx30to85": 660,
+          "isCandidate": true
+        },
+        {
+          "color": 33,
+          "px": 784,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.659722,
+            "p50": 0.659722,
+            "p90": 0.659722
+          },
+          "chokeWindowPx30to85": 784,
+          "isCandidate": true
+        }
+      ],
+      "note": "已被 v2 取代：挡不住的证明见逐格 BFS 的 E 上限（只能到最近图边的距离，40×40 实测 1.19%、48×48 0.998%），永远到不了 30%。v1 layerDepth 不参与 v2 verdict。"
     }
   }
 }
