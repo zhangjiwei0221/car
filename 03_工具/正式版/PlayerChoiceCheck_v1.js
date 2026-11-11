@@ -126,12 +126,16 @@ for (let i = 0; i < picks.length; i++) {
   const Fgain = F.length ? Math.max(...F.map(x => x.v.gain)) : null;
   const bestGain = opts.length ? Math.max(...opts.map(x => x.v.gain)) : 0;
   const bestDGain = D.length ? Math.max(...D.map(x => x.v.gain)) : 0;
+  const bestFree = F.length ? F.reduce((a, b) => (b.v.gain > a.v.gain ? b : a)) : null;
+  const bestD = D.length ? D.reduce((a, b) => (b.v.gain > a.v.gain ? b : a)) : null;
   const weakFree = F.length > 0 && bestDGain > 0 && Fgain < bestDGain * weakRatio;
   const rec = s.buffer.length >= 3 ? recoveryDepth(s, maxDepth, { n: 300 }) : null;
   rows.push({
     step: i + 1, buffer: s.buffer.length, M: ms.length,
     C: opts.filter(x => x.v.gain > 0).length, F: F.length, D: D.length,
     Fgain, bestGain, bestDGain, weakFree,
+    bestFree: bestFree ? { r: bestFree.m.r, c: bestFree.m.c, color: bestFree.m.antBox && bestFree.m.antBox.color, count: bestFree.m.antBox && bestFree.m.antBox.count, gain: bestFree.v.gain } : null,
+    bestD: bestD ? { r: bestD.m.r, c: bestD.m.c, color: bestD.m.antBox && bestD.m.antBox.color, count: bestD.m.antBox && bestD.m.antBox.count, gain: bestD.v.gain } : null,
     recoveryDepth: rec,
     pick: picks[i]
   });
