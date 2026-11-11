@@ -35,7 +35,7 @@ function parseArl(out) {
   const can = /可通关（最小路线）[\s\S]{0,60}?([✓✗])/.exec(out);
   return {
     peak: num(/峰值=4\s+(\d+)/, out), mid: num(/玩家中段 45–80%\s+\d+ 步（占比 (\d+)%）/, out),
-    tol: num(/容错 55–75%\s+(\d+)\/20/, out), open: num(/开局可点≥5\s+(\d+)/, out),
+    tol: num(/容错[^\n]*?(\d+)\/20/, out), open: num(/开局可点≥5\s+(\d+)/, out),
     at4: num(/at4≥5\s+(\d+)/, out), canPass: can ? can[1] : '?'
   };
 }

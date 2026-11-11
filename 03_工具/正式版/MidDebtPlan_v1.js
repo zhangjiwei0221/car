@@ -6,7 +6,7 @@
  * 思路：当前 v1 切法把债都放在开局，中段没有可持续的债；单旋钮抬不动 mid。
  * 做法：沿 ReachTimeline 的玩家路线，挑一个中段的车，把它加大 δ（制造债），
  *       从同色后段的车搬走 δ（总容量不变）；要求
- *         新容量 > 该步 reach（是债）且 ≤ 之后最大 reach（能还），且 ≤ 40。
+ *         新容量 > 该步 reach（是债）且 ≤ 之后最大 reach（能还），且 ≤ --max-car（默认 60）。
  * 输出每个候选后，跑 SeedGate / RecoveryVariantCheck / ChainRatchetCheck，按 A 的目标排序：
  *       硬门全过 + ratchet PASS + mid 15–40，mid 最大者优先。
  *
@@ -29,6 +29,7 @@ const input = process.argv[2];
 const outdir = path.resolve(arg('--outdir', ''));
 const deltas = String(arg('--deltas', '8,12,16')).split(',').map(Number).filter(x => x > 0);
 const maxVariants = Number(arg('--max', 12));
+const maxCar = Number(arg('--max-car', 60));
 if (!input || !outdir) {
   console.error('用法: node MidDebtPlan_v1.js <关卡.json> --outdir <目录> [--deltas 8,12,16] [--max 12]');
   process.exit(2);
@@ -95,7 +96,7 @@ for (const c of colors) {
       const q = picks[j];
       for (const d of deltas) {
         const newCount = p.count + d;
-        if (newCount > 40) continue;
+        if (newCount > maxCar) continue;
         if (newCount <= p.reachAtPick + 1) continue;      // 必须是债
         if (newCount > maxFuture) continue;                // 必须能还
         if (q.count - d < 8) continue;                     // 后车不能太小

@@ -205,7 +205,7 @@ function parseArl(out) {
   return {
     peak: num(/峰值=4\s+(\d+)/),
     mid: num(/玩家中段 45–80%\s+\d+ 步（占比 (\d+)%）/),
-    tol: num(/容错 55–75%(?:（参考）)?\s+(\d+)\/20/),
+    tol: num(/容错[^\n]*?(\d+)\/20/),
     open: num(/开局可点≥5\s+(\d+)/),
     at4: num(/at4≥5\s+(\d+)/),
     canPass: can ? can[1] : '?',
