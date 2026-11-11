@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const state = { levels: [], current: null, route: 'freefirst', overlaySolver: true, step: 1, series: { buffer: true, M: true, C: true, F: true, D: true } };
+const state = { levels: [], current: null, route: 'freefirst', overlaySolver: true, step: 1, series: { buffer: true, M: true, C: true, F: true, D: true }, autopsy: {}, autopsyLoading: {} };
 const C = { f: '#3fb950', d: '#f85149', c0: '#8b949e', buf: '#a371f7', M: '#58a6ff', C: '#39c5cf', F: '#3fb950', D: '#f85149', solver: '#f0883e' };
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -43,7 +43,72 @@ function select(id) {
   state.current = state.levels.find(x => x.id === id) || null;
   state.step = 1;
   renderAll();
+  loadAutopsy();
 }
+async function loadAutopsy() {
+  if (!state.current) return;
+  const key = state.current.id + ':' + state.route;
+  if (state.autopsy[key] || state.autopsyLoading[key]) return;
+  state.autopsyLoading[key] = true;
+  try {
+    const content = JSON.stringify(state.current.level);
+    const j = await fetch('/api/autopsy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, mode: state.route }) }).then(r => r.json());
+    if (j && j.steps) state.autopsy[key] = j;
+    renderStep();
+  } catch (e) { } finally { state.autopsyLoading[key] = false; }
+}
+function chip(color, text) {
+  return `<span class="chip"><span class="swatch" style="display:inline-block;background:${colorHex(color)}"></span>${text}</span>`;
+}
+function renderAutopsy(t) {
+  const el = $('#autopsy'); if (!el) return;
+  const key = state.current.id + ':' + state.route;
+  const a = state.autopsy[key];
+  if (!a) { el.innerHTML = '<span class="empty">解剖数据加载中…</span>'; return; }
+  const st = (a.steps || [])[state.step - 1];
+  if (!st) { el.innerHTML = '<span class="empty">这一步没有解剖记录</span>'; return; }
+  const ev = st.events || {}, c = st.constraints || {}, S = a.summary || {}, inv = a.static || {};
+  const colors = (inv.colors || []).length;
+  const cons = inv.conservation || {};
+  const head = `<div class="autopsy-head">${cons.ok ? '✅ 守恒' : '❌ 守恒'} ${cons.spoolsPlusPipes}/${cons.totalPixels}` +
+    ` · 车 ${(inv.counts || {}).boxes} 黑 ${(inv.counts || {}).blacks} 管 ${(inv.counts || {}).pipes}` +
+    ` 冰 ${(inv.counts || {}).iceCells}/${(inv.counts || {}).iceBalls} 链 ${(inv.counts || {}).chainGroups} 问号 ${(inv.counts || {}).qCells || 0}` +
+    ` · ${colors} 色 · ${S.won ? '通关' : '未通关'} ${S.steps} 步</div>`;
+
+  // 发生
+  const removed = (ev.boardRemoved || []).map(x => chip(x.color, `${x.r},${x.c} ${colorName(x.color)}:${x.count}`)).join('') || '<span class="empty">无</span>';
+  const pix = Object.entries(ev.targetEliminated && ev.targetEliminated.byColor || {}).map(([k, v]) => chip(+k, `${colorName(+k)} ${v}px`)).join('') || '<span class="empty">0</span>';
+  const added = (ev.bufferAdded || []).map(x => chip(x.color, `+${colorName(x.color)} ${x.progress || 0}/${x.need} 余${x.remaining}`)).join('') || '';
+  const removedBuf = (ev.bufferRemoved || []).map(x => chip(x.color, `-${colorName(x.color)} 余${x.remaining}`)).join('') || '';
+  const progressed = (ev.bufferProgressed || []).map(x => chip(x.color, `${colorName(x.color)} ${x.from}→${x.to} 余${x.remaining}`)).join('') || '';
+  const numice = (ev.numice || []).map(x => `<span class="chip warn">冰 ${x.r},${x.c} ${x.event}${x.event === 'dec' ? ` ${x.before}→${x.after}` : ''}</span>`).join('') || '';
+  const pipe = (ev.pipe || []).map(x => `<span class="chip warn">管 ${x.r},${x.c} ${x.event}${x.color != null ? ' 色' + x.color : ''}</span>`).join('') || '';
+  const refill = (ev.cellChanges || []).filter(x => x.after && x.after.t === 'box' && (!x.before || x.before.t !== 'box')).map(x => chip(x.after.color, `补充 ${x.r},${x.c} ${colorName(x.after.color)}:${x.after.count}`)).join('') || '';
+  const comp = ev.completedDelta ? `<span class="chip ok">完成 +${ev.completedDelta}</span>` : '';
+
+  // 约束
+  const flags = [];
+  if (c.overReach) flags.push(`<span class="chip warn">本步形成债 ${c.overBy}px（容量 ${c.capacity} > 可达 ${c.reachBefore}）</span>`);
+  if (c.slotShort) flags.push('<span class="chip bad">链组空位不足</span>');
+  if (c.visibleBefore != null && c.reachBefore != null && c.visibleBefore >= c.capacity && c.reachBefore < c.capacity) flags.push(`<span class="chip warn">信息陷阱：看得见 ${c.visibleBefore}，真可达 ${c.reachBefore}（容量 ${c.capacity}）</span>`);
+  const pc = (c.perColor || []).filter(x => x.remaining > 0).sort((x, y) => x.reach - y.reach).slice(0, 10);
+  const pcRows = pc.map(x => `<tr><td>${chip(x.color, colorName(x.color))}</td><td>${x.remaining}</td><td>${x.reach}</td><td>${x.reach >= x.remaining ? '够' : '缺'}</td></tr>`).join('');
+
+  el.innerHTML = head +
+    `<div class="autopsy-cols">` +
+    `<div class="autopsy-block"><div class="detail-title">发生</div>` +
+    `<div class="kv"><b>取走</b>${removed}</div>` +
+    `<div class="kv"><b>目标图消</b>${pix}</div>` +
+    `<div class="kv"><b>暂存</b>${added || '<span class="empty">无新增</span>'}${progressed}${removedBuf}</div>` +
+    ((numice || pipe || comp || refill) ? `<div class="kv"><b>事件</b>${numice}${pipe}${comp}${refill}</div>` : '') +
+    `</div>` +
+    `<div class="autopsy-block"><div class="detail-title">约束</div>` +
+    `<div class="kv"><b>本车</b>${chip(c.color, colorName(c.color))} 容量 ${c.capacity} · 入场可达 ${c.reachBefore} · 可见 ${c.visibleBefore} · 空位 ${c.freeSlots}</div>` +
+    `<div class="kv">${flags.join('') || '<span class="chip ok">本步无约束告警</span>'}</div>` +
+    `<div class="table-scroll"><table class="mini"><thead><tr><th>颜色</th><th>剩余</th><th>可达</th><th>差额</th></tr></thead><tbody>${pcRows}</tbody></table></div>` +
+    `</div></div>`;
+}
+
 function renderList() {
   const ul = $('#levelList'); ul.innerHTML = '';
   if (!state.levels.length) { ul.innerHTML = '<div class="empty">还没有关卡。导入单关 JSON 或目录。</div>'; return; }
@@ -278,6 +343,7 @@ function renderStep() {
     cells.forEach((v, i) => { const td = document.createElement('td'); if (i === 6) td.className = 'kind'; if (i === 8 && o.dead) td.className = 'dead'; td.innerHTML = v; tr.appendChild(td); });
     tb.appendChild(tr);
   }
+  renderAutopsy(t);
 }
 function renderCharts() { drawChart('buffer'); drawChart('choice'); }
 function renderAll() { renderMetrics(); renderRouteSummary(); renderCharts(); renderStep(); renderList(); }
@@ -286,6 +352,7 @@ document.querySelectorAll('.route-tabs button').forEach(b => b.onclick = () => {
   state.route = b.dataset.route;
   document.querySelectorAll('.route-tabs button').forEach(x => x.classList.toggle('active', x === b));
   renderAll();
+  loadAutopsy();
 });
 $('#overlaySolver').addEventListener('change', e => { state.overlaySolver = e.target.checked; renderCharts(); });
 document.querySelectorAll('[data-series]').forEach(cb => cb.addEventListener('change', e => { state.series[e.target.dataset.series] = e.target.checked; renderCharts(); }));

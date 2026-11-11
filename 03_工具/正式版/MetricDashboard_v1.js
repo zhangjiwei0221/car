@@ -93,8 +93,21 @@ function paletteFor(blocks) {
   return out;
 }
 
-function analyze(name, content) {
-  const hash = crypto.createHash('sha256').update(content + '|' + CACHE_VERSION).digest('hex').slice(0, 16);
+/* 逐步解剖（发生 / 约束）：只读，复用 RouteTimeline 的路线，不改变 analyze 的缓存与结果 */
+function autopsy(content, mode) {
+  const m = mode === 'solver' ? 'solver' : 'freefirst';
+  const hash = crypto.createHash('sha256').update(content + '|autopsy|' + m + '|' + CACHE_VERSION).digest('hex').slice(0, 16);
+  const levelFile = path.join(CACHE, hash + '.autopsy.level.json');
+  const outFile = path.join(CACHE, hash + '.autopsy.json');
+  if (!fs.existsSync(outFile)) {
+    fs.writeFileSync(levelFile, content);
+    const r = run('LevelAutopsy_v1.js', [levelFile, '--mode', m, '--out', outFile], 600000);
+    if (r.status !== 0 || !fs.existsSync(outFile)) throw new Error('LevelAutopsy 失败：' + (r.out || r.error));
+  }
+  return JSON.parse(fs.readFileSync(outFile, 'utf8'));
+}
+
+function analyze(name, content) {  const hash = crypto.createHash('sha256').update(content + '|' + CACHE_VERSION).digest('hex').slice(0, 16);
   const levelFile = path.join(CACHE, hash + '.json');
   const cacheFile = path.join(CACHE, hash + '.dashboard.json');
   if (fs.existsSync(cacheFile)) {
@@ -164,7 +177,37 @@ const server = http.createServer((req, res) => {
     }
     return;
   }
+  if (req.method === 'GET' && req.url.startsWith('/api/autopsy-path')) {
+    try {
+      const u = new URL(req.url, 'http://127.0.0.1');
+      const p = u.searchParams.get('path') || '';
+      const mode = u.searchParams.get('mode') || 'freefirst';
+      const ok = ALLOW_PREFIX.some(pre => p.startsWith(pre));
+      if (!ok || !p.endsWith('.json') || !fs.existsSync(p)) throw new Error('路径不允许或不存在：' + p);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(autopsy(fs.readFileSync(p, 'utf8'), mode)));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: false, error: String(e.message || e) }));
+    }
+    return;
+  }
   if (req.method === 'GET') return serveStatic(req, res);
+  if (req.method === 'POST' && req.url === '/api/autopsy') {
+    let body = '';
+    req.on('data', d => { body += d; if (body.length > 20 * 1024 * 1024) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const j = JSON.parse(body);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(autopsy(j.content || '', j.mode || 'freefirst')));
+      } catch (e) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: String(e.message || e) }));
+      }
+    });
+    return;
+  }
   if (req.method === 'POST' && req.url === '/api/analyze') {
     let body = '';
     req.on('data', d => { body += d; if (body.length > 20 * 1024 * 1024) req.destroy(); });

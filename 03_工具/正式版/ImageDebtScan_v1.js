@@ -96,7 +96,10 @@ function main() {
   }
   let files = [];
   if (fs.statSync(target).isDirectory()) {
-    files = fs.readdirSync(target).filter(f => f.endsWith('.txt') && f.includes('分图4色')).map(f => path.join(target, f));
+    const all = fs.readdirSync(target).filter(f => f.endsWith('.txt'));
+    // 旧目录按「分图4色」筛；普通关卡/新抽出的目标图没有这个字样时，扫全部 .txt。
+    const four = all.filter(f => f.includes('分图4色'));
+    files = (four.length ? four : all).map(f => path.join(target, f));
   } else files = [target];
   const reports = files.map(f => {
     try { return scan(f); } catch (e) { return { file: path.basename(f), error: e.message }; }
