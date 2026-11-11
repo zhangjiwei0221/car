@@ -185,6 +185,7 @@ function moveScore(s, m, strategy) {
   let score;
   if (strategy === 'max-eat') score = [dead ? 0 : 1, gain, free, -buf, -stuckPx, -m.r, -m.c];
   else if (strategy === 'small-debt') score = [dead ? 0 : 1, free, -buf, -stuckPx, gain, -m.r, -m.c];
+  else if (strategy === 'debt-first') score = [dead ? 0 : 1, buf, free, gain, -stuckPx, -m.r, -m.c];
   else score = [dead ? 0 : 1, free, gain, -buf, -stuckPx, -m.r, -m.c];
   return { m, score };
 }
@@ -269,6 +270,7 @@ for (const file of files) {
   if (!noPolicy) {
     const sr = solverRoute(lv);
     if (sr.length) routes.push(checkRoute(lv, sr, 'solver'));
+    // debt-first 只作诊断（会把已知低流失关也判死），不进默认硬门
     for (const st of ['free-first', 'max-eat', 'small-debt']) {
       const pr = policyRoute(lv, st);
       if (pr.length) routes.push(checkRoute(lv, pr, st));
