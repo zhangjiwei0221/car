@@ -61,6 +61,17 @@ function battery(levelFile, tag) {
   row.tag = tag;
   return row;
 }
+/** 锁链棘轮检查：路线死锁/陷阱（见 ChainRatchetCheck_v1） */
+function ratchetPass(levelFile) {
+  const t = fs.mkdtempSync(path.join(os.tmpdir(), 'csp_rat_' + process.pid + '_'));
+  const f = path.join(t, path.basename(levelFile));
+  fs.copyFileSync(levelFile, f);
+  const out = path.join(t, 'ratchet.json');
+  const r = run('ChainRatchetCheck_v1.js', [f, '--out', out], 900000);
+  if (!fs.existsSync(out)) return { pass: false, error: r.out.slice(-300) };
+  const row = readJson(out).rows[0] || {};
+  return { pass: !!row.pass, flags: (row.flags || []).length, traps: (row.traps || []).length };
+}
 function hardPass(m) {
   if (!m || !m.arl || !m.opening || !m.policy || !m.layout) return false;
   // 低流失硬门口径（下一阶段 §3.2）：C0@buf<5 = 0；F0@buf≥3 ≤ 2；
@@ -143,9 +154,11 @@ for (const v of variants) {
     if (fs.existsSync(rxFile)) { cur = rxFile; rxed = true; }
   }
   const m = battery(cur, v.tag);
-  results.push({ tag: v.tag, swap: v.swap, built, rxed, file: cur, metrics: m });
-  console.log(`  ${v.tag}: ` + JSON.stringify(digest(m)) + (hardPass(m) ? ' score=' + softScore(m) : ''));
-  if (hardPass(m)) passers.push({ file: cur, metrics: m, from: v.tag, score: softScore(m) });
+  const rat = ratchetPass(cur);
+  results.push({ tag: v.tag, swap: v.swap, built, rxed, file: cur, metrics: m, ratchet: rat });
+  const ok = hardPass(m) && rat.pass;
+  console.log(`  ${v.tag}: ` + JSON.stringify(digest(m)) + ' ratchet=' + (rat.pass ? 'PASS' : 'FAIL') + (ok ? ' score=' + softScore(m) : ''));
+  if (ok) passers.push({ file: cur, metrics: m, from: v.tag, score: softScore(m), ratchet: rat });
 }
 let best = null;
 if (passers.length) {
@@ -178,8 +191,8 @@ if (!best && holder && !skipKnob) {
 const out = {
   tool: 'CarSplitPlan_v0', generatedAt: new Date().toISOString(),
   id, target, cornerColor,
-  variants: results.map(x => ({ tag: x.tag, swap: x.swap, file: x.file, digest: digest(x.metrics) })),
-  best: best && best.file ? { from: best.from, file: best.file, digest: digest(best.metrics) } : null
+  variants: results.map(x => ({ tag: x.tag, swap: x.swap, file: x.file, digest: digest(x.metrics), ratchet: x.ratchet })),
+  best: best && best.file ? { from: best.from, file: best.file, digest: digest(best.metrics), ratchet: best.ratchet } : null
 };
 writeJson(path.join(outdir, `建造报告_${id}.json`), out);
 
@@ -187,7 +200,7 @@ if (best && best.file) {
   const outLevel = path.join(outdir, `关卡_${id}_v1.json`);
   fs.copyFileSync(best.file, outLevel);
   console.log(`\n硬门全过 → ${outLevel}（来自 ${best.from}）`);
-  console.log('  ' + JSON.stringify(digest(best.metrics)));
+  console.log('  ' + JSON.stringify(digest(best.metrics)) + ' ratchet=' + (best.ratchet && best.ratchet.pass ? 'PASS' : 'FAIL'));
 } else {
   console.log('\n没有硬门全过的候选（判负记录见 建造报告_' + id + '.json）');
 }
