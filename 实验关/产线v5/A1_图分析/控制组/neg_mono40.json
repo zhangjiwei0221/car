@@ -1,0 +1,205 @@
+{
+  "tool": "ImageLayerMap_v1",
+  "version": "v1",
+  "generatedAt": "2026-11-11T17:50:07.795Z",
+  "file": "neg_mono40.txt",
+  "size": "40x40",
+  "totalPx": 1600,
+  "coloredPx": 1600,
+  "colorCount": 1,
+  "model": {
+    "name": "block-dependency-shortest-path",
+    "caliber": "corner / 只看目标图",
+    "eDefinition": "E(p) = 从图边到 p 的最省路径上、必须先吃掉的像素数 ÷ 全图像素数；同色 4 连通块为计费单位，空位 0 不计费。",
+    "optimisticLowerBound": "E 是乐观估计：只依赖图，忽略车供给/容量/暂存 5 格/障碍；假定需要哪个颜色就一定有车。计费单位为整色块；若能只吃色块内一条隧道，真实最早进度可能更早。"
+  },
+  "colors": [
+    {
+      "color": 7,
+      "px": 1600,
+      "blocks": 1,
+      "borderPx": 156,
+      "eMin": 0,
+      "eQuantiles": {
+        "p10": 0,
+        "p50": 0,
+        "p90": 0
+      },
+      "progressAt80PctEatable": 0,
+      "eMax": 0,
+      "chokeWindowPx30to85": 0,
+      "isChokeCandidate": false,
+      "reason": "没有像素的 E 落在 30–85%（不是被挡在深处）"
+    }
+  ],
+  "demandCurve": [
+    {
+      "from": 0,
+      "to": 0.05,
+      "label": "0-5%",
+      "total": 1600,
+      "byColor": {
+        "7": 1600
+      }
+    },
+    {
+      "from": 0.05,
+      "to": 0.1,
+      "label": "5-10%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.1,
+      "to": 0.15,
+      "label": "10-15%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.15,
+      "to": 0.2,
+      "label": "15-20%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.2,
+      "to": 0.25,
+      "label": "20-25%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.25,
+      "to": 0.3,
+      "label": "25-30%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.3,
+      "to": 0.35,
+      "label": "30-35%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.35,
+      "to": 0.4,
+      "label": "35-40%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.4,
+      "to": 0.45,
+      "label": "40-45%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.45,
+      "to": 0.5,
+      "label": "45-50%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.5,
+      "to": 0.55,
+      "label": "50-55%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.55,
+      "to": 0.6,
+      "label": "55-60%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.6,
+      "to": 0.65,
+      "label": "60-65%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.65,
+      "to": 0.7,
+      "label": "65-70%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.7,
+      "to": 0.75,
+      "label": "70-75%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.75,
+      "to": 0.8,
+      "label": "75-80%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.8,
+      "to": 0.85,
+      "label": "80-85%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.85,
+      "to": 0.9,
+      "label": "85-90%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.9,
+      "to": 0.95,
+      "label": "90-95%",
+      "total": 0,
+      "byColor": {}
+    },
+    {
+      "from": 0.95,
+      "to": 1,
+      "label": "95-100%",
+      "total": 0,
+      "byColor": {}
+    }
+  ],
+  "chokeCandidates": [],
+  "imageUpperBound": {
+    "layerDepth": 0,
+    "candidateColors": [],
+    "candidateBands": [],
+    "distinctCandidateBands": 0,
+    "maxBorderBlobShare": 0.0975,
+    "largestBorderBlob": {
+      "color": 7,
+      "size": 1600,
+      "borderPx": 156
+    },
+    "verdict": "图不行",
+    "reason": "没有颜色在 30–85% 区间有 ≥30px 可卡；无论怎么切车摆车都做不出供给卡口",
+    "notes": [
+      "最大同色块 7 占全图 100%（贴边 156px）：这是大块（可能是背景或外圈）；要跨过它才能到的颜色，E 会被“整色块计费”抬高（方向对、绝对进度偏保守）。"
+    ]
+  },
+  "diagnostics": {
+    "eCell": {
+      "model": "literal-per-cell-bfs",
+      "maxE": 0.011875,
+      "pxAtLeast30Pct": 0,
+      "note": "任务书字面“每进入一个彩色格计 1”的 4 邻接 BFS。40×40 图上最大约 min(H,W)/2 格，E 上限 ≈1%，进不了 30–85% 窗口；仅作对照，不参与候选/判定。"
+    }
+  }
+}
