@@ -1,0 +1,119 @@
+{
+  "tool": "GatePlan_v1",
+  "version": "v1",
+  "generatedAt": "2026-11-12T01:15:49.629Z",
+  "source": "../../../../tmp/B2_imgs_95102/3.json",
+  "image": "3.txt",
+  "imageVerdict": "图可以",
+  "options": {
+    "maxGates": 2,
+    "minWindow": 0.2,
+    "maxWindow": 0.85,
+    "strictOnePerColor": false
+  },
+  "gateCandidates": [
+    {
+      "color": 34,
+      "totalPx": 377,
+      "peaks": [
+        {
+          "window": "30-35%",
+          "pxInWindow": 41,
+          "shareInWindow": 0.4059
+        },
+        {
+          "window": "55-60%",
+          "pxInWindow": 40,
+          "shareInWindow": 0.396
+        }
+      ]
+    }
+  ],
+  "candidatesRanked": [
+    {
+      "color": 34,
+      "window": "30-35%",
+      "demandPxInWindow": 41,
+      "score": 153.02,
+      "gateType": "chain2"
+    },
+    {
+      "color": 34,
+      "window": "55-60%",
+      "demandPxInWindow": 40,
+      "score": 149.29,
+      "gateType": "chain2"
+    }
+  ],
+  "gates": [
+    {
+      "gateId": 1,
+      "progressWindow": [
+        0.3,
+        0.35
+      ],
+      "gateColor": 34,
+      "demandPxInWindow": 41,
+      "windowPx": 101,
+      "gateType": "chain2",
+      "keyCar": {
+        "color": 34,
+        "capacity": 40,
+        "why": "进场当步应能吃满（窗口内该色可达 41px ≥ 40px）"
+      },
+      "priceCar": {
+        "color": 31,
+        "capacity": 25,
+        "why": "代价：该色在后续 10%（35%–45%）露出 27px，容量 25 可回收"
+      },
+      "outsidePlan": {
+        "maxOutsideCapacity": "≤ 窗口需求 × 0.4",
+        "how": "门外该色车容量合计不超过 40%"
+      },
+      "alternativeRoute": {
+        "type": "ice",
+        "color": 34,
+        "iceSteps": "比门晚 6–10 辆"
+      },
+      "rationale": "色34 在 30-35% 占该窗口 41% 需求（41/101px，该色共 377px），是图上这一进度最主要的消耗色。该色共有 2 段分开的需求带，本卡片只是其中一段，需人工确认是否算独立门。",
+      "draft": true
+    },
+    {
+      "gateId": 2,
+      "progressWindow": [
+        0.55,
+        0.6
+      ],
+      "gateColor": 34,
+      "demandPxInWindow": 40,
+      "windowPx": 101,
+      "gateType": "chain2",
+      "keyCar": {
+        "color": 34,
+        "capacity": 40,
+        "why": "进场当步应能吃满（窗口内该色可达 40px ≥ 40px）"
+      },
+      "priceCar": {
+        "color": 5,
+        "capacity": 30,
+        "why": "代价：该色在后续 10%（60%–70%）露出 30px，容量 30 可回收"
+      },
+      "outsidePlan": {
+        "maxOutsideCapacity": "≤ 窗口需求 × 0.4",
+        "how": "门外该色车容量合计不超过 40%"
+      },
+      "alternativeRoute": {
+        "type": "ice",
+        "color": 34,
+        "iceSteps": "比门晚 6–10 辆"
+      },
+      "rationale": "色34 在 55-60% 占该窗口 40% 需求（40/101px，该色共 377px），是图上这一进度最主要的消耗色。该色共有 2 段分开的需求带，本卡片只是其中一段，需人工确认是否算独立门。",
+      "draft": true
+    }
+  ],
+  "noGateReason": null,
+  "notes": [
+    "草案由 GatePlan_v1 自动生成，draft=true；容量（钥匙 40 / 代价 ≤30，按后续 10% 需求取 5 的倍数）是占位值，不是 S2 最终切车结论。",
+    "门类型、窗口、价格色的规则是暂定值，B 阶段有数据后校准。"
+  ]
+}

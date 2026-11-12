@@ -1,0 +1,41 @@
+{
+  "image": "106",
+  "source": "/Users/red/Desktop/正常关卡/106.txt",
+  "imageVerdict": "两条分开的需求带（两个不同门色）",
+  "draft": true,
+  "needUserReview": ["门的强度（门后放几辆车）", "代价色是否真的要等那么久", "第二种过法是否值得保留"],
+  "gates": [
+    {
+      "gateId": 1,
+      "progressWindow": [0.20, 0.25],
+      "gateColor": 32,
+      "fact": { "totalPx": 323, "cumulativeBefore": 70, "gatedPx": 253, "windowDemandPx": 43, "shareInWindow": 0.42 },
+      "door": {
+        "type": "chain2",
+        "keyCar": { "color": 32, "capacity": 35, "why": "进场当步应吃满（窗口内该色 43px）" },
+        "priceCar": { "color": 11, "capacity": 25, "why": "代价；11 在 20–30% 仍有 22/16px，之后可回收" },
+        "heldBehindDoor": "门后放 4–5 辆 32（约 130–165px），门外留 2 辆（约 70px，正好等于窗口前累计）"
+      },
+      "keyVisibleWhy": "消融序列显示 20–25% 窗口里 32 是新暴露的头号色（43/101px）；建造时须确认门在第 1–2 行，开局就能看见 32 在吃",
+      "priceRecovery": "11 在 25–30% 露出 16px、30–35% 仍需检查；若 11 后续不足，改用 30（25–30% 有 13px）",
+      "secondRoute": { "type": "ice", "target": "门外那辆 32", "steps": "比门晚 6–10 辆" },
+      "breathBefore": "0–20% 不设门；该段压力靠位置（预计 ≤0.3）"
+    },
+    {
+      "gateId": 2,
+      "progressWindow": [0.65, 0.70],
+      "gateColor": 14,
+      "fact": { "totalPx": 336, "cumulativeBefore": 109, "gatedPx": 227, "windowDemandPx": 53, "shareInWindow": 0.52 },
+      "door": {
+        "type": "chain2",
+        "keyCar": { "color": 14, "capacity": 40, "why": "窗口内 14 有 53px，40 可当步吃满" },
+        "priceCar": { "color": 28, "capacity": 25, "why": "代价；28 在 65–75% 有 20/15px" },
+        "heldBehindDoor": "门后放 4 辆 14（约 115–130px），门外留约 109px（=窗口前累计）"
+      },
+      "keyVisibleWhy": "65–80% 三个窗口 14 都是头号色（53/64/52px）；后段门，玩家到那时已经学会看色",
+      "priceRecovery": "28 在 70–75% 有 15px；若不足，代价色改用 21（65–70% 9px，偏弱，需人判）",
+      "secondRoute": { "type": "ice", "target": "门外那辆 14", "steps": "比门晚 6–10 辆" },
+      "breathBefore": "30–60% 是长段：靠位置加压，目标 freeP3 0.25–0.35"
+    }
+  ]
+}

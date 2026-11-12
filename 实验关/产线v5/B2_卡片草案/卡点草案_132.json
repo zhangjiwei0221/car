@@ -1,0 +1,151 @@
+{
+  "tool": "GatePlan_v1",
+  "version": "v1",
+  "generatedAt": "2026-11-12T01:15:49.626Z",
+  "source": "../../../../tmp/B2_imgs_95102/132.json",
+  "image": "132.txt",
+  "imageVerdict": "图可以",
+  "options": {
+    "maxGates": 2,
+    "minWindow": 0.2,
+    "maxWindow": 0.85,
+    "strictOnePerColor": false
+  },
+  "gateCandidates": [
+    {
+      "color": 19,
+      "totalPx": 675,
+      "peaks": [
+        {
+          "window": "20-25%",
+          "pxInWindow": 41,
+          "shareInWindow": 0.4824
+        },
+        {
+          "window": "30-35%",
+          "pxInWindow": 41,
+          "shareInWindow": 0.4824
+        },
+        {
+          "window": "35-40%",
+          "pxInWindow": 48,
+          "shareInWindow": 0.5647
+        },
+        {
+          "window": "40-45%",
+          "pxInWindow": 56,
+          "shareInWindow": 0.6588
+        },
+        {
+          "window": "45-50%",
+          "pxInWindow": 56,
+          "shareInWindow": 0.6588
+        },
+        {
+          "window": "50-55%",
+          "pxInWindow": 41,
+          "shareInWindow": 0.4824
+        },
+        {
+          "window": "70-75%",
+          "pxInWindow": 45,
+          "shareInWindow": 0.5294
+        }
+      ]
+    }
+  ],
+  "candidatesRanked": [
+    {
+      "color": 19,
+      "window": "40-45%",
+      "demandPxInWindow": 56,
+      "score": 444.69,
+      "gateType": "chain2"
+    },
+    {
+      "color": 19,
+      "window": "70-75%",
+      "demandPxInWindow": 45,
+      "score": 357.35,
+      "gateType": "pipe"
+    },
+    {
+      "color": 19,
+      "window": "20-25%",
+      "demandPxInWindow": 41,
+      "score": 325.62,
+      "gateType": "chain2"
+    }
+  ],
+  "gates": [
+    {
+      "gateId": 1,
+      "progressWindow": [
+        0.4,
+        0.45
+      ],
+      "gateColor": 19,
+      "demandPxInWindow": 56,
+      "windowPx": 85,
+      "gateType": "chain2",
+      "keyCar": {
+        "color": 19,
+        "capacity": 40,
+        "why": "进场当步应能吃满（窗口内该色可达 56px ≥ 40px）"
+      },
+      "priceCar": {
+        "color": 17,
+        "capacity": 15,
+        "why": "代价：该色在后续 10%（45%–55%）露出 17px，容量 15 可回收"
+      },
+      "outsidePlan": {
+        "maxOutsideCapacity": "≤ 窗口需求 × 0.4",
+        "how": "门外该色车容量合计不超过 40%"
+      },
+      "alternativeRoute": {
+        "type": "ice",
+        "color": 19,
+        "iceSteps": "比门晚 6–10 辆"
+      },
+      "rationale": "色19 在 40-45% 占该窗口 66% 需求（56/85px，该色共 675px），是图上这一进度最主要的消耗色。该色共有 3 段分开的需求带，本卡片只是其中一段，需人工确认是否算独立门。",
+      "draft": true
+    },
+    {
+      "gateId": 2,
+      "progressWindow": [
+        0.7,
+        0.75
+      ],
+      "gateColor": 19,
+      "demandPxInWindow": 45,
+      "windowPx": 85,
+      "gateType": "pipe",
+      "keyCar": {
+        "color": 19,
+        "capacity": 40,
+        "why": "进场当步应能吃满（窗口内该色可达 45px ≥ 40px）"
+      },
+      "priceCar": {
+        "color": 3,
+        "capacity": 30,
+        "why": "代价：该色在后续 10%（75%–85%）露出 30px，容量 30 可回收"
+      },
+      "outsidePlan": {
+        "maxOutsideCapacity": "≤ 窗口需求 × 0.4",
+        "how": "门外该色车容量合计不超过 40%"
+      },
+      "alternativeRoute": {
+        "type": "ice",
+        "color": 19,
+        "iceSteps": "比门晚 6–10 辆"
+      },
+      "rationale": "色19 在 70-75% 占该窗口 53% 需求（45/85px，该色共 675px），是图上这一进度最主要的消耗色。",
+      "draft": true
+    }
+  ],
+  "noGateReason": null,
+  "notes": [
+    "草案由 GatePlan_v1 自动生成，draft=true；容量（钥匙 40 / 代价 ≤30，按后续 10% 需求取 5 的倍数）是占位值，不是 S2 最终切车结论。",
+    "门类型、窗口、价格色的规则是暂定值，B 阶段有数据后校准。"
+  ]
+}

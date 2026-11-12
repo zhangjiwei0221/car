@@ -1,0 +1,700 @@
+{
+  "tool": "ImageLayerMap_v2",
+  "version": "v2",
+  "supersedes": "ImageLayerMap_v1（block-Dijkstra / layerDepth 口径）",
+  "generatedAt": "2026-11-12T01:18:38.240Z",
+  "file": "59.txt",
+  "size": "40x35",
+  "totalPx": 1400,
+  "coloredPx": 1347,
+  "colorCount": 11,
+  "model": {
+    "name": "corner-ablation-demand",
+    "caliber": "corner / 只看目标图 / 无车自由吃",
+    "sequence": "初始已吃为空；暴露=贴图边或与已吃格/已空0格4邻接；每步吃 D=(H-1-r)+c 最小的暴露彩色格，平手 r 大、c 小；直到吃完。",
+    "progress": "已吃彩色像素 / 总彩色像素",
+    "peak": "窗口内某色占该窗口像素 ≥30% 且 ≥40px",
+    "gateCandidate": "总像素 ≥60、开局不可达、且在 20–90% 区间有峰",
+    "note": "图只能提供需求；供给（车/锁链/管道/冰）不在本工具内。"
+  },
+  "colors": [
+    {
+      "color": 2,
+      "px": 207,
+      "startExposedPx": 15,
+      "progressQuantiles": {
+        "p10": 0.157832,
+        "p50": 0.650334,
+        "p90": 0.951002
+      },
+      "firstProgress": 0.01856,
+      "lastProgress": 0.991091,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 4,
+      "px": 79,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.473942,
+        "p50": 0.740906,
+        "p90": 0.863994
+      },
+      "firstProgress": 0.363771,
+      "lastProgress": 0.888641,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 6,
+      "px": 114,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.032146,
+        "p50": 0.091685,
+        "p90": 0.186117
+      },
+      "firstProgress": 0.012621,
+      "lastProgress": 0.256125,
+      "peaks": [
+        {
+          "window": "5-10%",
+          "windowIndex": 1,
+          "from": 0.05,
+          "to": 0.1,
+          "pxInWindow": 44,
+          "shareInWindow": 0.6567
+        }
+      ],
+      "isGateCandidate": false
+    },
+    {
+      "color": 7,
+      "px": 58,
+      "startExposedPx": 13,
+      "progressQuantiles": {
+        "p10": 0.364588,
+        "p50": 0.653304,
+        "p90": 0.90297
+      },
+      "firstProgress": 0.318486,
+      "lastProgress": 0.914625,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 12,
+      "px": 27,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.474536,
+        "p50": 0.585746,
+        "p90": 0.726206
+      },
+      "firstProgress": 0.412027,
+      "lastProgress": 0.737936,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 13,
+      "px": 72,
+      "startExposedPx": 9,
+      "progressQuantiles": {
+        "p10": 0.265108,
+        "p50": 0.468448,
+        "p90": 0.74395
+      },
+      "firstProgress": 0.207869,
+      "lastProgress": 0.767632,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 14,
+      "px": 98,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.287082,
+        "p50": 0.5,
+        "p90": 0.728508
+      },
+      "firstProgress": 0.226429,
+      "lastProgress": 0.959169,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 21,
+      "px": 265,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.205939,
+        "p50": 0.416481,
+        "p90": 0.919525
+      },
+      "firstProgress": 0.111359,
+      "lastProgress": 0.974016,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 26,
+      "px": 55,
+      "startExposedPx": 9,
+      "progressQuantiles": {
+        "p10": 0.016481,
+        "p50": 0.090572,
+        "p90": 0.240089
+      },
+      "firstProgress": 0.005939,
+      "lastProgress": 0.276912,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 30,
+      "px": 170,
+      "startExposedPx": 100,
+      "progressQuantiles": {
+        "p10": 0.029621,
+        "p50": 0.50297,
+        "p90": 0.985226
+      },
+      "firstProgress": 0.000742,
+      "lastProgress": 1,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 31,
+      "px": 202,
+      "startExposedPx": 6,
+      "progressQuantiles": {
+        "p10": 0.271121,
+        "p50": 0.55271,
+        "p90": 0.856422
+      },
+      "firstProgress": 0.037862,
+      "lastProgress": 0.966592,
+      "peaks": [],
+      "isGateCandidate": false
+    }
+  ],
+  "demandCurve": [
+    {
+      "from": 0,
+      "to": 0.05,
+      "label": "0-5%",
+      "total": 67,
+      "byColor": {
+        "2": 7,
+        "6": 20,
+        "26": 17,
+        "30": 22,
+        "31": 1
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.05,
+      "to": 0.1,
+      "label": "5-10%",
+      "total": 67,
+      "byColor": {
+        "2": 2,
+        "6": 44,
+        "26": 13,
+        "30": 4,
+        "31": 4
+      },
+      "peaks": [
+        {
+          "color": 6,
+          "pxInWindow": 44,
+          "shareInWindow": 0.6567
+        }
+      ]
+    },
+    {
+      "from": 0.1,
+      "to": 0.15,
+      "label": "10-15%",
+      "total": 68,
+      "byColor": {
+        "2": 11,
+        "6": 22,
+        "21": 8,
+        "26": 7,
+        "30": 16,
+        "31": 4
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.15,
+      "to": 0.2,
+      "label": "15-20%",
+      "total": 67,
+      "byColor": {
+        "2": 12,
+        "6": 19,
+        "21": 18,
+        "26": 4,
+        "30": 12,
+        "31": 2
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.2,
+      "to": 0.25,
+      "label": "20-25%",
+      "total": 67,
+      "byColor": {
+        "2": 5,
+        "6": 8,
+        "13": 6,
+        "14": 3,
+        "21": 22,
+        "26": 10,
+        "30": 8,
+        "31": 5
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.25,
+      "to": 0.3,
+      "label": "25-30%",
+      "total": 68,
+      "byColor": {
+        "2": 1,
+        "6": 1,
+        "13": 6,
+        "14": 10,
+        "21": 30,
+        "26": 4,
+        "30": 4,
+        "31": 12
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.3,
+      "to": 0.35,
+      "label": "30-35%",
+      "total": 67,
+      "byColor": {
+        "2": 4,
+        "7": 4,
+        "13": 9,
+        "14": 15,
+        "21": 25,
+        "30": 4,
+        "31": 6
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.35,
+      "to": 0.4,
+      "label": "35-40%",
+      "total": 67,
+      "byColor": {
+        "2": 5,
+        "4": 3,
+        "7": 5,
+        "13": 6,
+        "14": 7,
+        "21": 21,
+        "30": 4,
+        "31": 16
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.4,
+      "to": 0.45,
+      "label": "40-45%",
+      "total": 68,
+      "byColor": {
+        "2": 5,
+        "4": 5,
+        "7": 3,
+        "12": 1,
+        "13": 8,
+        "14": 8,
+        "21": 19,
+        "30": 4,
+        "31": 15
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.45,
+      "to": 0.5,
+      "label": "45-50%",
+      "total": 67,
+      "byColor": {
+        "2": 10,
+        "4": 1,
+        "7": 7,
+        "12": 3,
+        "13": 6,
+        "14": 6,
+        "21": 12,
+        "30": 5,
+        "31": 17
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.5,
+      "to": 0.55,
+      "label": "50-55%",
+      "total": 67,
+      "byColor": {
+        "2": 15,
+        "4": 3,
+        "7": 4,
+        "12": 2,
+        "13": 5,
+        "14": 5,
+        "21": 7,
+        "30": 7,
+        "31": 19
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.55,
+      "to": 0.6,
+      "label": "55-60%",
+      "total": 68,
+      "byColor": {
+        "2": 15,
+        "4": 6,
+        "7": 3,
+        "12": 8,
+        "13": 4,
+        "14": 8,
+        "21": 4,
+        "30": 4,
+        "31": 16
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.6,
+      "to": 0.65,
+      "label": "60-65%",
+      "total": 67,
+      "byColor": {
+        "2": 11,
+        "4": 10,
+        "7": 3,
+        "12": 2,
+        "13": 5,
+        "14": 7,
+        "21": 3,
+        "30": 6,
+        "31": 20
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.65,
+      "to": 0.7,
+      "label": "65-70%",
+      "total": 67,
+      "byColor": {
+        "2": 11,
+        "4": 6,
+        "7": 4,
+        "12": 6,
+        "13": 5,
+        "14": 9,
+        "21": 2,
+        "30": 4,
+        "31": 20
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.7,
+      "to": 0.75,
+      "label": "70-75%",
+      "total": 68,
+      "byColor": {
+        "2": 8,
+        "4": 6,
+        "7": 6,
+        "12": 5,
+        "13": 8,
+        "14": 13,
+        "21": 7,
+        "30": 4,
+        "31": 11
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.75,
+      "to": 0.8,
+      "label": "75-80%",
+      "total": 67,
+      "byColor": {
+        "2": 22,
+        "4": 12,
+        "7": 3,
+        "13": 4,
+        "21": 13,
+        "30": 9,
+        "31": 4
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.8,
+      "to": 0.85,
+      "label": "80-85%",
+      "total": 67,
+      "byColor": {
+        "2": 19,
+        "4": 14,
+        "7": 4,
+        "14": 2,
+        "21": 15,
+        "30": 6,
+        "31": 7
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.85,
+      "to": 0.9,
+      "label": "85-90%",
+      "total": 68,
+      "byColor": {
+        "2": 10,
+        "4": 13,
+        "7": 5,
+        "14": 1,
+        "21": 20,
+        "30": 8,
+        "31": 11
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.9,
+      "to": 0.95,
+      "label": "90-95%",
+      "total": 67,
+      "byColor": {
+        "2": 13,
+        "7": 7,
+        "14": 1,
+        "21": 29,
+        "30": 10,
+        "31": 7
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.95,
+      "to": 1,
+      "label": "95-100%",
+      "total": 68,
+      "byColor": {
+        "2": 21,
+        "14": 3,
+        "21": 10,
+        "30": 29,
+        "31": 5
+      },
+      "peaks": []
+    }
+  ],
+  "demandPeaks": [
+    {
+      "windowIndex": 1,
+      "window": "5-10%",
+      "from": 0.05,
+      "to": 0.1,
+      "color": 6,
+      "pxInWindow": 44,
+      "shareInWindow": 0.6567
+    }
+  ],
+  "gateCandidates": [],
+  "imageUpperBound": {
+    "verdict": "图不行",
+    "level": 0,
+    "gateWindowCount": 0,
+    "gateWindows": [],
+    "gateBands": [],
+    "distinctGateBands": 0,
+    "reason": "20–90% 区间没有颜色形成需求峰（该色占窗口 ≥30% 且 ≥40px）",
+    "notes": [
+      "6 个颜色开局就有像素可达（贴边或经 0 连通到图边），按规则不作为门候补；它们从 0% 就能吃，不能被后置的门整体卡住。",
+      "峰阈值：窗口内占比 ≥30% 且 ≥40px；门候补总量 ≥60px（均为暂定值）。"
+    ]
+  },
+  "diagnostics": {
+    "eCell": {
+      "model": "literal-per-cell-bfs",
+      "maxE": 0.012143,
+      "pxAtLeast30Pct": 0,
+      "note": "任务书字面“每进入一个彩色格计 1”的 4 邻接 BFS。图里没有不可吃格，最短路只能到最近图边，E 上限约 min(H,W)/2 ÷ H×W；40×40 实测 1.19%、48×48 0.998%。仅作“挡不住”的证明，不参与 v2 判定。"
+    },
+    "blockModel": {
+      "layerDepth": 0,
+      "candidateColors": [],
+      "maxBorderBlobShare": 0,
+      "largestBorderBlob": {
+        "color": 21,
+        "size": 262,
+        "borderPx": 0
+      },
+      "verdict": "图不行",
+      "colors": [
+        {
+          "color": 2,
+          "px": 207,
+          "borderPx": 1,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0,
+            "p90": 0.022857
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 4,
+          "px": 79,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.001429,
+            "p50": 0.001429,
+            "p90": 0.017286
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 6,
+          "px": 114,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.000714,
+            "p50": 0.000714,
+            "p90": 0.000714
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 7,
+          "px": 58,
+          "borderPx": 7,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0.003571,
+            "p90": 0.017857
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 12,
+          "px": 27,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.004286,
+            "p50": 0.011429,
+            "p90": 0.020714
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 13,
+          "px": 72,
+          "borderPx": 5,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0.030714,
+            "p90": 0.08
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 14,
+          "px": 98,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.000714,
+            "p50": 0.000714,
+            "p90": 0.025714
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 21,
+          "px": 265,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.001429,
+            "p50": 0.001429,
+            "p90": 0.001429
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 26,
+          "px": 55,
+          "borderPx": 5,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0.009286,
+            "p90": 0.082143
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 30,
+          "px": 170,
+          "borderPx": 94,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0,
+            "p90": 0
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 31,
+          "px": 202,
+          "borderPx": 2,
+          "eQuantiles": {
+            "p10": 0.002857,
+            "p50": 0.02,
+            "p90": 0.046429
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        }
+      ],
+      "note": "已被 v2 取代：挡不住的证明见逐格 BFS 的 E 上限（只能到最近图边的距离，40×40 实测 1.19%、48×48 0.998%），永远到不了 30%。v1 layerDepth 不参与 v2 verdict。"
+    }
+  }
+}

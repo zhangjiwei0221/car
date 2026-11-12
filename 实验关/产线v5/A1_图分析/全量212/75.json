@@ -1,0 +1,881 @@
+{
+  "tool": "ImageLayerMap_v2",
+  "version": "v2",
+  "supersedes": "ImageLayerMap_v1（block-Dijkstra / layerDepth 口径）",
+  "generatedAt": "2026-11-12T01:18:38.270Z",
+  "file": "75.txt",
+  "size": "42x42",
+  "totalPx": 1764,
+  "coloredPx": 1764,
+  "colorCount": 13,
+  "model": {
+    "name": "corner-ablation-demand",
+    "caliber": "corner / 只看目标图 / 无车自由吃",
+    "sequence": "初始已吃为空；暴露=贴图边或与已吃格/已空0格4邻接；每步吃 D=(H-1-r)+c 最小的暴露彩色格，平手 r 大、c 小；直到吃完。",
+    "progress": "已吃彩色像素 / 总彩色像素",
+    "peak": "窗口内某色占该窗口像素 ≥30% 且 ≥40px",
+    "gateCandidate": "总像素 ≥60、开局不可达、且在 20–90% 区间有峰",
+    "note": "图只能提供需求；供给（车/锁链/管道/冰）不在本工具内。"
+  },
+  "colors": [
+    {
+      "color": 1,
+      "px": 4,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.424036,
+        "p50": 0.651644,
+        "p90": 0.661791
+      },
+      "firstProgress": 0.330499,
+      "lastProgress": 0.662132,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 3,
+      "px": 570,
+      "startExposedPx": 68,
+      "progressQuantiles": {
+        "p10": 0.044161,
+        "p50": 0.695295,
+        "p90": 0.954705
+      },
+      "firstProgress": 0.000567,
+      "lastProgress": 1,
+      "peaks": [
+        {
+          "window": "0-5%",
+          "windowIndex": 0,
+          "from": 0,
+          "to": 0.05,
+          "pxInWindow": 61,
+          "shareInWindow": 0.6932
+        },
+        {
+          "window": "5-10%",
+          "windowIndex": 1,
+          "from": 0.05,
+          "to": 0.1,
+          "pxInWindow": 41,
+          "shareInWindow": 0.4659
+        },
+        {
+          "window": "80-85%",
+          "windowIndex": 16,
+          "from": 0.8,
+          "to": 0.85,
+          "pxInWindow": 48,
+          "shareInWindow": 0.5455
+        },
+        {
+          "window": "85-90%",
+          "windowIndex": 17,
+          "from": 0.85,
+          "to": 0.9,
+          "pxInWindow": 63,
+          "shareInWindow": 0.7159
+        },
+        {
+          "window": "90-95%",
+          "windowIndex": 18,
+          "from": 0.9,
+          "to": 0.95,
+          "pxInWindow": 62,
+          "shareInWindow": 0.7045
+        },
+        {
+          "window": "95-100%",
+          "windowIndex": 19,
+          "from": 0.95,
+          "to": 1,
+          "pxInWindow": 59,
+          "shareInWindow": 0.6629
+        }
+      ],
+      "isGateCandidate": false
+    },
+    {
+      "color": 5,
+      "px": 55,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.344898,
+        "p50": 0.586168,
+        "p90": 0.801361
+      },
+      "firstProgress": 0.307256,
+      "lastProgress": 0.822562,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 6,
+      "px": 62,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.227381,
+        "p50": 0.352891,
+        "p90": 0.597619
+      },
+      "firstProgress": 0.18254,
+      "lastProgress": 0.661565,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 10,
+      "px": 119,
+      "startExposedPx": 2,
+      "progressQuantiles": {
+        "p10": 0.306349,
+        "p50": 0.450113,
+        "p90": 0.748526
+      },
+      "firstProgress": 0.013605,
+      "lastProgress": 0.807823,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 13,
+      "px": 100,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.08271,
+        "p50": 0.204932,
+        "p90": 0.468934
+      },
+      "firstProgress": 0.04195,
+      "lastProgress": 0.5822,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 14,
+      "px": 173,
+      "startExposedPx": 1,
+      "progressQuantiles": {
+        "p10": 0.163946,
+        "p50": 0.523243,
+        "p90": 0.726644
+      },
+      "firstProgress": 0.072562,
+      "lastProgress": 0.777211,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 15,
+      "px": 230,
+      "startExposedPx": 52,
+      "progressQuantiles": {
+        "p10": 0.170465,
+        "p50": 0.553571,
+        "p90": 0.844161
+      },
+      "firstProgress": 0.044785,
+      "lastProgress": 0.94898,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 21,
+      "px": 92,
+      "startExposedPx": 3,
+      "progressQuantiles": {
+        "p10": 0.042971,
+        "p50": 0.188492,
+        "p90": 0.642234
+      },
+      "firstProgress": 0.019841,
+      "lastProgress": 0.685374,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 23,
+      "px": 121,
+      "startExposedPx": 36,
+      "progressQuantiles": {
+        "p10": 0.246032,
+        "p50": 0.510771,
+        "p90": 0.78458
+      },
+      "firstProgress": 0.130952,
+      "lastProgress": 0.880952,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 30,
+      "px": 16,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.305839,
+        "p50": 0.415533,
+        "p90": 0.554705
+      },
+      "firstProgress": 0.287982,
+      "lastProgress": 0.577098,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 31,
+      "px": 221,
+      "startExposedPx": 2,
+      "progressQuantiles": {
+        "p10": 0.137755,
+        "p50": 0.56746,
+        "p90": 0.958617
+      },
+      "firstProgress": 0.024943,
+      "lastProgress": 0.987528,
+      "peaks": [],
+      "isGateCandidate": false
+    },
+    {
+      "color": 34,
+      "px": 1,
+      "startExposedPx": 0,
+      "progressQuantiles": {
+        "p10": 0.113946,
+        "p50": 0.113946,
+        "p90": 0.113946
+      },
+      "firstProgress": 0.113946,
+      "lastProgress": 0.113946,
+      "peaks": [],
+      "isGateCandidate": false
+    }
+  ],
+  "demandCurve": [
+    {
+      "from": 0,
+      "to": 0.05,
+      "label": "0-5%",
+      "total": 88,
+      "byColor": {
+        "3": 61,
+        "10": 4,
+        "13": 2,
+        "15": 1,
+        "21": 13,
+        "31": 7
+      },
+      "peaks": [
+        {
+          "color": 3,
+          "pxInWindow": 61,
+          "shareInWindow": 0.6932
+        }
+      ]
+    },
+    {
+      "from": 0.05,
+      "to": 0.1,
+      "label": "5-10%",
+      "total": 88,
+      "byColor": {
+        "3": 41,
+        "13": 12,
+        "14": 6,
+        "15": 8,
+        "21": 14,
+        "31": 7
+      },
+      "peaks": [
+        {
+          "color": 3,
+          "pxInWindow": 41,
+          "shareInWindow": 0.4659
+        }
+      ]
+    },
+    {
+      "from": 0.1,
+      "to": 0.15,
+      "label": "10-15%",
+      "total": 88,
+      "byColor": {
+        "3": 24,
+        "13": 19,
+        "14": 9,
+        "15": 9,
+        "21": 13,
+        "23": 1,
+        "31": 12,
+        "34": 1
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.15,
+      "to": 0.2,
+      "label": "15-20%",
+      "total": 88,
+      "byColor": {
+        "3": 33,
+        "6": 3,
+        "13": 12,
+        "14": 7,
+        "15": 13,
+        "21": 7,
+        "23": 5,
+        "31": 8
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.2,
+      "to": 0.25,
+      "label": "20-25%",
+      "total": 88,
+      "byColor": {
+        "3": 19,
+        "6": 7,
+        "13": 15,
+        "14": 7,
+        "15": 12,
+        "21": 8,
+        "23": 8,
+        "31": 12
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.25,
+      "to": 0.3,
+      "label": "25-30%",
+      "total": 89,
+      "byColor": {
+        "3": 20,
+        "6": 8,
+        "10": 7,
+        "13": 8,
+        "14": 7,
+        "15": 11,
+        "21": 5,
+        "23": 11,
+        "30": 1,
+        "31": 11
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.3,
+      "to": 0.35,
+      "label": "30-35%",
+      "total": 88,
+      "byColor": {
+        "1": 1,
+        "3": 11,
+        "5": 9,
+        "6": 10,
+        "10": 9,
+        "13": 9,
+        "14": 9,
+        "15": 9,
+        "21": 3,
+        "23": 8,
+        "30": 4,
+        "31": 6
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.35,
+      "to": 0.4,
+      "label": "35-40%",
+      "total": 88,
+      "byColor": {
+        "3": 5,
+        "5": 5,
+        "6": 12,
+        "10": 20,
+        "13": 4,
+        "14": 5,
+        "15": 11,
+        "21": 2,
+        "23": 9,
+        "30": 2,
+        "31": 13
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.4,
+      "to": 0.45,
+      "label": "40-45%",
+      "total": 88,
+      "byColor": {
+        "3": 6,
+        "5": 5,
+        "6": 7,
+        "10": 19,
+        "13": 8,
+        "14": 11,
+        "15": 11,
+        "21": 3,
+        "23": 7,
+        "30": 3,
+        "31": 8
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.45,
+      "to": 0.5,
+      "label": "45-50%",
+      "total": 88,
+      "byColor": {
+        "3": 8,
+        "5": 3,
+        "6": 4,
+        "10": 17,
+        "13": 6,
+        "14": 16,
+        "15": 13,
+        "21": 1,
+        "23": 10,
+        "30": 1,
+        "31": 9
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.5,
+      "to": 0.55,
+      "label": "50-55%",
+      "total": 89,
+      "byColor": {
+        "3": 11,
+        "5": 3,
+        "6": 2,
+        "10": 10,
+        "13": 4,
+        "14": 19,
+        "15": 16,
+        "21": 2,
+        "23": 7,
+        "30": 2,
+        "31": 13
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.55,
+      "to": 0.6,
+      "label": "55-60%",
+      "total": 88,
+      "byColor": {
+        "3": 17,
+        "5": 4,
+        "6": 3,
+        "10": 5,
+        "13": 1,
+        "14": 15,
+        "15": 11,
+        "21": 5,
+        "23": 6,
+        "30": 3,
+        "31": 18
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.6,
+      "to": 0.65,
+      "label": "60-65%",
+      "total": 88,
+      "byColor": {
+        "1": 1,
+        "3": 13,
+        "5": 3,
+        "6": 5,
+        "10": 5,
+        "14": 16,
+        "15": 11,
+        "21": 9,
+        "23": 8,
+        "31": 17
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.65,
+      "to": 0.7,
+      "label": "65-70%",
+      "total": 88,
+      "byColor": {
+        "1": 2,
+        "3": 20,
+        "5": 4,
+        "6": 1,
+        "10": 5,
+        "14": 18,
+        "15": 13,
+        "21": 7,
+        "23": 8,
+        "31": 10
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.7,
+      "to": 0.75,
+      "label": "70-75%",
+      "total": 88,
+      "byColor": {
+        "3": 19,
+        "5": 5,
+        "10": 6,
+        "14": 20,
+        "15": 23,
+        "23": 12,
+        "31": 3
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.75,
+      "to": 0.8,
+      "label": "75-80%",
+      "total": 89,
+      "byColor": {
+        "3": 30,
+        "5": 8,
+        "10": 10,
+        "14": 8,
+        "15": 20,
+        "23": 12,
+        "31": 1
+      },
+      "peaks": []
+    },
+    {
+      "from": 0.8,
+      "to": 0.85,
+      "label": "80-85%",
+      "total": 88,
+      "byColor": {
+        "3": 48,
+        "5": 6,
+        "10": 2,
+        "15": 19,
+        "23": 7,
+        "31": 6
+      },
+      "peaks": [
+        {
+          "color": 3,
+          "pxInWindow": 48,
+          "shareInWindow": 0.5455
+        }
+      ]
+    },
+    {
+      "from": 0.85,
+      "to": 0.9,
+      "label": "85-90%",
+      "total": 88,
+      "byColor": {
+        "3": 63,
+        "15": 12,
+        "23": 2,
+        "31": 11
+      },
+      "peaks": [
+        {
+          "color": 3,
+          "pxInWindow": 63,
+          "shareInWindow": 0.7159
+        }
+      ]
+    },
+    {
+      "from": 0.9,
+      "to": 0.95,
+      "label": "90-95%",
+      "total": 88,
+      "byColor": {
+        "3": 62,
+        "15": 7,
+        "31": 19
+      },
+      "peaks": [
+        {
+          "color": 3,
+          "pxInWindow": 62,
+          "shareInWindow": 0.7045
+        }
+      ]
+    },
+    {
+      "from": 0.95,
+      "to": 1,
+      "label": "95-100%",
+      "total": 89,
+      "byColor": {
+        "3": 59,
+        "31": 30
+      },
+      "peaks": [
+        {
+          "color": 3,
+          "pxInWindow": 59,
+          "shareInWindow": 0.6629
+        }
+      ]
+    }
+  ],
+  "demandPeaks": [
+    {
+      "windowIndex": 0,
+      "window": "0-5%",
+      "from": 0,
+      "to": 0.05,
+      "color": 3,
+      "pxInWindow": 61,
+      "shareInWindow": 0.6932
+    },
+    {
+      "windowIndex": 1,
+      "window": "5-10%",
+      "from": 0.05,
+      "to": 0.1,
+      "color": 3,
+      "pxInWindow": 41,
+      "shareInWindow": 0.4659
+    },
+    {
+      "windowIndex": 16,
+      "window": "80-85%",
+      "from": 0.8,
+      "to": 0.85,
+      "color": 3,
+      "pxInWindow": 48,
+      "shareInWindow": 0.5455
+    },
+    {
+      "windowIndex": 17,
+      "window": "85-90%",
+      "from": 0.85,
+      "to": 0.9,
+      "color": 3,
+      "pxInWindow": 63,
+      "shareInWindow": 0.7159
+    },
+    {
+      "windowIndex": 18,
+      "window": "90-95%",
+      "from": 0.9,
+      "to": 0.95,
+      "color": 3,
+      "pxInWindow": 62,
+      "shareInWindow": 0.7045
+    },
+    {
+      "windowIndex": 19,
+      "window": "95-100%",
+      "from": 0.95,
+      "to": 1,
+      "color": 3,
+      "pxInWindow": 59,
+      "shareInWindow": 0.6629
+    }
+  ],
+  "gateCandidates": [],
+  "imageUpperBound": {
+    "verdict": "图不行",
+    "level": 0,
+    "gateWindowCount": 0,
+    "gateWindows": [],
+    "gateBands": [],
+    "distinctGateBands": 0,
+    "reason": "20–90% 有 2 个需求峰，但对应颜色开局可达或总像素 <60，不能作为门候补",
+    "notes": [
+      "7 个颜色开局就有像素可达（贴边或经 0 连通到图边），按规则不作为门候补；它们从 0% 就能吃，不能被后置的门整体卡住。",
+      "峰阈值：窗口内占比 ≥30% 且 ≥40px；门候补总量 ≥60px（均为暂定值）。"
+    ]
+  },
+  "diagnostics": {
+    "eCell": {
+      "model": "literal-per-cell-bfs",
+      "maxE": 0.011338,
+      "pxAtLeast30Pct": 0,
+      "note": "任务书字面“每进入一个彩色格计 1”的 4 邻接 BFS。图里没有不可吃格，最短路只能到最近图边，E 上限约 min(H,W)/2 ÷ H×W；40×40 实测 1.19%、48×48 0.998%。仅作“挡不住”的证明，不参与 v2 判定。"
+    },
+    "blockModel": {
+      "layerDepth": 0,
+      "candidateColors": [],
+      "maxBorderBlobShare": 0.02381,
+      "largestBorderBlob": {
+        "color": 3,
+        "size": 438,
+        "borderPx": 42
+      },
+      "verdict": "图不行",
+      "colors": [
+        {
+          "color": 1,
+          "px": 4,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.001134,
+            "p50": 0.004252,
+            "p90": 0.011338
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 3,
+          "px": 570,
+          "borderPx": 68,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0,
+            "p90": 0
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 5,
+          "px": 55,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.014739,
+            "p50": 0.037982,
+            "p90": 0.048526
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 6,
+          "px": 62,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.002268,
+            "p50": 0.005669,
+            "p90": 0.013605
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 10,
+          "px": 119,
+          "borderPx": 2,
+          "eQuantiles": {
+            "p10": 0.009637,
+            "p50": 0.010204,
+            "p90": 0.041383
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 13,
+          "px": 100,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.002268,
+            "p50": 0.004535,
+            "p90": 0.014172
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 14,
+          "px": 173,
+          "borderPx": 1,
+          "eQuantiles": {
+            "p10": 0.003968,
+            "p50": 0.037982,
+            "p90": 0.043424
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 15,
+          "px": 230,
+          "borderPx": 52,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0,
+            "p90": 0.00737
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 21,
+          "px": 92,
+          "borderPx": 3,
+          "eQuantiles": {
+            "p10": 0.002268,
+            "p50": 0.006236,
+            "p90": 0.020295
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 23,
+          "px": 121,
+          "borderPx": 36,
+          "eQuantiles": {
+            "p10": 0,
+            "p50": 0,
+            "p90": 0
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 30,
+          "px": 16,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.014172,
+            "p50": 0.014172,
+            "p90": 0.024376
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 31,
+          "px": 221,
+          "borderPx": 2,
+          "eQuantiles": {
+            "p10": 0.001134,
+            "p50": 0.00907,
+            "p90": 0.053855
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        },
+        {
+          "color": 34,
+          "px": 1,
+          "borderPx": 0,
+          "eQuantiles": {
+            "p10": 0.014172,
+            "p50": 0.014172,
+            "p90": 0.014172
+          },
+          "chokeWindowPx30to85": 0,
+          "isCandidate": false
+        }
+      ],
+      "note": "已被 v2 取代：挡不住的证明见逐格 BFS 的 E 上限（只能到最近图边的距离，40×40 实测 1.19%、48×48 0.998%），永远到不了 30%。v1 layerDepth 不参与 v2 verdict。"
+    }
+  }
+}
