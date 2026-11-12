@@ -15,7 +15,14 @@
  *   greedy  —— lure：本步吃得最多，平手暂存少（PressureBuild_v5.playPath 'lure'）。
  *
  * 用法：
- *   node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] --out <目录>
+ *   node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] [--no-mcfd] --out <目录>
+ *
+ * --no-mcfd：
+ *   不统计每步的 M/C/F/D，只记 buffer / progress / gain。
+ *   随机玩家的选路逻辑与随机数消耗完全不变（仍然是同一洗牌序列、同一个“当步不死”），
+ *   因此同种子下通关率与带统计时**逐局相同**；只是不再对所有合法选项预展开，
+ *   速度约快 3–8 倍（关卡越复杂、合法选项越多，差距越大）。
+ *   不带此开关时统计选项，速度慢 3–8 倍。
  *
  * 输出（单文件输入直接写到 --out；目录输入写到 --out/<关名>/）：
  *   routes_seed<种子>.json  { level, seed, player:'random', games:[
@@ -49,8 +56,11 @@ const Sim = A.Simulator, St = A.SolverStrategy;
 // ==================== 参数 ====================
 function usage(msg) {
   if (msg) console.error(msg);
-  console.error('用法: node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] --out <目录>');
-  process.exit(2);
+  console.error('用法: node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] [--no-mcfd] --out <目录>');
+  console.error('  --no-mcfd  不统计每步 M/C/F/D，只记 buffer/进度/gain；通关率不变，速度约快 3–8 倍');
+  console.error('             （不带此开关时统计选项，速度慢 3–8 倍）');
+  console.error('  --help     显示本帮助');
+  process.exit(msg ? 2 : 0);
 }
 const args = process.argv.slice(2);
 const flags = {};
@@ -65,6 +75,7 @@ for (let i = 0; i < args.length; i++) {
   } else positionals.push(a);
 }
 const INPUT = positionals[0];
+if (flags.help) usage();
 if (!INPUT) usage('缺少关卡输入');
 const NRAND = flags.random === undefined ? 100 : Number(flags.random);
 if (!Number.isFinite(NRAND) || NRAND < 1) usage('--random 必须是正整数');
@@ -73,6 +84,7 @@ const SEEDS = String(flags.seeds === undefined ? '1,2,3' : flags.seeds)
 if (!SEEDS.length) usage('--seeds 解析为空');
 const DO_SKILLED = !!flags.skilled;
 const DO_GREEDY = !!flags.greedy;
+const NO_MCFD = !!flags['no-mcfd'];
 const OUT = flags.out === true || flags.out === undefined ? '' : String(flags.out);
 if (!OUT) usage('需要 --out <目录>');
 
@@ -151,6 +163,7 @@ function lurePath(lv) {
 // 但 random 玩家仍然**洗牌整张合法车列表**（与 PressureBuild 相同的随机数消耗），
 // 再按洗牌顺序找第一个“当步不死”的选项。
 function runRandom(lv, rnd) {
+  if (NO_MCFD) return runRandomNoStats(lv, rnd);
   let s = Sim.createState(lv, { useSlotStart: true, instantChain: false });
   const route = [];
   let maxBuffer = s.buffer.length;
@@ -208,6 +221,55 @@ function runRandom(lv, rnd) {
       progress: round(progress, 6),
       gain: pick.gain,
       M: ms.length, C, F, D
+    });
+    s = pick.t;
+    if (s.buffer.length > maxBuffer) maxBuffer = s.buffer.length;
+  }
+  return { won: true, steps: route.length, deathStep: null, deathProgress: null, maxBuffer, route };
+}
+
+// —— --no-mcfd：跳过 M/C/F/D 统计的快路径 ——
+// 决策与随机数消耗与 runRandom 完全相同：同样对合法车列表洗牌（ms.length-1 次随机数），
+// 再按洗牌顺序逐个 cloneState+applyPick 找第一个“当步不死”的选项。
+// 区别只是**不预展开所有选项**、不统计 M/C/F/D，因此同种子下逐局路线与通关率不变。
+function runRandomNoStats(lv, rnd) {
+  let s = Sim.createState(lv, { useSlotStart: true, instantChain: false });
+  const route = [];
+  let maxBuffer = s.buffer.length;
+  while (!isWon(s)) {
+    const bufBefore = s.buffer.length;
+    const progress = s.eliminatedPixels / s.totalPixels;
+    const ms = Sim.listMoves(s).filter(m => !m.blocked);
+
+    // 洗牌：与 runRandom / PressureBuild 完全相同的 LCG 消耗（ms.length-1 次）
+    const idx = ms.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const x = idx[i]; idx[i] = idx[j]; idx[j] = x; }
+
+    let pick = null;
+    for (const k of idx) {
+      const m = ms[k];
+      const t = St.cloneState(s);
+      const e0 = t.eliminatedPixels;
+      if (!Sim.applyPick(t, m.r, m.c)) continue;
+      if (!isDead(t) || isWon(t)) { pick = { r: m.r, c: m.c, t, gain: t.eliminatedPixels - e0 }; break; }
+    }
+    if (!pick) {
+      if (bufBefore > maxBuffer) maxBuffer = bufBefore;
+      return {
+        won: false,
+        steps: route.length,
+        deathStep: route.length,
+        deathProgress: round(progress, 6),
+        maxBuffer,
+        route
+      };
+    }
+    route.push({
+      step: route.length + 1,
+      r: pick.r, c: pick.c,
+      buffer: bufBefore,
+      progress: round(progress, 6),
+      gain: pick.gain
     });
     s = pick.t;
     if (s.buffer.length > maxBuffer) maxBuffer = s.buffer.length;
