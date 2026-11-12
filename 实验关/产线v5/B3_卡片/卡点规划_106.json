@@ -2,40 +2,100 @@
   "image": "106",
   "source": "/Users/red/Desktop/正常关卡/106.txt",
   "imageVerdict": "两条分开的需求带（两个不同门色）",
-  "draft": true,
-  "needUserReview": ["门的强度（门后放几辆车）", "代价色是否真的要等那么久", "第二种过法是否值得保留"],
+  "draft": false,
+  "needUserReview": [
+    "后段门用 14+3 还是改用 32+30（3 色只有一辆，代价偏重）",
+    "后段要不要保留第二种过法"
+  ],
   "gates": [
     {
       "gateId": 1,
-      "progressWindow": [0.20, 0.25],
+      "progressWindow": [
+        0.2,
+        0.3
+      ],
       "gateColor": 32,
-      "fact": { "totalPx": 323, "cumulativeBefore": 70, "gatedPx": 253, "windowDemandPx": 43, "shareInWindow": 0.42 },
+      "fact": {
+        "totalPx": 323,
+        "cumulativeBefore": 70,
+        "pickedBy": 0.3,
+        "gatedPx": null
+      },
       "door": {
         "type": "chain2",
-        "keyCar": { "color": 32, "capacity": 35, "why": "进场当步应吃满（窗口内该色 43px）" },
-        "priceCar": { "color": 11, "capacity": 25, "why": "代价；11 在 20–30% 仍有 22/16px，之后可回收" },
-        "heldBehindDoor": "门后放 4–5 辆 32（约 130–165px），门外留 2 辆（约 70px，正好等于窗口前累计）"
+        "keyCar": {
+          "r": 2,
+          "c": 6,
+          "color": 32,
+          "capacity": 43,
+          "medianFirstClick": 0.248,
+          "why": "窗口内可点；容量 43，需窗口内 32 色可达 ≥43px"
+        },
+        "priceCar": {
+          "r": 1,
+          "c": 6,
+          "color": 28,
+          "capacity": 43,
+          "medianFirstClick": 0.29,
+          "why": "与钥匙正交相邻；28 后续窗口仍有需求，可回收"
+        },
+        "heldBehindDoor": "另把 r3c3 的 32:43（中位 0.255）加数字冰，值≈窗口结束时已拿车数的 60%，等于门后再留一辆"
       },
-      "keyVisibleWhy": "消融序列显示 20–25% 窗口里 32 是新暴露的头号色（43/101px）；建造时须确认门在第 1–2 行，开局就能看见 32 在吃",
-      "priceRecovery": "11 在 25–30% 露出 16px、30–35% 仍需检查；若 11 后续不足，改用 30（25–30% 有 13px）",
-      "secondRoute": { "type": "ice", "target": "门外那辆 32", "steps": "比门晚 6–10 辆" },
-      "breathBefore": "0–20% 不设门；该段压力靠位置（预计 ≤0.3）"
+      "keyVisibleWhy": "32 在 20–30% 是头号需求色（43/39px/窗口）；r2c6 在盘右边缘，第 2 行即可见",
+      "priceRecovery": "28 在 r1c6 后方还有 r1c5/r0c4/r0c6/r2c0/r3c2/r5c6 共 6 辆同色车，容量充足",
+      "secondRoute": {
+        "type": "ice",
+        "target": "r3c3 的 32:43",
+        "steps": "冰化时间比门晚 6–10 辆"
+      },
+      "breathBefore": "0–20% 无门；这段靠位置加压"
     },
     {
       "gateId": 2,
-      "progressWindow": [0.65, 0.70],
+      "progressWindow": [
+        0.75,
+        0.85
+      ],
       "gateColor": 14,
-      "fact": { "totalPx": 336, "cumulativeBefore": 109, "gatedPx": 227, "windowDemandPx": 53, "shareInWindow": 0.52 },
+      "fact": {
+        "totalPx": 336,
+        "cumulativeBefore": 109,
+        "pickedBy": 0.85,
+        "gatedPx": null
+      },
       "door": {
         "type": "chain2",
-        "keyCar": { "color": 14, "capacity": 40, "why": "窗口内 14 有 53px，40 可当步吃满" },
-        "priceCar": { "color": 28, "capacity": 25, "why": "代价；28 在 65–75% 有 20/15px" },
-        "heldBehindDoor": "门后放 4 辆 14（约 115–130px），门外留约 109px（=窗口前累计）"
+        "keyCar": {
+          "r": 6,
+          "c": 0,
+          "color": 14,
+          "capacity": 35,
+          "medianFirstClick": 0.79,
+          "why": "底座上 14 色最晚可点的车；窗口内 14 有 52px，35 可吃满"
+        },
+        "priceCar": {
+          "r": 5,
+          "c": 0,
+          "color": 3,
+          "capacity": 40,
+          "medianFirstClick": 0.7,
+          "why": "与钥匙正交相邻；3 色仅此一辆，作为代价偏重，需人判"
+        },
+        "heldBehindDoor": "门上只挡这两辆；后段不再加冰（后段加冰会变成长磨）"
       },
-      "keyVisibleWhy": "65–80% 三个窗口 14 都是头号色（53/64/52px）；后段门，玩家到那时已经学会看色",
-      "priceRecovery": "28 在 70–75% 有 15px；若不足，代价色改用 21（65–70% 9px，偏弱，需人判）",
-      "secondRoute": { "type": "ice", "target": "门外那辆 14", "steps": "比门晚 6–10 辆" },
-      "breathBefore": "30–60% 是长段：靠位置加压，目标 freeP3 0.25–0.35"
+      "keyVisibleWhy": "14 在 65–80% 三个窗口都是头号色（53/64/52px）；r6c0 在底角，后段才可点，位置天然是“后段门”",
+      "priceRecovery": "3 色只有这一辆车，代价 40px 需要在 85% 后被回收；如果回收不了，改用 r6c5 的 32:22 + r5c5 的 30:43 组门",
+      "secondRoute": {
+        "type": "none",
+        "why": "后段不再留第二种过法，避免“错过就死”的窗口过窄；改为把门提前到 75%"
+      },
+      "breathBefore": "30–75% 是长段：靠位置与一把小冰加压"
     }
-  ]
+  ],
+  "revisedBy": "S1.5 卡片可行性核对（2026-11-12）：窗口与容量改为实际车",
+  "feasibility": {
+    "base": "实验关/产线v5/C1_建造/106_base/关卡_ZC_106_default.json",
+    "method": "20 局随机玩家，每辆车首次可点进度的中位数",
+    "note": "门只能延迟、不能提前；以下窗口由实际车的中位可点进度决定，不再用原卡片的 20-25%/65-70%"
+  }
 }
