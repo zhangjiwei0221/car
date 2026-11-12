@@ -15,8 +15,11 @@
  *   greedy  —— lure：本步吃得最多，平手暂存少（PressureBuild_v5.playPath 'lure'）。
  *
  * 用法：
- *   node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] [--no-mcfd] --out <目录>
+ *   node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] [--no-mcfd] [--bottom-only] --out <目录>
  *
+ * --bottom-only：
+ *   目标图只开底边入口（上/左/右为墙），corner 选取顺序不变；棋盘取盒不变。
+ *   默认关闭（四边入口）。
  * --no-mcfd：
  *   不统计每步的 M/C/F/D，只记 buffer / progress / gain。
  *   随机玩家的选路逻辑与随机数消耗完全不变（仍然是同一洗牌序列、同一个“当步不死”），
@@ -56,9 +59,10 @@ const Sim = A.Simulator, St = A.SolverStrategy;
 // ==================== 参数 ====================
 function usage(msg) {
   if (msg) console.error(msg);
-  console.error('用法: node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] [--no-mcfd] --out <目录>');
+  console.error('用法: node PopulationSim_v1.js <关卡.json | 目录> --random 100 --seeds 1,2,3 [--skilled] [--greedy] [--no-mcfd] [--bottom-only] --out <目录>');
   console.error('  --no-mcfd  不统计每步 M/C/F/D，只记 buffer/进度/gain；通关率不变，速度约快 3–8 倍');
   console.error('             （不带此开关时统计选项，速度慢 3–8 倍）');
+  console.error('  --bottom-only  目标图只开底边入口（上/左/右为墙）；默认四边入口');
   console.error('  --help     显示本帮助');
   process.exit(msg ? 2 : 0);
 }
@@ -85,6 +89,7 @@ if (!SEEDS.length) usage('--seeds 解析为空');
 const DO_SKILLED = !!flags.skilled;
 const DO_GREEDY = !!flags.greedy;
 const NO_MCFD = !!flags['no-mcfd'];
+const BOTTOM_ONLY = !!flags['bottom-only'];
 const OUT = flags.out === true || flags.out === undefined ? '' : String(flags.out);
 if (!OUT) usage('需要 --out <目录>');
 
@@ -111,7 +116,7 @@ function round(x, n) { const p = Math.pow(10, n); return Math.round(x * p) / p; 
 
 // —— free-first（原样搬运 PressureBuild_v5.freePath；额外记录终态进度/maxBuffer）——
 function freePath(lv) {
-  const s0 = Sim.createState(lv, { useSlotStart: true, instantChain: false });
+  const s0 = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   let s = s0; const bufs = [];
   let maxBuffer = s.buffer.length;
   for (let i = 0; i < 80 && !isWon(s); i++) {
@@ -141,7 +146,7 @@ function freePath(lv) {
 
 // —— lure：原样搬运 PressureBuild_v5.playPath('lure') ——
 function lurePath(lv) {
-  let s = Sim.createState(lv, { useSlotStart: true, instantChain: false });
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   const open = legalN(s);
   const bufs = [];
   let maxBuffer = s.buffer.length;
@@ -164,7 +169,7 @@ function lurePath(lv) {
 // 再按洗牌顺序找第一个“当步不死”的选项。
 function runRandom(lv, rnd) {
   if (NO_MCFD) return runRandomNoStats(lv, rnd);
-  let s = Sim.createState(lv, { useSlotStart: true, instantChain: false });
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   const route = [];
   let maxBuffer = s.buffer.length;
   while (!isWon(s)) {
@@ -233,7 +238,7 @@ function runRandom(lv, rnd) {
 // 再按洗牌顺序逐个 cloneState+applyPick 找第一个“当步不死”的选项。
 // 区别只是**不预展开所有选项**、不统计 M/C/F/D，因此同种子下逐局路线与通关率不变。
 function runRandomNoStats(lv, rnd) {
-  let s = Sim.createState(lv, { useSlotStart: true, instantChain: false });
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   const route = [];
   let maxBuffer = s.buffer.length;
   while (!isWon(s)) {

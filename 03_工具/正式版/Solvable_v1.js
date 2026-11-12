@@ -12,7 +12,9 @@
  *                     证明无解是 T6b 的活，不在本工具的输出含义内。
  *
  * 用法：
- *   node Solvable_v1.js <关卡.json> [--width 16] [--timeout 30] [--out 结果.json]
+ *   node Solvable_v1.js <关卡.json> [--width 16] [--timeout 30] [--bottom-only] [--out 结果.json]
+ *
+ * --bottom-only：目标图只开底边入口（上/左/右为墙），corner 顺序不变；默认四边入口。
  *
  * 输出（控制台一行 JSON）：
  *   {level, width, solvable, steps, bestPx, totalPx, sec, timedOut}
@@ -40,13 +42,14 @@ const arg = (k, d) => {
 
 const input = process.argv[2];
 if (!input || input.startsWith('--')) {
-  console.error('用法: node Solvable_v1.js <关卡.json> [--width 16] [--timeout 30] [--out 结果.json]');
+  console.error('用法: node Solvable_v1.js <关卡.json> [--width 16] [--timeout 30] [--bottom-only] [--out 结果.json]');
   process.exit(2);
 }
 
 const width = Math.max(1, parseInt(arg('--width', '16'), 10) || 16);
 const timeoutSec = Math.max(0, parseFloat(arg('--timeout', '30')) || 0);
 const outFile = arg('--out', null);
+const bottomOnly = process.argv.includes('--bottom-only');
 
 function fail(msg) {
   console.error(msg);
@@ -92,7 +95,7 @@ function solve() {
   const t0 = Date.now();
   const deadline = timeoutSec > 0 ? t0 + timeoutSec * 1000 : Infinity;
 
-  const s0 = Sim.createState(level, { useSlotStart: true, instantChain: false });
+  const s0 = Sim.createState(level, { useSlotStart: true, bottomOnly, instantChain: false });
   const totalPx = s0.totalPixels || level.totalPixels || 0;
   let bestPx = s0.eliminatedPixels || 0;
 
