@@ -1,7 +1,7 @@
 # v5-0：致命选项指标 × 分组2 线上（②列）相关性。用法：python3 corr.py
 import json, csv, math, glob, os
 D = os.path.dirname(os.path.abspath(__file__))
-CSV = os.path.join(D, '../../../测试版本/2026_10_05/分组2-20261110-新指标.csv')
+CSV = os.path.join(D, '../../../测试版本/2026_11_05/分组2-20261110-新指标.csv')
 r = [x for x in csv.reader(open(CSV, encoding='utf-8-sig')) if x and x[0].strip()]
 ix = {k: i for i, k in enumerate(r[0])}
 on = {}

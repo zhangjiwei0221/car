@@ -27,7 +27,7 @@ const MIN_BLOB = 40; // 一辆车典型容量
 
 const TXT_DIR = '/Users/red/Desktop/正常关卡';
 const TXT_NAMES = ['106', '91', '23', '18'];
-const G2_DIR = '/Users/red/Desktop/毛线汽车/测试版本/2026_10_05/分组2';
+const G2_DIR = '/Users/red/Desktop/毛线汽车/测试版本/2026_11_05/分组2';
 const G2_LEVELS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
 // 已知量（L2–L13 顺序）

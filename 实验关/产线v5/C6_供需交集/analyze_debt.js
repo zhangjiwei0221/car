@@ -31,8 +31,8 @@ const Sim = A.Simulator;
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const ROUTES = arg('--routes', path.join(__dirname, 'routes'));
-const LEVELS = arg('--levels', path.join(__dirname, '../../../测试版本/2026_10_05/分组2'));
-const CSV = arg('--csv', path.join(__dirname, '../../../测试版本/2026_10_05/分组2-20261110-新指标.csv'));
+const LEVELS = arg('--levels', path.join(__dirname, '../../../测试版本/2026_11_05/分组2'));
+const CSV = arg('--csv', path.join(__dirname, '../../../测试版本/2026_11_05/分组2-20261110-新指标.csv'));
 const OUT = arg('--out', path.join(__dirname, 'debt_summary.json'));
 const LEVEL_IDS = (arg('--level-ids', '2,3,4,5,6,7,8,9,10,11,12,13'))
   .split(',').map(s => Number(s.trim())).filter(Number.isFinite);

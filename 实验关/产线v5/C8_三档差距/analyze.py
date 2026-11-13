@@ -4,7 +4,7 @@
 
 用法：
   python3 -I analyze.py --solvable DIR --greedy DIR --random DIR \
-      --csv 测试版本/2026_10_05/分组2-20261110-新指标.csv --out result.json
+      --csv 测试版本/2026_11_05/分组2-20261110-新指标.csv --out result.json
 
 只读输入，不改任何现有文件。Spearman 用平均秩处理并列（不依赖 scipy）。
 """
