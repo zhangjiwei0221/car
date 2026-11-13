@@ -1,0 +1,782 @@
+{
+  "generatedAt": "2026-11-13T01:42:25.960Z",
+  "level": "/Users/red/Desktop/ParkPassenger.app/Contents/Resources/bin/G3_bq_level_2.json",
+  "config": {
+    "mode": "a",
+    "ref": "corner",
+    "useSlotStart": true,
+    "instantChain": false
+  },
+  "summary": {
+    "count": 10,
+    "exactStateMatch": 4,
+    "triggerOnlyMatch": 6,
+    "preheatClicks": {
+      "3": 10
+    },
+    "allPass": true,
+    "note": "exactStateMatch：预热后棋盘/暂存/数字冰/已消像素（归一）均与源序列的点击前状态一致；triggerOnlyMatch：棋盘/数字冰/已消像素（归一）一致，暂存按 remaining 重建（need/progress 不同），触发数字一致。"
+  },
+  "entries": [
+    {
+      "file": "BUG_1_G3-2.json",
+      "sourceSequence": 1,
+      "tier": "精确法（count=need，已吃像素退回目标图）",
+      "preheatClickOrder": [
+        {
+          "row": 1,
+          "col": 5,
+          "color": 26,
+          "count": 38
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 33
+        },
+        {
+          "row": 4,
+          "col": 5,
+          "color": 20,
+          "count": 30
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 4,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": "28/82/0|28/62/0|31/54/0|32/53/0|30/53/0|.|26/50/1|28/25/0|28/46/0|30/40/0|32/40/0|P:11:15/21,15/28,31/40|.|27/24/1|24/24/0|13/36/0|13/36/0|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|.|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#152#26/38/9,24/33/0,20/30/0#1,3=4,3,4=16",
+        "sourceEliminatedPixels": 152,
+        "rebuildPreEliminatedPixels": 143,
+        "matches": {
+          "cells": true,
+          "buffer": true,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 26,
+          "need": 38,
+          "progress": 9,
+          "remaining": 29
+        },
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 0,
+          "remaining": 33
+        },
+        {
+          "color": 20,
+          "need": 30,
+          "progress": 0,
+          "remaining": 30
+        }
+      ]
+    },
+    {
+      "file": "BUG_2_G3-2.json",
+      "sourceSequence": 2,
+      "tier": "精确法（count=need，已吃像素退回目标图）",
+      "preheatClickOrder": [
+        {
+          "row": 1,
+          "col": 5,
+          "color": 26,
+          "count": 38
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 33
+        },
+        {
+          "row": 4,
+          "col": 5,
+          "color": 20,
+          "count": 30
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 4,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": "28/82/0|28/62/0|.|32/53/0|15/21/0|.|26/50/1|28/25/0|28/46/0|30/40/0|32/40/0|P:11:15/28,31/40|.|27/24/1|24/24/0|13/36/0|13/36/0|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#223#26/38/3,24/33/0,20/30/0#1,3=3,3,4=15",
+        "sourceEliminatedPixels": 223,
+        "rebuildPreEliminatedPixels": 220,
+        "matches": {
+          "cells": true,
+          "buffer": true,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 26,
+          "need": 38,
+          "progress": 3,
+          "remaining": 35
+        },
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 0,
+          "remaining": 33
+        },
+        {
+          "color": 20,
+          "need": 30,
+          "progress": 0,
+          "remaining": 30
+        }
+      ]
+    },
+    {
+      "file": "BUG_3_G3-2.json",
+      "sourceSequence": 3,
+      "tier": "精确法（count=need，已吃像素退回目标图）",
+      "preheatClickOrder": [
+        {
+          "row": 1,
+          "col": 5,
+          "color": 26,
+          "count": 38
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 33
+        },
+        {
+          "row": 4,
+          "col": 5,
+          "color": 20,
+          "count": 30
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 4,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": "28/82/0|28/62/0|.|32/53/0|30/53/0|.|26/50/1|28/25/0|28/46/0|.|32/40/0|P:11:15/21,15/28,31/40|.|27/24/1|24/24/0|13/36/0|13/36/0|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#216#26/38/9,24/33/0,20/30/0#1,3=3,3,4=15",
+        "sourceEliminatedPixels": 216,
+        "rebuildPreEliminatedPixels": 207,
+        "matches": {
+          "cells": true,
+          "buffer": true,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 26,
+          "need": 38,
+          "progress": 9,
+          "remaining": 29
+        },
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 0,
+          "remaining": 33
+        },
+        {
+          "color": 20,
+          "need": 30,
+          "progress": 0,
+          "remaining": 30
+        }
+      ]
+    },
+    {
+      "file": "BUG_4_G3-2.json",
+      "sourceSequence": 8,
+      "tier": "精确法（count=need，已吃像素退回目标图）",
+      "preheatClickOrder": [
+        {
+          "row": 1,
+          "col": 5,
+          "color": 26,
+          "count": 38
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 33
+        },
+        {
+          "row": 4,
+          "col": 5,
+          "color": 20,
+          "count": 30
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 4,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": "28/82/0|28/62/0|.|32/53/0|15/28/0|.|26/50/1|28/25/0|28/46/0|30/40/0|32/40/0|P:11:31/40|.|27/24/1|24/24/0|13/36/0|13/36/0|13/36/0|.|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#286#26/38/9,24/33/0,20/30/0#1,3=1,3,4=13",
+        "sourceEliminatedPixels": 286,
+        "rebuildPreEliminatedPixels": 277,
+        "matches": {
+          "cells": true,
+          "buffer": true,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 26,
+          "need": 38,
+          "progress": 9,
+          "remaining": 29
+        },
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 0,
+          "remaining": 33
+        },
+        {
+          "color": 20,
+          "need": 30,
+          "progress": 0,
+          "remaining": 30
+        }
+      ]
+    },
+    {
+      "file": "BUG_5_G3-2.json",
+      "sourceSequence": 4,
+      "tier": "任务书法（count=remaining）",
+      "preheatClickOrder": [
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 33
+        },
+        {
+          "row": 3,
+          "col": 6,
+          "color": 18,
+          "count": 1
+        },
+        {
+          "row": 4,
+          "col": 5,
+          "color": 20,
+          "count": 30
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 2,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": ".|28/62/0|.|32/53/0|30/53/0|.|26/50/1|28/25/0|28/46/0|30/40/0|32/40/0|P:11:15/21,15/28,31/40|.|27/24/1|24/24/0|13/36/0|13/36/0|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|.|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#309#24/33/0,18/23/22,20/30/0#1,3=2,3,4=14",
+        "sourceEliminatedPixels": 309,
+        "rebuildPreEliminatedPixels": 309,
+        "matches": {
+          "cells": true,
+          "buffer": false,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 0,
+          "remaining": 33
+        },
+        {
+          "color": 18,
+          "need": 23,
+          "progress": 22,
+          "remaining": 1
+        },
+        {
+          "color": 20,
+          "need": 30,
+          "progress": 0,
+          "remaining": 30
+        }
+      ]
+    },
+    {
+      "file": "BUG_6_G3-2.json",
+      "sourceSequence": 6,
+      "tier": "任务书法（count=remaining）",
+      "preheatClickOrder": [
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 3
+        },
+        {
+          "row": 5,
+          "col": 4,
+          "color": 25,
+          "count": 19
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "color": 28,
+          "count": 18
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 2,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": ".|.|31/54/0|.|30/53/0|.|26/50/1|28/25/0|28/46/0|30/40/0|32/40/0|P:11:15/21,15/28,31/40|.|27/24/1|24/24/0|13/36/0|13/36/0|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|.|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#397#24/33/30,25/26/7,28/62/44#1,3=1,3,4=13",
+        "sourceEliminatedPixels": 397,
+        "rebuildPreEliminatedPixels": 397,
+        "matches": {
+          "cells": true,
+          "buffer": false,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 30,
+          "remaining": 3
+        },
+        {
+          "color": 25,
+          "need": 26,
+          "progress": 7,
+          "remaining": 19
+        },
+        {
+          "color": 28,
+          "need": 62,
+          "progress": 44,
+          "remaining": 18
+        }
+      ]
+    },
+    {
+      "file": "BUG_7_G3-2.json",
+      "sourceSequence": 11,
+      "tier": "任务书法（count=remaining）",
+      "preheatClickOrder": [
+        {
+          "row": 1,
+          "col": 2,
+          "color": 30,
+          "count": 14
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 3
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "color": 28,
+          "count": 18
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 1,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": ".|.|.|32/53/0|15/21/0|.|26/50/1|28/25/0|28/46/0|.|32/40/0|P:11:15/28,31/40|.|27/24/1|24/24/0|13/36/0|13/36/0|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#470#30/40/26,24/33/30,28/62/44#3,4=12",
+        "sourceEliminatedPixels": 470,
+        "rebuildPreEliminatedPixels": 470,
+        "matches": {
+          "cells": true,
+          "buffer": false,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 30,
+          "need": 40,
+          "progress": 26,
+          "remaining": 14
+        },
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 30,
+          "remaining": 3
+        },
+        {
+          "color": 28,
+          "need": 62,
+          "progress": 44,
+          "remaining": 18
+        }
+      ]
+    },
+    {
+      "file": "BUG_8_G3-2.json",
+      "sourceSequence": 22,
+      "tier": "任务书法（count=remaining）",
+      "preheatClickOrder": [
+        {
+          "row": 1,
+          "col": 1,
+          "color": 28,
+          "count": 4
+        },
+        {
+          "row": 4,
+          "col": 5,
+          "color": 20,
+          "count": 3
+        },
+        {
+          "row": 5,
+          "col": 5,
+          "color": 28,
+          "count": 26
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 3,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": ".|.|.|32/53/0|15/21/0|.|26/50/1|.|.|30/40/0|32/40/0|P:11:15/28,31/40|.|27/24/1|24/24/0|.|13/36/0|13/36/0|13/36/0|.|27/18/1|30/23/0|.|1/34/0|13/34/0|19/34/0|.|.|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#597#28/46/42,20/30/27,28/26/0#3,4=8",
+        "sourceEliminatedPixels": 597,
+        "rebuildPreEliminatedPixels": 597,
+        "matches": {
+          "cells": true,
+          "buffer": false,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 28,
+          "need": 46,
+          "progress": 42,
+          "remaining": 4
+        },
+        {
+          "color": 20,
+          "need": 30,
+          "progress": 27,
+          "remaining": 3
+        },
+        {
+          "color": 28,
+          "need": 26,
+          "progress": 0,
+          "remaining": 26
+        }
+      ]
+    },
+    {
+      "file": "BUG_9_G3-2.json",
+      "sourceSequence": 24,
+      "tier": "任务书法（count=remaining）",
+      "preheatClickOrder": [
+        {
+          "row": 2,
+          "col": 0,
+          "color": 24,
+          "count": 4
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "color": 30,
+          "count": 4
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 33
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 1,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": ".|28/62/0|31/54/0|32/53/0|15/28/0|.|26/50/1|.|.|.|32/40/0|P:11:31/40|.|27/24/1|.|.|.|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|31/30/0|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|30/17/0|26/16/0#536#24/24/20,30/40/36,24/33/0#3,4=8",
+        "sourceEliminatedPixels": 536,
+        "rebuildPreEliminatedPixels": 536,
+        "matches": {
+          "cells": true,
+          "buffer": false,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 24,
+          "need": 24,
+          "progress": 20,
+          "remaining": 4
+        },
+        {
+          "color": 30,
+          "need": 40,
+          "progress": 36,
+          "remaining": 4
+        },
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 0,
+          "remaining": 33
+        }
+      ]
+    },
+    {
+      "file": "BUG_10_G3-2.json",
+      "sourceSequence": 29,
+      "tier": "任务书法（count=remaining）",
+      "preheatClickOrder": [
+        {
+          "row": 3,
+          "col": 5,
+          "color": 24,
+          "count": 3
+        },
+        {
+          "row": 5,
+          "col": 5,
+          "color": 28,
+          "count": 24
+        },
+        {
+          "row": 6,
+          "col": 5,
+          "color": 30,
+          "count": 6
+        }
+      ],
+      "triggerClick": {
+        "row": 4,
+        "col": 6,
+        "note": "二锁链 (4,6) 32/22"
+      },
+      "bufAfterEachPreheat": [
+        1,
+        2,
+        3
+      ],
+      "bufEnter": 5,
+      "bufAfter": 1,
+      "overflow": false,
+      "gameOver": false,
+      "deadEnd": false,
+      "stateKey": {
+        "source": ".|.|.|32/53/0|15/28/0|.|26/50/1|28/25/0|.|.|32/40/0|P:11:31/40|.|27/24/1|24/24/0|.|.|13/36/0|13/36/0|.|27/18/1|30/23/0|28/35/0|1/34/0|13/34/0|19/34/0|.|18/23/0|20/22/0|18/31/0|30/30/0|32/30/0|.|.|32/22/2|B|26/28/0|B|3/27/0|25/26/0|.|26/21/2|28/20/0|3/20/0|25/19/0|31/23/0|32/17/0|.|26/16/0#658#24/33/30,28/26/2,30/17/11#3,4=6",
+        "sourceEliminatedPixels": 658,
+        "rebuildPreEliminatedPixels": 658,
+        "matches": {
+          "cells": true,
+          "buffer": false,
+          "numice": true,
+          "eliminatedPixelsNormalized": true
+        },
+        "note": "关卡格式无法预置 eliminatedPixels；重建后 eliminatedPixels + preEliminated 与源状态一致。管道按剩余队列比较（next 仅表示已释放数，队列空时等价）。"
+      },
+      "conservation": {
+        "ok": true,
+        "violations": []
+      },
+      "bufferBeforeDetail": [
+        {
+          "color": 24,
+          "need": 33,
+          "progress": 30,
+          "remaining": 3
+        },
+        {
+          "color": 28,
+          "need": 26,
+          "progress": 2,
+          "remaining": 24
+        },
+        {
+          "color": 30,
+          "need": 17,
+          "progress": 11,
+          "remaining": 6
+        }
+      ]
+    }
+  ]
+}
