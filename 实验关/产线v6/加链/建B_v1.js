@@ -10,7 +10,11 @@
  *   - 两格正交相邻、都是车、都在第 0 行或第 0–1 行。
  *
  * 用法：
- *   node 建B_v1.js <A关卡.json> <r1,c1> <r2,c2> <out.json> [--gid 1]
+ *   node 建B_v1.js <A关卡.json> <r1,c1> <r2,c2> <out.json> [--gid 1] [--allow-valve]
+ *
+ * 逃生阀检查（2026-11-17，EscapeValveCheck_v1）：
+ *   链绑了“开局点一下即吃满”的车 → 满格时唯一能腾位的车被锁住/要 2 空位 → 开局锁死
+ *   （103 的 13 局死因）。默认拒绝这种链；确需实验请加 --allow-valve。
  */
 const fs = require('fs');
 
@@ -32,6 +36,16 @@ function fail(msg) { console.error('FAIL: ' + msg); process.exit(1); }
 const rows = after.spools.length, cols = after.spools[0].length;
 if (Math.max(r1, r2) > 1) fail('两格必须在第 0 行或第 0–1 行');
 if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) fail('两格必须正交相邻');
+
+// 逃生阀检查：默认拒绝“绑开局能一次吃满的车”
+if (!process.argv.includes('--allow-valve')) {
+  const EV = require('../../../03_工具/正式版/EscapeValveCheck_v1.js');
+  const valves = EV.openingValves(before);
+  const vkey = new Set(valves.map(v => v.r + ',' + v.c));
+  const hits = [[r1, c1], [r2, c2]].filter(([r, c]) => vkey.has(r + ',' + c));
+  if (hits.length) fail('链绑了开局逃生阀 ' + hits.map(([r, c]) => `(${r},${c})`).join(' ') +
+    '（点一下即吃满，满格时唯一出路）——确需实验请加 --allow-valve');
+}
 const ca = after.spools[r1][c1], cb = after.spools[r2][c2];
 for (const [r, c, cell] of [[r1, c1, ca], [r2, c2, cb]]) {
   if (!cell || !(cell.id > 0) || !(cell.count > 0)) fail(`(${r},${c}) 不是车`);

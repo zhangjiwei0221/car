@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const B = require(path.join(__dirname, '../../../03_工具/正式版/Build006Thickness_v688.js'));
 const A = B.loadSolver('corner');
+const EV = require(path.join(__dirname, '../../../03_工具/正式版/EscapeValveCheck_v1.js'));
 const Sim = A.Simulator, St = A.SolverStrategy;
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
@@ -31,6 +32,11 @@ const OUT = arg('--out', `/tmp/加链scan_${process.pid}.json`);
 
 const game = JSON.parse(fs.readFileSync(LEVEL, 'utf8'));
 const ROWS = game.spools.length, COLS = game.spools[0].length;
+
+// 开局逃生阀（EscapeValveCheck_v1）：点一下即吃满的车；链绑了它，满格时无路可走（103 的 13 局死因）。
+// 这类候选默认不进排名，只在 excludedValve 里留档。
+const OPENING_VALVES = (() => { try { return EV.openingValves(game); } catch (e) { return []; } })();
+const VALVE_KEY = new Set(OPENING_VALVES.map(v => `${v.r},${v.c}`));
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 function lcg(seed) { let rs = seed; return () => { rs = (rs * 1103515245 + 12345) & 0x7fffffff; return rs / 0x7fffffff; }; }
@@ -222,6 +228,8 @@ for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       a: [r, c], b: [rr, cc], colorA: a.id, capA: a.count, colorB: b.id, capB: b.count,
       actA: aa.median, actB: ab.median, actA_n: aa.n, actB_n: ab.n,
       pickA, pickB,
+      valveA: VALVE_KEY.has(ka), valveB: VALVE_KEY.has(kb),
+      valvePair: VALVE_KEY.has(ka) || VALVE_KEY.has(kb),
       midAct: midA && midB, midPick: midPickA && midPickB, midColor: midColorA && midColorB,
       demandA: da.classify, demandB: db.classify,
       score: (midPickA && midPickB ? 20 : 0) + (midColorA && midColorB ? 10 : 0)
@@ -230,20 +238,30 @@ for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     });
   }
 }
-candidates.sort((x, y) => y.score - x.score);
+// 逃生阀对的候选单独留档，不进排名（绑了阀 = 满格时唯一出路被锁，103 的 13 局死因）
+const excludedValve = candidates.filter(c => c.valvePair);
+const ranked = candidates.filter(c => !c.valvePair);
+ranked.sort((x, y) => y.score - x.score);
 
 const out = {
   tool: '扫描_v1', level: path.basename(LEVEL), seed: SEED, runs: RUNS,
   randomWinRate: runs.filter(x => x.won).length / runs.length,
   freeWon: free.won, freeProgress: r3(free.progress),
   activation, firstPick, colorDemand: colorDemandRows,
-  candidates: candidates.map(c => ({ ...c, actA: r3(c.actA), actB: r3(c.actB), score: r3(c.score) })),
+  openingValves: OPENING_VALVES,
+  candidates: ranked.map(c => ({ ...c, actA: r3(c.actA), actB: r3(c.actB), score: r3(c.score) })),
+  excludedValve: excludedValve.map(c => ({ a: c.a, b: c.b, colorA: c.colorA, colorB: c.colorB, pickA: c.pickA, pickB: c.pickB })),
   runDetails: allRuns.map(x => ({ won: x.won, steps: x.steps, progress: r3(x.progress) })),
   _pid: process.pid
 };
 fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
 console.log('saved', OUT);
 console.log(`random win ${out.randomWinRate}  free won=${free.won} prog=${out.freeProgress}`);
+console.log(`开局逃生阀 ${out.openingValves.length} 个: ${out.openingValves.map(v => `(${v.r},${v.c})色${v.color}/${v.count}`).join(' ') || '无'}`);
+if (out.excludedValve.length) {
+  console.log(`已排除逃生阀对 ${out.excludedValve.length} 组（链绑阀 = 满格时唯一出路被锁，103 的 13 局死因）:`);
+  for (const c of out.excludedValve) console.log(`  ${c.a}(${c.colorA}) + ${c.b}(${c.colorB})  pick=${c.pickA}/${c.pickB}`);
+}
 console.log('\n=== 候选（两车“首次被拿”中位都在 0.20–0.60；行 0 / 0–1）===');
 const usable = out.candidates.filter(c => c.midPick && c.midColor);
 if (!usable.length) console.log('  （无）');

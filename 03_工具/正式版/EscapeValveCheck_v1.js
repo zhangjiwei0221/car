@@ -27,6 +27,9 @@
  * 用法：
  *   node EscapeValveCheck_v1.js <关卡.json | 目录> [--pair r1,c1 r2,c2] [--json] [--out 报告.json]
  *   退出码：0 = 链未绑逃生阀；1 = 绑了；2 = 用法/读取错误。
+ *
+ * 模块用法（供 加链/扫描_v1、建B_v1 复用）：
+ *   const { openingValves, isChainType, stripChains } = require('./EscapeValveCheck_v1');
  */
 const fs = require('fs');
 const path = require('path');
@@ -34,19 +37,9 @@ const B = require('./Build006Thickness_v688');
 const A = B.loadSolver('corner');
 const Sim = A.Simulator, St = A.SolverStrategy;
 
-const argv = process.argv.slice(2);
-const arg = (k, d) => { const i = argv.indexOf(k); return i > 0 ? argv[i + 1] : d; };
-const has = (k) => argv.indexOf(k) > 0;
-const input = argv[0];
-const outFile = arg('--out', null);
-const asJson = has('--json');
-const pairArg = has('--pair') ? [arg('--pair'), argv[argv.indexOf('--pair') + 2]] : null;
-if (!input || input.startsWith('--')) {
-  console.error('用法: node EscapeValveCheck_v1.js <关卡.json | 目录> [--pair r1,c1 r2,c2] [--json] [--out 报告.json]');
-  process.exit(2);
-}
-
 const isChainType = (t) => (Array.isArray(t) ? t.includes(5) : t === 5);
+
+/** 去掉整关的锁链（type 里的 5 与对应 param），用于测“它本来能不能一次吃满”。 */
 function stripChains(g) {
   const c = JSON.parse(JSON.stringify(g));
   for (const row of c.spools) for (const x of row) {
@@ -61,8 +54,8 @@ function stripChains(g) {
   return c;
 }
 
+/** 开局逃生阀：单点后 completedBoxes +1 的车。返回 [{r,c,color,count}]。 */
 function openingValves(g) {
-  // 去掉链再测，才能看清“它本来能不能一次吃满”
   const lv = A.parseLevel(A.fromGameFormat(stripChains(g)));
   const s = Sim.createState(lv, { useSlotStart: true, instantChain: false });
   const valves = [];
@@ -78,7 +71,8 @@ function openingValves(g) {
   return valves;
 }
 
-function checkLevel(file) {
+/** 单文件检查。pairArg 可选：['r,c','r,c']。 */
+function checkLevel(file, pairArg) {
   const g = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (!g || !Array.isArray(g.spools)) return { file: path.basename(file), skipped: '不是关卡（无 spools）', ok: true };
   const valves = openingValves(g);
@@ -96,34 +90,51 @@ function checkLevel(file) {
   return { file: path.basename(file), valves, chained, hits, ok: hits.length === 0 };
 }
 
-const files = fs.statSync(input).isDirectory()
-  ? fs.readdirSync(input).filter(f => f.endsWith('.json')).sort().map(f => path.join(input, f))
-  : [input];
-const results = [];
-for (const f of files) {
-  try { results.push(checkLevel(f)); }
-  catch (e) { results.push({ file: path.basename(f), error: e.message, ok: false }); }
+function main() {
+  const argv = process.argv.slice(2);
+  const arg = (k, d) => { const i = argv.indexOf(k); return i > 0 ? argv[i + 1] : d; };
+  const has = (k) => argv.indexOf(k) > 0;
+  const input = argv[0];
+  const outFile = arg('--out', null);
+  const asJson = has('--json');
+  const pairArg = has('--pair') ? [arg('--pair'), argv[argv.indexOf('--pair') + 2]] : null;
+  if (!input || input.startsWith('--')) {
+    console.error('用法: node EscapeValveCheck_v1.js <关卡.json | 目录> [--pair r1,c1 r2,c2] [--json] [--out 报告.json]');
+    process.exit(2);
+  }
+
+  const files = fs.statSync(input).isDirectory()
+    ? fs.readdirSync(input).filter(f => f.endsWith('.json')).sort().map(f => path.join(input, f))
+    : [input];
+  const results = [];
+  for (const f of files) {
+    try { results.push(checkLevel(f, pairArg)); }
+    catch (e) { results.push({ file: path.basename(f), error: e.message, ok: false }); }
+  }
+
+  if (asJson) {
+    const out = { tool: 'EscapeValveCheck_v1', results };
+    console.log(JSON.stringify(out, null, 1));
+    if (outFile) fs.writeFileSync(outFile, JSON.stringify(out, null, 1));
+  } else {
+    for (const r of results) {
+      if (r.skipped) { if (has('--verbose')) console.log(`[SKIP] ${r.file}: ${r.skipped}`); continue; }
+      if (r.error) { console.log(`[ERR ] ${r.file}: ${r.error}`); continue; }
+      const vtxt = r.valves.length ? r.valves.map(v => `(${v.r},${v.c})色${v.color}/${v.count}`).join(' ') : '无';
+      if (r.hits.length) {
+        console.log(`[FAIL] ${r.file}: 链格 ${r.hits.map(t => `(${t.r},${t.c})色${t.color}/${t.count}`).join(' ')} 是开局逃生阀（点一下即吃满）——链会把它锁住/要 2 空位，满格时无路可走`);
+      } else if (r.chained.length) {
+        console.log(`[PASS] ${r.file}: ${r.chained.length} 个链格均不是逃生阀`);
+      } else {
+        console.log(`[INFO] ${r.file}: 无锁链；开局逃生阀 ${r.valves.length} 个`);
+      }
+      console.log(`       开局逃生阀: ${vtxt}`);
+    }
+    if (outFile) fs.writeFileSync(outFile, JSON.stringify({ tool: 'EscapeValveCheck_v1', results }, null, 1));
+  }
+  const bad = results.some(r => r.hits && r.hits.length && (pairArg || r.chained.length));
+  process.exit(bad ? 1 : 0);
 }
 
-if (asJson) {
-  const out = { tool: 'EscapeValveCheck_v1', results };
-  console.log(JSON.stringify(out, null, 1));
-  if (outFile) fs.writeFileSync(outFile, JSON.stringify(out, null, 1));
-} else {
-  for (const r of results) {
-    if (r.skipped) { if (has('--verbose')) console.log(`[SKIP] ${r.file}: ${r.skipped}`); continue; }
-    if (r.error) { console.log(`[ERR ] ${r.file}: ${r.error}`); continue; }
-    const vtxt = r.valves.length ? r.valves.map(v => `(${v.r},${v.c})色${v.color}/${v.count}`).join(' ') : '无';
-    if (r.hits.length) {
-      console.log(`[FAIL] ${r.file}: 链格 ${r.hits.map(t => `(${t.r},${t.c})色${t.color}/${t.count}`).join(' ')} 是开局逃生阀（点一下即吃满）——链会把它锁住/要 2 空位，满格时无路可走`);
-    } else if (r.chained.length) {
-      console.log(`[PASS] ${r.file}: ${r.chained.length} 个链格均不是逃生阀`);
-    } else {
-      console.log(`[INFO] ${r.file}: 无锁链；开局逃生阀 ${r.valves.length} 个`);
-    }
-    console.log(`       开局逃生阀: ${vtxt}`);
-  }
-  if (outFile) fs.writeFileSync(outFile, JSON.stringify({ tool: 'EscapeValveCheck_v1', results }, null, 1));
-}
-const bad = results.some(r => r.hits && r.hits.length && (pairArg || r.chained.length));
-process.exit(bad ? 1 : 0);
+module.exports = { openingValves, isChainType, stripChains, checkLevel };
+if (require.main === module) main();
