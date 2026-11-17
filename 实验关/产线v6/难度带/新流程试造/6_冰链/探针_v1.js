@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('fs');
+const B=require('/Users/red/Desktop/毛线汽车/03_工具/正式版/Build006Thickness_v688');
+const A=B.loadSolver('corner');
+const g=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+const lv=A.parseLevel(A.fromGameFormat(g));
+const s=A.Simulator.createState(lv,{useSlotStart:true,bottomOnly:false,instantChain:false});
+const ms=A.Simulator.listMoves(s).filter(m=>!m.blocked);
+const o=A.Solver.runSolver(lv,0,1,false,false,{capturePreviewStats:true,instantChain:false});
+const buf=(o.pressureSamples||[]).map(x=>x.buf||0);
+console.log(JSON.stringify({file:process.argv[2].split('/').pop(),opening:ms.length,won:!!o.completed,steps:buf.length,peak:Math.max(0,...buf),at4:buf.filter(v=>v>=4).length,at3:buf.filter(v=>v>=3).length}));
