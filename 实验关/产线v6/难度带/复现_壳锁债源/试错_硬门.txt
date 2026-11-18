@@ -1,0 +1,30 @@
+壳锁债源复现 · 建变体硬门试错原始记录（2026-11-18，corner）
+================================================================
+
+[194 · 首版 S=(0,2) 11/21，P=(1,1) 5/44]
+V_shell（壳 S / 管 P，P 方向 down 13）：ChainRatchet PASS
+V_pipe（管 S 方向 left 14 / 壳 P）：ChainRatchet FAIL  solver:8(allMovesDead, buf=4)
+  → 基座 solver 贪心第 5 步取 (1,1)，V_pipe 把 (1,1) 做成永久壳后早期路线断。
+  → 换 P=(2,3) 28/29。
+
+[194 · 最终 P=(2,3) 方向组合（S 方向 × P 方向）]
+S02d14_P23d13 V_shell PASS / V_pipe PASS
+S02d13_P23d13 V_shell PASS / V_pipe PASS
+S02d12_P23d13 V_shell PASS / V_pipe PASS
+S02d14_P23d14 V_shell PASS / V_pipe PASS
+S02d13_P23d14 V_shell PASS / V_pipe PASS
+S02d12_P23d14 V_shell PASS / V_pipe PASS
+→ 取 S=(0,2) type14 左（出口 (0,1)#32/44）、P=(2,3) type13 下（出口 (3,3)#30/44，普通车，solver 早期不取）。
+
+[18 · 首版 S=(1,6) 34/32，P=(1,4) 18/32；方向组合 3×3]
+（S 方向 dS ∈ {14 左, 11 上, 13 下}；P 方向 dP ∈ {12 右, 13 下, 11 上}）
+dS=14,dP=12  V_shell FAIL small-debt:8 / V_pipe FAIL small-debt:8
+dS=14,dP=13  V_shell PASS / V_pipe FAIL small-debt:8
+dS=14,dP=11  V_shell FAIL solver:6,small-debt:8 / V_pipe FAIL small-debt:8
+dS=11,dP=12  V_shell FAIL small-debt:8 / V_pipe FAIL small-debt:8
+dS=11,dP=13  V_shell PASS / V_pipe FAIL small-debt:8
+dS=11,dP=11  V_shell FAIL solver:6,small-debt:8 / V_pipe FAIL small-debt:8
+dS=13,dP=12  V_shell FAIL small-debt:8 / V_pipe PASS
+dS=13,dP=13  V_shell PASS / V_pipe PASS   ← 唯一两变体同时 PASS
+dS=13,dP=11  V_shell FAIL solver:6,small-debt:8 / V_pipe PASS
+→ 取 S=(1,6) type13 下（管出口 (2,6)#34/32）、P=(1,4) type13 下（管出口 (2,4)#31/32）。
