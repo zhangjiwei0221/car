@@ -280,7 +280,7 @@ function labOf(rgb) {
   const fx = f(X), fy = f(Y), fz = f(Z);
   const A = 500 * (fx - fy), B = 200 * (fy - fz);
   let h = Math.atan2(B, A) * 180 / Math.PI; if (h < 0) h += 360;
-  v = { L: 116 * fy - 16, C: Math.hypot(A, B), h };
+  v = { L: 116 * fy - 16, C: Math.hypot(A, B), h, A, B };
   _labCache.set(key, v);
   return v;
 }
@@ -345,7 +345,8 @@ function cellToId(pix) {
   return { main, cand };
 }
 const info = [];
-for (let r = 0; r < ROWS; r++) { const row = [];
+const medGrid = [];          // 【v156】每格格心窗口中位色（颜色对照用：输出色 ← 源图平均色）
+for (let r = 0; r < ROWS; r++) { const row = [], mrow = [];
   for (let c = 0; c < COLS; c++) {
     const x0 = Math.floor(c * sw / COLS), x1 = Math.max(x0 + 1, Math.floor((c + 1) * sw / COLS));
     const y0 = Math.floor(r * sh / ROWS), y1 = Math.max(y0 + 1, Math.floor((r + 1) * sh / ROWS));
@@ -355,9 +356,16 @@ for (let r = 0; r < ROWS; r++) { const row = [];
     const ky0 = Math.floor(y0 + (y1 - y0) * kit), ky1 = Math.max(ky0 + 1, Math.ceil(y1 - (y1 - y0) * kit));
     const pix = [];
     for (let y = ky0; y < ky1; y++) for (let x = kx0; x < kx1; x++) pix.push(srcPx(x, y));
+    if (pix.length) {
+      const R = [], G = [], B = [];
+      for (const p of pix) { R.push(p[0]); G.push(p[1]); B.push(p[2]); }
+      R.sort((a, b) => a - b); G.sort((a, b) => a - b); B.sort((a, b) => a - b);
+      const m = pix.length >> 1;
+      mrow.push([R[m], G[m], B[m]]);
+    } else mrow.push(null);
     row.push(cellToId(pix));
   }
-  info.push(row);
+  info.push(row); medGrid.push(mrow);
 }
 
 // ---------- 3. 吸附色表 + 限制色数（细线保护要求"相邻格也选中相近的候选色"，连续两格以上才认）----------
@@ -381,6 +389,9 @@ if (MAX_COLORS > COLOR_CAP) console.log('提示：--colors ' + MAX_COLORS + ' �
 let keep = [...used.entries()].sort((a, b) => b[1] - a[1]).slice(0, Math.min(MAX_COLORS, COLOR_CAP)).map(e => e[0]);
 let grid = cell.map(row => row.map(id => keep.includes(id) ? id : nearest(rgbOf(hexOf(id)), keep)));
 if (used.size > keep.length) console.log('色数限制：把 ' + used.size + ' 色压到 ' + keep.length + ' 色（用最多的那些）');
+// 【v156】色差口径：只统计「源色 → 色表」这一步（含 --colors 限色），在去碎色/挖背景之前留一份。
+//   去碎色会把整格改到邻色（实测 1 格黄色小岛被并成蓝色，ΔE 156），那是结构处理不是调色，混进来会误导。
+const mappedGrid = grid.map(row => row.slice());
 
 // ---------- 4. 去碎色（4-连通小块并到边界最长的邻色）----------
 function despeckle(grid, minPx) {
@@ -464,6 +475,26 @@ let fidelity = null, diffCells = 0;
   fidelity = n ? same / n : 0;
 }
 
+// ---------- 4.7 【v156】颜色对照：每个输出色 ← 它覆盖的格子"源图平均色" + ΔE76 ----------
+//   用户反馈"感觉老是有色差"：输出色永远来自色表，源色不会逐格保留。这里给出逐色的
+//   输出色 / 源图平均色 / ΔE76，让"差多少"可查，而不是只能凭眼睛感觉。
+const colorDiff = {};
+let dETotal = 0, dEN = 0, dEMax = 0, dEMaxId = 0;
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+  const id = mappedGrid[r][c]; if (!id) continue;
+  const med = medGrid[r][c]; if (!med) continue;
+  const la = labOf(rgbOf(hexOf(id))), lb = labOf(med);
+  const de = Math.hypot(la.L - lb.L, la.A - lb.A, la.B - lb.B);
+  const e = colorDiff[id] || (colorDiff[id] = { n: 0, sr: 0, sg: 0, sb: 0, dE: 0, max: 0 });
+  e.n++; e.sr += med[0]; e.sg += med[1]; e.sb += med[2];
+  e.dE += de; if (de > e.max) e.max = de;
+  dETotal += de; dEN++; if (de > dEMax) { dEMax = de; dEMaxId = id; }
+}
+Object.keys(colorDiff).forEach(k => { const e = colorDiff[k];
+  e.avg = [Math.round(e.sr / e.n), Math.round(e.sg / e.n), Math.round(e.sb / e.n)];
+  e.dE = e.dE / e.n;
+});
+
 // ---------- 5. 出文件 + 报告 ----------
 fs.mkdirSync(OUTDIR, { recursive: true });
 const base = NAME + '_' + COLS + 'x' + ROWS;
@@ -505,6 +536,20 @@ Object.keys(cnt).map(Number).sort((a, b) => b - a).forEach(id => {
     ? String(OUTLIB === 'official' ? '-1' : ' 0').padStart(3) + ' 空位'
     : String(showNo(id)).padStart(3) + ' ' + nameOf(id).padEnd(4) + ' ' + hexOf(id)) + '  ×' + cnt[id]);
 });
+// 【v156】颜色对照：逐色「输出色 ← 源图平均色 ΔE76」
+if (dEN) {
+  const toHex = c => '#' + c.map(v => (+v || 0).toString(16).padStart(2, '0').toUpperCase()).join('');
+  console.log('\n颜色与源图（ΔE76，0 = 无色差，越大越“变色”）：全图平均 ' + (dETotal / dEN).toFixed(1) +
+    '，最差 ' + dEMax.toFixed(1) + '（' + showNo(dEMaxId) + ' ' + nameOf(dEMaxId) + '）');
+  console.log('   输出色 ← 源图该色格子的平均色（格心窗口中位色）');
+  console.log('   只统计「源色 → 色表」这一步（含 --colors 限色）；去碎色/挖背景整格改色不计入');
+  console.log('   单格最大常来自混色格（一格两种颜色，中位色与主色簇不一致）或细线保护，主要看平均值');
+  Object.keys(colorDiff).map(Number).sort((a, b) => colorDiff[b].n - colorDiff[a].n).forEach(id => {
+    const e = colorDiff[id];
+    console.log('   ' + String(showNo(id)).padStart(3) + ' ' + nameOf(id).padEnd(4) + ' ' + hexOf(id) +
+      ' ← 源 ~' + toHex(e.avg) + '　ΔE ' + e.dE.toFixed(1) + '（' + e.n + ' 格）');
+  });
+}
 if (A.Generator && A.Generator.checkFragmentGate) {
   // 闸门只按"色号是否相等"算几何碎色（不看色值），所以工作态编号直接喂进去就是准确口径。
   const g = A.Generator.checkFragmentGate(grid, { fragmentMaxRate: 0.22 });
