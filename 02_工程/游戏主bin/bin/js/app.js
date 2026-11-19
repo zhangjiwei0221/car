@@ -7,7 +7,7 @@
 
 var AntSolver = AntSolver || {};
 
-var APP_BUILD = "638";
+var APP_BUILD = "639";
 try { console.log("[app] build " + APP_BUILD); } catch (e) {}
 
 AntSolver.App = (function() {
@@ -3078,6 +3078,26 @@ AntSolver.App = (function() {
       eliminatedPixels: st.eliminatedPixels,
       totalPixels: st.totalPixels,
       progress: st.totalPixels ? +(st.eliminatedPixels / st.totalPixels).toFixed(4) : 0,
+      // 【v639】记录冰与管道的当前状态：冰在解封前是墙，导出不记冰态就没法回放归因（用户 2026-11-19）。
+      numice: (function () {
+        var out = [];
+        if (st.numice) Object.keys(st.numice).forEach(function (k) {
+          var it = st.numice[k]; if (!it || !(it.remaining > 0)) return;
+          var p = k.split(',');
+          out.push({ r: +p[0], c: +p[1], remaining: it.remaining });
+        });
+        return out;
+      })(),
+      pipes: (function () {
+        var out = [];
+        for (var rr = 0; rr < st.cells.length; rr++) for (var cc = 0; cc < st.cells[rr].length; cc++) {
+          var cell = st.cells[rr][cc];
+          if (!cell || cell.t !== 'pipe') continue;
+          var q = cell.queue || [], next = cell.next || 0;
+          out.push({ r: rr, c: cc, dir: cell.dir, opened: !!cell.opened, next: next, left: Math.max(0, q.length - next) });
+        }
+        return out;
+      })(),
       gameOver: !!st.gameOver,
       gameWon: !!st.gameWon
     });
