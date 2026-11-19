@@ -13,6 +13,20 @@
  * 口径：loadSolver('corner')，useSlotStart:true，instantChain:false（AGENTS 红线 2）。
  * 随机玩家与 PopulationSim_v1 --no-mcfd 逐行同源（同 LCG、同洗牌、同死亡判据）。
  *
+ * 窗口字段（2026-11-20，换链色实验）：
+ *   色 15 在 140 上 total=38 全部在一辆被链住的车里，freeFirst=.256 / freeLast=.37——
+ *   供给只存在于 25.6%–37% 的窄窗，链把车绑在开局，玩家在窗口前拿着它当债，错过即永久债。
+ *   因此每个候选对增加：
+ *   - 逐色 `window = freeLast − freeFirst`（free-first 路线里该色供给的可用跨度；
+ *     freeFirst/freeLast 任一为 null 时 window=null）；
+ *   - 逐色供给结构：`cars`（spools 同色车数）、`capSum`（同色车容量和，含管道队列）、
+ *     `uniqueCar`（cars===1，该色唯一车——链住它=整色供给被绑）；
+ *   - `windowRisk`：任一色满足 `freeLast < 0.6` 或 `window < 0.2`，
+ *     或（`uniqueCar` 且 `freeLast < 0.8`）→ true。`freeLast == null`（free-first 路线
+ *     没吃到该色）同样记 true（等于窗口不存在）。判定用未舍入值。
+ *   候选对上输出 `windowA/windowB`、`carsA/carsB`、`uniqueCarA/uniqueCarB`、
+ *   `riskA/riskB`、`windowRisk`。选链建议：`windowRisk=false`、window 越大越好。
+ *
  * 用法：
  *   node 扫描_v1.js <关卡.json> [--runs 20] [--seed 977] [--out <文件.json>]
  */
@@ -180,14 +194,29 @@ function colorDemand(trace) {
 }
 const freeDem = colorDemand(free.colorTrace);
 const randDems = runs.map(x => colorDemand(x.colorTrace));
+// 同色供给结构（spools 车数 / 容量和；blocks 像素总数在 totals 里）
+const supply = {};
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+  const cell = game.spools[r][c];
+  if (!cell || !(cell.id > 0) || !(cell.count > 0)) continue;
+  const s = supply[cell.id] || (supply[cell.id] = { cars: 0, capSum: 0 });
+  s.cars++; s.capSum += cell.count;
+}
 const colorDemandRows = Object.keys(totals).map(Number).sort((a, b) => a - b).map(col => {
   const tot = totals[col];
   const firsts = randDems.map(d => d.firstEat[col]).filter(v => v != null);
   const b = freeDem.bucket[col] || { early: 0, mid: 0, late: 0 };
   const midShare = b.mid / tot;
+  const sup = supply[col] || { cars: 0, capSum: 0 };
+  const ff = freeDem.firstEat[col], fl = freeDem.lastEat[col];
+  const win = (ff != null && fl != null) ? fl - ff : null;
+  const risk = fl == null ? true
+    : (fl < 0.6 || (win != null && win < 0.2) || (sup.cars === 1 && fl < 0.8));
   return {
     color: col, total: tot,
-    freeFirst: r3(freeDem.firstEat[col]), freeLast: r3(freeDem.lastEat[col]),
+    freeFirst: r3(ff), freeLast: r3(fl), window: r3(win),
+    cars: sup.cars, capSum: sup.capSum, uniqueCar: sup.cars === 1,
+    windowRisk: risk,
     randFirstMed: r3(median(firsts)),
     midShare: r3(midShare),
     classify: (freeDem.firstEat[col] == null ? 'unreached'
@@ -224,10 +253,16 @@ for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const da = demandByColor[a.id] || {}, db = demandByColor[b.id] || {};
     const midColorA = da.classify === 'mid-demand' || da.classify === 'weak-mid';
     const midColorB = db.classify === 'mid-demand' || db.classify === 'weak-mid';
+    const riskA = da.windowRisk === true, riskB = db.windowRisk === true;
     candidates.push({
       a: [r, c], b: [rr, cc], colorA: a.id, capA: a.count, colorB: b.id, capB: b.count,
       actA: aa.median, actB: ab.median, actA_n: aa.n, actB_n: ab.n,
       pickA, pickB,
+      windowA: da.window == null ? null : da.window, windowB: db.window == null ? null : db.window,
+      freeFirstA: da.freeFirst, freeLastA: da.freeLast, freeFirstB: db.freeFirst, freeLastB: db.freeLast,
+      carsA: da.cars, carsB: db.cars, capSumA: da.capSum, capSumB: db.capSum,
+      uniqueCarA: da.uniqueCar === true, uniqueCarB: db.uniqueCar === true,
+      riskA, riskB, windowRisk: riskA || riskB,
       valveA: VALVE_KEY.has(ka), valveB: VALVE_KEY.has(kb),
       valvePair: VALVE_KEY.has(ka) || VALVE_KEY.has(kb),
       midAct: midA && midB, midPick: midPickA && midPickB, midColor: midColorA && midColorB,
@@ -266,10 +301,10 @@ console.log('\n=== 候选（两车“首次被拿”中位都在 0.20–0.60；�
 const usable = out.candidates.filter(c => c.midPick && c.midColor);
 if (!usable.length) console.log('  （无）');
 for (const c of usable) {
-  console.log(`  ${c.a}(${c.colorA}/${c.capA}) + ${c.b}(${c.colorB}/${c.capB})  act=${c.actA}/${c.actB} pick=${c.pickA}/${c.pickB}  color=${c.demandA}/${c.demandB}  score=${c.score}`);
+  console.log(`  ${c.a}(${c.colorA}/${c.capA}) + ${c.b}(${c.colorB}/${c.capB})  act=${c.actA}/${c.actB} pick=${c.pickA}/${c.pickB}  window=${c.windowA}/${c.windowB} risk=${c.windowRisk}  color=${c.demandA}/${c.demandB}  score=${c.score}`);
 }
 console.log('\n=== 全候选（诊断）===');
-for (const c of out.candidates) console.log(`  ${c.a}(${c.colorA}/${c.capA}) + ${c.b}(${c.colorB}/${c.capB})  act=${c.actA}/${c.actB} pick=${c.pickA}/${c.pickB}  color=${c.demandA}/${c.demandB}  midAct=${c.midAct} midPick=${c.midPick} midColor=${c.midColor}`);
+for (const c of out.candidates) console.log(`  ${c.a}(${c.colorA}/${c.capA}) + ${c.b}(${c.colorB}/${c.capB})  act=${c.actA}/${c.actB} pick=${c.pickA}/${c.pickB}  window=${c.windowA}/${c.windowB} risk=${c.windowRisk}  color=${c.demandA}/${c.demandB}  midAct=${c.midAct} midPick=${c.midPick} midColor=${c.midColor}`);
 console.log('\n=== 激活 / 首次被拿（只列行 0–1）===');
 for (let r = 0; r <= 1; r++) for (let c = 0; c < COLS; c++) {
   const k = r + ',' + c, a = activation[k], cell = game.spools[r][c];
@@ -283,4 +318,4 @@ for (let r = 0; r <= 1; r++) for (let c = 0; c < COLS; c++) {
   console.log(`  ${k} color=${cell.id} cap=${cell.count} type=${JSON.stringify(cell.type)} act=${a.median} pick=${firstPick[k] ? firstPick[k].median : null} (n=${a.n})`);
 }
 console.log('\n=== 逐色需求 ===');
-for (const d of colorDemandRows) console.log(`  color=${d.color} total=${d.total} freeFirst=${d.freeFirst} freeLast=${d.freeLast} midShare=${d.midShare} ${d.classify}`);
+for (const d of colorDemandRows) console.log(`  color=${d.color} total=${d.total} freeFirst=${d.freeFirst} freeLast=${d.freeLast} window=${d.window} cars=${d.cars} capSum=${d.capSum} uniqueCar=${d.uniqueCar} windowRisk=${d.windowRisk} midShare=${d.midShare} ${d.classify}`);
