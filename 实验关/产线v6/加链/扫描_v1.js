@@ -42,6 +42,8 @@ const LEVEL = process.argv[2];
 if (!LEVEL || LEVEL.startsWith('--')) { console.error('用法: node 扫描_v1.js <关卡.json> [--runs 20] [--seed 977] [--out <文件>]'); process.exit(2); }
 const RUNS = Math.max(2, Number(arg('--runs', 20)) || 20);
 const SEED = Number(arg('--seed', 977));
+// 允许的行（2026-11-20 中段链实验）：默认 0,1；传 --rows 2,3,4 可枚举中段行
+const ROWS_ALLOWED = new Set(String(arg('--rows', '0,1')).split(',').map(Number).filter(Number.isFinite));
 const OUT = arg('--out', `/tmp/加链scan_${process.pid}.json`);
 
 const game = JSON.parse(fs.readFileSync(LEVEL, 'utf8'));
@@ -240,7 +242,7 @@ for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     if (rr >= ROWS || cc >= COLS) continue;
     const b = game.spools[rr][cc];
     if (!isCar(b) || isPipe(b)) continue;
-    if (Math.max(r, rr) > 1) continue;              // 只在第 0 行 / 第 0–1 行
+    if (!ROWS_ALLOWED.has(r) || !ROWS_ALLOWED.has(rr)) continue;   // 默认只在第 0 行 / 第 0–1 行；--rows 可放开
     const ka = r + ',' + c, kb = rr + ',' + cc;
     const aa = activation[ka], ab = activation[kb];
     if (!aa || !ab) continue;

@@ -21,6 +21,9 @@ const fs = require('fs');
 const args = process.argv.slice(2).filter(a => !a.startsWith('--'));
 const gidArg = process.argv.indexOf('--gid');
 const GID = gidArg > 0 ? Number(process.argv[gidArg + 1]) : 1;
+// 允许的最大行号（2026-11-20 中段链实验）：默认 1；传 --max-row 4 可建第 2–4 行的链
+const maxRowArg = process.argv.indexOf('--max-row');
+const MAXROW = maxRowArg > 0 ? Number(process.argv[maxRowArg + 1]) : 1;
 const [IN, A1, B1, OUT] = args;
 if (!IN || !A1 || !B1 || !OUT) {
   console.error('用法: node 建B_v1.js <A关卡.json> <r1,c1> <r2,c2> <out.json> [--gid 1]');
@@ -34,7 +37,7 @@ const after = clone(before);
 
 function fail(msg) { console.error('FAIL: ' + msg); process.exit(1); }
 const rows = after.spools.length, cols = after.spools[0].length;
-if (Math.max(r1, r2) > 1) fail('两格必须在第 0 行或第 0–1 行');
+if (Math.max(r1, r2) > MAXROW) fail('两格必须在第 0–' + MAXROW + ' 行（--max-row 可放开）');
 if (Math.abs(r1 - r2) + Math.abs(c1 - c2) !== 1) fail('两格必须正交相邻');
 
 // 逃生阀检查：默认拒绝“绑开局能一次吃满的车”
