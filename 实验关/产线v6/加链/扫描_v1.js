@@ -44,6 +44,7 @@ const RUNS = Math.max(2, Number(arg('--runs', 20)) || 20);
 const SEED = Number(arg('--seed', 977));
 // 三面墙（bottomOnly，2026-11-21）：--bottom-only 时上/左/右为墙、只从底边进
 const BOTTOM_ONLY = process.argv.includes('--bottom-only');
+const INSTANT_CHAIN = process.argv.includes('--instant-chain');
 // 允许的行（2026-11-20 中段链实验）：默认 0,1；传 --rows 2,3,4 可枚举中段行
 const ROWS_ALLOWED = new Set(String(arg('--rows', '0,1')).split(',').map(Number).filter(Number.isFinite));
 const OUT = arg('--out', `/tmp/加链scan_${process.pid}.json`);
@@ -79,7 +80,7 @@ function colorEaten(s) {
 
 // ==================== 玩家 ====================
 function runRandom(lv, rnd) {
-  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   const route = [];
   let maxBuffer = s.buffer.length;
   const first = {}, firstPick = {};
@@ -115,7 +116,7 @@ function runRandom(lv, rnd) {
 }
 
 function runFree(lv) {
-  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   const first = {}, firstPick = {}, colorTrace = [], route = [];
   let maxBuffer = s.buffer.length;
   for (let i = 0; i < 120 && !isWon(s); i++) {
