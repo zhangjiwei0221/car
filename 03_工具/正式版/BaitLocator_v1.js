@@ -34,6 +34,7 @@ const EV = require('./EscapeValveCheck_v1.js');
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i > 0 ? argv[i + 1] : d; };
 const BOTTOM_ONLY = process.argv.includes('--bottom-only'); // 三面墙（2026-11-21）
+const INSTANT_CHAIN = process.argv.includes('--instant-chain'); // 瞬时连锁（2026-11-21）
 const has = (k) => argv.indexOf(k) > 0;
 const FILE = argv[0];
 if (!FILE || FILE.startsWith('--')) {
@@ -62,7 +63,7 @@ const colorTotals = {};
 for (const row of game.blocks) for (const v of row) if (v > 0) colorTotals[v] = (colorTotals[v] || 0) + 1;
 
 function play(p, rnd) {
-  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   const hist = [];
   const firstPickByCell = {};
   let steps = 0;
@@ -111,7 +112,7 @@ function play(p, rnd) {
 
 // 开局可点 / 逃生阀
 const valves = new Set(EV.openingValves(game).map(v => `${v.r},${v.c}`));
-const start = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
+const start = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
 const openingCells = new Set(Sim.listMoves(start).filter(m => !m.blocked).map(m => `${m.r},${m.c}`));
 
 const byCell = {}, byColor = {}, byColorDebt = {}, deaths = [];

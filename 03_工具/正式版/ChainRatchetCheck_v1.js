@@ -40,6 +40,7 @@ const limit = Number(arg('--limit', 0)) || 0;
 const noPolicy = has('--no-policy');
 // 三面墙（bottomOnly，2026-11-21）：--bottom-only
 const BOTTOM_ONLY = has('--bottom-only');
+const INSTANT_CHAIN = has('--instant-chain');
 
 if (!input) {
   console.error('用法: node ChainRatchetCheck_v1.js <关卡.json | 目录> [--path 用户路径.json] [--out report.json]');
@@ -165,7 +166,7 @@ function findTraps(s) {
 
 // ---------- 路线生成 ----------
 function solverRoute(lv) {
-  const min = A.Solver.runMinBuffer(lv, { depth: 3, instantChain: false });
+  const min = A.Solver.runMinBuffer(lv, { depth: 3, instantChain: INSTANT_CHAIN });
   const byStep = {};
   for (const p of min.pickOrder || []) if (!byStep[p.step]) byStep[p.step] = { r: p.r, c: p.c };
   return Object.keys(byStep).map(Number).sort((a, b) => a - b).map(s => ({ r: byStep[s].r, c: byStep[s].c }));
@@ -202,7 +203,7 @@ function chooseMove(s, strategy) {
   return best;
 }
 function policyRoute(lv, strategy) {
-  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
+  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   const picks = [];
   for (let i = 0; i < 200; i++) {
     if (s.gameWon || s.eliminatedPixels >= s.totalPixels || s.gameOver) break;
@@ -216,7 +217,7 @@ function policyRoute(lv, strategy) {
 
 // ---------- 沿路线检查 ----------
 function checkRoute(lv, picks, tag) {
-  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
+  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   const flags = [];
   const traps = [];
   let steps = 0;
