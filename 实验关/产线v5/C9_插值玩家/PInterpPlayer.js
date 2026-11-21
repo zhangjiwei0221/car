@@ -78,6 +78,8 @@ const OUT = flags.out === true || flags.out === undefined ? '' : String(flags.ou
 if (!OUT) { console.error('需要 --out <目录>'); process.exit(2); }
 // 三面墙（bottomOnly）：上/左/右为墙、只从底边进（2026-11-21）
 const BOTTOM_ONLY = flags['bottom-only'] === true;
+// 瞬时连锁（策略0，2026-11-21）：--instant-chain
+const INSTANT_CHAIN = flags['instant-chain'] === true;
 
 const isWon = (s) => s.eliminatedPixels >= s.totalPixels;
 const isDead = (s) => !!(s.overflow || s.buffer.length > s.bufferLimit || Sim.isDeadEnd(s));
@@ -98,7 +100,7 @@ const MAX_STEPS = 200;
  * @param {function} rnd LCG
  */
 function playInterp(lv, p, rnd) {
-  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   let steps = 0;
   let maxBuffer = s.buffer.length;
   const pureRandom = p <= 0;
