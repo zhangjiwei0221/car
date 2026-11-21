@@ -38,6 +38,8 @@ const outFile = arg('--out', null);
 const userPath = arg('--path', null);
 const limit = Number(arg('--limit', 0)) || 0;
 const noPolicy = has('--no-policy');
+// 三面墙（bottomOnly，2026-11-21）：--bottom-only
+const BOTTOM_ONLY = has('--bottom-only');
 
 if (!input) {
   console.error('用法: node ChainRatchetCheck_v1.js <关卡.json | 目录> [--path 用户路径.json] [--out report.json]');
@@ -200,7 +202,7 @@ function chooseMove(s, strategy) {
   return best;
 }
 function policyRoute(lv, strategy) {
-  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   const picks = [];
   for (let i = 0; i < 200; i++) {
     if (s.gameWon || s.eliminatedPixels >= s.totalPixels || s.gameOver) break;
@@ -214,7 +216,7 @@ function policyRoute(lv, strategy) {
 
 // ---------- 沿路线检查 ----------
 function checkRoute(lv, picks, tag) {
-  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+  const s = A.Simulator.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: false });
   const flags = [];
   const traps = [];
   let steps = 0;
