@@ -14,7 +14,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const B = require(path.resolve(__dirname, '../../../../03_工具/正式版/Build006Thickness_v688.js'));
+const B = require(path.resolve(__dirname, '../../../03_工具/正式版/Build006Thickness_v688.js'));
 const A = B.loadSolver('corner');
 const Sim = A.Simulator, St = A.SolverStrategy;
 

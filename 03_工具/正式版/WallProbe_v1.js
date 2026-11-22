@@ -10,7 +10,10 @@
  *   3) 汇总随意档，按“距离目标窗口中点”排序
  *
  * 用法：
- *   node WallProbe_v1.js <图片目录> [--games 20] [--seed 977] [--out 结果.json] [--work /tmp/wallprobe_<pid>]
+ *   node WallProbe_v1.js <图片目录> [--games 20] [--seed 977] [--out 结果.json] [--work /tmp/wallprobe_<pid>] [--fast]
+ *
+ *   --fast：用 SplitLevel 默认切车直筛（每图约 2 秒），不走 CarSplitPlan 的加压/验收；
+ *           筛出有张力的图后再走完整产线。不加 --fast 时每图数分钟。
  */
 const fs = require('fs');
 const path = require('path');
@@ -24,6 +27,7 @@ const GAMES = Number(arg('--games', 20));
 const SEED = Number(arg('--seed', 977));
 const OUT = arg('--out', null);
 const WORK = arg('--work', `/tmp/wallprobe_${process.pid}`);
+const FAST = argv.includes('--fast'); // 默认切车直筛（SplitLevel，不走 CarSplitPlan 加压/验收）
 const ROOT = path.resolve(__dirname, '../..');
 const TOOLS = path.join(ROOT, '03_工具/正式版');
 fs.mkdirSync(WORK, { recursive: true });
@@ -36,10 +40,16 @@ for (const f of files) {
   const outDir = path.join(WORK, name);
   try {
     fs.mkdirSync(outDir, { recursive: true });
-    execFileSync('node', [path.join(TOOLS, 'CarSplitPlan_v0.js'), '--target', src, '--outdir', outDir, '--rows', '7', '--cols', '7', '--id', 'ZC_' + name.replace(/[^A-Za-z0-9]/g, '_')], { stdio: 'ignore' });
-    const lv = fs.readdirSync(outDir).filter(x => /^关卡_.*_default\.json$/.test(x))[0];
-    if (!lv) throw new Error('无 default 关卡');
-    const lvPath = path.join(outDir, lv);
+    let lvPath;
+    if (FAST) {
+      lvPath = path.join(outDir, 'lv.json');
+      execFileSync('node', [path.join(TOOLS, 'SplitLevel_v722.js'), '--target', src, '--out', lvPath, '--rows', '7', '--cols', '7'], { stdio: 'ignore' });
+    } else {
+      execFileSync('node', [path.join(TOOLS, 'CarSplitPlan_v0.js'), '--target', src, '--outdir', outDir, '--rows', '7', '--cols', '7', '--id', 'ZC_' + name.replace(/[^A-Za-z0-9]/g, '_')], { stdio: 'ignore' });
+      const lv = fs.readdirSync(outDir).filter(x => /^关卡_.*_default\.json$/.test(x))[0];
+      if (!lv) throw new Error('无 default 关卡');
+      lvPath = path.join(outDir, lv);
+    }
     execFileSync('node', [path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'), lvPath, '--bottom-only', '--instant-chain', '--p', '0,0.1,0.2', '--games', String(GAMES), '--seeds', String(SEED), '--out', path.join(outDir, 'q')], { stdio: 'ignore' });
     const sum = JSON.parse(fs.readFileSync(path.join(outDir, 'q', 'summary_all.json'), 'utf8'));
     const m = {}; for (const r of sum) m[r.p.toFixed(1)] = r.winRate;

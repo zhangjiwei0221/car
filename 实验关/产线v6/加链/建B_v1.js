@@ -55,6 +55,20 @@ for (const [r, c, cell] of [[r1, c1, ca], [r2, c2, cb]]) {
   const ts = Array.isArray(cell.type) ? cell.type : (cell.type === 0 || cell.type == null ? [] : [cell.type]);
   if (ts.includes(5)) fail(`(${r},${c}) 已经是锁链`);
 }
+// gid 撞组保护（2026-11-22）：底座已带锁链组（如 CarSplitPlan 的 R1 守卫组）时，
+// 用同一个 gid 会把新对**并进旧组**，生成 3+ 格、可能断开的链组——引擎照算，
+// 直到 LayoutScore L4 才暴露（实测把难度从 1.000 压到 .65 的“关键链”就是这样来的）。
+if (!process.argv.includes('--allow-merge')) {
+  let usedBy = null;
+  for (let r = 0; r < rows && !usedBy; r++) for (let c = 0; c < cols; c++) {
+    const cell = before.spools[r][c];
+    const ts = Array.isArray(cell.type) ? cell.type : (cell.type === 0 || cell.type == null ? [] : [cell.type]);
+    if (!ts.includes(5)) continue;
+    const gs = Array.isArray(cell.param) ? cell.param : [cell.param];
+    if (gs.includes(GID)) { usedBy = `(${r},${c})`; break; }
+  }
+  if (usedBy) fail(`gid ${GID} 已被 ${usedBy} 占用——再建会并成一组断链（排版 L4）。换一个 gid，或确需合并加 --allow-merge`);
+}
 function setChain(cell, gid) {
   const ts = Array.isArray(cell.type) ? cell.type : (cell.type === 0 || cell.type == null ? [] : [cell.type]);
   const ice = ts.indexOf(7), q = ts.indexOf(6);
