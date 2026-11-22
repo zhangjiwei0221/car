@@ -12,7 +12,8 @@
  *   maxBlob   该色最大连通块
  * 两个关键统计：
  *   bigShare  = maxBlob / coloredPx            —— “大且联”的顺手色，越高关卡越平
- *   midColors = 满足 totalPx≥60 且 40≤maxBlob≤120 的颜色数
+ *   midColors = 满足 totalPx≥60·s 且 40·s≤maxBlob≤120·s 的颜色数，s=(W·H)/1600
+ *               （2026-11-22 用户裁决：阈值按图面积缩放，参考 40×40=1600px）
  *               —— 这些是“需要先开一片、再拿一辆”的张力色
  *
  * 用法：
@@ -67,12 +68,13 @@ function scan(b) {
     e.blobs.push(n);
   }
   let coloredPx = 0, maxBlob = 0, midColors = 0;
+  const midScale = (W * H) / 1600;   // 中间色阈值按面积缩放（参考 40×40）
   const detail = [];
   for (const [v, e] of perColor) {
     const mx = Math.max(...e.blobs);
     coloredPx += e.totalPx;
     if (mx > maxBlob) maxBlob = mx;
-    const mid = e.totalPx >= 60 && mx >= 40 && mx <= 120;
+    const mid = e.totalPx >= 60 * midScale && mx >= 40 * midScale && mx <= 120 * midScale;
     if (mid) midColors++;
     detail.push({ color: v, totalPx: e.totalPx, blobs: e.blobs.length, maxBlob: mx, mid });
   }
