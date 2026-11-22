@@ -379,6 +379,32 @@ if (buryColors.length > 0) {
     b.maxY = maxY;
     b.meanY = sumY / Math.max(1, b.cells.length);
   }
+  // 【2026-11-22 改进点1：--stagger-cap 同色大小车错配】
+  // 对同色 >=2 辆车的颜色，在保持该色总像素 100% 守恒且每车 >=10px (不触发 LayoutScore <8px) 的前提下，
+  // 将均等豆腐块 (19,19,19) 改造为阶梯容量 (如 27,19,11 或 26,12)，让玩家必须看车上数字评估暴露像素量！
+  if (process.argv.includes('--stagger-cap')) {
+    const byCol = {};
+    for (const b of boxes) (byCol[b.color] = byCol[b.color] || []).push(b);
+    for (const cid of Object.keys(byCol)) {
+      const arr = byCol[cid];
+      if (arr.length < 2) continue;
+      // 按靠近底边排序：浅层车与中层车做大小错配
+      arr.sort((a, b) => (b.maxY - a.maxY) || (b.meanY - a.meanY));
+      const n = arr.length;
+      const pairs = Math.floor(n / 2);
+      for (let k = 0; k < pairs; k++) {
+        // 交替把第 k 辆做大/做小，使前排既有大车（诱饵：点早了卡槽需异色车剥层救）又有小车（活路：直接吃满退场）
+        const bigFirst = ((Number(cid) + k) % 2 === 0);
+        const hi = bigFirst ? arr[k] : arr[n - 1 - k];
+        const lo = bigFirst ? arr[n - 1 - k] : arr[k];
+        const delta = Math.min(8, Math.max(0, lo.count - 11), Math.max(0, 34 - hi.count));
+        if (delta >= 3) {
+          hi.count += delta;
+          lo.count -= delta;
+        }
+      }
+    }
+  }
   // 按 (maxY 降序, meanY 降序) 排列，使得底边暴露的车自然排在 row 0..2，顶边深处的车排在 row 4..6
   boxes.sort((a, b) => (b.maxY - a.maxY) || (b.meanY - a.meanY) || (a.count - b.count));
   placed = boxes.slice();
