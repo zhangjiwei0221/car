@@ -49,7 +49,9 @@ const ROWS = game.spools.length;
 const COLS = game.spools[0].length;
 
 function play(rnd) {
-  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
+  const BOTTOM_ONLY = argv.includes('--bottom-only');
+  const INSTANT_CHAIN = argv.includes('--instant-chain');
+  let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   const cellState = {};
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     cellState[r + ',' + c] = { exposed: false, exposureBalls: null, exposureStep: null, picked: false, pickBalls: null };
