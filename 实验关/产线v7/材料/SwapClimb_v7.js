@@ -29,6 +29,7 @@ const HI = Number(arg('--hi', 0.68));
 const MID = (LO + HI) / 2;
 const REPORT = arg('--report', null);
 const EARLY_W = Number(arg('--early-w', 0.6));
+const HUMAN_CASUAL = argv.includes('--human-casual');
 if (!IN || !OUT) { console.error('用法: node SwapClimb_v7.js <底座.json> <输出.json> [--iters 30] [--games 35] [--seed 977] [--lo .58] [--hi .68]'); process.exit(2); }
 
 const lcg = (s) => { let x = s; return () => { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; }; };
@@ -45,7 +46,39 @@ function playOne(lv, p, r) {
     const ms = Sim.listMoves(s).filter(m => !m.blocked);
     if (!ms.length) break;
     let pick = null;
-    if (r() < p) {
+    const useG = (p >= 1) || (p > 0 && r() < p);
+    if (HUMAN_CASUAL) {
+      const allMoves = [];
+      for (const m of ms) {
+        const t = St.cloneState(s), e0 = t.eliminatedPixels, c0 = t.completedBoxes;
+        if (!Sim.applyPick(t, m.r, m.c)) continue;
+        allMoves.push({
+          t, alive: !isDead(t) || isWon(t),
+          gain: t.eliminatedPixels - e0,
+          bufAfter: t.buffer.length,
+          cleared: t.completedBoxes > c0 ? 1 : 0
+        });
+      }
+      const aliveList = allMoves.filter(o => o.alive);
+      if (useG) {
+        if (aliveList.length) {
+          aliveList.sort((a, b) => (b.cleared - a.cleared) || (a.bufAfter - b.bufAfter) || (b.gain - a.gain));
+          pick = aliveList[0].t;
+        }
+      } else if (s.buffer.length <= 2) {
+        const chunkVis = aliveList.filter(o => o.gain >= 6);
+        const anyVis   = aliveList.filter(o => o.gain > 0);
+        const pool = chunkVis.length ? chunkVis : (anyVis.length ? anyVis : aliveList);
+        if (pool.length) pick = pool[Math.floor(r() * pool.length)].t;
+      } else {
+        const fatalVis = allMoves.filter(o => !o.alive && o.gain >= 8);
+        const safeChunk = aliveList.filter(o => o.gain >= 6);
+        const safeVis = safeChunk.length ? safeChunk : aliveList.filter(o => o.gain > 0);
+        if (fatalVis.length > 0 && r() < 0.20) pick = null;
+        else if (safeVis.length) pick = safeVis[Math.floor(r() * safeVis.length)].t;
+        else if (aliveList.length) pick = aliveList[Math.floor(r() * aliveList.length)].t;
+      }
+    } else if (useG) {
       let bg = -1;
       for (const m of ms) {
         const t = St.cloneState(s), e0 = t.eliminatedPixels;
