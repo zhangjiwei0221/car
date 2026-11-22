@@ -4,7 +4,8 @@
  * LayoutScore_v1 —— 排版检查（用户 7 条口述的量化版）
  *
  * 硬否决：
- *   L1 碎车：任一辆 <5px；或 ≥3 辆 <8px 且该色总像素 ≥100
+ *   L1 碎车：≤5px 的车且该色总量大于该车（被切碎）→ 硬否决；颜色本身 ≤5px 的单车合规
+ *           或 ≥3 辆 <8px 的“被切碎”车（颜色总量 > 该车）
  *   L2 半成品：≥2 行/列「整行同色」（该行非空格全是同一色）
  *   L4 锁链不正交：链组成员不是正交相邻
  *   L5 目标图不可辨：某色 ≤2px 的碎片像素占比 > 20%
@@ -31,10 +32,15 @@ function scoreLevel(g){
   const total={}; for(const row of g.blocks||[]) for(const x of row) if(x) total[x]=(total[x]||0)+1;
   const hard=[], warn=[];
   // L1
+  // 2026-11-22 用户裁决：≤5px 的车，若它就是该色的全部（颜色本身只有这么小）是合规的；
+  // 只有“颜色总量 > 该车”时才算被切碎（大色切出小碎片才是硬伤）。
   const tiny=cars.filter(x=>x.car.count<=5);
-  const small8=cars.filter(x=>x.car.count<8);
+  const tinySplit=tiny.filter(x=>(total[x.car.id]||0)>x.car.count);
+  // 同理：<8px 的车若来自“本色就小”的颜色（总量 ≥ 车本身即未切碎）也算合规；
+  // 只有被切碎的小车或大色里的小车才计入。
+  const small8=cars.filter(x=>x.car.count<8 && (total[x.car.id]||0)>x.car.count);
   const small8Big=small8.filter(x=>(total[x.car.id]||0)>=100);
-  if(tiny.length) hard.push(`L1: ${tiny.length} cars <=5px`);
+  if(tinySplit.length) hard.push(`L1: ${tinySplit.length} cars <=5px (色被切碎)`);
   if(small8.length>=3) hard.push(`L1: ${small8.length} cars <8px`);
   else if(small8Big.length) warn.push(`L1: ${small8Big.length} small cars in big colors`);
   // L2: full same-color rows/cols
