@@ -80,6 +80,10 @@ if (!OUT) { console.error('需要 --out <目录>'); process.exit(2); }
 const BOTTOM_ONLY = flags['bottom-only'] === true;
 // 瞬时连锁（策略0，2026-11-21）：--instant-chain
 const INSTANT_CHAIN = flags['instant-chain'] === true;
+// 【2026-11-22 第二刀】短视真人模型（--human-casual）：
+//   随意端不再闭眼点 0 暴露像素的颜色，而是在“当前能吃到像素(gain>0)”的车里短视选择（不精算车容量是否超过暴露量、易误点大车或贪解链卡槽）；
+//   认真端不仅看 gain，而且优先选“能当场吃满退场、暂存区占用最少(-buffer.length)”的车（看数字选小车防占坑）。
+const HUMAN_CASUAL = flags['human-casual'] === true;
 
 const isWon = (s) => s.eliminatedPixels >= s.totalPixels;
 const isDead = (s) => !!(s.overflow || s.buffer.length > s.bufferLimit || Sim.isDeadEnd(s));
@@ -103,6 +107,8 @@ function playInterp(lv, p, rnd) {
   let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   let steps = 0;
   let maxBuffer = s.buffer.length;
+  // 【2026-11-22 第三刀】前(0-30%) / 中(30-70%) / 后(70-100%) 三段暂存区峰值波形跟踪
+  let bufEarlyMax = s.buffer.length, bufMidMax = 0, bufLateMax = 0;
   const pureRandom = p <= 0;
   const pureGreedy = p >= 1;
 
@@ -115,7 +121,70 @@ function playInterp(lv, p, rnd) {
     let pick = null;
     const useGreedy = pureGreedy || (!pureRandom && rnd() < p);
 
-    if (useGreedy) {
+    if (HUMAN_CASUAL) {
+      // 【2026-11-22 第二刀：短视真人模型】
+      // 关键物理差异：
+      //   1) 真人没有模拟器的“当步免死透视眼(aliveT)”！当暂存区已占 3-4 格时，若某辆车（或锁链）在当前暴露边界上有同色像素(gain>0)，
+      //      短视真人看到“上面有这个颜色可消”就会点下去，而不会提前算清“它吃掉这几颗像素后还剩尾巴，会把第 5 个槽占满导致满槽暴毙(isDead)”！
+      //   2) 但真人也绝不瞎点：只要场上有能吃到像素的车(gain>0)，真人不会去点 0 暴露像素的车（除非当前只剩 1-2 格负载且想盲开锁链，或全场无 gain>0 的车）。
+      const allMoves = [];
+      for (const m of ms) {
+        const t = St.cloneState(s);
+        const e0 = t.eliminatedPixels;
+        const c0 = t.completedBoxes;
+        const cell = s.cells[m.r] && s.cells[m.r][m.c];
+        const carCount = (cell && cell.count) || 0;
+        if (!Sim.applyPick(t, m.r, m.c)) continue;
+        allMoves.push({
+          r: m.r, c: m.c, t,
+          alive: aliveT(t),
+          gain: t.eliminatedPixels - e0,
+          bufAfter: t.buffer.length,
+          cleared: t.completedBoxes > c0 ? 1 : 0,
+          carCount
+        });
+      }
+      if (useGreedy) {
+        // 认真真人端：有免死预判(只选 alive)，且看数字算容量——优先选“当场吃满退场(cleared=1)、暂存最少(-bufAfter)、消得最多(gain)”
+        const aliveList = allMoves.filter(o => o.alive);
+        if (aliveList.length) {
+          aliveList.sort((a, b) => (b.cleared - a.cleared) || (a.bufAfter - b.bufAfter) || (b.gain - a.gain));
+          const top = aliveList[0];
+          const tied = aliveList.filter(o => o.cleared === top.cleared && o.bufAfter === top.bufAfter && o.gain === top.gain);
+          pick = tied[Math.floor(rnd() * tied.length)];
+        }
+      } else {
+        // 【短视随意真人端（两阶段真人心理模型）】：
+        // 1) 安全/大意期（暂存区 <= 2 格，空位充裕）：真人只看颜色不看数字！
+        //    在所有“当前能吃到像素(gain>0)”的车里，真人反而偏爱“看着还没吃完、或者容量大/带链”的车（不会精算 cleared），
+        //    甚至在有多辆同色车时有 70% 概率误点不能当场退场的大车/锁链(cleared===0)，从而在暂存区不知不觉攒下 2-3 辆卡槽大车！
+        // 2) 警觉/自救期（暂存区 >= 3 格，红灯亮起只剩 1-2 个空位）：
+        //    真人看到槽快满了会本能避开“当步立刻满槽自杀(!alive，如只剩1空位还去点双车链)”的选项；
+        //    但在存活选项里，仍有 50% 概率只看眼前能消最多像素(gain最大)而不看能否退场，若前期攒下的卡槽大车无异色车可剥层解救，则在自救期满槽阵亡！
+        const aliveList = allMoves.filter(o => o.alive);
+        if (s.buffer.length <= 2) {
+          // 安全/大意期（暂存区 <= 2 格）：中立短视——只要当前暴露边界上有该色像素(gain>0)，
+          // 真人不对 cleared 做区分（在所有 gain>0 的可见颜色车里均匀选，不瞎点 0 暴露色）。
+          const chunkVis = aliveList.filter(o => o.gain >= 6);
+          const anyVis   = aliveList.filter(o => o.gain > 0);
+          const pool = chunkVis.length > 0 ? chunkVis : (anyVis.length > 0 ? anyVis : aliveList);
+          if (pool.length) pick = pool[Math.floor(rnd() * pool.length)];
+        } else {
+          // 警觉/自救期（buf >= 3）：只剩 1-2 个空位，真人 80% 概率在能活下来的可见车(alive & gain>0)里自救，
+          // 20% 概率因看走眼大车容量误点“有暴露像素但吃不完导致当步满槽(!alive & gain>0)”的车！
+          const fatalVisible = allMoves.filter(o => !o.alive && o.gain >= 8);
+          const safeChunk    = aliveList.filter(o => o.gain >= 6);
+          const safeVisible  = safeChunk.length > 0 ? safeChunk : aliveList.filter(o => o.gain > 0);
+          if (fatalVisible.length > 0 && rnd() < 0.20) {
+            pick = null; // 看走眼大车容量，当步满槽阵亡
+          } else if (safeVisible.length > 0) {
+            pick = safeVisible[Math.floor(rnd() * safeVisible.length)];
+          } else if (aliveList.length > 0) {
+            pick = aliveList[Math.floor(rnd() * aliveList.length)];
+          }
+        }
+      }
+    } else if (useGreedy) {
       // 贪心端：展开全部合法选项，alive 里 gain 最大；并列均匀随机。
       // 与 C8_greedy_v1 一致：每步消耗 1 次 rnd（即使没有并列）。
       const cand = [];
@@ -151,15 +220,20 @@ function playInterp(lv, p, rnd) {
 
     if (!pick) {
       if (s.buffer.length > maxBuffer) maxBuffer = s.buffer.length;
-      return { won: false, steps, deathProgress: round(progress, 6), maxBuffer };
+      return { won: false, steps, deathProgress: round(progress, 6), maxBuffer, bufWave: [bufEarlyMax, bufMidMax, bufLateMax] };
     }
     if (s.buffer.length > maxBuffer) maxBuffer = s.buffer.length;
     s = pick.t;
-    if (s.buffer.length > maxBuffer) maxBuffer = s.buffer.length;
+    const bNow = s.buffer.length;
+    if (bNow > maxBuffer) maxBuffer = bNow;
+    const pNow = s.eliminatedPixels / s.totalPixels;
+    if (pNow < 0.30) { if (bNow > bufEarlyMax) bufEarlyMax = bNow; }
+    else if (pNow < 0.70) { if (bNow > bufMidMax) bufMidMax = bNow; }
+    else { if (bNow > bufLateMax) bufLateMax = bNow; }
     steps++;
   }
-  if (isWon(s)) return { won: true, steps, deathProgress: null, maxBuffer };
-  return { won: false, steps, deathProgress: round(s.eliminatedPixels / s.totalPixels, 6), maxBuffer };
+  if (isWon(s)) return { won: true, steps, deathProgress: null, maxBuffer, bufWave: [bufEarlyMax, bufMidMax, bufLateMax] };
+  return { won: false, steps, deathProgress: round(s.eliminatedPixels / s.totalPixels, 6), maxBuffer, bufWave: [bufEarlyMax, bufMidMax, bufLateMax] };
 }
 
 function deathDist(perGame) {
@@ -224,6 +298,12 @@ function runLevel(file, p, outDir) {
     winRate: round(wins / allGames.length, 4),
     deathMean: fails.length ? round(fails.reduce((a, g) => a + g.deathProgress, 0) / fails.length, 4) : null,
     deathDist: deathDist(allGames),
+    bufWaveMean: allGames.length ? [
+      round(allGames.reduce((a, g) => a + (g.bufWave ? g.bufWave[0] : 0), 0) / allGames.length, 2),
+      round(allGames.reduce((a, g) => a + (g.bufWave ? g.bufWave[1] : 0), 0) / allGames.length, 2),
+      round(allGames.reduce((a, g) => a + (g.bufWave ? g.bufWave[2] : 0), 0) / allGames.length, 2)
+    ] : null,
+    midTightRate: wins > 0 ? round(allGames.filter(g => g.won && g.bufWave && g.bufWave[1] >= 3).length / wins, 3) : 0,
     perGame: allGames
   };
   fs.writeFileSync(path.join(outDir, 'summary.json'), JSON.stringify(summary, null, 2));
@@ -240,7 +320,8 @@ for (const p of PLIST) {
     const sm = runLevel(file, p, outDir);
     all.push({
       level: sm.level, levelNo: sm.levelNo, p: sm.p, games: sm.games,
-      seeds: sm.seeds, winRate: sm.winRate, deathMean: sm.deathMean, deathDist: sm.deathDist
+      seeds: sm.seeds, winRate: sm.winRate, deathMean: sm.deathMean, deathDist: sm.deathDist,
+      bufWaveMean: sm.bufWaveMean, midTightRate: sm.midTightRate
     });
     console.log(`${pTag(p)}  ${sm.level}  win=${sm.winRate.toFixed(2)}  ${sm.seeds.map(x => `${x.seed}=${x.winRate.toFixed(2)}`).join(' ')}`);
   }

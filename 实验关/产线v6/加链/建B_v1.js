@@ -50,10 +50,18 @@ if (!process.argv.includes('--allow-valve')) {
     '（点一下即吃满，满格时唯一出路）——确需实验请加 --allow-valve');
 }
 const ca = after.spools[r1][c1], cb = after.spools[r2][c2];
+// 统计全盘每色车数，默认拒绝把“全盘唯一车(cars===1)”绑进锁链（2026-11-22 第二刀短视真人模型实证：绑唯一车会让短视真人胜率暴跌至 .110）
+const _carCnt = {};
+for (const row of before.spools) for (const c of row) {
+  if (c && c.id > 0 && c.count > 0) _carCnt[c.id] = (_carCnt[c.id] || 0) + 1;
+}
 for (const [r, c, cell] of [[r1, c1, ca], [r2, c2, cb]]) {
   if (!cell || !(cell.id > 0) || !(cell.count > 0)) fail(`(${r},${c}) 不是车`);
   const ts = Array.isArray(cell.type) ? cell.type : (cell.type === 0 || cell.type == null ? [] : [cell.type]);
   if (ts.includes(5)) fail(`(${r},${c}) 已经是锁链`);
+  if (!process.argv.includes('--allow-unique') && (_carCnt[cell.id] || 0) <= 1) {
+    fail(`(${r},${c}) 色${cell.id} 是全盘唯一车(1辆)——绑进锁链会导致真人满槽暴毙（确需实验加 --allow-unique）`);
+  }
 }
 // gid 撞组保护（2026-11-22）：底座已带锁链组（如 CarSplitPlan 的 R1 守卫组）时，
 // 用同一个 gid 会把新对**并进旧组**，生成 3+ 格、可能断开的链组——引擎照算，
