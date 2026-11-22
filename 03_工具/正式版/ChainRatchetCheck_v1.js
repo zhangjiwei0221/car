@@ -166,7 +166,7 @@ function findTraps(s) {
 
 // ---------- 路线生成 ----------
 function solverRoute(lv) {
-  const min = A.Solver.runMinBuffer(lv, { depth: 3, instantChain: INSTANT_CHAIN });
+  const min = A.Solver.runMinBuffer(lv, { depth: 3, bottomOnly: BOTTOM_ONLY, instantChain: INSTANT_CHAIN });
   const byStep = {};
   for (const p of min.pickOrder || []) if (!byStep[p.step]) byStep[p.step] = { r: p.r, c: p.c };
   return Object.keys(byStep).map(Number).sort((a, b) => a - b).map(s => ({ r: byStep[s].r, c: byStep[s].c }));

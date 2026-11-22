@@ -43,7 +43,7 @@ for (const f of files) {
     let lvPath;
     if (FAST) {
       lvPath = path.join(outDir, 'lv.json');
-      execFileSync('node', [path.join(TOOLS, 'SplitLevel_v722.js'), '--target', src, '--out', lvPath, '--rows', '7', '--cols', '7'], { stdio: 'ignore' });
+      execFileSync('node', [path.join(TOOLS, 'SplitLevel_v722.js'), '--target', src, '--out', lvPath, '--rows', '7', '--cols', '7', '--bottom-only'], { stdio: 'ignore' });
     } else {
       execFileSync('node', [path.join(TOOLS, 'CarSplitPlan_v0.js'), '--target', src, '--outdir', outDir, '--rows', '7', '--cols', '7', '--id', 'ZC_' + name.replace(/[^A-Za-z0-9]/g, '_')], { stdio: 'ignore' });
       const lv = fs.readdirSync(outDir).filter(x => /^关卡_.*_default\.json$/.test(x))[0];

@@ -88,9 +88,12 @@ const reg = regions();
 const totals = {};
 // 【2026-11-03】图边框（开局可达）每色像素数——陷阱大车不能超过这个的 1.3 倍，
 // 否则 167 这种车会又大又没用（玩家一看就知道吃不满，直接懵）
+const BOTTOM_ONLY = process.argv.includes('--bottom-only');
 const edgeReach = {};
 for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
-  if (y === 0 || x === 0 || y === R - 1 || x === C - 1) edgeReach[g[y][x]] = (edgeReach[g[y][x]] || 0) + 1;
+  if (BOTTOM_ONLY ? (y === R - 1) : (y === 0 || x === 0 || y === R - 1 || x === C - 1)) {
+    edgeReach[g[y][x]] = (edgeReach[g[y][x]] || 0) + 1;
+  }
 }
 for (const col of Object.keys(reg)) totals[col] = reg[col].reduce((a, r) => a + r.length, 0);
 
@@ -107,8 +110,12 @@ if (debtColors > 0) {
 }
 // ---------- 开局暴露色（贴边界的颜色） ----------
 const exposed = new Set();
-for (let x = 0; x < C; x++) { exposed.add(g[0][x]); exposed.add(g[R - 1][x]); }
-for (let y = 0; y < R; y++) { exposed.add(g[y][0]); exposed.add(g[y][C - 1]); }
+if (BOTTOM_ONLY) {
+  for (let x = 0; x < C; x++) exposed.add(g[R - 1][x]);
+} else {
+  for (let x = 0; x < C; x++) { exposed.add(g[0][x]); exposed.add(g[R - 1][x]); }
+  for (let y = 0; y < R; y++) { exposed.add(g[y][0]); exposed.add(g[y][C - 1]); }
+}
 // ---------- 每色切成块（精确划分，不丢像素） ----------
 // 通过调整 targetSize 让块数 <= 格子数；只允许同色相邻块合并
 let _trapDbg = { calls: 0, pushes: {} };
@@ -127,6 +134,9 @@ function splitAll(targetSize) {
     if (BY_ORDER) {
       // D 值 = (最后一行-行) + 列，升序 = 先被消的在前
       pool.sort((a, b) => (((R - 1 - a[0]) + a[1]) - ((R - 1 - b[0]) + b[1])) || (a[0] - b[0]));
+    } else if (BOTTOM_ONLY) {
+      // 三面墙（仅底边入口）：自底向上剥离，行号大（靠近底边 R-1）的像素先被消！
+      pool.sort((a, b) => (b[0] - a[0]) || (a[1] - b[1]));
     } else {
       pool.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
     }
@@ -304,6 +314,9 @@ if (order === 'color') {
   let rs = seed >>> 0 || 1;
   const rnd = () => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 4294967296; };
   for (let i = boxes.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [boxes[i], boxes[j]] = [boxes[j], boxes[i]]; }
+} else if (BOTTOM_ONLY) {
+  // 三面墙：靠近底边（first[0] 大）的车排在前面（spools row 0），顶边（first[0] 小）的车排在深行（spools row 6）！
+  boxes.sort((a, b) => (b.first[0] - a.first[0]) || (a.first[1] - b.first[1]));
 } else {
   boxes.sort((a, b) => (a.first[0] - b.first[0]) || (a.first[1] - b.first[1]));
 }
@@ -355,6 +368,20 @@ if (buryColors.length > 0) {
     const [sr, sc] = slots[i++];
     placed[sr * cols + sc] = b;
   }
+} else if (BOTTOM_ONLY) {
+  // 【2026-11-22 真·三面墙摆盘】上/左/右三面被墙封死，目标图严格从底边 (y = R-1) 自下往上逐层溶解！
+  // 若沿用四边 EDGE_BIG 按全图最大车塞 row 0，会把顶边大色车塞进 row 0 导致开局第一排无车可消当场死锁。
+  // 正确做法：按每辆车所辖像素块在目标图中的【最底行 max(y) 降序（越靠底边越先暴露）+ 容量适中】排入 7x7 棋盘！
+  // 且对每辆车记录 maxRow = max(cell[0]) 与 meanRow，让 row 0..6 顺应自底向上的剥离层序，同时加入可控交错。
+  for (const b of boxes) {
+    let maxY = -1, sumY = 0;
+    for (const [cy, cx] of b.cells) { if (cy > maxY) maxY = cy; sumY += cy; }
+    b.maxY = maxY;
+    b.meanY = sumY / Math.max(1, b.cells.length);
+  }
+  // 按 (maxY 降序, meanY 降序) 排列，使得底边暴露的车自然排在 row 0..2，顶边深处的车排在 row 4..6
+  boxes.sort((a, b) => (b.maxY - a.maxY) || (b.meanY - a.meanY) || (a.count - b.count));
+  placed = boxes.slice();
 } else if (EDGE_BIG) {
   // 边框（开局可见）放大车 → 开局没几个能一口吃满的；内部放小车当后段奖励
   const edge = [], inner2 = [];

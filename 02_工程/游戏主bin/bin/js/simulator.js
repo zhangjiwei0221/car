@@ -166,8 +166,8 @@ AntSolver.Simulator = (function() {
       resCount: 0       // 曾入场暂存的球数（滞留分母）→ 平均滞留 = resSum/resCount
     };
 
-    // 瞬时连锁模式固定四方向：即使调用方误传 bottomOnly 也强制关掉，避免出现「四方向模式却按底部播种」。
-    if (s.instantChain && s.bottomOnly) s.bottomOnly = false;
+    // 【2026-11-22 v7修正】分组4实机为“三面墙(bottomOnly) + 四方向瞬时连锁(instantChain/策略0)”组合；
+    // 允许 bottomOnly 与 instantChain 同时开启（不再强制将 bottomOnly 置为 false）。
     // 初始可达空格：仅与棋盘外部连通的空格（对齐 ColonyFlow computeReach，封闭空腔不可达）
     s.eliminated = AntSolver.outsideReachSeed(level.blocks, levelRows, levelCols, s.bottomOnly);
 
@@ -640,17 +640,24 @@ AntSolver.Simulator = (function() {
    * @param {object} [stat] 传入则回填 { rounds:[每轮消除数], batches:number, snapshotFirst:number }
    * @returns {number} 实际消除的像素数
    */
-  function instantChainEliminate(eliminated, blocks, rows, cols, colorId, maxCount, trace, start, stat) {
+  function instantChainEliminate(eliminated, blocks, rows, cols, colorId, maxCount, trace, start, stat, bottomOnly) {
     if (maxCount <= 0) return 0;
     // 起点缺失时不静默乱来：用最底最左作确定性兜底，并在 stat 里标出来，供上层如实展示。
     var st = start || { r: rows - 1, c: 0 };
     if (stat) { stat.rounds = []; stat.batches = 0; stat.startFallback = !start; }
 
     function reachable(r, c) {
-      // 四方向：贴任一边即为外部入口；否则邻接已消除格才算可达（空腔打通后继续向内）。
-      if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) return true;
-      if (eliminated[r - 1][c] || eliminated[r + 1][c]) return true;
-      if (eliminated[r][c - 1] || eliminated[r][c + 1]) return true;
+      // 【2026-11-22 v7修正】bottomOnly=true（三面墙）时，仅底边 r === rows - 1 为外部入口（上/左/右三面被墙阻挡）；
+      // 只有打破底边后，内部像素通过四方向邻接已消除格才能连锁可达。
+      if (bottomOnly) {
+        if (r === rows - 1) return true;
+      } else {
+        if (r === 0 || r === rows - 1 || c === 0 || c === cols - 1) return true;
+      }
+      if (r > 0 && eliminated[r - 1][c]) return true;
+      if (r + 1 < rows && eliminated[r + 1][c]) return true;
+      if (c > 0 && eliminated[r][c - 1]) return true;
+      if (c + 1 < cols && eliminated[r][c + 1]) return true;
       return false;
     }
 
@@ -684,8 +691,8 @@ AntSolver.Simulator = (function() {
   }
 
   /** 瞬时连锁模式下的可达同色计数（不改动传入矩阵之外的状态）。 */
-  function instantChainCount(tempElim, blocks, rows, cols, colorId, start) {
-    return instantChainEliminate(tempElim, blocks, rows, cols, colorId, Infinity, null, start, null);
+  function instantChainCount(tempElim, blocks, rows, cols, colorId, start, bottomOnly) {
+    return instantChainEliminate(tempElim, blocks, rows, cols, colorId, Infinity, null, start, null, bottomOnly);
   }
 
   /**
@@ -704,7 +711,7 @@ AntSolver.Simulator = (function() {
    */
   function elimOnMatrix(elimMatrix, s, colorId, maxCount, trace, start, stat) {
     if (s.instantChain) {
-      return instantChainEliminate(elimMatrix, s.blocks, s.rows, s.cols, colorId, maxCount, trace, start, stat || null);
+      return instantChainEliminate(elimMatrix, s.blocks, s.rows, s.cols, colorId, maxCount, trace, start, stat || null, s.bottomOnly);
     }
     return floodFillEliminate(elimMatrix, s.blocks, s.rows, s.cols, colorId, maxCount, trace, start || null, s.bottomOnly);
   }
@@ -756,7 +763,7 @@ AntSolver.Simulator = (function() {
       for (var sr = 0; sr < s.rows; sr++) scratch.push(s.eliminated[sr].slice());
       var trace = [];
       if (s.instantChain) {
-        instantChainEliminate(scratch, s.blocks, s.rows, s.cols, parseInt(colorId, 10), Infinity, trace, next.start, null);
+        instantChainEliminate(scratch, s.blocks, s.rows, s.cols, parseInt(colorId, 10), Infinity, trace, next.start, null, s.bottomOnly);
       } else {
         floodFillEliminate(scratch, s.blocks, s.rows, s.cols, parseInt(colorId, 10), Infinity, trace, next.start, s.bottomOnly);
       }

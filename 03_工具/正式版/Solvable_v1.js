@@ -50,6 +50,7 @@ const width = Math.max(1, parseInt(arg('--width', '16'), 10) || 16);
 const timeoutSec = Math.max(0, parseFloat(arg('--timeout', '30')) || 0);
 const outFile = arg('--out', null);
 const bottomOnly = process.argv.includes('--bottom-only');
+const instantChain = process.argv.includes('--instant-chain');
 
 function fail(msg) {
   console.error(msg);
@@ -95,7 +96,7 @@ function solve() {
   const t0 = Date.now();
   const deadline = timeoutSec > 0 ? t0 + timeoutSec * 1000 : Infinity;
 
-  const s0 = Sim.createState(level, { useSlotStart: true, bottomOnly, instantChain: false });
+  const s0 = Sim.createState(level, { useSlotStart: true, bottomOnly, instantChain });
   const totalPx = s0.totalPixels || level.totalPixels || 0;
   let bestPx = s0.eliminatedPixels || 0;
 
