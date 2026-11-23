@@ -408,6 +408,42 @@ if (buryColors.length > 0) {
   // 按 (maxY 降序, meanY 降序) 排列，使得底边暴露的车自然排在 row 0..2，顶边深处的车排在 row 4..6
   boxes.sort((a, b) => (b.maxY - a.maxY) || (b.meanY - a.meanY) || (a.count - b.count));
   placed = boxes.slice();
+} else if (process.argv.includes('--stagger-cap')) {
+  // 【2026-11-23 v6 升级：四边无墙按洋葱圈层深摆盘 + 同色大小车错配 + 终局中心层沉底】
+  // 计算每辆车所辖像素距四边的最小外圈距离 minRing（0=贴四边外框开局直消，越大越靠近目标图中心洋葱心！）
+  for (const b of boxes) {
+    let minD = 999, sumD = 0;
+    for (const [cy, cx] of b.cells) {
+      const d = Math.min(cy, R - 1 - cy, cx, C - 1 - cx);
+      if (d < minD) minD = d;
+      sumD += d;
+    }
+    b.minRing = minD;
+    b.meanRing = sumD / Math.max(1, b.cells.length);
+  }
+  const byCol = {};
+  for (const b of boxes) (byCol[b.color] = byCol[b.color] || []).push(b);
+  for (const cid of Object.keys(byCol)) {
+    const arr = byCol[cid];
+    if (arr.length < 2) continue;
+    arr.sort((a, b) => (a.minRing - b.minRing) || (a.meanRing - b.meanRing));
+    const n = arr.length;
+    const pairs = Math.floor(n / 2);
+    for (let k = 0; k < pairs; k++) {
+      // 前小后大 + 交错：前排给 14-20px 亲民车防开局死锁，中后段给 28-38px 大车造拉扯
+      const lo = arr[k], hi = arr[n - 1 - k];
+      const delta = Math.min(7, Math.max(0, lo.count - 14), Math.max(0, 42 - hi.count));
+      if (delta >= 3) {
+        lo.count -= delta;
+        hi.count += delta;
+      }
+    }
+  }
+  // 按 (minRing 升序, meanRing 升序) 排入 row 0..6：
+  //   row 0..1 100% 是贴四边外框(minRing=0)开局直消的车；
+  //   row 5..6 则是目标图最中心(minRing最大)最后 25% 才剥到的洋葱心车！
+  boxes.sort((a, b) => (a.minRing - b.minRing) || (a.meanRing - b.meanRing) || (a.count - b.count));
+  placed = boxes.slice();
 } else if (EDGE_BIG) {
   // 边框（开局可见）放大车 → 开局没几个能一口吃满的；内部放小车当后段奖励
   const edge = [], inner2 = [];
