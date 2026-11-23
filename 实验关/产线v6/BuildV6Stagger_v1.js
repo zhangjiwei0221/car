@@ -46,6 +46,10 @@ const BLACK_MODE = Number(arg('--black-mode', '0')); // 0 | 2 (腰部对称双�
 const Q_COUNT = Number(arg('--q-count', '0')); // 0 | 2..4 (在第2-3行放问号车遮挡远期视野，绝不放第5-6行终局位)
 const ROWS = Number(arg('--rows', '7'));
 const COLS = Number(arg('--cols', '7'));
+const RAND_LO = Number(arg('--rand-lo', '0.55'));   // 主尺下限（B 档 = .45）
+const RAND_HI = Number(arg('--rand-hi', '0.68'));   // 主尺上限（B 档 = .58）
+const HUM_MAX = Number(arg('--hum-max', '1.00'));   // 短视真人上限（B 档 = .75）
+const FAIR_MIN = Number(arg('--fair-min', '0.90')); // 认真档下限（B 档 = .85）
 const ITERS = Number(arg('--iters', '8'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
@@ -56,13 +60,15 @@ if (!TARGET || !OUT) {
   process.exit(2);
 }
 
+// 【2026-11-23 升级：前中深层错落锁链分布（行1-2 破口链 2 对 + 行3-4 中腰链 1-2 对）】
+// 改变此前所有链子扎堆在第 2、3 行（row 1..2）的模板化布局，将 1-2 对链下沉到第 4、5 行（row 3..4）中腰接力，同时保证 row 1 留 >=4 个畅通单车口！
 const CHAIN_STYLES = [
-  [[[1,0],[2,0]], [[1,3],[1,4]], [[2,5],[2,6]]],
-  [[[1,1],[1,2]], [[1,5],[2,5]], [[2,0],[2,1]], [[2,3],[2,4]]],
-  [[[1,1],[2,1]], [[1,3],[2,3]], [[1,6],[2,6]]],
-  [[[1,0],[1,1]], [[1,4],[1,5]], [[2,2],[2,3]]],
-  [[[1,2],[2,2]], [[1,4],[1,5]], [[2,0],[2,1]], [[2,4],[2,5]]],
-  [[[2,0],[2,1]], [[1,3],[2,3]], [[1,6],[2,6]]]
+  [[[1,0],[2,0]], [[1,4],[1,5]], [[3,2],[3,3]], [[4,5],[4,6]]],
+  [[[1,1],[1,2]], [[2,5],[3,5]], [[3,1],[4,1]], [[4,3],[4,4]]],
+  [[[1,1],[2,1]], [[1,5],[2,5]], [[3,3],[4,3]]],
+  [[[1,0],[1,1]], [[2,4],[2,5]], [[3,1],[3,2]], [[4,4],[4,5]]],
+  [[[1,2],[2,2]], [[1,5],[1,6]], [[3,0],[3,1]], [[4,3],[4,4]]],
+  [[[1,3],[2,3]], [[2,0],[2,1]], [[3,5],[4,5]]]
 ];
 
 const COL_ORDERS = [
@@ -187,7 +193,7 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
   function evalG(g) {
     if (maxSameColorRun(g.spools) > 3) return null;
     const lv = A.parseLevel(A.fromGameFormat(g));
-    const PS = [0.1, 0.9];
+    const PS = [0, 0.1, 0.2, 0.8, 0.9, 1.0];
     const rates = {};
     let deaths = 0, early = 0;
     for (const p of PS) {
@@ -199,30 +205,31 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
       }
       rates[p] = w / games;
     }
-    const casual = rates[0.1];
-    const fair = rates[0.9];
-    const earlyShare = deaths >= 3 ? early / deaths : 0;
+    const casual = (rates[0] + rates[0.1] + rates[0.2]) / 3;
+    const fair = (rates[0.8] + rates[0.9] + rates[1]) / 3;
+    const earlyShare = deaths ? early / deaths : 0;
     let inv = 0;
     for (let i = 1; i < PS.length; i++) if (rates[PS[i]] < rates[PS[i - 1]]) inv++;
-    const sc = Math.abs(casual - mid) + 0.8 * Math.max(0, earlyShare - 0.15) + 0.6 * Math.max(0, 0.90 - fair) + 0.02 * inv;
+    const sc = Math.abs(casual - mid) + 2.5 * Math.max(0, earlyShare - 0.15) + 0.6 * Math.max(0, 0.90 - fair) + 0.02 * inv;
     return { casual, fair, earlyShare, inv, sc };
   }
   let bestEv = evalG(cur) || { sc: 1e9 };
-  // 允许在 row 0..4 的普通车之间换位（保护 row 5..6 的终局明牌挪车让路机关不被破坏！）
-  const plainCoords = [];
-  for (let r = 0; r <= 4; r++) for (let c = 0; c < 7; c++) {
-    if (isPlain(cur.spools[r][c])) plainCoords.push([r, c]);
-  }
-  for (let it = 0; it < iters && plainCoords.length >= 2; it++) {
-    const i1 = Math.floor(rnd() * plainCoords.length);
-    let i2 = Math.floor(rnd() * (plainCoords.length - 1));
-    if (i2 >= i1) i2++;
-    const [r1, c1] = plainCoords[i1], [r2, c2] = plainCoords[i2];
+  // 【2026-11-23 修复】必须允许「前排(0..2) ↔ 深层(3..6)」跨行对调（把外圈色压到后排、把深层色提到前排），才能在四边模式下把原随意档从 1.00 压进 .55-.68！
+  for (let it = 0; it < iters; it++) {
+    const front = [], deep = [];
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (!isPlain(cur.spools[r][c])) continue;
+      if (r <= 2) front.push([r, c]);
+      if (r >= 3) deep.push([r, c]);
+    }
+    if (!front.length || !deep.length) break;
+    const [r1, c1] = front[Math.floor(rnd() * front.length)];
+    const [r2, c2] = deep[Math.floor(rnd() * deep.length)];
     if (cur.spools[r1][c1].id === cur.spools[r2][c2].id && cur.spools[r1][c1].count === cur.spools[r2][c2].count) continue;
     const cand = JSON.parse(JSON.stringify(cur));
     const tmp = cand.spools[r1][c1]; cand.spools[r1][c1] = cand.spools[r2][c2]; cand.spools[r2][c2] = tmp;
     const ev = evalG(cand);
-    if (ev && ev.sc <= bestEv.sc) {
+    if (ev && ev.sc <= bestEv.sc && ev.casual <= Math.max(bestEv.casual, hi)) {
       cur = cand; bestEv = ev;
       if (ev.casual >= lo && ev.casual <= hi && ev.fair >= 0.92 && ev.earlyShare < 0.15) break;
     }
@@ -232,9 +239,7 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
 
 function setupEndgameClimax(game) {
   // 【2026-11-23 终局“第 5 行核心色车明牌挡住正下方第 6 行内壳钥匙车（挪车让路蓄水清盘）”机关】
-  // 分析目标图 blocks 中心区域：
-  //   最中心洋葱心 coreColors: 距四边距离 >= 15 (即 row 15..24, col 15..24) 占比最高的颜色 A
-  //   内壳钥匙色 shellColors: 距四边距离 10..14 包在洋葱心外围的颜色 B
+  // 只在 row 5..6 的第 2、4 两列定点布置 2 对上下挡路车（不再把 row 4..6 全量重排洗回温室顺摆！）
   const Bmat = game.blocks, R = Bmat.length, C = Bmat[0].length;
   const corePx = {}, shellPx = {};
   for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
@@ -243,24 +248,6 @@ function setupEndgameClimax(game) {
     if (d >= Math.floor(Math.min(R, C) * 0.38)) corePx[v] = (corePx[v] || 0) + 1;
     else if (d >= Math.floor(Math.min(R, C) * 0.25)) shellPx[v] = (shellPx[v] || 0) + 1;
   }
-  // 在 row 4..6 的普通车中，把“内壳钥匙色 B”的车放到第 6 行 (6,2),(6,3),(6,5)，
-  // 把“最中心洋葱心色 A”的大车放到其正上方的第 5 行 (5,2),(5,3),(5,5)！
-  const pool = [];
-  for (let r = 4; r <= 6; r++) for (let c = 0; c < 7; c++) {
-    pool.push({ r, c, cell: game.spools[r][c] });
-  }
-  // 按 (corePx[id] - shellPx[id]) 排序：正值最大的是最中心核心色 A（放 row 5 挡路），负值最小的是内壳钥匙色 B（放 row 6 被挡在正下方）
-  const cells = pool.map(p => p.cell);
-  cells.sort((a, b) => {
-    const scoreA = (corePx[a.id] || 0) * 2 - (shellPx[a.id] || 0);
-    const scoreB = (corePx[b.id] || 0) * 2 - (shellPx[b.id] || 0);
-    return scoreB - scoreA; // 最中心核心色排最前 -> 填入 row 4..5；内壳钥匙色排最后 -> 填入 row 6 正下方！
-  });
-  let idx = 0;
-  for (let r = 4; r <= 6; r++) for (let c = 0; c < 7; c++) {
-    game.spools[r][c] = cells[idx++];
-  }
-  // 若出现同色 4+ 连排，微调交换消除连排
   fixSameColorRuns(game.spools);
 }
 
@@ -302,7 +289,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       execFileSync('node', [
         path.join(ROOT, '实验关/产线v6/加链/建B_v1.js'),
         cur, `${a[0]},${a[1]}`, `${b[0]},${b[1]}`, nxt,
-        '--gid', String(i + 1), '--max-row', '2'
+        '--gid', String(i + 1), '--max-row', '4'
       ], { stdio: 'ignore' });
       chainUsed.add(a[0] + ',' + a[1]);
       chainUsed.add(b[0] + ',' + b[1]);
@@ -325,7 +312,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       for (const [br, bc] of [[r1, c1], [r2, c2]]) {
         for (const [dr, dc] of [[0, 1], [0, -1], [1, 0]]) {
           const nr = br + dr, nc = bc + dc;
-          if (nr < 1 || nr > 3 || nc < 0 || nc >= COLS) continue;
+          if (nr < 1 || nr > 4 || nc < 0 || nc >= COLS) continue;
           const key = `${nr},${nc}`;
           if (chainUsed.has(key)) continue;
           const cell = d3c.spools[nr][nc];
@@ -335,7 +322,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
               execFileSync('node', [
                 path.join(ROOT, '实验关/产线v6/加链/建B_v1.js'),
                 cur, `${br},${bc}`, `${nr},${nc}`, nxt,
-                '--gid', String(gid), '--max-row', '3', '--allow-merge'
+                '--gid', String(gid), '--max-row', '4', '--allow-merge'
               ], { stdio: 'ignore' });
             } catch (e) {
               // 建B_v1 若因首格已是锁链拦截，直接安全写入合并格并过 LayoutScore L4 连通校验
@@ -549,7 +536,8 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
   }
 
-  const climbedObj = climbFourSide(icedObj, ITERS, 12, SEED, 0.57, 0.66);
+  // 5. 四边 corner 换位爬山（允许前排0..2与深层3..6跨行错位，把原随意档从1.00压进0.57..0.66）
+  const climbedObj = climbFourSide(icedObj, ITERS, 6, SEED, RAND_LO + 0.01, RAND_HI - 0.01);
   fixSameColorRuns(climbedObj.spools);
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   fs.writeFileSync(climbedLv, JSON.stringify(climbedObj, null, 1));
@@ -617,8 +605,7 @@ function fullVerifyV6(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 && maxIceParam <= 20 &&
-    randFair >= 0.90 && humFair >= 0.90 &&
-    ((randCasual >= 0.50 && randCasual <= 0.72) || (humCasual >= 0.45 && humCasual <= 0.72));
+    randFair >= FAIR_MIN && humFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual <= HUM_MAX;
 
   return {
     allPass, randCasual, randFair, randWave, humCasual, humFair, humWave,
@@ -642,8 +629,8 @@ for (let t = 0; t < MAX_TRIES; t++) {
     const ver = fullVerifyV6(built.file, work, `s${st}`);
     const rec = { ...built, verify: ver };
     console.log(`[v6 try style=${st}] allPass=${ver.allPass} | 原随意=${ver.randCasual}/${ver.randFair} 波形=${JSON.stringify(ver.randWave)} | 短视真人=${ver.humCasual}/${ver.humFair} 波形=${JSON.stringify(ver.humWave)} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 冰上限=${ver.maxIceParam} | 二排畅口=${ver.row1Open} | 面额=${ver.distinctCaps}`);
-    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.maxIceParam <= 20 && ver.randFair >= 0.90 && ver.humFair >= 0.90;
-    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.maxIceParam <= 20 && best.verify.randFair >= 0.90 && best.verify.humFair >= 0.90) : false;
+    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.maxIceParam <= 20 && ver.randFair >= FAIR_MIN && ver.humFair >= FAIR_MIN;
+    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.maxIceParam <= 20 && best.verify.randFair >= FAIR_MIN && best.verify.humFair >= FAIR_MIN) : false;
     if (!best || (ver.allPass && !best.verify.allPass) ||
         (!ver.allPass && !best.verify.allPass && hardSafe && !bestSafe) ||
         (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.randCasual - 0.62) < Math.abs(best.verify.randCasual - 0.62))) {

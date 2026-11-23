@@ -451,11 +451,18 @@ if (buryColors.length > 0) {
       }
     }
   }
-  // 按 (minRing 升序, meanRing 升序) 排入 row 0..6：
-  //   row 0..1 100% 是贴四边外框(minRing=0)开局直消的车；
-  //   row 5..6 则是目标图最中心(minRing最大)最后 25% 才剥到的洋葱心车！
+  // 【2026-11-23 第一刀后半段补完：四边 --stagger-cap 层间位置交错摆盘】
+  // 先按 (minRing 升序, meanRing 升序, count 升序) 排好层深，然后把 row 0..1 (索引 0..13) 的 5 个位置
+  // 与 row 4..6 (索引 28..48) 的深层内芯车/大车做确定性交错对调！
+  // 这样第 0..1 排既保留 9 辆外皮小车（保开局能动、早死=0%），又将 5 辆外皮车沉入 row 4..6、把 5 辆内芯车提到前两排（打破四边温室，自带原生错位张力）！
   boxes.sort((a, b) => (a.minRing - b.minRing) || (a.meanRing - b.meanRing) || (a.count - b.count));
-  placed = boxes.slice();
+  const mixed = boxes.slice();
+  const frontLimit = Math.min(2 * cols, mixed.length);
+  const deepStart = Math.min(4 * cols, mixed.length - 1);
+  for (let i = 1, m = mixed.length - 2; i < frontLimit && m >= deepStart; i += 3, m -= 3) {
+    const tmp = mixed[i]; mixed[i] = mixed[m]; mixed[m] = tmp;
+  }
+  placed = mixed;
 } else if (EDGE_BIG) {
   // 边框（开局可见）放大车 → 开局没几个能一口吃满的；内部放小车当后段奖励
   const edge = [], inner2 = [];

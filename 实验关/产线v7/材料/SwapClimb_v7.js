@@ -21,14 +21,14 @@ const Sim = A.Simulator, St = A.SolverStrategy;
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i > 0 ? argv[i + 1] : d; };
 const IN = argv[0], OUT = argv[1];
-const ITERS = Number(arg('--iters', 30));
-const GAMES = Number(arg('--games', 35));
+const ITERS = Number(arg('--iters', 40));
+const GAMES = Number(arg('--games', 12));
 const SEED = Number(arg('--seed', 977));
 const LO = Number(arg('--lo', 0.58));
 const HI = Number(arg('--hi', 0.68));
 const MID = (LO + HI) / 2;
 const REPORT = arg('--report', null);
-const EARLY_W = Number(arg('--early-w', 0.6));
+const EARLY_W = Number(arg('--early-w', 3.0));
 const HUMAN_CASUAL = argv.includes('--human-casual');
 if (!IN || !OUT) { console.error('用法: node SwapClimb_v7.js <底座.json> <输出.json> [--iters 30] [--games 35] [--seed 977] [--lo .58] [--hi .68]'); process.exit(2); }
 
@@ -143,10 +143,17 @@ console.log('iter0', JSON.stringify(brief(curEv)));
 for (let it = 1; it <= ITERS; it++) {
   if (curEv && curEv.casual <= HI && curEv.casual >= LO && curEv.earlyShare <= 0.15 && curEv.fair >= 0.85 && curEv.inv <= 2) break;
   const g = clones(cur);
-  const cells = [];
-  for (let r = 0; r < g.spools.length; r++) for (let c = 0; c < g.spools[r].length; c++) if (isPlainCar(g.spools[r][c])) cells.push([r, c]);
-  const a = cells[Math.floor(rnd() * cells.length)], b = cells[Math.floor(rnd() * cells.length)];
-  if (!a || !b || (a[0] === b[0] && a[1] === b[1])) continue;
+  // 【2026-11-23 修复】换位必须做「前排浅层车 ↔ 中深层车」跨行错位，否则同层互换对原随意档几乎无影响：
+  const R = g.spools.length;
+  const front = [], deep = [];
+  for (let r = 0; r < R; r++) for (let c = 0; c < g.spools[r].length; c++) {
+    if (!isPlainCar(g.spools[r][c])) continue;
+    if (r <= 2) front.push([r, c]);
+    if (r >= 3) deep.push([r, c]);
+  }
+  if (!front.length || !deep.length) continue;
+  const a = front[Math.floor(rnd() * front.length)], b = deep[Math.floor(rnd() * deep.length)];
+  if (!a || !b || g.spools[a[0]][a[1]].id === g.spools[b[0]][b[1]].id) continue;
   const tmp = g.spools[a[0]][a[1]]; g.spools[a[0]][a[1]] = g.spools[b[0]][b[1]]; g.spools[b[0]][b[1]] = tmp;
   const ev = evalWall(g);
   if (!ev) { log.push({ iter: it, swap: [a, b], accepted: false }); continue; }

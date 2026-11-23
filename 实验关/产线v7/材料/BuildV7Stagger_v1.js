@@ -55,13 +55,15 @@ if (!TARGET || !OUT) {
   process.exit(2);
 }
 
+// 【2026-11-23 升级：前中深层错落锁链分布（行1-2 破口链 2 对 + 行3-4 中腰链 1-2 对）】
+// 改变此前所有链子扎堆在第 2、3 行（row 1..2）的模板化布局，将 1-2 对链下沉到第 4、5 行（row 3..4）中腰接力，同时保证 row 1 留 >=4 个畅通单车口！
 const CHAIN_STYLES = [
-  [[[1,0],[2,0]], [[1,3],[1,4]], [[2,5],[2,6]]],
-  [[[1,1],[1,2]], [[1,5],[2,5]], [[2,0],[2,1]], [[2,3],[2,4]]],
-  [[[1,1],[2,1]], [[1,3],[2,3]], [[1,6],[2,6]]],
-  [[[1,0],[1,1]], [[1,4],[1,5]], [[2,2],[2,3]]],
-  [[[1,2],[2,2]], [[1,4],[1,5]], [[2,0],[2,1]], [[2,4],[2,5]]],
-  [[[2,0],[2,1]], [[1,3],[2,3]], [[1,6],[2,6]]]
+  [[[1,0],[2,0]], [[1,4],[1,5]], [[3,2],[3,3]], [[4,5],[4,6]]],
+  [[[1,1],[1,2]], [[2,5],[3,5]], [[3,1],[4,1]], [[4,3],[4,4]]],
+  [[[1,1],[2,1]], [[1,5],[2,5]], [[3,3],[4,3]]],
+  [[[1,0],[1,1]], [[2,4],[2,5]], [[3,1],[3,2]], [[4,4],[4,5]]],
+  [[[1,2],[2,2]], [[1,5],[1,6]], [[3,0],[3,1]], [[4,3],[4,4]]],
+  [[[1,3],[2,3]], [[2,0],[2,1]], [[3,5],[4,5]]]
 ];
 
 const COL_ORDERS = [
@@ -116,7 +118,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       execFileSync('node', [
         path.join(ROOT, '实验关/产线v6/加链/建B_v1.js'),
         cur, `${a[0]},${a[1]}`, `${b[0]},${b[1]}`, nxt,
-        '--gid', String(i + 1), '--max-row', '2', '--allow-valve'
+        '--gid', String(i + 1), '--max-row', '4', '--allow-valve'
       ], { stdio: 'ignore' });
       chainUsed.add(a[0] + ',' + a[1]);
       chainUsed.add(b[0] + ',' + b[1]);
@@ -140,7 +142,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       for (const [br, bc] of [[r1, c1], [r2, c2]]) {
         for (const [dr, dc] of [[0, 1], [0, -1], [1, 0]]) {
           const nr = br + dr, nc = bc + dc;
-          if (nr < 1 || nr > 3 || nc < 0 || nc >= COLS) continue;
+          if (nr < 1 || nr > 4 || nc < 0 || nc >= COLS) continue;
           const key = `${nr},${nc}`;
           if (chainUsed.has(key)) continue;
           const cell = d3c.spools[nr][nc];
@@ -350,7 +352,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
-    icedLv, climbedLv, '--human-casual', '--iters', String(ITERS), '--games', '20', '--seed', String(SEED), '--lo', '0.54', '--hi', '0.66'
+    icedLv, climbedLv, '--iters', String(ITERS), '--games', '10', '--seed', String(SEED), '--lo', '0.57', '--hi', '0.66'
   ], { stdio: 'ignore' });
 
   return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
@@ -419,8 +421,7 @@ function fullVerify(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 &&
-    humFair >= 0.90 && randFair >= 0.90 &&
-    ((randCasual >= 0.50 && randCasual <= 0.75) || (humCasual >= 0.48 && humCasual <= 0.78));
+    humFair >= 0.90 && randFair >= 0.90 && randCasual >= 0.55 && randCasual <= 0.68;
 
   return {
     allPass, randCasual, randFair, humCasual, humFair, bufWave, midTight,
