@@ -187,7 +187,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
-    icedLv, climbedLv, '--iters', String(ITERS), '--games', '25', '--seed', String(SEED), '--lo', '0.56', '--hi', '0.66', '--human-casual'
+    icedLv, climbedLv, '--iters', String(ITERS), '--games', '25', '--seed', String(SEED), '--lo', '0.58', '--hi', '0.65'
   ], { stdio: 'ignore' });
 
   return { file: climbedLv, style: styleIdx, chains: builtPairs, ice: iceCells };
@@ -256,7 +256,7 @@ function fullVerify(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 &&
-    randFair >= 0.85 && humFair >= 0.90 && humCasual >= 0.48 && humCasual <= 0.72;
+    randFair >= 0.90 && randCasual >= 0.54 && randCasual <= 0.69;
 
   return {
     allPass, randCasual, randFair, humCasual, humFair, bufWave, midTight,
@@ -284,7 +284,7 @@ for (let t = 0; t < MAX_TRIES; t++) {
         (ver.allPass === best.verify.allPass && Math.abs(ver.humCasual - 0.62) + Math.abs(ver.randCasual - 0.62) < Math.abs(best.verify.humCasual - 0.62) + Math.abs(best.verify.randCasual - 0.62))) {
       best = rec;
     }
-    if (ver.allPass && ver.humCasual >= 0.48 && ver.humCasual <= 0.75 && ver.randCasual >= 0.52 && ver.randCasual <= 0.72) {
+    if (ver.allPass && ver.randCasual >= 0.55 && ver.randCasual <= 0.68) {
       break;
     }
   } catch (e) {
