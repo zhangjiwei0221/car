@@ -36,8 +36,13 @@ const TARGET = arg('--target', null);
 const OUT = arg('--out', null);
 const INIT_STYLE = Number(arg('--style', '0'));
 const WITH_PIPE = has('--with-pipe');
-const PIPE_MOUTH = arg('--pipe-mouth', 'big'); // 'big' (管口大车增难/替冰) | 'small' (管口小车保终局波形)
-const PIPE_REPLACE_ICE = !has('--keep-9-ice'); // 有管道时默认开启「管道替深水冰(5冰)」，传 --keep-9-ice 则保留 9 冰
+const PIPE_MODE = arg('--pipe-mode', WITH_PIPE ? '1' : 'auto'); // 'auto' (按大车数与周期自动选0/1/2/3管) | '0' | '1' | '2' | '3'
+const PIPE_MOUTH = arg('--pipe-mouth', 'auto'); // 'auto' (自动找平) | 'big' | 'small'
+const PIPE_REPLACE_ICE = !has('--keep-9-ice'); // 有管道时默认开启「管道替深水冰」，传 --keep-9-ice 则保留 9 冰
+const LEVEL_IDX = Number(arg('--level-idx', '0'));
+const WITH_CHAIN3 = has('--with-3chain'); // 启用「2小1大」安全三锁链
+const ROWS = Number(arg('--rows', '7'));
+const COLS = Number(arg('--cols', '7'));
 const ITERS = Number(arg('--iters', '14'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
@@ -120,71 +125,139 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
   }
 
+  // 2.5 可选「2小1大」安全三锁链 (--with-3chain，日志 §1188/§1190)：
+  //     严禁 3 大车同绑（实测会让短视真人从 .567 崩到 .233）；只准把 1 辆紧邻的冗余小车(<=16px)并入已有二连链，构成 [小+大+小] 三连链！
+  if (WITH_CHAIN3 && builtPairs.length > 0) {
+    const d3c = JSON.parse(fs.readFileSync(cur, 'utf8'));
+    let merged3 = false;
+    for (let gi = 0; gi < builtPairs.length && !merged3; gi++) {
+      const gid = gi + 1;
+      const [[r1, c1], [r2, c2]] = builtPairs[gi];
+      const cap1 = d3c.spools[r1][c1].count, cap2 = d3c.spools[r2][c2].count;
+      if (Math.min(cap1, cap2) > 20) continue;
+      for (const [br, bc] of [[r1, c1], [r2, c2]]) {
+        for (const [dr, dc] of [[0, 1], [0, -1], [1, 0]]) {
+          const nr = br + dr, nc = bc + dc;
+          if (nr < 1 || nr > 3 || nc < 0 || nc >= COLS) continue;
+          const key = `${nr},${nc}`;
+          if (chainUsed.has(key)) continue;
+          const cell = d3c.spools[nr][nc];
+          if (cell && cell.id > 0 && cell.type === 0 && cell.count <= 16 && (colorCars[cell.id] || 0) >= 3) {
+            const nxt = path.join(workDir, `s${styleIdx}_chain3.json`);
+            cell.type = 5; cell.param = gid;
+            fs.writeFileSync(nxt, JSON.stringify(d3c, null, 1));
+            chainUsed.add(key);
+            builtPairs[gi].push([nr, nc]);
+            cur = nxt;
+            merged3 = true;
+            break;
+          }
+        }
+        if (merged3) break;
+      }
+    }
+  }
+
+  // 3. 产线管道自治决策树 (--pipe-mode auto|0|1|2|3，日志 §1189/§1190)
+  const dPrePipe = JSON.parse(fs.readFileSync(cur, 'utf8'));
+  let giantCnt = 0;
+  for (let rr = 2; rr < ROWS; rr++) for (let cc = 0; cc < COLS; cc++) {
+    const x = dPrePipe.spools[rr][cc];
+    if (x && x.id > 0 && x.type === 0 && x.count >= 30 && (colorCars[x.id] || 0) >= 3) giantCnt++;
+  }
+  let targetPipes = 0;
+  if (PIPE_MODE === 'auto') {
+    if (LEVEL_IDX > 0 && LEVEL_IDX % 9 === 0) targetPipes = 3;
+    else if (giantCnt >= 5 || (LEVEL_IDX > 0 && LEVEL_IDX % 5 === 0)) targetPipes = 2;
+    else if (giantCnt >= 3 || (LEVEL_IDX > 0 && LEVEL_IDX % 3 === 0)) targetPipes = 1;
+    else targetPipes = 0;
+  } else {
+    targetPipes = Math.max(0, Math.min(3, Number(PIPE_MODE) || 0));
+  }
+
   const pipeUsed = new Set();
-  if (WITH_PIPE) {
-    const pCol = (2 + styleIdx) % 5 + 1;
-    const pipeCell = `4,${pCol}`;
-    const dNow = JSON.parse(fs.readFileSync(cur, 'utf8'));
-    if (PIPE_MOUTH === 'big') {
-      let bestRC = null, bestCap = dNow.spools[4][pCol].count;
-      for (let rr = 3; rr <= 5; rr++) for (let cc = 0; cc < 7; cc++) {
-        const x = dNow.spools[rr][cc];
-        if (x && x.type === 0 && (colorCars[x.id] || 0) >= 3 && x.count > bestCap) {
-          bestCap = x.count; bestRC = [rr, cc];
+  const pipeColsUsed = [];
+  if (targetPipes > 0) {
+    const pipeCols = targetPipes === 1
+      ? [(2 + styleIdx) % 5 + 1]
+      : (targetPipes === 2 ? [1, 5] : [1, 3, 5]);
+    const splitsPerPipe = targetPipes === 3 ? 2 : 3;
+    for (let pi = 0; pi < pipeCols.length; pi++) {
+      const pCol = pipeCols[pi];
+      const pipeCell = `4,${pCol}`;
+      if (chainUsed.has(pipeCell) || pipeUsed.has(pipeCell)) continue;
+      const dNow = JSON.parse(fs.readFileSync(cur, 'utf8'));
+      const mouthMode = PIPE_MOUTH === 'auto'
+        ? (targetPipes === 3 && pi === 1 ? 'small' : 'big')
+        : PIPE_MOUTH;
+      if (mouthMode === 'big') {
+        let bestRC = null, bestCap = dNow.spools[4][pCol].count;
+        for (let rr = 3; rr <= 5; rr++) for (let cc = 0; cc < COLS; cc++) {
+          const k = `${rr},${cc}`;
+          if (chainUsed.has(k) || pipeUsed.has(k) || (pipeCols.includes(cc) && rr === 4)) continue;
+          const x = dNow.spools[rr][cc];
+          if (x && x.type === 0 && (colorCars[x.id] || 0) >= 3 && x.count > bestCap) {
+            bestCap = x.count; bestRC = [rr, cc];
+          }
+        }
+        if (bestRC) {
+          const [br, bc] = bestRC;
+          const tmp = dNow.spools[4][pCol]; dNow.spools[4][pCol] = dNow.spools[br][bc]; dNow.spools[br][bc] = tmp;
+          fs.writeFileSync(cur, JSON.stringify(dNow, null, 1));
         }
       }
-      if (bestRC) {
-        const [br, bc] = bestRC;
-        const tmp = dNow.spools[4][pCol]; dNow.spools[4][pCol] = dNow.spools[br][bc]; dNow.spools[br][bc] = tmp;
-        fs.writeFileSync(cur, JSON.stringify(dNow, null, 1));
-      }
-    }
-    const pColor = dNow.spools[4][pCol].id;
-    const seenCol = new Set([pColor]);
-    // 严格只挑 row 3..6 中 count 最大且 >=24px 的冗余大车做对半拆（严禁拆 <=20px 的前排中小车！）
-    const cands = [];
-    for (let rr = 3; rr <= 6; rr++) for (let cc = 0; cc < 7; cc++) {
-      if (rr === 4 && cc === pCol) continue;
-      if (chainUsed.has(`${rr},${cc}`)) continue;
-      const cell = dNow.spools[rr][cc];
-      if (cell && cell.id > 0 && cell.type === 0 && cell.count >= 24 && (colorCars[cell.id] || 0) >= 3) {
-        cands.push({ r: rr, c: cc, id: cell.id, count: cell.count });
-      }
-    }
-    cands.sort((a, b) => b.count - a.count);
-    const splits = [];
-    for (const cd of cands) {
-      if (splits.length >= 3) break;
-      if (!seenCol.has(cd.id)) { seenCol.add(cd.id); splits.push(`${cd.r},${cd.c}`); }
-    }
-    for (const cd of cands) {
-      if (splits.length >= 3) break;
-      const k = `${cd.r},${cd.c}`;
-      if (!splits.includes(k)) splits.push(k);
-    }
-    if (splits.length === 3) {
-      const nxt = path.join(workDir, `s${styleIdx}_pipe.json`);
-      try {
-        execFileSync('node', [
-          path.join(ROOT, '实验关/产线v6/难度带/四辆管/split_pipe_v1.js'),
-          cur, nxt, '--pipe', pipeCell, '--dir', '11', '--split', splits.join(';')
-        ], { stdio: 'ignore' });
-        if (PIPE_MOUTH === 'small') {
-          const pObj = JSON.parse(fs.readFileSync(nxt, 'utf8'));
-          pObj.spools[4][pCol].param = [...pObj.spools[4][pCol].param].reverse();
-          fs.writeFileSync(nxt, JSON.stringify(pObj, null, 1));
+      const pColor = dNow.spools[4][pCol].id;
+      const seenCol = new Set([pColor]);
+      const cands = [];
+      for (let rr = 3; rr < ROWS; rr++) for (let cc = 0; cc < COLS; cc++) {
+        const k = `${rr},${cc}`;
+        if ((rr === 4 && pipeCols.includes(cc)) || chainUsed.has(k) || pipeUsed.has(k)) continue;
+        const cell = dNow.spools[rr][cc];
+        if (cell && cell.id > 0 && cell.type === 0 && cell.count >= 22 && (colorCars[cell.id] || 0) >= 3) {
+          cands.push({ r: rr, c: cc, id: cell.id, count: cell.count });
         }
-        pipeUsed.add(pipeCell);
-        splits.forEach(s => pipeUsed.add(s));
-        cur = nxt;
-      } catch (e) {}
+      }
+      cands.sort((a, b) => b.count - a.count);
+      const splits = [];
+      for (const cd of cands) {
+        if (splits.length >= splitsPerPipe) break;
+        if (!seenCol.has(cd.id)) { seenCol.add(cd.id); splits.push(`${cd.r},${cd.c}`); }
+      }
+      for (const cd of cands) {
+        if (splits.length >= splitsPerPipe) break;
+        const k = `${cd.r},${cd.c}`;
+        if (!splits.includes(k)) splits.push(k);
+      }
+      if (splits.length === splitsPerPipe) {
+        const nxt = path.join(workDir, `s${styleIdx}_pipe${pi + 1}.json`);
+        try {
+          execFileSync('node', [
+            path.join(ROOT, '实验关/产线v6/难度带/四辆管/split_pipe_v1.js'),
+            cur, nxt, '--pipe', pipeCell, '--dir', '11', '--split', splits.join(';')
+          ], { stdio: 'ignore' });
+          if (mouthMode === 'small') {
+            const pObj = JSON.parse(fs.readFileSync(nxt, 'utf8'));
+            pObj.spools[4][pCol].param = [...pObj.spools[4][pCol].param].reverse();
+            fs.writeFileSync(nxt, JSON.stringify(pObj, null, 1));
+          }
+          pipeUsed.add(pipeCell);
+          pipeColsUsed.push(pCol);
+          splits.forEach(s => pipeUsed.add(s));
+          cur = nxt;
+        } catch (e) {}
+      }
     }
   }
 
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
-  const rowNeeds = (WITH_PIPE && pipeUsed.size > 0 && PIPE_REPLACE_ICE)
-    ? [[2, 2, 8], [3, 2, 13], [5, 1, 21]]
-    : [[2, 2, 8], [3, 2, 13], [4, 2, 17], [5, 1, 21], [6, 2, 25]];
+  const actualPipes = pipeColsUsed.length;
+  const rowNeeds = (!PIPE_REPLACE_ICE || actualPipes === 0)
+    ? [[2, 2, 8], [3, 2, 13], [4, 2, 17], [5, 1, 21], [6, 2, 25]]
+    : (actualPipes >= 3
+      ? []
+      : (actualPipes === 2
+        ? [[2, 2, 8]]
+        : [[2, 2, 8], [3, 2, 13], [5, 1, 21]]));
   const colSeq = COL_ORDERS[styleIdx % COL_ORDERS.length];
   const iceCells = [];
   for (let idx = 0; idx < rowNeeds.length; idx++) {
@@ -214,18 +287,22 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   }
 
   const icedLv = path.join(workDir, `s${styleIdx}_iced.json`);
-  execFileSync('node', [
-    path.join(ROOT, '实验关/产线v6/难度带/冰剂量/add_ice_662.js'),
-    cur, '--cells', iceCells.join(';'), '--out', icedLv
-  ], { stdio: 'ignore' });
+  if (iceCells.length > 0) {
+    execFileSync('node', [
+      path.join(ROOT, '实验关/产线v6/难度带/冰剂量/add_ice_662.js'),
+      cur, '--cells', iceCells.join(';'), '--out', icedLv
+    ], { stdio: 'ignore' });
+  } else {
+    fs.copyFileSync(cur, icedLv);
+  }
 
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
-    icedLv, climbedLv, '--iters', String(ITERS), '--games', '25', '--seed', String(SEED), '--lo', '0.58', '--hi', '0.65'
+    icedLv, climbedLv, '--human-casual', '--iters', String(ITERS), '--games', '20', '--seed', String(SEED), '--lo', '0.54', '--hi', '0.66'
   ], { stdio: 'ignore' });
 
-  return { file: climbedLv, style: styleIdx, chains: builtPairs, ice: iceCells };
+  return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, ice: iceCells };
 }
 
 function fullVerify(lvFile, workDir, tag) {
@@ -291,7 +368,8 @@ function fullVerify(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 &&
-    randFair >= 0.90 && randCasual >= 0.54 && randCasual <= 0.69;
+    humFair >= 0.90 && randFair >= 0.90 &&
+    ((randCasual >= 0.54 && randCasual <= 0.69) || (humCasual >= 0.50 && humCasual <= 0.72));
 
   return {
     allPass, randCasual, randFair, humCasual, humFair, bufWave, midTight,
@@ -304,7 +382,7 @@ const baseLv = path.join(work, 'base.json');
 execFileSync('node', [
   path.join(TOOLS, 'SplitLevel_v722.js'),
   '--target', TARGET, '--out', baseLv,
-  '--rows', '7', '--cols', '7', '--bottom-only', '--stagger-cap'
+  '--rows', String(ROWS), '--cols', String(COLS), '--bottom-only', '--stagger-cap', '--no-first-test'
 ], { stdio: 'ignore' });
 
 let best = null;

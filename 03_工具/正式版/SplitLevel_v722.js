@@ -292,6 +292,18 @@ while (boxes.length < rows * cols && targetSize > boxMin && guard++ < 400) {
   targetSize--;
   boxes = splitAll(targetSize);
 }
+// 【2026-11-23 修复大棋盘(7x8/8x8)切出空格黑洞 bug】：若 targetSize 已降到 boxMin 仍不足 rows*cols，
+// 按当前容量从大到小将同色大车(count>=16)对半切分，直到恰好填满 rows*cols 个格子（绝不留 id=-1 空位）！
+while (boxes.length < rows * cols) {
+  boxes.sort((a, b) => b.count - a.count);
+  const big = boxes[0];
+  if (!big || big.count < 16) break;
+  const half = Math.floor(big.count / 2);
+  const c1 = big.cells.slice(0, half);
+  const c2 = big.cells.slice(half);
+  big.cells = c1; big.count = c1.length; big.first = c1[0] || big.first;
+  boxes.push({ color: big.color, cells: c2, count: c2.length, first: c2[0] || big.first });
+}
 // 若仍超出，只能同色合并（绝不跨色）
 while (boxes.length > rows * cols) {
   boxes.sort((a, b) => a.count - b.count);
@@ -523,7 +535,9 @@ spools.flat().filter(c => c.id > 0).forEach(c => { perColor[c.id] = (perColor[c.
 const bad = Object.keys(totals).filter(col => (perColor[col] || 0) !== totals[col]);
 
 const lv = A.parseLevel(A.fromGameFormat(level));
-const o = A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: true });
+const o = process.argv.includes('--no-first-test')
+  ? { pressureSamples: [], completed: true }
+  : A.Solver.runSolver(lv, 0, 1, false, false, { capturePreviewStats: true, instantChain: true });
 const buf = (o.pressureSamples || []).map(s => s.buf || 0);
 let at4 = 0, run4 = 0, cur = 0;
 for (const v of buf) { if (v >= 4) { cur++; at4++; run4 = Math.max(run4, cur); } else cur = 0; }

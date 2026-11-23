@@ -78,11 +78,13 @@ let s = Sim.createState(lv, { useSlotStart: true, instantChain: false });
 const open = Sim.listMoves(s).filter(m => !m.blocked).length;
 const colorSum = {};
 for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-  const x = sp[r][c]; if (!x || !(x.id > 0)) continue;
-  colorSum[x.id] = (colorSum[x.id] || 0) + x.count;
+  const x = sp[r][c]; if (!x) continue;
+  if (x.id > 0) colorSum[x.id] = (colorSum[x.id] || 0) + x.count;
+  const ts = Array.isArray(x.type) ? x.type : [x.type];
+  if (ts.some(t => t >= 11 && t <= 14) && Array.isArray(x.param)) {
+    for (const q of x.param) if (q && q.id > 0) colorSum[q.id] = (colorSum[q.id] || 0) + q.count;
+  }
 }
-// 队列里的车按各自颜色计入（管道格 id=0，不能靠格子的 id 归并）
-for (const q of queue) colorSum[q.id] = (colorSum[q.id] || 0) + q.count;
 const blk = {}; for (let r = 0; r < out.blocks.length; r++) for (let c = 0; c < out.blocks[r].length; c++) {
   const col = out.blocks[r][c]; if (col > 0) blk[col] = (blk[col] || 0) + 1;
 }
