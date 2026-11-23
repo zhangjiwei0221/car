@@ -41,7 +41,7 @@ const isDead = (st) => !!(st.overflow || st.buffer.length > st.bufferLimit || Si
 
 function playOne(lv, p, r) {
   let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: true, instantChain: true });
-  for (let step = 0; step < 200; step++) {
+  for (let step = 0; step < 80; step++) {
     if (isWon(s)) return { won: true, prog: 1 };
     const ms = Sim.listMoves(s).filter(m => !m.blocked);
     if (!ms.length) break;

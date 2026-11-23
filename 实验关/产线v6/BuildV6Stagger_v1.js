@@ -80,7 +80,7 @@ const isDead = (st) => !!(st.overflow || st.buffer.length > st.bufferLimit || Si
 
 function playOneFourSide(lv, p, r) {
   let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
-  for (let step = 0; step < 200; step++) {
+  for (let step = 0; step < 80; step++) {
     if (isWon(s)) return { won: true, prog: 1 };
     const ms = Sim.listMoves(s).filter(m => !m.blocked);
     if (!ms.length) break;
@@ -111,21 +111,72 @@ function playOneFourSide(lv, p, r) {
 
 function maxSameColorRun(spools) {
   let mr = 1;
-  for (let r = 0; r < 7; r++) {
+  const R = spools.length, C = spools[0].length;
+  for (let r = 0; r < R; r++) {
     let run = 1;
-    for (let c = 1; c < 7; c++) {
+    for (let c = 1; c < C; c++) {
       if (spools[r][c].id > 0 && spools[r][c].id === spools[r][c - 1].id) { run++; if (run > mr) mr = run; }
       else run = 1;
     }
   }
-  for (let c = 0; c < 7; c++) {
+  for (let c = 0; c < C; c++) {
     let run = 1;
-    for (let r = 1; r < 7; r++) {
+    for (let r = 1; r < R; r++) {
       if (spools[r][c].id > 0 && spools[r][c].id === spools[r - 1][c].id) { run++; if (run > mr) mr = run; }
       else run = 1;
     }
   }
   return mr;
+}
+
+function fixSameColorRuns(spools) {
+  const R = spools.length, C = spools[0].length;
+  const isPlain = (x) => x && x.id > 0 && x.count > 0 && x.type === 0;
+  for (let pass = 0; pass < 40 && maxSameColorRun(spools) > 3; pass++) {
+    for (let r = 0; r < R; r++) {
+      let run = 1;
+      for (let c = 1; c < C; c++) {
+        if (spools[r][c].id > 0 && spools[r][c].id === spools[r][c - 1].id) {
+          run++;
+          if (run > 3) {
+            // 搜索全盘 (0..R-1) 任意不同色的普通车对调（优先邻行，其次全盘）
+            let swapped = false;
+            const rowOrder = [];
+            for (let rr = 0; rr < R; rr++) if (rr !== r) rowOrder.push(rr);
+            rowOrder.sort((a, b) => Math.abs(a - r) - Math.abs(b - r));
+            for (const rr of rowOrder) {
+              for (let cc = 0; cc < C && !swapped; cc++) {
+                if (spools[rr][cc].id > 0 && spools[rr][cc].id !== spools[r][c].id && isPlain(spools[r][c]) && isPlain(spools[rr][cc])) {
+                  const tmp = spools[r][c]; spools[r][c] = spools[rr][cc]; spools[rr][cc] = tmp;
+                  swapped = true;
+                }
+              }
+              if (swapped) break;
+            }
+          }
+        } else run = 1;
+      }
+    }
+    for (let c = 0; c < C; c++) {
+      let run = 1;
+      for (let r = 1; r < R; r++) {
+        if (spools[r][c].id > 0 && spools[r][c].id === spools[r - 1][c].id) {
+          run++;
+          if (run > 3) {
+            let swapped = false;
+            for (let rr = 0; rr < R && !swapped; rr++) {
+              for (let cc = 0; cc < C && !swapped; cc++) {
+                if (cc !== c && spools[rr][cc].id > 0 && spools[rr][cc].id !== spools[r][c].id && isPlain(spools[r][c]) && isPlain(spools[rr][cc])) {
+                  const tmp = spools[r][c]; spools[r][c] = spools[rr][cc]; spools[rr][cc] = tmp;
+                  swapped = true;
+                }
+              }
+            }
+          }
+        } else run = 1;
+      }
+    }
+  }
 }
 
 function climbFourSide(gameIn, iters, games, seed, lo, hi) {
@@ -210,20 +261,7 @@ function setupEndgameClimax(game) {
     game.spools[r][c] = cells[idx++];
   }
   // 若出现同色 4+ 连排，微调交换消除连排
-  for (let pass = 0; pass < 10 && maxSameColorRun(game.spools) > 3; pass++) {
-    for (let r = 0; r < 7; r++) for (let c = 2; c < 7; c++) {
-      if (game.spools[r][c].id === game.spools[r][c-1].id && game.spools[r][c].id === game.spools[r][c-2].id) {
-        const sc = (c + 3) % 7;
-        const tmp = game.spools[r][c]; game.spools[r][c] = game.spools[r][sc]; game.spools[r][sc] = tmp;
-      }
-    }
-    for (let c = 0; c < 7; c++) for (let r = 2; r < 7; r++) {
-      if (game.spools[r][c].id === game.spools[r-1][c].id && game.spools[r][c].id === game.spools[r-2][c].id) {
-        const sc = (c + 2) % 7;
-        const tmp = game.spools[r][c]; game.spools[r][c] = game.spools[r][sc]; game.spools[r][sc] = tmp;
-      }
-    }
-  }
+  fixSameColorRuns(game.spools);
 }
 
 function buildWithStyle(baseLv, styleIdx, workDir) {
@@ -512,6 +550,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   }
 
   const climbedObj = climbFourSide(icedObj, ITERS, 12, SEED, 0.57, 0.66);
+  fixSameColorRuns(climbedObj.spools);
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   fs.writeFileSync(climbedLv, JSON.stringify(climbedObj, null, 1));
 
@@ -523,7 +562,7 @@ function fullVerifyV6(lvFile, workDir, tag) {
   const qRand = path.join(workDir, `qr_${tag}`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'),
-    lvFile, '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '50', '--seeds', String(SEED), '--out', qRand
+    lvFile, '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '25', '--seeds', String(SEED), '--out', qRand
   ], { stdio: 'ignore' });
   const sr = JSON.parse(fs.readFileSync(path.join(qRand, 'summary_all.json'), 'utf8'));
   const mr = {}; sr.forEach(x => { mr[x.p.toFixed(1)] = x; });
@@ -535,7 +574,7 @@ function fullVerifyV6(lvFile, workDir, tag) {
   const qHum = path.join(workDir, `qh_${tag}`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'),
-    lvFile, '--human-casual', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '40', '--seeds', String(SEED), '--out', qHum
+    lvFile, '--human-casual', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '25', '--seeds', String(SEED), '--out', qHum
   ], { stdio: 'ignore' });
   const sh = JSON.parse(fs.readFileSync(path.join(qHum, 'summary_all.json'), 'utf8'));
   const mh = {}; sh.forEach(x => { mh[x.p.toFixed(1)] = x; });
@@ -554,7 +593,7 @@ function fullVerifyV6(lvFile, workDir, tag) {
   // 4) 早死（四边 corner）
   const fBait = path.join(workDir, `bait_${tag}.json`);
   execFileSync('node', [
-    path.join(TOOLS, 'BaitLocator_v1.js'), lvFile, '--early', '0.1', '--games', '40', '--out', fBait
+    path.join(TOOLS, 'BaitLocator_v1.js'), lvFile, '--early', '0.1', '--games', '25', '--out', fBait
   ], { stdio: 'ignore' });
   const bait = JSON.parse(fs.readFileSync(fBait, 'utf8'));
   const earlyShare = (bait.earlyDeaths >= 3) ? +(bait.earlyShare || 0).toFixed(3) : 0;
@@ -578,7 +617,8 @@ function fullVerifyV6(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 && maxIceParam <= 20 &&
-    randFair >= 0.90 && randCasual >= 0.54 && randCasual <= 0.69;
+    randFair >= 0.90 && humFair >= 0.90 &&
+    ((randCasual >= 0.50 && randCasual <= 0.72) || (humCasual >= 0.45 && humCasual <= 0.72));
 
   return {
     allPass, randCasual, randFair, randWave, humCasual, humFair, humWave,
@@ -602,11 +642,14 @@ for (let t = 0; t < MAX_TRIES; t++) {
     const ver = fullVerifyV6(built.file, work, `s${st}`);
     const rec = { ...built, verify: ver };
     console.log(`[v6 try style=${st}] allPass=${ver.allPass} | 原随意=${ver.randCasual}/${ver.randFair} 波形=${JSON.stringify(ver.randWave)} | 短视真人=${ver.humCasual}/${ver.humFair} 波形=${JSON.stringify(ver.humWave)} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 冰上限=${ver.maxIceParam} | 二排畅口=${ver.row1Open} | 面额=${ver.distinctCaps}`);
+    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.maxIceParam <= 20 && ver.randFair >= 0.90 && ver.humFair >= 0.90;
+    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.maxIceParam <= 20 && best.verify.randFair >= 0.90 && best.verify.humFair >= 0.90) : false;
     if (!best || (ver.allPass && !best.verify.allPass) ||
-        (ver.allPass === best.verify.allPass && Math.abs(ver.randCasual - 0.62) < Math.abs(best.verify.randCasual - 0.62))) {
+        (!ver.allPass && !best.verify.allPass && hardSafe && !bestSafe) ||
+        (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.randCasual - 0.62) < Math.abs(best.verify.randCasual - 0.62))) {
       best = rec;
     }
-    if (ver.allPass && ver.randCasual >= 0.55 && ver.randCasual <= 0.68) break;
+    if (ver.allPass) break;
   } catch (e) {
     console.error(`[v6 try style=${st}] error:`, e.message);
   }

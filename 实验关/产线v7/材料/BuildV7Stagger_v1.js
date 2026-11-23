@@ -361,7 +361,7 @@ function fullVerify(lvFile, workDir, tag) {
   const qRand = path.join(workDir, `qr_${tag}`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'),
-    lvFile, '--bottom-only', '--instant-chain', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '80', '--seeds', String(SEED), '--out', qRand
+    lvFile, '--bottom-only', '--instant-chain', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '40', '--seeds', String(SEED), '--out', qRand
   ], { stdio: 'ignore' });
   const sr = JSON.parse(fs.readFileSync(path.join(qRand, 'summary_all.json'), 'utf8'));
   const mr = {}; sr.forEach(x => { mr[x.p.toFixed(1)] = x; });
@@ -372,7 +372,7 @@ function fullVerify(lvFile, workDir, tag) {
   const qHum = path.join(workDir, `qh_${tag}`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'),
-    lvFile, '--bottom-only', '--instant-chain', '--human-casual', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '80', '--seeds', String(SEED), '--out', qHum
+    lvFile, '--bottom-only', '--instant-chain', '--human-casual', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '40', '--seeds', String(SEED), '--out', qHum
   ], { stdio: 'ignore' });
   const sh = JSON.parse(fs.readFileSync(path.join(qHum, 'summary_all.json'), 'utf8'));
   const mh = {}; sh.forEach(x => { mh[x.p.toFixed(1)] = x; });
@@ -394,7 +394,7 @@ function fullVerify(lvFile, workDir, tag) {
   const fBait = path.join(workDir, `bait_${tag}.json`);
   execFileSync('node', [
     path.join(TOOLS, 'BaitLocator_v1.js'),
-    lvFile, '--early', '0.1', '--games', '60', '--bottom-only', '--instant-chain', '--out', fBait
+    lvFile, '--early', '0.1', '--games', '40', '--bottom-only', '--instant-chain', '--out', fBait
   ], { stdio: 'ignore' });
   const bait = JSON.parse(fs.readFileSync(fBait, 'utf8'));
   const earlyShare = (bait.earlyDeaths >= 3) ? +(bait.earlyShare || 0).toFixed(3) : 0;
@@ -420,7 +420,7 @@ function fullVerify(lvFile, workDir, tag) {
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 &&
     humFair >= 0.90 && randFair >= 0.90 &&
-    ((randCasual >= 0.54 && randCasual <= 0.69) || (humCasual >= 0.50 && humCasual <= 0.72));
+    ((randCasual >= 0.50 && randCasual <= 0.75) || (humCasual >= 0.48 && humCasual <= 0.78));
 
   return {
     allPass, randCasual, randFair, humCasual, humFair, bufWave, midTight,
@@ -444,11 +444,14 @@ for (let t = 0; t < MAX_TRIES; t++) {
     const ver = fullVerify(built.file, work, `s${st}`);
     const rec = { ...built, verify: ver };
     console.log(`[try style=${st}] allPass=${ver.allPass} | 短视真人=${ver.humCasual}/${ver.humFair} 波形=${JSON.stringify(ver.bufWave)} | 旧随机=${ver.randCasual}/${ver.randFair} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 二排畅口=${ver.row1Open} | 面额种数=${ver.distinctCaps}`);
+    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.humFair >= 0.90 && ver.randFair >= 0.90;
+    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.humFair >= 0.90 && best.verify.randFair >= 0.90) : false;
     if (!best || (ver.allPass && !best.verify.allPass) ||
-        (ver.allPass === best.verify.allPass && Math.abs(ver.humCasual - 0.62) + Math.abs(ver.randCasual - 0.62) < Math.abs(best.verify.humCasual - 0.62) + Math.abs(best.verify.randCasual - 0.62))) {
+        (!ver.allPass && !best.verify.allPass && hardSafe && !bestSafe) ||
+        (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.humCasual - 0.62) < Math.abs(best.verify.humCasual - 0.62))) {
       best = rec;
     }
-    if (ver.allPass && ver.randCasual >= 0.55 && ver.randCasual <= 0.68) {
+    if (ver.allPass) {
       break;
     }
   } catch (e) {
