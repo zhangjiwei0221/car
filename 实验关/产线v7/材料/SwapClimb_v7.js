@@ -79,13 +79,19 @@ function playOne(lv, p, r) {
         else if (aliveList.length) pick = aliveList[Math.floor(r() * aliveList.length)].t;
       }
     } else if (useG) {
-      let bg = -1;
+      const cand = [];
+      let bg = -Infinity;
       for (const m of ms) {
         const t = St.cloneState(s), e0 = t.eliminatedPixels;
         if (!Sim.applyPick(t, m.r, m.c)) continue;
         if (isDead(t) && !isWon(t)) continue;
         const g = t.eliminatedPixels - e0;
-        if (g > bg) { bg = g; pick = t; }
+        if (g > bg) bg = g;
+        cand.push({ t, g });
+      }
+      if (cand.length) {
+        const tied = cand.filter(o => o.g === bg);
+        pick = tied[Math.floor(r() * tied.length)].t;
       }
     } else {
       const idx = ms.map((_, i) => i);
@@ -103,19 +109,19 @@ function playOne(lv, p, r) {
 }
 
 const PS = [0, 0.1, 0.2, 0.8, 0.9, 1];
-function evalWall(game) {
+function evalWall(game, nGames = GAMES) {
   let lv;
   try { lv = A.parseLevel(A.fromGameFormat(game)); } catch (e) { return null; }
   const rates = {};
   let deaths = 0, early = 0;
   for (const p of PS) {
-    const r = lcg(Math.round(SEED + p * 1000));
+    const r = lcg(SEED);
     let w = 0;
-    for (let g = 0; g < GAMES; g++) {
+    for (let g = 0; g < nGames; g++) {
       const res = playOne(lv, p, r);
       if (res.won) w++; else { deaths++; if (res.prog < 0.1) early++; }
     }
-    rates[p] = w / GAMES;
+    rates[p] = w / nGames;
   }
   const casual = (rates[0] + rates[0.1] + rates[0.2]) / 3;
   const fair = (rates[0.8] + rates[0.9] + rates[1]) / 3;
@@ -140,10 +146,30 @@ let best = clones(cur), bestScore = curScore;
 const log = [{ iter: 0, ...brief(curEv), accepted: true }];
 console.log('iter0', JSON.stringify(brief(curEv)));
 
+// 预计算每个颜色在三面墙(自底 row=R-1 向上)下的平均深度 colorDepth[id]（越靠顶边值越大、越晚暴露）
+const colorDepth = {};
+{
+  const Bmat = base.blocks, BR = Bmat.length, BC = Bmat[0].length;
+  const sumD = {}, cntD = {};
+  for (let r = 0; r < BR; r++) for (let c = 0; c < BC; c++) {
+    const v = Bmat[r][c]; if (v <= 0) continue;
+    sumD[v] = (sumD[v] || 0) + (BR - 1 - r);
+    cntD[v] = (cntD[v] || 0) + 1;
+  }
+  for (const k of Object.keys(cntD)) colorDepth[k] = sumD[k] / cntD[k];
+}
+
 for (let it = 1; it <= ITERS; it++) {
-  if (curEv && curEv.casual <= HI && curEv.casual >= LO && curEv.earlyShare <= 0.15 && curEv.fair >= 0.85 && curEv.inv <= 2) break;
+  if (curEv && curEv.casual <= HI && curEv.casual >= LO && curEv.earlyShare <= 0.15 && curEv.fair >= 0.85 && curEv.inv <= 2) {
+    const fullEv = evalWall(cur, 40);
+    if (fullEv && fullEv.casual <= HI + 0.01 && fullEv.casual >= LO - 0.01 && fullEv.fair >= 0.85 && fullEv.earlyShare <= 0.18) {
+      curEv = fullEv; best = clones(cur); break;
+    }
+    curEv = fullEv || curEv; curScore = score(curEv);
+  }
   const g = clones(cur);
-  // 【2026-11-23 修复】换位必须做「前排浅层车 ↔ 中深层车」跨行错位，否则同层互换对原随意档几乎无影响：
+  // 【2026-11-23 定向供需错位换位】
+  // 当 casual > HI（太易需加压）：只从 front(row 0..2) 选浅层/小车，与 deep(row 3..6) 中更深层或更大容量的车对调，拒绝无效反向换位！
   const R = g.spools.length;
   const front = [], deep = [];
   for (let r = 0; r < R; r++) for (let c = 0; c < g.spools[r].length; c++) {
@@ -152,13 +178,29 @@ for (let it = 1; it <= ITERS; it++) {
     if (r >= 3) deep.push([r, c]);
   }
   if (!front.length || !deep.length) continue;
-  const a = front[Math.floor(rnd() * front.length)], b = deep[Math.floor(rnd() * deep.length)];
-  if (!a || !b || g.spools[a[0]][a[1]].id === g.spools[b[0]][b[1]].id) continue;
+  const needHarder = !curEv || curEv.casual > HI;
+  let a = null, b = null;
+  for (let tryPair = 0; tryPair < 25; tryPair++) {
+    const ca = front[Math.floor(rnd() * front.length)];
+    const cb = deep[Math.floor(rnd() * deep.length)];
+    const cellA = g.spools[ca[0]][ca[1]], cellB = g.spools[cb[0]][cb[1]];
+    if (cellA.id === cellB.id) continue;
+    const dA = colorDepth[cellA.id] || 0, dB = colorDepth[cellB.id] || 0;
+    if (needHarder && (dB > dA + 1.0 || (dB >= dA - 1.0 && cellB.count > cellA.count))) { a = ca; b = cb; break; }
+    if (!needHarder && (dA > dB + 1.0 || cellA.count > cellB.count)) { a = ca; b = cb; break; }
+  }
+  if (!a || !b) {
+    a = front[Math.floor(rnd() * front.length)];
+    b = deep[Math.floor(rnd() * deep.length)];
+    if (!a || !b || g.spools[a[0]][a[1]].id === g.spools[b[0]][b[1]].id) continue;
+  }
   const tmp = g.spools[a[0]][a[1]]; g.spools[a[0]][a[1]] = g.spools[b[0]][b[1]]; g.spools[b[0]][b[1]] = tmp;
   const ev = evalWall(g);
   if (!ev) { log.push({ iter: it, swap: [a, b], accepted: false }); continue; }
   const vs = score(ev);
-  const better = vs < curScore && ev.casual <= Math.max(curEv.casual, HI);
+  const fairOk = ev.fair >= 0.88 || ev.fair >= curEv.fair;
+  const earlyOk = ev.earlyShare <= 0.18 || ev.earlyShare <= curEv.earlyShare;
+  const better = fairOk && earlyOk && vs < curScore && ev.casual <= Math.max(curEv.casual, HI);
   log.push({ iter: it, swap: [a, b], ...brief(ev), accepted: better });
   console.log(`iter${it} (${a})<->(${b})`, JSON.stringify(brief(ev)), better ? '接受' : '');
   if (better) { cur = g; curEv = ev; curScore = vs; if (vs < bestScore) { best = clones(g); bestScore = vs; } }

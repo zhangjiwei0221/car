@@ -112,9 +112,9 @@ const before = printStats(mat, '改前:');
 const outMat = mat.map(row => row.slice());
 const changes = [];
 
-for (let pass = 0; pass < 4; pass++) {
+for (let pass = 0; pass < 6; pass++) {
   const { total, ring, ringPath } = colorStats(outMat);
-  // 找出最该处理的颜色
+  // 找出超标颜色：外圈占比 >= RING_THR，或全图总占比 >= TOTAL_THR
   let dom = null, domScore = 0;
   for (const k of Object.keys(total)) {
     const c = +k;
@@ -127,21 +127,27 @@ for (let pass = 0; pass < 4; pass++) {
   }
   if (dom == null) break;
 
-  // 选替代色：图内已有、RGB 距离够、自身占比 <20%（按距离从远到近，可轮流用 2~3 个）
+  // 选替代色：图内已有、RGB 距离够、自身占比 < TOTAL_THR - 0.03（优先喂给占比偏小的颜色，使各色车数均匀在 2~7 辆）
   const candidates = Object.keys(total).map(Number)
-    .filter(c => c !== dom && total[c] / TOTAL < 0.20 && colorDist(c, dom) >= MIN_DIST)
-    .sort((a, b) => colorDist(b, dom) - colorDist(a, dom));
+    .filter(c => c !== dom && total[c] / TOTAL < (TOTAL_THR - 0.03) && total[c] >= 8 && colorDist(c, dom) >= MIN_DIST)
+    .sort((a, b) => (total[a] - total[b]) || (colorDist(b, dom) - colorDist(a, dom)));
   const rep = candidates[0];
   if (!rep) {
     console.log(`  ⚠ 色${dom} 超阈值，但图内找不到视觉可分辨（RGB距离>=${MIN_DIST}）的替代色，跳过`);
     break;
   }
 
-  // 1) 外圈弧段轮流拆色：需要几种颜色才能把单色压到 RING_THR 以内
+  // 1) 外圈弧段轮流拆色：铁律——外圈只能用“本来就在外圈有暴露(ring[c]>0)”的其他外圈色互拆，
+  //    严禁把原本藏在图中心(ring[c]===0)的纯内芯色涂到外边界上捅穿洋葱层！
   const ringShareBefore = (ring[dom] || 0) / ringPath.length;
   let ringChanged = 0;
   if (ringShareBefore >= RING_THR) {
-    const palette = [dom].concat(candidates.slice(0, 3)); // [主色, 替代1, 替代2, 替代3]
+    // 严格只从“本来就在外圈有暴露(ring[c]>0)”的颜色里选外圈替代色，绝不把 ring=0 的内芯色引到外边界！
+    const ringCands = Object.keys(ring).map(Number)
+      .filter(c => c !== dom && (ring[c] || 0) > 0 && (ring[c] || 0) / ringPath.length < 0.25 && colorDist(c, dom) >= 65)
+      .sort((a, b) => (total[a] - total[b]) || (colorDist(b, dom) - colorDist(a, dom)));
+    const useList = ringCands.length >= 1 ? ringCands : candidates;
+    const palette = [dom].concat(useList.slice(0, 3));
     const K = Math.max(2, Math.min(palette.length, Math.ceil(1 / RING_THR)));
     for (let i = 0; i < ringPath.length; i++) {
       const segIdx = Math.floor(i / SEG);
@@ -152,20 +158,35 @@ for (let pass = 0; pass < 4; pass++) {
   }
   changes.push({ pass: pass + 1, dom, rep, ringShareBefore: +(ringShareBefore * 100).toFixed(0), ringChanged });
 
-  // 2) 若总占比仍超阈值，再整块重分配最大的非外圈连通块
+  // 2) 若总占比仍超阈值，将内部连通块优先分给同样在内部(ring[c]===0)的内芯小色，强化洋葱内芯厚度！
   const st2 = colorStats(outMat);
   if ((st2.total[dom] || 0) / TOTAL >= TOTAL_THR) {
+    const innerCands = candidates.filter(c => (ring[c] || 0) === 0);
+    const innerList = innerCands.length >= 1 ? innerCands : candidates;
     const comps = componentsOfColor(outMat, dom);
     let moved = 0;
-    for (const comp of comps) {
-      if ((st2.total[dom] || 0) - moved <= TOTAL_THR * TOTAL) break;
-      // 跳过与外圈相连的块（上面已按弧段处理）
-      const touchesRing = comp.some(([y, x]) => y === 0 || x === 0 || y === R - 1 || x === C - 1);
-      if (touchesRing) continue;
-      for (const [y, x] of comp) outMat[y][x] = rep;
-      moved += comp.length;
+    const needCut = Math.ceil((st2.total[dom] || 0) - TOTAL_THR * TOTAL);
+    for (let ci = 0; ci < comps.length && moved < needCut; ci++) {
+      const comp = comps[ci];
+      const useRep = innerList[ci % Math.min(3, innerList.length)] || rep;
+      if (comp.length <= needCut - moved + 25) {
+        for (const [y, x] of comp) {
+          if (y === 0 || x === 0 || y === R - 1 || x === C - 1) continue; // 不涂到外边界
+          outMat[y][x] = useRep;
+          moved++;
+        }
+      } else {
+        const sortedCells = comp.filter(([y, x]) => y > 0 && x > 0 && y < R - 1 && x < C - 1)
+          .sort((a, b) => (b[0] - a[0]) || (b[1] - a[1]));
+        const take = Math.min(Math.max(0, sortedCells.length - 15), needCut - moved);
+        for (let i = 0; i < take; i++) {
+          const [y, x] = sortedCells[i];
+          outMat[y][x] = useRep;
+          moved++;
+        }
+      }
     }
-    if (moved) changes.push({ pass: pass + 1, dom, rep, note: `内部连通块整块改色 ${moved}px` });
+    if (moved) changes.push({ pass: pass + 1, dom, rep: innerList[0] || rep, note: `内部连通块增厚内芯色 ${moved}px` });
   }
 }
 
@@ -175,7 +196,8 @@ const beforeColors = Object.keys(before.total).sort().join(',');
 const afterColors = Object.keys(after.total).sort().join(',');
 const minPx = Math.min(...Object.values(after.total));
 const okColors = beforeColors === afterColors;
-const okMin = minPx >= 8;
+// 校验每色 >= 8px，或原图本就 < 8px 且未被削减（遵循 2026-11-22 规则：原图小色切成单车合规，只禁把大色削成 <8px 碎片）
+const okMin = Object.keys(after.total).every(k => after.total[k] >= 8 || after.total[k] >= before.total[k]);
 
 console.log('改后:', '');
 printStats(outMat, '       ');

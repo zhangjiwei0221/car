@@ -45,6 +45,10 @@ const BLACK_MODE = Number(arg('--black-mode', '0')); // 0 | 2 (腰部对称双�
 const Q_COUNT = Number(arg('--q-count', '0')); // 0 | 2..4 (在第2-3行放问号车遮挡远期视野，绝不放第5-6行终局位)
 const ROWS = Number(arg('--rows', '7'));
 const COLS = Number(arg('--cols', '7'));
+const RAND_LO = Number(arg('--rand-lo', '0.55'));   // 主尺下限（B 档 = .45）
+const RAND_HI = Number(arg('--rand-hi', '0.68'));   // 主尺上限（B 档 = .58）
+const HUM_MAX = Number(arg('--hum-max', '1.00'));   // 短视真人上限（B 档 = .75）
+const FAIR_MIN = Number(arg('--fair-min', '0.90')); // 认真档下限（B 档 = .85）
 const ITERS = Number(arg('--iters', '14'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
@@ -55,15 +59,15 @@ if (!TARGET || !OUT) {
   process.exit(2);
 }
 
-// 【2026-11-23 升级：前中深层错落锁链分布（行1-2 破口链 2 对 + 行3-4 中腰链 1-2 对）】
-// 改变此前所有链子扎堆在第 2、3 行（row 1..2）的模板化布局，将 1-2 对链下沉到第 4、5 行（row 3..4）中腰接力，同时保证 row 1 留 >=4 个畅通单车口！
+// 【2026-11-23 升级：前中深层错落锁链分布（行1-2 破口链 2-3 对 + 行3-4 中腰链 1-2 对）】
+// 既保证三面墙策略0下第 2-3 行有足够破口阻力，又把 1-2 对链错落放到第 4-5 行（row 3..4）中腰接力，同时保证 row 1 留 >=3-4 个畅通单车口！
 const CHAIN_STYLES = [
-  [[[1,0],[2,0]], [[1,4],[1,5]], [[3,2],[3,3]], [[4,5],[4,6]]],
-  [[[1,1],[1,2]], [[2,5],[3,5]], [[3,1],[4,1]], [[4,3],[4,4]]],
-  [[[1,1],[2,1]], [[1,5],[2,5]], [[3,3],[4,3]]],
-  [[[1,0],[1,1]], [[2,4],[2,5]], [[3,1],[3,2]], [[4,4],[4,5]]],
-  [[[1,2],[2,2]], [[1,5],[1,6]], [[3,0],[3,1]], [[4,3],[4,4]]],
-  [[[1,3],[2,3]], [[2,0],[2,1]], [[3,5],[4,5]]]
+  [[[1,0],[2,0]], [[1,4],[1,5]], [[2,2],[3,2]], [[4,5],[4,6]]],
+  [[[1,1],[1,2]], [[1,5],[2,5]], [[2,0],[3,0]], [[4,3],[4,4]]],
+  [[[1,1],[2,1]], [[1,4],[2,4]], [[2,6],[3,6]], [[3,2],[4,2]]],
+  [[[1,0],[1,1]], [[1,5],[2,5]], [[2,3],[2,4]], [[3,1],[4,1]]],
+  [[[1,2],[2,2]], [[1,5],[1,6]], [[2,0],[2,1]], [[3,4],[4,4]]],
+  [[[1,3],[2,3]], [[2,0],[2,1]], [[1,5],[2,5]], [[3,4],[3,5]]]
 ];
 
 const COL_ORDERS = [
@@ -84,22 +88,46 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   }
   const isUnique = (r, c) => (colorCars[lv0.spools[r][c].id] || 0) <= 1;
 
-  // 若选中的链格包含唯一车，先把该唯一车与行 3-5 的一辆冗余色普通车对调位置（从源头消除前两排唯一车被锁死的风险！）
+  // 自动把 row 0..1 的唯一车(cars===1)以及当前 style 所有预设链格上“链外剩余车 < 2 辆”的紧缺色，与 row 3..6 非链格上的充裕色对调！
+  // 从源头杜绝：① 唯一车被绑；② 只有2辆车的颜色被两条链全部锁光导致 buffer=4 时触发棘轮陷阱(ChainRatchet trap)！
   let curLv = JSON.parse(JSON.stringify(lv0));
-  for (let r = 0; r <= 2; r++) {
-    for (let c = 0; c < 7; c++) {
-      if ((colorCars[curLv.spools[r][c].id] || 0) <= 1) {
-        // 找 row 3..5 的冗余色(cars>=4)对调
+  const pairs = CHAIN_STYLES[styleIdx % CHAIN_STYLES.length];
+  const planChainSet = new Set();
+  pairs.forEach(([a, b]) => { planChainSet.add(`${a[0]},${a[1]}`); planChainSet.add(`${b[0]},${b[1]}`); });
+  const chainColorUsed = {};
+  for (const [a, b] of pairs) {
+    for (let idx = 0; idx < 2; idx++) {
+      const [r, c] = idx === 0 ? a : b;
+      const peerId = idx === 1 ? curLv.spools[a[0]][a[1]].id : -1;
+      const id = curLv.spools[r][c].id;
+      const used = chainColorUsed[id] || 0;
+      // 锁链铁律：① 链内两格必须异色(id !== peerId)；② 同色最多进2个链格且链外至少留2辆普通车
+      if (id === peerId || used >= 2 || (colorCars[id] || 0) - used <= 2) {
         let swapped = false;
-        for (let rr = 4; rr >= 3 && !swapped; rr--) {
-          for (let cc = 1; cc < 6 && !swapped; cc++) {
-            const id2 = curLv.spools[rr][cc].id;
-            if ((colorCars[id2] || 0) >= 4) {
-              const tmp = curLv.spools[r][c];
-              curLv.spools[r][c] = curLv.spools[rr][cc];
-              curLv.spools[rr][cc] = tmp;
-              swapped = true;
-            }
+        for (let rr = 5; rr >= 2 && !swapped; rr--) for (let cc = 0; cc < 7 && !swapped; cc++) {
+          if (planChainSet.has(`${rr},${cc}`)) continue;
+          const id2 = curLv.spools[rr][cc].id;
+          const u2 = chainColorUsed[id2] || 0;
+          if (id2 !== peerId && u2 < 2 && ((colorCars[id2] || 0) - u2 >= 3)) {
+            const tmp = curLv.spools[r][c]; curLv.spools[r][c] = curLv.spools[rr][cc]; curLv.spools[rr][cc] = tmp;
+            swapped = true;
+          }
+        }
+      }
+      const finalId = curLv.spools[r][c].id;
+      chainColorUsed[finalId] = (chainColorUsed[finalId] || 0) + 1;
+    }
+  }
+  for (let r = 0; r <= 1; r++) {
+    for (let c = 0; c < 7; c++) {
+      const id = curLv.spools[r][c].id;
+      if (!planChainSet.has(`${r},${c}`) && (colorCars[id] || 0) <= 1) {
+        let swapped = false;
+        for (let rr = 6; rr >= 3 && !swapped; rr--) for (let cc = 0; cc < 7 && !swapped; cc++) {
+          const id2 = curLv.spools[rr][cc].id;
+          if (!planChainSet.has(`${rr},${cc}`) && (colorCars[id2] || 0) >= 3) {
+            const tmp = curLv.spools[r][c]; curLv.spools[r][c] = curLv.spools[rr][cc]; curLv.spools[rr][cc] = tmp;
+            swapped = true;
           }
         }
       }
@@ -108,24 +136,27 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   let cur = path.join(workDir, `s${styleIdx}_base.json`);
   fs.writeFileSync(cur, JSON.stringify(curLv, null, 1));
 
-  const pairs = CHAIN_STYLES[styleIdx % CHAIN_STYLES.length];
   const chainUsed = new Set();
   const builtPairs = [];
   for (let i = 0; i < pairs.length; i++) {
-    const [a, b] = pairs[i];
+    const [a0, b0] = pairs[i];
     const nxt = path.join(workDir, `s${styleIdx}_c${i + 1}.json`);
-    try {
-      execFileSync('node', [
-        path.join(ROOT, '实验关/产线v6/加链/建B_v1.js'),
-        cur, `${a[0]},${a[1]}`, `${b[0]},${b[1]}`, nxt,
-        '--gid', String(i + 1), '--max-row', '4', '--allow-valve'
-      ], { stdio: 'ignore' });
-      chainUsed.add(a[0] + ',' + a[1]);
-      chainUsed.add(b[0] + ',' + b[1]);
-      builtPairs.push([a, b]);
-      cur = nxt;
-    } catch (e) {
-      // 该对若不满足条件则跳过
+    for (const dc of [0, -1, 1]) {
+      const a = [a0[0], a0[1] + dc], b = [b0[0], b0[1] + dc];
+      if (a[1] < 0 || a[1] >= COLS || b[1] < 0 || b[1] >= COLS) continue;
+      if (chainUsed.has(`${a[0]},${a[1]}`) || chainUsed.has(`${b[0]},${b[1]}`)) continue;
+      try {
+        execFileSync('node', [
+          path.join(ROOT, '实验关/产线v6/加链/建B_v1.js'),
+          cur, `${a[0]},${a[1]}`, `${b[0]},${b[1]}`, nxt,
+          '--gid', String(i + 1), '--max-row', '4', '--allow-valve'
+        ], { stdio: 'ignore' });
+        chainUsed.add(a[0] + ',' + a[1]);
+        chainUsed.add(b[0] + ',' + b[1]);
+        builtPairs.push([a, b]);
+        cur = nxt;
+        break;
+      } catch (e) {}
     }
   }
 
@@ -187,7 +218,12 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       : (targetPipes === 2 ? [1, 5] : [1, 3, 5]);
     const splitsPerPipe = targetPipes === 3 ? 2 : 3;
     for (let pi = 0; pi < pipeCols.length; pi++) {
-      const pCol = pipeCols[pi];
+      let pCol = pipeCols[pi];
+      if (chainUsed.has(`4,${pCol}`) || pipeUsed.has(`4,${pCol}`)) {
+        for (const altC of [3, 2, 4, 1, 5]) {
+          if (!chainUsed.has(`4,${altC}`) && !pipeUsed.has(`4,${altC}`)) { pCol = altC; break; }
+        }
+      }
       const pipeCell = `4,${pCol}`;
       if (chainUsed.has(pipeCell) || pipeUsed.has(pipeCell)) continue;
       const dNow = JSON.parse(fs.readFileSync(cur, 'utf8'));
@@ -352,7 +388,8 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
-    icedLv, climbedLv, '--iters', String(ITERS), '--games', '10', '--seed', String(SEED), '--lo', '0.57', '--hi', '0.66'
+    icedLv, climbedLv, '--iters', String(ITERS), '--games', '12', '--seed', String(SEED),
+    '--lo', String(+(RAND_LO + 0.01).toFixed(3)), '--hi', String(+(RAND_HI - 0.02).toFixed(3))
   ], { stdio: 'ignore' });
 
   return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
@@ -421,7 +458,7 @@ function fullVerify(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 &&
-    humFair >= 0.90 && randFair >= 0.90 && randCasual >= 0.55 && randCasual <= 0.68;
+    humFair >= FAIR_MIN && randFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual <= HUM_MAX;
 
   return {
     allPass, randCasual, randFair, humCasual, humFair, bufWave, midTight,
@@ -438,6 +475,7 @@ execFileSync('node', [
 ], { stdio: 'ignore' });
 
 let best = null;
+const TARGET_MID = (RAND_LO + RAND_HI) / 2;
 for (let t = 0; t < MAX_TRIES; t++) {
   const st = (INIT_STYLE + t) % CHAIN_STYLES.length;
   try {
@@ -445,11 +483,11 @@ for (let t = 0; t < MAX_TRIES; t++) {
     const ver = fullVerify(built.file, work, `s${st}`);
     const rec = { ...built, verify: ver };
     console.log(`[try style=${st}] allPass=${ver.allPass} | 短视真人=${ver.humCasual}/${ver.humFair} 波形=${JSON.stringify(ver.bufWave)} | 旧随机=${ver.randCasual}/${ver.randFair} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 二排畅口=${ver.row1Open} | 面额种数=${ver.distinctCaps}`);
-    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.humFair >= 0.90 && ver.randFair >= 0.90;
-    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.humFair >= 0.90 && best.verify.randFair >= 0.90) : false;
+    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.humFair >= FAIR_MIN && ver.randFair >= FAIR_MIN;
+    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.humFair >= FAIR_MIN && best.verify.randFair >= FAIR_MIN) : false;
     if (!best || (ver.allPass && !best.verify.allPass) ||
         (!ver.allPass && !best.verify.allPass && hardSafe && !bestSafe) ||
-        (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.humCasual - 0.62) < Math.abs(best.verify.humCasual - 0.62))) {
+        (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.randCasual - TARGET_MID) < Math.abs(best.verify.randCasual - TARGET_MID))) {
       best = rec;
     }
     if (ver.allPass) {

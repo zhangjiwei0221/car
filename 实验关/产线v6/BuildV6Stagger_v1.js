@@ -92,13 +92,19 @@ function playOneFourSide(lv, p, r) {
     if (!ms.length) break;
     let pick = null;
     if ((p >= 1) || (p > 0 && r() < p)) {
-      let bg = -1;
+      const cand = [];
+      let bg = -Infinity;
       for (const m of ms) {
         const t = St.cloneState(s), e0 = t.eliminatedPixels;
         if (!Sim.applyPick(t, m.r, m.c)) continue;
         if (isDead(t) && !isWon(t)) continue;
         const g = t.eliminatedPixels - e0;
-        if (g > bg) { bg = g; pick = t; }
+        if (g > bg) bg = g;
+        cand.push({ t, g });
+      }
+      if (cand.length) {
+        const tied = cand.filter(o => o.g === bg);
+        pick = tied[Math.floor(r() * tied.length)].t;
       }
     } else {
       const idx = ms.map((_, i) => i);
@@ -197,7 +203,7 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
     const rates = {};
     let deaths = 0, early = 0;
     for (const p of PS) {
-      const r = lcg(Math.round(seed + p * 1000));
+      const r = lcg(seed);
       let w = 0;
       for (let i = 0; i < games; i++) {
         const res = playOneFourSide(lv, p, r);
@@ -229,9 +235,11 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
     const cand = JSON.parse(JSON.stringify(cur));
     const tmp = cand.spools[r1][c1]; cand.spools[r1][c1] = cand.spools[r2][c2]; cand.spools[r2][c2] = tmp;
     const ev = evalG(cand);
-    if (ev && ev.sc <= bestEv.sc && ev.casual <= Math.max(bestEv.casual, hi)) {
+    const fairOk = ev && (ev.fair >= 0.88 || ev.fair >= (bestEv.fair || 0));
+    const earlyOk = ev && (ev.earlyShare <= 0.18 || ev.earlyShare <= (bestEv.earlyShare || 1));
+    if (ev && fairOk && earlyOk && ev.sc <= bestEv.sc && ev.casual <= Math.max(bestEv.casual, hi)) {
       cur = cand; bestEv = ev;
-      if (ev.casual >= lo && ev.casual <= hi && ev.fair >= 0.92 && ev.earlyShare < 0.15) break;
+      if (ev.casual >= lo && ev.casual <= hi && ev.fair >= 0.90 && ev.earlyShare < 0.15) break;
     }
   }
   return cur;
@@ -263,13 +271,27 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   // 1. 布置终局“第 5 行核心色车明牌挡住正下方第 6 行内壳钥匙车”机关
   setupEndgameClimax(curLv);
 
-  // 2. 自动把 row 0..2 的全盘唯一车(cars===1)与 row 3..4 的冗余色对调，从源头杜绝前两排唯一车被锁死
-  for (let r = 0; r <= 2; r++) for (let c = 0; c < 7; c++) {
-    if ((colorCars[curLv.spools[r][c].id] || 0) <= 1) {
+  // 2. 自动把 row 0..2 以及当前 style 所有预设链格上的全盘唯一车(cars===1)与 row 3..5 的非链冗余色对调，并确保每对链两格异色！
+  const pairs = CHAIN_STYLES[styleIdx % CHAIN_STYLES.length];
+  const planChainSet = new Set();
+  pairs.forEach(([a, b]) => { planChainSet.add(`${a[0]},${a[1]}`); planChainSet.add(`${b[0]},${b[1]}`); });
+  for (let r = 0; r <= 4; r++) for (let c = 0; c < 7; c++) {
+    if ((r <= 2 || planChainSet.has(`${r},${c}`)) && (colorCars[curLv.spools[r][c].id] || 0) <= 1) {
       let swapped = false;
-      for (let rr = 4; rr >= 3 && !swapped; rr--) for (let cc = 1; cc < 6 && !swapped; cc++) {
-        if ((colorCars[curLv.spools[rr][cc].id] || 0) >= 4) {
+      for (let rr = 5; rr >= 3 && !swapped; rr--) for (let cc = 1; cc < 6 && !swapped; cc++) {
+        if (!planChainSet.has(`${rr},${cc}`) && (colorCars[curLv.spools[rr][cc].id] || 0) >= 4) {
           const tmp = curLv.spools[r][c]; curLv.spools[r][c] = curLv.spools[rr][cc]; curLv.spools[rr][cc] = tmp;
+          swapped = true;
+        }
+      }
+    }
+  }
+  for (const [a, b] of pairs) {
+    if (curLv.spools[a[0]][a[1]].id === curLv.spools[b[0]][b[1]].id) {
+      let swapped = false;
+      for (let rr = 4; rr >= 2 && !swapped; rr--) for (let cc = 0; cc < 7 && !swapped; cc++) {
+        if (!planChainSet.has(`${rr},${cc}`) && curLv.spools[rr][cc].id !== curLv.spools[a[0]][a[1]].id && (colorCars[curLv.spools[rr][cc].id] || 0) >= 3) {
+          const tmp = curLv.spools[b[0]][b[1]]; curLv.spools[b[0]][b[1]] = curLv.spools[rr][cc]; curLv.spools[rr][cc] = tmp;
           swapped = true;
         }
       }
@@ -279,7 +301,6 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   fs.writeFileSync(cur, JSON.stringify(curLv, null, 1));
 
   // 3. 去模板化建链（第二排留 >=4 个无链无冰畅通口，绝不绑唯一车，绝不绑逃生阀）
-  const pairs = CHAIN_STYLES[styleIdx % CHAIN_STYLES.length];
   const chainUsed = new Set();
   const builtPairs = [];
   for (let i = 0; i < pairs.length; i++) {
@@ -537,7 +558,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   }
 
   // 5. 四边 corner 换位爬山（允许前排0..2与深层3..6跨行错位，把原随意档从1.00压进0.57..0.66）
-  const climbedObj = climbFourSide(icedObj, ITERS, 6, SEED, RAND_LO + 0.01, RAND_HI - 0.01);
+  const climbedObj = climbFourSide(icedObj, ITERS, 12, SEED, RAND_LO + 0.01, RAND_HI - 0.01);
   fixSameColorRuns(climbedObj.spools);
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   fs.writeFileSync(climbedLv, JSON.stringify(climbedObj, null, 1));
