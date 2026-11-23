@@ -42,6 +42,8 @@ const PIPE_MODE = arg('--pipe-mode', WITH_PIPE ? '1' : 'auto'); // 'auto' (按�
 const PIPE_MOUTH = arg('--pipe-mouth', 'auto'); // 'auto' (自动找平) | 'big' | 'small'
 const LEVEL_IDX = Number(arg('--level-idx', '0')); // 批量序号(用于周期排班: 每4关1管, 每9关2-3管)
 const WITH_CHAIN3 = has('--with-3chain'); // 启用「2小1大」安全三锁链
+const BLACK_MODE = Number(arg('--black-mode', '0')); // 0 | 2 (腰部对称双黑块) | 3 (品字形三黑块迷宫+自动替掉4块深冰)
+const Q_COUNT = Number(arg('--q-count', '0')); // 0 | 2..4 (在第2-3行放问号车遮挡远期视野，绝不放第5-6行终局位)
 const ROWS = Number(arg('--rows', '7'));
 const COLS = Number(arg('--cols', '7'));
 const ITERS = Number(arg('--iters', '8'));
@@ -412,14 +414,14 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
   }
 
-  // 4. 禁盲盒敲冰 + 障碍总量守恒（加管自动减冰：0管->9冰, 1管->5冰, 2管->2冰, 3管->0冰）
+  // 4. 禁盲盒敲冰 + 障碍总量守恒（加管或加3黑块迷宫均自动减冰：0管0黑->9冰, 1管或3黑->5冰, 2管->2冰, 3管->0冰）
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
   const actualPipes = pipeColsUsed.length;
   const rowNeeds = actualPipes >= 3
     ? []
     : (actualPipes === 2
       ? [[2, 2, 6]]
-      : (actualPipes === 1
+      : ((actualPipes === 1 || BLACK_MODE >= 2)
         ? [[2, 2, 6], [3, 2, 9], [5, 1, 16]]
         : [[2, 2, 6], [3, 2, 9], [4, 2, 13], [5, 1, 16], [6, 2, 19]]));
   const colSeq = COL_ORDERS[styleIdx % COL_ORDERS.length];
@@ -462,11 +464,58 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
 
   // 5. 四边 corner 换位爬山（保护 row 5..6 的终局明牌挪车机关）
   const icedObj = JSON.parse(fs.readFileSync(icedLv, 'utf8'));
+
+  // 4.5 可选「真黑块 (id: -1 永久实心墙) 改变棋盘拓扑」与「第2-3行问号车 (type: 6 远期迷雾)」(2026-11-23 日志 §1191)
+  const blackCoords = [];
+  if (BLACK_MODE >= 2) {
+    const wantBlacks = BLACK_MODE >= 3 ? [[1, 3], [3, 1], [3, 5]] : [[2, 1], [2, 5]];
+    for (const [br, bc] of wantBlacks) {
+      let pickedRC = null;
+      for (const dc of [0, 1, -1, 2, -2]) {
+        const cc = bc + dc;
+        if (cc < 0 || cc >= COLS) continue;
+        const x = icedObj.spools[br][cc];
+        if (x && x.id > 0 && x.type === 0 && (colorCars[x.id] || 0) >= 3) { pickedRC = [br, cc]; break; }
+      }
+      if (pickedRC) {
+        const [pr, pc] = pickedRC;
+        const cid = icedObj.spools[pr][pc].id, cap = icedObj.spools[pr][pc].count;
+        let target = null;
+        for (let r = ROWS - 1; r >= 0; r--) for (let c = 0; c < COLS; c++) {
+          if (r === pr && c === pc) continue;
+          const y = icedObj.spools[r][c];
+          if (y && y.id === cid && y.count > 0) {
+            if (!target || y.count < target.count) target = y;
+          }
+        }
+        if (target) {
+          target.count += cap;
+          icedObj.spools[pr][pc] = { id: -1, type: 0, param: 0, count: 0 };
+          blackCoords.push([pr, pc]);
+        }
+      }
+    }
+  }
+  const qCoords = [];
+  if (Q_COUNT > 0) {
+    // 严格只放在 row 2..3 的非链非冰普通车格（绝不放 row 0，也绝不放 row 5..6 终局明牌位！）
+    for (let r = 2; r <= 3 && qCoords.length < Q_COUNT; r++) {
+      for (const c of COL_ORDERS[styleIdx % COL_ORDERS.length][r - 2]) {
+        if (qCoords.length >= Q_COUNT) break;
+        const x = icedObj.spools[r][c];
+        if (x && x.id > 0 && x.type === 0) {
+          x.type = 6; x.param = 0;
+          qCoords.push([r, c]);
+        }
+      }
+    }
+  }
+
   const climbedObj = climbFourSide(icedObj, ITERS, 12, SEED, 0.57, 0.66);
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   fs.writeFileSync(climbedLv, JSON.stringify(climbedObj, null, 1));
 
-  return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, ice: iceCells };
+  return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
 }
 
 function fullVerifyV6(lvFile, workDir, tag) {

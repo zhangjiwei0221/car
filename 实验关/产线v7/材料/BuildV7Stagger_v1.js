@@ -41,6 +41,8 @@ const PIPE_MOUTH = arg('--pipe-mouth', 'auto'); // 'auto' (自动找平) | 'big'
 const PIPE_REPLACE_ICE = !has('--keep-9-ice'); // 有管道时默认开启「管道替深水冰」，传 --keep-9-ice 则保留 9 冰
 const LEVEL_IDX = Number(arg('--level-idx', '0'));
 const WITH_CHAIN3 = has('--with-3chain'); // 启用「2小1大」安全三锁链
+const BLACK_MODE = Number(arg('--black-mode', '0')); // 0 | 2 (腰部对称双黑块) | 3 (品字形三黑块迷宫+自动替掉4块深冰)
+const Q_COUNT = Number(arg('--q-count', '0')); // 0 | 2..4 (在第2-3行放问号车遮挡远期视野，绝不放第5-6行终局位)
 const ROWS = Number(arg('--rows', '7'));
 const COLS = Number(arg('--cols', '7'));
 const ITERS = Number(arg('--iters', '14'));
@@ -251,7 +253,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
 
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
   const actualPipes = pipeColsUsed.length;
-  const rowNeeds = (!PIPE_REPLACE_ICE || actualPipes === 0)
+  const rowNeeds = (!PIPE_REPLACE_ICE || (actualPipes === 0 && BLACK_MODE < 2))
     ? [[2, 2, 8], [3, 2, 13], [4, 2, 17], [5, 1, 21], [6, 2, 25]]
     : (actualPipes >= 3
       ? []
@@ -296,13 +298,62 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     fs.copyFileSync(cur, icedLv);
   }
 
+  // 可选「真黑块 (id: -1 永久实心墙) 改变棋盘拓扑」与「第2-3行问号车 (type: 6 远期迷雾)」(2026-11-23 日志 §1191)
+  const icedObj = JSON.parse(fs.readFileSync(icedLv, 'utf8'));
+  const blackCoords = [];
+  if (BLACK_MODE >= 2) {
+    const wantBlacks = BLACK_MODE >= 3 ? [[1, 2], [3, 1], [3, 4]] : [[2, 2], [2, 5]];
+    for (const [br, bc] of wantBlacks) {
+      let pickedRC = null;
+      for (const dc of [0, 1, -1, 2, -2]) {
+        const cc = bc + dc;
+        if (cc < 0 || cc >= COLS) continue;
+        const x = icedObj.spools[br][cc];
+        if (x && x.id > 0 && x.type === 0 && (colorCars[x.id] || 0) >= 3) { pickedRC = [br, cc]; break; }
+      }
+      if (pickedRC) {
+        const [pr, pc] = pickedRC;
+        const cid = icedObj.spools[pr][pc].id, cap = icedObj.spools[pr][pc].count;
+        let target = null;
+        for (let r = ROWS - 1; r >= 0; r--) for (let c = 0; c < COLS; c++) {
+          if (r === pr && c === pc) continue;
+          const y = icedObj.spools[r][c];
+          if (y && y.id === cid && y.count > 0) {
+            if (!target || y.count < target.count) target = y;
+          }
+        }
+        if (target) {
+          target.count += cap;
+          icedObj.spools[pr][pc] = { id: -1, type: 0, param: 0, count: 0 };
+          blackCoords.push([pr, pc]);
+        }
+      }
+    }
+  }
+  const qCoords = [];
+  if (Q_COUNT > 0) {
+    for (let r = 2; r <= 3 && qCoords.length < Q_COUNT; r++) {
+      for (const c of COL_ORDERS[styleIdx % COL_ORDERS.length][r - 2]) {
+        if (qCoords.length >= Q_COUNT) break;
+        const x = icedObj.spools[r][c];
+        if (x && x.id > 0 && x.type === 0) {
+          x.type = 6; x.param = 0;
+          qCoords.push([r, c]);
+        }
+      }
+    }
+  }
+  if (blackCoords.length > 0 || qCoords.length > 0) {
+    fs.writeFileSync(icedLv, JSON.stringify(icedObj, null, 1));
+  }
+
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
     icedLv, climbedLv, '--human-casual', '--iters', String(ITERS), '--games', '20', '--seed', String(SEED), '--lo', '0.54', '--hi', '0.66'
   ], { stdio: 'ignore' });
 
-  return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, ice: iceCells };
+  return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
 }
 
 function fullVerify(lvFile, workDir, tag) {
