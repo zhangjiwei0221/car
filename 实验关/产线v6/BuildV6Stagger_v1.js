@@ -33,9 +33,12 @@ const Sim = A.Simulator, St = A.SolverStrategy;
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
+const has = k => argv.includes(k);
 const TARGET = arg('--target', null);
 const OUT = arg('--out', null);
 const INIT_STYLE = Number(arg('--style', '0'));
+const WITH_PIPE = has('--with-pipe');
+const PIPE_MOUTH = arg('--pipe-mouth', 'big'); // 'big' (管口大车增难/替冰) | 'small' (管口小车保终局波形)
 const ITERS = Number(arg('--iters', '8'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
@@ -263,10 +266,74 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     } catch (e) {}
   }
 
-  // 4. 禁盲盒敲冰：行 2-6 的 9 块散点冰数字严格 <= 20（行2 p6/7, 行3 p9/10, 行4 p13/14, 行5 p16, 行6 p19/20）
-  //    确保第 20 辆车（约 40% 进度）前冰块全部碎光，进入终局时第 5、第 6 行所有车的颜色 100% 明牌可见！
+  // 3.5 可选「只拆中深层大车 4 辆队列管 + 自动拔掉 4 块深水冰（管道替深水冰）」(2026-11-23 日志 §1188)
+  const pipeUsed = new Set();
+  if (WITH_PIPE) {
+    const pCol = (2 + styleIdx) % 5 + 1;
+    const pipeCell = `4,${pCol}`;
+    const dNow = JSON.parse(fs.readFileSync(cur, 'utf8'));
+    // 若选 big-mouth，先把 row 3..5 最大的一辆冗余车对调到 (4,pCol) 当管口整车
+    if (PIPE_MOUTH === 'big') {
+      let bestRC = null, bestCap = dNow.spools[4][pCol].count;
+      for (let rr = 3; rr <= 5; rr++) for (let cc = 0; cc < 7; cc++) {
+        const x = dNow.spools[rr][cc];
+        if (x && x.type === 0 && (colorCars[x.id] || 0) >= 3 && x.count > bestCap) {
+          bestCap = x.count; bestRC = [rr, cc];
+        }
+      }
+      if (bestRC) {
+        const [br, bc] = bestRC;
+        const tmp = dNow.spools[4][pCol]; dNow.spools[4][pCol] = dNow.spools[br][bc]; dNow.spools[br][bc] = tmp;
+        fs.writeFileSync(cur, JSON.stringify(dNow, null, 1));
+      }
+    }
+    const pColor = dNow.spools[4][pCol].id;
+    const seenCol = new Set([pColor]);
+    // 严格只挑 row 2..6 中 count 最大且 >=26px 的冗余大车做对半拆（严禁拆 <24px 的中小车！）
+    const cands = [];
+    for (let rr = 2; rr <= 6; rr++) for (let cc = 0; cc < 7; cc++) {
+      if (rr === 4 && cc === pCol) continue;
+      if (chainUsed.has(`${rr},${cc}`)) continue;
+      const cell = dNow.spools[rr][cc];
+      if (cell && cell.id > 0 && cell.type === 0 && cell.count >= 26 && (colorCars[cell.id] || 0) >= 3) {
+        cands.push({ r: rr, c: cc, id: cell.id, count: cell.count });
+      }
+    }
+    cands.sort((a, b) => b.count - a.count);
+    const splits = [];
+    for (const cd of cands) {
+      if (splits.length >= 3) break;
+      if (!seenCol.has(cd.id)) { seenCol.add(cd.id); splits.push(`${cd.r},${cd.c}`); }
+    }
+    for (const cd of cands) {
+      if (splits.length >= 3) break;
+      const k = `${cd.r},${cd.c}`;
+      if (!splits.includes(k)) splits.push(k);
+    }
+    if (splits.length === 3) {
+      const nxt = path.join(workDir, `s${styleIdx}_pipe.json`);
+      try {
+        execFileSync('node', [
+          path.join(ROOT, '实验关/产线v6/难度带/四辆管/split_pipe_v1.js'),
+          cur, nxt, '--pipe', pipeCell, '--dir', '11', '--split', splits.join(';')
+        ], { stdio: 'ignore' });
+        if (PIPE_MOUTH === 'small') {
+          const pObj = JSON.parse(fs.readFileSync(nxt, 'utf8'));
+          pObj.spools[4][pCol].param = [...pObj.spools[4][pCol].param].reverse();
+          fs.writeFileSync(nxt, JSON.stringify(pObj, null, 1));
+        }
+        pipeUsed.add(pipeCell);
+        splits.forEach(s => pipeUsed.add(s));
+        cur = nxt;
+      } catch (e) {}
+    }
+  }
+
+  // 4. 禁盲盒敲冰：无管时放 9 块早化冰（行2-6, p<=20）；有 4 辆管时启动「管道替深水冰」，自动拔掉行4与行6的 4 块深水冰（只留 5 块早化冰）！
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
-  const rowNeeds = [[2, 2, 6], [3, 2, 9], [4, 2, 13], [5, 1, 16], [6, 2, 19]];
+  const rowNeeds = (WITH_PIPE && pipeUsed.size > 0)
+    ? [[2, 2, 6], [3, 2, 9], [5, 1, 16]]
+    : [[2, 2, 6], [3, 2, 9], [4, 2, 13], [5, 1, 16], [6, 2, 19]];
   const colSeq = COL_ORDERS[styleIdx % COL_ORDERS.length];
   const iceCells = [];
   for (let idx = 0; idx < rowNeeds.length; idx++) {
@@ -275,7 +342,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     const pickedCols = [];
     for (const c of cols) {
       const key = `${r},${c}`;
-      if (chainUsed.has(key)) continue;
+      if (chainUsed.has(key) || pipeUsed.has(key)) continue;
       const cell = lvData.spools[r][c];
       if (!cell || cell.id <= 0 || cell.type !== 0 || (colorCars[cell.id] || 0) < 2) continue;
       if (pickedCols.some(pc => Math.abs(pc - c) === 1) && cols.length > 4) continue;
@@ -287,7 +354,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     for (const c of cols) {
       if (pickedCols.length >= need) break;
       const key = `${r},${c}`;
-      if (chainUsed.has(key) || pickedCols.includes(c)) continue;
+      if (chainUsed.has(key) || pipeUsed.has(key) || pickedCols.includes(c)) continue;
       const cell = lvData.spools[r][c];
       if (!cell || cell.id <= 0 || cell.type !== 0 || (colorCars[cell.id] || 0) < 2) continue;
       pickedCols.push(c);

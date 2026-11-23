@@ -36,6 +36,8 @@ const TARGET = arg('--target', null);
 const OUT = arg('--out', null);
 const INIT_STYLE = Number(arg('--style', '0'));
 const WITH_PIPE = has('--with-pipe');
+const PIPE_MOUTH = arg('--pipe-mouth', 'big'); // 'big' (管口大车增难/替冰) | 'small' (管口小车保终局波形)
+const PIPE_REPLACE_ICE = !has('--keep-9-ice'); // 有管道时默认开启「管道替深水冰(5冰)」，传 --keep-9-ice 则保留 9 冰
 const ITERS = Number(arg('--iters', '14'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
@@ -122,17 +124,43 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   if (WITH_PIPE) {
     const pCol = (2 + styleIdx) % 5 + 1;
     const pipeCell = `4,${pCol}`;
-    // 选 row 5 的 3 个不同颜色且 count>=18 的格做拆半
     const dNow = JSON.parse(fs.readFileSync(cur, 'utf8'));
+    if (PIPE_MOUTH === 'big') {
+      let bestRC = null, bestCap = dNow.spools[4][pCol].count;
+      for (let rr = 3; rr <= 5; rr++) for (let cc = 0; cc < 7; cc++) {
+        const x = dNow.spools[rr][cc];
+        if (x && x.type === 0 && (colorCars[x.id] || 0) >= 3 && x.count > bestCap) {
+          bestCap = x.count; bestRC = [rr, cc];
+        }
+      }
+      if (bestRC) {
+        const [br, bc] = bestRC;
+        const tmp = dNow.spools[4][pCol]; dNow.spools[4][pCol] = dNow.spools[br][bc]; dNow.spools[br][bc] = tmp;
+        fs.writeFileSync(cur, JSON.stringify(dNow, null, 1));
+      }
+    }
     const pColor = dNow.spools[4][pCol].id;
     const seenCol = new Set([pColor]);
-    const splits = [];
-    for (let c = 0; c < 7 && splits.length < 3; c++) {
-      const cell = dNow.spools[5][c];
-      if (cell && cell.id > 0 && cell.count >= 16 && !seenCol.has(cell.id) && (colorCars[cell.id] || 0) >= 3) {
-        seenCol.add(cell.id);
-        splits.push(`5,${c}`);
+    // 严格只挑 row 3..6 中 count 最大且 >=24px 的冗余大车做对半拆（严禁拆 <=20px 的前排中小车！）
+    const cands = [];
+    for (let rr = 3; rr <= 6; rr++) for (let cc = 0; cc < 7; cc++) {
+      if (rr === 4 && cc === pCol) continue;
+      if (chainUsed.has(`${rr},${cc}`)) continue;
+      const cell = dNow.spools[rr][cc];
+      if (cell && cell.id > 0 && cell.type === 0 && cell.count >= 24 && (colorCars[cell.id] || 0) >= 3) {
+        cands.push({ r: rr, c: cc, id: cell.id, count: cell.count });
       }
+    }
+    cands.sort((a, b) => b.count - a.count);
+    const splits = [];
+    for (const cd of cands) {
+      if (splits.length >= 3) break;
+      if (!seenCol.has(cd.id)) { seenCol.add(cd.id); splits.push(`${cd.r},${cd.c}`); }
+    }
+    for (const cd of cands) {
+      if (splits.length >= 3) break;
+      const k = `${cd.r},${cd.c}`;
+      if (!splits.includes(k)) splits.push(k);
     }
     if (splits.length === 3) {
       const nxt = path.join(workDir, `s${styleIdx}_pipe.json`);
@@ -141,6 +169,11 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
           path.join(ROOT, '实验关/产线v6/难度带/四辆管/split_pipe_v1.js'),
           cur, nxt, '--pipe', pipeCell, '--dir', '11', '--split', splits.join(';')
         ], { stdio: 'ignore' });
+        if (PIPE_MOUTH === 'small') {
+          const pObj = JSON.parse(fs.readFileSync(nxt, 'utf8'));
+          pObj.spools[4][pCol].param = [...pObj.spools[4][pCol].param].reverse();
+          fs.writeFileSync(nxt, JSON.stringify(pObj, null, 1));
+        }
         pipeUsed.add(pipeCell);
         splits.forEach(s => pipeUsed.add(s));
         cur = nxt;
@@ -149,7 +182,9 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   }
 
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
-  const rowNeeds = [[2, 2, 8], [3, 2, 13], [4, 2, 17], [5, 1, 21], [6, 2, 25]];
+  const rowNeeds = (WITH_PIPE && pipeUsed.size > 0 && PIPE_REPLACE_ICE)
+    ? [[2, 2, 8], [3, 2, 13], [5, 1, 21]]
+    : [[2, 2, 8], [3, 2, 13], [4, 2, 17], [5, 1, 21], [6, 2, 25]];
   const colSeq = COL_ORDERS[styleIdx % COL_ORDERS.length];
   const iceCells = [];
   for (let idx = 0; idx < rowNeeds.length; idx++) {
