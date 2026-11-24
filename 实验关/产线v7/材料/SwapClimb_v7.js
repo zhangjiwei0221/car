@@ -194,9 +194,10 @@ for (let it = 1; it <= ITERS; it++) {
   // 【2026-11-23 定向供需错位换位】
   // 当 casual > HI（太易需加压）：只从 front(row 0..2) 选浅层/小车，与 deep(row 3..6) 中更深层或更大容量的车对调，拒绝无效反向换位！
   const R = g.spools.length;
+  const CLIMAX_SET = new Set(['5,2', '5,4', '6,2', '6,4']);
   const front = [], deep = [];
   for (let r = 0; r < R; r++) for (let c = 0; c < g.spools[r].length; c++) {
-    if (!isPlainCar(g.spools[r][c])) continue;
+    if (!isPlainCar(g.spools[r][c]) || CLIMAX_SET.has(`${r},${c}`)) continue;
     if (r <= 2) front.push([r, c]);
     if (r >= 3) deep.push([r, c]);
   }

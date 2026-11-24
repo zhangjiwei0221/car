@@ -281,7 +281,7 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
   for (let it = 0; it < iters; it++) {
     const front = [], deep = [];
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-      if (!isPlain(cur.spools[r][c])) continue;
+      if (!isPlain(cur.spools[r][c]) || CLIMAX_SET.has(`${r},${c}`)) continue;
       if (r <= 2) front.push([r, c]);
       if (r >= 3) deep.push([r, c]);
     }
@@ -677,13 +677,10 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
   }
 
-  // 5. 四边 corner 换位爬山（允许前排0..2与深层3..6跨行错位，把原随意档从1.00压进0.57..0.66）
+  // 5. 四边 corner 换位爬山（允许前排0..2与深层3..6跨行错位，CLIMAX_SET 四定点已在 climbFourSide 内保护，爬山后严禁二次盲换破坏胜率！）
   const climbedObj = climbFourSide(icedObj, ITERS, 12, SEED, RAND_LO + 0.01, RAND_HI - 0.01);
   fixSameColorRuns(climbedObj.spools);
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
-  // 5.5 【派工#001】终局挪车机关最终落位：管道/黑块/换位爬山都可能把 (5,2)/(5,4)/(6,2)/(6,4) 洗走，
-  //     这里只对普通车（type===0）在同一 row 4..6 区间再补一次；不碰链/冰/管/黑块。
-  setupEndgameClimax(climbedObj, { skipFix: true });
   fs.writeFileSync(climbedLv, JSON.stringify(climbedObj, null, 1));
 
   return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
@@ -766,6 +763,7 @@ execFileSync('node', [
 ], { stdio: 'ignore' });
 
 let best = null;
+const TARGET_MID = (RAND_LO + RAND_HI) / 2;
 for (let t = 0; t < MAX_TRIES; t++) {
   const st = (INIT_STYLE + t) % CHAIN_STYLES.length;
   try {
@@ -777,7 +775,7 @@ for (let t = 0; t < MAX_TRIES; t++) {
     const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.maxIceParam <= MAX_ICE_CAP && best.verify.randFair >= FAIR_MIN && best.verify.humFair >= FAIR_MIN) : false;
     if (!best || (ver.allPass && !best.verify.allPass) ||
         (!ver.allPass && !best.verify.allPass && hardSafe && !bestSafe) ||
-        (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.randCasual - 0.62) < Math.abs(best.verify.randCasual - 0.62))) {
+        (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.randCasual - TARGET_MID) < Math.abs(best.verify.randCasual - TARGET_MID))) {
       best = rec;
     }
     if (ver.allPass) break;

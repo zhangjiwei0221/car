@@ -471,12 +471,6 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     '--hum-lo', String(HUM_MIN), '--hum-hi', String(+(HUM_MAX - 0.02).toFixed(3))
   ], { stdio: 'ignore' });
 
-  // 【派工#001】终局挪车机关最终落位：管道/黑块/换位爬山都可能把 (5,2)/(5,4)/(6,2)/(6,4) 洗走，
-  // 这里只对普通车（type===0）在同一 row 4..6 区间再补一次；不碰链/冰/管/黑块。
-  const finalClimax = JSON.parse(fs.readFileSync(climbedLv, 'utf8'));
-  setupEndgameClimaxV7(finalClimax);
-  fs.writeFileSync(climbedLv, JSON.stringify(finalClimax, null, 1));
-
   return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
 }
 
