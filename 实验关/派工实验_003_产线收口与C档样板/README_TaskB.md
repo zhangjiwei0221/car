@@ -49,17 +49,18 @@ node 实验关/产线v5/C9_插值玩家/PInterpPlayer.js <关.json> \
 - 验收：
   - `LayoutScore hard=0 warn=0 maxRun=3`，`<8px=0`；
   - `Solvable --width 8 --bottom-only --instant-chain`：`true / 36 步 / 576/576`；
-  - `PInterpPlayer` 40 局 seed977：`randCasual=1.000`、`humCasual=1.000`、`humMid=1.000`、`humFair=1.000`、`randWave=[2.88,3.05,2.42]`、`humWave=[1.73,1.90,1.88]`；
+  - `PInterpPlayer` 40 局 seed977：`randCasual=1.000`、`humCasual=1.000`、`humMid=1.000`、`humFair=1.000`、`randWave=[2.53,2.98,2.70]`、`humWave=[1.63,1.93,1.80]`；
   - `BaitLocator --early 0.1 --games 40`：`deathsTotal=0 / earlyDeaths=0 / earlyShare=0%`；
   - 格式：`toprow=24 / blocks=24×24 / maprow=mapcol=6 / spools=6×6`，脚本链路可直接解析。
-- md5：`e093d157`。
+- md5：`3828caeb`。
+- **脸部微调（用户 15:00 反馈）**：左眼镜像右眼的 C 形（`r10 c7-c8 / r11 c7 / r12 c7-c8`），两腮红各 3 像素（左 `r13 c6-c8`、右 `r13 c15-c17`）；改后重切重验，仍全 `p=1.000`、`hard=0`、`solvable=true`。
 
 ## 4. 终稿与换装
 
 - 终稿：`G4_上线重排终稿/G4_bq_level_1..10.json` + `md5.txt`。
 - 客户端：`/Users/red/Desktop/分组4/ParkPassenger.app/Contents/Resources/bin/G4_bq_level_1..10.json` 已覆盖；10 个 md5 与终稿逐位一致。
 - 终稿 L1..L10 md5（前 8）：
-  `e093d157 / b6f069b0 / b8fb3997 / 67d053db / 3eb39a79 / f0d1a58c / a154a506 / 68026c49 / 328969fb / 4d5aa99f`
+  `3828caeb / b6f069b0 / b8fb3997 / 67d053db / 3eb39a79 / f0d1a58c / a154a506 / 68026c49 / 328969fb / 4d5aa99f`
 
 ## 5. 遗留
 
