@@ -57,7 +57,7 @@ const ITERS = Number(arg('--iters', '8'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
 const MAX_TRIES = Number(arg('--tries', '3'));
-const MAX_ICE_CAP = Number(arg('--max-ice', '36')); // 【派工#001】中后期封路冰恢复后，冰数字上限从写死 20 提为可配（默认 28）
+const MAX_ICE_CAP = Number(arg('--max-ice', '29')); // 【派工#005 折中定型】默认 29（覆盖行6 双冰 28/29）
 
 // 【派工#001】终局挪车机关四定点：第 5 行核心色大车压住第 6 行内壳钥匙车。
 // 管道拆分 / 选冰 / 前排唯一车对调都不得占用或替换这 4 格（爬山后再做一次最终落位兜底）。
@@ -670,15 +670,14 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const boardColorCars = {};
   for (const row of lvData.spools) for (const x of row) if (x && x.id > 0) boardColorCars[x.id] = (boardColorCars[x.id] || 0) + 1;
   const actualPipes = pipeColsUsed.length;
-  // 【派工#001】中后期封路冰恢复：哪怕 1 根管道或黑块，也保留 7 块冰（覆盖行 2/3/4/5/6），
-  // 冰数字回到真实到达步数窗口（行4 18/19、行5 23、行6 27/28）；无管无黑块时 9 块。
+  // 【派工#005 折中定型】中后期封路冰天花板 p<=28/29（行2 8/9、行3 12/13、行4 18、行5 23、行6 28）
   const rowNeeds = actualPipes >= 3
     ? []
     : (actualPipes === 2
-      ? [[2, 2, 9]]
+      ? [[2, 2, 8]]
       : ((actualPipes === 1 || BLACK_MODE >= 2)
-        ? [[2, 2, 9], [3, 2, 16], [4, 1, 24], [5, 1, 30], [6, 1, 35]]
-        : [[2, 2, 9], [3, 2, 16], [4, 2, 24], [5, 1, 30], [6, 2, 35]]));
+        ? [[2, 2, 8], [3, 2, 12], [4, 1, 18], [5, 1, 23], [6, 1, 28]]
+        : [[2, 2, 8], [3, 2, 12], [4, 2, 18], [5, 1, 23], [6, 2, 28]]));
   // 【派工#002】靶向断供冰：预计算每色在四边外圈 3 层（深度<=2）的像素占比。
   // easyShare 越大 = 越容易在浅层/外圈被顺手消掉，是玩家的“救援顺手色”；
   // 选冰时优先冻这些色（断供），把内芯深色大债车裸露在冰外让玩家踩。

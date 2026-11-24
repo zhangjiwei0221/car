@@ -396,15 +396,14 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const boardColorCars = {};
   for (const row of lvData.spools) for (const x of row) if (x && x.id > 0) boardColorCars[x.id] = (boardColorCars[x.id] || 0) + 1;
   const actualPipes = pipeColsUsed.length;
-  // 【派工#001】中后期封路冰恢复：1 根管道或黑块也保留 7 块冰（行 2/3/4/5/6），
-  // 冰数字回到真实到达步数窗口（行4 20/21、行5 25、行6 30/31）；无管无黑块时 9 块。
+  // 【派工#005 折中定型】中后期封路冰天花板 p<=32/33（行2 10/11、行3 15/16、行4 21、行5 27、行6 32）
   const rowNeeds = (!PIPE_REPLACE_ICE || (actualPipes === 0 && BLACK_MODE < 2))
-    ? [[2, 2, 10], [3, 2, 17], [4, 2, 25], [5, 1, 31], [6, 2, 36]]
+    ? [[2, 2, 10], [3, 2, 15], [4, 2, 21], [5, 1, 27], [6, 2, 32]]
     : (actualPipes >= 3
       ? []
       : (actualPipes === 2
         ? [[2, 2, 10]]
-        : [[2, 2, 10], [3, 2, 17], [4, 1, 25], [5, 1, 31], [6, 1, 36]]));
+        : [[2, 2, 10], [3, 2, 15], [4, 1, 21], [5, 1, 27], [6, 1, 32]]));
   // 【派工#002】靶向断供冰：预计算每色在底边下半场（r >= floor(R*0.55)）的像素占比。
   // easyShare 越大 = 越早从三面墙底边暴露、是玩家的“救援顺手色”；
   // 选冰时优先冻这些色（断供），把顶层深色债车裸露在冰外让玩家踩。
