@@ -40,12 +40,12 @@ node 实验关/产线v5/C9_插值玩家/PInterpPlayer.js <关.json> \
 
 **处理**：严格保留总工表顺序，未对调；原因见任务单 §4.1。`humCasual` 整体 `.708→.300` 坡度正常。
 
-## 3. 新 L1（5×5 / 5 色对角几何，25 车，真正不会输）
+## 3. 新 L1（4×5 / 5 色对角几何，20 车，真正不会输）
 
-- 源图：`L1_latin5_src.txt`——25×25 正方形、5×5 个 5×5 色块、5 色（31/1/14/30/24），按对角循环排成 Latin 方阵；每色 5 车、每车 25px。
-- 切摆：`SplitLevel_v722 --target L1_latin5_src.txt --out L1_latin5.json --rows 5 --cols 5 --bottom-only --no-first-test` → 5×5 / 25 车 / 625px，0 机制。
-- 验收：`hard=0/warn=0/maxRun=1/<8px=0`；`Solvable 25 步/625/625`；`PInterp` 100 局全 1.000、`early=0%`、`bufWave=[0,0,0]`；**最坏情况 200/200 胜、`maxBuf=0`**。
-- md5：`a8ded7af`；格式 `toprow=25 / blocks=25×25 / maprow=mapcol=5 / spools=5×5`。
+- 源图：`L1_latin4x5_src.txt`——20×20 正方形、4 行 × 5 列 20 个色块（每块 4×5px）、5 色（31/1/14/30/24），对角 Latin 矩形；每色 4 车、每车 20px。
+- 切摆：`SplitLevel_v722 --target L1_latin4x5_src.txt --out L1_latin4x5.json --rows 4 --cols 5 --bottom-only --no-first-test` → 4×5 / 20 车 / 400px，0 机制。
+- 验收：`hard=0/warn=0/maxRun=1/<8px=0`；`Solvable 20 步/400/400`；`PInterp` 100 局全 1.000、`early=0%`、`bufWave=[0,0,0]`；**最坏情况 200/200 胜、`maxBuf=0`**。
+- md5：`e5f2b841`；格式 `toprow=20 / blocks=20×20 / maprow=4 / mapcol=5 / spools=4×5`。
 
 ## 3.5 Z 档 L2（用户 15:25 追加）
 
@@ -64,7 +64,7 @@ node 实验关/产线v5/C9_插值玩家/PInterpPlayer.js <关.json> \
 - 终稿：`G4_上线重排终稿/G4_bq_level_1..10.json` + `md5.txt`。
 - 客户端：`/Users/red/Desktop/分组4/ParkPassenger.app/Contents/Resources/bin/G4_bq_level_1..10.json` 已覆盖；10 个 md5 与终稿逐位一致。
 - 终稿 L1..L10 md5（前 8）：
-  `a8ded7af / 8aa793ad / b8fb3997 / 67d053db / 3eb39a79 / f0d1a58c / a154a506 / 68026c49 / 328969fb / 4d5aa99f`
+  `e5f2b841 / 8aa793ad / b8fb3997 / 67d053db / 3eb39a79 / f0d1a58c / a154a506 / 68026c49 / 328969fb / 4d5aa99f`
 
 ## 5. 遗留
 
