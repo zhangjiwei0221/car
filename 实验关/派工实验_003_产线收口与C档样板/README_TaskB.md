@@ -40,21 +40,13 @@ node 实验关/产线v5/C9_插值玩家/PInterpPlayer.js <关.json> \
 
 **处理**：严格保留总工表顺序，未对调；原因见任务单 §4.1。`humCasual` 整体 `.708→.300` 坡度正常。
 
-## 3. 新 L1（5×5 / 25 色几何教程，真正不会输）
+## 3. 新 L1（6×6 猫脸，用户定稿）
 
-> 用户 15:25 反馈：猫脸 7 色 36 车仍有“连点 5 个新盒塞满暂存”的失败路径；教程关改用简单几何色彩。
-
-- 源图：`L1_geo5_src.txt`——25×25px、5×5 个 5×5 几何色块、**25 色**（1–25，避开 31+32），每色 25px。
-- 切摆：`SplitLevel_v722 --target L1_geo5_src.txt --out L1_geo5.json --rows 5 --cols 5 --bottom-only --no-first-test`
-- 结果：5×5 / 25 车 / 625px，**每车 = 一个完整颜色盒**（每色 1 辆车）；0 链 0 冰 0 管 0 黑 0 问号。
-- 验收：
-  - `LayoutScore hard=0 warn=0 maxRun=1`，`<8px=0`；
-  - `Solvable --width 8 --bottom-only --instant-chain`：`true / 25 步 / 625/625`；
-  - `PInterpPlayer` 40 局 seed977：`randCasual=1.000`、`humCasual=1.000`、`humMid=1.000`、`humFair=1.000`、`earlyShare=0%`；`bufWave=[0,0,0]`（暂存从未占用）；
-  - `BaitLocator --early 0.1 --games 40`：`deathsTotal=0 / earlyDeaths=0 / earlyShare=0%`；
-  - **最坏情况玩家 200 局：200/200 胜、`maxBuf=0`**（不是概率，是每击即消）；
-  - 格式：`toprow=25 / blocks=25×25 / maprow=mapcol=5 / spools=5×5`。
-- md5：`591148ba`。旧猫脸 6×6 版 `3828caeb` 归档 `_pre_geo/`，不再上线。
+- 源图：`L1_src_24x24.txt`（24×24、7 色、576px、无 <8px、无 31+32；左眼镜像右眼、两腮红各 3 像素）。
+- 切摆：`SplitLevel_v722 --target L1_src_24x24.txt --out L1_base.json --rows 6 --cols 6 --bottom-only --stagger-cap --no-first-test` → 6×6 / 36 车 / 576px，0 机制，逐色守恒 576/576。
+- 验收：`hard=0/warn=0/maxRun=3/<8px=0`；`Solvable 36 步/576/576`；`PInterp` 40 局全 1.000、`early=0%`、`bufWave=[1.63,1.93,1.80]`。
+- **不是数学上不会输**：最坏情况玩家 200/200 在第 4 步塞满 5 槽；用户 15:56 已知情并选择猫脸。5×5/25 色“每车一盒”版可 100% 不输，归档 `_pre_geo/` 备选。
+- md5：`3828caeb`；格式 `toprow=24 / blocks=24×24 / maprow=mapcol=6 / spools=6×6`。
 
 ## 3.5 Z 档 L2（用户 15:25 追加）
 
@@ -71,7 +63,7 @@ node 实验关/产线v5/C9_插值玩家/PInterpPlayer.js <关.json> \
 - 终稿：`G4_上线重排终稿/G4_bq_level_1..10.json` + `md5.txt`。
 - 客户端：`/Users/red/Desktop/分组4/ParkPassenger.app/Contents/Resources/bin/G4_bq_level_1..10.json` 已覆盖；10 个 md5 与终稿逐位一致。
 - 终稿 L1..L10 md5（前 8）：
-  `591148ba / dfd01486 / b8fb3997 / 67d053db / 3eb39a79 / f0d1a58c / a154a506 / 68026c49 / 328969fb / 4d5aa99f`
+  `3828caeb / dfd01486 / b8fb3997 / 67d053db / 3eb39a79 / f0d1a58c / a154a506 / 68026c49 / 328969fb / 4d5aa99f`
 
 ## 5. 遗留
 
