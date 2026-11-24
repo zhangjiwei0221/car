@@ -27,6 +27,9 @@ const SEED = Number(arg('--seed', 977));
 const LO = Number(arg('--lo', 0.58));
 const HI = Number(arg('--hi', 0.68));
 const MID = (LO + HI) / 2;
+const HUM_LO = Number(arg('--hum-lo', 0.32));
+const HUM_HI = Number(arg('--hum-hi', 0.75));
+const HUM_MID = (HUM_LO + HUM_HI) / 2;
 const REPORT = arg('--report', null);
 const EARLY_W = Number(arg('--early-w', 3.0));
 const HUMAN_CASUAL = argv.includes('--human-casual');
@@ -39,7 +42,7 @@ function isPlainCar(x) { if (!x || !(x.id > 0) || !(x.count > 0)) return false; 
 const isWon = (st) => st.eliminatedPixels >= st.totalPixels;
 const isDead = (st) => !!(st.overflow || st.buffer.length > st.bufferLimit || Sim.isDeadEnd(st));
 
-function playOne(lv, p, r) {
+function playOne(lv, p, r, isHum = HUMAN_CASUAL) {
   let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: true, instantChain: true });
   for (let step = 0; step < 80; step++) {
     if (isWon(s)) return { won: true, prog: 1 };
@@ -47,7 +50,7 @@ function playOne(lv, p, r) {
     if (!ms.length) break;
     let pick = null;
     const useG = (p >= 1) || (p > 0 && r() < p);
-    if (HUMAN_CASUAL) {
+    if (isHum) {
       const allMoves = [];
       for (const m of ms) {
         const t = St.cloneState(s), e0 = t.eliminatedPixels, c0 = t.completedBoxes;
@@ -63,7 +66,9 @@ function playOne(lv, p, r) {
       if (useG) {
         if (aliveList.length) {
           aliveList.sort((a, b) => (b.cleared - a.cleared) || (a.bufAfter - b.bufAfter) || (b.gain - a.gain));
-          pick = aliveList[0].t;
+          const top = aliveList[0];
+          const tied = aliveList.filter(o => o.cleared === top.cleared && o.bufAfter === top.bufAfter && o.gain === top.gain);
+          pick = tied[Math.floor(r() * tied.length)].t;
         }
       } else if (s.buffer.length <= 2) {
         const chunkVis = aliveList.filter(o => o.gain >= 6);
@@ -128,17 +133,35 @@ function evalWall(game, nGames = GAMES) {
   const earlyShare = deaths ? early / deaths : 0;
   let inv = 0;
   for (let i = 1; i < PS.length; i++) if (rates[PS[i]] < rates[PS[i - 1]]) inv++;
-  return { casual, fair, earlyShare, inv, rates };
+  // 【2026-11-24 惰性双目标联合爬山】只在主尺 casual 接近目标带 [LO-0.12, HI+0.12] 且 fair>=0.85 时才测短视真人，兼顾速度与双尺命中！
+  let humCasual = HUM_MID, humFair = 1.0;
+  if (casual >= LO - 0.12 && casual <= HI + 0.12 && fair >= 0.85 && earlyShare <= 0.18) {
+    const hGames = Math.min(nGames, 12);
+    const rh = lcg(SEED), rhF = lcg(SEED);
+    let hw = 0, hfw = 0;
+    for (let g = 0; g < hGames; g++) {
+      if (playOne(lv, 0.1, rh, true).won) hw++;
+      if (playOne(lv, 0.9, rhF, true).won) hfw++;
+    }
+    humCasual = hw / hGames;
+    humFair = hfw / hGames;
+  }
+  return { casual, fair, humCasual, humFair, earlyShare, inv, rates };
 }
 function score(ev) {
   if (!ev) return 1e9;
+  const humOver = Math.max(0, (ev.humCasual || 0) - HUM_HI);
+  const humUnder = Math.max(0, HUM_LO - (ev.humCasual || 0));
+  // 带内 [HUM_LO, HUM_HI] 且 humFair>=0.88 时 humPen=0，避免与带外惰性未测步产生评分标尺跳变！
+  const humPen = 0.85 * (humOver + humUnder) + 0.6 * Math.max(0, 0.88 - (ev.humFair ?? 1));
   return Math.abs(ev.casual - MID)
+    + humPen
     + EARLY_W * Math.max(0, ev.earlyShare - 0.15)
     + 0.5 * Math.max(0, 0.85 - ev.fair)
     + 0.02 * ev.inv;
 }
 const clones = (g) => JSON.parse(JSON.stringify(g));
-const brief = (ev) => ev ? { casual: +ev.casual.toFixed(3), fair: +ev.fair.toFixed(3), early: +ev.earlyShare.toFixed(3), inv: ev.inv } : null;
+const brief = (ev) => ev ? { casual: +ev.casual.toFixed(3), fair: +ev.fair.toFixed(3), hum: +(ev.humCasual || 0).toFixed(3), hFair: +(ev.humFair ?? 1).toFixed(3), early: +ev.earlyShare.toFixed(3), inv: ev.inv } : null;
 
 let cur = clones(base);
 let curEv = evalWall(cur), curScore = score(curEv);
@@ -160,9 +183,9 @@ const colorDepth = {};
 }
 
 for (let it = 1; it <= ITERS; it++) {
-  if (curEv && curEv.casual <= HI && curEv.casual >= LO && curEv.earlyShare <= 0.15 && curEv.fair >= 0.85 && curEv.inv <= 2) {
+  if (curEv && curEv.casual <= HI && curEv.casual >= LO && curEv.humCasual <= HUM_HI && curEv.humCasual >= HUM_LO && curEv.earlyShare <= 0.15 && curEv.fair >= 0.85 && (curEv.humFair ?? 1) >= 0.85 && curEv.inv <= 2) {
     const fullEv = evalWall(cur, 40);
-    if (fullEv && fullEv.casual <= HI + 0.01 && fullEv.casual >= LO - 0.01 && fullEv.fair >= 0.85 && fullEv.earlyShare <= 0.18) {
+    if (fullEv && fullEv.casual <= HI + 0.01 && fullEv.casual >= LO - 0.01 && fullEv.humCasual <= HUM_HI + 0.02 && fullEv.humCasual >= HUM_LO - 0.02 && fullEv.fair >= 0.85 && (fullEv.humFair ?? 1) >= 0.85 && fullEv.earlyShare <= 0.18) {
       curEv = fullEv; best = clones(cur); break;
     }
     curEv = fullEv || curEv; curScore = score(curEv);
@@ -178,7 +201,7 @@ for (let it = 1; it <= ITERS; it++) {
     if (r >= 3) deep.push([r, c]);
   }
   if (!front.length || !deep.length) continue;
-  const needHarder = !curEv || curEv.casual > HI;
+  const needHarder = !curEv || (curEv.casual > HI) || (curEv.casual >= LO && curEv.humCasual > HUM_HI);
   let a = null, b = null;
   for (let tryPair = 0; tryPair < 25; tryPair++) {
     const ca = front[Math.floor(rnd() * front.length)];
@@ -186,6 +209,8 @@ for (let it = 1; it <= ITERS; it++) {
     const cellA = g.spools[ca[0]][ca[1]], cellB = g.spools[cb[0]][cb[1]];
     if (cellA.id === cellB.id) continue;
     const dA = colorDepth[cellA.id] || 0, dB = colorDepth[cellB.id] || 0;
+    // 三面墙下 row 0 是唯一底边入口，严禁把过于靠顶边(dB > 18)的深层死车塞进 row 0 导致 early>0.70 开局锁死！
+    if (ca[0] === 0 && needHarder && dB > 18) continue;
     if (needHarder && (dB > dA + 1.0 || (dB >= dA - 1.0 && cellB.count > cellA.count))) { a = ca; b = cb; break; }
     if (!needHarder && (dA > dB + 1.0 || cellA.count > cellB.count)) { a = ca; b = cb; break; }
   }
@@ -198,9 +223,11 @@ for (let it = 1; it <= ITERS; it++) {
   const ev = evalWall(g);
   if (!ev) { log.push({ iter: it, swap: [a, b], accepted: false }); continue; }
   const vs = score(ev);
-  const fairOk = ev.fair >= 0.88 || ev.fair >= curEv.fair;
-  const earlyOk = ev.earlyShare <= 0.18 || ev.earlyShare <= curEv.earlyShare;
-  const better = fairOk && earlyOk && vs < curScore && ev.casual <= Math.max(curEv.casual, HI);
+  const fairOk = (ev.fair >= 0.88 || ev.fair >= curEv.fair) && ((ev.humFair ?? 1) >= 0.88 || (ev.humFair ?? 1) >= (curEv.humFair ?? 0));
+  const earlyOk = ev.earlyShare <= 0.15 || ev.earlyShare <= curEv.earlyShare;
+  const casBoundOk = ev.casual <= Math.max(curEv.casual, HI) && ev.casual >= Math.min(curEv.casual, LO);
+  const humBoundOk = ev.humCasual <= Math.max(curEv.humCasual, HUM_HI) && ev.humCasual >= Math.min(curEv.humCasual, HUM_LO);
+  const better = fairOk && earlyOk && casBoundOk && humBoundOk && vs < curScore;
   log.push({ iter: it, swap: [a, b], ...brief(ev), accepted: better });
   console.log(`iter${it} (${a})<->(${b})`, JSON.stringify(brief(ev)), better ? '接受' : '');
   if (better) { cur = g; curEv = ev; curScore = vs; if (vs < bestScore) { best = clones(g); bestScore = vs; } }

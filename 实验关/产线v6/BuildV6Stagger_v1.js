@@ -48,6 +48,7 @@ const ROWS = Number(arg('--rows', '7'));
 const COLS = Number(arg('--cols', '7'));
 const RAND_LO = Number(arg('--rand-lo', '0.55'));   // 主尺下限（B 档 = .45）
 const RAND_HI = Number(arg('--rand-hi', '0.68'));   // 主尺上限（B 档 = .58）
+const HUM_MIN = Number(arg('--hum-min', '0.32'));   // 短视真人下限（防 <.30 坑真人死局）
 const HUM_MAX = Number(arg('--hum-max', '1.00'));   // 短视真人上限（B 档 = .75）
 const FAIR_MIN = Number(arg('--fair-min', '0.90')); // 认真档下限（B 档 = .85）
 const ITERS = Number(arg('--iters', '8'));
@@ -84,14 +85,48 @@ const lcg = (s) => { let x = s; return () => { x = (x * 1103515245 + 12345) & 0x
 const isWon = (st) => st.eliminatedPixels >= st.totalPixels;
 const isDead = (st) => !!(st.overflow || st.buffer.length > st.bufferLimit || Sim.isDeadEnd(st));
 
-function playOneFourSide(lv, p, r) {
+function playOneFourSide(lv, p, r, isHum = false) {
   let s = Sim.createState(lv, { useSlotStart: true, bottomOnly: false, instantChain: false });
   for (let step = 0; step < 80; step++) {
     if (isWon(s)) return { won: true, prog: 1 };
     const ms = Sim.listMoves(s).filter(m => !m.blocked);
     if (!ms.length) break;
     let pick = null;
-    if ((p >= 1) || (p > 0 && r() < p)) {
+    const useG = (p >= 1) || (p > 0 && r() < p);
+    if (isHum) {
+      const allMoves = [];
+      for (const m of ms) {
+        const t = St.cloneState(s), e0 = t.eliminatedPixels, c0 = t.completedBoxes;
+        if (!Sim.applyPick(t, m.r, m.c)) continue;
+        allMoves.push({
+          t, alive: !isDead(t) || isWon(t),
+          gain: t.eliminatedPixels - e0,
+          bufAfter: t.buffer.length,
+          cleared: t.completedBoxes > c0 ? 1 : 0
+        });
+      }
+      const aliveList = allMoves.filter(o => o.alive);
+      if (useG) {
+        if (aliveList.length) {
+          aliveList.sort((a, b) => (b.cleared - a.cleared) || (a.bufAfter - b.bufAfter) || (b.gain - a.gain));
+          const top = aliveList[0];
+          const tied = aliveList.filter(o => o.cleared === top.cleared && o.bufAfter === top.bufAfter && o.gain === top.gain);
+          pick = tied[Math.floor(r() * tied.length)].t;
+        }
+      } else if (s.buffer.length <= 2) {
+        const chunkVis = aliveList.filter(o => o.gain >= 6);
+        const anyVis   = aliveList.filter(o => o.gain > 0);
+        const pool = chunkVis.length ? chunkVis : (anyVis.length ? anyVis : aliveList);
+        if (pool.length) pick = pool[Math.floor(r() * pool.length)].t;
+      } else {
+        const fatalVis = allMoves.filter(o => !o.alive && o.gain >= 8);
+        const safeChunk = aliveList.filter(o => o.gain >= 6);
+        const safeVis = safeChunk.length ? safeChunk : aliveList.filter(o => o.gain > 0);
+        if (fatalVis.length > 0 && r() < 0.20) pick = null;
+        else if (safeVis.length) pick = safeVis[Math.floor(r() * safeVis.length)].t;
+        else if (aliveList.length) pick = aliveList[Math.floor(r() * aliveList.length)].t;
+      }
+    } else if (useG) {
       const cand = [];
       let bg = -Infinity;
       for (const m of ms) {
@@ -216,8 +251,25 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
     const earlyShare = deaths ? early / deaths : 0;
     let inv = 0;
     for (let i = 1; i < PS.length; i++) if (rates[PS[i]] < rates[PS[i - 1]]) inv++;
-    const sc = Math.abs(casual - mid) + 2.5 * Math.max(0, earlyShare - 0.15) + 0.6 * Math.max(0, 0.90 - fair) + 0.02 * inv;
-    return { casual, fair, earlyShare, inv, sc };
+    // 【2026-11-24 惰性双目标联合爬山】只在主尺 casual 接近目标带 [lo-0.10, hi+0.10] 且 fair>=0.85 时才测慢4倍的短视真人，兼顾速度与双尺命中！
+    const humMid = (HUM_MIN + Math.min(0.75, HUM_MAX)) / 2;
+    let humCasual = humMid, humFair = 1.0, humPen = 0;
+    if (casual >= lo - 0.10 && casual <= hi + 0.10 && fair >= 0.85 && earlyShare <= 0.18) {
+      const hGames = Math.min(games, 8);
+      const rh = lcg(seed), rhF = lcg(seed);
+      let hw = 0, hfw = 0;
+      for (let i = 0; i < hGames; i++) {
+        if (playOneFourSide(lv, 0.1, rh, true).won) hw++;
+        if (playOneFourSide(lv, 0.9, rhF, true).won) hfw++;
+      }
+      humCasual = hw / hGames;
+      humFair = hfw / hGames;
+      const humOver = Math.max(0, humCasual - HUM_MAX);
+      const humUnder = Math.max(0, HUM_MIN - humCasual);
+      humPen = 0.85 * (humOver + humUnder) + 0.6 * Math.max(0, 0.88 - humFair);
+    }
+    const sc = Math.abs(casual - mid) + humPen + 2.5 * Math.max(0, earlyShare - 0.15) + 0.6 * Math.max(0, 0.90 - fair) + 0.02 * inv;
+    return { casual, fair, humCasual, humFair, earlyShare, inv, sc };
   }
   let bestEv = evalG(cur) || { sc: 1e9 };
   // 【2026-11-23 修复】必须允许「前排(0..2) ↔ 深层(3..6)」跨行对调（把外圈色压到后排、把深层色提到前排），才能在四边模式下把原随意档从 1.00 压进 .55-.68！
@@ -235,11 +287,13 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
     const cand = JSON.parse(JSON.stringify(cur));
     const tmp = cand.spools[r1][c1]; cand.spools[r1][c1] = cand.spools[r2][c2]; cand.spools[r2][c2] = tmp;
     const ev = evalG(cand);
-    const fairOk = ev && (ev.fair >= 0.88 || ev.fair >= (bestEv.fair || 0));
-    const earlyOk = ev && (ev.earlyShare <= 0.18 || ev.earlyShare <= (bestEv.earlyShare || 1));
-    if (ev && fairOk && earlyOk && ev.sc <= bestEv.sc && ev.casual <= Math.max(bestEv.casual, hi)) {
+    const fairOk = ev && (ev.fair >= 0.88 || ev.fair >= (bestEv.fair || 0)) && ((ev.humFair ?? 1) >= 0.88 || (ev.humFair ?? 1) >= (bestEv.humFair ?? 0));
+    const earlyOk = ev && (ev.earlyShare <= 0.15 || ev.earlyShare <= (bestEv.earlyShare || 1));
+    const casBoundOk = ev && (ev.casual <= Math.max(bestEv.casual ?? 1, hi) && ev.casual >= Math.min(bestEv.casual ?? 0, lo));
+    const humBoundOk = ev && (ev.humCasual <= Math.max(bestEv.humCasual ?? 1, HUM_MAX) && ev.humCasual >= Math.min(bestEv.humCasual ?? 0, HUM_MIN));
+    if (ev && fairOk && earlyOk && casBoundOk && humBoundOk && ev.sc <= bestEv.sc) {
       cur = cand; bestEv = ev;
-      if (ev.casual >= lo && ev.casual <= hi && ev.fair >= 0.90 && ev.earlyShare < 0.15) break;
+      if (ev.casual >= lo && ev.casual <= hi && ev.humCasual >= HUM_MIN && ev.humCasual <= HUM_MAX && ev.fair >= 0.90 && (ev.humFair ?? 1) >= 0.88 && ev.earlyShare < 0.15) break;
     }
   }
   return cur;
@@ -626,7 +680,7 @@ function fullVerifyV6(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 && maxIceParam <= 20 &&
-    randFair >= FAIR_MIN && humFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual <= HUM_MAX;
+    randFair >= FAIR_MIN && humFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual >= HUM_MIN && humCasual <= HUM_MAX;
 
   return {
     allPass, randCasual, randFair, randWave, humCasual, humFair, humWave,

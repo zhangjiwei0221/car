@@ -47,9 +47,10 @@ const ROWS = Number(arg('--rows', '7'));
 const COLS = Number(arg('--cols', '7'));
 const RAND_LO = Number(arg('--rand-lo', '0.55'));   // 主尺下限（B 档 = .45）
 const RAND_HI = Number(arg('--rand-hi', '0.68'));   // 主尺上限（B 档 = .58）
+const HUM_MIN = Number(arg('--hum-min', '0.32'));   // 短视真人下限（防 <.30 坑真人死局）
 const HUM_MAX = Number(arg('--hum-max', '1.00'));   // 短视真人上限（B 档 = .75）
 const FAIR_MIN = Number(arg('--fair-min', '0.90')); // 认真档下限（B 档 = .85）
-const ITERS = Number(arg('--iters', '14'));
+const ITERS = Number(arg('--iters', '25'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
 const MAX_TRIES = Number(arg('--tries', '4'));
@@ -389,7 +390,8 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
     icedLv, climbedLv, '--iters', String(ITERS), '--games', '12', '--seed', String(SEED),
-    '--lo', String(+(RAND_LO + 0.01).toFixed(3)), '--hi', String(+(RAND_HI - 0.02).toFixed(3))
+    '--lo', String(+(RAND_LO + 0.01).toFixed(3)), '--hi', String(+(RAND_HI - 0.02).toFixed(3)),
+    '--hum-lo', String(HUM_MIN), '--hum-hi', String(+(HUM_MAX - 0.02).toFixed(3))
   ], { stdio: 'ignore' });
 
   return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
@@ -458,7 +460,7 @@ function fullVerify(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 &&
-    humFair >= FAIR_MIN && randFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual <= HUM_MAX;
+    humFair >= FAIR_MIN && randFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual >= HUM_MIN && humCasual <= HUM_MAX;
 
   return {
     allPass, randCasual, randFair, humCasual, humFair, bufWave, midTight,
