@@ -49,6 +49,8 @@ const RAND_LO = Number(arg('--rand-lo', '0.55'));   // 主尺下限（B 档 = .4
 const RAND_HI = Number(arg('--rand-hi', '0.68'));   // 主尺上限（B 档 = .58）
 const HUM_MIN = Number(arg('--hum-min', '0.32'));   // 短视真人下限（防 <.30 坑真人死局）
 const HUM_MAX = Number(arg('--hum-max', '1.00'));   // 短视真人上限（B 档 = .75）
+const HUM_MID_MIN = Number(arg('--hum-mid-min', '0'));  // 【派工#003 A3】短视真人 p=.5 下限
+const HUM_MID_MAX = Number(arg('--hum-mid-max', '1'));  // 【派工#003 A3】短视真人 p=.5 上限
 const FAIR_MIN = Number(arg('--fair-min', '0.90')); // 认真档下限（B 档 = .85）
 const ITERS = Number(arg('--iters', '25'));
 const SEED = Number(arg('--seed', '977'));
@@ -354,7 +356,45 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
   }
 
+  // 【派工#003 A2】真黑块先于选冰：黑块落位/并车后立即重算盘面颜色计数，冰再按黑后计数选色
+  const blackCoords = [];
+  if (BLACK_MODE >= 2) {
+    const preBlackObj = JSON.parse(fs.readFileSync(cur, 'utf8'));
+    const preBoardCars = {};
+    for (const row of preBlackObj.spools) for (const x of row) if (x && x.id > 0) preBoardCars[x.id] = (preBoardCars[x.id] || 0) + 1;
+    const wantBlacks = BLACK_MODE >= 3 ? [[1, 2], [3, 1], [3, 4]] : [[2, 2], [2, 5]];
+    for (const [br, bc] of wantBlacks) {
+      let pickedRC = null;
+      for (const dc of [0, 1, -1, 2, -2]) {
+        const cc = bc + dc;
+        if (cc < 0 || cc >= COLS) continue;
+        const x = preBlackObj.spools[br][cc];
+        if (x && x.id > 0 && x.type === 0 && (preBoardCars[x.id] || 0) >= 3) { pickedRC = [br, cc]; break; }
+      }
+      if (pickedRC) {
+        const [pr, pc] = pickedRC;
+        const cid = preBlackObj.spools[pr][pc].id, cap = preBlackObj.spools[pr][pc].count;
+        let target = null;
+        for (let r = ROWS - 1; r >= 0; r--) for (let c = 0; c < COLS; c++) {
+          if (r === pr && c === pc) continue;
+          const y = preBlackObj.spools[r][c];
+          if (y && y.id === cid && y.count > 0) {
+            if (!target || y.count < target.count) target = y;
+          }
+        }
+        if (target) {
+          target.count += cap;
+          preBlackObj.spools[pr][pc] = { id: -1, type: 0, param: 0, count: 0 };
+          blackCoords.push([pr, pc]);
+        }
+      }
+    }
+    if (blackCoords.length) fs.writeFileSync(cur, JSON.stringify(preBlackObj, null, 1));
+  }
+
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
+  const boardColorCars = {};
+  for (const row of lvData.spools) for (const x of row) if (x && x.id > 0) boardColorCars[x.id] = (boardColorCars[x.id] || 0) + 1;
   const actualPipes = pipeColsUsed.length;
   // 【派工#001】中后期封路冰恢复：1 根管道或黑块也保留 7 块冰（行 2/3/4/5/6），
   // 冰数字回到真实到达步数窗口（行4 20/21、行5 25、行6 30/31）；无管无黑块时 9 块。
@@ -387,7 +427,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     const key = `${r},${c}`;
     if (chainUsed.has(key) || pipeUsed.has(key) || CLIMAX_SET.has(key)) return false;
     const cell = lvData.spools[r][c];
-    return !!(cell && cell.id > 0 && cell.type === 0 && (colorCars[cell.id] || 0) >= minCarsForRow(r));
+    return !!(cell && cell.id > 0 && cell.type === 0 && (boardColorCars[cell.id] || 0) >= minCarsForRow(r));
   };
   for (let idx = 0; idx < rowNeeds.length; idx++) {
     const [r, need, baseParam] = rowNeeds[idx];
@@ -425,38 +465,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     fs.copyFileSync(cur, icedLv);
   }
 
-  // 可选「真黑块 (id: -1 永久实心墙) 改变棋盘拓扑」与「第2-3行问号车 (type: 6 远期迷雾)」(2026-11-23 日志 §1191)
   const icedObj = JSON.parse(fs.readFileSync(icedLv, 'utf8'));
-  const blackCoords = [];
-  if (BLACK_MODE >= 2) {
-    const wantBlacks = BLACK_MODE >= 3 ? [[1, 2], [3, 1], [3, 4]] : [[2, 2], [2, 5]];
-    for (const [br, bc] of wantBlacks) {
-      let pickedRC = null;
-      for (const dc of [0, 1, -1, 2, -2]) {
-        const cc = bc + dc;
-        if (cc < 0 || cc >= COLS) continue;
-        const x = icedObj.spools[br][cc];
-        if (x && x.id > 0 && x.type === 0 && (colorCars[x.id] || 0) >= 3) { pickedRC = [br, cc]; break; }
-      }
-      if (pickedRC) {
-        const [pr, pc] = pickedRC;
-        const cid = icedObj.spools[pr][pc].id, cap = icedObj.spools[pr][pc].count;
-        let target = null;
-        for (let r = ROWS - 1; r >= 0; r--) for (let c = 0; c < COLS; c++) {
-          if (r === pr && c === pc) continue;
-          const y = icedObj.spools[r][c];
-          if (y && y.id === cid && y.count > 0) {
-            if (!target || y.count < target.count) target = y;
-          }
-        }
-        if (target) {
-          target.count += cap;
-          icedObj.spools[pr][pc] = { id: -1, type: 0, param: 0, count: 0 };
-          blackCoords.push([pr, pc]);
-        }
-      }
-    }
-  }
   const qCoords = [];
   if (Q_COUNT > 0) {
     for (let r = 2; r <= 3 && qCoords.length < Q_COUNT; r++) {
@@ -477,7 +486,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
-    icedLv, climbedLv, '--iters', String(ITERS), '--games', '12', '--seed', String(SEED),
+    icedLv, climbedLv, '--iters', String(ITERS), '--games', '12', '--seed', String(SEED), '--hum-mid-min', String(HUM_MID_MIN), '--hum-mid-max', String(HUM_MID_MAX),
     '--lo', String(+(RAND_LO + 0.01).toFixed(3)), '--hi', String(+(RAND_HI - 0.02).toFixed(3)),
     '--hum-lo', String(HUM_MIN), '--hum-hi', String(+(HUM_MAX - 0.02).toFixed(3))
   ], { stdio: 'ignore' });
@@ -501,11 +510,12 @@ function fullVerify(lvFile, workDir, tag) {
   const qHum = path.join(workDir, `qh_${tag}`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'),
-    lvFile, '--bottom-only', '--instant-chain', '--human-casual', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '40', '--seeds', String(SEED), '--out', qHum
+    lvFile, '--bottom-only', '--instant-chain', '--human-casual', '--p', '0,0.1,0.2,0.5,0.8,0.9,1', '--games', '40', '--seeds', String(SEED), '--out', qHum
   ], { stdio: 'ignore' });
   const sh = JSON.parse(fs.readFileSync(path.join(qHum, 'summary_all.json'), 'utf8'));
   const mh = {}; sh.forEach(x => { mh[x.p.toFixed(1)] = x; });
   const humCasual = +((mh['0.0'].winRate + mh['0.1'].winRate + mh['0.2'].winRate) / 3).toFixed(3);
+  const humMid = +mh['0.5'].winRate.toFixed(3);
   const humFair   = +((mh['0.8'].winRate + mh['0.9'].winRate + mh['1.0'].winRate) / 3).toFixed(3);
   const bufWave   = mh['0.1'].bufWaveMean;
   const midTight  = mh['0.1'].midTightRate;
@@ -548,10 +558,10 @@ function fullVerify(lvFile, workDir, tag) {
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
   const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 &&
-    humFair >= FAIR_MIN && randFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual >= HUM_MIN && humCasual <= HUM_MAX;
+    humFair >= FAIR_MIN && randFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual >= HUM_MIN && humCasual <= HUM_MAX && humMid >= HUM_MID_MIN && humMid <= HUM_MID_MAX;
 
   return {
-    allPass, randCasual, randFair, humCasual, humFair, bufWave, midTight,
+    allPass, randCasual, randFair, humCasual, humMid, humFair, bufWave, midTight,
     earlyShare, ratPass, solvable: sol.solvable, steps: sol.steps, hard0, row1Open, distinctCaps: caps.size
   };
 }
@@ -572,7 +582,7 @@ for (let t = 0; t < MAX_TRIES; t++) {
     const built = buildWithStyle(baseLv, st, work);
     const ver = fullVerify(built.file, work, `s${st}`);
     const rec = { ...built, verify: ver };
-    console.log(`[try style=${st}] allPass=${ver.allPass} | 短视真人=${ver.humCasual}/${ver.humFair} 波形=${JSON.stringify(ver.bufWave)} | 旧随机=${ver.randCasual}/${ver.randFair} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 二排畅口=${ver.row1Open} | 面额种数=${ver.distinctCaps}`);
+    console.log(`[try style=${st}] allPass=${ver.allPass} | 短视真人=${ver.humCasual}/mid${ver.humMid}/${ver.humFair} 波形=${JSON.stringify(ver.bufWave)} | 旧随机=${ver.randCasual}/${ver.randFair} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 二排畅口=${ver.row1Open} | 面额种数=${ver.distinctCaps}`);
     const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.humFair >= FAIR_MIN && ver.randFair >= FAIR_MIN;
     const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.humFair >= FAIR_MIN && best.verify.randFair >= FAIR_MIN) : false;
     if (!best || (ver.allPass && !best.verify.allPass) ||

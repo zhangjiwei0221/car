@@ -30,6 +30,8 @@ const MID = (LO + HI) / 2;
 const HUM_LO = Number(arg('--hum-lo', 0.32));
 const HUM_HI = Number(arg('--hum-hi', 0.75));
 const HUM_MID = (HUM_LO + HUM_HI) / 2;
+const HMID_LO = Number(arg('--hum-mid-min', 0));
+const HMID_HI = Number(arg('--hum-mid-max', 1));
 const REPORT = arg('--report', null);
 const EARLY_W = Number(arg('--early-w', 3.0));
 const HUMAN_CASUAL = argv.includes('--human-casual');
@@ -134,7 +136,7 @@ function evalWall(game, nGames = GAMES) {
   let inv = 0;
   for (let i = 1; i < PS.length; i++) if (rates[PS[i]] < rates[PS[i - 1]]) inv++;
   // 【2026-11-24 惰性双目标联合爬山】只在主尺 casual 接近目标带 [LO-0.12, HI+0.12] 且 fair>=0.85 时才测短视真人，兼顾速度与双尺命中！
-  let humCasual = HUM_MID, humFair = 1.0;
+  let humCasual = HUM_MID, humFair = 1.0, humMid = null;
   if (casual >= LO - 0.12 && casual <= HI + 0.12 && fair >= 0.85 && earlyShare <= 0.18) {
     const hGames = Math.min(nGames, 12);
     const rh = lcg(SEED), rhF = lcg(SEED);
@@ -145,8 +147,9 @@ function evalWall(game, nGames = GAMES) {
     }
     humCasual = hw / hGames;
     humFair = hfw / hGames;
+    if (HMID_HI < 1) { const rhM = lcg(SEED); let hm = 0; for (let g = 0; g < hGames; g++) if (playOne(lv, 0.5, rhM, true).won) hm++; humMid = hm / hGames; }
   }
-  return { casual, fair, humCasual, humFair, earlyShare, inv, rates };
+  return { casual, fair, humCasual, humMid, humFair, earlyShare, inv, rates };
 }
 function score(ev) {
   if (!ev) return 1e9;
@@ -154,14 +157,16 @@ function score(ev) {
   const humUnder = Math.max(0, HUM_LO - (ev.humCasual || 0));
   // 带内 [HUM_LO, HUM_HI] 且 humFair>=0.88 时 humPen=0，避免与带外惰性未测步产生评分标尺跳变！
   const humPen = 0.85 * (humOver + humUnder) + 0.6 * Math.max(0, 0.88 - (ev.humFair ?? 1));
+  const midPen = (ev.humMid == null) ? 0 : 0.5 * Math.max(0, ev.humMid - HMID_HI) + 0.5 * Math.max(0, HMID_LO - ev.humMid);
   return Math.abs(ev.casual - MID)
     + humPen
+    + midPen
     + EARLY_W * Math.max(0, ev.earlyShare - 0.15)
     + 0.5 * Math.max(0, 0.85 - ev.fair)
     + 0.02 * ev.inv;
 }
 const clones = (g) => JSON.parse(JSON.stringify(g));
-const brief = (ev) => ev ? { casual: +ev.casual.toFixed(3), fair: +ev.fair.toFixed(3), hum: +(ev.humCasual || 0).toFixed(3), hFair: +(ev.humFair ?? 1).toFixed(3), early: +ev.earlyShare.toFixed(3), inv: ev.inv } : null;
+const brief = (ev) => ev ? { casual: +ev.casual.toFixed(3), fair: +ev.fair.toFixed(3), hum: +(ev.humCasual || 0).toFixed(3), mid: ev.humMid == null ? null : +ev.humMid.toFixed(3), hFair: +(ev.humFair ?? 1).toFixed(3), early: +ev.earlyShare.toFixed(3), inv: ev.inv } : null;
 
 let cur = clones(base);
 let curEv = evalWall(cur), curScore = score(curEv);
