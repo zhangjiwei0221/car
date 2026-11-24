@@ -55,6 +55,69 @@ const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
 const MAX_TRIES = Number(arg('--tries', '4'));
 
+// 【派工#001】终局挪车机关四定点：第 5 行核心色大车压住第 6 行内壳钥匙车。
+// 管道拆分 / 选冰 / 前排唯一车对调都不得占用或替换这 4 格（爬山后再做一次最终落位兜底）。
+const CLIMAX_SET = new Set(['5,2', '5,4', '6,2', '6,4']);
+
+// 【2026-11-24 派工#001】三面墙版终局挪车高潮机关：
+//   v7 按图的上部 25% 行为 corePx 最顶层核心色、25%~48% 行为 shellPx 次顶层内壳色；
+//   把 2 辆 shellPx 车放到 (6,2)/(6,4)，把 2 辆 corePx 大车放到正上方 (5,2)/(5,4)，且与正下方异色、容量尽可能大；
+//   只在 r ∈ [4,6] 后三行内部互换，绝不动 row 0..3。
+function setupEndgameClimaxV7(game, opts = {}) {
+  const Bmat = game.blocks, R = Bmat.length, C = Bmat[0].length;
+  const corePx = {}, shellPx = {};
+  const coreEnd = Math.floor(R * 0.25), shellEnd = Math.floor(R * 0.48);
+  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+    const v = Bmat[r][c]; if (v <= 0) continue;
+    if (r < coreEnd) corePx[v] = (corePx[v] || 0) + 1;
+    else if (r < shellEnd) shellPx[v] = (shellPx[v] || 0) + 1;
+  }
+
+  const S = game.spools, SR = S.length, SC = S[0].length;
+  const ROW_LO = 4, ROW_HI = Math.min(6, SR - 1);
+  const plain = (r, c) => !!(S[r] && S[r][c] && S[r][c].type === 0 && S[r][c].id > 0 && S[r][c].count > 0);
+  const swap = (a, b) => { const t = S[a[0]][a[1]]; S[a[0]][a[1]] = S[b[0]][b[1]]; S[b[0]][b[1]] = t; };
+  const report = { shellPlaced: 0, corePlaced: 0 };
+
+  // ① 内壳钥匙车 -> (6,2)/(6,4)
+  for (const tc of [2, 4]) {
+    if (6 > ROW_HI || tc >= SC) continue;
+    if (!plain(6, tc)) continue;
+    if (shellPx[S[6][tc].id] > 0) { report.shellPlaced++; continue; }
+    const cands = [];
+    for (let r = ROW_LO; r <= ROW_HI; r++) for (let c = 0; c < SC; c++) {
+      if (!plain(r, c) || CLIMAX_SET.has(`${r},${c}`)) continue;
+      const id = S[r][c].id;
+      if (!(shellPx[id] > 0)) continue;
+      cands.push({ r, c, id, core: corePx[id] || 0, count: S[r][c].count });
+    }
+    cands.sort((a, b) => (a.core - b.core) || (Math.abs(a.c - tc) - Math.abs(b.c - tc)) || (a.count - b.count));
+    if (!cands.length) continue;
+    swap([6, tc], [cands[0].r, cands[0].c]);
+    report.shellPlaced++;
+  }
+
+  // ② 核心色大车 -> (5,2)/(5,4)，必须与正下方 (6,col) 异色
+  for (const tc of [2, 4]) {
+    if (5 > ROW_HI || tc >= SC) continue;
+    if (!plain(5, tc)) continue;
+    const belowId = plain(6, tc) ? S[6][tc].id : -1;
+    if ((corePx[S[5][tc].id] > 0) && S[5][tc].id !== belowId) { report.corePlaced++; continue; }
+    const cands = [];
+    for (let r = ROW_LO; r <= ROW_HI; r++) for (let c = 0; c < SC; c++) {
+      if (!plain(r, c) || CLIMAX_SET.has(`${r},${c}`)) continue;
+      const id = S[r][c].id;
+      if (!(corePx[id] > 0) || id === belowId) continue;
+      cands.push({ r, c, id, count: S[r][c].count });
+    }
+    cands.sort((a, b) => (b.count - a.count) || (Math.abs(a.c - tc) - Math.abs(b.c - tc)));
+    if (!cands.length) continue;
+    swap([5, tc], [cands[0].r, cands[0].c]);
+    report.corePlaced++;
+  }
+  return report;
+}
+
 if (!TARGET || !OUT) {
   console.error('用法: node BuildV7Stagger_v1.js --target <图.txt> --out <输出.json> [--style 0..5] [--with-pipe] [--report 证书.json]');
   process.exit(2);
@@ -92,6 +155,8 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   // 自动把 row 0..1 的唯一车(cars===1)以及当前 style 所有预设链格上“链外剩余车 < 2 辆”的紧缺色，与 row 3..6 非链格上的充裕色对调！
   // 从源头杜绝：① 唯一车被绑；② 只有2辆车的颜色被两条链全部锁光导致 buffer=4 时触发棘轮陷阱(ChainRatchet trap)！
   let curLv = JSON.parse(JSON.stringify(lv0));
+  // 【派工#001】开头先摆终局挪车机关（爬山后再做一次最终落位兜底）
+  setupEndgameClimaxV7(curLv);
   const pairs = CHAIN_STYLES[styleIdx % CHAIN_STYLES.length];
   const planChainSet = new Set();
   pairs.forEach(([a, b]) => { planChainSet.add(`${a[0]},${a[1]}`); planChainSet.add(`${b[0]},${b[1]}`); });
@@ -106,7 +171,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       if (id === peerId || used >= 2 || (colorCars[id] || 0) - used <= 2) {
         let swapped = false;
         for (let rr = 5; rr >= 2 && !swapped; rr--) for (let cc = 0; cc < 7 && !swapped; cc++) {
-          if (planChainSet.has(`${rr},${cc}`)) continue;
+          if (planChainSet.has(`${rr},${cc}`) || CLIMAX_SET.has(`${rr},${cc}`)) continue;
           const id2 = curLv.spools[rr][cc].id;
           const u2 = chainColorUsed[id2] || 0;
           if (id2 !== peerId && u2 < 2 && ((colorCars[id2] || 0) - u2 >= 3)) {
@@ -126,7 +191,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
         let swapped = false;
         for (let rr = 6; rr >= 3 && !swapped; rr--) for (let cc = 0; cc < 7 && !swapped; cc++) {
           const id2 = curLv.spools[rr][cc].id;
-          if (!planChainSet.has(`${rr},${cc}`) && (colorCars[id2] || 0) >= 3) {
+          if (!planChainSet.has(`${rr},${cc}`) && !CLIMAX_SET.has(`${rr},${cc}`) && (colorCars[id2] || 0) >= 3) {
             const tmp = curLv.spools[r][c]; curLv.spools[r][c] = curLv.spools[rr][cc]; curLv.spools[rr][cc] = tmp;
             swapped = true;
           }
@@ -235,7 +300,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
         let bestRC = null, bestCap = dNow.spools[4][pCol].count;
         for (let rr = 3; rr <= 5; rr++) for (let cc = 0; cc < COLS; cc++) {
           const k = `${rr},${cc}`;
-          if (chainUsed.has(k) || pipeUsed.has(k) || (pipeCols.includes(cc) && rr === 4)) continue;
+          if (chainUsed.has(k) || pipeUsed.has(k) || CLIMAX_SET.has(k) || (pipeCols.includes(cc) && rr === 4)) continue;
           const x = dNow.spools[rr][cc];
           if (x && x.type === 0 && (colorCars[x.id] || 0) >= 3 && x.count > bestCap) {
             bestCap = x.count; bestRC = [rr, cc];
@@ -252,7 +317,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       const cands = [];
       for (let rr = 3; rr < ROWS; rr++) for (let cc = 0; cc < COLS; cc++) {
         const k = `${rr},${cc}`;
-        if ((rr === 4 && pipeCols.includes(cc)) || chainUsed.has(k) || pipeUsed.has(k)) continue;
+        if ((rr === 4 && pipeCols.includes(cc)) || chainUsed.has(k) || pipeUsed.has(k) || CLIMAX_SET.has(k)) continue;
         const cell = dNow.spools[rr][cc];
         if (cell && cell.id > 0 && cell.type === 0 && cell.count >= 22 && (colorCars[cell.id] || 0) >= 3) {
           cands.push({ r: rr, c: cc, id: cell.id, count: cell.count });
@@ -292,24 +357,31 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
 
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
   const actualPipes = pipeColsUsed.length;
+  // 【派工#001】中后期封路冰恢复：1 根管道或黑块也保留 7 块冰（行 2/3/4/5/6），
+  // 冰数字回到真实到达步数窗口（行4 20/21、行5 25、行6 30/31）；无管无黑块时 9 块。
   const rowNeeds = (!PIPE_REPLACE_ICE || (actualPipes === 0 && BLACK_MODE < 2))
-    ? [[2, 2, 8], [3, 2, 13], [4, 2, 17], [5, 1, 21], [6, 2, 25]]
+    ? [[2, 2, 9], [3, 2, 14], [4, 2, 20], [5, 1, 25], [6, 2, 30]]
     : (actualPipes >= 3
       ? []
       : (actualPipes === 2
-        ? [[2, 2, 8]]
-        : [[2, 2, 8], [3, 2, 13], [5, 1, 21]]));
+        ? [[2, 2, 9]]
+        : [[2, 2, 9], [3, 2, 14], [4, 1, 20], [5, 1, 25], [6, 1, 30]]));
   const colSeq = COL_ORDERS[styleIdx % COL_ORDERS.length];
   const iceCells = [];
+  // 后排（r>=4）深水冰只冻充裕冗余色（>=3 辆），绝不冻只剩 2 辆的紧缺色；也绝不占用终局挪车 4 定点
+  const minCarsForRow = (r) => (r >= 4 ? 3 : 2);
+  const iceOk = (r, c) => {
+    const key = `${r},${c}`;
+    if (chainUsed.has(key) || pipeUsed.has(key) || CLIMAX_SET.has(key)) return false;
+    const cell = lvData.spools[r][c];
+    return !!(cell && cell.id > 0 && cell.type === 0 && (colorCars[cell.id] || 0) >= minCarsForRow(r));
+  };
   for (let idx = 0; idx < rowNeeds.length; idx++) {
     const [r, need, baseParam] = rowNeeds[idx];
     const cols = colSeq[idx];
     const pickedCols = [];
     for (const c of cols) {
-      const key = `${r},${c}`;
-      if (chainUsed.has(key) || pipeUsed.has(key)) continue;
-      const cell = lvData.spools[r][c];
-      if (!cell || cell.id <= 0 || cell.type !== 0 || (colorCars[cell.id] || 0) < 2) continue;
+      if (!iceOk(r, c)) continue;
       if (pickedCols.some(pc => Math.abs(pc - c) === 1) && cols.length > 4) continue;
       pickedCols.push(c);
       const p = baseParam + (pickedCols.length === 2 ? 1 : 0);
@@ -318,12 +390,17 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
     for (const c of cols) {
       if (pickedCols.length >= need) break;
-      const key = `${r},${c}`;
-      if (chainUsed.has(key) || pipeUsed.has(key) || pickedCols.includes(c)) continue;
-      const cell = lvData.spools[r][c];
-      if (!cell || cell.id <= 0 || cell.type !== 0 || (colorCars[cell.id] || 0) < 2) continue;
+      if (!iceOk(r, c) || pickedCols.includes(c)) continue;
       pickedCols.push(c);
       iceCells.push(`${r},${c}:${baseParam}`);
+    }
+    // 兜底：固定列序不够时，在本行其余列补足（仍只冻 >=3 辆的冗余色，保证 7 块冰）
+    if (pickedCols.length < need) {
+      for (let c = 0; c < COLS && pickedCols.length < need; c++) {
+        if (pickedCols.includes(c) || !iceOk(r, c)) continue;
+        pickedCols.push(c);
+        iceCells.push(`${r},${c}:${baseParam}`);
+      }
     }
   }
 
@@ -393,6 +470,12 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     '--lo', String(+(RAND_LO + 0.01).toFixed(3)), '--hi', String(+(RAND_HI - 0.02).toFixed(3)),
     '--hum-lo', String(HUM_MIN), '--hum-hi', String(+(HUM_MAX - 0.02).toFixed(3))
   ], { stdio: 'ignore' });
+
+  // 【派工#001】终局挪车机关最终落位：管道/黑块/换位爬山都可能把 (5,2)/(5,4)/(6,2)/(6,4) 洗走，
+  // 这里只对普通车（type===0）在同一 row 4..6 区间再补一次；不碰链/冰/管/黑块。
+  const finalClimax = JSON.parse(fs.readFileSync(climbedLv, 'utf8'));
+  setupEndgameClimaxV7(finalClimax);
+  fs.writeFileSync(climbedLv, JSON.stringify(finalClimax, null, 1));
 
   return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
 }

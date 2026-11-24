@@ -55,6 +55,11 @@ const ITERS = Number(arg('--iters', '8'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
 const MAX_TRIES = Number(arg('--tries', '3'));
+const MAX_ICE_CAP = Number(arg('--max-ice', '28')); // 【派工#001】中后期封路冰恢复后，冰数字上限从写死 20 提为可配（默认 28）
+
+// 【派工#001】终局挪车机关四定点：第 5 行核心色大车压住第 6 行内壳钥匙车。
+// 管道拆分 / 选冰 / 前排唯一车对调都不得占用或替换这 4 格（爬山后再做一次最终落位兜底）。
+const CLIMAX_SET = new Set(['5,2', '5,4', '6,2', '6,4']);
 
 if (!TARGET || !OUT) {
   console.error('用法: node BuildV6Stagger_v1.js --target <图.txt> --out <输出.json> [--style 0..5] [--iters 18]');
@@ -299,9 +304,12 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
   return cur;
 }
 
-function setupEndgameClimax(game) {
-  // 【2026-11-23 终局“第 5 行核心色车明牌挡住正下方第 6 行内壳钥匙车（挪车让路蓄水清盘）”机关】
-  // 只在 row 5..6 的第 2、4 两列定点布置 2 对上下挡路车（不再把 row 4..6 全量重排洗回温室顺摆！）
+function setupEndgameClimax(game, opts = {}) {
+  // 【2026-11-24 派工#001 补实：原实现只有 corePx/shellPx 统计，是空壳，没有任何车位交换】
+  // 终局“第 5 行核心色大车明牌挡住正下方第 6 行内壳钥匙车（挪车让路蓄水清盘）”机关：
+  //   ① 2 辆 shellPx 内壳色车 -> 第 6 行 (6,2)/(6,4)；
+  //   ② 2 辆 corePx 核心色大车 -> 正上方第 5 行 (5,2)/(5,4)，且与正下方 (6,col) 异色、容量尽可能大；
+  //   ③ 只在 r ∈ [4,6] 内部互换，绝不动 row 0..3 的前中段交错。
   const Bmat = game.blocks, R = Bmat.length, C = Bmat[0].length;
   const corePx = {}, shellPx = {};
   for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
@@ -310,7 +318,53 @@ function setupEndgameClimax(game) {
     if (d >= Math.floor(Math.min(R, C) * 0.38)) corePx[v] = (corePx[v] || 0) + 1;
     else if (d >= Math.floor(Math.min(R, C) * 0.25)) shellPx[v] = (shellPx[v] || 0) + 1;
   }
-  fixSameColorRuns(game.spools);
+  // 先修横向同色长串，再做定点换位，避免 fixSameColorRuns 把刚摆好的 2x2 机关又洗掉
+  if (!opts.skipFix) fixSameColorRuns(game.spools);
+
+  const S = game.spools, SR = S.length, SC = S[0].length;
+  const ROW_LO = 4, ROW_HI = Math.min(6, SR - 1);
+  const plain = (r, c) => !!(S[r] && S[r][c] && S[r][c].type === 0 && S[r][c].id > 0 && S[r][c].count > 0);
+  const swap = (a, b) => { const t = S[a[0]][a[1]]; S[a[0]][a[1]] = S[b[0]][b[1]]; S[b[0]][b[1]] = t; };
+  const report = { shellPlaced: 0, corePlaced: 0 };
+
+  // ① 内壳钥匙车 -> (6,2)/(6,4)
+  for (const tc of [2, 4]) {
+    if (6 > ROW_HI || tc >= SC) continue;
+    if (!plain(6, tc)) continue; // 不碰管道/冰块/黑块/锁链，只换普通车位
+    if (shellPx[S[6][tc].id] > 0) { report.shellPlaced++; continue; }
+    const cands = [];
+    for (let r = ROW_LO; r <= ROW_HI; r++) for (let c = 0; c < SC; c++) {
+      if (!plain(r, c) || CLIMAX_SET.has(`${r},${c}`)) continue;
+      const id = S[r][c].id;
+      if (!(shellPx[id] > 0)) continue;
+      cands.push({ r, c, id, core: corePx[id] || 0, count: S[r][c].count });
+    }
+    // 纯内壳色优先（不把核心色沉到第 6 行）；同色次之；离目标列近、容量小的优先，把大车留给第 5 行核心位
+    cands.sort((a, b) => (a.core - b.core) || (Math.abs(a.c - tc) - Math.abs(b.c - tc)) || (a.count - b.count));
+    if (!cands.length) continue;
+    swap([6, tc], [cands[0].r, cands[0].c]);
+    report.shellPlaced++;
+  }
+
+  // ② 核心色大车 -> (5,2)/(5,4)，必须与正下方 (6,col) 异色
+  for (const tc of [2, 4]) {
+    if (5 > ROW_HI || tc >= SC) continue;
+    if (!plain(5, tc)) continue;
+    const belowId = plain(6, tc) ? S[6][tc].id : -1;
+    if ((corePx[S[5][tc].id] > 0) && S[5][tc].id !== belowId) { report.corePlaced++; continue; }
+    const cands = [];
+    for (let r = ROW_LO; r <= ROW_HI; r++) for (let c = 0; c < SC; c++) {
+      if (!plain(r, c) || CLIMAX_SET.has(`${r},${c}`)) continue;
+      const id = S[r][c].id;
+      if (!(corePx[id] > 0) || id === belowId) continue;
+      cands.push({ r, c, id, count: S[r][c].count });
+    }
+    cands.sort((a, b) => (b.count - a.count) || (Math.abs(a.c - tc) - Math.abs(b.c - tc)));
+    if (!cands.length) continue;
+    swap([5, tc], [cands[0].r, cands[0].c]);
+    report.corePlaced++;
+  }
+  return report;
 }
 
 function buildWithStyle(baseLv, styleIdx, workDir) {
@@ -333,7 +387,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     if ((r <= 2 || planChainSet.has(`${r},${c}`)) && (colorCars[curLv.spools[r][c].id] || 0) <= 1) {
       let swapped = false;
       for (let rr = 5; rr >= 3 && !swapped; rr--) for (let cc = 1; cc < 6 && !swapped; cc++) {
-        if (!planChainSet.has(`${rr},${cc}`) && (colorCars[curLv.spools[rr][cc].id] || 0) >= 4) {
+        if (!planChainSet.has(`${rr},${cc}`) && !CLIMAX_SET.has(`${rr},${cc}`) && (colorCars[curLv.spools[rr][cc].id] || 0) >= 4) {
           const tmp = curLv.spools[r][c]; curLv.spools[r][c] = curLv.spools[rr][cc]; curLv.spools[rr][cc] = tmp;
           swapped = true;
         }
@@ -459,7 +513,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
         let bestRC = null, bestCap = dNow.spools[4][pCol].count;
         for (let rr = 3; rr <= 5; rr++) for (let cc = 0; cc < COLS; cc++) {
           const k = `${rr},${cc}`;
-          if (chainUsed.has(k) || pipeUsed.has(k) || pipeCols.includes(cc) && rr === 4) continue;
+          if (chainUsed.has(k) || pipeUsed.has(k) || CLIMAX_SET.has(k) || pipeCols.includes(cc) && rr === 4) continue;
           const x = dNow.spools[rr][cc];
           if (x && x.type === 0 && (colorCars[x.id] || 0) >= 3 && x.count > bestCap) {
             bestCap = x.count; bestRC = [rr, cc];
@@ -476,7 +530,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       const cands = [];
       for (let rr = 2; rr < ROWS; rr++) for (let cc = 0; cc < COLS; cc++) {
         const k = `${rr},${cc}`;
-        if ((rr === 4 && pipeCols.includes(cc)) || chainUsed.has(k) || pipeUsed.has(k)) continue;
+        if ((rr === 4 && pipeCols.includes(cc)) || chainUsed.has(k) || pipeUsed.has(k) || CLIMAX_SET.has(k)) continue;
         const cell = dNow.spools[rr][cc];
         if (cell && cell.id > 0 && cell.type === 0 && cell.count >= 24 && (colorCars[cell.id] || 0) >= 3) {
           cands.push({ r: rr, c: cc, id: cell.id, count: cell.count });
@@ -514,27 +568,34 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
   }
 
-  // 4. 禁盲盒敲冰 + 障碍总量守恒（加管或加3黑块迷宫均自动减冰：0管0黑->9冰, 1管或3黑->5冰, 2管->2冰, 3管->0冰）
+  // 4. 禁盲盒敲冰 + 障碍总量守恒（加管或加3黑块迷宫均自动减冰：0管0黑->9冰, 1管或黑块->7冰, 2管->1冰, 3管->0冰）
   const lvData = JSON.parse(fs.readFileSync(cur, 'utf8'));
   const actualPipes = pipeColsUsed.length;
+  // 【派工#001】中后期封路冰恢复：哪怕 1 根管道或黑块，也保留 7 块冰（覆盖行 2/3/4/5/6），
+  // 冰数字回到真实到达步数窗口（行4 18/19、行5 23、行6 27/28）；无管无黑块时 9 块。
   const rowNeeds = actualPipes >= 3
     ? []
     : (actualPipes === 2
       ? [[2, 2, 6]]
       : ((actualPipes === 1 || BLACK_MODE >= 2)
-        ? [[2, 2, 6], [3, 2, 9], [5, 1, 16]]
-        : [[2, 2, 6], [3, 2, 9], [4, 2, 13], [5, 1, 16], [6, 2, 19]]));
+        ? [[2, 2, 7], [3, 2, 12], [4, 1, 18], [5, 1, 23], [6, 1, 27]]
+        : [[2, 2, 7], [3, 2, 12], [4, 2, 18], [5, 1, 23], [6, 2, 27]]));
   const colSeq = COL_ORDERS[styleIdx % COL_ORDERS.length];
   const iceCells = [];
+  // 后排（r>=4）深水冰只冻充裕冗余色（>=3 辆），绝不冻只剩 2 辆的紧缺色；也绝不占用终局挪车 4 定点
+  const minCarsForRow = (r) => (r >= 4 ? 3 : 2);
+  const iceOk = (r, c) => {
+    const key = `${r},${c}`;
+    if (chainUsed.has(key) || pipeUsed.has(key) || CLIMAX_SET.has(key)) return false;
+    const cell = lvData.spools[r][c];
+    return !!(cell && cell.id > 0 && cell.type === 0 && (colorCars[cell.id] || 0) >= minCarsForRow(r));
+  };
   for (let idx = 0; idx < rowNeeds.length; idx++) {
     const [r, need, baseParam] = rowNeeds[idx];
     const cols = colSeq[idx];
     const pickedCols = [];
     for (const c of cols) {
-      const key = `${r},${c}`;
-      if (chainUsed.has(key) || pipeUsed.has(key)) continue;
-      const cell = lvData.spools[r][c];
-      if (!cell || cell.id <= 0 || cell.type !== 0 || (colorCars[cell.id] || 0) < 2) continue;
+      if (!iceOk(r, c)) continue;
       if (pickedCols.some(pc => Math.abs(pc - c) === 1) && cols.length > 4) continue;
       pickedCols.push(c);
       const p = baseParam + (pickedCols.length === 2 ? 1 : 0);
@@ -543,12 +604,17 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
     for (const c of cols) {
       if (pickedCols.length >= need) break;
-      const key = `${r},${c}`;
-      if (chainUsed.has(key) || pipeUsed.has(key) || pickedCols.includes(c)) continue;
-      const cell = lvData.spools[r][c];
-      if (!cell || cell.id <= 0 || cell.type !== 0 || (colorCars[cell.id] || 0) < 2) continue;
+      if (!iceOk(r, c) || pickedCols.includes(c)) continue;
       pickedCols.push(c);
       iceCells.push(`${r},${c}:${baseParam}`);
+    }
+    // 兜底：固定列序不够时，在本行其余列补足（仍只冻 >=3 辆的冗余色，保证 7 块冰）
+    if (pickedCols.length < need) {
+      for (let c = 0; c < COLS && pickedCols.length < need; c++) {
+        if (pickedCols.includes(c) || !iceOk(r, c)) continue;
+        pickedCols.push(c);
+        iceCells.push(`${r},${c}:${baseParam}`);
+      }
     }
   }
 
@@ -615,6 +681,9 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const climbedObj = climbFourSide(icedObj, ITERS, 12, SEED, RAND_LO + 0.01, RAND_HI - 0.01);
   fixSameColorRuns(climbedObj.spools);
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
+  // 5.5 【派工#001】终局挪车机关最终落位：管道/黑块/换位爬山都可能把 (5,2)/(5,4)/(6,2)/(6,4) 洗走，
+  //     这里只对普通车（type===0）在同一 row 4..6 区间再补一次；不碰链/冰/管/黑块。
+  setupEndgameClimax(climbedObj, { skipFix: true });
   fs.writeFileSync(climbedLv, JSON.stringify(climbedObj, null, 1));
 
   return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
@@ -679,7 +748,7 @@ function fullVerifyV6(lvFile, workDir, tag) {
   const caps = new Set();
   d.spools.forEach(r => r.forEach(c => { if (c && c.id > 0) caps.add(c.count); }));
 
-  const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 && maxIceParam <= 20 &&
+  const allPass = sol.solvable && hard0 && ratPass && earlyShare < 0.20 && row1Open >= 3 && maxIceParam <= MAX_ICE_CAP &&
     randFair >= FAIR_MIN && humFair >= FAIR_MIN && randCasual >= RAND_LO && randCasual <= RAND_HI && humCasual >= HUM_MIN && humCasual <= HUM_MAX;
 
   return {
@@ -704,8 +773,8 @@ for (let t = 0; t < MAX_TRIES; t++) {
     const ver = fullVerifyV6(built.file, work, `s${st}`);
     const rec = { ...built, verify: ver };
     console.log(`[v6 try style=${st}] allPass=${ver.allPass} | 原随意=${ver.randCasual}/${ver.randFair} 波形=${JSON.stringify(ver.randWave)} | 短视真人=${ver.humCasual}/${ver.humFair} 波形=${JSON.stringify(ver.humWave)} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 冰上限=${ver.maxIceParam} | 二排畅口=${ver.row1Open} | 面额=${ver.distinctCaps}`);
-    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.maxIceParam <= 20 && ver.randFair >= FAIR_MIN && ver.humFair >= FAIR_MIN;
-    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.maxIceParam <= 20 && best.verify.randFair >= FAIR_MIN && best.verify.humFair >= FAIR_MIN) : false;
+    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.maxIceParam <= MAX_ICE_CAP && ver.randFair >= FAIR_MIN && ver.humFair >= FAIR_MIN;
+    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.maxIceParam <= MAX_ICE_CAP && best.verify.randFair >= FAIR_MIN && best.verify.humFair >= FAIR_MIN) : false;
     if (!best || (ver.allPass && !best.verify.allPass) ||
         (!ver.allPass && !best.verify.allPass && hardSafe && !bestSafe) ||
         (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.randCasual - 0.62) < Math.abs(best.verify.randCasual - 0.62))) {
