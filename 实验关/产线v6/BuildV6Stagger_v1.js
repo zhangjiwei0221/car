@@ -66,15 +66,14 @@ if (!TARGET || !OUT) {
   process.exit(2);
 }
 
-// 【2026-11-23 升级：前中深层错落锁链分布（行1-2 破口链 2 对 + 行3-4 中腰链 1-2 对）】
-// 改变此前所有链子扎堆在第 2、3 行（row 1..2）的模板化布局，将 1-2 对链下沉到第 4、5 行（row 3..4）中腰接力，同时保证 row 1 留 >=4 个畅通单车口！
+// 【2026-11-24 派工#002：5 对四层阶梯链（行1-2 两对破口 + 行2-3 一对承接 + 行3-4 一对中腰 + 行4-5 一对后段），row 1 留 4 个畅通单车口】
 const CHAIN_STYLES = [
-  [[[1,0],[2,0]], [[1,4],[1,5]], [[3,2],[3,3]], [[4,5],[4,6]]],
-  [[[1,1],[1,2]], [[2,5],[3,5]], [[3,1],[4,1]], [[4,3],[4,4]]],
-  [[[1,1],[2,1]], [[1,5],[2,5]], [[3,3],[4,3]]],
-  [[[1,0],[1,1]], [[2,4],[2,5]], [[3,1],[3,2]], [[4,4],[4,5]]],
-  [[[1,2],[2,2]], [[1,5],[1,6]], [[3,0],[3,1]], [[4,3],[4,4]]],
-  [[[1,3],[2,3]], [[2,0],[2,1]], [[3,5],[4,5]]]
+  [[[1,0],[2,0]], [[1,4],[1,5]], [[2,2],[3,2]], [[3,6],[4,6]], [[4,1],[4,2]]],
+  [[[1,1],[1,2]], [[1,5],[2,5]], [[2,0],[3,0]], [[3,3],[3,4]], [[4,5],[4,6]]],
+  [[[1,1],[2,1]], [[1,4],[2,4]], [[2,6],[3,6]], [[3,2],[4,2]], [[4,0],[5,0]]],
+  [[[1,0],[1,1]], [[1,5],[2,5]], [[2,3],[2,4]], [[3,1],[4,1]], [[4,5],[5,5]]],
+  [[[1,2],[2,2]], [[1,5],[1,6]], [[2,0],[2,1]], [[3,4],[4,4]], [[4,0],[4,1]]],
+  [[[1,3],[2,3]], [[2,0],[2,1]], [[1,5],[2,5]], [[3,4],[3,5]], [[4,1],[5,1]]]
 ];
 
 const COL_ORDERS = [
@@ -418,7 +417,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       execFileSync('node', [
         path.join(ROOT, '实验关/产线v6/加链/建B_v1.js'),
         cur, `${a[0]},${a[1]}`, `${b[0]},${b[1]}`, nxt,
-        '--gid', String(i + 1), '--max-row', '4'
+        '--gid', String(i + 1), '--max-row', '5'
       ], { stdio: 'ignore' });
       chainUsed.add(a[0] + ',' + a[1]);
       chainUsed.add(b[0] + ',' + b[1]);
@@ -451,7 +450,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
               execFileSync('node', [
                 path.join(ROOT, '实验关/产线v6/加链/建B_v1.js'),
                 cur, `${br},${bc}`, `${nr},${nc}`, nxt,
-                '--gid', String(gid), '--max-row', '4', '--allow-merge'
+                '--gid', String(gid), '--max-row', '5', '--allow-merge'
               ], { stdio: 'ignore' });
             } catch (e) {
               // 建B_v1 若因首格已是锁链拦截，直接安全写入合并格并过 LayoutScore L4 连通校验
@@ -580,7 +579,20 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       : ((actualPipes === 1 || BLACK_MODE >= 2)
         ? [[2, 2, 7], [3, 2, 12], [4, 1, 18], [5, 1, 23], [6, 1, 27]]
         : [[2, 2, 7], [3, 2, 12], [4, 2, 18], [5, 1, 23], [6, 2, 27]]));
-  const colSeq = COL_ORDERS[styleIdx % COL_ORDERS.length];
+  // 【派工#002】靶向断供冰：预计算每色在四边外圈 3 层（深度<=2）的像素占比。
+  // easyShare 越大 = 越容易在浅层/外圈被顺手消掉，是玩家的“救援顺手色”；
+  // 选冰时优先冻这些色（断供），把内芯深色大债车裸露在冰外让玩家踩。
+  const easyShare = {};
+  {
+    const B = lvData.blocks, BR = B.length, BC = B[0].length;
+    const outerPx = {}, totalPx = {};
+    for (let r = 0; r < BR; r++) for (let c = 0; c < BC; c++) {
+      const v = B[r][c]; if (v <= 0) continue;
+      totalPx[v] = (totalPx[v] || 0) + 1;
+      if (Math.min(r, BR - 1 - r, c, BC - 1 - c) <= 2) outerPx[v] = (outerPx[v] || 0) + 1;
+    }
+    for (const id of Object.keys(totalPx)) easyShare[id] = (outerPx[id] || 0) / totalPx[id];
+  }
   const iceCells = [];
   // 后排（r>=4）深水冰只冻充裕冗余色（>=3 辆），绝不冻只剩 2 辆的紧缺色；也绝不占用终局挪车 4 定点
   const minCarsForRow = (r) => (r >= 4 ? 3 : 2);
@@ -592,29 +604,27 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   };
   for (let idx = 0; idx < rowNeeds.length; idx++) {
     const [r, need, baseParam] = rowNeeds[idx];
-    const cols = colSeq[idx];
-    const pickedCols = [];
-    for (const c of cols) {
-      if (!iceOk(r, c)) continue;
-      if (pickedCols.some(pc => Math.abs(pc - c) === 1) && cols.length > 4) continue;
-      pickedCols.push(c);
-      const p = baseParam + (pickedCols.length === 2 ? 1 : 0);
-      iceCells.push(`${r},${c}:${p}`);
-      if (pickedCols.length >= need) break;
+    const availCols = [];
+    for (let c = 0; c < COLS; c++) if (iceOk(r, c)) availCols.push(c);
+    // 救援价值从高到低：外圈顺手色优先；同价值时优先容量小的救援车，把内芯大债车露给玩家
+    availCols.sort((c1, c2) => {
+      const s1 = easyShare[lvData.spools[r][c1].id] || 0;
+      const s2 = easyShare[lvData.spools[r][c2].id] || 0;
+      return (s2 - s1) || (lvData.spools[r][c1].count - lvData.spools[r][c2].count);
+    });
+    const picked = [];
+    for (const c of availCols) {
+      if (picked.length >= need) break;
+      if (need === 2 && picked.length === 1 && Math.abs(picked[0] - c) === 1) continue;
+      picked.push(c);
     }
-    for (const c of cols) {
-      if (pickedCols.length >= need) break;
-      if (!iceOk(r, c) || pickedCols.includes(c)) continue;
-      pickedCols.push(c);
-      iceCells.push(`${r},${c}:${baseParam}`);
+    // 无不相邻列时允许相邻，补足 need
+    for (const c of availCols) {
+      if (picked.length >= need) break;
+      if (!picked.includes(c)) picked.push(c);
     }
-    // 兜底：固定列序不够时，在本行其余列补足（仍只冻 >=3 辆的冗余色，保证 7 块冰）
-    if (pickedCols.length < need) {
-      for (let c = 0; c < COLS && pickedCols.length < need; c++) {
-        if (pickedCols.includes(c) || !iceOk(r, c)) continue;
-        pickedCols.push(c);
-        iceCells.push(`${r},${c}:${baseParam}`);
-      }
+    for (let i = 0; i < picked.length; i++) {
+      iceCells.push(`${r},${picked[i]}:${baseParam + (i === 1 ? 1 : 0)}`);
     }
   }
 
