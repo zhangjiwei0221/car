@@ -257,10 +257,10 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
     const earlyShare = deaths ? early / deaths : 0;
     let inv = 0;
     for (let i = 1; i < PS.length; i++) if (rates[PS[i]] < rates[PS[i - 1]]) inv++;
-    // 【2026-11-24 惰性双目标联合爬山】只在主尺 casual 接近目标带 [lo-0.10, hi+0.10] 且 fair>=0.85 时才测慢4倍的短视真人，兼顾速度与双尺命中！
-    const humMid = (HUM_MIN + Math.min(0.75, HUM_MAX)) / 2;
-    let humCasual = humMid, humFair = 1.0, humPen = 0;
-    if (casual >= lo - 0.10 && casual <= hi + 0.10 && fair >= 0.85 && earlyShare <= 0.18) {
+    // 【2026-11-24 #004 惰性双目标+humMid联合爬山】只在主尺 casual 接近目标带 [lo-0.12, hi+0.12] 且 fair>=0.85 时才测短视真人
+    const humTarget = (HUM_MIN + Math.min(0.75, HUM_MAX)) / 2;
+    let humCasual = humTarget, humFair = 1.0, humMid = (HUM_MID_MIN + HUM_MID_MAX) / 2, humPen = 0;
+    if (casual >= lo - 0.12 && casual <= hi + 0.12 && fair >= 0.85 && earlyShare <= 0.18) {
       const hGames = Math.min(games, 8);
       const rh = lcg(seed), rhF = lcg(seed);
       let hw = 0, hfw = 0;
@@ -270,14 +270,36 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
       }
       humCasual = hw / hGames;
       humFair = hfw / hGames;
+      let midPen = 0;
+      if (HUM_MID_MAX < 1 || HUM_MID_MIN > 0) {
+        const rhM = lcg(seed);
+        let hmw = 0;
+        for (let i = 0; i < hGames; i++) if (playOneFourSide(lv, 0.5, rhM, true).won) hmw++;
+        humMid = hmw / hGames;
+        midPen = 0.75 * (Math.max(0, humMid - HUM_MID_MAX) + Math.max(0, HUM_MID_MIN - humMid));
+      }
       const humOver = Math.max(0, humCasual - HUM_MAX);
       const humUnder = Math.max(0, HUM_MIN - humCasual);
-      humPen = 0.85 * (humOver + humUnder) + 0.6 * Math.max(0, 0.88 - humFair);
+      humPen = 0.85 * (humOver + humUnder) + midPen + 0.6 * Math.max(0, 0.88 - humFair);
     }
     const sc = Math.abs(casual - mid) + humPen + 2.5 * Math.max(0, earlyShare - 0.15) + 0.6 * Math.max(0, 0.90 - fair) + 0.02 * inv;
-    return { casual, fair, humCasual, humFair, earlyShare, inv, sc };
+    return { casual, fair, humCasual, humMid, humFair, earlyShare, inv, sc };
   }
   let bestEv = evalG(cur) || { sc: 1e9 };
+  // 【2026-11-24 #004】四边洋葱圈颜色深度/外圈暴露像素，供定向供需错位抽样
+  const colorDepth = {}, ringPx = {};
+  {
+    const Bmat = cur.blocks, BR = Bmat.length, BC = Bmat[0].length;
+    const sumD = {}, cntD = {};
+    for (let r = 0; r < BR; r++) for (let c = 0; c < BC; c++) {
+      const v = Bmat[r][c]; if (v <= 0) continue;
+      const d = Math.min(r, BR - 1 - r, c, BC - 1 - c);
+      sumD[v] = (sumD[v] || 0) + d;
+      cntD[v] = (cntD[v] || 0) + 1;
+      if (d === 0) ringPx[v] = (ringPx[v] || 0) + 1;
+    }
+    for (const k of Object.keys(cntD)) colorDepth[k] = sumD[k] / cntD[k];
+  }
   // 【2026-11-23 修复】必须允许「前排(0..2) ↔ 深层(3..6)」跨行对调（把外圈色压到后排、把深层色提到前排），才能在四边模式下把原随意档从 1.00 压进 .55-.68！
   for (let it = 0; it < iters; it++) {
     const front = [], deep = [];
@@ -287,8 +309,21 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
       if (r >= 3) deep.push([r, c]);
     }
     if (!front.length || !deep.length) break;
-    const [r1, c1] = front[Math.floor(rnd() * front.length)];
-    const [r2, c2] = deep[Math.floor(rnd() * deep.length)];
+    const needHarder = !bestEv || (bestEv.casual > hi) || (bestEv.casual >= lo && (bestEv.humCasual > HUM_MAX || (HUM_MID_MAX < 1 && (bestEv.humMid ?? 1) > HUM_MID_MAX)));
+    let pickF = null, pickD = null;
+    for (let tryPair = 0; tryPair < 25; tryPair++) {
+      const ca = front[Math.floor(rnd() * front.length)];
+      const cb = deep[Math.floor(rnd() * deep.length)];
+      const cellA = cur.spools[ca[0]][ca[1]], cellB = cur.spools[cb[0]][cb[1]];
+      if (cellA.id === cellB.id) continue;
+      const dA = colorDepth[cellA.id] || 0, dB = colorDepth[cellB.id] || 0;
+      // 四边模式下 row 0 若塞入完全不贴外圈(ringPx===0)且深度过深(dB > 6)的死色，易引发早死，予以跳过
+      if (ca[0] === 0 && needHarder && !(ringPx[cellB.id] > 0) && dB > 6) continue;
+      if (needHarder && (dB > dA + 0.6 || (dB >= dA - 0.5 && cellB.count > cellA.count))) { pickF = ca; pickD = cb; break; }
+      if (!needHarder && (dA > dB + 0.6 || cellA.count > cellB.count)) { pickF = ca; pickD = cb; break; }
+    }
+    const [r1, c1] = pickF || front[Math.floor(rnd() * front.length)];
+    const [r2, c2] = pickD || deep[Math.floor(rnd() * deep.length)];
     if (cur.spools[r1][c1].id === cur.spools[r2][c2].id && cur.spools[r1][c1].count === cur.spools[r2][c2].count) continue;
     const cand = JSON.parse(JSON.stringify(cur));
     const tmp = cand.spools[r1][c1]; cand.spools[r1][c1] = cand.spools[r2][c2]; cand.spools[r2][c2] = tmp;
@@ -297,9 +332,11 @@ function climbFourSide(gameIn, iters, games, seed, lo, hi) {
     const earlyOk = ev && (ev.earlyShare <= 0.15 || ev.earlyShare <= (bestEv.earlyShare || 1));
     const casBoundOk = ev && (ev.casual <= Math.max(bestEv.casual ?? 1, hi) && ev.casual >= Math.min(bestEv.casual ?? 0, lo));
     const humBoundOk = ev && (ev.humCasual <= Math.max(bestEv.humCasual ?? 1, HUM_MAX) && ev.humCasual >= Math.min(bestEv.humCasual ?? 0, HUM_MIN));
-    if (ev && fairOk && earlyOk && casBoundOk && humBoundOk && ev.sc <= bestEv.sc) {
+    const midBoundOk = (HUM_MID_MAX >= 1 && HUM_MID_MIN <= 0) || (ev && (ev.humMid ?? 1) <= Math.max(bestEv.humMid ?? 1, HUM_MID_MAX) && (ev.humMid ?? 0) >= Math.min(bestEv.humMid ?? 0, HUM_MID_MIN));
+    if (ev && fairOk && earlyOk && casBoundOk && humBoundOk && midBoundOk && ev.sc <= bestEv.sc) {
       cur = cand; bestEv = ev;
-      if (ev.casual >= lo && ev.casual <= hi && ev.humCasual >= HUM_MIN && ev.humCasual <= HUM_MAX && ev.fair >= 0.90 && (ev.humFair ?? 1) >= 0.88 && ev.earlyShare < 0.15) break;
+      const midHit = (HUM_MID_MAX >= 1 && HUM_MID_MIN <= 0) || ((ev.humMid ?? 1) >= HUM_MID_MIN && (ev.humMid ?? 0) <= HUM_MID_MAX);
+      if (ev.casual >= lo && ev.casual <= hi && ev.humCasual >= HUM_MIN && ev.humCasual <= HUM_MAX && midHit && ev.fair >= 0.90 && (ev.humFair ?? 1) >= 0.88 && ev.earlyShare < 0.15) break;
     }
   }
   return cur;
