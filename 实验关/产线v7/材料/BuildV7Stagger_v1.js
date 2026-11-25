@@ -20,7 +20,8 @@
  *      ⑦ 排版与逐色守恒 (LayoutScore_v1)：hard=0
  *
  * 用法：
- *   node BuildV7Stagger_v1.js --target <34_修正/X.txt> --out <输出.json> [--style 0..5] [--with-pipe] [--report <证书.json>]
+ *   node BuildV7Stagger_v1.js --target <34_修正/X.txt> --out <输出.json> [--style 0..5] [--with-pipe]
+ *        [--pipe-mode auto|0|1|2|3] [--pipe-mouth auto|big|small|dumbbell] [--report <证书.json>]
  */
 const fs = require('fs');
 const path = require('path');
@@ -37,25 +38,52 @@ const OUT = arg('--out', null);
 const INIT_STYLE = Number(arg('--style', '0'));
 const WITH_PIPE = has('--with-pipe');
 const PIPE_MODE = arg('--pipe-mode', WITH_PIPE ? '1' : 'auto'); // 'auto' (按大车数与周期自动选0/1/2/3管) | '0' | '1' | '2' | '3'
-const PIPE_MOUTH = arg('--pipe-mouth', 'auto'); // 'auto' (自动找平) | 'big' | 'small'
+const PIPE_MOUTH = arg('--pipe-mouth', 'auto'); // 'auto' (自动找平) | 'big' | 'small' | 'dumbbell' (哑铃 [大,小,小,次大])
 const PIPE_REPLACE_ICE = !has('--keep-9-ice'); // 有管道时默认开启「管道替深水冰」，传 --keep-9-ice 则保留 9 冰
 const LEVEL_IDX = Number(arg('--level-idx', '0'));
 const WITH_CHAIN3 = has('--with-3chain'); // 启用「2小1大」安全三锁链
 const BLACK_MODE = Number(arg('--black-mode', '0')); // 0 | 2 (腰部对称双黑块) | 3 (品字形三黑块迷宫+自动替掉4块深冰)
 const Q_COUNT = Number(arg('--q-count', '0')); // 0 | 2..4 (在第2-3行放问号车遮挡远期视野，绝不放第5-6行终局位)
-const ROWS = Number(arg('--rows', '7'));
-const COLS = Number(arg('--cols', '7'));
-const RAND_LO = Number(arg('--rand-lo', '0.55'));   // 主尺下限（B 档 = .45）
-const RAND_HI = Number(arg('--rand-hi', '0.68'));   // 主尺上限（B 档 = .58）
-const HUM_MIN = Number(arg('--hum-min', '0.32'));   // 短视真人下限（防 <.30 坑真人死局）
-const HUM_MAX = Number(arg('--hum-max', '1.00'));   // 短视真人上限（B 档 = .75）
-const HUM_MID_MIN = Number(arg('--hum-mid-min', '0'));  // 【派工#003 A3】短视真人 p=.5 下限
-const HUM_MID_MAX = Number(arg('--hum-mid-max', '1'));  // 【派工#003 A3】短视真人 p=.5 上限
-const FAIR_MIN = Number(arg('--fair-min', '0.90')); // 认真档下限（B 档 = .85）
+const SHELL_SINK = !has('--no-shell-sink'); // 【派工#006 消融开关】默认开启隔板色沉底
+// 【派工#010】棋盘尺寸自适应：未显式传 --rows/--cols 时，W>=39 的大图自动 7×8（56 格，对齐分组 1 原版）
+function detectInputWidth(file) {
+  try {
+    const ls = fs.readFileSync(file, 'utf8').trim().split(/\r?\n/);
+    const body = ls[0].startsWith('像素') ? ls.slice(1) : ls;
+    for (const l of body) if (l.trim()) return l.trim().split(/\s+/).length;
+  } catch (e) {}
+  return 35;
+}
+const INPUT_W = detectInputWidth(TARGET);
+const ROWS = has('--rows') ? Number(arg('--rows')) : 7;
+const COLS = has('--cols') ? Number(arg('--cols')) : (INPUT_W >= 39 ? 8 : 7);
+// 【派工#009】--tier 档位预设（显式参数优先，100% 向下兼容；不传时沿用旧默认）
+const TIER = String(arg('--tier', 'auto') || 'auto').toUpperCase();
+const TIER_PRESETS = {
+  A: { randLo: 0.65, randHi: 0.85, humMin: 0.58, humMax: 0.88, humMidMin: 0.72, humMidMax: 0.95, fairMin: 0.92 },
+  B: { randLo: 0.48, randHi: 0.75, humMin: 0.40, humMax: 0.68, humMidMin: 0.60, humMidMax: 0.84, fairMin: 0.88 },
+  C: { randLo: 0.30, randHi: 0.60, humMin: 0.22, humMax: 0.50, humMidMin: 0.45, humMidMax: 0.72, fairMin: 0.85 }
+};
+const TP = TIER_PRESETS[TIER] || null;
+const BC_TIER = (TIER === 'B' || TIER === 'C');
+const AUTO_GEAR = !has('--no-auto-gear');
+const AUTO_BAND = !has('--no-auto-band');
+const RAND_LO = has('--rand-lo') ? Number(arg('--rand-lo')) : (TP ? TP.randLo : 0.55);
+const RAND_HI = has('--rand-hi') ? Number(arg('--rand-hi')) : (TP ? TP.randHi : 0.68);
+const HUM_MIN = has('--hum-min') ? Number(arg('--hum-min')) : (TP ? TP.humMin : 0.32);
+const HUM_MAX = has('--hum-max') ? Number(arg('--hum-max')) : (TP ? TP.humMax : 1.00);
+const HUM_MID_MIN = has('--hum-mid-min') ? Number(arg('--hum-mid-min')) : (TP ? TP.humMidMin : 0);
+const HUM_MID_MAX = has('--hum-mid-max') ? Number(arg('--hum-mid-max')) : (TP ? TP.humMidMax : 1);
+const FAIR_MIN = has('--fair-min') ? Number(arg('--fair-min')) : (TP ? TP.fairMin : 0.90);
 const ITERS = Number(arg('--iters', '25'));
 const SEED = Number(arg('--seed', '977'));
 const REPORT = arg('--report', null);
 const MAX_TRIES = Number(arg('--tries', '4'));
+// 【派工#009】CLI 锁定标记：未显式传的旋钮允许 gear 自适应覆盖
+const LOCK_PIPE_MODE = has('--pipe-mode') || WITH_PIPE;
+const LOCK_PIPE_MOUTH = has('--pipe-mouth');
+const LOCK_BLACK = has('--black-mode');
+const LOCK_Q = has('--q-count');
 
 // 【派工#001】终局挪车机关四定点：第 5 行核心色大车压住第 6 行内壳钥匙车。
 // 管道拆分 / 选冰 / 前排唯一车对调都不得占用或替换这 4 格（爬山后再做一次最终落位兜底）。
@@ -117,6 +145,33 @@ function setupEndgameClimaxV7(game, opts = {}) {
     swap([5, tc], [cands[0].r, cands[0].c]);
     report.corePlaced++;
   }
+
+  // ③ 【派工#006】隔板色沉底：把跑到 row 1..3 的隔板色(shell)普通车，与 row 4..6 的顶盖色(core)普通车对调，
+  //    最多 2 辆、前排至少保留 1 辆（防棘轮死锁），让隔板色主力被扣在最后两排，
+  //    玩家不挖穿到终局就剥不开顶盖色 → 70% 进度后仍有高潮。
+  const shellIds = new Set();
+  for (const tc of [2, 4]) { if (6 <= ROW_HI && tc < SC && plain(6, tc)) shellIds.add(S[6][tc].id); }
+  let sunk = 0;
+  if (SHELL_SINK && shellIds.size) {
+    const front = [];
+    for (let r = 1; r <= 3; r++) for (let c = 0; c < SC; c++) {
+      if (plain(r, c) && shellIds.has(S[r][c].id)) front.push([r, c]);
+    }
+    for (const [fr, fc] of front) {
+      if (sunk >= (opts.maxSink ?? 2) || front.length - sunk <= 1) break;
+      let best = null;
+      for (let rr = 6; rr >= 4; rr--) for (let cc = 0; cc < SC; cc++) {
+        if (!plain(rr, cc) || CLIMAX_SET.has(`${rr},${cc}`)) continue;
+        const id = S[rr][cc].id;
+        if (shellIds.has(id) || !(corePx[id] > 0)) continue;
+        if (!best || S[rr][cc].count > best.count) best = { r: rr, c: cc, count: S[rr][cc].count };
+      }
+      if (!best) continue;
+      swap([fr, fc], [best.r, best.c]);
+      sunk++;
+    }
+  }
+  report.shellSunk = sunk;
   return report;
 }
 
@@ -144,10 +199,20 @@ const COL_ORDERS = [
   [[2,4,0,5,3,1,6], [1,3,5,2,4,0,6], [1,4,0,5,2,3,6], [2,5,1,4,3,0,6], [1,4,2,5,0,3,6]]
 ];
 
-function buildWithStyle(baseLv, styleIdx, workDir) {
+function buildWithStyle(baseLv, styleIdx, workDir, gearOpts = {}) {
+  // 【派工#009】动态配方：未显式锁定的旋钮由 gear 覆盖
+  const gPipeMode = gearOpts.pipeMode !== undefined ? gearOpts.pipeMode : PIPE_MODE;
+  const gPipeMouth = gearOpts.pipeMouth !== undefined ? gearOpts.pipeMouth : PIPE_MOUTH;
+  const gBlackMode = gearOpts.blackMode !== undefined ? gearOpts.blackMode : BLACK_MODE;
+  const gQCount = gearOpts.qCount !== undefined ? gearOpts.qCount : Q_COUNT;
+  const gMaxSink = gearOpts.maxSink !== undefined ? gearOpts.maxSink : 2;
+  const gIceScale = gearOpts.iceScale !== undefined ? gearOpts.iceScale : 1.0;
+  const gWithChain3 = gearOpts.withChain3 !== undefined ? gearOpts.withChain3 : WITH_CHAIN3;
+  const gChainPairs = gearOpts.chainPairs !== undefined ? gearOpts.chainPairs : 5;
+  const gIters = gearOpts.iters !== undefined ? gearOpts.iters : ITERS;
   const lv0 = JSON.parse(fs.readFileSync(baseLv, 'utf8'));
   const colorCars = {};
-  for (let r = 0; r < 7; r++) for (let c = 0; c < 7; c++) {
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const id = lv0.spools[r][c].id;
     if (id > 0) colorCars[id] = (colorCars[id] || 0) + 1;
   }
@@ -157,8 +222,8 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   // 从源头杜绝：① 唯一车被绑；② 只有2辆车的颜色被两条链全部锁光导致 buffer=4 时触发棘轮陷阱(ChainRatchet trap)！
   let curLv = JSON.parse(JSON.stringify(lv0));
   // 【派工#001】开头先摆终局挪车机关（爬山后再做一次最终落位兜底）
-  setupEndgameClimaxV7(curLv);
-  const pairs = CHAIN_STYLES[styleIdx % CHAIN_STYLES.length];
+  const climax = setupEndgameClimaxV7(curLv, { maxSink: gMaxSink });
+  const pairs = CHAIN_STYLES[styleIdx % CHAIN_STYLES.length].slice(0, Math.max(2, Math.min(5, gChainPairs)));
   const planChainSet = new Set();
   pairs.forEach(([a, b]) => { planChainSet.add(`${a[0]},${a[1]}`); planChainSet.add(`${b[0]},${b[1]}`); });
   const chainColorUsed = {};
@@ -171,7 +236,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       // 锁链铁律：① 链内两格必须异色(id !== peerId)；② 同色最多进2个链格且链外至少留2辆普通车
       if (id === peerId || used >= 2 || (colorCars[id] || 0) - used <= 2) {
         let swapped = false;
-        for (let rr = 5; rr >= 2 && !swapped; rr--) for (let cc = 0; cc < 7 && !swapped; cc++) {
+        for (let rr = 5; rr >= 2 && !swapped; rr--) for (let cc = 0; cc < COLS && !swapped; cc++) {
           if (planChainSet.has(`${rr},${cc}`) || CLIMAX_SET.has(`${rr},${cc}`)) continue;
           const id2 = curLv.spools[rr][cc].id;
           const u2 = chainColorUsed[id2] || 0;
@@ -186,11 +251,11 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     }
   }
   for (let r = 0; r <= 1; r++) {
-    for (let c = 0; c < 7; c++) {
+    for (let c = 0; c < COLS; c++) {
       const id = curLv.spools[r][c].id;
       if (!planChainSet.has(`${r},${c}`) && (colorCars[id] || 0) <= 1) {
         let swapped = false;
-        for (let rr = 6; rr >= 3 && !swapped; rr--) for (let cc = 0; cc < 7 && !swapped; cc++) {
+        for (let rr = 6; rr >= 3 && !swapped; rr--) for (let cc = 0; cc < COLS && !swapped; cc++) {
           const id2 = curLv.spools[rr][cc].id;
           if (!planChainSet.has(`${rr},${cc}`) && !CLIMAX_SET.has(`${rr},${cc}`) && (colorCars[id2] || 0) >= 3) {
             const tmp = curLv.spools[r][c]; curLv.spools[r][c] = curLv.spools[rr][cc]; curLv.spools[rr][cc] = tmp;
@@ -229,7 +294,7 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
 
   // 2.5 可选「2小1大」安全三锁链 (--with-3chain，日志 §1188/§1190)：
   //     严禁 3 大车同绑（实测会让短视真人从 .567 崩到 .233）；只准把 1 辆紧邻的冗余小车(<=16px)并入已有二连链，构成 [小+大+小] 三连链！
-  if (WITH_CHAIN3 && builtPairs.length > 0) {
+  if (gWithChain3 && builtPairs.length > 0) {
     const d3c = JSON.parse(fs.readFileSync(cur, 'utf8'));
     let merged3 = false;
     for (let gi = 0; gi < builtPairs.length && !merged3; gi++) {
@@ -268,17 +333,18 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     if (x && x.id > 0 && x.type === 0 && x.count >= 30 && (colorCars[x.id] || 0) >= 3) giantCnt++;
   }
   let targetPipes = 0;
-  if (PIPE_MODE === 'auto') {
+  if (gPipeMode === 'auto') {
     if (LEVEL_IDX > 0 && LEVEL_IDX % 9 === 0) targetPipes = 3;
     else if (giantCnt >= 5 || (LEVEL_IDX > 0 && LEVEL_IDX % 5 === 0)) targetPipes = 2;
     else if (giantCnt >= 3 || (LEVEL_IDX > 0 && LEVEL_IDX % 3 === 0)) targetPipes = 1;
     else targetPipes = 0;
   } else {
-    targetPipes = Math.max(0, Math.min(3, Number(PIPE_MODE) || 0));
+    targetPipes = Math.max(0, Math.min(3, Number(gPipeMode) || 0));
   }
 
   const pipeUsed = new Set();
   const pipeColsUsed = [];
+  const pipeQueues = [];
   if (targetPipes > 0) {
     const pipeCols = targetPipes === 1
       ? [(2 + styleIdx) % 5 + 1]
@@ -294,9 +360,9 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
       const pipeCell = `4,${pCol}`;
       if (chainUsed.has(pipeCell) || pipeUsed.has(pipeCell)) continue;
       const dNow = JSON.parse(fs.readFileSync(cur, 'utf8'));
-      const mouthMode = PIPE_MOUTH === 'auto'
+      const mouthMode = gPipeMouth === 'auto'
         ? (targetPipes === 3 && pi === 1 ? 'small' : 'big')
-        : PIPE_MOUTH;
+        : gPipeMouth;
       if (mouthMode === 'big') {
         let bestRC = null, bestCap = dNow.spools[4][pCol].count;
         for (let rr = 3; rr <= 5; rr++) for (let cc = 0; cc < COLS; cc++) {
@@ -347,6 +413,48 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
             pObj.spools[4][pCol].param = [...pObj.spools[4][pCol].param].reverse();
             fs.writeFileSync(nxt, JSON.stringify(pObj, null, 1));
           }
+          // 【派工#007 真·哑铃管】[大, 小, 小, 大]：先按容量排成 [最大,最小,最小,次大]；
+          // 管口/管底任一端 <门槛（口 24px / 底 22px）时，就从盘面 row 3..6 找一辆 >=24px 的现成整车，
+          // 与该端 {id,count} 整体互换 —— 管道变成真哑铃，且全盘逐色总像素 100% 守恒。
+          if (mouthMode === 'dumbbell') {
+            const pObj = JSON.parse(fs.readFileSync(nxt, 'utf8'));
+            const q = pObj.spools[4][pCol].param;
+            if (Array.isArray(q) && q.length === 4) {
+              const byCap = q.slice().sort((a, b) => a.count - b.count);
+              const newQ = [byCap[3], byCap[0], byCap[1], byCap[2]];
+              const pickBoardCar = (minCap, excludeId) => {
+                let bestRC = null, bestCap = minCap - 1;
+                for (let rr = 3; rr < ROWS; rr++) for (let cc = 0; cc < COLS; cc++) {
+                  const k = `${rr},${cc}`;
+                  if ((rr === 4 && cc === pCol) || chainUsed.has(k) || pipeUsed.has(k) || CLIMAX_SET.has(k)) continue;
+                  const cell = pObj.spools[rr][cc];
+                  if (cell && cell.id > 0 && cell.type === 0 && cell.id !== excludeId && cell.count > bestCap) {
+                    bestCap = cell.count; bestRC = [rr, cc];
+                  }
+                }
+                return bestRC;
+              };
+              const swapInto = (slot, rc) => {
+                const boardCell = pObj.spools[rc[0]][rc[1]];
+                const tmp = { id: newQ[slot].id, count: newQ[slot].count };
+                newQ[slot] = { id: boardCell.id, count: boardCell.count };
+                boardCell.id = tmp.id; boardCell.count = tmp.count;
+              };
+              // 管口：拆半管的 max 常常只有 14–16px，也要换成 >=24px 整车，否则哑铃只剩一头大。
+              if (newQ[0].count < 24) {
+                const rc = pickBoardCar(24, newQ[3].id);
+                if (rc) swapInto(0, rc);
+              }
+              // 管底：换一辆 >=24px 整车，保证 70% 后从管底吐出的大车顶后段波峰。
+              if (newQ[3].count < 22) {
+                const rc = pickBoardCar(24, newQ[0].id);
+                if (rc) swapInto(3, rc);
+              }
+              pObj.spools[4][pCol].param = newQ;
+              fs.writeFileSync(nxt, JSON.stringify(pObj, null, 1));
+            }
+          }
+          try { pipeQueues.push({ r: 4, c: pCol, mode: mouthMode, param: JSON.parse(fs.readFileSync(nxt, 'utf8')).spools[4][pCol].param.map(q => q.count) }); } catch (e) {}
           pipeUsed.add(pipeCell);
           pipeColsUsed.push(pCol);
           splits.forEach(s => pipeUsed.add(s));
@@ -358,11 +466,11 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
 
   // 【派工#003 A2】真黑块先于选冰：黑块落位/并车后立即重算盘面颜色计数，冰再按黑后计数选色
   const blackCoords = [];
-  if (BLACK_MODE >= 2) {
+  if (gBlackMode >= 2) {
     const preBlackObj = JSON.parse(fs.readFileSync(cur, 'utf8'));
     const preBoardCars = {};
     for (const row of preBlackObj.spools) for (const x of row) if (x && x.id > 0) preBoardCars[x.id] = (preBoardCars[x.id] || 0) + 1;
-    const wantBlacks = BLACK_MODE >= 3 ? [[1, 2], [3, 1], [3, 4]] : [[2, 2], [2, 5]];
+    const wantBlacks = gBlackMode >= 3 ? [[1, 2], [3, 1], [3, 4]] : [[2, 2], [2, 5]];
     for (const [br, bc] of wantBlacks) {
       let pickedRC = null;
       for (const dc of [0, 1, -1, 2, -2]) {
@@ -396,28 +504,34 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   const boardColorCars = {};
   for (const row of lvData.spools) for (const x of row) if (x && x.id > 0) boardColorCars[x.id] = (boardColorCars[x.id] || 0) + 1;
   const actualPipes = pipeColsUsed.length;
-  // 【派工#005 折中定型】中后期封路冰天花板 p<=32/33（行2 10/11、行3 15/16、行4 21、行5 27、行6 32）
-  const rowNeeds = (!PIPE_REPLACE_ICE || (actualPipes === 0 && BLACK_MODE < 2))
+  // 【派工#009】解耦管道与冰：按棋盘真实槽位预算给阶梯冰，不再搞“3管0冰 / 2管只留2冰”一刀切。
+  const iceScale = gearOpts.iceScale || 1.0;
+  const scaleIce = (p) => Math.max(6, Math.min(33, Math.round(p * iceScale)));
+  const fullLadder = (!PIPE_REPLACE_ICE || (actualPipes === 0 && gBlackMode < 2))
     ? [[2, 2, 10], [3, 2, 15], [4, 2, 21], [5, 1, 27], [6, 2, 32]]
     : (actualPipes >= 3
-      ? []
+      ? [[2, 2, 10], [3, 1, 15], [4, 1, 21]]
       : (actualPipes === 2
-        ? [[2, 2, 10]]
+        ? [[2, 2, 10], [3, 2, 15], [4, 1, 21], [5, 1, 27]]
         : [[2, 2, 10], [3, 2, 15], [4, 1, 21], [5, 1, 27], [6, 1, 32]]));
-  // 【派工#002】靶向断供冰：预计算每色在底边下半场（r >= floor(R*0.55)）的像素占比。
-  // easyShare 越大 = 越早从三面墙底边暴露、是玩家的“救援顺手色”；
-  // 选冰时优先冻这些色（断供），把顶层深色债车裸露在冰外让玩家踩。
-  const easyShare = {};
+  const rowNeeds = fullLadder.map(([r, n, p]) => [r, n, scaleIce(p)]);
+  // 【派工#009】图层深度靶向冰：分「底边前 30% 开门色」与「图中腰 30~70% 承接色」两段权重。
+  const earlyBottomShare = {}, midWaistShare = {};
   {
     const B = lvData.blocks, BR = B.length, BC = B[0].length;
-    const bottomPx = {}, totalPx = {};
-    const bottomStart = Math.floor(BR * 0.55);
+    const totalPx = {}, earlyPx = {}, midPx = {};
+    const earlyStart = Math.floor(BR * 0.70);
+    const midStart = Math.floor(BR * 0.30), midEnd = Math.floor(BR * 0.70);
     for (let r = 0; r < BR; r++) for (let c = 0; c < BC; c++) {
       const v = B[r][c]; if (v <= 0) continue;
       totalPx[v] = (totalPx[v] || 0) + 1;
-      if (r >= bottomStart) bottomPx[v] = (bottomPx[v] || 0) + 1;
+      if (r >= earlyStart) earlyPx[v] = (earlyPx[v] || 0) + 1;
+      if (r >= midStart && r < midEnd) midPx[v] = (midPx[v] || 0) + 1;
     }
-    for (const id of Object.keys(totalPx)) easyShare[id] = (bottomPx[id] || 0) / totalPx[id];
+    for (const id of Object.keys(totalPx)) {
+      earlyBottomShare[id] = (earlyPx[id] || 0) / totalPx[id];
+      midWaistShare[id] = (midPx[id] || 0) / totalPx[id];
+    }
   }
   const iceCells = [];
   // 后排（r>=4）深水冰只冻充裕冗余色（>=3 辆），绝不冻只剩 2 辆的紧缺色；也绝不占用终局挪车 4 定点
@@ -432,10 +546,13 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
     const [r, need, baseParam] = rowNeeds[idx];
     const availCols = [];
     for (let c = 0; c < COLS; c++) if (iceOk(r, c)) availCols.push(c);
-    // 救援价值从高到低：底边顺手色优先；同价值时优先容量小的救援车，把顶层大债车露给玩家
+    // 【派工#009】分层靶向：前排浅冰冻「底边开门顺手色」，后排深冰冻「中腰主力承接色」
+    const targetScore = (id) => (r <= 3
+      ? (earlyBottomShare[id] || 0)
+      : (midWaistShare[id] || 0) * 1.2 + (earlyBottomShare[id] || 0) * 0.5);
     availCols.sort((c1, c2) => {
-      const s1 = easyShare[lvData.spools[r][c1].id] || 0;
-      const s2 = easyShare[lvData.spools[r][c2].id] || 0;
+      const s1 = targetScore(lvData.spools[r][c1].id);
+      const s2 = targetScore(lvData.spools[r][c2].id);
       return (s2 - s1) || (lvData.spools[r][c1].count - lvData.spools[r][c2].count);
     });
     const picked = [];
@@ -466,10 +583,10 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
 
   const icedObj = JSON.parse(fs.readFileSync(icedLv, 'utf8'));
   const qCoords = [];
-  if (Q_COUNT > 0) {
-    for (let r = 2; r <= 3 && qCoords.length < Q_COUNT; r++) {
+  if (gQCount > 0) {
+    for (let r = 2; r <= 3 && qCoords.length < gQCount; r++) {
       for (const c of COL_ORDERS[styleIdx % COL_ORDERS.length][r - 2]) {
-        if (qCoords.length >= Q_COUNT) break;
+        if (qCoords.length >= gQCount) break;
         const x = icedObj.spools[r][c];
         if (x && x.id > 0 && x.type === 0) {
           x.type = 6; x.param = 0;
@@ -483,22 +600,25 @@ function buildWithStyle(baseLv, styleIdx, workDir) {
   }
 
   const climbedLv = path.join(workDir, `s${styleIdx}_climbed.json`);
+  const climbGames = INPUT_W >= 39 ? '6' : '12';
+  const effIters = INPUT_W >= 39 ? String(Math.min(14, Number(gIters) || 14)) : String(gIters);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v7/材料/SwapClimb_v7.js'),
-    icedLv, climbedLv, '--iters', String(ITERS), '--games', '12', '--seed', String(SEED), '--hum-mid-min', String(HUM_MID_MIN), '--hum-mid-max', String(HUM_MID_MAX),
+    icedLv, climbedLv, '--iters', effIters, '--games', climbGames, '--seed', String(SEED), '--hum-mid-min', String(HUM_MID_MIN), '--hum-mid-max', String(HUM_MID_MAX),
     '--lo', String(+(RAND_LO + 0.01).toFixed(3)), '--hi', String(+(RAND_HI - 0.02).toFixed(3)),
     '--hum-lo', String(HUM_MIN), '--hum-hi', String(+(HUM_MAX - 0.02).toFixed(3))
   ], { stdio: 'ignore' });
 
-  return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells };
+  return { file: climbedLv, style: styleIdx, chains: builtPairs, pipes: actualPipes, blacks: blackCoords, questions: qCoords, ice: iceCells, climax, pipeQueues };
 }
 
 function fullVerify(lvFile, workDir, tag) {
+  const vGames = INPUT_W >= 39 ? '20' : '40';
   // 1) 旧随机三段
   const qRand = path.join(workDir, `qr_${tag}`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'),
-    lvFile, '--bottom-only', '--instant-chain', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', '40', '--seeds', String(SEED), '--out', qRand
+    lvFile, '--bottom-only', '--instant-chain', '--p', '0,0.1,0.2,0.8,0.9,1', '--games', vGames, '--seeds', String(SEED), '--out', qRand
   ], { stdio: 'ignore' });
   const sr = JSON.parse(fs.readFileSync(path.join(qRand, 'summary_all.json'), 'utf8'));
   const mr = {}; sr.forEach(x => { mr[x.p.toFixed(1)] = x; });
@@ -509,7 +629,7 @@ function fullVerify(lvFile, workDir, tag) {
   const qHum = path.join(workDir, `qh_${tag}`);
   execFileSync('node', [
     path.join(ROOT, '实验关/产线v5/C9_插值玩家/PInterpPlayer.js'),
-    lvFile, '--bottom-only', '--instant-chain', '--human-casual', '--p', '0,0.1,0.2,0.5,0.8,0.9,1', '--games', '40', '--seeds', String(SEED), '--out', qHum
+    lvFile, '--bottom-only', '--instant-chain', '--human-casual', '--p', '0,0.1,0.2,0.5,0.8,0.9,1', '--games', vGames, '--seeds', String(SEED), '--out', qHum
   ], { stdio: 'ignore' });
   const sh = JSON.parse(fs.readFileSync(path.join(qHum, 'summary_all.json'), 'utf8'));
   const mh = {}; sh.forEach(x => { mh[x.p.toFixed(1)] = x; });
@@ -565,39 +685,228 @@ function fullVerify(lvFile, workDir, tag) {
   };
 }
 
+// 【2026-11-25 选图硬红线守卫】强制校验输入目标图必须是 W === H 标准正方形且 0 空位（zeros === 0，除非显式传 --allow-empty-px）
+let INPUT_MAT = null;
+{
+  const rawLines = fs.readFileSync(TARGET, 'utf8').trim().split(/\r?\n/);
+  const body = rawLines[0].startsWith('像素') ? rawLines.slice(1) : rawLines;
+  const mat = body.filter(l => l.trim()).map(l => l.trim().split(/\s+/).map(Number));
+  const H = mat.length, W = mat[0] ? mat[0].length : 0;
+  let zeros = 0;
+  for (const r of mat) for (const v of r) if (!v || v <= 0) zeros++;
+  if (H !== W) {
+    console.error(`❌ [选图红线拒绝] 目标图 ${TARGET} 不是标准正方形 (${W}x${H})！v7 严禁使用长方形图。`);
+    process.exit(2);
+  }
+  if (zeros > 0 && !has('--allow-empty-px')) {
+    console.error(`❌ [选图红线拒绝] 目标图 ${TARGET} 含有 ${zeros} 个空像素(0)（顶部或边缘缺块，非满格正方形）！请换 100% 满格正方形图。`);
+    process.exit(2);
+  }
+  INPUT_MAT = mat;
+}
+
 const work = fs.mkdtempSync('/tmp/v7pipeline_');
+
+// ===== 【派工#009】诊图定方器：4 个物理指纹 → 初始配方 =====
+function diagnoseImageAndRecipe(mat) {
+  const H = mat.length, W = mat[0].length;
+  const totalPx = H * W;
+  const isLargeMap = W >= 39;
+  const giantCompThr = Math.max(65, Math.round(totalPx * 0.065));
+  const autoBandMaxComp = Math.max(110, Math.round(totalPx * 0.11));
+  const cnt = {};
+  for (const row of mat) for (const v of row) if (v > 0) cnt[v] = (cnt[v] || 0) + 1;
+  const seen = mat.map(r => r.map(() => false));
+  let maxComp = 0, giantSpanCount = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (seen[y][x]) continue;
+    const col = mat[y][x], st = [[y, x]];
+    seen[y][x] = true;
+    const cells = [];
+    while (st.length) {
+      const [a, b] = st.pop(); cells.push([a, b]);
+      for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const na = a + da, nb = b + db;
+        if (na >= 0 && nb >= 0 && na < H && nb < W && !seen[na][nb] && mat[na][nb] === col) { seen[na][nb] = true; st.push([na, nb]); }
+      }
+    }
+    if (cells.length > maxComp) maxComp = cells.length;
+    const ys = cells.map(p => p[0]);
+    if (cells.length >= giantCompThr && Math.max(...ys) - Math.min(...ys) >= 6) giantSpanCount++;
+  }
+  let changes = 0;
+  for (let x = 0; x < W; x++) for (let y = 0; y < H - 1; y++) if (mat[y][x] !== mat[y + 1][x]) changes++;
+  const avgColChanges = +(changes / W).toFixed(2);
+  const colorCount = Object.keys(cnt).length;
+  const easyImage = colorCount <= 10 || avgColChanges < 8.5;
+  const recipe = {
+    pipeMode: LOCK_PIPE_MODE ? PIPE_MODE : (isLargeMap ? 2 : (BC_TIER && easyImage ? 1 : 'auto')),
+    pipeMouth: LOCK_PIPE_MOUTH ? PIPE_MOUTH : (BC_TIER && easyImage ? 'dumbbell' : 'auto'),
+    blackMode: LOCK_BLACK ? BLACK_MODE : 0,
+    qCount: LOCK_Q ? Q_COUNT : (BC_TIER && easyImage ? 3 : 0),
+    maxSink: BC_TIER ? 3 : 2,
+    iceScale: 1.0,
+    withChain3: WITH_CHAIN3,
+    iters: ITERS
+  };
+  return { colorCount, maxComp, giantSpanCount, avgColChanges, easyImage, totalPx, isLargeMap, giantCompThr, autoBandMaxComp, recipe };
+}
+const imageDiag = diagnoseImageAndRecipe(INPUT_MAT);
+
+// 智能动作 A：千层饼旧图自动微创（只在 maxComp>=95 且 avgColChanges<7 的单调大块图上触发）
+let effectiveTarget = TARGET;
+// 注：11.txt 的 avgColChanges 实测 10.44（33 号黑条纹拉高换色次数），单用 <7.0 会让“千层饼旗舰样例”永不触发；
+// 这里补一个“超巨块 maxComp>=110”分支，既让 11.txt 触发，又保证 #008 的 comp_02（maxComp=95, avg=13）不被误改。
+const autoBandMaxComp = Math.max(110, Math.round(INPUT_MAT.length * INPUT_MAT[0].length * 0.11));
+const monotonePie = imageDiag.maxComp >= autoBandMaxComp && imageDiag.giantSpanCount >= 1;
+if (AUTO_BAND && monotonePie) {
+  const bandOut = path.join(work, 'auto_band.txt');
+  execFileSync('node', [path.join(TOOLS, 'PrepImage_v1.js'), '--target', TARGET, '--out', bandOut, '--wall-band', '--giant-comp', '65'], { stdio: 'ignore' });
+  effectiveTarget = bandOut;
+  console.log(`[AutoBand] 千层饼图触发微创: maxComp=${imageDiag.maxComp} avgColChanges=${imageDiag.avgColChanges} giantSpan=${imageDiag.giantSpanCount} -> ${bandOut}`);
+}
+
 const baseLv = path.join(work, 'base.json');
 execFileSync('node', [
   path.join(TOOLS, 'SplitLevel_v722.js'),
-  '--target', TARGET, '--out', baseLv,
+  '--target', effectiveTarget, '--out', baseLv,
   '--rows', String(ROWS), '--cols', String(COLS), '--bottom-only', '--stagger-cap', '--no-first-test'
 ], { stdio: 'ignore' });
 
-let best = null;
+const baseGear = imageDiag.recipe;
 const TARGET_MID = (RAND_LO + RAND_HI) / 2;
-for (let t = 0; t < MAX_TRIES; t++) {
-  const st = (INIT_STYLE + t) % CHAIN_STYLES.length;
-  try {
-    const built = buildWithStyle(baseLv, st, work);
-    const ver = fullVerify(built.file, work, `s${st}`);
-    const rec = { ...built, verify: ver };
-    console.log(`[try style=${st}] allPass=${ver.allPass} | 短视真人=${ver.humCasual}/mid${ver.humMid}/${ver.humFair} 波形=${JSON.stringify(ver.bufWave)} | 旧随机=${ver.randCasual}/${ver.randFair} | 早死=${(ver.earlyShare*100).toFixed(1)}% | 棘轮=${ver.ratPass} | 二排畅口=${ver.row1Open} | 面额种数=${ver.distinctCaps}`);
-    const hardSafe = ver.solvable && ver.hard0 && ver.ratPass && ver.earlyShare < 0.20 && ver.row1Open >= 3 && ver.humFair >= FAIR_MIN && ver.randFair >= FAIR_MIN;
-    const bestSafe = best ? (best.verify.solvable && best.verify.hard0 && best.verify.ratPass && best.verify.earlyShare < 0.20 && best.verify.row1Open >= 3 && best.verify.humFair >= FAIR_MIN && best.verify.randFair >= FAIR_MIN) : false;
-    if (!best || (ver.allPass && !best.verify.allPass) ||
-        (!ver.allPass && !best.verify.allPass && hardSafe && !bestSafe) ||
-        (ver.allPass === best.verify.allPass && hardSafe === bestSafe && Math.abs(ver.randCasual - TARGET_MID) < Math.abs(best.verify.randCasual - TARGET_MID))) {
-      best = rec;
+const HUM_TARGET = (HUM_MIN + Math.min(0.85, HUM_MAX)) / 2;
+const HMID_TARGET = (HUM_MID_MIN > 0 || HUM_MID_MAX < 1) ? (HUM_MID_MIN + HUM_MID_MAX) / 2 : 0.60;
+// 【派工#007+#011】分层词典序：allPass → 结构/棘轮 → 公平 → 真人进带(humInBand) → 越界总距离(bandOut) → 距带中心(dist)
+function bandOutDist(val, lo, hi) {
+  if (val < lo) return lo - val;
+  if (val > hi) return val - hi;
+  return 0;
+}
+function rankRec(r) {
+  const v = r.verify;
+  const structOk = (v.solvable && v.hard0 && v.ratPass && v.earlyShare < 0.20 && v.row1Open >= 3) ? 1 : 0;
+  const fairOk = (v.humFair >= FAIR_MIN && v.randFair >= FAIR_MIN) ? 1 : 0;
+  const humOut = bandOutDist(v.humCasual, HUM_MIN, HUM_MAX) + bandOutDist(v.humMid ?? HMID_TARGET, HUM_MID_MIN, HUM_MID_MAX);
+  const randOut = bandOutDist(v.randCasual, RAND_LO, RAND_HI);
+  const humInBand = (humOut === 0) ? 1 : 0;
+  const totalOut = humOut * 1.8 + randOut;
+  const dist = Math.abs(v.humCasual - HUM_TARGET) + 0.8 * Math.abs((v.humMid ?? HMID_TARGET) - HMID_TARGET) + 0.6 * Math.abs(v.randCasual - TARGET_MID);
+  return { all: v.allPass ? 1 : 0, structOk, fairOk, humInBand, totalOut, dist };
+}
+function betterRec(a, b) {
+  if (!b) return true;
+  const ra = rankRec(a), rb = rankRec(b);
+  if (ra.all !== rb.all) return ra.all > rb.all;
+  if (ra.structOk !== rb.structOk) return ra.structOk > rb.structOk;
+  if (ra.fairOk !== rb.fairOk) return ra.fairOk > rb.fairOk;
+  if (ra.humInBand !== rb.humInBand) return ra.humInBand > rb.humInBand;
+  if (Math.abs(ra.totalOut - rb.totalOut) > 1e-6) return ra.totalOut < rb.totalOut;
+  return ra.dist < rb.dist;
+}
+// 【派工#009】升降挡配方（已按实机体感封顶 blackMode<=2 严禁品字3黑块夹管道，降挡支持拆链 chainPairs=3）
+function gearOptsFor(shift, base) {
+  const g = { ...base };
+  if (shift >= 1) {
+    g.pipeMode = Math.max(1, Number(g.pipeMode) || 0);
+    g.pipeMouth = 'dumbbell';
+    g.maxSink = 3;
+    g.qCount = Math.max(2, Number(g.qCount) || 0);
+    g.blackMode = Math.min(2, Math.max(1, Number(g.blackMode) || 0));
+    g.chainPairs = 5;
+    g.iters = ITERS + 15;
+  }
+  if (shift >= 2) {
+    g.blackMode = 2; // 永久封顶 2 黑块（严禁 3 黑块夹死 (4,3) 管道）
+    g.maxSink = 3;
+    g.qCount = 3;
+    g.withChain3 = false;
+    g.iceScale = 1.06;
+  }
+  if (shift <= -1) {
+    g.blackMode = Math.max(0, Number(g.blackMode) - 1);
+    g.pipeMouth = 'big';
+    g.maxSink = 1;
+    g.chainPairs = 3; // 过紧时自动拆减锁链至 3 对
+    g.iceScale = 0.80;
+  }
+  if (shift <= -2) {
+    // 【派工#010】大图过紧急救：0 黑块 + 双管拆巨车 + 管口小车上活路 + 只留 2 对链 + 冰降到 65%
+    g.blackMode = 0;
+    g.pipeMode = Math.max(2, Number(base.pipeMode) || 2);
+    g.pipeMouth = 'small';
+    g.chainPairs = 2;
+    g.iceScale = 0.65;
+  }
+  return g;
+}
+
+let best = null;
+let snapSeq = 0;
+const allTried = [];
+const gearHistory = [];
+function runRound(gearOpts, gearTag, styles) {
+  let passed = false;
+  for (const st of styles) {
+    try {
+      const built = buildWithStyle(baseLv, st, work, gearOpts);
+      const ver = fullVerify(built.file, work, `${gearTag}_s${st}`);
+      const rec = { ...built, verify: ver, gear: gearTag };
+      allTried.push(rec);
+      console.log(`[try ${gearTag} style=${st}] allPass=${ver.allPass} | 短视真人=${ver.humCasual}/mid${ver.humMid}/${ver.humFair} 波形=${JSON.stringify(ver.bufWave)} | 旧随机=${ver.randCasual}/${ver.randFair} | 早死=${(ver.earlyShare * 100).toFixed(1)}% | 棘轮=${ver.ratPass} | 二排畅口=${ver.row1Open} | queues=${JSON.stringify(built.pipeQueues)} | climax=${JSON.stringify(built.climax)}`);
+      if (betterRec(rec, best)) {
+        const snap = path.join(work, `best_${snapSeq++}.json`);
+        fs.copyFileSync(rec.file, snap);
+        best = { ...rec, file: snap };
+      }
+      if (ver.allPass) { passed = true; break; }
+    } catch (e) {
+      console.error(`[try ${gearTag} style=${st}] error:`, e.message);
     }
-    if (ver.allPass) {
-      break;
+  }
+  return passed;
+}
+
+gearHistory.push({ round: 0, gear: 0, tag: 'gear0', recipe: baseGear, reason: 'base-recipe' });
+const styles0 = Array.from({ length: MAX_TRIES }, (_, t) => (INIT_STYLE + t) % CHAIN_STYLES.length);
+let done = runRound(baseGear, 'gear0', styles0);
+
+if (!done && AUTO_GEAR && best) {
+  const sorted = allTried.slice().sort((a, b) => (betterRec(a, b) ? -1 : 1));
+  const topStyles = [];
+  for (const r of sorted) { if (!topStyles.includes(r.style)) topStyles.push(r.style); if (topStyles.length >= 2) break; }
+  const v = best.verify;
+  const tight = !v.ratPass || v.humFair < FAIR_MIN || v.humCasual < HUM_MIN || v.humMid < HUM_MID_MIN || v.randCasual < RAND_LO;
+  const loose = !tight && v.ratPass && (v.humMid > HUM_MID_MAX || v.humCasual > HUM_MAX || v.randCasual > RAND_HI);
+  const shift = tight ? -1 : (loose ? 1 : 0);
+  const reason = tight
+    ? `过紧/卡死 rat=${v.ratPass} humFair=${v.humFair} hum=${v.humCasual} mid=${v.humMid} rand=${v.randCasual}`
+    : (loose ? `偏松 rand=${v.randCasual}(>${RAND_HI}) hum=${v.humCasual}(>${HUM_MAX}) mid=${v.humMid}(>${HUM_MID_MAX})` : '既不算偏松也不算过紧（被 randFair/fair 等卡住）');
+  console.log(`[AutoGear] 触发判定: ${reason} => shift=${shift > 0 ? '+' + shift : shift} topStyles=${topStyles.join(',')}`);
+  let gear = shift;
+  for (let round = 1; round <= 2 && !done && shift !== 0; round++) {
+    const opts = gearOptsFor(gear, baseGear);
+    const tag = gear > 0 ? `gearP${gear}` : `gearM${Math.abs(gear)}`;
+    gearHistory.push({ round, gear, tag, reason, recipe: opts, styles: topStyles.slice() });
+    console.log(`[AutoGear shift -> ${gear > 0 ? '+' + gear : gear}] reason=${reason} recipe=${JSON.stringify(opts)} styles=${topStyles.join(',')}`);
+    done = runRound(opts, tag, topStyles);
+    if (done) break;
+    const v2 = best.verify;
+    const stillLoose = v2.ratPass && (v2.randCasual > RAND_HI || v2.humCasual > HUM_MAX || v2.humMid > HUM_MID_MAX);
+    if (gear > 0 && stillLoose) { gear = 2; continue; }
+    if (gear < 0) {
+      const stillTight = !v2.ratPass || v2.humFair < FAIR_MIN || v2.humMid < HUM_MID_MIN;
+      if (stillTight) { gear = -2; continue; }
     }
-  } catch (e) {
-    console.error(`[try style=${st}] error:`, e.message);
+    break;
   }
 }
 
 if (!best) { console.error('所有 style 尝试均失败'); process.exit(1); }
 fs.copyFileSync(best.file, OUT);
-if (REPORT) fs.writeFileSync(REPORT, JSON.stringify(best, null, 2));
-console.log(JSON.stringify({ ok: true, out: OUT, chosenStyle: best.style, chains: best.chains, ice: best.ice, verify: best.verify }));
+const reportObj = { ...best, imageDiag, tier: TIER, effectiveTarget, autoBand: effectiveTarget !== TARGET, gearHistory };
+if (REPORT) fs.writeFileSync(REPORT, JSON.stringify(reportObj, null, 2));
+console.log(JSON.stringify({
+  ok: true, out: OUT, chosenStyle: best.style, chosenGear: best.gear,
+  imageDiag, autoBand: effectiveTarget !== TARGET, gearHistory, verify: best.verify
+}));

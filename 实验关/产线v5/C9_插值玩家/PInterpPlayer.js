@@ -162,18 +162,21 @@ function playInterp(lv, p, rnd) {
         //    真人看到槽快满了会本能避开“当步立刻满槽自杀(!alive，如只剩1空位还去点双车链)”的选项；
         //    但在存活选项里，仍有 50% 概率只看眼前能消最多像素(gain最大)而不看能否退场，若前期攒下的卡槽大车无异色车可剥层解救，则在自救期满槽阵亡！
         const aliveList = allMoves.filter(o => o.alive);
+        // 【派工#010+#011】视线阈值按全盘平均车容量缩放 + 小车饱腹感识别：
+        // <=24px/车（32/35 小图）严格维持 6/8；中大图除认 gain>=chunkThr 外，
+        // 只要某辆车能当场吃满退场(cleared===1)或吃饱自身容量的 35%(gain>=6 && gain>=carCount*0.35)，真人同样会纳入主力视野，绝不死磕唯一巨车！
+        const avgCap = Math.max(20, Math.round((s.totalPixels || 1024) / 52));
+        const chunkThr = avgCap <= 24 ? 6 : Math.round(avgCap * 0.28);
+        const fatalThr = avgCap <= 24 ? 8 : Math.round(avgCap * 0.35);
+        const isGoodChunk = (o) => o.gain >= chunkThr || (avgCap > 24 && (o.cleared === 1 || (o.gain >= 6 && o.gain >= o.carCount * 0.35)));
         if (s.buffer.length <= 2) {
-          // 安全/大意期（暂存区 <= 2 格）：中立短视——只要当前暴露边界上有该色像素(gain>0)，
-          // 真人不对 cleared 做区分（在所有 gain>0 的可见颜色车里均匀选，不瞎点 0 暴露色）。
-          const chunkVis = aliveList.filter(o => o.gain >= 6);
+          const chunkVis = aliveList.filter(isGoodChunk);
           const anyVis   = aliveList.filter(o => o.gain > 0);
           const pool = chunkVis.length > 0 ? chunkVis : (anyVis.length > 0 ? anyVis : aliveList);
           if (pool.length) pick = pool[Math.floor(rnd() * pool.length)];
         } else {
-          // 警觉/自救期（buf >= 3）：只剩 1-2 个空位，真人 80% 概率在能活下来的可见车(alive & gain>0)里自救，
-          // 20% 概率因看走眼大车容量误点“有暴露像素但吃不完导致当步满槽(!alive & gain>0)”的车！
-          const fatalVisible = allMoves.filter(o => !o.alive && o.gain >= 8);
-          const safeChunk    = aliveList.filter(o => o.gain >= 6);
+          const fatalVisible = allMoves.filter(o => !o.alive && o.gain >= fatalThr && (avgCap <= 24 || o.gain >= o.carCount * 0.22));
+          const safeChunk    = aliveList.filter(isGoodChunk);
           const safeVisible  = safeChunk.length > 0 ? safeChunk : aliveList.filter(o => o.gain > 0);
           if (fatalVisible.length > 0 && rnd() < 0.20) {
             pick = null; // 看走眼大车容量，当步满槽阵亡

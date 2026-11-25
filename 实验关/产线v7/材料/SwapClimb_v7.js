@@ -56,15 +56,22 @@ function playOne(lv, p, r, isHum = HUMAN_CASUAL) {
       const allMoves = [];
       for (const m of ms) {
         const t = St.cloneState(s), e0 = t.eliminatedPixels, c0 = t.completedBoxes;
+        const cell = s.cells[m.r] && s.cells[m.r][m.c];
+        const carCount = (cell && cell.count) || 0;
         if (!Sim.applyPick(t, m.r, m.c)) continue;
         allMoves.push({
           t, alive: !isDead(t) || isWon(t),
           gain: t.eliminatedPixels - e0,
           bufAfter: t.buffer.length,
-          cleared: t.completedBoxes > c0 ? 1 : 0
+          cleared: t.completedBoxes > c0 ? 1 : 0,
+          carCount
         });
       }
       const aliveList = allMoves.filter(o => o.alive);
+      const avgCap = Math.max(20, Math.round((s.totalPixels || 1024) / 52));
+      const chunkThr = avgCap <= 24 ? 6 : Math.round(avgCap * 0.28);
+      const fatalThr = avgCap <= 24 ? 8 : Math.round(avgCap * 0.35);
+      const isGoodChunk = (o) => o.gain >= chunkThr || (avgCap > 24 && (o.cleared === 1 || (o.gain >= 6 && o.gain >= o.carCount * 0.35)));
       if (useG) {
         if (aliveList.length) {
           aliveList.sort((a, b) => (b.cleared - a.cleared) || (a.bufAfter - b.bufAfter) || (b.gain - a.gain));
@@ -73,13 +80,13 @@ function playOne(lv, p, r, isHum = HUMAN_CASUAL) {
           pick = tied[Math.floor(r() * tied.length)].t;
         }
       } else if (s.buffer.length <= 2) {
-        const chunkVis = aliveList.filter(o => o.gain >= 6);
+        const chunkVis = aliveList.filter(isGoodChunk);
         const anyVis   = aliveList.filter(o => o.gain > 0);
         const pool = chunkVis.length ? chunkVis : (anyVis.length ? anyVis : aliveList);
         if (pool.length) pick = pool[Math.floor(r() * pool.length)].t;
       } else {
-        const fatalVis = allMoves.filter(o => !o.alive && o.gain >= 8);
-        const safeChunk = aliveList.filter(o => o.gain >= 6);
+        const fatalVis = allMoves.filter(o => !o.alive && o.gain >= fatalThr && (avgCap <= 24 || o.gain >= o.carCount * 0.22));
+        const safeChunk = aliveList.filter(isGoodChunk);
         const safeVis = safeChunk.length ? safeChunk : aliveList.filter(o => o.gain > 0);
         if (fatalVis.length > 0 && r() < 0.20) pick = null;
         else if (safeVis.length) pick = safeVis[Math.floor(r() * safeVis.length)].t;
@@ -135,9 +142,9 @@ function evalWall(game, nGames = GAMES) {
   const earlyShare = deaths ? early / deaths : 0;
   let inv = 0;
   for (let i = 1; i < PS.length; i++) if (rates[PS[i]] < rates[PS[i - 1]]) inv++;
-  // 【2026-11-24 惰性双目标联合爬山】只在主尺 casual 接近目标带 [LO-0.12, HI+0.12] 且 fair>=0.85 时才测短视真人，兼顾速度与双尺命中！
-  let humCasual = HUM_MID, humFair = 1.0, humMid = null;
-  if (casual >= LO - 0.12 && casual <= HI + 0.12 && fair >= 0.85 && earlyShare <= 0.18) {
+  // 【派工#011 修复】只要 fair>=0.80 且 earlyShare<=0.20 就必测短视真人，绝不在 casual 偏高时假装 humCasual=HUM_MID 蒙混过关！
+  let humCasual = 0, humFair = 0.8, humMid = HMID_LO;
+  if (fair >= 0.80 && earlyShare <= 0.20) {
     const hGames = Math.min(nGames, 12);
     const rh = lcg(SEED), rhF = lcg(SEED);
     let hw = 0, hfw = 0;

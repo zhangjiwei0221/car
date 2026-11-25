@@ -304,17 +304,20 @@ while (boxes.length < rows * cols) {
   big.cells = c1; big.count = c1.length; big.first = c1[0] || big.first;
   boxes.push({ color: big.color, cells: c2, count: c2.length, first: c2[0] || big.first });
 }
-// 若仍超出，只能同色合并（绝不跨色）
+// 若仍超出，只能同色合并（绝不跨色）；【派工#011】合并到同色中当前容量最小的那辆车，防止单辆车被喂成 100~132px 巨型死车！
 while (boxes.length > rows * cols) {
   boxes.sort((a, b) => a.count - b.count);
-  // 不能直接 shift 最小车：它可能独苗（如露营的色24 只有 1 辆）→ 无法合并 → break → 整车丢失
   let pick = -1;
   for (let i = 0; i < boxes.length; i++) {
     if (boxes.some((b, j) => j !== i && b.color === boxes[i].color)) { pick = i; break; }
   }
   if (pick < 0) break;
   const small = boxes.splice(pick, 1)[0];
-  const sameIdx = boxes.findIndex(b => b.color === small.color);
+  let sameIdx = -1, minCnt = Infinity;
+  for (let j = 0; j < boxes.length; j++) {
+    if (boxes[j].color === small.color && boxes[j].count < minCnt) { minCnt = boxes[j].count; sameIdx = j; }
+  }
+  if (sameIdx < 0) break;
   boxes[sameIdx].count += small.count;
   boxes[sameIdx].cells = boxes[sameIdx].cells.concat(small.cells);
 }
@@ -404,12 +407,19 @@ if (buryColors.length > 0) {
       arr.sort((a, b) => (b.maxY - a.maxY) || (b.meanY - a.meanY));
       const n = arr.length;
       const pairs = Math.floor(n / 2);
+      // 【派工#010】按该色平均车容量动态拉开大小车差距：
+      // avgC<=26（32×32/35×35，均车 ~21）→ loMin=11 / hiMax=34 / maxDelta=8，100% 沿用旧行为；
+      // avgC>26（40×40~55×55，均车 48~54）→ 例如 50+50 可错配成 28 小活路车 + 72 大主力车。
+      const avgC = Math.round(arr.reduce((s, x) => s + x.count, 0) / n);
+      const loMin = avgC > 26 ? Math.max(16, Math.round(avgC * 0.52)) : 11;
+      const hiMax = avgC > 26 ? Math.min(82, Math.round(avgC * 1.45)) : 34;
+      const maxDelta = avgC > 26 ? Math.round(avgC * 0.42) : 8;
       for (let k = 0; k < pairs; k++) {
         // 交替把第 k 辆做大/做小，使前排既有大车（诱饵：点早了卡槽需异色车剥层救）又有小车（活路：直接吃满退场）
         const bigFirst = ((Number(cid) + k) % 2 === 0);
         const hi = bigFirst ? arr[k] : arr[n - 1 - k];
         const lo = bigFirst ? arr[n - 1 - k] : arr[k];
-        const delta = Math.min(8, Math.max(0, lo.count - 11), Math.max(0, 34 - hi.count));
+        const delta = Math.min(maxDelta, Math.max(0, lo.count - loMin), Math.max(0, hiMax - hi.count));
         if (delta >= 3) {
           hi.count += delta;
           lo.count -= delta;
