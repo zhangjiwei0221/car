@@ -29,6 +29,9 @@ const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '../../..');
 const TOOLS = path.join(ROOT, '03_工具/正式版');
+const B_SOLVER = require(path.join(TOOLS, 'Build006Thickness_v688.js'));
+const A_SOLVER = B_SOLVER.loadSolver('corner');
+const SimProbe = A_SOLVER.Simulator, StProbe = A_SOLVER.SolverStrategy;
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const has = k => argv.includes(k);
@@ -59,10 +62,11 @@ const ROWS = has('--rows') ? Number(arg('--rows')) : 7;
 const COLS = has('--cols') ? Number(arg('--cols')) : (INPUT_W >= 39 ? 8 : 7);
 // 【派工#009】--tier 档位预设（显式参数优先，100% 向下兼容；不传时沿用旧默认）
 const TIER = String(arg('--tier', 'auto') || 'auto').toUpperCase();
+const IS_WIDE_BOARD = (COLS >= 8 || INPUT_W >= 39);
 const TIER_PRESETS = {
-  A: { randLo: 0.65, randHi: 0.85, humMin: 0.58, humMax: 0.88, humMidMin: 0.72, humMidMax: 0.95, fairMin: 0.92 },
-  B: { randLo: 0.48, randHi: 0.75, humMin: 0.40, humMax: 0.68, humMidMin: 0.60, humMidMax: 0.84, fairMin: 0.88 },
-  C: { randLo: 0.30, randHi: 0.60, humMin: 0.22, humMax: 0.50, humMidMin: 0.45, humMidMax: 0.72, fairMin: 0.85 }
+  A: { randLo: 0.65, randHi: 0.90, humMin: 0.58, humMax: 0.88, humMidMin: 0.72, humMidMax: 0.95, fairMin: 0.92 },
+  B: { randLo: IS_WIDE_BOARD ? 0.42 : 0.48, randHi: IS_WIDE_BOARD ? 0.88 : 0.68, humMin: 0.40, humMax: 0.68, humMidMin: 0.60, humMidMax: 0.84, fairMin: 0.88 },
+  C: { randLo: IS_WIDE_BOARD ? 0.25 : 0.30, randHi: IS_WIDE_BOARD ? 0.70 : 0.60, humMin: 0.22, humMax: 0.50, humMidMin: 0.45, humMidMax: 0.72, fairMin: 0.85 }
 };
 const TP = TIER_PRESETS[TIER] || null;
 const BC_TIER = (TIER === 'B' || TIER === 'C');
@@ -504,18 +508,92 @@ function buildWithStyle(baseLv, styleIdx, workDir, gearOpts = {}) {
   const boardColorCars = {};
   for (const row of lvData.spools) for (const x of row) if (x && x.id > 0) boardColorCars[x.id] = (boardColorCars[x.id] || 0) + 1;
   const actualPipes = pipeColsUsed.length;
-  // 【派工#009】解耦管道与冰：按棋盘真实槽位预算给阶梯冰，不再搞“3管0冰 / 2管只留2冰”一刀切。
+  // 【派工#012 核心升级：废除按行号写死冰数字公式 → 无冰试跑测 T_expose(r,c) 与暴露时刻暂存区压力 B_expose(r,c) 动态定冰】
+  // 物理原则：
+  //   1) 防废冰（绝不提前化光）：先在当前已摆好链/管/黑块的无冰盘面上快速试跑 4 局短视真人(p=0.25)，
+  //      实测每格 (r,c) 头顶被挖空、第一次进入可点击第一线的真实步数 T_expose(r,c)，
+  //      以及暴露那一刻玩家的暂存区负载 B_expose(r,c) 与场上存活备选车数 A_expose(r,c)；
+  //   2) 防死冰（阻挡有用且难度不崩）：
+  //      - 优先选「暴露时暂存区尚有余量 (B_expose <= 2.6) 且场上备选活路充裕 (A_expose >= 3)」的顺手冗余车放冰，
+  //        避开「暴露时暂存已满 3.5~4 格生死线且唯一救命」的致命卡点车！
+  //      - 冰数字 P = T_expose(r,c) + delta：
+  //        * 当 B_expose <= 2.0（顺风松弛期，尤其 row 4..6 后排）：delta = +4 ~ +6 步（真阻挡，逼玩家绕路垫步推高波峰）；
+  //        * 当 2.0 < B_expose <= 3.0（中压拉扯期）：delta = +3 ~ +4 步（温和阻挡，挡一下但有旁路可走）；
+  //        * 当 B_expose > 3.0（高压警戒期）：delta = +1 ~ +2 步（刚挖到跟前仅剩 1~2 步即化开救场，有视觉压迫但绝不锁死崩盘）！
+  function probeExposeTiming(gameObj, nRuns = 4) {
+    let lv;
+    try { lv = A_SOLVER.parseLevel(A_SOLVER.fromGameFormat(gameObj)); } catch (e) { return {}; }
+    const sumT = {}, sumB = {}, sumA = {}, cnt = {};
+    const lcgP = (s) => { let x = s; return () => { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; }; };
+    for (let g = 0; g < nRuns; g++) {
+      const rndP = lcgP(SEED + g * 131 + styleIdx * 17);
+      let s = SimProbe.createState(lv, { useSlotStart: true, bottomOnly: true, instantChain: true });
+      const firstExp = {};
+      const avgCap = Math.max(20, Math.round((s.totalPixels || 1024) / 52));
+      const chunkThr = avgCap <= 24 ? 6 : Math.round(avgCap * 0.28);
+      for (let step = 1; step <= 85; step++) {
+        if (s.eliminatedPixels >= s.totalPixels) break;
+        const ms = SimProbe.listMoves(s).filter(m => !m.blocked);
+        if (!ms.length) break;
+        const allM = [];
+        for (const m of ms) {
+          const t = StProbe.cloneState(s), e0 = t.eliminatedPixels, c0 = t.completedBoxes;
+          if (!SimProbe.applyPick(t, m.r, m.c)) continue;
+          const dead = !!(t.overflow || t.buffer.length > t.bufferLimit || SimProbe.isDeadEnd(t));
+          const won = t.eliminatedPixels >= t.totalPixels;
+          allM.push({ r: m.r, c: m.c, t, alive: !dead || won, gain: t.eliminatedPixels - e0, cleared: t.completedBoxes > c0 ? 1 : 0, bufAfter: t.buffer.length });
+        }
+        const aliveList = allM.filter(o => o.alive);
+        for (const m of ms) {
+          const k = `${m.r},${m.c}`;
+          if (firstExp[k] === undefined) {
+            firstExp[k] = { t: step, buf: s.buffer.length, alt: aliveList.length };
+          }
+        }
+        if (!aliveList.length) break;
+        let pick = null;
+        if (rndP() < 0.30) {
+          aliveList.sort((a, b) => (b.cleared - a.cleared) || (a.bufAfter - b.bufAfter) || (b.gain - a.gain));
+          pick = aliveList[0].t;
+        } else {
+          const vis = aliveList.filter(o => o.gain >= chunkThr || o.cleared === 1);
+          const pool = vis.length ? vis : (aliveList.filter(o => o.gain > 0).length ? aliveList.filter(o => o.gain > 0) : aliveList);
+          pick = pool[Math.floor(rndP() * pool.length)].t;
+        }
+        s = pick;
+      }
+      for (const k of Object.keys(firstExp)) {
+        sumT[k] = (sumT[k] || 0) + firstExp[k].t;
+        sumB[k] = (sumB[k] || 0) + firstExp[k].buf;
+        sumA[k] = (sumA[k] || 0) + firstExp[k].alt;
+        cnt[k] = (cnt[k] || 0) + 1;
+      }
+    }
+    const res = {};
+    for (const k of Object.keys(cnt)) {
+      res[k] = { tExp: sumT[k] / cnt[k], bExp: sumB[k] / cnt[k], aExp: sumA[k] / cnt[k] };
+    }
+    return res;
+  }
+
+  const probeStats = probeExposeTiming(lvData, 4);
   const iceScale = gearOpts.iceScale || 1.0;
-  const scaleIce = (p) => Math.max(6, Math.min(33, Math.round(p * iceScale)));
-  const fullLadder = (!PIPE_REPLACE_ICE || (actualPipes === 0 && gBlackMode < 2))
-    ? [[2, 2, 10], [3, 2, 15], [4, 2, 21], [5, 1, 27], [6, 2, 32]]
-    : (actualPipes >= 3
-      ? [[2, 2, 10], [3, 1, 15], [4, 1, 21]]
-      : (actualPipes === 2
-        ? [[2, 2, 10], [3, 2, 15], [4, 1, 21], [5, 1, 27]]
-        : [[2, 2, 10], [3, 2, 15], [4, 1, 21], [5, 1, 27], [6, 1, 32]]));
-  const rowNeeds = fullLadder.map(([r, n, p]) => [r, n, scaleIce(p)]);
-  // 【派工#009】图层深度靶向冰：分「底边前 30% 开门色」与「图中腰 30~70% 承接色」两段权重。
+  const maxIceCap = IS_WIDE_BOARD ? 46 : 33;
+  // 各行目标冰块数（7×8 大盘格子充裕，保持 8~9 块冰，第 6 行必留 2 块后排大数字冰！）
+  const rowCounts = IS_WIDE_BOARD
+    ? (actualPipes >= 3 ? [[2, 2], [3, 2], [4, 1], [5, 1], [6, 1]] : [[2, 2], [3, 2], [4, 2], [5, 1], [6, 2]])
+    : ((!PIPE_REPLACE_ICE || (actualPipes === 0 && gBlackMode < 2))
+      ? [[2, 2], [3, 2], [4, 2], [5, 1], [6, 2]]
+      : (actualPipes >= 3
+        ? [[2, 2], [3, 1], [4, 1]]
+        : (actualPipes === 2
+          ? [[2, 2], [3, 2], [4, 1], [5, 1]]
+          : [[2, 2], [3, 2], [4, 1], [5, 1], [6, 1]])));
+  // 当试跑未挖到某深格时的保底暴露步数（按真实棋盘每行车数计算）
+  const fallbackExpByRow = (r) => (IS_WIDE_BOARD
+    ? ({ 2: 11, 3: 17, 4: 24, 5: 31, 6: 38 }[r] || r * 6)
+    : ({ 2: 7, 3: 12, 4: 17, 5: 23, 6: 28 }[r] || r * 4.5));
+
   const earlyBottomShare = {}, midWaistShare = {};
   {
     const B = lvData.blocks, BR = B.length, BC = B[0].length;
@@ -534,7 +612,6 @@ function buildWithStyle(baseLv, styleIdx, workDir, gearOpts = {}) {
     }
   }
   const iceCells = [];
-  // 后排（r>=4）深水冰只冻充裕冗余色（>=3 辆），绝不冻只剩 2 辆的紧缺色；也绝不占用终局挪车 4 定点
   const minCarsForRow = (r) => (r >= 4 ? 3 : 2);
   const iceOk = (r, c) => {
     const key = `${r},${c}`;
@@ -542,33 +619,49 @@ function buildWithStyle(baseLv, styleIdx, workDir, gearOpts = {}) {
     const cell = lvData.spools[r][c];
     return !!(cell && cell.id > 0 && cell.type === 0 && (boardColorCars[cell.id] || 0) >= minCarsForRow(r));
   };
-  for (let idx = 0; idx < rowNeeds.length; idx++) {
-    const [r, need, baseParam] = rowNeeds[idx];
+  let prevRowMaxIce = IS_WIDE_BOARD ? 10 : 7;
+  for (let idx = 0; idx < rowCounts.length; idx++) {
+    const [r, need] = rowCounts[idx];
     const availCols = [];
     for (let c = 0; c < COLS; c++) if (iceOk(r, c)) availCols.push(c);
-    // 【派工#009】分层靶向：前排浅冰冻「底边开门顺手色」，后排深冰冻「中腰主力承接色」
-    const targetScore = (id) => (r <= 3
+    const layerWeight = (id) => (r <= 3
       ? (earlyBottomShare[id] || 0)
       : (midWaistShare[id] || 0) * 1.2 + (earlyBottomShare[id] || 0) * 0.5);
-    availCols.sort((c1, c2) => {
-      const s1 = targetScore(lvData.spools[r][c1].id);
-      const s2 = targetScore(lvData.spools[r][c2].id);
-      return (s2 - s1) || (lvData.spools[r][c1].count - lvData.spools[r][c2].count);
-    });
+    // 【派工#012 选位评分】：既看图层归属，又优先挑「暴露时暂存压力温和 (bExp<=2.6) 且场上备选活路多 (aExp>=3)」的格子，
+    // 绝不把冰优先扣在 bExp>=3.3 且 aExp<=1 的高压唯一救命车上！
+    const cellScore = (c) => {
+      const id = lvData.spools[r][c].id;
+      const ps = probeStats[`${r},${c}`];
+      const safetyBonus = ps ? ((ps.bExp <= 2.6 ? 0.6 : (ps.bExp >= 3.4 ? -0.8 : 0)) + Math.min(0.6, (ps.aExp || 2) * 0.12)) : 0;
+      return layerWeight(id) + safetyBonus;
+    };
+    availCols.sort((c1, c2) => (cellScore(c2) - cellScore(c1)) || (lvData.spools[r][c1].count - lvData.spools[r][c2].count));
     const picked = [];
     for (const c of availCols) {
       if (picked.length >= need) break;
       if (need === 2 && picked.length === 1 && Math.abs(picked[0] - c) === 1) continue;
       picked.push(c);
     }
-    // 无不相邻列时允许相邻，补足 need
     for (const c of availCols) {
       if (picked.length >= need) break;
       if (!picked.includes(c)) picked.push(c);
     }
+    let rowMax = prevRowMaxIce;
     for (let i = 0; i < picked.length; i++) {
-      iceCells.push(`${r},${picked[i]}:${baseParam + (i === 1 ? 1 : 0)}`);
+      const c = picked[i];
+      const ps = probeStats[`${r},${c}`];
+      const tExp = ps ? ps.tExp : fallbackExpByRow(r);
+      const bExp = ps ? ps.bExp : 2.0;
+      // 按暴露时刻暂存区压力动态决定阻挡余量 delta（阻挡有用且不崩盘！）
+      const delta = bExp <= 2.0 ? (r >= 5 ? 6 : 5) : (bExp <= 2.9 ? 4 : 2);
+      const rawP = Math.round((tExp + delta + (i === 1 ? 1 : 0)) * iceScale);
+      // 保证后一行冰数字严格高于前一行（阶梯单调递增，视觉与体感逻辑自洽）
+      const minForThisRow = prevRowMaxIce + (IS_WIDE_BOARD ? 3 : 2) + (i === 1 ? 1 : 0);
+      const finalP = Math.min(maxIceCap, Math.max(minForThisRow, rawP));
+      if (finalP > rowMax) rowMax = finalP;
+      iceCells.push(`${r},${c}:${finalP}`);
     }
+    prevRowMaxIce = rowMax;
   }
 
   const icedLv = path.join(workDir, `s${styleIdx}_iced.json`);
@@ -828,7 +921,7 @@ function gearOptsFor(shift, base) {
     g.pipeMouth = 'big';
     g.maxSink = 1;
     g.chainPairs = 3; // 过紧时自动拆减锁链至 3 对
-    g.iceScale = 0.80;
+    g.iceScale = IS_WIDE_BOARD ? 1.0 : 0.85;
   }
   if (shift <= -2) {
     // 【派工#010】大图过紧急救：0 黑块 + 双管拆巨车 + 管口小车上活路 + 只留 2 对链 + 冰降到 65%
@@ -836,7 +929,7 @@ function gearOptsFor(shift, base) {
     g.pipeMode = Math.max(2, Number(base.pipeMode) || 2);
     g.pipeMouth = 'small';
     g.chainPairs = 2;
-    g.iceScale = 0.65;
+    g.iceScale = IS_WIDE_BOARD ? 0.92 : 0.72;
   }
   return g;
 }
@@ -876,8 +969,9 @@ if (!done && AUTO_GEAR && best) {
   const topStyles = [];
   for (const r of sorted) { if (!topStyles.includes(r.style)) topStyles.push(r.style); if (topStyles.length >= 2) break; }
   const v = best.verify;
-  const tight = !v.ratPass || v.humFair < FAIR_MIN || v.humCasual < HUM_MIN || v.humMid < HUM_MID_MIN || v.randCasual < RAND_LO;
-  const loose = !tight && v.ratPass && (v.humMid > HUM_MID_MAX || v.humCasual > HUM_MAX || v.randCasual > RAND_HI);
+  const humInBand = (v.humCasual >= HUM_MIN && v.humCasual <= HUM_MAX && v.humMid >= HUM_MID_MIN && v.humMid <= HUM_MID_MAX);
+  const tight = !v.ratPass || v.humFair < FAIR_MIN || v.humCasual < HUM_MIN || v.humMid < HUM_MID_MIN || (!humInBand && v.randCasual < RAND_LO);
+  const loose = !tight && v.ratPass && (v.humMid > HUM_MID_MAX || v.humCasual > HUM_MAX || (!humInBand && v.randCasual > RAND_HI));
   const shift = tight ? -1 : (loose ? 1 : 0);
   const reason = tight
     ? `过紧/卡死 rat=${v.ratPass} humFair=${v.humFair} hum=${v.humCasual} mid=${v.humMid} rand=${v.randCasual}`
