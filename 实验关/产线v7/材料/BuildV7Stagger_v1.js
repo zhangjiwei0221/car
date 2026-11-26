@@ -71,7 +71,7 @@ const TIER_PRESETS = {
 const TP = TIER_PRESETS[TIER] || null;
 const BC_TIER = (TIER === 'B' || TIER === 'C');
 const AUTO_GEAR = !has('--no-auto-gear');
-const AUTO_BAND = !has('--no-auto-band');
+const AUTO_BAND = has('--auto-band'); // 【用户 2026-11-26 12:36】默认关闭“千层饼微创”改图；确需启用时显式传 --auto-band（--no-auto-band 保留兼容但不再默认开启）
 const RAND_LO = has('--rand-lo') ? Number(arg('--rand-lo')) : (TP ? TP.randLo : 0.55);
 const RAND_HI = has('--rand-hi') ? Number(arg('--rand-hi')) : (TP ? TP.randHi : 0.68);
 const HUM_MIN = has('--hum-min') ? Number(arg('--hum-min')) : (TP ? TP.humMin : 0.32);
