@@ -71,7 +71,8 @@ const TIER_PRESETS = {
 const TP = TIER_PRESETS[TIER] || null;
 const BC_TIER = (TIER === 'B' || TIER === 'C');
 const AUTO_GEAR = !has('--no-auto-gear');
-const AUTO_BAND = has('--auto-band'); // 【用户 2026-11-26 12:36】默认关闭“千层饼微创”改图；确需启用时显式传 --auto-band（--no-auto-band 保留兼容但不再默认开启）
+const AUTO_BAND = has('--auto-band');
+const LATE_PRESSURE = has('--late-pressure'); // 【实验】忽略档位，按 bufWave[2] 后期压力选优 // 【用户 2026-11-26 12:36】默认关闭“千层饼微创”改图；确需启用时显式传 --auto-band（--no-auto-band 保留兼容但不再默认开启）
 const RAND_LO = has('--rand-lo') ? Number(arg('--rand-lo')) : (TP ? TP.randLo : 0.55);
 const RAND_HI = has('--rand-hi') ? Number(arg('--rand-hi')) : (TP ? TP.randHi : 0.68);
 const HUM_MIN = has('--hum-min') ? Number(arg('--hum-min')) : (TP ? TP.humMin : 0.32);
@@ -578,7 +579,7 @@ function buildWithStyle(baseLv, styleIdx, workDir, gearOpts = {}) {
 
   const probeStats = probeExposeTiming(lvData, 4);
   const iceScale = gearOpts.iceScale || 1.0;
-  const maxIceCap = IS_WIDE_BOARD ? 46 : 33;
+  const maxIceCap = IS_WIDE_BOARD ? 50 : 33;
   // 各行目标冰块数（7×8 大盘格子充裕，保持 8~9 块冰，第 6 行必留 2 块后排大数字冰！）
   const rowCounts = IS_WIDE_BOARD
     ? (actualPipes >= 3 ? [[2, 2], [3, 2], [4, 1], [5, 1], [6, 1]] : [[2, 2], [3, 2], [4, 2], [5, 1], [6, 2]])
@@ -632,7 +633,16 @@ function buildWithStyle(baseLv, styleIdx, workDir, gearOpts = {}) {
     const cellScore = (c) => {
       const id = lvData.spools[r][c].id;
       const ps = probeStats[`${r},${c}`];
-      const safetyBonus = ps ? ((ps.bExp <= 2.6 ? 0.6 : (ps.bExp >= 3.4 ? -0.8 : 0)) + Math.min(0.6, (ps.aExp || 2) * 0.12)) : 0;
+      let safetyBonus = 0;
+      if (ps) {
+        const b = ps.bExp, a = ps.aExp || 0;
+        // 【2026-11-26 用户要求】从“安全优先”改为“关键但可绕优先”：
+        // bExp 2.4~3.0 且 aExp 2~3 的格子加权最高；bExp>=3.4 且 aExp<=1 的“唯一救命车”重罚，绝不优先冻。
+        if (b >= 2.4 && b <= 3.0) safetyBonus += 0.9;
+        if (a >= 2 && a <= 3) safetyBonus += 0.5;
+        if (b <= 2.9 && a >= 3) safetyBonus += 0.3;
+        if (b >= 3.4 && a <= 1) safetyBonus -= 2.0;
+      }
       return layerWeight(id) + safetyBonus;
     };
     availCols.sort((c1, c2) => (cellScore(c2) - cellScore(c1)) || (lvData.spools[r][c1].count - lvData.spools[r][c2].count));
@@ -652,12 +662,14 @@ function buildWithStyle(baseLv, styleIdx, workDir, gearOpts = {}) {
       const ps = probeStats[`${r},${c}`];
       const tExp = ps ? ps.tExp : fallbackExpByRow(r);
       const bExp = ps ? ps.bExp : 2.0;
-      // 按暴露时刻暂存区压力动态决定阻挡余量 delta（阻挡有用且不崩盘！）
-      const delta = bExp <= 2.0 ? (r >= 5 ? 6 : 5) : (bExp <= 2.9 ? 4 : 2);
-      const rawP = Math.round((tExp + delta + (i === 1 ? 1 : 0)) * iceScale);
+      // 【2026-11-26 用户要求】不再用小 delta 猜，直接以“剩余阻挡步数”为目标：6 / 10 / 14。
+      const desiredBlock = bExp <= 2.0 ? 6 : (bExp <= 3.0 ? 8 : 10);
+      const rawP = Math.round((tExp + desiredBlock + (i === 1 ? 1 : 0)) * iceScale);
       // 保证后一行冰数字严格高于前一行（阶梯单调递增，视觉与体感逻辑自洽）
       const minForThisRow = prevRowMaxIce + (IS_WIDE_BOARD ? 3 : 2) + (i === 1 ? 1 : 0);
-      const finalP = Math.min(maxIceCap, Math.max(minForThisRow, rawP));
+      // 大盘 row6 两块后排冰必须落在 52~55，避免被前面行的单调下限或 cap 截成 46。
+      const row6Floor = (IS_WIDE_BOARD && r === 6) ? 48 : 0;
+      const finalP = Math.min(maxIceCap, Math.max(minForThisRow, row6Floor, rawP));
       if (finalP > rowMax) rowMax = finalP;
       iceCells.push(`${r},${c}:${finalP}`);
     }
@@ -885,7 +897,8 @@ function rankRec(r) {
   const humInBand = (humOut === 0) ? 1 : 0;
   const totalOut = humOut * 1.8 + randOut;
   const dist = Math.abs(v.humCasual - HUM_TARGET) + 0.8 * Math.abs((v.humMid ?? HMID_TARGET) - HMID_TARGET) + 0.6 * Math.abs(v.randCasual - TARGET_MID);
-  return { all: v.allPass ? 1 : 0, structOk, fairOk, humInBand, totalOut, dist };
+  const late = (v.bufWave && v.bufWave[2]) || 0;
+  return { all: v.allPass ? 1 : 0, structOk, fairOk, humInBand, totalOut, late, dist };
 }
 function betterRec(a, b) {
   if (!b) return true;
@@ -893,6 +906,7 @@ function betterRec(a, b) {
   if (ra.all !== rb.all) return ra.all > rb.all;
   if (ra.structOk !== rb.structOk) return ra.structOk > rb.structOk;
   if (ra.fairOk !== rb.fairOk) return ra.fairOk > rb.fairOk;
+  if (LATE_PRESSURE && Math.abs(ra.late - rb.late) > 1e-6) return ra.late > rb.late;
   if (ra.humInBand !== rb.humInBand) return ra.humInBand > rb.humInBand;
   if (Math.abs(ra.totalOut - rb.totalOut) > 1e-6) return ra.totalOut < rb.totalOut;
   return ra.dist < rb.dist;
@@ -952,7 +966,7 @@ function runRound(gearOpts, gearTag, styles) {
         fs.copyFileSync(rec.file, snap);
         best = { ...rec, file: snap };
       }
-      if (ver.allPass) { passed = true; break; }
+      if (ver.allPass && !LATE_PRESSURE) { passed = true; break; }
     } catch (e) {
       console.error(`[try ${gearTag} style=${st}] error:`, e.message);
     }

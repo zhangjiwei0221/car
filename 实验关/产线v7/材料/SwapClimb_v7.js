@@ -71,7 +71,7 @@ function playOne(lv, p, r, isHum = HUMAN_CASUAL) {
       const avgCap = Math.max(20, Math.round((s.totalPixels || 1024) / 52));
       const chunkThr = avgCap <= 24 ? 6 : Math.round(avgCap * 0.28);
       const fatalThr = avgCap <= 24 ? 8 : Math.round(avgCap * 0.35);
-      const isGoodChunk = (o) => o.gain >= chunkThr || (avgCap > 24 && (o.cleared === 1 || (o.gain >= 6 && o.gain >= o.carCount * 0.35)));
+      const isGoodChunk = (o) => o.gain >= chunkThr || (avgCap >= 38 && (o.cleared === 1 || (o.gain >= 8 && o.gain >= o.carCount * 0.35)));
       if (useG) {
         if (aliveList.length) {
           aliveList.sort((a, b) => (b.cleared - a.cleared) || (a.bufAfter - b.bufAfter) || (b.gain - a.gain));
@@ -85,7 +85,7 @@ function playOne(lv, p, r, isHum = HUMAN_CASUAL) {
         const pool = chunkVis.length ? chunkVis : (anyVis.length ? anyVis : aliveList);
         if (pool.length) pick = pool[Math.floor(r() * pool.length)].t;
       } else {
-        const fatalVis = allMoves.filter(o => !o.alive && o.gain >= fatalThr && (avgCap <= 24 || o.gain >= o.carCount * 0.22));
+        const fatalVis = allMoves.filter(o => !o.alive && o.gain >= fatalThr && (avgCap < 38 || o.gain >= o.carCount * 0.22));
         const safeChunk = aliveList.filter(isGoodChunk);
         const safeVis = safeChunk.length ? safeChunk : aliveList.filter(o => o.gain > 0);
         if (fatalVis.length > 0 && r() < 0.20) pick = null;

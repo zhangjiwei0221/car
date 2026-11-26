@@ -1274,8 +1274,13 @@ AntSolver.Simulator = (function() {
     for (var bi = 0; bi < s.buffer.length; bi++) {
       var b = s.buffer[bi];
       if (b.progress >= b.need) continue;
-      var em = s.eliminated.map(function (row) { return row.slice(); });
-      if (floodFillCount(em, s.blocks, s.rows, s.cols, b.color, s.bottomOnly) > 0) return false;
+      for (var r = 0; r < s.rows; r++) {
+        for (var c = 0; c < s.cols; c++) {
+          if (s.eliminated[r][c] || s.blocks[r][c] !== b.color) continue;
+          if (s.bottomOnly ? (r === s.rows - 1) : (r === 0 || r === s.rows - 1 || c === 0 || c === s.cols - 1)) return false;
+          if ((r > 0 && s.eliminated[r - 1][c]) || (r + 1 < s.rows && s.eliminated[r + 1][c]) || (c > 0 && s.eliminated[r][c - 1]) || (c + 1 < s.cols && s.eliminated[r][c + 1])) return false;
+        }
+      }
     }
     // 暂存里没有可继续吃的车；满格就是死局（真机此时也点不动新盒）。
     if (s.buffer.length >= s.bufferLimit) return true;

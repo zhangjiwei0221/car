@@ -19,6 +19,14 @@
  * 用法：
  *   node PrepImage_v1.js --target <图.txt> --out <新图.txt>
  *        [--seg 3] [--ring-thr 0.40] [--total-thr 0.22] [--min-dist 100]
+ *        [--wall-band] [--giant-comp 70] [--band-max 8] [--band-bridge 0|1]
+ *
+ * 【2026-11-25 派工#006】--wall-band：零毁容「同色系阴影腰线」切纵向巨块
+ *   v7 三面墙 + 策略 0 下，一整块纯色纵向巨块会被一吸到底（如 11.txt 的 136px 红块）。
+ *   对「>= giant-comp px 且纵向跨度 >= 6 行」的四连通块，在其中腰两行（midR/midR+1）
+ *   用「图内已有、同色系最近、占比<16%」的颜色画一条腰带，把巨块拦腰切成上下两块；
+ *   不新增色号、不改轮廓，只多一条自然阴影线。--band-bridge 1（默认）会把中腰 <=2px
+ *   的细隔断一并连成连续腰带，避免留下 <8px 碎块。
  */
 const fs = require('fs');
 const path = require('path');
@@ -31,6 +39,10 @@ const SEG = Number(arg('--seg', 3));
 const RING_THR = Number(arg('--ring-thr', 0.40));
 const TOTAL_THR = Number(arg('--total-thr', 0.22));
 const MIN_DIST = Number(arg('--min-dist', 100));
+const WALL_BAND = process.argv.includes('--wall-band');
+const GIANT_COMP = Number(arg('--giant-comp', '70'));
+const BAND_MAX = Number(arg('--band-max', '8'));
+const BAND_BRIDGE = arg('--band-bridge', '1') !== '0';
 if (!TARGET || !OUT) {
   console.error('用法: node PrepImage_v1.js --target <图.txt> --out <新图.txt> [--seg 3] [--ring-thr .40] [--total-thr .22]');
   process.exit(2);
@@ -190,6 +202,79 @@ for (let pass = 0; pass < 6; pass++) {
   }
 }
 
+// ---------- 【派工#006】零毁容「同色系阴影腰线」切纵向巨块（--wall-band） ----------
+const bandLog = [];
+if (WALL_BAND) {
+  // 先对「当前图」做一次快照，找出所有巨型连通块，再逐个开刀（不级联二次切割，
+  // 保证只在原巨块中腰加一条腰带；切完若仍 >80px 由外层的 --giant-comp 控制是否再跑）。
+  const st0 = colorStats(outMat);
+  const targets = [];
+  for (const k of Object.keys(st0.total).map(Number)) {
+    if ((st0.total[k] || 0) < 20) continue;
+    for (const comp of componentsOfColor(outMat, k)) {
+      if (comp.length < GIANT_COMP) continue;
+      const ys = comp.map(p => p[0]);
+      const minR = Math.min(...ys), maxR = Math.max(...ys);
+      if (maxR - minR < 6) continue;
+      targets.push({ k, comp, minR, maxR, midR: Math.floor((minR + maxR) / 2) });
+    }
+  }
+  targets.sort((a, b) => b.comp.length - a.comp.length);
+  for (const target of targets) {
+    if (bandLog.length >= BAND_MAX) break;
+    const { k, comp, minR, maxR, midR } = target;
+    const total = colorStats(outMat).total;
+    const paintRows = [midR, midR + 1].filter(r => r >= 0 && r < R);
+    const onRows = comp.filter(([r]) => paintRows.includes(r));
+    if (!onRows.length || (total[k] || 0) - onRows.length < 20) continue;
+
+    const allCols = comp.map(p => p[1]);
+    const cLo = Math.max(0, Math.min(...allCols) - 2), cHi = Math.min(C - 1, Math.max(...allCols) + 2);
+    const rLo = Math.max(0, midR - 2), rHi = Math.min(R - 1, midR + 2);
+    // 【派工#007 修复】腰带色严禁选 <45px 的单车小色（防 15px+24px=39px 合成独苗大债车卡死认真档）！
+    // 必须选图内原本就有 >=45px（至少 2~3 辆车分摊新增像素）且 <=22% 的充裕色。
+    const pickBandCands = (minPx, maxShare) => Object.keys(total).map(Number)
+      .filter(cand => cand !== k && (total[cand] || 0) >= minPx && total[cand] / TOTAL < maxShare &&
+        !((cand === 31 && k === 32) || (cand === 32 && k === 31)))
+      .map(cand => {
+        let near = 0;
+        for (let r = rLo; r <= rHi; r++) for (let x = cLo; x <= cHi; x++) if (outMat[r][x] === cand) near++;
+        return { cand, near, dist: colorDist(cand, k), n: total[cand] };
+      })
+      .sort((a, b) => ((a.near > 0) - (b.near > 0)) || (a.dist - b.dist) || (a.n - b.n));
+    let cands = pickBandCands(45, 0.22);
+    if (!cands.length) cands = pickBandCands(28, 0.25);
+    if (!cands.length) {
+      console.log(`  ⚠ 巨块 色${k}(${comp.length}px) 找不到合格腰带色，跳过`);
+      continue;
+    }
+    const band = cands[0].cand;
+    let painted = 0;
+    for (const r of paintRows) {
+      const xs = comp.filter(([y]) => y === r).map(([, x]) => x).sort((a, b) => a - b);
+      for (const x of xs) { if (outMat[r][x] !== band) { outMat[r][x] = band; painted++; } }
+      // 平滑腰带：把中腰 <=2px 的细隔断一并连起来，避免切出 <8px 碎块
+      if (BAND_BRIDGE) {
+        for (let i = 1; i < xs.length; i++) {
+          if (xs[i] - xs[i - 1] > 1 && xs[i] - xs[i - 1] <= 3) {
+            for (let x = xs[i - 1] + 1; x < xs[i]; x++) {
+              if (outMat[r][x] !== band) { outMat[r][x] = band; painted++; }
+            }
+          }
+        }
+      }
+    }
+    const after = componentsOfColor(outMat, k).map(pc => pc.length);
+    const remain = colorStats(outMat).total[k] || 0;
+    bandLog.push({
+      color: k, comp: comp.length, rows: `${minR}..${maxR}`, midR,
+      band, bandDist: +cands[0].dist.toFixed(1), painted,
+      remain, maxCompAfter: Math.max(...after)
+    });
+    console.log(`  🩹 腰带: 色${k} ${comp.length}px(行${minR}..${maxR}) 中腰=${midR} → 腰带色${band}(距离${cands[0].dist.toFixed(1)}) 涂${painted}px | 该色剩余${remain}px 最大块=${Math.max(...after)}px`);
+  }
+}
+
 // ---------- 校验 ----------
 const after = colorStats(outMat);
 const beforeColors = Object.keys(before.total).sort().join(',');
@@ -202,6 +287,7 @@ const okMin = Object.keys(after.total).every(k => after.total[k] >= 8 || after.t
 console.log('改后:', '');
 printStats(outMat, '       ');
 console.log('  改动明细:', JSON.stringify(changes));
+if (WALL_BAND) console.log('  腰带明细:', JSON.stringify(bandLog));
 console.log(`  ✅ 校验: 色数不变=${okColors}(${beforeColors} → ${afterColors}) | 每色>=8px=${okMin}(最小${minPx}px)`);
 if (!okColors || !okMin) {
   console.error('  ❌ 校验失败，不写出');

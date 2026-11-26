@@ -168,14 +168,14 @@ function playInterp(lv, p, rnd) {
         const avgCap = Math.max(20, Math.round((s.totalPixels || 1024) / 52));
         const chunkThr = avgCap <= 24 ? 6 : Math.round(avgCap * 0.28);
         const fatalThr = avgCap <= 24 ? 8 : Math.round(avgCap * 0.35);
-        const isGoodChunk = (o) => o.gain >= chunkThr || (avgCap > 24 && (o.cleared === 1 || (o.gain >= 6 && o.gain >= o.carCount * 0.35)));
+        const isGoodChunk = (o) => o.gain >= chunkThr || (avgCap >= 38 && (o.cleared === 1 || (o.gain >= 8 && o.gain >= o.carCount * 0.35)));
         if (s.buffer.length <= 2) {
           const chunkVis = aliveList.filter(isGoodChunk);
           const anyVis   = aliveList.filter(o => o.gain > 0);
           const pool = chunkVis.length > 0 ? chunkVis : (anyVis.length > 0 ? anyVis : aliveList);
           if (pool.length) pick = pool[Math.floor(rnd() * pool.length)];
         } else {
-          const fatalVisible = allMoves.filter(o => !o.alive && o.gain >= fatalThr && (avgCap <= 24 || o.gain >= o.carCount * 0.22));
+          const fatalVisible = allMoves.filter(o => !o.alive && o.gain >= fatalThr && (avgCap < 38 || o.gain >= o.carCount * 0.22));
           const safeChunk    = aliveList.filter(isGoodChunk);
           const safeVisible  = safeChunk.length > 0 ? safeChunk : aliveList.filter(o => o.gain > 0);
           if (fatalVisible.length > 0 && rnd() < 0.20) {

@@ -321,6 +321,55 @@ while (boxes.length > rows * cols) {
   boxes[sameIdx].count += small.count;
   boxes[sameIdx].cells = boxes[sameIdx].cells.concat(small.cells);
 }
+// 【派工#011 独苗巨车封顶】若初切+合并后产生 >80px 的巨型车（或 >=76px 的独苗车，如 G1_11 色号 1 的 123px、色号 14 的 86px），
+// 将其对半拆为 2 辆（61+62 / 43+43），并从车数最多（>=5 辆）的大色族中把最小的两辆合并（其后 --stagger-cap 会把该色族重新均匀摊平到 <=82px）！
+for (let gStep = 0; gStep < 12; gStep++) {
+  const colCnt = {};
+  for (const b of boxes) colCnt[b.color] = (colCnt[b.color] || 0) + 1;
+  let bigIdx = -1, bigScore = 0;
+  for (let i = 0; i < boxes.length; i++) {
+    const c = boxes[i].count;
+    const isSingle = colCnt[boxes[i].color] === 1;
+    if ((isSingle && c >= 76) || c > 82) {
+      const sc = c + (isSingle ? 50 : 0);
+      if (sc > bigScore) { bigScore = sc; bigIdx = i; }
+    }
+  }
+  if (bigIdx < 0) break;
+  let donorCol = -1, bestAvg = Infinity;
+  for (const cid of Object.keys(colCnt)) {
+    const cNum = Number(cid);
+    if (cNum === boxes[bigIdx].color || colCnt[cid] < 5) continue;
+    const same = boxes.filter(b => b.color === cNum);
+    const totalC = same.reduce((s, x) => s + x.count, 0);
+    const newAvg = totalC / (same.length - 1);
+    if (newAvg <= 68 && newAvg < bestAvg) { bestAvg = newAvg; donorCol = cNum; }
+  }
+  if (donorCol < 0) break;
+  // 1) 先拆巨车
+  const giant = boxes[bigIdx];
+  const half = Math.floor(giant.count / 2);
+  const c1 = giant.cells.slice(0, half);
+  const c2 = giant.cells.slice(half);
+  giant.cells = c1; giant.count = c1.length; giant.first = c1[0] || giant.first;
+  boxes.push({ color: giant.color, cells: c2, count: c2.length, first: c2[0] || giant.first });
+  // 2) 再合并 donorCol 中最小的两辆车腾出 1 格，并对 donorCol 做一次均值限幅（单车 <=76px）
+  const donorBoxes = boxes.filter(b => b.color === donorCol).sort((a, b) => a.count - b.count);
+  const rem = donorBoxes[0];
+  donorBoxes[1].count += rem.count;
+  donorBoxes[1].cells = donorBoxes[1].cells.concat(rem.cells);
+  boxes.splice(boxes.indexOf(rem), 1);
+  const leftBoxes = boxes.filter(b => b.color === donorCol);
+  for (let rStep = 0; rStep < 10; rStep++) {
+    leftBoxes.sort((a, b) => b.count - a.count);
+    const hi = leftBoxes[0], lo = leftBoxes[leftBoxes.length - 1];
+    if (hi.count <= 76 || hi.count - lo.count <= 6) break;
+    const shift = Math.min(hi.count - 74, Math.floor((hi.count - lo.count) / 2));
+    if (shift <= 0) break;
+    hi.count -= shift;
+    lo.count += shift;
+  }
+}
 // 摆放顺序：按颜色聚在一起（同色相邻，方便成链）
 const order = String(arg('--order', 'pos'));
 if (order === 'color') {
